@@ -1,6 +1,6 @@
 # Specification
 
-flow-janus is a minimal library that hides which coding-agent CLI actually runs behind a uniform
+flowjanus is a minimal library that hides which coding-agent CLI actually runs behind a uniform
 interface. No CLI, no runtime, no orchestration — just classes.
 
 ## Structure

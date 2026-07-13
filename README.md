@@ -1,11 +1,11 @@
-# flow-janus
+# flowjanus
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 
 > Treat any coding agent as one interface, hiding which CLI actually runs.
 
-flow-janus is a tiny library that puts a uniform face on coding-agent CLIs. A caller programs against
+flowjanus is a tiny library that puts a uniform face on coding-agent CLIs. A caller programs against
 one `run(prompt)` method; whether that dispatches to `claude`, `codex`, `kimi`, or an agent you add
 yourself is a detail behind the class. It is pure standard-library Python (≥ 3.12) with **zero
 third-party dependencies**.
@@ -23,19 +23,19 @@ third-party dependencies**.
 ## Background
 
 The concrete agents (`claude --print`, `codex exec`, `kimi --prompt`) differ in how they take a
-prompt and which flags they expect. flow-janus hides that: `AgentBase` owns the subprocess call and
+prompt and which flags they expect. flowjanus hides that: `AgentBase` owns the subprocess call and
 error handling, and each backend is a small subclass that only builds its command. Swapping the
 backend is swapping the class — the calling code does not change.
 
 ## Install
 
-flow-janus is pure Python (≥ 3.12) with zero third-party dependencies.
+flowjanus is pure Python (≥ 3.12) with zero third-party dependencies.
 
 From source, with [uv](https://docs.astral.sh/uv/):
 
 ```sh
-git clone git@github.com:humanfia/flow-janus.git
-cd flow-janus
+git clone git@github.com:humanfia/flowjanus.git
+cd flowjanus
 uv sync
 ```
 
