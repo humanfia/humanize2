@@ -1,0 +1,19 @@
+[project]
+name = "flowjanus"
+version = "0.1.0"
+description = "A certain agent flow runtime"
+readme = "README.md"
+authors = [
+    { name = "Zijian Zhang", email = "35801754+futrime@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11.28,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest>=8"]
