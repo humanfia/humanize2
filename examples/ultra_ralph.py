@@ -6,7 +6,7 @@ while true; do claude --print --effort ultracode < TASK.md; sleep 5; done
 import time
 from pathlib import Path
 
-from flowjanus import AgentBase, ClaudeCodeAgent
+from flowjanus.agents import AgentBase, ClaudeCodeAgent
 
 
 def ultra_ralph(agent: AgentBase, task: str) -> None:

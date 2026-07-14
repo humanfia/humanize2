@@ -12,7 +12,7 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
-from flowjanus import AgentBase, ClaudeCodeAgent, CodexAgent
+from flowjanus.agents import AgentBase, ClaudeCodeAgent, CodexAgent
 
 
 def flame_chase(agents: Sequence[AgentBase], task: str) -> None:

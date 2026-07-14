@@ -11,7 +11,7 @@ done
 import time
 from pathlib import Path
 
-from flowjanus import AgentBase, KimiCodeCLIAgent
+from flowjanus.agents import AgentBase, KimiCodeCLIAgent
 
 JUDGE_PROMPT = """You are a strict task-completion auditor in the working directory of a coding \
 agent. Use shell tools to verify the agent's work against the actual repository, and reply with a \
@@ -30,5 +30,5 @@ def arar(executor: AgentBase, reviewer: AgentBase, task: str) -> None:
 
 
 if __name__ == "__main__":
-    agent = KimiCodeCLIAgent(model="kimi-code/k3")
+    agent = KimiCodeCLIAgent(model="kimi-code/k3", effort="high")
     arar(agent, agent, Path("TASK.md").read_text())

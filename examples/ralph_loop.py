@@ -6,7 +6,7 @@ while true; do claude --print < TASK.md; sleep 5; done
 import time
 from pathlib import Path
 
-from flowjanus import AgentBase, ClaudeCodeAgent
+from flowjanus.agents import AgentBase, ClaudeCodeAgent
 
 
 def ralph_loop(agent: AgentBase, task: str) -> None:

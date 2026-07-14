@@ -24,8 +24,8 @@ third-party dependencies**.
 
 The concrete agents (`claude --print`, `codex exec`, `kimi --prompt`) differ in how they take a
 prompt and which flags they expect. flowjanus hides that: `AgentBase` owns the subprocess call and
-error handling, and each backend is a small subclass that only builds its command. Swapping the
-backend is swapping the class — the calling code does not change.
+error handling, and each backend is a small subclass whose `run` builds its own command. Swapping
+the backend is swapping the class — the calling code does not change.
 
 ## Install
 
@@ -39,8 +39,8 @@ cd flowjanus
 uv sync
 ```
 
-Or vendor it: copy `src/flowjanus/` into your project and `from flowjanus import ClaudeCodeAgent`
-works with no install.
+Or vendor it: copy `src/flowjanus/` into your project and
+`from flowjanus.agents import ClaudeCodeAgent` works with no install.
 
 The agents shell out to the backend CLIs, so the ones you use must be installed and authenticated on
 `PATH`.
@@ -48,44 +48,44 @@ The agents shell out to the backend CLIs, so the ones you use must be installed 
 ## Usage
 
 ```python
-from flowjanus import ClaudeCodeAgent, CodexAgent, KimiCodeCLIAgent
+from flowjanus.agents import ClaudeCodeAgent, CodexAgent, KimiCodeCLIAgent
 
 agent = ClaudeCodeAgent(model="claude-opus-4-8", effort="high")
 print(agent.run("Summarize CHANGELOG.md in 5 bullets"))  # -> str
 
 # same interface, different backend
-print(CodexAgent(model="gpt-5-codex").run("Write a pytest for utils.slugify"))
-print(KimiCodeCLIAgent(model="kimi-code/k3").run("Explain this repo"))
+print(CodexAgent(model="gpt-5-codex", effort="high").run("Write a pytest for utils.slugify"))
+print(KimiCodeCLIAgent(model="kimi-code/k3", effort="high").run("Explain this repo"))
 ```
 
-Add your own agent by subclassing `AgentBase` and building its command:
+Add your own agent by subclassing `AgentBase` and implementing `run`:
 
 ```python
-from flowjanus import AgentBase
+from flowjanus.agents import AgentBase
 
 
 class AcmeAgent(AgentBase):
-    def _command(self, prompt: str) -> tuple[list[str], str | None]:
-        argv = ["acme-bot", "--json"]
-        if self.model:
-            argv += ["--model", self.model]
-        return argv, prompt  # (argv, stdin); stdin=None => prompt is inside argv
+    def run(self, prompt: str) -> str:
+        argv = ["acme-bot", "--json", "--model", self.model, "--effort", self.effort]
+        return self._run_cli(argv, prompt)  # (argv, stdin); stdin=None => prompt is inside argv
 
 
-AcmeAgent(model="large").run("hello")
+AcmeAgent(model="large", effort="high").run("hello")
 ```
 
 ## API
 
-Everything is re-exported from the `flowjanus` package.
+Everything is exported from the `flowjanus.agents` package.
 
-- **`AgentBase(*, model=None, effort=None, timeout=None, cwd=None)`** — base class.
-  - **`run(prompt: str) -> str`** — run one turn, return the agent's final text, raise `AgentError`
-    on a nonzero exit.
-  - **`_command(prompt: str) -> tuple[list[str], str | None]`** — the one method a subclass
-    implements: return `(argv, stdin)`, where `stdin=None` means the prompt is already in `argv`.
-- **`ClaudeCodeAgent`**, **`CodexAgent`**, **`KimiCodeCLIAgent`** — the built-in backends.
-- **`AgentError`** — raised when the underlying CLI exits nonzero.
+- **`AgentBase(*, model: str, effort: str)`** — base class.
+  - **`run(prompt: str) -> str`** — the one method a subclass implements: run one turn and return
+    the agent's final text.
+  - **`_run_cli(argv: list[str], stdin: str | None) -> str`** — the shared plumbing a subclass
+    calls: run `argv`, tee its stdout, return it stripped, and raise
+    `subprocess.CalledProcessError` on a nonzero exit. `stdin=None` means the prompt is already in
+    `argv`.
+- **`ClaudeCodeAgent`**, **`CodexAgent`**, **`KimiCodeCLIAgent`** — the built-in backends. `kimi`
+  has no effort knob, so `KimiCodeCLIAgent` ignores `effort`.
 
 ## Maintainers
 

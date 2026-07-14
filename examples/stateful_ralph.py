@@ -7,7 +7,7 @@ while true; do kimi --continue --prompt "$(cat TASK.md)"; sleep 5; done
 import time
 from pathlib import Path
 
-from flowjanus import AgentBase, KimiCodeCLIAgent
+from flowjanus.agents import AgentBase, KimiCodeCLIAgent
 
 
 def stateful_ralph(agent: AgentBase, task: str) -> None:
@@ -18,4 +18,6 @@ def stateful_ralph(agent: AgentBase, task: str) -> None:
 
 
 if __name__ == "__main__":
-    stateful_ralph(KimiCodeCLIAgent(model="kimi-code/k3"), Path("TASK.md").read_text())
+    stateful_ralph(
+        KimiCodeCLIAgent(model="kimi-code/k3", effort="high"), Path("TASK.md").read_text()
+    )

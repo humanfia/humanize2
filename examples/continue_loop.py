@@ -7,7 +7,7 @@ while true; do kimi --continue --prompt "continue"; sleep 5; done
 import time
 from pathlib import Path
 
-from flowjanus import AgentBase, KimiCodeCLIAgent
+from flowjanus.agents import AgentBase, KimiCodeCLIAgent
 
 
 def continue_loop(agent: AgentBase, task: str) -> None:
@@ -18,4 +18,6 @@ def continue_loop(agent: AgentBase, task: str) -> None:
 
 
 if __name__ == "__main__":
-    continue_loop(KimiCodeCLIAgent(model="kimi-code/k3"), Path("TASK.md").read_text())
+    continue_loop(
+        KimiCodeCLIAgent(model="kimi-code/k3", effort="high"), Path("TASK.md").read_text()
+    )
