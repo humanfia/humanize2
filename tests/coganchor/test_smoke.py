@@ -71,10 +71,7 @@ def test_agent_state_directory_is_not_mirrored(
     (private / "token").write_text("local secret\n")
 
     result = anchorage.run(
-        "bash",
-        "-c",
-        f"cat {private}/token",
-        extra_args=("--local-path", str(private)),
+        "bash", "-c", f"cat {private}/token", local_paths=(str(private),)
     )
     assert "local secret" in result.stdout
 

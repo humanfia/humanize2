@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-coganchor = "amflows.coganchor:main"
+coganchor = "amflows.coganchor.cli:main"
 exomyth = "amflows.exomyth.cli:main"
 
 [build-system]

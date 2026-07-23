@@ -23,7 +23,14 @@ Expose `AgentBase`, `SessionBase`, and all agent and session classes.
 class AgentConfig:
     model: str
     effort: str
+    anchor: AnchorConfig | None = None
 ```
+
+- `anchor` MUST be the `amflows.coganchor.AnchorConfig` the agent's turns are run under, or
+  `None` to run them on this machine.
+- An anchored turn MUST be run by spawning `AnchorConfig.command(argv)`, never by calling
+  coganchor in this process: a turn is pumped from threads of its own, which a supervisor that
+  forks the agent and takes the process's signal handling cannot be given.
 
 ## `base.py`
 

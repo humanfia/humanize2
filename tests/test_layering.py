@@ -1,10 +1,13 @@
 """The structural rules of the package tree, in one table.
 
-Two things nothing else can check. The subpackages are three merged projects that share a
-namespace and nothing else, so each must stay importable on its own. And ``coganchor serve`` runs
-on the target, which may be any architecture, while :mod:`amflows.coganchor.linux` picks a register
-map at import time and refuses anything but x86-64 -- so the serving half must not reach the agent
-half. Both were package boundaries before the merge; now they are rules, so they are checked here.
+Two things nothing else can check. The subpackages are merged projects that keep their own
+dependencies: janus names the machine its agents act on, so it reads coganchor's settings, and
+nothing else crosses -- exomyth stays alone, and neither of the others may reach back up into
+janus. And ``coganchor serve`` runs on the target, which may be any architecture, while
+:mod:`amflows.coganchor.linux` picks a register map at import time and refuses anything but
+x86-64 -- so the serving half must not reach the agent half, nor may anything a caller imports
+to configure one. Both were package boundaries before the merge; now they are rules, so they are
+checked here.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 
 #: What each layer may import besides its own subtree. Longest matching layer wins.
 ALLOWED = {
-    "amflows.janus": {"amflows"},
+    "amflows.janus": {"amflows", "amflows.coganchor"},
     "amflows.exomyth": {"amflows"},
     "amflows.coganchor": {"amflows"},
     "amflows.coganchor.serve": {
@@ -30,6 +33,12 @@ ALLOWED = {
         "amflows.coganchor.proto",
     },
 }
+
+#: What reaching ``serve`` costs besides: the entry point and the settings it routes through,
+#: which are held to the same bar as the package itself and import their machinery only when
+#: it is used. Loaded rather than imported, so it widens what a run may load and not what the
+#: serving half may name.
+STARTUP = {"amflows.coganchor.anchor", "amflows.coganchor.cli"}
 
 
 def _module_name(source: Path) -> str:
@@ -104,10 +113,10 @@ def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
     probe = (
         "import contextlib, io, sys\n"
         "sys.path.insert(0, sys.argv[1])\n"
-        "from amflows import coganchor\n"
+        "from amflows.coganchor import cli\n"
         "with contextlib.redirect_stdout(io.StringIO()):\n"
         "    try:\n"
-        "        coganchor.main(['serve', '--help'])\n"
+        "        cli.main(['serve', '--help'])\n"
         "    except SystemExit:\n"
         "        pass\n"
         "print('\\n'.join(m for m in sys.modules if m.split('.')[0] == 'amflows'))\n"
@@ -125,6 +134,6 @@ def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
     loaded = set(result.stdout.split())
     serve = "amflows.coganchor.serve"
     assert f"{serve}.cli" in loaded, "serve did not actually run"
-    assert loaded <= ALLOWED[serve] | {
+    assert loaded <= ALLOWED[serve] | STARTUP | {
         name for name in loaded if name.startswith(serve)
     }

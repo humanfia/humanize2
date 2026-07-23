@@ -204,10 +204,10 @@ def build_bundle(destination: Path | None = None) -> Path:
 
     The whole package ships, tracer half included, because pruning it would be
     a list to keep in step with the source tree.  Nothing is lost by that: the
-    target only ever runs ``serve``, which :func:`amflows.coganchor.main` reaches
-    without importing the modules that need ptrace or an x86-64 register map,
-    so the bundle runs on a target of any architecture.  It is pure stdlib, so
-    a host needs nothing but ``python3``.
+    target only ever runs ``serve``, which :func:`amflows.coganchor.cli.main`
+    reaches without importing the modules that need ptrace or an x86-64 register
+    map, so the bundle runs on a target of any architecture.  It is pure stdlib,
+    so a host needs nothing but ``python3``.
     """
     if destination is None:
         destination = Path(tempfile.gettempdir()) / f"coganchor-{os.getuid()}.pyz"
@@ -233,7 +233,7 @@ def build_bundle(destination: Path | None = None) -> Path:
         # the entry point but throws its return value away -- a target that
         # failed to start would then look like a clean exit.
         (root / "__main__.py").write_text(
-            f"from {coganchor.__name__} import main\n\nraise SystemExit(main())\n"
+            f"from {coganchor.__name__}.cli import main\n\nraise SystemExit(main())\n"
         )
         # One timestamp for everything, so the archive is a function of the source alone: the
         # bundle is addressed on the target by its digest, and a build stamp would miss that

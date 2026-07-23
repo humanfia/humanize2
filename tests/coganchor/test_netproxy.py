@@ -149,9 +149,7 @@ def test_agent_connections_are_tunnelled_end_to_end(
         "s.sendall(b'from-the-agent')\n"
         "print(s.recv(100).decode())\n"
     )
-    result = anchorage.run(
-        "python3", "-c", program, extra_args=("--net", "remote"), timeout=90
-    )
+    result = anchorage.run("python3", "-c", program, net="remote", timeout=90)
     assert "echo:from-the-agent" in result.stdout, result.stderr
 
 

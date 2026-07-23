@@ -69,7 +69,8 @@ class SessionBase(ABC):
         conversation rather than interleaving two. Both of the agent's streams are teed to ours
         as they arrive, so a long turn stays watchable. A failed turn leaves the session
         unopened, so the next call retries the turn the same way rather than resuming a session
-        that may not exist.
+        that may not exist. An anchored agent is run through coganchor, which is what puts the
+        turn's files and commands on another machine while the conversation stays here.
 
         Args:
           prompt: The input prompt for this turn.
@@ -83,6 +84,11 @@ class SessionBase(ABC):
         """
         with self._lock:
             argv, stdin = self._turn(prompt)
+            if (anchor := self._agent.config.anchor) is not None:
+                # Spawned rather than called: coganchor's supervisor forks the agent and takes
+                # the process's signal handling with it, which a flow pumping turns from
+                # threads of its own has no way to lend it.
+                argv = anchor.command(argv)
             with subprocess.Popen(
                 argv,
                 # No prompt on stdin means no stdin at all: inheriting ours would let the agent

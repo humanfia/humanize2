@@ -1,12 +1,13 @@
-"""The two subpackages composed, which is the only place their fit is checked.
+"""The subpackages composed, which is the only place their fit is checked.
 
-Neither imports the other, and neither can: they are merged projects that share a namespace and
-nothing else. A flow is what joins them, by handing exomyth what janus reports -- so nothing but
-this checks that an agent's `opened` really names the sessions exomyth files under that agent.
+exomyth imports neither of the others and neither imports it: a flow is what joins them, by
+handing exomyth what janus reports -- so nothing but this checks that an agent's `opened` really
+names the sessions exomyth files under that agent. janus does read coganchor's settings, but only
+as settings; that they still describe a session it can drive is checked here too.
 
-The flow is run for real against a fake `claude` that records a transcript where the real one
-would, which is the whole path: the id janus pins, the transcript that id names, and the agent
-that says it opened it.
+The flows are run for real against a fake `claude` that records a transcript where the real one
+would and writes a file where it is told to, which is the whole path: the id janus pins, the
+transcript that id names, the agent that says it opened it, and the machine the work landed on.
 """
 
 from __future__ import annotations
@@ -18,18 +19,22 @@ from pathlib import Path
 import pytest
 
 from amflows import exomyth
+from amflows.coganchor import AnchorConfig
 from amflows.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from tests.coganchor.conftest import VIRTUAL_WORKSPACE
 from tests.exomyth.conftest import labels
 
 CONFIG = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 
-#: A `claude --print` that writes the transcript its session id names, and answers.
+#: A `claude --print` that writes the transcript its session id names, works, and answers.
 FAKE = """
 import datetime, json, os, pathlib, re, sys
 
 flags = dict(zip(sys.argv, sys.argv[1:]))  # every flag paired with what follows it
 cwd, now = pathlib.Path.cwd(), datetime.datetime.now(datetime.UTC)
-taken = flags["--session-id"]
+taken = flags.get("--session-id") or flags["--resume"]
+with pathlib.Path("landed.txt").open("a") as landed:  # the work, wherever the workspace is
+    landed.write(taken)
 path = (
     pathlib.Path(os.environ["CLAUDE_CONFIG_DIR"])
     / "projects"
@@ -65,10 +70,8 @@ print("done")
 
 
 @pytest.fixture
-def flow(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> tuple[Path, dict[str, list[str]]]:
-    """Runs a flow's two agents for real, and reports its workspace and what each opened."""
+def sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Puts a fake `claude` on PATH, hides the real agent homes, and returns the workspace."""
     binaries = tmp_path / "bin"
     binaries.mkdir()
     fake = binaries / "claude"
@@ -82,12 +85,18 @@ def flow(
     for variable in ("CODEX_HOME", "KIMI_CODE_HOME"):
         monkeypatch.delenv(variable, raising=False)  # neither has a home under our HOME
     monkeypatch.chdir(workspace)
+    return workspace
+
+
+@pytest.fixture
+def flow(sandbox: Path) -> tuple[Path, dict[str, list[str]]]:
+    """Runs a flow's two agents for real, and reports its workspace and what each opened."""
     # The rlar shape, at one model and one effort: what nothing in a transcript tells apart.
     executor = ClaudeCodeAgent(CONFIG, name="executor")
     reviewer = ClaudeCodeAgent(CONFIG, name="reviewer")
     executor.launch().run("do the task")
     reviewer.launch().run("judge the work")
-    return workspace, {agent.id: agent.opened for agent in (executor, reviewer)}
+    return sandbox, {agent.id: agent.opened for agent in (executor, reviewer)}
 
 
 def test_a_flow_is_traced_as_the_agents_it_ran(
@@ -101,4 +110,51 @@ def test_a_flow_is_traced_as_the_agents_it_ran(
     assert labels(document, "process_name") == {
         "executor · claude-opus-4-8 · high · 1 sessions",
         "reviewer · claude-opus-4-8 · high · 1 sessions",
+    }
+
+
+@pytest.mark.timeout(180)
+def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
+    sandbox: Path, tmp_path: Path
+) -> None:
+    """An anchor moves the work, not the conversation, so the flow reads back the same way.
+
+    The agent runs on this machine whatever the anchor says, keeping its credentials and the
+    transcript a trace is built from; the file it writes is checked on the target, where the
+    workspace it was given only ever existed.
+    """
+    target, mirror = tmp_path / "target", tmp_path / "mirror"
+    target.mkdir()
+    mirror.mkdir()
+    agent = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(
+            model="claude-opus-4-8",
+            effort="high",
+            anchor=AnchorConfig(
+                target=f"local:{target}",
+                workspace=VIRTUAL_WORKSPACE,
+                shadow=str(mirror),
+            ),
+        ),
+        name="executor",
+    )
+    session = agent.launch()
+
+    assert (
+        session.run("do the task") == "done"
+    )  # the turn is the flow's, as it always was
+    # A second turn resumes the conversation and reaches the target through the mirror the
+    # first one left behind, which is the shape every loop in examples/ runs in.
+    assert session.run("keep going") == "done"
+
+    assert (target / "landed.txt").read_text() == session.id * 2
+    assert not (
+        sandbox / "landed.txt"
+    ).exists()  # nothing landed where the flow was started
+
+    document = exomyth.collect(sessions=session.id, agents={agent.id: agent.opened})
+
+    assert document["otherData"]["sessions"] == "1"
+    assert labels(document, "process_name") == {
+        "executor · claude-opus-4-8 · high · 1 sessions"
     }

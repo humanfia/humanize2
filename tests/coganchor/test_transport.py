@@ -167,14 +167,6 @@ def test_ssh_transport_bootstraps_and_runs(tmp_path: Path) -> None:
     assert (target / "reply.txt").read_text() == "written-back\n"
 
 
-def test_check_reports_the_target(anchorage: Anchorage) -> None:
-    anchorage.seed({"a.txt": "1\n", "b.txt": "2\n"})
-    result = anchorage.run("--check")
-    assert result.returncode == 0, result.stderr
-    assert "2 entries" in result.stdout
-    assert anchorage.workspace in result.stdout
-
-
 def test_running_without_an_agent_is_an_error(anchorage: Anchorage) -> None:
     result = anchorage.run()
     assert result.returncode == 2

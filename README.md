@@ -12,7 +12,8 @@ A flow is a coding agent driven in a loop. amflows is the three pieces that take
 - **`amflows.exomyth`** turns the trajectories they leave behind into a Chrome JSON trace.
 - **`amflows.coganchor`** runs an agent on one machine and has it act on another.
 
-Each is importable on its own; nothing pulls in the others.
+exomyth stands alone, and so does coganchor; janus reads coganchor's settings, and only to say
+where an agent's work should land.
 
 ## Table of Contents
 
@@ -82,6 +83,22 @@ exomyth.collect(agents={a.id: a.opened for a in (executor, reviewer)})
 `opened` is the backend's id for every session the agent ever opened, including the ones a Ralph
 loop dropped a turn later — ids, so a flow running for days remembers them in a list of strings.
 
+Give a config an `anchor` and its agents work on another machine, without any other change to the
+flow. The agent still runs here, so its credentials and its trajectory stay within reach:
+
+```python
+from amflows.coganchor import AnchorConfig
+
+config = ClaudeCodeAgentConfig(
+    model="claude-opus-4-8",
+    effort="high",
+    anchor=AnchorConfig(target="ssh://build-box", workspace="/srv/project"),
+)
+```
+
+Each turn is anchored on its own, so a loop of short turns reaches the target once per turn; a
+target left listening on `tcp://` makes that a socket rather than an ssh session to bootstrap.
+
 [examples/](examples/) has the flow loops from flowbench written this way: `ralph_loop`, `goal`,
 `flame_chase`, `stateful_ralph`, `continue_loop` and `rlar`.
 
@@ -125,8 +142,24 @@ network from them — happens on the target. It needs no plugin and no cooperati
 
 `--target` takes `ssh://HOST`, `tcp://HOST:PORT` or `local[:DIR]`; `--workspace` names the project
 directory as it exists on the target; `--check` connects, reports what it found, and exits;
-`--shadow` puts the local mirror somewhere other than the workspace path. Instead of reconnecting
-over ssh each time, a target can be left listening:
+`--shadow` puts the local mirror somewhere other than the workspace path.
+
+`amflows.coganchor.connect` runs that same session from Python, taking those settings as an
+`AnchorConfig` and returning the agent's exit status:
+
+```python
+from amflows.coganchor import AnchorConfig, connect
+
+connect(
+    ["claude", "--print"],
+    AnchorConfig(target="ssh://build-box", workspace="/srv/project"),
+)
+```
+
+`amflows.coganchor.check` is `--check` from Python: it returns what the target says about
+itself, without running anything there.
+
+Instead of reconnecting over ssh each time, a target can be left listening:
 
 ```sh
 # on the target

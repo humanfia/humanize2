@@ -20,14 +20,15 @@ from __future__ import annotations
 import os
 import socket
 import subprocess
-import sys
 import threading
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from amflows.coganchor import AnchorConfig
 from amflows.coganchor.proto import Channel
 from amflows.coganchor.remote import RemoteClient
 from amflows.coganchor.serve.exports import ExportTable
@@ -62,24 +63,21 @@ class Anchorage:
         *command: str,
         stdin: bytes = b"",
         timeout: int = DEFAULT_TIMEOUT,
-        extra_args: tuple[str, ...] = (),
+        **settings: Any,
     ) -> subprocess.CompletedProcess[str]:
-        """Run ``command`` as the agent under full interception."""
-        argv = [
-            sys.executable,
-            "-m",
-            "amflows.coganchor",
-            "--target",
-            f"local:{self.target}",
-            "--workspace",
-            self.workspace,
-            "--shadow",
-            str(self.mirror),
-            *extra_args,
-            *command,
-        ]
+        """Run ``command`` as the agent under full interception.
+
+        Spawned the way a flow spawns it, through :meth:`AnchorConfig.command`, so the
+        settings this suite drives coganchor with are the ones janus renders.
+        """
+        config = AnchorConfig(
+            target=f"local:{self.target}",
+            workspace=self.workspace,
+            shadow=str(self.mirror),
+            **settings,
+        )
         completed = subprocess.run(
-            argv,
+            config.command(command),
             input=stdin,
             capture_output=True,
             timeout=timeout,

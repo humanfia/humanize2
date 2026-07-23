@@ -1,6 +1,6 @@
 """Entry point for ``python -m amflows.coganchor`` and the bootstrapped zipapp."""
 
-from amflows.coganchor import main
+from amflows.coganchor.cli import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -14,12 +14,14 @@ import os
 import subprocess
 import sys
 import threading
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
 
+from amflows.coganchor import AnchorConfig
 from amflows.janus import (
     AgentBase,
     AgentConfig,
@@ -113,6 +115,21 @@ class _QuitterSession(SessionBase):
 class _QuitterAgent(AgentBase):
     def launch(self) -> _QuitterSession:
         return _QuitterSession(self)
+
+
+@dataclass(frozen=True, kw_only=True, slots=True)
+class _HereAnchor(AnchorConfig):
+    """An anchor that runs the turn here after all, and keeps what it was handed.
+
+    A real one would spawn coganchor, which needs a target and a machine to intercept on;
+    what janus owes it is the whole call the backend built, which is what this records.
+    """
+
+    seen: list[list[str]] = field(default_factory=list)
+
+    def command(self, argv: Sequence[str]) -> list[str]:
+        self.seen.append(list(argv))
+        return list(argv)
 
 
 @dataclass(frozen=True)
@@ -410,6 +427,30 @@ def test_kimi_opens_then_resumes(clis: _FakeCLIs) -> None:
         "--model",
         "kimi-code/k3",
     ]
+
+
+def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -> None:
+    """The agent still runs here, so the session it opens is still ours to resume."""
+    anchor = _HereAnchor(target="ssh://build-box", workspace="/srv/project")
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high", anchor=anchor)
+    ).launch()
+    session.run("hi")
+    session.run("again")
+
+    # What coganchor is given is the backend's own call, resumed session id and all.
+    tail = [
+        "--dangerously-skip-permissions",
+        "--model",
+        "claude-opus-4-8",
+        "--effort",
+        "high",
+    ]
+    assert anchor.seen == [
+        ["claude", "--print", "--session-id", session.id, *tail],
+        ["claude", "--print", "--resume", session.id, *tail],
+    ]
+    assert [call.stdin for call in clis.calls()] == ["hi", "again"]
 
 
 @pytest.mark.parametrize("agent", [CodexAgent, KimiCodeCLIAgent])

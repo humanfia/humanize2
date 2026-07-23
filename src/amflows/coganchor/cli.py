@@ -4,10 +4,8 @@
     coganchor --target ssh://gpu-01 codex exec "run the test suite"
     coganchor --target ssh://build-box kimi
 
-The agent process runs locally, so its credentials, its state directory and
-its connection to its model provider stay put.  Everything it *does* -- reading
-and writing project files, running commands, reaching the network from those
-commands -- happens on the target.
+Every option here is a field of :class:`~amflows.coganchor.anchor.AnchorConfig`,
+so what this parses is what :func:`~amflows.coganchor.anchor.connect` takes.
 """
 
 from __future__ import annotations
@@ -17,18 +15,11 @@ import logging
 import os
 import sys
 
-from amflows.coganchor import __version__, agents
-from amflows.coganchor.netproxy import NetProxy
-from amflows.coganchor.policy import Layout, Router
+from amflows.coganchor import __version__
+from amflows.coganchor.anchor import AnchorConfig, check, connect
 from amflows.coganchor.proto import ProtocolError
-from amflows.coganchor.remote import RemoteClient
-from amflows.coganchor.shadow import ShadowTree, prepare_shadow_root
-from amflows.coganchor.supervisor import Launch, Supervisor
-from amflows.coganchor.transport import Target, Transport, connect
 
-__all__ = ["main"]
-
-log = logging.getLogger(__name__)
+__all__ = ["build_parser", "main"]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -124,109 +115,64 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    """Runs the agent named on the command line, or serves a session for one elsewhere.
+
+    Args:
+      argv: The arguments to parse, defaulting to this process's own.
+
+    Returns:
+      The agent's exit status, or one of our own if it never ran.
+    """
+    arguments = sys.argv[1:] if argv is None else argv
+    if arguments and arguments[0] == "serve":
+        # Routed before the agent half is reached: both ends of a session are this one
+        # program, but only this end needs ptrace and an x86-64 register map, which is what
+        # lets the same program serve a target of any architecture.
+        from amflows.coganchor.serve.cli import main as serve
+
+        return serve(arguments[1:])
+
+    parser = build_parser()
+    args = parser.parse_args(arguments)
     logging.basicConfig(
         level=args.log_level.upper(),
         format="%(asctime)s coganchor %(levelname)s %(message)s",
         stream=sys.stderr,
     )
+    if not args.command and not args.check:
+        parser.error("no agent given; try `coganchor claude`")
     try:
-        return _run(args)
+        # Every option is a setting, and every setting is an option.
+        config = AnchorConfig(
+            target=args.target,
+            workspace=args.workspace,
+            remote_path=args.remote_path,
+            shadow=args.shadow,
+            local_paths=tuple(args.local_path),
+            local_execs=tuple(args.local_exec),
+            net=args.net,
+            net_allow=tuple(args.net_allow),
+            token=args.token,
+            force=args.force,
+        )
+    except ValueError as exc:
+        # Settings a session could not be run under are bad arguments, not failed sessions,
+        # so they exit 2 the way argparse's own rejections do.
+        parser.error(str(exc))
+
+    try:
+        if not args.check:
+            return connect(args.command, config)
+        found = check(config)
+        print(f"target      {found['target']}")
+        print(f"hostname    {found.get('hostname')}")
+        print(f"python      {found.get('python')} (pid {found.get('pid')})")
+        for export in found.get("exports", []):
+            print(f"export      {export['virtual']} -> {export['real']}")
+        print(f"workspace   {found['workspace']} ({found['entries']} entries)")
+        return 0
     except KeyboardInterrupt:
         return 130
     except (ConnectionError, ProtocolError, OSError, ValueError) as exc:
         print(f"coganchor: {exc}", file=sys.stderr)
         return 1
-
-
-def _run(args: argparse.Namespace) -> int:
-    try:
-        target = Target.parse(args.target)
-    except ValueError as exc:
-        # A malformed argument exits 2, like argparse's own rejections.
-        print(f"coganchor: {exc}", file=sys.stderr)
-        return 2
-    workspace = os.path.abspath(args.workspace or os.getcwd())
-    shadow_root = os.path.abspath(args.shadow) if args.shadow else workspace
-    remote_path = args.remote_path or target.path or None
-    exports = [f"{workspace}:{remote_path}" if remote_path else workspace]
-
-    if args.check:
-        return _check(target, exports, args.token, workspace)
-
-    if not args.command:
-        print("coganchor: no agent given; try `coganchor claude`", file=sys.stderr)
-        return 2
-    agent = agents.resolve(args.command)
-
-    layout = Layout.create(shadow_root, workspace)
-    router = Router(
-        layouts=(layout,),
-        local_paths=tuple(
-            agent.local_paths + [os.path.abspath(p) for p in args.local_path]
-        ),
-        local_programs=tuple(
-            agent.local_programs + [os.path.abspath(p) for p in args.local_exec]
-        ),
-    )
-    prepare_shadow_root(shadow_root, force=args.force, target=target.describe())
-
-    transport = connect(target, exports, args.token)
-    client = RemoteClient(transport.channel)
-    netproxy = NetProxy(client, tuple(args.net_allow)) if args.net == "remote" else None
-    supervisor = Supervisor(
-        client,
-        router,
-        ShadowTree(client, router),
-        Launch(
-            program=agent.program,
-            argv=agent.argv,
-            env=_agent_env(target, workspace, shadow_root),
-            cwd=shadow_root,
-        ),
-        netproxy=netproxy,
-        token=args.token,
-    )
-    log.info("running %s against %s", agent.profile.name, target.describe())
-    try:
-        if netproxy is not None:
-            netproxy.start()
-        return supervisor.run()
-    finally:
-        if netproxy is not None:
-            netproxy.close()
-        client.close()
-        transport.close()
-
-
-def _check(
-    target: Target, exports: list[str], token: str | None, workspace: str
-) -> int:
-    """Connect, describe what is on the other end, and disconnect."""
-    transport: Transport | None = None
-    try:
-        transport = connect(target, exports, token)
-        client = RemoteClient(transport.channel)
-        info = client.start(token)
-        listing = client.listdir(workspace)
-        print(f"target      {target.describe()}")
-        print(f"hostname    {info.get('hostname')}")
-        print(f"python      {info.get('python')} (pid {info.get('pid')})")
-        for export in info.get("exports", []):
-            print(f"export      {export['virtual']} -> {export['real']}")
-        print(f"workspace   {workspace} ({len(listing['entries'])} entries)")
-        client.close()
-        return 0
-    finally:
-        if transport is not None:
-            transport.close()
-
-
-def _agent_env(target: Target, workspace: str, shadow_root: str) -> dict[str, str]:
-    env = dict(os.environ)
-    env["COGANCHOR"] = __version__
-    env["COGANCHOR_TARGET"] = target.describe()
-    env["PWD"] = shadow_root
-    # Agents surface this to the model; being explicit beats it guessing.
-    env["COGANCHOR_WORKSPACE"] = workspace
-    return env
