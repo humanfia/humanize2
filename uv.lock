@@ -19,7 +19,6 @@ dev = [
     { name = "pytest" },
     { name = "pytest-timeout" },
     { name = "ruff" },
-    { name = "types-dateparser" },
 ]
 
 [package.metadata]
@@ -30,7 +29,6 @@ dev = [
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-timeout", specifier = ">=2.3" },
     { name = "ruff", specifier = ">=0.6" },
-    { name = "types-dateparser", specifier = ">=1.4.1.20260617" },
 ]
 
 [[package]]
@@ -262,15 +260,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
-]
-
-[[package]]
-name = "types-dateparser"
-version = "1.4.1.20260617"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d1/1d/647618b84fe99f40ff485c859de1b0db45c95a955704f5952e719f16834c/types_dateparser-1.4.1.20260617.tar.gz", hash = "sha256:aaf1958a88e2bca849ff36b4696476c829c7b0ad06ff8d473635a8a985468346", size = 17703, upload-time = "2026-06-17T06:56:49.371Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/1f/75b08cc011dc70cfa9b31715dd56b0603d42dfd98f45c70131f7d2fc2da5/types_dateparser-1.4.1.20260617-py3-none-any.whl", hash = "sha256:af5619f005b56880898c54a9cb25bbc1c145751710d456be4f94c50751316ddb", size = 24889, upload-time = "2026-06-17T06:56:48.315Z" },
 ]
 
 [[package]]

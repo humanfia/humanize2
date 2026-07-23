@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pathlib
+import re
 import unittest.mock
 
 import pytest
@@ -10,6 +11,9 @@ import pytest
 from amflows import exomyth
 from amflows.exomyth import cli
 from tests.exomyth.conftest import loaded
+
+#: Where a trace lands when none was asked for: this run, in this workspace.
+_DEFAULT = re.compile(r"\.amflows/\d{8}T\d{6}Z\.trace\.json")
 
 
 def run(monkeypatch: pytest.MonkeyPatch, *argv: str) -> None:
@@ -26,7 +30,7 @@ def run(monkeypatch: pytest.MonkeyPatch, *argv: str) -> None:
             None,
             {
                 "sessions": None,
-                "output": "exomyth.trace.json",
+                "output": None,  # stands for the generated default, matched below
                 "start": None,
                 "end": None,
             },
@@ -66,8 +70,12 @@ def test_forwards_every_argument_to_collect(
 
     run(monkeypatch, "collect", *argv)
 
+    passed = dict(collect.call_args.kwargs)
+    if options["output"] is None:  # the default is named after the moment it was taken
+        assert _DEFAULT.fullmatch(str(passed["output"]))
+        passed["output"] = None
     assert collect.call_args.args == (target,)
-    assert collect.call_args.kwargs == options
+    assert passed == options
 
 
 def test_writes_the_same_trace_as_the_library(
@@ -92,9 +100,12 @@ def test_writes_the_default_output_and_reports_it(
 ) -> None:
     run(monkeypatch, "collect", str(workspace))
 
-    summary = loaded(tmp_path / "exomyth.trace.json")["otherData"]
+    written = list((tmp_path / ".amflows").glob("*.trace.json"))
+    assert len(written) == 1  # the directory is made on the way, and holds one trace
+    summary = loaded(written[0])["otherData"]
     assert capsys.readouterr().out == (
-        f"exomyth.trace.json: {summary['sessions']} sessions, {summary['slices']} slices\n"
+        f".amflows/{written[0].name}: {summary['sessions']} sessions, "
+        f"{summary['slices']} slices\n"
     )
 
 
@@ -105,7 +116,9 @@ def test_reports_an_empty_workspace(
 ) -> None:
     run(monkeypatch, "collect", str(workspace))
 
-    assert capsys.readouterr().out == "exomyth.trace.json: 0 sessions, 0 slices\n"
+    reported, _, counts = capsys.readouterr().out.partition(": ")
+    assert _DEFAULT.fullmatch(reported)
+    assert counts == "0 sessions, 0 slices\n"
 
 
 def test_rejects_a_time_it_cannot_read(

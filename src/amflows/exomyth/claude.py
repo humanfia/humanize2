@@ -13,6 +13,7 @@ from .session import (
     Session,
     label,
     mapping,
+    records,
     summarize,
     text_of,
     title_of,
@@ -57,7 +58,7 @@ def collect(
     for path in sorted(projects.glob(f"{folder}/*.jsonl")):
         key = f"claude:{path.stem}"
         if wanted(sessions, key):
-            logs.append((key, key, path, {}))
+            logs.append((key, path.stem, path, {}))
     for path in sorted(projects.glob(f"{folder}/*/subagents/**/*.jsonl")):
         if path.name == "journal.jsonl":
             continue
@@ -83,21 +84,23 @@ def collect(
         meta["label"] = name
         if isinstance(meta.get("toolUseId"), str):
             spawns[meta["toolUseId"]] = key
-        logs.append((key, root, path, meta))
+        logs.append((key, parts[0], path, meta))
 
     collected: list[Session] = []
-    for key, root, path, meta in logs:
+    for key, ident, path, meta in logs:
         actions, info = _parse(path, window, spawns)
-        ident = path.stem.removeprefix("agent-")[:8]
+        root = f"claude:{ident}"
+        short = path.stem.removeprefix("agent-")[:8]
         title = (
-            f"{ident} · {info['title']}"
+            f"{short} · {info['title']}"
             if info.get("title")
-            else title_of(ident, actions)
+            else title_of(short, actions)
         )
         collected.append(
             Session(
                 key=key,
-                agent="claude",
+                backend="claude",
+                ident=ident,
                 label="main" if key == root else str(meta.get("label")),
                 title=title,
                 parent=None if key == root else root,
@@ -129,11 +132,7 @@ def _parse(
     think: Action | None = None
     request: str | None = None
     prev = 0.0
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        try:
-            record: dict[str, Any] = json.loads(line)
-        except json.JSONDecodeError:
-            continue
+    for record in records(path):
         stamp = record.get("timestamp")
         if not isinstance(stamp, str):
             continue
@@ -191,6 +190,15 @@ def _parse(
                 request, think = None, None
             prev = max(prev, at)
         elif kind == "assistant":
+            model = message.get("model")
+            # Only the answers say what answered them, and Claude lets a session change model
+            # mid-conversation, so the first answer is taken: what the session opened at.
+            # `<synthetic>` names an answer Claude wrote for itself, such as an API error,
+            # rather than a model, and would otherwise take a session with it.
+            if "model" not in info and isinstance(model, str) and model[:1] != "<":
+                info["model"] = model
+                if record.get("effort") is not None:
+                    info["effort"] = record["effort"]
             identifier = record.get("requestId") or message.get("id")
             if identifier != request:
                 request = str(identifier)
@@ -199,7 +207,7 @@ def _parse(
                     "llm",
                     prev,
                     at,
-                    {"model": message.get("model"), "usage": message.get("usage")},
+                    {"model": model, "usage": message.get("usage")},
                 )
                 actions.append(think)
                 prev = at

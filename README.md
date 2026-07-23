@@ -47,8 +47,8 @@ uv sync
 
 ### janus
 
-An agent is a model at an effort; a session is one conversation with it. Which of the two a loop
-holds decides what the flow remembers.
+An agent runs at a model and an effort; a session is one conversation with it. Which of the two a
+loop holds decides what the flow remembers.
 
 ```python
 from amflows.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
@@ -68,6 +68,20 @@ session.run("continue")  # resumes it, task still in context
 as they arrive, and a turn that fails raises `subprocess.CalledProcessError` without opening the
 session, so the next call retries it.
 
+Two agents at one model and one effort are still two agents — an executor and the reviewer that
+judges it. Name them, and each reports the sessions it opened, which is what tells a trace apart:
+
+```python
+config = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+executor = ClaudeCodeAgent(config, name="executor")
+reviewer = ClaudeCodeAgent(config, name="reviewer")
+...
+exomyth.collect(agents={a.id: a.opened for a in (executor, reviewer)})
+```
+
+`opened` is the backend's id for every session the agent ever opened, including the ones a Ralph
+loop dropped a turn later — ids, so a flow running for days remembers them in a list of strings.
+
 [examples/](examples/) has the flow loops from flowbench written this way: `ralph_loop`, `goal`,
 `flame_chase`, `stateful_ralph`, `continue_loop` and `rlar`.
 
@@ -77,9 +91,15 @@ session, so the next call retries it.
 exomyth collect [<workspace>] [--session <session>[,<session>]...] [--output <output>] [--start <start>] [--end <end>]
 ```
 
-Collects the trajectories recorded for a workspace and writes `exomyth.trace.json`. Load it in
-[ui.perfetto.dev](https://ui.perfetto.dev) or `chrome://tracing`: sessions and sub-agents become
-tracks, one slice per action, with prompt, reasoning, tool input and tool output attached.
+Collects the trajectories recorded for a workspace and writes `.amflows/<datetime>.trace.json`.
+Load it in [ui.perfetto.dev](https://ui.perfetto.dev) or `chrome://tracing`: sessions and
+sub-agents become tracks, one slice per action, with prompt, reasoning, tool input and tool
+output attached.
+
+Each **agent** is one process. An agent is a configuration — a backend at a model at an effort —
+together with every sub-agent it started, so a loop of one-shot sessions reads as one agent
+rather than a hundred. A flow that drove the sessions itself knows better, and says so by passing
+`agents=`, which is what tells two agents run at the same configuration apart.
 
 ```sh
 exomyth collect                                   # current workspace, all history
@@ -87,9 +107,10 @@ exomyth collect ~/myproject --start "3 days ago"  # another workspace, recent hi
 exomyth collect --session 0a1b2c3d,5f6e           # two sessions, wherever they ran
 ```
 
-Agent home directories come from `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and `KIMI_CODE_HOME`, falling
-back to `~/.claude`, `~/.codex` and `~/.kimi-code`; a missing one is skipped. `amflows.exomyth.collect`
-takes the same arguments, returns the trace document, and writes a file only when `output` is given.
+Trajectories are read from the backends' own home directories, named by `CLAUDE_CONFIG_DIR`,
+`CODEX_HOME` and `KIMI_CODE_HOME` and falling back to `~/.claude`, `~/.codex` and `~/.kimi-code`;
+a missing one is skipped. `amflows.exomyth.collect` takes the same arguments plus `agents`,
+returns the trace document, and writes a file only when `output` is given.
 
 ### coganchor
 
@@ -133,7 +154,6 @@ PRs accepted. Open an issue to discuss a substantial change first.
 
 ```sh
 uvx ruff format && uvx ruff check && uv run pytest
-uv run --with mypy mypy --strict src tests examples
 uv run pytest --run-agents  # also drives claude, codex and kimi for real
 ```
 

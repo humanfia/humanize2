@@ -6,6 +6,7 @@ import contextlib
 import subprocess
 import sys
 import threading
+import uuid
 import weakref
 from abc import ABC, abstractmethod
 from typing import IO
@@ -126,6 +127,9 @@ class SessionBase(ABC):
                 # Separated, so that a stdout without a trailing newline cannot glue the first
                 # line of stderr onto the last of stdout and hide a line the id is read from.
                 self._id = self._read_session_id(stdout + "\n" + "".join(err))
+                # The backend logs this session from here on but never says whose it is, so the
+                # moment its id becomes known is the moment the agent takes note of it.
+                self._agent._opened.append(self._id)
             return stdout.strip()
 
     @abstractmethod
@@ -156,19 +160,42 @@ class SessionBase(ABC):
 class AgentBase(ABC):
     """A coding agent behind a uniform interface: structure only, and no history.
 
-    An agent says which model to run at which effort. The conversation lives in the
-    :class:`SessionBase` it launches, so a flow decides for itself whether turns share context --
-    a fresh session per turn is a Ralph loop, one session across turns is a stateful one.
+    An agent says which model to run at which effort, and is one agent apart from that: a flow
+    that reviews its own work runs two of them at one configuration, and they are not the same
+    agent. The conversation lives in the :class:`SessionBase` it launches, so a flow decides for
+    itself whether turns share context -- a fresh session per turn is a Ralph loop, one session
+    across turns is a stateful one.
     """
 
-    def __init__(self, config: AgentConfig):
+    def __init__(self, config: AgentConfig, *, name: str | None = None):
         """Initializes an agent that has launched nothing yet.
 
         Args:
           config: The model and effort every session of this agent runs at.
+          name: What to call this agent, defaulting to one nothing else answers to. Two agents
+            sharing a name are one agent to a trace, which is how the roles of a flow survive
+            being restarted; two left unnamed are two, which is how one configuration driven
+            twice -- an executor and the reviewer judging it -- stays two.
         """
         self._config = config
+        self._id = name or f"{type(self).__name__}#{uuid.uuid4().hex[:8]}"
         self._sessions: list[weakref.ref[SessionBase]] = []
+        self._opened: list[str] = []
+
+    @property
+    def id(self) -> str:
+        """What this agent is called, and what a trace groups its sessions under."""
+        return self._id
+
+    @property
+    def opened(self) -> list[str]:
+        """The backend's id for every session this agent has opened, oldest first.
+
+        What :attr:`sessions` cannot say: a flow that drops a session per turn keeps none of
+        them, but the backend logged them all, and a trace of the run has to know whose they
+        were. Ids rather than sessions, so remembering a day of turns costs a list of strings.
+        """
+        return list(self._opened)
 
     @property
     def config(self) -> AgentConfig:

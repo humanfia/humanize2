@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import pathlib
+from collections.abc import Iterator
 from typing import Any
 
 _LABEL_KEYS = (
@@ -52,21 +54,54 @@ class Session:
 
     Attributes:
         key: Globally unique session identifier.
-        agent: Name of the coding agent that produced the log.
+        backend: Name of the coding agent CLI that produced the log.
+        ident: The id the backend itself knows this session by, which is what a
+            flow driving it writes down. A sub-agent has one of its own only
+            where its backend gives it one: a Codex sub-agent is a thread like
+            any other, while a Claude sub-agent and every Kimi agent answer to
+            the session they were started under.
         label: Role of this session, such as main or the sub-agent type.
         title: Human readable title, usually an id and the first prompt.
         parent: Key of the session that spawned this one, if any.
+        agent: The agent this session ran on, which sessions are gathered by and
+            which names their process: a configuration -- a backend at a model at
+            an effort -- unless a flow wrote down an agent of its own to run it
+            on. Named once every log is collected.
         args: Session wide details such as model, cwd and version.
         actions: Slices recorded for this session.
     """
 
     key: str
-    agent: str
+    backend: str
+    ident: str
     label: str
     title: str
     parent: str | None = None
+    agent: str = ""
     args: dict[str, Any] = dataclasses.field(default_factory=dict)
     actions: list[Action] = dataclasses.field(default_factory=list)
+
+
+def records(path: pathlib.Path) -> Iterator[dict[str, Any]]:
+    """Reads a JSON Lines log as the records it holds.
+
+    Every log here is read while whatever writes it may still be appending, and none of them is
+    worth failing a whole trace over, so a line that is not a whole record is skipped rather
+    than fatal -- a torn last line as much as one that holds something other than a record.
+
+    Args:
+        path: The log to read.
+
+    Yields:
+        Each record of the log, in the order they were written.
+    """
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict):
+            yield record
 
 
 def summarize(text: str, limit: int = 96) -> str:

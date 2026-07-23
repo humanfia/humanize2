@@ -6,7 +6,7 @@ import json
 import math
 import os
 import pathlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import dateparser
@@ -25,6 +25,7 @@ def collect(
     workspace: str | os.PathLike[str] | None = None,
     *,
     sessions: str | Iterable[str] | None = None,
+    agents: Mapping[str, Iterable[str]] | None = None,
     output: str | os.PathLike[str] | None = None,
     start: str | None = None,
     end: str | None = None,
@@ -36,6 +37,11 @@ def collect(
     workspace keeps only the named sessions recorded there, and naming neither
     collects the current working directory.
 
+    What is collected is gathered by the agent that ran it: one backend at one
+    model at one effort, and every sub-agent under it, so that a loop of
+    one-shot sessions reads as one agent rather than a hundred. A flow that
+    drove the sessions itself knows better, and says so through agents.
+
     Args:
         workspace: Workspace directory to collect trajectories for, defaults to
             the current working directory unless sessions are named.
@@ -43,7 +49,13 @@ def collect(
             iterable of ids, defaults to every session. An id can be given
             whole or shortened the way its session slice shows it, and the
             sub-agents a session started are collected with it.
-        output: Trace file to write, nothing is written when omitted.
+        agents: What each agent of a flow opened, as the ids the backends gave
+            those sessions, which is what a janus agent reports as its own name
+            and its opened. Sessions nobody claims are read as the configuration
+            they ran at, so this is only needed to tell apart two agents that
+            ran at the same one.
+        output: Trace file to write, nothing is written when omitted. Its
+            directory is created if it does not exist.
         start: Earliest session time to include, in any wording dateparser
             understands, defaults to the earliest record.
         end: Latest session time to include, defaults to the latest record.
@@ -86,9 +98,27 @@ def collect(
         if home.is_dir():
             collected += collector(home, root, names, window)
 
+    named = {ident: name for name, opened in (agents or {}).items() for ident in opened}
+    known = {item.key: item for item in collected}
+    for item in collected:
+        # Whatever ran a session ran every sub-agent under it, whatever those were
+        # configured with themselves, so each is named after the root it hangs from.
+        root_of, seen = item, {item.key}
+        while root_of.parent in known and root_of.parent not in seen:
+            root_of = known[root_of.parent]
+            seen.add(root_of.key)
+        parts = (
+            named.get(root_of.ident, root_of.backend),
+            root_of.args.get("model"),
+            root_of.args.get("effort"),
+        )
+        item.agent = " · ".join(str(part) for part in parts if part)
+
     document = trace.build(collected, root, names)
     if output is not None:
-        pathlib.Path(output).write_text(
+        destination = pathlib.Path(output)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
             json.dumps(document, ensure_ascii=False), encoding="utf-8"
         )
     return document

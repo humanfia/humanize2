@@ -34,3 +34,9 @@ uv run python examples/ralph_loop.py
   is the same call with `prefix="/goal -- "`.
 - flowbench's `k3_swarm` variants change the runtime under a flow, not the flow, so they map
   onto the same files.
+- [rlar.py](rlar.py) names the two agents it runs, which is what a trace tells them apart by. It
+  is the one flow here that needs it: its executor and reviewer run at one model and one effort,
+  so unnamed they would read as a single agent talking to itself. Hand their `id` and `opened` to
+  `exomyth.collect(agents=...)` to see them as two; the rest run one agent apiece and need
+  nothing, since [`exomyth collect`](../README.md#exomyth) already reads a lone agent as the
+  configuration it ran at.

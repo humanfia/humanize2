@@ -89,6 +89,7 @@ def claude_home(
                 "type": "assistant",
                 "timestamp": _stamp(2),
                 "requestId": "request-1",
+                "effort": "xhigh",
                 "message": {
                     "id": "message-1",
                     "model": "claude-opus-5",
@@ -125,6 +126,7 @@ def claude_home(
                 "type": "assistant",
                 "timestamp": _stamp(5),
                 "requestId": "request-2",
+                "effort": "xhigh",
                 "message": {
                     "id": "message-2",
                     "model": "claude-opus-5",
@@ -190,6 +192,8 @@ def claude_home(
                 "type": "assistant",
                 "timestamp": _stamp(8),
                 "requestId": "request-3",
+                # A sub-agent of its own model and effort, which is its parent's all the same.
+                "effort": "medium",
                 "message": {
                     "id": "message-3",
                     "model": "claude-sonnet-5",
@@ -209,7 +213,18 @@ def claude_home(
                 "sessionId": CLAUDE_ELSEWHERE,
                 "promptId": "prompt-3",
                 "message": {"role": "user", "content": "read the other repo"},
-            }
+            },
+            {
+                "type": "assistant",
+                "timestamp": _stamp(21),
+                "requestId": "request-4",
+                "effort": "xhigh",  # the same configuration as the other workspace's run
+                "message": {
+                    "id": "message-4",
+                    "model": "claude-opus-5",
+                    "content": [{"type": "text", "text": "read it"}],
+                },
+            },
         ],
     )
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(home))
@@ -473,6 +488,15 @@ def kimi_home(
     )
     monkeypatch.setenv("KIMI_CODE_HOME", str(home))
     return home
+
+
+#: What a flow that drove these sessions would report: three agents, two at one configuration.
+#: The Kimi id is spelled the way `kimi -r` prints it, not the way its own logs shorten it.
+FLOW = {
+    "executor": [CLAUDE_SESSION],
+    "reviewer": [CLAUDE_ELSEWHERE],
+    "worker": [KIMI_SESSION],
+}
 
 
 @pytest.fixture

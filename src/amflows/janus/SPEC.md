@@ -8,6 +8,7 @@
 ├── base.py
 ├── claude.py
 ├── codex.py
+├── config.py
 └── kimi.py
 ```
 
@@ -30,7 +31,12 @@ class AgentConfig:
 
 ```python
 class AgentBase(ABC):
-    def __init__(self, config: AgentConfig): ...
+    def __init__(self, config: AgentConfig, *, name: str | None = None): ...
+
+    @property
+    @abstractmethod
+    def id(self) -> str:
+        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -42,6 +48,11 @@ class AgentBase(ABC):
     def sessions(self) -> list[SessionBase]:
         raise NotImplementedError
 
+    @property
+    @abstractmethod
+    def opened(self) -> list[str]:
+        raise NotImplementedError
+
     @abstractmethod
     def launch(self) -> SessionBase:
         """Creates a new session.
@@ -51,6 +62,12 @@ class AgentBase(ABC):
         """
         raise NotImplementedError
 ```
+
+- `id` MUST be the given name, or one no other agent answers to when no name is given, so that
+  two agents of the same config are two agents.
+- `opened` MUST report the backend's id for every session this agent has opened, oldest first,
+  including the sessions nobody holds any more. It is what a flow hands a trace to say which
+  trajectories were this agent's.
 
 ### `SessionBase`
 
@@ -77,6 +94,7 @@ class SessionBase(ABC):
 ```
 
 - MUST NOT run a session in parallel; use a lock to ensure that only one turn is run at a time.
+- MUST add a session to its agent's `opened` as it opens, and never for a turn that failed.
 
 ## `claude.py` / `codex.py` / ... - Concrete Agent and Session Classes
 

@@ -66,12 +66,14 @@ def build(
     tracks: dict[str, tuple[int, int]] = {}
     origins: dict[str, tuple[int, int, float]] = {}
     order = sorted(
-        groups, key=lambda name: min(spans[item.key][0] for item in groups[name])
+        groups, key=lambda agent: min(spans[item.key][0] for item in groups[agent])
     )
-    for pid, name in enumerate(order, start=1):
-        members = groups[name]
+    for pid, agent in enumerate(order, start=1):
+        members = groups[agent]
         events.append(
-            _meta(pid, 0, "process_name", {"name": f"{name} · {len(members)} sessions"})
+            _meta(
+                pid, 0, "process_name", {"name": f"{agent} · {len(members)} sessions"}
+            )
         )
         events.append(_meta(pid, 0, "process_sort_index", {"sort_index": pid}))
         events.append(_meta(pid, 0, "process_labels", {"labels": label}))
@@ -112,7 +114,7 @@ def build(
                     "session",
                     start,
                     finish,
-                    {**item.args, "parent": item.parent},
+                    {**item.args, "agent": item.agent, "parent": item.parent},
                 )
                 entries.append((item, banner))
                 entries.extend((item, action) for action in item.actions)
@@ -152,6 +154,7 @@ def build(
         "otherData": {
             **scope,
             "agents": ", ".join(sorted({item.agent for item in live})),
+            "backends": ", ".join(sorted({item.backend for item in live})),
             "sessions": str(len(live)),
             "slices": str(sum(len(item.actions) for item in live)),
             "tracks": str(sum(1 for event in events if event["name"] == "thread_name")),

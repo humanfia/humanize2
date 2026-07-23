@@ -8,7 +8,16 @@ import pytest
 
 from amflows import exomyth
 from amflows.exomyth import collector
-from tests.exomyth.conftest import banners, labels, loaded, named, slices
+from tests.exomyth.conftest import (
+    CLAUDE_ELSEWHERE,
+    CLAUDE_SESSION,
+    FLOW,
+    banners,
+    labels,
+    loaded,
+    named,
+    slices,
+)
 
 
 def test_exposes_collect_as_the_public_api() -> None:
@@ -21,7 +30,10 @@ def test_collects_every_agent(homes: None, workspace: pathlib.Path) -> None:
 
     summary = document["otherData"]
     assert summary["workspace"] == str(workspace)
-    assert summary["agents"] == "claude, codex, kimi"
+    assert summary["backends"] == "claude, codex, kimi"
+    assert summary["agents"] == (
+        "claude · claude-opus-5 · xhigh, codex · gpt-5.6 · high, kimi · kimi-k2 · high"
+    )
     assert summary["sessions"] == "6"
     assert summary["start"] == "2026-07-20T10:00:00+00:00"
     assert summary["end"] == "2026-07-20T10:00:14+00:00"
@@ -45,7 +57,7 @@ def test_reports_claude_prompt_reasoning_and_tool(
 ) -> None:
     document = exomyth.collect(workspace)
 
-    assert document["otherData"]["agents"] == "claude"
+    assert document["otherData"]["backends"] == "claude"
     turn = named(document, "turn: map the repo")
     assert turn["args"]["prompt"] == "map the repo"
     think = named(document, "think: look around first")
@@ -67,7 +79,7 @@ def test_reports_codex_prompt_reasoning_and_tool(
 ) -> None:
     document = exomyth.collect(workspace)
 
-    assert document["otherData"]["agents"] == "codex"
+    assert document["otherData"]["backends"] == "codex"
     turn = named(document, "turn: port the module")
     assert turn["args"]["prompt"] == "port the module"
     assert turn["args"]["result"] == "done"
@@ -86,7 +98,7 @@ def test_reports_kimi_prompt_reasoning_and_tool(
 ) -> None:
     document = exomyth.collect(workspace)
 
-    assert document["otherData"]["agents"] == "kimi"
+    assert document["otherData"]["backends"] == "kimi"
     assert named(document, "turn: wire up the loop")["args"]["origin"] == "cli"
     think = named(document, "think: read the loop first")
     assert think["args"]["thinking"] == "read the loop first"
@@ -128,10 +140,73 @@ def test_names_tracks_after_their_role(homes: None, workspace: pathlib.Path) -> 
 
     tracks = {name.split(" ~")[0] for name in labels(document, "thread_name")}
     assert tracks == {"main", "subagent"}
+
+
+def test_gathers_a_configuration_and_its_sub_agents_into_one_agent(
+    homes: None, workspace: pathlib.Path
+) -> None:
+    """A backend at a model at an effort is one agent, sub-agents included.
+
+    The Explore under the Claude session answered at sonnet and medium, and is still part of
+    the agent that started it: what a sub-agent is configured with is its parent's business.
+    """
+    document = exomyth.collect(workspace)
+
     assert labels(document, "process_name") == {
-        "claude · 2 sessions",
-        "codex · 2 sessions",
-        "kimi · 2 sessions",
+        "claude · claude-opus-5 · xhigh · 2 sessions",
+        "codex · gpt-5.6 · high · 2 sessions",
+        "kimi · kimi-k2 · high · 2 sessions",
+    }
+
+
+def test_gathers_the_runs_of_one_configuration_into_one_agent(
+    claude_home: pathlib.Path,
+) -> None:
+    """Two runs of one coding agent are one agent, whichever workspace each ran in."""
+    document = exomyth.collect(sessions=[CLAUDE_SESSION, CLAUDE_ELSEWHERE])
+
+    assert labels(document, "process_name") == {
+        "claude · claude-opus-5 · xhigh · 3 sessions"
+    }
+
+
+def test_tells_apart_the_agents_a_flow_names(claude_home: pathlib.Path) -> None:
+    """The case configuration cannot answer: one model at one effort, run as two agents.
+
+    The executor's two sessions are its own and the sub-agent it started, which it never had
+    to claim: a sub-agent belongs to whoever ran the session that started it.
+    """
+    document = exomyth.collect(sessions=[CLAUDE_SESSION, CLAUDE_ELSEWHERE], agents=FLOW)
+
+    assert labels(document, "process_name") == {
+        "executor · claude-opus-5 · xhigh · 2 sessions",
+        "reviewer · claude-opus-5 · xhigh · 1 sessions",
+    }
+    assert document["otherData"]["agents"] == (
+        "executor · claude-opus-5 · xhigh, reviewer · claude-opus-5 · xhigh"
+    )
+
+
+def test_names_the_agent_of_every_session_a_flow_claims(
+    homes: None, workspace: pathlib.Path
+) -> None:
+    """A flow names what it drove; everything else is still read as a configuration.
+
+    Each backend is claimed by the id it hands out: the whole id for Claude, and for Kimi the
+    session it prints to resume, which its logs name a folder after. Codex ran outside the
+    flow here, so it is read as the configuration it ran at.
+    """
+    document = exomyth.collect(workspace, agents=FLOW)
+
+    assert labels(document, "process_name") == {
+        "executor · claude-opus-5 · xhigh · 2 sessions",
+        "worker · kimi-k2 · high · 2 sessions",
+        "codex · gpt-5.6 · high · 2 sessions",
+    }
+    assert {event["args"]["agent"] for event in banners(document)} == {
+        "executor · claude-opus-5 · xhigh",
+        "worker · kimi-k2 · high",
+        "codex · gpt-5.6 · high",
     }
 
 
@@ -165,7 +240,7 @@ def test_skips_agents_without_a_home(
 ) -> None:
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing"))
 
-    assert exomyth.collect(workspace)["otherData"]["agents"] == "claude"
+    assert exomyth.collect(workspace)["otherData"]["backends"] == "claude"
 
 
 def test_cuts_off_records_outside_the_window(

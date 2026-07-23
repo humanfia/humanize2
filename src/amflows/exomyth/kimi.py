@@ -11,6 +11,7 @@ from .session import (
     Session,
     label,
     mapping,
+    records,
     summarize,
     text_of,
     title_of,
@@ -75,7 +76,9 @@ def collect(
             collected.append(
                 Session(
                     key=key,
-                    agent="kimi",
+                    backend="kimi",
+                    # Every agent of a session shares the id `kimi -r` resumes it by.
+                    ident=ident,
                     label="main"
                     if agent_id == "main"
                     else f"{details.get('type') or 'agent'} · {agent_id}",
@@ -103,11 +106,7 @@ def _parse(
     turn: Action | None = None
     step: Action | None = None
     prev = 0.0
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        try:
-            record: dict[str, Any] = json.loads(line)
-        except json.JSONDecodeError:
-            continue
+    for record in records(path):
         moment = record.get("time")
         if not isinstance(moment, (int, float)):
             continue

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 
 from .collector import collect
 
@@ -30,8 +31,7 @@ def main() -> None:
     )
     command.add_argument(
         "--output",
-        default="exomyth.trace.json",
-        help="Trace file to write, defaults to exomyth.trace.json.",
+        help="Trace file to write, defaults to .amflows/<datetime>.trace.json.",
     )
     command.add_argument(
         "--start", help="Earliest session time to include, e.g. '2 days ago'."
@@ -40,12 +40,16 @@ def main() -> None:
         "--end", help="Latest session time to include, e.g. 'yesterday 18:00'."
     )
     args = parser.parse_args()
+    # One trace per run, named after the moment it was taken, so collecting twice keeps both
+    # rather than writing over the first.
+    stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+    output = args.output or f".amflows/{stamp}.trace.json"
 
     try:
         document = collect(
             args.workspace,
             sessions=args.sessions,
-            output=args.output,
+            output=output,
             start=args.start,
             end=args.end,
         )
@@ -53,6 +57,6 @@ def main() -> None:
         parser.error(str(error))
     summary = document["otherData"]
     print(
-        f"{args.output}: {summary.get('sessions', '0')} sessions, "
+        f"{output}: {summary.get('sessions', '0')} sessions, "
         f"{summary.get('slices', '0')} slices"
     )

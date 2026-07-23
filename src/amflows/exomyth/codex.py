@@ -12,6 +12,7 @@ from .session import (
     Session,
     label,
     mapping,
+    records,
     summarize,
     text_of,
     title_of,
@@ -89,7 +90,8 @@ def collect(
         collected.append(
             Session(
                 key=f"codex:{ident}",
-                agent="codex",
+                backend="codex",
+                ident=ident,
                 label=str(name) if name else "main",
                 title=title_of(ident[:8], actions),
                 parent=f"codex:{ancestor}"
@@ -119,11 +121,7 @@ def _parse(
     turn: Action | None = None
     think: Action | None = None
     prev = 0.0
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        try:
-            record: dict[str, Any] = json.loads(line)
-        except json.JSONDecodeError:
-            continue
+    for record in records(path):
         stamp = record.get("timestamp")
         if not isinstance(stamp, str):
             continue

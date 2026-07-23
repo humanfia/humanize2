@@ -222,4 +222,5 @@ __marimo__/
 
 
 # Traces written by `exomyth collect`
+.amflows/
 *.trace.json

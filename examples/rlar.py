@@ -9,7 +9,10 @@ while true; do
     sleep 5
 done
 
-This is the flow the split pays off in: the executor must remember, the reviewer must not.
+This is the flow the split pays off in: the executor must remember, the reviewer must not. They
+run at one model and one effort and are still two agents, which is why each is named: a trace
+reads the executor's session and the reviewer's audits as two, rather than as one agent that
+keeps changing its mind about what it is doing.
 """
 
 import json
@@ -82,7 +85,9 @@ def rlar(executor: SessionBase, reviewer: AgentBase, task: str) -> None:
 
 
 if __name__ == "__main__":
-    agent = KimiCodeCLIAgent(
-        KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
-    )
-    rlar(agent.launch(), agent, Path("TASK.md").read_text())
+    config = KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
+    # Both are held, so that a trace of the run can be asked for either one's own sessions:
+    # `exomyth.collect(agents={a.id: a.opened for a in (executor, reviewer)})`.
+    executor = KimiCodeCLIAgent(config, name="executor")
+    reviewer = KimiCodeCLIAgent(config, name="reviewer")
+    rlar(executor.launch(), reviewer, Path("TASK.md").read_text())

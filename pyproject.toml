@@ -12,11 +12,6 @@ license-files = ["LICENSE"]
 dependencies = [
     "dateparser>=1.4.1",
 ]
-classifiers = [
-    "Environment :: Console",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3.12",
-]
 
 [project.scripts]
 coganchor = "amflows.coganchor:main"
@@ -31,5 +26,4 @@ dev = [
     "pytest>=8",
     "pytest-timeout>=2.3",
     "ruff>=0.6",
-    "types-dateparser>=1.4.1.20260617",
 ]
