@@ -8,18 +8,20 @@ import time
 from contextlib import suppress
 from pathlib import Path
 
-from flowjanus.agents import AgentBase, ClaudeCodeAgent
+from amflows.janus import AgentBase, ClaudeCodeAgent, ClaudeCodeAgentConfig
 
 
 def ralph_loop(agent: AgentBase, task: str) -> None:
     while True:
         with suppress(subprocess.CalledProcessError):  # flowbench's `|| true`
-            agent.run(task)  # a throwaway session: the agent starts from the task each time
+            agent.launch().run(
+                task
+            )  # a new session: the agent starts from the task each time
         time.sleep(5)
 
 
 if __name__ == "__main__":
     ralph_loop(
-        ClaudeCodeAgent(model="claude-opus-4-8", effort="high"),
+        ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")),
         Path("TASK.md").read_text(),
     )

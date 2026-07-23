@@ -1,0 +1,238 @@
+"""Tests for the exomyth.collect library entry point."""
+
+from __future__ import annotations
+
+import pathlib
+
+import pytest
+
+from amflows import exomyth
+from amflows.exomyth import collector
+from tests.exomyth.conftest import banners, labels, loaded, named, slices
+
+
+def test_exposes_collect_as_the_public_api() -> None:
+    assert exomyth.__all__ == ["collect"]
+    assert exomyth.collect is collector.collect
+
+
+def test_collects_every_agent(homes: None, workspace: pathlib.Path) -> None:
+    document = exomyth.collect(workspace)
+
+    summary = document["otherData"]
+    assert summary["workspace"] == str(workspace)
+    assert summary["agents"] == "claude, codex, kimi"
+    assert summary["sessions"] == "6"
+    assert summary["start"] == "2026-07-20T10:00:00+00:00"
+    assert summary["end"] == "2026-07-20T10:00:14+00:00"
+
+
+def test_renders_one_session_slice_per_track(
+    homes: None, workspace: pathlib.Path
+) -> None:
+    document = exomyth.collect(workspace)
+
+    names = [str(event["name"]) for event in banners(document)]
+    assert len(names) == 6
+    assert sum(name.startswith("main · ") for name in names) == 3
+    assert any(name.startswith("Explore · scout the tests · ") for name in names)
+    assert any(name.startswith("agents/scout.md · ") for name in names)
+    assert any(name.startswith("explore · explore-1 · ") for name in names)
+
+
+def test_reports_claude_prompt_reasoning_and_tool(
+    claude_home: pathlib.Path, workspace: pathlib.Path
+) -> None:
+    document = exomyth.collect(workspace)
+
+    assert document["otherData"]["agents"] == "claude"
+    turn = named(document, "turn: map the repo")
+    assert turn["args"]["prompt"] == "map the repo"
+    think = named(document, "think: look around first")
+    assert think["args"]["model"] == "claude-opus-5"
+    assert think["args"]["usage"] == {"input_tokens": 12, "output_tokens": 34}
+    call = named(document, "Bash: List files")
+    assert call["args"]["input"] == {"command": "ls", "description": "List files"}
+    assert call["args"]["output"] == "README.md"
+    assert call["args"]["error"] is False
+    assert call["dur"] == 2_000_000
+    assert named(document, "say: listing the files")["args"]["text"] == (
+        "listing the files"
+    )
+    assert named(document, "system: compact_boundary")["args"]["level"] == "info"
+
+
+def test_reports_codex_prompt_reasoning_and_tool(
+    codex_home: pathlib.Path, workspace: pathlib.Path
+) -> None:
+    document = exomyth.collect(workspace)
+
+    assert document["otherData"]["agents"] == "codex"
+    turn = named(document, "turn: port the module")
+    assert turn["args"]["prompt"] == "port the module"
+    assert turn["args"]["result"] == "done"
+    assert named(document, "think: read the module")["cat"] == "llm"
+    call = named(document, "shell: cat module.py")
+    assert call["args"]["input"] == {"command": "cat module.py"}
+    assert call["args"]["output"] == "print('hi')"
+    assert call["dur"] == 2_000_000
+    assert named(document, "say: ported the module")["args"]["text"] == (
+        "ported the module"
+    )
+
+
+def test_reports_kimi_prompt_reasoning_and_tool(
+    kimi_home: pathlib.Path, workspace: pathlib.Path
+) -> None:
+    document = exomyth.collect(workspace)
+
+    assert document["otherData"]["agents"] == "kimi"
+    assert named(document, "turn: wire up the loop")["args"]["origin"] == "cli"
+    think = named(document, "think: read the loop first")
+    assert think["args"]["thinking"] == "read the loop first"
+    assert think["args"]["finishReason"] == "stop"
+    call = named(document, "Read: loop.py")
+    assert call["args"]["input"] == {"file_path": "loop.py"}
+    assert call["args"]["output"] == "while True:"
+    assert call["dur"] == 2_000_000
+    assert named(document, "system: permission auto")["cat"] == "event"
+
+
+def test_links_sub_agents_to_their_spawner(
+    homes: None, workspace: pathlib.Path
+) -> None:
+    document = exomyth.collect(workspace)
+
+    flows = [event for event in document["traceEvents"] if event["ph"] in ("s", "f")]
+    assert len(flows) == 4
+    assert {flow["id"] for flow in flows if flow["ph"] == "s"} == {
+        flow["id"] for flow in flows if flow["ph"] == "f"
+    }
+    sessions = banners(document)
+    roles = {
+        event["args"]["session"]: event["name"].split(" · ")[0] for event in sessions
+    }
+    assert {
+        roles[event["args"]["session"]]: roles.get(event["args"]["parent"])
+        for event in sessions
+    } == {
+        "main": None,
+        "Explore": "main",
+        "agents/scout.md": "main",
+        "explore": "main",
+    }
+
+
+def test_names_tracks_after_their_role(homes: None, workspace: pathlib.Path) -> None:
+    document = exomyth.collect(workspace)
+
+    tracks = {name.split(" ~")[0] for name in labels(document, "thread_name")}
+    assert tracks == {"main", "subagent"}
+    assert labels(document, "process_name") == {
+        "claude · 2 sessions",
+        "codex · 2 sessions",
+        "kimi · 2 sessions",
+    }
+
+
+def test_defaults_to_the_current_directory(
+    homes: None, workspace: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(workspace)
+
+    assert exomyth.collect() == exomyth.collect(workspace)
+
+
+def test_accepts_a_workspace_string(homes: None, workspace: pathlib.Path) -> None:
+    assert exomyth.collect(str(workspace)) == exomyth.collect(workspace)
+
+
+def test_ignores_another_workspace(homes: None, tmp_path: pathlib.Path) -> None:
+    document = exomyth.collect(tmp_path / "nowhere")
+
+    assert document == {
+        "traceEvents": [],
+        "displayTimeUnit": "ms",
+        "otherData": {"workspace": str(tmp_path / "nowhere")},
+    }
+
+
+def test_skips_agents_without_a_home(
+    claude_home: pathlib.Path,
+    workspace: pathlib.Path,
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing"))
+
+    assert exomyth.collect(workspace)["otherData"]["agents"] == "claude"
+
+
+def test_cuts_off_records_outside_the_window(
+    homes: None, workspace: pathlib.Path
+) -> None:
+    whole = exomyth.collect(workspace)
+    window = exomyth.collect(
+        workspace,
+        start="2026-07-20 10:00:04+00:00",
+        end="2026-07-20 10:00:08+00:00",
+    )
+
+    assert 0 < len(slices(window)) < len(slices(whole))
+    assert window["otherData"]["start"] == "2026-07-20T10:00:04+00:00"
+    assert window["otherData"]["end"] == "2026-07-20T10:00:08+00:00"
+
+
+def test_returns_an_empty_document_for_an_empty_window(
+    homes: None, workspace: pathlib.Path
+) -> None:
+    document = exomyth.collect(workspace, end="2026-07-20 09:00:00+00:00")
+
+    assert document["traceEvents"] == []
+    assert document["otherData"] == {"workspace": str(workspace)}
+
+
+def test_rejects_a_time_it_cannot_read(workspace: pathlib.Path) -> None:
+    with pytest.raises(ValueError, match="cannot parse time: not a time at all!!"):
+        exomyth.collect(workspace, start="not a time at all!!")
+
+
+def test_writes_the_output_file(
+    homes: None, workspace: pathlib.Path, tmp_path: pathlib.Path
+) -> None:
+    output = tmp_path / "nested" / "trace.json"
+    output.parent.mkdir()
+
+    document = exomyth.collect(workspace, output=output)
+
+    assert loaded(output) == document
+
+
+def test_writes_relative_output_next_to_the_caller(
+    homes: None, workspace: pathlib.Path, tmp_path: pathlib.Path
+) -> None:
+    document = exomyth.collect(workspace, output="trace.json")
+
+    assert loaded(tmp_path / "trace.json") == document
+
+
+def test_writes_nothing_without_an_output(
+    homes: None, workspace: pathlib.Path, tmp_path: pathlib.Path
+) -> None:
+    exomyth.collect(workspace)
+
+    assert list(tmp_path.glob("*.json")) == []
+
+
+def test_keeps_unicode_readable(
+    kimi_home: pathlib.Path, workspace: pathlib.Path, tmp_path: pathlib.Path
+) -> None:
+    path = next(kimi_home.glob("sessions/*/*/agents/main/wire.jsonl"))
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("wire up the loop", "接上循环"),
+        encoding="utf-8",
+    )
+
+    exomyth.collect(workspace, output=tmp_path / "trace.json")
+
+    assert "接上循环" in (tmp_path / "trace.json").read_text(encoding="utf-8")

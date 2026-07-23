@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from .base import AgentBase, SessionBase
+from .config import AgentConfig
 
 _SESSION_ID = re.compile(r"^To resume this session: kimi -r (\S+)$", re.MULTILINE)
+
+
+@dataclass(frozen=True, kw_only=True)
+class KimiCodeCLIAgentConfig(AgentConfig):
+    """What Kimi Code is configured with: the common model, and an effort it has no knob for."""
 
 
 class KimiCodeCLISession(SessionBase):
@@ -18,8 +25,11 @@ class KimiCodeCLISession(SessionBase):
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
         """Builds ``kimi [--session <id>] --prompt`` with the prompt as an argument."""
-        resume = ["--session", self.session_id] if self.session_id else []
-        return (["kimi", *resume, "--prompt", prompt, "--model", self.agent.model], None)
+        resume = ["--session", self._id] if self._id else []
+        return (
+            ["kimi", *resume, "--prompt", prompt, "--model", self._agent.config.model],
+            None,
+        )
 
     def _read_session_id(self, transcript: str) -> str:
         """Reads the id out of the ``To resume this session: kimi -r <id>`` line.
@@ -36,6 +46,6 @@ class KimiCodeCLISession(SessionBase):
 class KimiCodeCLIAgent(AgentBase):
     """Kimi Code, which takes the prompt as a flag and has no effort knob, so effort is ignored."""
 
-    def start(self) -> KimiCodeCLISession:
+    def launch(self) -> KimiCodeCLISession:
         """Creates a new Kimi Code session."""
         return KimiCodeCLISession(self)

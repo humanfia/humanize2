@@ -8,7 +8,7 @@ import time
 from contextlib import suppress
 from pathlib import Path
 
-from flowjanus.agents import AgentBase, ClaudeCodeAgent
+from amflows.janus import AgentBase, ClaudeCodeAgent, ClaudeCodeAgentConfig
 
 
 def goal_loop(agent: AgentBase, task: str, *, prefix: str = "/goal ") -> None:
@@ -16,12 +16,13 @@ def goal_loop(agent: AgentBase, task: str, *, prefix: str = "/goal ") -> None:
     # the task as a subcommand.
     while True:
         with suppress(subprocess.CalledProcessError):  # flowbench's `|| true`
-            agent.run(prefix + task)  # the agent keeps itself going; the loop just restarts it
+            # The agent keeps itself going; the loop just restarts it.
+            agent.launch().run(prefix + task)
         time.sleep(5)
 
 
 if __name__ == "__main__":
     goal_loop(
-        ClaudeCodeAgent(model="claude-opus-4-8", effort="max"),
+        ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="max")),
         Path("TASK.md").read_text(),
     )

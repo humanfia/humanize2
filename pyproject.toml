@@ -1,32 +1,35 @@
 [project]
-name = "flowjanus"
+name = "amflows"
 version = "0.1.0"
-description = "A certain agent flow runtime"
+description = "Orchestrate, execute, and observe agent flows"
 readme = "README.md"
 authors = [
     { name = "Zijian Zhang", email = "35801754+futrime@users.noreply.github.com" }
 ]
 requires-python = ">=3.12"
-license = "MIT"
+license = "Apache-2.0"
 license-files = ["LICENSE"]
-dependencies = []
+dependencies = [
+    "dateparser>=1.4.1",
+]
+classifiers = [
+    "Environment :: Console",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.scripts]
+coganchor = "amflows.coganchor:main"
+exomyth = "amflows.exomyth.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.28,<0.12.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
-dev = ["pytest>=8", "mypy>=1.13"]
-
-[tool.ruff]
-line-length = 100
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF"]
-
-[tool.mypy]
-strict = true
-python_version = "3.12"
-files = ["src", "examples"]
-mypy_path = "src"
-explicit_package_bases = true
+dev = [
+    "pytest>=8",
+    "pytest-timeout>=2.3",
+    "ruff>=0.6",
+    "types-dateparser>=1.4.1.20260617",
+]

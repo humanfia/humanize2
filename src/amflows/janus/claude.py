@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 from .base import AgentBase, SessionBase
+from .config import AgentConfig
+
+
+@dataclass(frozen=True, kw_only=True)
+class ClaudeCodeAgentConfig(AgentConfig):
+    """What Claude Code is configured with: the common model and effort, and nothing else."""
 
 
 class ClaudeCodeSession(SessionBase):
@@ -14,36 +21,38 @@ class ClaudeCodeSession(SessionBase):
     a second agent working alongside would steal the resume.
     """
 
-    _id: str  # the id this session is opened under, reserved by the turn that opens it
+    _pinned: (
+        str  # the id this session is opened under, reserved by the turn that opens it
+    )
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
         """Builds ``claude --print`` with the prompt on stdin, opening or resuming the session."""
         # A fresh id per attempt: an opening turn that failed may still have left Claude holding
         # the id it was given, and retrying under that one would collide forever.
-        self._id = self.session_id or str(uuid.uuid4())
+        self._pinned = self._id or str(uuid.uuid4())
         return (
             [
                 "claude",
                 "--print",
-                "--resume" if self.session_id else "--session-id",
-                self._id,
+                "--resume" if self._id else "--session-id",
+                self._pinned,
                 "--dangerously-skip-permissions",
                 "--model",
-                self.agent.model,
+                self._agent.config.model,
                 "--effort",
-                self.agent.effort,
+                self._agent.config.effort,
             ],
             prompt,
         )
 
     def _read_session_id(self, transcript: str) -> str:
         """Returns the pinned id: Claude took it, so there is nothing to read back."""
-        return self._id
+        return self._pinned
 
 
 class ClaudeCodeAgent(AgentBase):
     """Claude Code, which takes the prompt on stdin and the effort via ``--effort``."""
 
-    def start(self) -> ClaudeCodeSession:
+    def launch(self) -> ClaudeCodeSession:
         """Creates a new Claude Code session."""
         return ClaudeCodeSession(self)

@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from .base import AgentBase, SessionBase
+from .config import AgentConfig
 
 _SESSION_ID = re.compile(r"^session id: (\S+)$", re.MULTILINE)
+
+
+@dataclass(frozen=True, kw_only=True)
+class CodexAgentConfig(AgentConfig):
+    """What Codex is configured with: the common model and effort, and nothing else."""
 
 
 class CodexSession(SessionBase):
@@ -18,7 +25,7 @@ class CodexSession(SessionBase):
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
         """Builds ``codex exec [resume <id>]`` with the prompt on stdin."""
-        resume = ["resume", self.session_id] if self.session_id else []
+        resume = ["resume", self._id] if self._id else []
         return (
             [
                 "codex",
@@ -27,9 +34,9 @@ class CodexSession(SessionBase):
                 "--dangerously-bypass-approvals-and-sandbox",
                 "--skip-git-repo-check",
                 "--model",
-                self.agent.model,
+                self._agent.config.model,
                 "-c",
-                f'model_reasoning_effort="{self.agent.effort}"',
+                f'model_reasoning_effort="{self._agent.config.effort}"',
                 "-c",
                 'service_tier="default"',
                 "-",  # take the prompt from stdin
@@ -52,6 +59,6 @@ class CodexSession(SessionBase):
 class CodexAgent(AgentBase):
     """Codex, which takes the prompt on stdin and the effort via ``model_reasoning_effort``."""
 
-    def start(self) -> CodexSession:
+    def launch(self) -> CodexSession:
         """Creates a new Codex session."""
         return CodexSession(self)

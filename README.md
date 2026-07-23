@@ -1,134 +1,127 @@
-# flowjanus
+# amflows
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
-> Treat any coding agent as one interface, hiding which CLI actually runs.
+> Orchestrate, execute, and observe agent flows.
 
-flowjanus is a tiny library that puts a uniform face on coding-agent CLIs. An **agent** is
-structure — a model at an effort level. A **session** is the conversation it runs on. A caller
-programs against one `run(prompt)` method and picks per flow whether turns share context; whether
-that dispatches to `claude`, `codex`, `kimi`, or an agent you add yourself is a detail behind the
-class. It is pure standard-library Python (≥ 3.12) with **zero third-party dependencies**.
+A flow is a coding agent driven in a loop. amflows is the three pieces that takes:
+
+- **`amflows.janus`** runs Claude Code, Codex and Kimi Code behind one interface, as agents that
+  hand out sessions.
+- **`amflows.exomyth`** turns the trajectories they leave behind into a Chrome JSON trace.
+- **`amflows.coganchor`** runs an agent on one machine and has it act on another.
+
+Each is importable on its own; nothing pulls in the others.
 
 ## Table of Contents
 
-- [Background](#background)
 - [Install](#install)
 - [Usage](#usage)
-- [API](#api)
+  - [janus](#janus)
+  - [exomyth](#exomyth)
+  - [coganchor](#coganchor)
+- [Security](#security)
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
 - [License](#license)
 
-## Background
-
-The concrete agents (`claude --print`, `codex exec`, `kimi --prompt`) differ in how they take a
-prompt, which flags they expect, and — most of all — how they name and reopen a conversation.
-Claude lets you pin a session id up front; Codex prints one in its header; Kimi prints one in a
-closing resume hint. Each of them also offers a "continue the newest session here" shortcut that
-silently breaks the moment a second agent runs in the same directory.
-
-flowjanus hides all of that. `SessionBase` owns the subprocess call, the stream teeing, and the
-error handling; each backend is a small pair of subclasses that build their own command and read
-their own session id back. Swapping the backend is swapping the class — the calling code does not
-change.
-
-Splitting the agent from the session is what makes both loop shapes expressible. A Ralph loop
-wants a fresh session per turn, so the agent rereads the repository instead of its own history. A
-stateful loop wants one session across every turn. Same agent, different session lifetime.
-
 ## Install
 
-flowjanus is pure Python (≥ 3.12) with zero third-party dependencies.
+Python ≥ 3.12, and the coding agent CLIs you intend to drive (`claude`, `codex`, `kimi`) on your
+PATH. `coganchor` additionally needs Linux x86-64 locally, and nothing but `python3` on the target.
+
+```sh
+pip install git+https://github.com/humanfia/amflows.git
+```
 
 From source, with [uv](https://docs.astral.sh/uv/):
 
 ```sh
-git clone git@github.com:humanfia/flowjanus.git
-cd flowjanus
+git clone git@github.com:humanfia/amflows.git
+cd amflows
 uv sync
 ```
 
-Or vendor it: copy `src/flowjanus/` into your project and
-`from flowjanus.agents import ClaudeCodeAgent` works with no install.
-
-The agents shell out to the backend CLIs, so the ones you use must be installed and authenticated
-on `PATH`.
-
 ## Usage
 
-```python
-from flowjanus.agents import ClaudeCodeAgent, CodexAgent, KimiCodeCLIAgent
+### janus
 
-agent = ClaudeCodeAgent(model="claude-opus-4-8", effort="high")
-
-# One turn in a throwaway session: nothing carries over to the next call.
-print(agent.run("Summarize CHANGELOG.md in 5 bullets"))  # -> str
-
-# Or a conversation that remembers, resumed under the hood on every turn after the first.
-session = agent.start()
-session.run("Refactor foo.py")
-session.run("Now write tests for what you just changed")
-print(session.session_id)  # the backend's id for that conversation
-
-# same interface, different backend
-print(CodexAgent(model="gpt-5-codex", effort="high").run("Write a pytest for utils.slugify"))
-print(KimiCodeCLIAgent(model="kimi-code/k3", effort="high").start().run("Explain this repo"))
-```
-
-Two independent sessions never steal each other's history, so an executor can keep working while
-a reviewer audits it from a clean slate — see [examples/arar.py](examples/arar.py).
-
-Add your own backend by subclassing `SessionBase` and `AgentBase`:
+An agent is a model at an effort; a session is one conversation with it. Which of the two a loop
+holds decides what the flow remembers.
 
 ```python
-from flowjanus.agents import AgentBase, SessionBase
+from amflows.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
+agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high"))
 
-class AcmeSession(SessionBase):
-    def _turn(self, prompt: str) -> tuple[list[str], str | None]:
-        resume = ["--resume", self.session_id] if self.session_id else []
-        argv = ["acme-bot", *resume, "--model", self.agent.model, "--effort", self.agent.effort]
-        return argv, prompt  # (argv, stdin); stdin=None => the prompt is already inside argv
+agent.launch().run(
+    "Read TASK.md and get started."
+)  # a new session: nothing carries over
 
-    def _read_session_id(self, transcript: str) -> str:
-        return transcript.split("session=")[1].split()[0]
-
-
-class AcmeAgent(AgentBase):
-    def start(self) -> AcmeSession:
-        return AcmeSession(self)
-
-
-AcmeAgent(model="large", effort="high").start().run("hello")
+session = agent.launch()
+session.run("Read TASK.md and get started.")  # opens the session
+session.run("continue")  # resumes it, task still in context
 ```
 
-## API
+`CodexAgent` and `KimiCodeCLIAgent` take the same calls. Both streams of a turn are passed through
+as they arrive, and a turn that fails raises `subprocess.CalledProcessError` without opening the
+session, so the next call retries it.
 
-Everything is exported from the `flowjanus.agents` package.
+[examples/](examples/) has the flow loops from flowbench written this way: `ralph_loop`, `goal`,
+`flame_chase`, `stateful_ralph`, `continue_loop` and `rlar`.
 
-- **`AgentBase(*, model: str, effort: str)`** — structure, and no history.
-  - **`start() -> SessionBase`** — the one method a backend implements: create a new session,
-    which stays unopened until its first turn.
-  - **`run(prompt: str) -> str`** — one turn in a throwaway session, dropped on return.
-- **`SessionBase(agent: AgentBase)`** — one conversation, across as many turns as you send it.
-  - **`run(prompt: str) -> str`** — send one turn and return the agent's final text. The first
-    call opens the backend session; every later one resumes it. Both of the agent's streams are
-    teed through to yours as they arrive. A nonzero exit raises
-    `subprocess.CalledProcessError` with both streams attached, and leaves the session unopened
-    so the next call retries rather than resuming a session that may not exist.
-  - **`session_id: str | None`** — the backend's id for this conversation, `None` until the
-    first turn lands.
-  - **`_turn(prompt) -> (argv, stdin)`** — what a backend implements: the command for one turn,
-    which opens a session while `session_id` is `None` and resumes it once set.
-  - **`_read_session_id(transcript) -> str`** — what a backend implements: read the session id
-    out of everything the opening turn printed, on stdout and stderr alike.
-- **`ClaudeCodeAgent`**, **`CodexAgent`**, **`KimiCodeCLIAgent`** and their
-  **`ClaudeCodeSession`**, **`CodexSession`**, **`KimiCodeCLISession`** — the built-in backends.
-  `kimi` has no effort knob, so `KimiCodeCLIAgent` ignores `effort`.
+### exomyth
 
-[examples/](examples) rewrites the flow loops from flowbench on this API.
+```sh
+exomyth collect [<workspace>] [--session <session>[,<session>]...] [--output <output>] [--start <start>] [--end <end>]
+```
+
+Collects the trajectories recorded for a workspace and writes `exomyth.trace.json`. Load it in
+[ui.perfetto.dev](https://ui.perfetto.dev) or `chrome://tracing`: sessions and sub-agents become
+tracks, one slice per action, with prompt, reasoning, tool input and tool output attached.
+
+```sh
+exomyth collect                                   # current workspace, all history
+exomyth collect ~/myproject --start "3 days ago"  # another workspace, recent history only
+exomyth collect --session 0a1b2c3d,5f6e           # two sessions, wherever they ran
+```
+
+Agent home directories come from `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and `KIMI_CODE_HOME`, falling
+back to `~/.claude`, `~/.codex` and `~/.kimi-code`; a missing one is skipped. `amflows.exomyth.collect`
+takes the same arguments, returns the trace document, and writes a file only when `output` is given.
+
+### coganchor
+
+```sh
+coganchor --target ssh://build-box claude
+coganchor --target ssh://gpu-01 codex exec "run the test suite"
+```
+
+The agent process stays here, keeping its credentials, its state directory and its link to its
+model provider. Everything it *does* — reading and writing files, running commands, reaching the
+network from them — happens on the target. It needs no plugin and no cooperation from the agent.
+
+`--target` takes `ssh://HOST`, `tcp://HOST:PORT` or `local[:DIR]`; `--workspace` names the project
+directory as it exists on the target; `--check` connects, reports what it found, and exits;
+`--shadow` puts the local mirror somewhere other than the workspace path. Instead of reconnecting
+over ssh each time, a target can be left listening:
+
+```sh
+# on the target
+coganchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
+# on this machine
+COGANCHOR_TOKEN=$SECRET coganchor --target tcp://build-box:7777 --workspace /srv/project claude
+```
+
+## Security
+
+**A `coganchor serve` port is equivalent to a shell on that machine.** An export bounds which files
+a request may name; it does not confine the commands that request can run. Give `--token` a real
+secret, and prefer `ssh://`, which needs no open port at all.
+
+The agent flows in [examples/](examples/) run their agents with permission prompts disabled, as
+flowbench does. Run them only in a workspace you are willing to have rewritten.
 
 ## Maintainers
 
@@ -139,9 +132,9 @@ Everything is exported from the `flowjanus.agents` package.
 PRs accepted. Open an issue to discuss a substantial change first.
 
 ```sh
-uv run python -m pytest        # the plumbing is tested with `sh`-backed fakes; no real CLI needed
-uvx ruff check && uvx ruff format --check
-uv run python -m mypy
+uvx ruff format && uvx ruff check && uv run pytest
+uv run --with mypy mypy --strict src tests examples
+uv run pytest --run-agents  # also drives claude, codex and kimi for real
 ```
 
 If you edit this README, please conform to the
@@ -149,4 +142,4 @@ If you edit this README, please conform to the
 
 ## License
 
-[MIT](LICENSE) © Zijian Zhang
+[Apache-2.0](LICENSE) © Zijian Zhang

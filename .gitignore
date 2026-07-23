@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+
+# Traces written by `exomyth collect`
+*.trace.json
