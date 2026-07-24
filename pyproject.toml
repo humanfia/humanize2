@@ -16,6 +16,7 @@ dependencies = [
 [project.scripts]
 coganchor = "amflows.coganchor.cli:main"
 exomyth = "amflows.exomyth.cli:main"
+janus = "amflows.janus.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.28,<0.12.0"]

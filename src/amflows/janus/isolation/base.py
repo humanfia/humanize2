@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class IsolationConfig(ABC):
     """The settings the machine an agent's turns are confined to is built from.
 
-    Frozen for the reason :class:`~amflows.janus.config.AgentConfig` is: the machine is started
+    Frozen for the reason :class:`~amflows.janus.agents.config.AgentConfig` is: the machine is
     once and every session of the agent lands on it, so a setting changed afterwards would
     describe something that is not running.
 

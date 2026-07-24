@@ -24,7 +24,7 @@ from amflows.janus import (
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
 )
-from amflows.janus import codex as appservers
+from amflows.janus.agents import codex as appservers
 
 #: A `kimi web` that says where it is listening and then serves the calls a turn is made of,
 #: recording each one. A prompt of `boom` is refused, which is how a failed turn is spelled.

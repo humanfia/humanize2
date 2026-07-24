@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     # import the half of coganchor that runs a session, nor the docker client behind isolation.
     from amflows.coganchor import AnchorConfig
 
-    from .isolation import IsolationConfig
+    from ..isolation import IsolationConfig
 
 
 @dataclass(frozen=True, kw_only=True)

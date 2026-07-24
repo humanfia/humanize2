@@ -2,29 +2,22 @@
 
 kimi --prompt "$(cat TASK.md)"                                   # first turn opens the session
 while true; do kimi --continue --prompt "$(cat TASK.md)" || true; sleep 5; done
+
+    janus -f examples/stateful_ralph.py -a kimi/kimi-code/k3/high "$(cat TASK.md)"
 """
 
 import subprocess
 import time
 from contextlib import suppress
-from pathlib import Path
 
-from amflows.janus import KimiCodeCLIAgent, KimiCodeCLIAgentConfig, SessionBase
+from amflows.janus import AgentBase
 
 
-def stateful_ralph(session: SessionBase, task: str) -> None:
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+    session = agent.launch()  # one session, held for as long as the flow runs
     while True:
         with suppress(subprocess.CalledProcessError):  # flowbench's `|| true`
-            session.run(
-                task
-            )  # the first turn opens the session; every later one resumes it
+            # The first turn opens the session; every later one resumes it.
+            session.run(task)
         time.sleep(5)
-
-
-if __name__ == "__main__":
-    stateful_ralph(
-        KimiCodeCLIAgent(
-            KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
-        ).launch(),
-        Path("TASK.md").read_text(),
-    )

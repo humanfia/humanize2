@@ -1,12 +1,23 @@
-"""Drive coding agent CLIs as agents and the sessions they hold."""
+"""Run a flow: agents driven in a loop, and the sessions they hold."""
 
 from __future__ import annotations
 
-from .base import AgentBase, CommandSessionBase, SessionBase
-from .claude import ClaudeCodeAgent, ClaudeCodeAgentConfig, ClaudeCodeSession
-from .codex import CodexAgent, CodexAgentConfig, CodexSession
-from .config import AgentConfig
-from .kimi import KimiCodeCLIAgent, KimiCodeCLIAgentConfig, KimiCodeCLISession
+from .agents import (
+    AgentBase,
+    AgentConfig,
+    ClaudeCodeAgent,
+    ClaudeCodeAgentConfig,
+    ClaudeCodeSession,
+    CodexAgent,
+    CodexAgentConfig,
+    CodexSession,
+    CommandSessionBase,
+    KimiCodeCLIAgent,
+    KimiCodeCLIAgentConfig,
+    KimiCodeCLISession,
+    SessionBase,
+)
+from .runner import NotAFlow, Runner
 
 __all__ = [
     "AgentBase",
@@ -21,5 +32,7 @@ __all__ = [
     "KimiCodeCLIAgent",
     "KimiCodeCLIAgentConfig",
     "KimiCodeCLISession",
+    "NotAFlow",
+    "Runner",
     "SessionBase",
 ]

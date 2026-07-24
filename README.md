@@ -49,8 +49,31 @@ uv sync
 
 ### janus
 
-An agent runs at a model and an effort; a session is one conversation with it. Which of the two a
-loop holds decides what the flow remembers.
+A flow is a Python file with a `run(agents, task)` in it, and `janus` runs one in this directory:
+
+```sh
+janus -f|--flow <flow> -a|--agents <backend>/<model>/<effort>[,<backend>/<model>/<effort>...] <task>
+```
+
+```sh
+janus -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "$(cat TASK.md)"
+janus -f examples/flame_chase.py -a claude/claude-opus-4-8/max,codex/gpt-5.6-sol/max "fix the build"
+```
+
+An agent is written `<backend>/<model>/<effort>`, and `-a` takes as many of them as the flow
+drives, comma separated, in the order it takes them; the option may be repeated instead. A flow
+says how many it drives in the tuple it annotates them with, and a command line that names a
+different number is refused before anything runs:
+
+```python
+def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:  # two agents, and only two
+```
+
+[examples/](examples/) has the flow loops from flowbench written this way: `ralph_loop`, `goal`,
+`flame_chase`, `stateful_ralph`, `continue_loop` and `rlar`.
+
+Inside a flow, an agent runs at a model and an effort; a session is one conversation with it.
+Which of the two a loop holds decides what the flow remembers.
 
 ```python
 from amflows.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
@@ -134,8 +157,9 @@ flow's trajectories are collected by session id rather than by workspace directo
 A flow killed outright leaves its containers behind, labelled with the uid that started them:
 `docker rm -f $(docker ps -q --filter label=amflows.janus=$(id -u))` clears yours.
 
-[examples/](examples/) has the flow loops from flowbench written this way: `ralph_loop`, `goal`,
-`flame_chase`, `stateful_ralph`, `continue_loop` and `rlar`.
+A name, an anchor and a machine of the agent's own are settings of the agent rather than of the
+flow, so `-a` does not reach them: a flow that needs one is handed agents built as above, by
+`Runner(flow, agents).run(task)`.
 
 ### exomyth
 

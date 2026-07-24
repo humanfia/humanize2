@@ -5,253 +5,71 @@
 ```
 .
 ├── __init__.py
-├── base.py
-├── claude.py
-├── codex.py
-├── config.py
+├── __main__.py
+├── agents
+├── cli.py
 ├── isolation
-│   ├── __init__.py
-│   ├── base.py
-│   └── docker.py
-└── kimi.py
+└── runner.py
 ```
+
+Each subdirectory has a SPEC of its own.
 
 ## `__init__.py`
 
-Expose `AgentBase`, `SessionBase`, `CommandSessionBase`, and all agent and session classes.
+Expose `Runner`, `NotAFlow`, and everything `agents` exposes.
 
-## `config.py`
+## Commands
 
-```python
-@dataclass(frozen=True, kw_only=True)
-class AgentConfig:
-    model: str
-    effort: str
-    anchor: AnchorConfig | None = None
-    isolation: IsolationConfig | None = None
+```shell
+janus -f|--flow <flow> -a|--agents <backend>/<model>/<effort>[,<backend>/<model>/<effort>...] <task>
 ```
 
-- `anchor` MUST be the `amflows.coganchor.AnchorConfig` the agent's turns are run under, or
-  `None` to run them on this machine.
-- `isolation` MUST be the machine to start for the agent and run its turns on, or `None` to use
-  one that is already running.
-- Both MUST NOT be given at once: each says where the work lands.
-- An anchored turn MUST be run by spawning `AnchorConfig.command(argv)`, never by calling
-  coganchor in this process: a turn is pumped from threads of its own, which a supervisor that
-  forks the agent and takes the process's signal handling cannot be given.
+Runs a flow in the current directory, on the agents it is given.
 
-## `base.py`
+Args:
 
-### `AgentBase`
+- `-f`, `--flow <flow>`: The Python file the flow is written in. Required.
+- `-a`, `--agents <backend>/<model>/<effort>[,...]`: The agents to drive the flow with, comma
+  separated and repeatable, in the order the flow takes them. Required.
+- `<task>`: What the flow is to have the agents do, as the text itself.
 
-```python
-class AgentBase(ABC):
-    def __init__(self, config: AgentConfig, *, name: str | None = None): ...
+- `<backend>` MUST be one of `claude`, `codex` and `kimi`, and `<model>` and `<effort>` MUST be
+  what that backend is asked for. A model MAY hold slashes of its own -- Kimi Code's are
+  `kimi-code/k3` -- so the backend MUST be read from the front and the effort from the back.
+- Two agents of one spelling MUST be two agents, so that a flow of an actor and a reviewer at
+  one configuration is what it says it is.
+- A flow that is not there, has no entry point, does not say how many agents it drives, or
+  drives a different number than were given MUST be reported as a usage error, before any
+  agent has run. Whatever else a flow does as it is imported is the flow's own, and MUST fail
+  as it would anywhere.
+- `__main__.py` MUST run this same command line, so that `python -m amflows.janus` is `janus`.
 
-    @property
-    @abstractmethod
-    def id(self) -> str:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def config(self) -> AgentConfig:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def sessions(self) -> list[SessionBase]:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def opened(self) -> list[str]:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def anchor(self) -> AnchorConfig | None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def launch(self) -> SessionBase:
-        """Creates a new session.
-
-        Returns:
-            A new session object.
-        """
-        raise NotImplementedError
-```
-
-- `id` MUST be the given name, or one no other agent answers to when no name is given, so that
-  two agents of the same config are two agents.
-- `opened` MUST report the backend's id for every session this agent has opened, oldest first,
-  including the sessions nobody holds any more. It is what a flow hands a trace to say which
-  trajectories were this agent's.
-- `anchor` MUST be where this agent's turns land, which is `AgentConfig.anchor` unless the agent
-  is isolated. An isolated agent MUST start its machine here, at most once and only when first
-  asked, and MUST stop it when the agent is collected or the process exits.
-
-### `SessionBase`
+## `runner.py`
 
 ```python
-class SessionBase(ABC):
-    def __init__(self, agent: AgentBase): ...
+class NotAFlow(ValueError): ...
 
-    @property
-    @abstractmethod
-    def id(self) -> str:
-        raise NotImplementedError
 
-    @abstractmethod
-    def run(self, prompt: str) -> str:
-        """Runs one turn in the session.
+class Runner:
+    def __init__(self, flow: str | os.PathLike[str], agents: Sequence[AgentBase]): ...
+
+    def run(self, task: str) -> None:
+        """Runs the flow, until it returns.
 
         Args:
-            prompt: The prompt to send to the agent.
-
-        Returns:
-            The agent's response.
+            task: What the flow is to have its agents do.
         """
-        raise NotImplementedError
-
-    def pursue(self, objective: str) -> str:
-        """Runs the session under a goal the agent keeps itself going toward.
-
-        Args:
-            objective: What the agent is to have achieved before it stops.
-
-        Returns:
-            The agent's response once it stops.
-        """
-        raise NotImplementedError
 ```
 
-- MUST NOT run a session in parallel; use a lock to ensure that only one turn is run at a time.
-- MUST add a session to its agent's `opened` as it opens, and never for a turn that failed.
-- A turn that fails MUST raise `subprocess.CalledProcessError`, whatever it was run through, so
-  that a flow catches turns rather than transports.
-- `pursue` MUST be the backend's own goal feature -- the one its `/goal` command reaches -- and
-  MUST NOT fall back to asking for one in the prompt, which is a prompt and not a goal. It MUST
-  raise `NotImplementedError` on a backend that has none, rather than running the objective as
-  an ordinary turn.
-- A goal is as many turns of the model as the objective takes, and the backend starts them
-  itself. `pursue` MUST follow the goal across all of them and answer with the last of them: a
-  session that has gone quiet is a goal that has stopped only once the goal itself says so.
-- A backend that reports a turn finished before what it said can be read back MUST be read once
-  more afterwards, and one that hands back a message still being written MUST be read again
-  until it is not. Neither may leave a landed turn answering with nothing.
-
-### `CommandSessionBase`
-
-```python
-class CommandSessionBase(SessionBase):
-    @abstractmethod
-    def _turn(self, prompt: str) -> tuple[list[str], str | None]:
-        """Builds the command one turn is run as.
-
-        Args:
-            prompt: The prompt to send to the agent.
-
-        Returns:
-            The command to run, and what to write to its stdin, or None when the prompt is
-            already inside the command.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def _read_session_id(self, transcript: str) -> str:
-        """Reads back the id the backend gave this session.
-
-        Args:
-            transcript: Everything the turn printed, on stdout and stderr alike.
-
-        Returns:
-            The backend's session id.
-        """
-        raise NotImplementedError
-```
-
-- A turn MUST be one run of the command, with both of the agent's streams teed to ours as they
-  arrive, so that a long turn stays watchable. A sink that has gone away MUST NOT take the turn
-  down with it, and MUST NOT stop the reading either: a pipe nobody drains blocks the agent.
-- Every session that is not one command per turn MUST derive from `SessionBase` instead, so
-  that a backend driven another way inherits none of this.
-
-## `claude.py` / `codex.py` / ... - Concrete Agent and Session Classes
-
-```python
-@dataclass(frozen=True, kw_only=True)
-class DummyAgentConfig(AgentConfig): ...
-
-
-class DummyAgent(AgentBase): ...
-
-
-class DummySession(CommandSessionBase): ...
-```
-
-- A backend MUST be driven through its command line where that can express what an agent is
-  configured with, and through the app server the backend serves its own client from where it
-  cannot -- a model, an effort, a mode or a goal that has no flag is a setting of a session
-  there, and asking the model for it in the prompt is not the same feature.
-- Such a server MUST be started at most once per agent, only when a turn first needs one, so
-  that a flow which needs none starts none; it MUST be started under the agent's anchor, and
-  stopped when the agent is collected or the process exits.
-- One server is shared by every session of its agent, so a call on it MUST be serialized: two
-  turns interleaved on one stream would each take the other's answers.
-- A backend told where to work MUST be told the directory the anchor puts it in, which is the
-  workspace itself unless the mirror was put somewhere else, and this one when it is not
-  anchored at all.
-
-## `isolation/__init__.py`
-
-Expose `IsolationBase`, `IsolationConfig`, and all backend and backend config classes.
-
-## `isolation/base.py`
-
-```python
-@dataclass(frozen=True, kw_only=True)
-class IsolationConfig(ABC):
-    workspace: str | None = None
-
-    @abstractmethod
-    def create(self) -> IsolationBase:
-        raise NotImplementedError
-
-
-class IsolationBase(ABC):
-    def __init__(self, config: IsolationConfig): ...
-
-    @abstractmethod
-    def start(self) -> AnchorConfig:
-        """Brings the machine up.
-
-        Returns:
-            The anchor that reaches it.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def stop(self) -> None:
-        """Takes the machine down."""
-        raise NotImplementedError
-```
-
-- `workspace` MUST be the project directory to give the machine, defaulting to this one, and
-  MUST be that directory itself rather than a copy of it, so the work outlives the machine.
-- `start` MUST leave the machine ready for a turn to be run against it, and MUST take down
-  whatever it created if it cannot.
-- `stop` MUST leave the workspace behind.
-
-## `isolation/docker.py` / ... - Concrete Isolation Backends
-
-```python
-@dataclass(frozen=True, kw_only=True)
-class DummyIsolationConfig(IsolationConfig): ...
-
-
-class DummyIsolation(IsolationBase): ...
-```
-
-- A container MUST run as the calling user, so the workspace stays that user's.
+- A flow MUST be a Python file whose entry point is `run(agents: tuple[...], task: str)`, and
+  that tuple MUST be of a fixed length, which is how many agents the flow drives: it is the one
+  thing about a flow a command line running it cannot otherwise know. It MUST be readable where
+  the flow runs rather than only where a type checker looks, since a count nothing can read
+  back is not one a command line can be held to.
+- `__init__` MUST load the flow and MUST raise `NotAFlow` unless the file is there and has
+  such an entry point, declaring as many agents as it was given, so that a flow started with
+  the wrong number of them fails before its first turn rather than partway through a loop.
+- Whatever the flow itself raises as it is loaded MUST be left alone, so that a flow whose own
+  setup fails is not answered with a command line to correct.
+- `run` MUST call the entry point with the agents as a tuple, in the order they were given, and
+  the task.

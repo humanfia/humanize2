@@ -2,17 +2,20 @@
 
 kimi --prompt "$(cat TASK.md)"                                   # first turn opens the session
 while true; do kimi --continue --prompt "continue" || true; sleep 5; done
+
+    janus -f examples/continue_loop.py -a kimi/kimi-code/k3/high "$(cat TASK.md)"
 """
 
 import subprocess
 import time
 from contextlib import suppress
-from pathlib import Path
 
-from amflows.janus import KimiCodeCLIAgent, KimiCodeCLIAgentConfig, SessionBase
+from amflows.janus import AgentBase
 
 
-def continue_loop(session: SessionBase, task: str) -> None:
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+    session = agent.launch()
     # Until a turn lands, keep sending the task: "continue" on its own would open a session that
     # never saw it. After that, resuming keeps the task in context.
     prompt = task
@@ -21,12 +24,3 @@ def continue_loop(session: SessionBase, task: str) -> None:
             session.run(prompt)
             prompt = "continue"
         time.sleep(5)
-
-
-if __name__ == "__main__":
-    continue_loop(
-        KimiCodeCLIAgent(
-            KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
-        ).launch(),
-        Path("TASK.md").read_text(),
-    )

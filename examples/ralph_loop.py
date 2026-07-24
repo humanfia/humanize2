@@ -1,27 +1,21 @@
 """Ralph loop (flowbench: ralph_loop) -- a fresh session every turn, so nothing carries over.
 
 while true; do claude --print < TASK.md || true; sleep 5; done
+
+    janus -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "$(cat TASK.md)"
 """
 
 import subprocess
 import time
 from contextlib import suppress
-from pathlib import Path
 
-from amflows.janus import AgentBase, ClaudeCodeAgent, ClaudeCodeAgentConfig
+from amflows.janus import AgentBase
 
 
-def ralph_loop(agent: AgentBase, task: str) -> None:
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
     while True:
         with suppress(subprocess.CalledProcessError):  # flowbench's `|| true`
-            agent.launch().run(
-                task
-            )  # a new session: the agent starts from the task each time
+            # A new session each turn: the agent starts from the task and nothing else.
+            agent.launch().run(task)
         time.sleep(5)
-
-
-if __name__ == "__main__":
-    ralph_loop(
-        ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")),
-        Path("TASK.md").read_text(),
-    )
