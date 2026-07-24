@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .base import AgentBase, SessionBase
+from .base import AgentBase, CommandSessionBase, SessionBase
 from .claude import ClaudeCodeAgent, ClaudeCodeAgentConfig, ClaudeCodeSession
 from .codex import CodexAgent, CodexAgentConfig, CodexSession
 from .config import AgentConfig
@@ -17,6 +17,7 @@ __all__ = [
     "CodexAgent",
     "CodexAgentConfig",
     "CodexSession",
+    "CommandSessionBase",
     "KimiCodeCLIAgent",
     "KimiCodeCLIAgentConfig",
     "KimiCodeCLISession",

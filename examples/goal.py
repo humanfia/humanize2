@@ -1,4 +1,4 @@
-"""Goal loop (flowbench: goal) -- ralph, but the task is handed to the agent's own /goal feature.
+"""Goal loop (flowbench: goal) -- ralph, with the task set as the agent's own goal.
 
 while true; do { printf '/goal '; cat TASK.md; } | claude --print || true; sleep 5; done
 """
@@ -11,13 +11,13 @@ from pathlib import Path
 from amflows.janus import AgentBase, ClaudeCodeAgent, ClaudeCodeAgentConfig
 
 
-def goal_loop(agent: AgentBase, task: str, *, prefix: str = "/goal ") -> None:
-    # Kimi Code needs prefix="/goal -- ", so that its goal parser cannot read the first word of
-    # the task as a subcommand.
+def goal_loop(agent: AgentBase, task: str) -> None:
+    # Ralph, turn for turn, except that a turn here is a goal: the agent keeps itself going
+    # until it has met the task, and the loop is only what starts it over when it stopped
+    # without having. Each round is a session of its own, so nothing carries over but the work.
     while True:
         with suppress(subprocess.CalledProcessError):  # flowbench's `|| true`
-            # The agent keeps itself going; the loop just restarts it.
-            agent.launch().run(prefix + task)
+            agent.launch().pursue(task)
         time.sleep(5)
 
 

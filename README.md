@@ -66,9 +66,20 @@ session.run("Read TASK.md and get started.")  # opens the session
 session.run("continue")  # resumes it, task still in context
 ```
 
-`CodexAgent` and `KimiCodeCLIAgent` take the same calls. Both streams of a turn are passed through
-as they arrive, and a turn that fails raises `subprocess.CalledProcessError` without opening the
-session, so the next call retries it.
+`CodexAgent` and `KimiCodeCLIAgent` take the same calls. What a turn says is passed through as it
+arrives, and a turn that fails raises `subprocess.CalledProcessError` without opening the session,
+so the next call retries it.
+
+A session can be given a goal instead of a prompt. This is the backend's own goal feature, the one
+its `/goal` command reaches: the agent decides for itself when the objective has been met, and
+until it does, a turn that would have ended starts another.
+
+```python
+agent.launch().pursue("the suite passes and nothing has been stubbed out")
+```
+
+Kimi Code's effort says how wide to run as well as how hard to think: `max` is one agent, and
+`swarmmax` is the same thinking at the width of a fleet of subagents.
 
 Two agents at one model and one effort are still two agents — an actor and the reviewer that reads
 its work. Name them, and each reports the sessions it opened, which is what tells a trace apart:

@@ -18,7 +18,7 @@
 
 ## `__init__.py`
 
-Expose `AgentBase`, `SessionBase`, and all agent and session classes.
+Expose `AgentBase`, `SessionBase`, `CommandSessionBase`, and all agent and session classes.
 
 ## `config.py`
 
@@ -114,10 +114,69 @@ class SessionBase(ABC):
             The agent's response.
         """
         raise NotImplementedError
+
+    def pursue(self, objective: str) -> str:
+        """Runs the session under a goal the agent keeps itself going toward.
+
+        Args:
+            objective: What the agent is to have achieved before it stops.
+
+        Returns:
+            The agent's response once it stops.
+        """
+        raise NotImplementedError
 ```
 
 - MUST NOT run a session in parallel; use a lock to ensure that only one turn is run at a time.
 - MUST add a session to its agent's `opened` as it opens, and never for a turn that failed.
+- A turn that fails MUST raise `subprocess.CalledProcessError`, whatever it was run through, so
+  that a flow catches turns rather than transports.
+- `pursue` MUST be the backend's own goal feature -- the one its `/goal` command reaches -- and
+  MUST NOT fall back to asking for one in the prompt, which is a prompt and not a goal. It MUST
+  raise `NotImplementedError` on a backend that has none, rather than running the objective as
+  an ordinary turn.
+- A goal is as many turns of the model as the objective takes, and the backend starts them
+  itself. `pursue` MUST follow the goal across all of them and answer with the last of them: a
+  session that has gone quiet is a goal that has stopped only once the goal itself says so.
+- A backend that reports a turn finished before what it said can be read back MUST be read once
+  more afterwards, and one that hands back a message still being written MUST be read again
+  until it is not. Neither may leave a landed turn answering with nothing.
+
+### `CommandSessionBase`
+
+```python
+class CommandSessionBase(SessionBase):
+    @abstractmethod
+    def _turn(self, prompt: str) -> tuple[list[str], str | None]:
+        """Builds the command one turn is run as.
+
+        Args:
+            prompt: The prompt to send to the agent.
+
+        Returns:
+            The command to run, and what to write to its stdin, or None when the prompt is
+            already inside the command.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _read_session_id(self, transcript: str) -> str:
+        """Reads back the id the backend gave this session.
+
+        Args:
+            transcript: Everything the turn printed, on stdout and stderr alike.
+
+        Returns:
+            The backend's session id.
+        """
+        raise NotImplementedError
+```
+
+- A turn MUST be one run of the command, with both of the agent's streams teed to ours as they
+  arrive, so that a long turn stays watchable. A sink that has gone away MUST NOT take the turn
+  down with it, and MUST NOT stop the reading either: a pipe nobody drains blocks the agent.
+- Every session that is not one command per turn MUST derive from `SessionBase` instead, so
+  that a backend driven another way inherits none of this.
 
 ## `claude.py` / `codex.py` / ... - Concrete Agent and Session Classes
 
@@ -129,8 +188,21 @@ class DummyAgentConfig(AgentConfig): ...
 class DummyAgent(AgentBase): ...
 
 
-class DummySession(SessionBase): ...
+class DummySession(CommandSessionBase): ...
 ```
+
+- A backend MUST be driven through its command line where that can express what an agent is
+  configured with, and through the app server the backend serves its own client from where it
+  cannot -- a model, an effort, a mode or a goal that has no flag is a setting of a session
+  there, and asking the model for it in the prompt is not the same feature.
+- Such a server MUST be started at most once per agent, only when a turn first needs one, so
+  that a flow which needs none starts none; it MUST be started under the agent's anchor, and
+  stopped when the agent is collected or the process exits.
+- One server is shared by every session of its agent, so a call on it MUST be serialized: two
+  turns interleaved on one stream would each take the other's answers.
+- A backend told where to work MUST be told the directory the anchor puts it in, which is the
+  workspace itself unless the mirror was put somewhere else, and this one when it is not
+  anchored at all.
 
 ## `isolation/__init__.py`
 

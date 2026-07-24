@@ -27,13 +27,11 @@ from amflows.janus import (
     ClaudeCodeAgentConfig,
     CodexAgent,
     CodexAgentConfig,
-    KimiCodeCLIAgent,
-    KimiCodeCLIAgentConfig,
-    SessionBase,
+    CommandSessionBase,
 )
 from tests.janus.conftest import HereAnchor, ShellAgent
 
-# Verbatim from `codex exec` and `kimi --prompt`, which is where the session ids come from.
+# Verbatim from `codex exec`, which is where its session id comes from.
 CODEX_TRANSCRIPT = """OpenAI Codex v0.144.4
 --------
 workdir: /tmp/probe
@@ -41,17 +39,12 @@ model: gpt-5.6-sol
 session id: 019fa62b-d9e1-7b73-be84-bd70260e1cf6
 --------
 """
-KIMI_TRANSCRIPT = """• Replying as asked.
-
-To resume this session: kimi -r session_d227710c-06ae-4935-a3d3-412abc707af9
-"""
 CODEX_ID = "019fa62b-d9e1-7b73-be84-bd70260e1cf6"
-KIMI_ID = "session_d227710c-06ae-4935-a3d3-412abc707af9"
 
 CONFIG = AgentConfig(model="m", effort="high")
 
 
-class _EchoSession(SessionBase):
+class _EchoSession(CommandSessionBase):
     """Runs `cat`, echoing the prompt back on stdout -- the only fake on the stdin path."""
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
@@ -66,7 +59,7 @@ class _EchoAgent(AgentBase):
         return _EchoSession(self)
 
 
-class _StubbornSession(SessionBase):
+class _StubbornSession(CommandSessionBase):
     """Fills its own stdout before reading a byte of the prompt, which a pipe cannot hold."""
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
@@ -81,7 +74,7 @@ class _StubbornAgent(AgentBase):
         return _StubbornSession(self)
 
 
-class _QuitterSession(SessionBase):
+class _QuitterSession(CommandSessionBase):
     """Rejects the call and exits before reading a byte of the prompt still being written."""
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
@@ -106,7 +99,7 @@ class _Call:
 
 @dataclass(frozen=True)
 class _FakeCLIs:
-    """Fake `claude`, `codex` and `kimi` on PATH, each recording the calls it was made with."""
+    """Fake `claude` and `codex` on PATH, each recording the calls it was made with."""
 
     log: Path
 
@@ -123,7 +116,6 @@ def clis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeCLIs:
     for name, transcript in (
         ("claude", ""),  # Claude prints no id: it takes the one it is given
         ("codex", CODEX_TRANSCRIPT),
-        ("kimi", KIMI_TRANSCRIPT),
     ):
         fake = binaries / name
         fake.write_text(
@@ -369,28 +361,15 @@ def test_codex_opens_then_resumes(clis: _FakeCLIs) -> None:
     assert resumed.argv[:3] == ["exec", "resume", CODEX_ID]
 
 
-def test_kimi_opens_then_resumes(clis: _FakeCLIs) -> None:
-    session = KimiCodeCLIAgent(
-        KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
+def test_claude_pursues_through_its_own_goal_command(clis: _FakeCLIs) -> None:
+    """`/goal` is Claude's, and print mode expands it: what a goal must not be is a prompt."""
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
     ).launch()
-    session.run("hi")
-    session.run("again")
+    session.pursue("the suite passes")
 
-    opened, resumed = clis.calls()
-    # prompt as an argument, not on stdin; effort is ignored for kimi
-    assert opened.argv == ["--prompt", "hi", "--model", "kimi-code/k3"]
-    assert opened.stdin == ""
-    assert (
-        session.id == KIMI_ID
-    )  # read back out of the resume hint the first turn printed
-    assert resumed.argv == [
-        "--session",
-        KIMI_ID,
-        "--prompt",
-        "again",
-        "--model",
-        "kimi-code/k3",
-    ]
+    (turn,) = clis.calls()
+    assert turn.stdin == "/goal the suite passes"
 
 
 def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -> None:
@@ -417,8 +396,12 @@ def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -
     assert [call.stdin for call in clis.calls()] == ["hi", "again"]
 
 
-@pytest.mark.parametrize("agent", [CodexAgent, KimiCodeCLIAgent])
-def test_unreadable_session_id_raises(agent: type[AgentBase]) -> None:
-    session = agent(CONFIG).launch()
+def test_unreadable_session_id_raises() -> None:
+    session = CodexAgent(CONFIG).launch()
     with pytest.raises(RuntimeError):
         session._read_session_id("no session id here")
+
+
+def test_a_backend_without_a_goal_feature_says_so() -> None:
+    with pytest.raises(NotImplementedError):
+        _EchoAgent(CONFIG).launch().pursue("the suite passes")

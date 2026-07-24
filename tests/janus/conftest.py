@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from amflows.coganchor import AnchorConfig
-from amflows.janus import AgentBase, SessionBase
+from amflows.janus import AgentBase, CommandSessionBase
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -24,7 +24,7 @@ class HereAnchor(AnchorConfig):
         return list(argv)
 
 
-class ShellSession(SessionBase):
+class ShellSession(CommandSessionBase):
     """Runs the prompt as a shell script, so each test spells the agent it stands in for."""
 
     def __init__(self, agent: AgentBase):
