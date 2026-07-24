@@ -9,9 +9,12 @@ import threading
 import uuid
 import weakref
 from abc import ABC, abstractmethod
-from typing import IO
+from typing import IO, TYPE_CHECKING
 
 from .config import AgentConfig
+
+if TYPE_CHECKING:
+    from amflows.coganchor import AnchorConfig
 
 
 def _tee(source: IO[str], sink: IO[str], captured: list[str]) -> None:
@@ -70,7 +73,8 @@ class SessionBase(ABC):
         as they arrive, so a long turn stays watchable. A failed turn leaves the session
         unopened, so the next call retries the turn the same way rather than resuming a session
         that may not exist. An anchored agent is run through coganchor, which is what puts the
-        turn's files and commands on another machine while the conversation stays here.
+        turn's files and commands on another machine while the conversation stays here, and an
+        isolated one is the same thing against a machine the agent started for itself.
 
         Args:
           prompt: The input prompt for this turn.
@@ -84,7 +88,7 @@ class SessionBase(ABC):
         """
         with self._lock:
             argv, stdin = self._turn(prompt)
-            if (anchor := self._agent.config.anchor) is not None:
+            if (anchor := self._agent.anchor) is not None:
                 # Spawned rather than called: coganchor's supervisor forks the agent and takes
                 # the process's signal handling with it, which a flow pumping turns from
                 # threads of its own has no way to lend it.
@@ -187,6 +191,9 @@ class AgentBase(ABC):
         self._id = name or f"{type(self).__name__}#{uuid.uuid4().hex[:8]}"
         self._sessions: list[weakref.ref[SessionBase]] = []
         self._opened: list[str] = []
+        # The machine an isolated agent started, once its first turn has started one.
+        self._anchor: AnchorConfig | None = None
+        self._starting = threading.Lock()
 
     @property
     def id(self) -> str:
@@ -207,6 +214,29 @@ class AgentBase(ABC):
     def config(self) -> AgentConfig:
         """The model and effort every session of this agent runs at."""
         return self._config
+
+    @property
+    def anchor(self) -> AnchorConfig | None:
+        """Where this agent's turns land, or None while they land here.
+
+        An isolated agent starts its machine the first time this is asked for, which is the
+        first turn it is given: constructing an agent pulls no image and starts no container,
+        and a flow that configures more agents than it drives pays for the ones it drives. The
+        machine then stands for as long as the agent does -- its sessions are turns of one
+        conversation each, and they must find the workspace as the last turn left it -- and is
+        taken down when the agent is collected, or at exit for one held to the end.
+        """
+        if self._config.isolation is None:
+            return self._config.anchor
+        # Two sessions of one agent share the machine rather than starting one each.
+        with self._starting:
+            if self._anchor is None:
+                isolation = self._config.isolation.create()
+                self._anchor = isolation.start()
+                # Held by the finalizer alone, which is what takes the machine down: when the
+                # agent is collected, and at exit for one held to the end.
+                weakref.finalize(self, isolation.stop)
+            return self._anchor
 
     @property
     def sessions(self) -> list[SessionBase]:

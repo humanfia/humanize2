@@ -36,7 +36,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--target",
         default=os.environ.get("COGANCHOR_TARGET", "local"),
         metavar="URL",
-        help="ssh://HOST, tcp://HOST:PORT, or local[:DIR] (default: $COGANCHOR_TARGET)",
+        help="ssh://HOST, docker://CONTAINER, tcp://HOST:PORT, or local[:DIR] "
+        "(default: $COGANCHOR_TARGET)",
     )
     parser.add_argument(
         "--workspace",

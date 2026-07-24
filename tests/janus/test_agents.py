@@ -14,14 +14,12 @@ import os
 import subprocess
 import sys
 import threading
-from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
-from amflows.coganchor import AnchorConfig
 from amflows.janus import (
     AgentBase,
     AgentConfig,
@@ -33,6 +31,7 @@ from amflows.janus import (
     KimiCodeCLIAgentConfig,
     SessionBase,
 )
+from tests.janus.conftest import HereAnchor, ShellAgent
 
 # Verbatim from `codex exec` and `kimi --prompt`, which is where the session ids come from.
 CODEX_TRANSCRIPT = """OpenAI Codex v0.144.4
@@ -67,26 +66,6 @@ class _EchoAgent(AgentBase):
         return _EchoSession(self)
 
 
-class _ShellSession(SessionBase):
-    """Runs the prompt as a shell script, so each test spells the agent it wants to stand in for."""
-
-    def __init__(self, agent: AgentBase):
-        super().__init__(agent)
-        self.reads = 0
-
-    def _turn(self, prompt: str) -> tuple[list[str], str | None]:
-        return (["sh", "-c", prompt], None)
-
-    def _read_session_id(self, transcript: str) -> str:
-        self.reads += 1
-        return transcript.strip()  # so a test can see exactly what the parser was given
-
-
-class _ShellAgent(AgentBase):
-    def launch(self) -> _ShellSession:
-        return _ShellSession(self)
-
-
 class _StubbornSession(SessionBase):
     """Fills its own stdout before reading a byte of the prompt, which a pipe cannot hold."""
 
@@ -115,21 +94,6 @@ class _QuitterSession(SessionBase):
 class _QuitterAgent(AgentBase):
     def launch(self) -> _QuitterSession:
         return _QuitterSession(self)
-
-
-@dataclass(frozen=True, kw_only=True, slots=True)
-class _HereAnchor(AnchorConfig):
-    """An anchor that runs the turn here after all, and keeps what it was handed.
-
-    A real one would spawn coganchor, which needs a target and a machine to intercept on;
-    what janus owes it is the whole call the backend built, which is what this records.
-    """
-
-    seen: list[list[str]] = field(default_factory=list)
-
-    def command(self, argv: Sequence[str]) -> list[str]:
-        self.seen.append(list(argv))
-        return list(argv)
 
 
 @dataclass(frozen=True)
@@ -180,7 +144,7 @@ def test_run_returns_agent_text() -> None:
 
 
 def test_both_streams_are_teed_and_captured(capsys: pytest.CaptureFixture[str]) -> None:
-    session = _ShellAgent(CONFIG).launch()
+    session = ShellAgent(CONFIG).launch()
     assert (
         session.run("echo progress >&2; echo answer") == "answer"
     )  # only stdout is the response
@@ -194,7 +158,7 @@ def test_both_streams_are_teed_and_captured(capsys: pytest.CaptureFixture[str]) 
 
 
 def test_failed_turn_raises_and_leaves_the_session_unopened() -> None:
-    session = _ShellAgent(CONFIG).launch()
+    session = ShellAgent(CONFIG).launch()
     with pytest.raises(subprocess.CalledProcessError) as exc:
         session.run("echo boom >&2; exit 3")
     assert exc.value.returncode == 3
@@ -207,7 +171,7 @@ def test_failed_turn_raises_and_leaves_the_session_unopened() -> None:
 
 
 def test_a_session_spans_its_turns() -> None:
-    session = _ShellAgent(CONFIG).launch()
+    session = ShellAgent(CONFIG).launch()
     with pytest.raises(RuntimeError):  # not opened until a turn lands
         _ = session.id
     session.run("echo one")
@@ -230,7 +194,7 @@ def test_an_agent_is_one_agent_apart_from_its_configuration() -> None:
 
 
 def test_an_agent_remembers_every_session_it_opened() -> None:
-    agent = _ShellAgent(CONFIG)
+    agent = ShellAgent(CONFIG)
     assert agent.opened == []  # nothing has been opened yet
     kept = agent.launch()
     kept.run("echo one")
@@ -247,7 +211,7 @@ def test_an_agent_remembers_every_session_it_opened() -> None:
 
 
 def test_a_failed_turn_leaves_nothing_behind_to_remember() -> None:
-    agent = _ShellAgent(CONFIG)
+    agent = ShellAgent(CONFIG)
     with pytest.raises(subprocess.CalledProcessError):
         agent.launch().run("exit 3")
 
@@ -290,7 +254,7 @@ def test_launching_while_another_thread_reads_loses_no_session() -> None:
 
 
 def test_turns_of_one_session_do_not_overlap(tmp_path: Path) -> None:
-    session = _ShellAgent(CONFIG).launch()
+    session = ShellAgent(CONFIG).launch()
     # `set -C` makes the redirection fail rather than truncate, so a turn that overlapped another
     # would exit nonzero instead of quietly sharing the marker.
     script = f'set -Ce; : > "{tmp_path}/turn"; sleep 0.05; rm "{tmp_path}/turn"'
@@ -309,7 +273,7 @@ def test_a_turn_that_takes_no_prompt_on_stdin_cannot_read_ours(tmp_path: Path) -
         with typed.open() as stdin:
             os.dup2(stdin.fileno(), 0)
         assert (
-            _ShellAgent(CONFIG).launch().run("cat") == ""
+            ShellAgent(CONFIG).launch().run("cat") == ""
         )  # nothing to read, rather than ours
     finally:
         os.dup2(ours, 0)
@@ -329,7 +293,7 @@ def test_a_turn_outlives_our_own_output_going_away(
             raise BrokenPipeError(errno.EPIPE, "Broken pipe")
 
     monkeypatch.setattr(sys, "stdout", _Closed())
-    session = _ShellAgent(CONFIG).launch()
+    session = ShellAgent(CONFIG).launch()
     turn = session.run(
         "yes answer | head -c 150000"
     )  # more than a pipe holds, nowhere to tee it
@@ -345,7 +309,7 @@ def test_a_turn_outlives_our_own_output_going_away(
 def test_output_the_encoding_cannot_decode_is_kept_and_does_not_wedge_the_session() -> (
     None
 ):
-    session = _ShellAgent(CONFIG).launch()
+    session = ShellAgent(CONFIG).launch()
     # A byte the encoding cannot decode used to kill the reader; with the pipe then unread the
     # agent blocked on its next write and the turn hung, holding the session's lock forever.
     script = "printf 'thinking \\377\\n' >&2; yes noise | head -c 150000 >&2; exit 3"
@@ -431,7 +395,7 @@ def test_kimi_opens_then_resumes(clis: _FakeCLIs) -> None:
 
 def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -> None:
     """The agent still runs here, so the session it opens is still ours to resume."""
-    anchor = _HereAnchor(target="ssh://build-box", workspace="/srv/project")
+    anchor = HereAnchor(target="ssh://build-box", workspace="/srv/project")
     session = ClaudeCodeAgent(
         ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high", anchor=anchor)
     ).launch()

@@ -26,8 +26,8 @@ class AnchorConfig:
     """Where an agent's work lands, and what of it stays on this machine.
 
     Attributes:
-      target: The machine the work lands on, as `ssh://HOST`, `tcp://HOST:PORT` or
-        `local[:DIR]`, where a local target stands in for a remote one.
+      target: The machine the work lands on, as `ssh://HOST`, `docker://CONTAINER`,
+        `tcp://HOST:PORT` or `local[:DIR]`, where a local target stands in for a remote one.
       workspace: The project directory as it exists on the target, defaulting to this one.
       remote_path: Where that workspace really lives on the target, if not `workspace`.
       shadow: The local mirror directory, defaulting to `workspace` so that the paths the

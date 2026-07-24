@@ -1,11 +1,15 @@
 """Getting a :class:`~amflows.coganchor.proto.Channel` to ``serve`` on the target.
 
-Three ways in:
+Four ways in:
 
 ``ssh://[user@]host[:port]``
     Ship a self-contained zipapp of coganchor to the host and run its ``serve``
     side over the ssh pipe.  Nothing needs to be installed there beyond
     Python 3.
+``docker://container``
+    The same, into a running container, over ``docker exec``.  A container is a
+    machine like any other here; it needs no port, no secret and no cooperation
+    beyond a ``python3``.
 ``tcp://host:port``
     Attach to a ``coganchor serve --listen`` someone already started.
 ``local[:REAL]``
@@ -40,6 +44,15 @@ log = logging.getLogger(__name__)
 #: Where the bootstrapped copy is cached on the target machine.
 REMOTE_CACHE = "~/.cache/coganchor"
 
+#: Installing that copy, for a target reached by piping it there. Written under a name of its
+#: own and moved into place, so a session finds the whole archive or none of it, and a copy
+#: already there is left where it is: it is named by its digest, so it is the same archive, and
+#: rewriting it would be rewriting a file a live session may still be importing from.
+_INSTALL = (
+    "if [ ! -s {file} ]; then cat > {file}.part && mv {file}.part {file}; "
+    "else cat > /dev/null; fi"
+)
+
 _SSH_OPTIONS = ("-T", "-o", "BatchMode=no", "-o", "ServerAliveInterval=30")
 
 
@@ -63,18 +76,23 @@ class Target:
             if host and port.isdigit():
                 return cls("ssh", host=host, port=int(port))
             return cls("ssh", host=authority)
+        if spec.startswith("docker://") and (container := spec[len("docker://") :]):
+            return cls("docker", host=container)
         if spec.startswith("tcp://"):
             host, _, port = spec[len("tcp://") :].rpartition(":")
             if not host or not port.isdigit():
                 raise ValueError(f"malformed target {spec!r}; expected tcp://HOST:PORT")
             return cls("tcp", host=host, port=int(port))
         raise ValueError(
-            f"unsupported target {spec!r}; expected ssh://HOST, tcp://HOST:PORT or local[:PATH]"
+            f"unsupported target {spec!r}; expected ssh://HOST, docker://CONTAINER, "
+            "tcp://HOST:PORT or local[:PATH]"
         )
 
     def describe(self) -> str:
         if self.scheme == "ssh":
             return f"ssh://{self.host}" + (f":{self.port}" if self.port else "")
+        if self.scheme == "docker":
+            return f"docker://{self.host}"
         if self.scheme == "tcp":
             return f"tcp://{self.host}:{self.port}"
         return f"local{':' + self.path if self.path else ''}"
@@ -103,6 +121,8 @@ def connect(target: Target, exports: list[str], token: str | None = None) -> Tra
         return _connect_tcp(target)
     if target.scheme == "ssh":
         return _connect_ssh(target, exports, token)
+    if target.scheme == "docker":
+        return _connect_docker(target, exports)
     return _connect_local(target, exports, token)
 
 
@@ -135,11 +155,7 @@ def _connect_ssh(target: Target, exports: list[str], token: str | None) -> Trans
         target.host,
     ]
 
-    upload = (
-        f"mkdir -p {REMOTE_CACHE} && "
-        f"if [ ! -s {remote_file} ]; then cat > {remote_file}.part && "
-        f"mv {remote_file}.part {remote_file}; else cat > /dev/null; fi"
-    )
+    upload = f"mkdir -p {REMOTE_CACHE} && " + _INSTALL.format(file=remote_file)
     result = subprocess.run(
         [*ssh, upload], input=payload, capture_output=True, check=False
     )
@@ -162,13 +178,51 @@ def _connect_ssh(target: Target, exports: list[str], token: str | None) -> Trans
     return _spawn([*ssh, remote_command], token)
 
 
+def _connect_docker(target: Target, exports: list[str]) -> Transport:
+    """Serve from inside a running container, over ``docker exec``.
+
+    The bundle is pushed the way ``ssh://`` pushes it, into the container's ``/tmp`` rather than
+    a home directory it may not have.  The exec inherits the container's own user and working
+    directory, so a container is served as whoever it runs as.
+    """
+    payload = build_bundle().read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()[:16]
+    remote_file = f"/tmp/coganchor-{digest}.pyz"
+    exec_in = ["docker", "exec", "-i", target.host]
+
+    result = subprocess.run(
+        [*exec_in, "sh", "-c", _INSTALL.format(file=remote_file)],
+        input=payload,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ConnectionError(
+            f"could not install coganchor in {target.host}: "
+            f"{result.stderr.decode(errors='replace').strip()}"
+        )
+
+    # Unquoted, unlike ssh: docker is handed the command as argv and passes it on, so an export
+    # holding a space or a quote needs nothing done to it to survive the trip.
+    command = [
+        *exec_in,
+        "python3",
+        remote_file,
+        "serve",
+        "--stdio",
+        *_export_args(exports),
+    ]
+    return _spawn(command, None)
+
+
 def _spawn(command: list[str], token: str | None) -> Transport:
     """Start a child that serves over its own stdin and stdout.
 
     The token travels in the environment the child inherits, which works for
-    ``local``.  For ``ssh`` the child is the ssh client rather than the target
-    and ssh does not forward the environment, so an ``ssh://`` session is
-    authenticated by ssh itself and the token goes unused.
+    ``local``.  For ``ssh`` and ``docker`` the child is the client rather than
+    the target and neither forwards the environment, so those sessions are
+    authenticated by ssh and by the docker socket themselves and the token goes
+    unused.
     """
     log.debug("starting the target: %s", " ".join(command))
     env = dict(os.environ)
@@ -191,7 +245,8 @@ def _export_args(exports: list[str], *, quote: bool = False) -> list[str]:
 
     The ssh transport hands its command to the target's shell as one string, so
     a workspace path containing a quote or a space has to survive that; the
-    local transport passes argv directly and must not be quoted.
+    local and docker transports pass argv straight through and must not be
+    quoted.
     """
     args: list[str] = []
     for export in exports:
@@ -248,5 +303,19 @@ def build_bundle(destination: Path | None = None) -> Path:
             # them -- it runs the archive, and zipimport ignores the entries' modes.
             path.chmod(0o755 if path.is_dir() else 0o644)
             os.utime(path, (stamp, stamp))
-        zipapp.create_archive(root, destination, interpreter="/usr/bin/env python3")
+        # Published by rename rather than written where it is read: two sessions starting at
+        # once build the same bytes to the same path, and a reader must find the whole archive
+        # or the last one, never a half-written file it would then ship to a target.
+        handle, staged = tempfile.mkstemp(
+            dir=destination.parent, prefix=f"{destination.name}."
+        )
+        os.close(handle)
+        try:
+            zipapp.create_archive(
+                root, Path(staged), interpreter="/usr/bin/env python3"
+            )
+            os.replace(staged, destination)
+        except BaseException:
+            os.unlink(staged)  # a build that failed leaves nothing of itself behind
+            raise
     return destination

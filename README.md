@@ -30,7 +30,8 @@ where an agent's work should land.
 ## Install
 
 Python ≥ 3.12, and the coding agent CLIs you intend to drive (`claude`, `codex`, `kimi`) on your
-PATH. `coganchor` additionally needs Linux x86-64 locally, and nothing but `python3` on the target.
+PATH. `coganchor` additionally needs Linux x86-64 locally, and nothing but `python3` on the target;
+isolating an agent in a container of its own needs the `docker` command and a daemon to reach.
 
 ```sh
 pip install git+https://github.com/humanfia/amflows.git
@@ -99,6 +100,29 @@ config = ClaudeCodeAgentConfig(
 Each turn is anchored on its own, so a loop of short turns reaches the target once per turn; a
 target left listening on `tcp://` makes that a socket rather than an ssh session to bootstrap.
 
+Give it an `isolation` instead and the agent brings its own machine: a container of the image
+you name, holding this project directory at the path it already has and running as you, so the
+work it leaves behind is yours in your own workspace and everything else is the image's.
+
+```python
+from amflows.janus.isolation import DockerIsolationConfig
+
+config = ClaudeCodeAgentConfig(
+    model="claude-opus-4-8",
+    effort="high",
+    isolation=DockerIsolationConfig(image="python:3.12", workspace="/srv/project"),
+)
+```
+
+The container starts on the agent's first turn, is shared by every session that agent launches,
+and is removed when the agent is; each turn reaches it as a `docker://` target, so it needs no
+port and no secret. The image needs a `python3` for coganchor's target half, and whatever else
+the agent is expected to reach for. An agent is anchored or isolated, not both, and an isolated
+flow's trajectories are collected by session id rather than by workspace directory.
+
+A flow killed outright leaves its containers behind, labelled with the uid that started them:
+`docker rm -f $(docker ps -q --filter label=amflows.janus=$(id -u))` clears yours.
+
 [examples/](examples/) has the flow loops from flowbench written this way: `ralph_loop`, `goal`,
 `flame_chase`, `stateful_ralph`, `continue_loop` and `rlar`.
 
@@ -140,9 +164,11 @@ The agent process stays here, keeping its credentials, its state directory and i
 model provider. Everything it *does* — reading and writing files, running commands, reaching the
 network from them — happens on the target. It needs no plugin and no cooperation from the agent.
 
-`--target` takes `ssh://HOST`, `tcp://HOST:PORT` or `local[:DIR]`; `--workspace` names the project
-directory as it exists on the target; `--check` connects, reports what it found, and exits;
-`--shadow` puts the local mirror somewhere other than the workspace path.
+`--target` takes `ssh://HOST`, `docker://CONTAINER`, `tcp://HOST:PORT` or `local[:DIR]`;
+`--workspace` names the project directory as it exists on the target; `--check` connects, reports
+what it found, and exits; `--shadow` puts the local mirror somewhere other than the workspace path.
+A container is a target like any other: `docker://` runs `serve` inside a running one over
+`docker exec`, as whoever that container runs as, and needs no port and no secret.
 
 `amflows.coganchor.connect` runs that same session from Python, taking those settings as an
 `AnchorConfig` and returning the agent's exit status:
@@ -172,7 +198,7 @@ COGANCHOR_TOKEN=$SECRET coganchor --target tcp://build-box:7777 --workspace /srv
 
 **A `coganchor serve` port is equivalent to a shell on that machine.** An export bounds which files
 a request may name; it does not confine the commands that request can run. Give `--token` a real
-secret, and prefer `ssh://`, which needs no open port at all.
+secret, and prefer `ssh://` or `docker://`, which need no open port at all.
 
 The agent flows in [examples/](examples/) run their agents with permission prompts disabled, as
 flowbench does. Run them only in a workspace you are willing to have rewritten.

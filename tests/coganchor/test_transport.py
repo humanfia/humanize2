@@ -19,6 +19,7 @@ def test_target_parsing() -> None:
     assert Target.parse("ssh://user@box:2222") == Target(
         "ssh", host="user@box", port=2222
     )
+    assert Target.parse("docker://janus-9f2c") == Target("docker", host="janus-9f2c")
     assert Target.parse("tcp://10.0.0.5:7777") == Target(
         "tcp", host="10.0.0.5", port=7777
     )
@@ -27,7 +28,7 @@ def test_target_parsing() -> None:
 
 
 @pytest.mark.parametrize(
-    "spec", ["", "box", "http://box", "tcp://box", "tcp://box:none"]
+    "spec", ["", "box", "http://box", "docker://", "tcp://box", "tcp://box:none"]
 )
 def test_malformed_targets_are_rejected(spec: str) -> None:
     with pytest.raises(ValueError, match=r"target|expected"):
@@ -35,7 +36,12 @@ def test_malformed_targets_are_rejected(spec: str) -> None:
 
 
 def test_target_descriptions_round_trip() -> None:
-    for spec in ("ssh://build-box", "tcp://10.0.0.5:7777", "local:/srv/project"):
+    for spec in (
+        "ssh://build-box",
+        "docker://janus-9f2c",
+        "tcp://10.0.0.5:7777",
+        "local:/srv/project",
+    ):
         assert Target.parse(spec).describe() == spec
 
 
