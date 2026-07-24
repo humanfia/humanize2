@@ -69,15 +69,15 @@ session.run("continue")  # resumes it, task still in context
 as they arrive, and a turn that fails raises `subprocess.CalledProcessError` without opening the
 session, so the next call retries it.
 
-Two agents at one model and one effort are still two agents — an executor and the reviewer that
-judges it. Name them, and each reports the sessions it opened, which is what tells a trace apart:
+Two agents at one model and one effort are still two agents — an actor and the reviewer that reads
+its work. Name them, and each reports the sessions it opened, which is what tells a trace apart:
 
 ```python
 config = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
-executor = ClaudeCodeAgent(config, name="executor")
+actor = ClaudeCodeAgent(config, name="actor")
 reviewer = ClaudeCodeAgent(config, name="reviewer")
 ...
-exomyth.collect(agents={a.id: a.opened for a in (executor, reviewer)})
+exomyth.collect(agents={a.id: a.opened for a in (actor, reviewer)})
 ```
 
 `opened` is the backend's id for every session the agent ever opened, including the ones a Ralph

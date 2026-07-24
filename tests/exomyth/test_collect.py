@@ -173,17 +173,17 @@ def test_gathers_the_runs_of_one_configuration_into_one_agent(
 def test_tells_apart_the_agents_a_flow_names(claude_home: pathlib.Path) -> None:
     """The case configuration cannot answer: one model at one effort, run as two agents.
 
-    The executor's two sessions are its own and the sub-agent it started, which it never had
+    The actor's two sessions are its own and the sub-agent it started, which it never had
     to claim: a sub-agent belongs to whoever ran the session that started it.
     """
     document = exomyth.collect(sessions=[CLAUDE_SESSION, CLAUDE_ELSEWHERE], agents=FLOW)
 
     assert labels(document, "process_name") == {
-        "executor · claude-opus-5 · xhigh · 2 sessions",
+        "actor · claude-opus-5 · xhigh · 2 sessions",
         "reviewer · claude-opus-5 · xhigh · 1 sessions",
     }
     assert document["otherData"]["agents"] == (
-        "executor · claude-opus-5 · xhigh, reviewer · claude-opus-5 · xhigh"
+        "actor · claude-opus-5 · xhigh, reviewer · claude-opus-5 · xhigh"
     )
 
 
@@ -199,12 +199,12 @@ def test_names_the_agent_of_every_session_a_flow_claims(
     document = exomyth.collect(workspace, agents=FLOW)
 
     assert labels(document, "process_name") == {
-        "executor · claude-opus-5 · xhigh · 2 sessions",
+        "actor · claude-opus-5 · xhigh · 2 sessions",
         "worker · kimi-k2 · high · 2 sessions",
         "codex · gpt-5.6 · high · 2 sessions",
     }
     assert {event["args"]["agent"] for event in banners(document)} == {
-        "executor · claude-opus-5 · xhigh",
+        "actor · claude-opus-5 · xhigh",
         "worker · kimi-k2 · high",
         "codex · gpt-5.6 · high",
     }

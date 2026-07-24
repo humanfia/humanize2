@@ -493,7 +493,7 @@ def kimi_home(
 #: What a flow that drove these sessions would report: three agents, two at one configuration.
 #: The Kimi id is spelled the way `kimi -r` prints it, not the way its own logs shorten it.
 FLOW = {
-    "executor": [CLAUDE_SESSION],
+    "actor": [CLAUDE_SESSION],
     "reviewer": [CLAUDE_ELSEWHERE],
     "worker": [KIMI_SESSION],
 }

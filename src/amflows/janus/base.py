@@ -181,7 +181,7 @@ class AgentBase(ABC):
           name: What to call this agent, defaulting to one nothing else answers to. Two agents
             sharing a name are one agent to a trace, which is how the roles of a flow survive
             being restarted; two left unnamed are two, which is how one configuration driven
-            twice -- an executor and the reviewer judging it -- stays two.
+            twice -- an actor and the reviewer reading its work -- stays two.
         """
         self._config = config
         self._id = name or f"{type(self).__name__}#{uuid.uuid4().hex[:8]}"

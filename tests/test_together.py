@@ -92,11 +92,11 @@ def sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def flow(sandbox: Path) -> tuple[Path, dict[str, list[str]]]:
     """Runs a flow's two agents for real, and reports its workspace and what each opened."""
     # The rlar shape, at one model and one effort: what nothing in a transcript tells apart.
-    executor = ClaudeCodeAgent(CONFIG, name="executor")
+    actor = ClaudeCodeAgent(CONFIG, name="actor")
     reviewer = ClaudeCodeAgent(CONFIG, name="reviewer")
-    executor.launch().run("do the task")
-    reviewer.launch().run("judge the work")
-    return sandbox, {agent.id: agent.opened for agent in (executor, reviewer)}
+    actor.launch().run("do the task")
+    reviewer.launch().run("review the work")
+    return sandbox, {agent.id: agent.opened for agent in (actor, reviewer)}
 
 
 def test_a_flow_is_traced_as_the_agents_it_ran(
@@ -108,7 +108,7 @@ def test_a_flow_is_traced_as_the_agents_it_ran(
 
     assert document["otherData"]["sessions"] == "2"
     assert labels(document, "process_name") == {
-        "executor · claude-opus-4-8 · high · 1 sessions",
+        "actor · claude-opus-4-8 · high · 1 sessions",
         "reviewer · claude-opus-4-8 · high · 1 sessions",
     }
 
@@ -136,7 +136,7 @@ def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
                 shadow=str(mirror),
             ),
         ),
-        name="executor",
+        name="actor",
     )
     session = agent.launch()
 
@@ -156,5 +156,5 @@ def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
 
     assert document["otherData"]["sessions"] == "1"
     assert labels(document, "process_name") == {
-        "executor · claude-opus-4-8 · high · 1 sessions"
+        "actor · claude-opus-4-8 · high · 1 sessions"
     }

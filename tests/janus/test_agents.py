@@ -219,14 +219,14 @@ def test_a_session_spans_its_turns() -> None:
 
 
 def test_an_agent_is_one_agent_apart_from_its_configuration() -> None:
-    # The rlar shape: an executor and the reviewer judging it, at one model and one effort.
-    executor, reviewer = _EchoAgent(CONFIG), _EchoAgent(CONFIG)
-    assert executor.id != reviewer.id
-    assert executor.config == reviewer.config
+    # The rlar shape: an actor and the reviewer reading its work, at one model and one effort.
+    actor, reviewer = _EchoAgent(CONFIG), _EchoAgent(CONFIG)
+    assert actor.id != reviewer.id
+    assert actor.config == reviewer.config
     # A flow that names its agents keeps those names across restarts; one left unnamed is
     # named after its class, so a trace of two of them still reads as two.
-    assert _EchoAgent(CONFIG, name="executor").id == "executor"
-    assert executor.id.startswith("_EchoAgent#")
+    assert _EchoAgent(CONFIG, name="actor").id == "actor"
+    assert actor.id.startswith("_EchoAgent#")
 
 
 def test_an_agent_remembers_every_session_it_opened() -> None:
