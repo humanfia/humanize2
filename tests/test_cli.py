@@ -45,6 +45,7 @@ def test_a_command_reaches_only_the_subpackage_it_is_carried_out_in(
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
     )
     reached = {name.split(".")[1] for name in result.stdout.split()}
+    assert reached, "the command imported nothing, so this checks nothing"
     assert reached <= {subpackage, "cli"}
 
 

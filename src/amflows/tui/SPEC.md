@@ -6,7 +6,7 @@
 .
 ├── __init__.py
 ├── app.py
-├── form.py
+├── complete.py
 └── monitor.py
 ```
 
@@ -29,10 +29,12 @@ line, with what the flow is doing beside the transcript.
   other line is said to the agent working right now, through `SessionBase.interject`, so that
   a turn already under way takes it into account rather than being restarted with it.
 - Enter MUST send and `ctrl+j` MUST break the line, so that a long prompt can be written.
-- A half-typed command MUST offer the rest of itself, greyed in after the cursor, and tab
-  MUST take it. What is offered MUST be the commands there actually are, and MUST be
-  reconsidered when the cursor moves: an offer made at the end of a line MUST NOT still stand
-  once the cursor is back in the middle of it.
+- A half-typed line MUST be offered what it could be finished with, in a list under the
+  editor, and tab MUST take what is highlighted. What is offered MUST be reconsidered when the
+  cursor moves as well as when the text does: an offer made at the end of a line MUST NOT
+  still stand once the cursor is back in the middle of it.
+- Keys the offers are using MUST be theirs only while there are offers: a prompt of more than
+  one line needs its arrows back, and focus MUST NOT be able to leave the editor.
 - A typed line MUST reach the agent that has a turn open, not whichever was named last: an
   agent between turns may still be holding a session that would take it silently.
 - Every command of the command line MUST be reachable, and MUST be reached by carrying out
@@ -85,28 +87,19 @@ a flow being a Python file that may branch any way it likes.
 - A backend that says what a turn cost MUST be believed over what its agent was configured
   with: a turn that reached for a sub-agent spent it on that model.
 
-## `form.py`
+## `complete.py`
 
 ```python
-@dataclass(frozen=True, slots=True)
-class Field:
-    name: str
-    flag: str = ""
-    hint: str = ""
-    value: str = ""
-    choices: Sequence[str] = ()
-    repeats: bool = False
-
-
-class Form(ModalScreen[list[str] | None]):
-    def __init__(self, command: str, fields: Iterable[Field]): ...
+def offered(typed: str, commands: tuple[str, ...]) -> list[str]: ...
+def flows(where: str | None = None) -> list[str]: ...
 ```
 
-A command filled in rather than typed.
+What the editor offers to finish, which is the only way anything is chosen.
 
-- MUST answer with the argument list the command line would have taken, or `None` if it was
-  dismissed, so that there is one command underneath either way.
-- A field left empty MUST reach the command line as nothing at all.
-- Offering a choice MUST NOT cost the interface its responsiveness: the flows offered by
-  `/run` are found by walking this directory, and a checkout with a virtualenv in it holds
-  thousands of Python files that are not flows.
+- Nothing MUST be chosen from a dialog. A `/` MUST offer the commands, and a flag MUST offer
+  whatever it is for -- the flows below this directory, the backends an agent runs on -- so
+  that there is one way to say a thing and it is the way it is written down.
+- An offer MUST be the whole of what the word becomes, so that taking one replaces what was
+  typed rather than being appended to it.
+- Finding the flows MUST NOT cost the interface its responsiveness: it reads every Python
+  file below this directory, which is far too slow to repeat between keystrokes.

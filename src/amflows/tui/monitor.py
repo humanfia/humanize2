@@ -156,15 +156,6 @@ class Monitor:
         with self._lock:
             return sorted(self.working)
 
-    def has_run(self) -> bool:
-        """Whether this flow has run anything at all.
-
-        Returns:
-          Whether there is anything to show beside the transcript.
-        """
-        with self._lock:
-            return bool(self.turns)
-
     def graph(self) -> list[str]:
         """The agents this flow has run, and what handed to what, as lines to show.
 

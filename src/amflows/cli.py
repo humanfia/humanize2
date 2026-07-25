@@ -13,16 +13,12 @@ only subpackage present and the architecture is whatever the target happens to b
 
 from __future__ import annotations
 
-import argparse
-import contextlib
-import datetime
-import logging
-import os
 import sys
-from importlib.metadata import version
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import argparse
+
     from amflows.janus import AgentBase
 
 __all__ = ["COMMANDS", "anchor_parser", "flow_and_agents", "main"]
@@ -50,20 +46,9 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
     Raises:
       SystemExit: If the line does not name a flow and an agent apiece, as argparse rejects it.
     """
-    from amflows.janus.agents import (
-        ClaudeCodeAgent,
-        ClaudeCodeAgentConfig,
-        CodexAgent,
-        CodexAgentConfig,
-        KimiCodeCLIAgent,
-        KimiCodeCLIAgentConfig,
-    )
+    import argparse
 
-    backends = {
-        "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
-        "codex": (CodexAgent, CodexAgentConfig),
-        "kimi": (KimiCodeCLIAgent, KimiCodeCLIAgentConfig),
-    }
+    backends = ("claude", "codex", "kimi")
     parser = argparse.ArgumentParser(
         prog="amflows run", description="Run an agent flow in this directory."
     )
@@ -89,6 +74,22 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
     )
     args = parser.parse_args(argv)
 
+    # Only now that the line is known to name agents: `--help` has already exited, and it
+    # should not have paid for three backends to say what it takes.
+    from amflows.janus.agents import (
+        ClaudeCodeAgent,
+        ClaudeCodeAgentConfig,
+        CodexAgent,
+        CodexAgentConfig,
+        KimiCodeCLIAgent,
+        KimiCodeCLIAgentConfig,
+    )
+
+    built = {
+        "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
+        "codex": (CodexAgent, CodexAgentConfig),
+        "kimi": (KimiCodeCLIAgent, KimiCodeCLIAgentConfig),
+    }
     agents: list[AgentBase] = []
     for spec in ",".join(args.agents).split(","):
         # Read from both ends, because a model name may hold slashes of its own -- Kimi's
@@ -97,7 +98,7 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
         model, _, effort = rest.rpartition("/")
         if backend not in backends or not model or not effort:
             parser.error(f"bad agent {spec!r}: expected BACKEND/MODEL/EFFORT")
-        agent, config = backends[backend]
+        agent, config = built[backend]
         agents.append(agent(config(model=model, effort=effort)))
     return args.flow, agents, args.task
 
@@ -111,9 +112,10 @@ def _run(argv: list[str]) -> int:
     Returns:
       Zero, once the flow has returned.
     """
+    path, agents, task = flow_and_agents(argv)
+
     from amflows.janus.runner import NotAFlow, Runner
 
-    path, agents, task = flow_and_agents(argv)
     try:
         runner = Runner(path, agents)
     except NotAFlow as error:
@@ -135,7 +137,7 @@ def _collect(argv: list[str]) -> int:
     Returns:
       Zero, once the trace has been written.
     """
-    from amflows.oronyx.collector import collect
+    import argparse
 
     parser = argparse.ArgumentParser(
         prog="amflows collect",
@@ -164,6 +166,11 @@ def _collect(argv: list[str]) -> int:
         "--end", help="Latest session time to include, e.g. 'yesterday 18:00'."
     )
     args = parser.parse_args(argv)
+
+    import datetime
+
+    from amflows.oronyx.collector import collect
+
     # One trace per run, named after the moment it was taken, so collecting twice keeps both
     # rather than writing over the first.
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -197,6 +204,9 @@ def anchor_parser() -> argparse.ArgumentParser:
     Returns:
       A parser whose result is what :class:`~amflows.coganchor.anchor.AnchorConfig` takes.
     """
+    import argparse
+    import os
+
     parser = argparse.ArgumentParser(
         prog="amflows anchor",
         description="Run a coding agent on this machine that acts on another one.",
@@ -301,11 +311,14 @@ def _anchor(argv: list[str]) -> int:
         # program -- the bundle shipped to the target -- serve a target of any architecture.
         return _serve(argv[1:])
 
-    from amflows.coganchor.anchor import AnchorConfig, check, connect
-    from amflows.coganchor.proto import ProtocolError
+    import logging
 
     parser = anchor_parser()
     args = parser.parse_args(argv)
+
+    from amflows.coganchor.anchor import AnchorConfig, check, connect
+    from amflows.coganchor.proto import ProtocolError
+
     # stderr, the one stream a session never speaks the protocol on.
     logging.basicConfig(
         level=args.log_level.upper(),
@@ -361,9 +374,10 @@ def _serve(argv: list[str]) -> int:
       Zero once the session or the listener is done, or a status of our own if neither could
       be started.
     """
-    from amflows.coganchor.proto import Channel
-    from amflows.coganchor.serve.exports import ExportTable
-    from amflows.coganchor.serve.server import Server
+    import argparse
+    import contextlib
+    import logging
+    import os
 
     parser = argparse.ArgumentParser(
         prog="amflows anchor serve",
@@ -396,6 +410,11 @@ def _serve(argv: list[str]) -> int:
         help="logging verbosity (default: warning)",
     )
     args = parser.parse_args(argv)
+
+    from amflows.coganchor.proto import Channel
+    from amflows.coganchor.serve.exports import ExportTable
+    from amflows.coganchor.serve.server import Server
+
     logging.basicConfig(
         level=args.log_level.upper(),
         format="%(asctime)s amflows %(levelname)s %(message)s",
@@ -483,6 +502,20 @@ def main(argv: list[str] | None = None) -> int:
         Amflows().run()
         return 0
     if not arguments or arguments[0] not in COMMANDS:
+        import argparse
+
+        if arguments[:1] == ["--version"]:
+            # Read from the installed metadata, which costs more to reach than everything
+            # else here put together -- so it is reached only when it is what was asked for.
+            from importlib.metadata import version
+
+            print(f"amflows {version('amflows')}")
+            return 0
+        # Anything else naming no command it knows: argparse says which was meant and exits,
+        # so nothing below it runs. `--version` is handled above precisely because it is the
+        # one flag this parser no longer carries, and would otherwise fall through to a
+        # command lookup that has nothing to look up.
+
         # There is nothing to route to, so this parser only has to say so. It knows the
         # commands by name and not by what they take -- each one answers
         # `amflows COMMAND --help` itself -- and whether it lists them or names the one that
@@ -491,9 +524,6 @@ def main(argv: list[str] | None = None) -> int:
             prog="amflows",
             description="Orchestrate, execute, and observe agent flows.",
             epilog="Run `amflows COMMAND --help` for what a command takes.",
-        )
-        parser.add_argument(
-            "--version", action="version", version=f"amflows {version('amflows')}"
         )
         commands = parser.add_subparsers(metavar="COMMAND", required=True)
         for name, (_, summary) in COMMANDS.items():

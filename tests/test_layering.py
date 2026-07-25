@@ -133,10 +133,11 @@ def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
         "sys.path.insert(0, sys.argv[1])\n"
         "from amflows import cli\n"
         "with contextlib.redirect_stdout(io.StringIO()):\n"
-        "    try:\n"
-        "        cli.main(['anchor', 'serve', '--help'])\n"
-        "    except SystemExit:\n"
-        "        pass\n"
+        # A line it reads all the way through rather than `--help`, which now exits before the
+        # serving half is reached at all: what is checked is what a run of it loads. The line
+        # is refused for its port, which is a return rather than an exit.
+        "    cli.main(['anchor', 'serve', '--export', '/project:/tmp',\n"
+        "              '--listen', 'not-a-port'])\n"
         "print('\\n'.join(m for m in sys.modules if m.split('.')[0] == 'amflows'))\n"
     )
     result = subprocess.run(

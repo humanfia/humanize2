@@ -7,7 +7,6 @@ drawn -- the interface's own job being to have one line mean both of those thing
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import sys
 import time
@@ -169,49 +168,16 @@ async def test_a_bad_run_line_is_a_line_to_correct_and_not_the_end_of_the_sessio
         assert "amflows run" in _transcript(app)
 
 
-def test_the_help_names_every_command() -> None:
-    """What the prompt offers must be what the command line has, or one of them is unreachable."""
+def test_a_flag_offers_what_it_is_for() -> None:
+    """A flow file and an agent are chosen by being offered, not by a dialog asking for them."""
     from amflows.cli import COMMANDS
-    from amflows.tui.app import _HELP
+    from amflows.tui.complete import offered
 
-    offered = {line.split()[0].lstrip("/") for line, _ in _HELP if line.startswith("/")}
-    assert set(COMMANDS) <= offered, json.dumps(sorted(offered))
+    found = offered("/run -f ", tuple(COMMANDS))
+    assert any(path.endswith("ralph_loop.py") for path in found), found
 
-
-@pytest.mark.timeout(60)
-async def test_a_command_given_nothing_is_filled_in_rather_than_typed(
-    workspace: Path,
-) -> None:
-    """The flags are the command line's business: `/collect` alone asks for them instead."""
-    from amflows.tui.form import Form
-
-    app = Amflows()
-    async with app.run_test() as driver:
-        await driver.press(*"/collect")
-        await driver.press("enter")
-        await driver.pause()
-
-        assert isinstance(app.screen, Form)
-        await driver.press("enter")  # take the sheet as it stands
-        await until(lambda: bool(list(workspace.glob(".amflows/*.trace.json"))), driver)
-
-    assert list(workspace.glob(".amflows/*.trace.json"))
-
-
-@pytest.mark.timeout(60)
-async def test_a_sheet_dismissed_runs_nothing(workspace: Path) -> None:
-    app = Amflows()
-    async with app.run_test() as driver:
-        await driver.press(*"/collect")
-        await driver.press("enter")
-        await driver.pause()
-        await driver.press("escape")
-        for _ in range(20):
-            await driver.pause()
-
-        assert app.is_running
-
-    assert not list(workspace.glob(".amflows/*.trace.json"))
+    agents = offered("/run -a claude/", tuple(COMMANDS))
+    assert all(spec.startswith("claude/") for spec in agents) and agents
 
 
 @pytest.mark.timeout(60)
@@ -237,42 +203,60 @@ async def test_what_the_flow_did_is_shown_beside_it(workspace: Path) -> None:
 
 
 @pytest.mark.timeout(60)
-async def test_a_half_typed_command_offers_the_rest_of_itself() -> None:
-    """Greyed in after the cursor, and taken with tab: what is typed is never guessed at."""
+async def test_a_half_typed_command_is_offered_the_rest_of_itself() -> None:
+    """Offered in a list under the editor, and taken with tab: nothing is ever guessed at."""
+    from textual.widgets import OptionList
+
     from amflows.tui.app import Editor
 
     app = Amflows()
     async with app.run_test() as driver:
-        editor = app.query_one(Editor)
         await driver.press(*"/ru")
+        await driver.pause()
 
-        assert editor.suggestion == "n"  # the rest of /run, waiting to be taken
+        offers = app.query_one("#offers", OptionList)
+        assert offers.has_class("offering")
+        assert [
+            str(offers.get_option_at_index(i).prompt)
+            for i in range(offers.option_count)
+        ] == ["/run"]
 
         await driver.press("tab")
 
-        assert editor.text == "/run "
+        assert app.query_one(Editor).text == "/run "
 
 
 @pytest.mark.timeout(60)
 async def test_nothing_is_offered_for_what_is_not_a_command() -> None:
+    from textual.widgets import OptionList
+
     from amflows.tui.app import Editor
 
     app = Amflows()
     async with app.run_test() as driver:
-        editor = app.query_one(Editor)
+        offers = app.query_one("#offers", OptionList)
 
         await driver.press(*"hello")
-        assert editor.suggestion == ""  # a line said to the agent completes to nothing
+        await driver.pause()
+        assert not offers.has_class(
+            "offering"
+        )  # a line said to the agent offers nothing
 
-        await driver.press("ctrl+a", "delete")
+        app.query_one(
+            Editor
+        ).text = ""  # ctrl+a is "start of line" here, not "select all"
         await driver.press(*"/zz")
-        assert editor.suggestion == ""  # and neither does a command that is not one
+        await driver.pause()
+        assert not offers.has_class("offering")  # nor does a command that is not one
 
 
 @pytest.mark.timeout(60)
 async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None:
-    """A command the command line grows must be completable without being listed twice."""
+    """A command the command line grows must be offered without being listed twice."""
     from amflows.cli import COMMANDS
-    from amflows.tui.app import _COMPLETIONS
+    from amflows.tui.app import _OWN
+    from amflows.tui.complete import offered
 
-    assert {f"/{name}" for name in COMMANDS} <= set(_COMPLETIONS)
+    offers = offered("/", (*COMMANDS, *_OWN))
+
+    assert {f"/{name}" for name in COMMANDS} <= set(offers)

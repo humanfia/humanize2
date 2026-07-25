@@ -1,19 +1,16 @@
 """amflows as a coding agent's own terminal, with a flow underneath instead of one agent.
 
-Laid out the way opencode is, because that is the thing this is: a transcript of the work,
-a multi-line editor under it, and a status line under that. What is different is what is
-running -- a flow driving several agents rather than one agent driving itself -- so the right
-of the screen says which agent is working, who handed to whom, and what it is all costing.
+Laid out the way opencode is, and no wider: a transcript, an editor under it, a status line
+under that, and what the flow is doing beside them. Nothing is chosen from a dialog -- a `/`
+offers the commands, and a flag offers whatever it takes -- so there is one way to say a thing
+and it is the way it is written down.
 
-The editor is both things at once: a line starting with `/` is a command, and any other line
-is said to the agent working right now. A command named with nothing after it is filled in
-rather than typed.
+The editor means both things at once: a line starting with `/` is a command, and any other
+line is said to the agent working right now.
 """
 
 from __future__ import annotations
 
-import asyncio
-import os
 import shlex
 import traceback
 from collections.abc import Callable
@@ -21,40 +18,29 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.markup import escape
-from textual import events, on, work
+from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
-from textual.widgets import RichLog, Static, TextArea
+from textual.widgets import OptionList, RichLog, Static, TextArea
 
 from amflows.cli import COMMANDS, flow_and_agents
 
-from .form import Form, fields_for
+from .complete import flows, offered
 from .monitor import Monitor, short
 
 if TYPE_CHECKING:
     from amflows.janus import AgentBase, Event
 
-#: What the editor understands, and the line `/help` shows each under. Every command of the
-#: command line is among them, which is checked rather than remembered.
-_HELP = (
-    ("/run", "drive a flow — with nothing after it, fill one in"),
-    ("/collect", "write what the agents left behind as a trace"),
-    ("/anchor", "run an agent whose work lands on another machine"),
-    ("/cd PATH", "work somewhere else"),
-    ("/help  /clear  /quit", "this, empty the transcript, leave"),
-    ("anything else", "say it to the agent working right now"),
-)
+#: What the editor understands beyond the commands the command line has.
+_OWN = ("help", "clear", "quit")
 
 #: How often the right-hand column and the status line are redrawn, in seconds.
 _REFRESH = 0.5
 
 #: How a tool call reads in the transcript, which is one compact row rather than a block.
 _TOOL = "  [dim]⏺[/dim] "
-
-#: Everything the editor completes: the commands of the command line and this one's own.
-_COMPLETIONS = sorted(f"/{name}" for name in (*COMMANDS, "cd", "help", "clear", "quit"))
 
 
 def _thousands(count: int) -> str:
@@ -79,7 +65,6 @@ class Editor(TextArea):
     BINDINGS: ClassVar = [
         Binding("enter", "send", "send", priority=True),
         Binding("ctrl+j", "newline", "newline", priority=True),
-        Binding("tab", "complete", "complete", priority=True),
     ]
 
     class Sent(Message):
@@ -104,41 +89,41 @@ class Editor(TextArea):
         """Breaks the line, which is what enter would do anywhere else."""
         self.insert("\n")
 
-    def action_complete(self) -> None:
-        """Takes the rest of the command being offered, if one is."""
-        if rest := self.suggestion:
-            self.insert(f"{rest} ")
+    async def _on_key(self, event: events.Key) -> None:
+        """Gives tab and the arrows to the offers, but only while there are any.
 
-    def update_suggestion(self) -> None:
-        """Offers the rest of the command being typed, which the editor greys in for us.
+        Bound here rather than on the application, and only when the list is showing: a key
+        the offers are not using is the editor's, and a prompt of more than one line needs
+        its arrows back.
+        """
+        listing = self.screen.query_one("#offers", OptionList)
+        if not listing.has_class("offering"):
+            return
+        if event.key == "tab":
+            event.prevent_default()
+            event.stop()
+            if listing.highlighted is not None:
+                self.take(str(listing.get_option_at_index(listing.highlighted).prompt))
+        elif event.key in ("up", "down"):
+            event.prevent_default()
+            event.stop()
+            listing.action_cursor_down() if event.key == "down" else (
+                listing.action_cursor_up()
+            )
+        elif event.key == "escape":
+            event.prevent_default()
+            event.stop()
+            listing.set_class(False, "offering")
 
-        Called by the editor whenever the text changes; also called on a cursor that moved,
-        because an offer is only ever made at the end of what is typed, where taking it would
-        put it.
+    def take(self, whole: str) -> None:
+        """Replaces the part being finished with what was offered for it.
+
+        Args:
+          whole: The offer, in full.
         """
         typed = self.text
-        offered = (
-            not typed.startswith("/")
-            or " " in typed
-            or "\n" in typed
-            or self.cursor_location != self.document.end
-        )
-        self.suggestion = (
-            ""
-            if offered
-            else next(
-                (name[len(typed) :] for name in _COMPLETIONS if name.startswith(typed)),
-                "",
-            )
-        )
-
-    def watch_selection(self, *_: object) -> None:
-        """Reconsiders the offer when the cursor moves, which the editor does not do itself.
-
-        Without this, an offer made at the end of the line would still be shown after the
-        cursor was moved back into the middle of it, and taking it would break the word.
-        """
-        self.update_suggestion()
+        self.text = typed[: len(typed) - len(typed.split(" ")[-1])] + whole + " "
+        self.move_cursor(self.document.end)
 
 
 class Amflows(App[None]):
@@ -146,29 +131,17 @@ class Amflows(App[None]):
 
     CSS = """
     Screen { background: $surface; }
-    #body { height: 1fr; }
-    #left { width: 1fr; }
+    #transcript { width: 1fr; padding: 1 2 0 2; }
+    .panel { margin-bottom: 1; }
     #side { width: 30; display: none; padding: 1 1 0 2; }
     #side.watching { display: block; }
 
-    #transcript {
-        background: $surface;
-        border: none;
-        padding: 1 2 0 2;
-        scrollbar-size-vertical: 1;
-    }
+    #offers { display: none; max-height: 8; border: none; padding: 0 2; background: $panel; }
+    #offers.offering { display: block; }
 
-    .panel { height: auto; margin-bottom: 1; }
-
-    #editor {
-        height: auto;
-        max-height: 10;
-        border: round $primary 60%;
-        background: $surface;
-        padding: 0 1;
-    }
+    #editor { height: auto; max-height: 10; border: round $primary 60%; }
     #editor:focus { border: round $primary; }
-    #status { height: 1; padding: 0 2; background: $surface; color: $text-muted; }
+    #status { height: 1; padding: 0 2; color: $text-muted; }
     """
 
     BINDINGS: ClassVar = [
@@ -185,20 +158,14 @@ class Amflows(App[None]):
         self._monitor = Monitor()
 
     def compose(self) -> ComposeResult:
-        """The transcript and what the flow is doing, the editor, then the status line."""
-        with Horizontal(id="body"):
-            with Vertical(id="left"):
-                yield RichLog(
-                    id="transcript",
-                    wrap=True,
-                    markup=True,
-                    highlight=False,
-                    auto_scroll=True,
-                )
+        """The transcript and what the flow is doing, the offers, the editor, the status."""
+        with Horizontal():
+            yield RichLog(id="transcript", wrap=True, markup=True)
             with Vertical(id="side"):
                 yield Static(id="flow", classes="panel")
                 yield Static(id="spend", classes="panel")
-        yield Editor(id="editor", soft_wrap=True, show_line_numbers=False)
+        yield OptionList(id="offers")
+        yield Editor(id="editor", show_line_numbers=False)
         yield Static(id="status")
 
     def on_mount(self) -> None:
@@ -210,14 +177,17 @@ class Amflows(App[None]):
         self.action_help()
         self._draw()
         self.set_interval(_REFRESH, self._draw)
+        # The editor is the only thing to type at, so it is the only thing that takes focus:
+        # a transcript or a list that could hold it would swallow the keystrokes meant for it.
+        for elsewhere in self.query("#transcript, #offers"):
+            elsewhere.can_focus = False
         self.query_one(Editor).focus()
+        # Found once, off the event loop, so that the first `/run -f` does not pay for a walk
+        # of this directory between one keystroke and the next.
+        self.run_worker(flows, thread=True)
 
     def on_print(self, event: events.Print) -> None:
-        """Puts something printed under this process into the transcript.
-
-        Whatever an agent wrote is shown as the text it is: a closing bracket it happened to
-        print is a bracket, not markup that would fail to parse and take this handler with it.
-        """
+        """Puts something printed under this process into the transcript."""
         if event.text.strip():
             self.show(event.text.rstrip("\n"), "dim" if event.stderr else "default")
 
@@ -232,40 +202,58 @@ class Amflows(App[None]):
         body = text if style == "" else f"[{style}]{escape(text)}[/{style}]"
         self.query_one("#transcript", RichLog).write(body)
 
+    @on(TextArea.Changed)
+    @on(TextArea.SelectionChanged)
+    def _offer(self) -> None:
+        """Offers whatever the line being typed could be finished with.
+
+        Reconsidered when the cursor moves as well as when the text does: an offer made at
+        the end of a line does not still stand once the cursor is back in the middle of it.
+        """
+        editor = self.query_one(Editor)
+        typed = editor.text
+        at_end = editor.cursor_location == editor.document.end
+        offers = offered(typed, (*COMMANDS, *_OWN)) if at_end else []
+        listing = self.query_one("#offers", OptionList)
+        listing.clear_options()
+        listing.set_class(bool(offers), "offering")
+        if offers:
+            listing.add_options(offers)
+            listing.highlighted = 0
+
     def _draw(self) -> None:
         """Redraws the right-hand column and the status line.
 
-        Called on a timer, which keeps ticking while the interface is being taken down and
-        while a sheet is up in front of it -- so there may be nothing left to draw on.
+        Called on a timer, which keeps ticking while the interface is being taken down -- so
+        there may be nothing left to draw on.
         """
-        if not self.is_running or not self.query("#side"):
+        if not self.is_running:
             return
-        self.query_one("#side").set_class(
-            bool(self._agents) or self._monitor.has_run(), "watching"
-        )
+        graph = self._monitor.graph()
+        self.query_one("#side").set_class(bool(self._agents or graph), "watching")
         self.query_one("#flow", Static).update(
+            "\n".join(["[b]flow[/b]", *(graph or ["[dim]nothing yet[/dim]"])])
+        )
+        spending = self._monitor.spending()
+        self.query_one("#spend", Static).update(
             "\n".join(
-                ["[b]flow[/b]", *(self._monitor.graph() or ["[dim]nothing yet[/dim]"])]
+                ["[b]tokens[/b]"]
+                + (
+                    [
+                        f"{escape(spend.model[:22])}\n"
+                        f"  [dim]{_thousands(spend.tokens)}   {spend.rate:.0f}/s[/dim]"
+                        for spend in spending
+                    ]
+                    or ["[dim]nothing spent yet[/dim]"]
+                )
             )
         )
-
-        spending = self._monitor.spending()
-        lines = ["[b]tokens[/b]"]
-        lines += [
-            f"{escape(spend.model[:22])}\n"
-            f"  [dim]{_thousands(spend.tokens)}   {spend.rate:.0f}/s[/dim]"
-            for spend in spending
-        ] or ["[dim]nothing spent yet[/dim]"]
-        self.query_one("#spend", Static).update("\n".join(lines))
-
         spent = sum(spend.tokens for spend in spending)
         rate = sum(spend.rate for spend in spending)
         working = ", ".join(self._monitor.now_working())
         status = [f"[dim]{escape(str(Path.cwd()))}[/dim]"]
         if working:
             status.append(f"[b]▶[/b] {escape(working)}")
-        elif self._agents:
-            status.append("[dim]…[/dim]")
         if spent:
             status.append(f"[dim]{_thousands(spent)} tokens · {rate:.0f}/s[/dim]")
         self.query_one("#status", Static).update("   ".join(status), layout=False)
@@ -275,9 +263,14 @@ class Amflows(App[None]):
         self.query_one("#transcript", RichLog).clear()
 
     def action_help(self) -> None:
-        """Shows what the editor understands."""
-        for command, what in _HELP:
-            self.show(f"  [b]{command}[/b]  [dim]{what}[/dim]")
+        """Shows what the editor understands, which is the commands and everything else."""
+        self.show(
+            "  [dim]"
+            + "  ".join(f"/{name}" for name in (*COMMANDS, *_OWN))
+            + "[/dim]\n"
+            "  [dim]tab takes what is offered · enter sends · ctrl+j breaks the line[/dim]\n"
+            "  [dim]a line not starting with / is said to the agent working now[/dim]"
+        )
 
     @on(Editor.Sent)
     def _sent(self, event: Editor.Sent) -> None:
@@ -295,62 +288,18 @@ class Amflows(App[None]):
         ) as error:  # an unbalanced quote is a line to correct, not a crash
             self.show(f"amflows: {error}", "red")
             return
-        self._carry_out(name, argv)
-
-    def _carry_out(self, name: str, argv: list[str]) -> None:
-        """Carries out one slash command, filling it in first if it was given nothing.
-
-        Args:
-          name: The command, without its slash.
-          argv: What followed it, split the way a shell would.
-        """
         if name == "quit":
             self.exit()
         elif name == "help":
             self.action_help()
         elif name == "clear":
             self.action_clear()
-        elif name == "cd":
-            self._cd(argv)
-        elif name not in COMMANDS:
-            self.show(f"amflows: no such command: /{name}", "red")
-        elif argv:
-            self._start(name, argv)
-        else:
-            self._fill_in(name)
-
-    @work
-    async def _fill_in(self, name: str) -> None:
-        """Asks for a command's arguments in a sheet, then carries it out.
-
-        Args:
-          name: The command to fill in.
-        """
-        fields = await asyncio.to_thread(fields_for, name)
-        if (argv := await self.push_screen_wait(Form(name, fields))) is not None:
-            self.show(f"[dim]/{name} {escape(shlex.join(argv))}[/dim]")
-            self._start(name, argv)
-
-    def _start(self, name: str, argv: list[str]) -> None:
-        """Runs a command, which for a flow means keeping its agents to be talked to.
-
-        Args:
-          name: The command, as `amflows` spells it.
-          argv: Its arguments.
-        """
-        if name == "run":
+        elif name == "run":
             self._flow(argv)
-        else:
+        elif name in COMMANDS:
             self._background(lambda: COMMANDS[name][0](argv))
-
-    def _cd(self, argv: list[str]) -> None:
-        """Moves to another directory, which is where a flow started here will run."""
-        try:
-            os.chdir(Path(argv[0]).expanduser() if argv else Path.home())
-        except OSError as error:
-            self.show(f"amflows: {error}", "red")
-            return
-        self._draw()
+        else:
+            self.show(f"amflows: no such command: /{name}", "red")
 
     def _flow(self, argv: list[str]) -> None:
         """Starts a flow, keeping its agents so that a typed line can reach one.
@@ -392,9 +341,8 @@ class Amflows(App[None]):
           agent: Whose turn said it.
           event: What was said.
         """
-        # First, and whatever else happens: showing a line raises once the interface has gone,
-        # and what a watcher raises is swallowed, so accounting placed after it would be lost
-        # for that event.
+        # First, whatever else happens: showing a line raises once the interface has gone, and
+        # what a watcher raises is swallowed, so accounting after it would be lost.
         for model, tokens in event.tokens.items():
             self._monitor.spend(agent.id, tokens, model=model)
         if event.kind == "begins":
@@ -403,8 +351,6 @@ class Amflows(App[None]):
         elif event.kind == "ends":
             self._monitor.ends(agent.id)
         elif event.kind == "tool":
-            # A tool is a row rather than a block: what matters in a transcript is that one
-            # was used and which, not the whole of what it was handed.
             self.call_from_thread(self.show, f"{_TOOL}{escape(event.text)}")
         elif event.kind == "reasoning":
             self.call_from_thread(self.show, event.text, "dim italic")
@@ -437,13 +383,15 @@ class Amflows(App[None]):
         Args:
           text: What to say.
         """
-        # Whoever has a turn open is who a typed line is for. The last agent on the command
-        # line may be sitting on a session of its own that is idle but still alive, and would
-        # take the line silently and say it back in its own next turn.
+        # Whoever has a turn open is who a typed line is for, and if nobody has, there is
+        # nobody to tell: an agent between turns still holds a session that would take the
+        # line without a word and say it back inside its own next turn.
         working = set(self._monitor.now_working())
-        busy = [agent for agent in self._agents if agent.id in working]
         sessions = [
-            session for agent in busy or self._agents for session in agent.sessions
+            session
+            for agent in self._agents
+            if agent.id in working
+            for session in agent.sessions
         ]
         if not sessions:
             self.show("amflows: nothing is running to be told that", "red")
@@ -451,8 +399,8 @@ class Amflows(App[None]):
         self.show(f"\n[b]›[/b] {escape(text)}")
 
         def put_in() -> int:
-            # Off the event loop: this writes to the agent's stdin, and a large paste into a
-            # pipe the interface itself is draining would otherwise deadlock the two.
+            # Off the event loop: this writes to the agent, and a large paste into a pipe the
+            # interface itself is draining would otherwise deadlock the two.
             try:
                 sessions[-1].interject(text)
             except (NotImplementedError, RuntimeError) as error:
