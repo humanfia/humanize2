@@ -2,12 +2,12 @@
 
     amflows run -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "$(cat TASK.md)"
     amflows collect
-    amflows moor --target ssh://build-box claude
-    amflows anchor --listen 7777 --export /srv/project
+    amflows anchor --target ssh://build-box claude
+    amflows anchor serve --listen 7777 --export /srv/project
 
 A command imports the subpackage it needs when it is the one asked for, and no earlier. Two
 things turn on that: `amflows run` must not pay for a date parser it will not use, and
-`amflows anchor` is what the zipapp bootstrapped onto a target runs, where coganchor is the
+`amflows anchor serve` is what the zipapp bootstrapped onto a target runs, where coganchor is the
 only subpackage present and the architecture is whatever the target happens to be.
 """
 
@@ -21,7 +21,7 @@ import os
 import sys
 from importlib.metadata import version
 
-__all__ = ["main", "moor_parser"]
+__all__ = ["anchor_parser", "main"]
 
 #: Addresses a target may be left listening on without a secret, because nothing off this
 #: machine can reach them.
@@ -164,8 +164,8 @@ def _collect(argv: list[str]) -> int:
     return 0
 
 
-def moor_parser() -> argparse.ArgumentParser:
-    """Builds the parser for `amflows moor`, whose every option is a setting of the session.
+def anchor_parser() -> argparse.ArgumentParser:
+    """Builds the parser for `amflows anchor`, whose every option is a setting of the session.
 
     Public because :meth:`~amflows.coganchor.anchor.AnchorConfig.command` renders this same
     command line to run a turn in a process of its own, and nothing else could check that what
@@ -175,9 +175,9 @@ def moor_parser() -> argparse.ArgumentParser:
       A parser whose result is what :class:`~amflows.coganchor.anchor.AnchorConfig` takes.
     """
     parser = argparse.ArgumentParser(
-        prog="amflows moor",
+        prog="amflows anchor",
         description="Run a coding agent on this machine that acts on another one.",
-        epilog="Example: amflows moor --target ssh://build-box claude --model opus",
+        epilog="Example: amflows anchor --target ssh://build-box claude --model opus",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -263,7 +263,7 @@ def moor_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _moor(argv: list[str]) -> int:
+def _anchor(argv: list[str]) -> int:
     """Runs the agent named on the command line, with its work landing on another machine.
 
     Args:
@@ -272,10 +272,16 @@ def _moor(argv: list[str]) -> int:
     Returns:
       The agent's exit status, or one of our own if it never ran.
     """
+    if argv and argv[0] == "serve":
+        # The other half of the same session, routed before the agent half is reached: only
+        # this end needs ptrace and an x86-64 register map, which is what lets the same
+        # program -- the bundle shipped to the target -- serve a target of any architecture.
+        return _serve(argv[1:])
+
     from amflows.coganchor.anchor import AnchorConfig, check, connect
     from amflows.coganchor.proto import ProtocolError
 
-    parser = moor_parser()
+    parser = anchor_parser()
     args = parser.parse_args(argv)
     # stderr, the one stream a session never speaks the protocol on.
     logging.basicConfig(
@@ -284,7 +290,7 @@ def _moor(argv: list[str]) -> int:
         stream=sys.stderr,
     )
     if not args.command and not args.check:
-        parser.error("no agent given; try `amflows moor claude`")
+        parser.error("no agent given; try `amflows anchor claude`")
     try:
         # Every option is a setting, and every setting is an option.
         config = AnchorConfig(
@@ -322,8 +328,8 @@ def _moor(argv: list[str]) -> int:
         return 1
 
 
-def _anchor(argv: list[str]) -> int:
-    """Replays on this machine what an `amflows moor` elsewhere asks of it.
+def _serve(argv: list[str]) -> int:
+    """Replays on this machine what an `amflows anchor` elsewhere asks of it.
 
     Args:
       argv: What followed the command name.
@@ -337,8 +343,8 @@ def _anchor(argv: list[str]) -> int:
     from amflows.coganchor.serve.server import Server
 
     parser = argparse.ArgumentParser(
-        prog="amflows anchor",
-        description="Replay an `amflows moor` session's operations on this machine.",
+        prog="amflows anchor serve",
+        description="Replay an `amflows anchor` session's operations on this machine.",
     )
     parser.add_argument(
         "--export",
@@ -430,8 +436,7 @@ _COMMANDS = {
         _collect,
         "aggregate the trajectories agents left behind into a Chrome trace",
     ),
-    "moor": (_moor, "run an agent here that acts on another machine"),
-    "anchor": (_anchor, "be the machine an `amflows moor` elsewhere acts on"),
+    "anchor": (_anchor, "run an agent here that acts on another machine"),
 }
 
 

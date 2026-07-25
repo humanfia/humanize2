@@ -63,7 +63,7 @@ amflows collect
 Moor an agent to [another machine](docs/remote-execution.md), so that its work lands there:
 
 ```sh
-amflows moor --target ssh://build-box claude
+amflows anchor --target ssh://build-box claude
 ```
 
 ## Documentation
@@ -71,8 +71,7 @@ amflows moor --target ssh://build-box claude
 - [Flows](docs/flows.md) — writing a flow and running it (`amflows run`)
 - [Agents](docs/agents.md) — sessions, goals, models and efforts, names
 - [Isolation](docs/isolation.md) — a container of the agent's own
-- [Remote execution](docs/remote-execution.md) — acting on another machine (`amflows moor`,
-  `amflows anchor`)
+- [Remote execution](docs/remote-execution.md) — acting on another machine (`amflows anchor`)
 - [Tracing](docs/tracing.md) — trajectories into a trace (`amflows collect`)
 
 ## Security

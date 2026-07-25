@@ -83,7 +83,7 @@ def serve_forever(host: str, port: int, table: ExportTable, token: str | None) -
     with server_type((host, port), handler) as server:
         bound = server.server_address
         print(
-            f"amflows anchor listening {bound[0]} {bound[1]}",
+            f"amflows anchor serve listening {bound[0]} {bound[1]}",
             file=sys.stderr,
             flush=True,
         )

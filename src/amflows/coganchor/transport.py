@@ -11,7 +11,7 @@ Four ways in:
     machine like any other here; it needs no port, no secret and no cooperation
     beyond a ``python3``.
 ``tcp://host:port``
-    Attach to an ``amflows anchor --listen`` someone already started.
+    Attach to an ``amflows anchor serve --listen`` someone already started.
 ``local[:REAL]``
     Run ``serve`` as a child process on this machine.  Used for development and
     by the test suite, where ``REAL`` is the directory standing in for the
@@ -138,6 +138,7 @@ def _connect_local(target: Target, exports: list[str], token: str | None) -> Tra
         "-m",
         "amflows",
         "anchor",
+        "serve",
         "--stdio",
         *_export_args(exports),
     ]
@@ -171,6 +172,7 @@ def _connect_ssh(target: Target, exports: list[str], token: str | None) -> Trans
             "python3",
             remote_file,
             "anchor",
+            "serve",
             "--stdio",
             *_export_args(exports, quote=True),
         ]
@@ -209,6 +211,7 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
         "python3",
         remote_file,
         "anchor",
+        "serve",
         "--stdio",
         *_export_args(exports),
     ]
@@ -259,7 +262,7 @@ def build_bundle(destination: Path | None = None) -> Path:
 
     The whole subpackage ships, tracer half included, because pruning it would
     be a list to keep in step with the source tree.  Nothing is lost by that:
-    the target only ever runs ``anchor``, which :func:`amflows.cli.main` reaches
+    the target only ever runs ``anchor serve``, which :func:`amflows.cli.main` reaches
     without importing the modules that need ptrace or an x86-64 register map --
     nor any other subpackage, none of which is here -- so the bundle runs on a
     target of any architecture.  It is pure stdlib, so a host needs nothing but

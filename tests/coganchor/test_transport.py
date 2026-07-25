@@ -51,7 +51,7 @@ def test_bundle_is_self_contained(tmp_path: Path) -> None:
     assert bundle.stat().st_size > 0
 
     result = subprocess.run(
-        [sys.executable, str(bundle), "anchor", "--help"],
+        [sys.executable, str(bundle), "anchor", "serve", "--help"],
         capture_output=True,
         text=True,
         # An empty PYTHONPATH proves nothing is being imported from this repo.
@@ -94,6 +94,7 @@ def test_bundle_reports_failure_in_its_exit_status(tmp_path: Path) -> None:
             sys.executable,
             str(bundle),
             "anchor",
+            "serve",
             "--export",
             f"/project:{target}",
             "--listen",
@@ -145,7 +146,7 @@ def test_ssh_transport_bootstraps_and_runs(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "amflows",
-            "moor",
+            "anchor",
             "--target",
             "ssh://localhost",
             "--workspace",

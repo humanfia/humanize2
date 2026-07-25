@@ -49,7 +49,7 @@ def test_a_rendered_command_is_parsed_back_as_the_settings_it_came_from(
     monkeypatch.setattr("amflows.coganchor.anchor.connect", record)
     rendered = FULL.command(["claude", "--print"])
     # The interpreter running the flow, so the child is the one amflows is installed in.
-    assert rendered[:4] == [sys.executable, "-m", "amflows", "moor"]
+    assert rendered[:4] == [sys.executable, "-m", "amflows", "anchor"]
 
     assert cli.main(rendered[3:]) == 0
 
@@ -63,7 +63,7 @@ def test_an_agent_argument_is_never_read_as_one_of_ours() -> None:
 
     rendered = AnchorConfig(target="ssh://build-box", force=True).command(argv)
 
-    assert cli.moor_parser().parse_args(rendered[4:]).command == argv
+    assert cli.anchor_parser().parse_args(rendered[4:]).command == argv
 
 
 def test_a_default_anchor_says_only_where_the_work_lands() -> None:
@@ -129,7 +129,7 @@ def test_a_target_nobody_can_read_is_refused_the_way_argparse_refuses_an_argumen
     None
 ):
     with pytest.raises(SystemExit) as refused:
-        cli.main(["moor", "--target", "rsync://build-box", "claude"])
+        cli.main(["anchor", "--target", "rsync://build-box", "claude"])
     assert refused.value.code == 2
 
 

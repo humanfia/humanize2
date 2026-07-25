@@ -101,7 +101,7 @@ class AnchorConfig:
             options += [f"{flag}={value}" for value in values]
         if self.force:
             options.append("--force")
-        return [sys.executable, "-m", "amflows", "moor", *options, *argv]
+        return [sys.executable, "-m", "amflows", "anchor", *options, *argv]
 
     def mount(self) -> tuple[Target, str, str]:
         """Reads the target, and works out where the workspace is on each side of it.

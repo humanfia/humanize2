@@ -21,7 +21,6 @@ from amflows import cli
 COMMANDS = [
     ("run", "janus"),
     ("collect", "oronyx"),
-    ("moor", "coganchor"),
     ("anchor", "coganchor"),
 ]
 
@@ -61,8 +60,8 @@ def test_a_command_is_given_the_rest_of_the_line_untouched(
 
 
 def test_the_status_a_command_exits_with_is_the_one_that_is_returned() -> None:
-    with unittest.mock.patch.dict(cli._COMMANDS, {"moor": (lambda argv: 130, "")}):
-        assert cli.main(["moor", "claude"]) == 130
+    with unittest.mock.patch.dict(cli._COMMANDS, {"anchor": (lambda argv: 130, "")}):
+        assert cli.main(["anchor", "claude"]) == 130
 
 
 @pytest.mark.parametrize("argv", [[], ["fly"], ["--target", "ssh://build-box"]])

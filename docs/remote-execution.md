@@ -6,8 +6,8 @@ network from them — happens on the target. It needs no plugin and no cooperati
 Linux x86-64 here, and nothing but `python3` there.
 
 ```sh
-amflows moor --target ssh://build-box claude
-amflows moor --target ssh://gpu-01 codex exec "run the test suite"
+amflows anchor --target ssh://build-box claude
+amflows anchor --target ssh://gpu-01 codex exec "run the test suite"
 ```
 
 `--target` takes `ssh://HOST`, `docker://CONTAINER`, `tcp://HOST:PORT` or `local[:DIR]`;
@@ -58,9 +58,9 @@ Instead of reconnecting over ssh each time, a target can be left listening:
 
 ```sh
 # on the target
-amflows anchor --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
+amflows anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 # on this machine
-AMFLOWS_TOKEN=$SECRET amflows moor --target tcp://build-box:7777 --workspace /srv/project claude
+AMFLOWS_TOKEN=$SECRET amflows anchor --target tcp://build-box:7777 --workspace /srv/project claude
 ```
 
 Read [Security](../README.md#security) before opening one.

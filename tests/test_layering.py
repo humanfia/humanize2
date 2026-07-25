@@ -131,7 +131,7 @@ def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
         "from amflows import cli\n"
         "with contextlib.redirect_stdout(io.StringIO()):\n"
         "    try:\n"
-        "        cli.main(['anchor', '--help'])\n"
+        "        cli.main(['anchor', 'serve', '--help'])\n"
         "    except SystemExit:\n"
         "        pass\n"
         "print('\\n'.join(m for m in sys.modules if m.split('.')[0] == 'amflows'))\n"
