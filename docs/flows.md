@@ -27,10 +27,15 @@ A running flow can be talked to. `amflows` with no command opens a prompt where 
 flow and anything else typed goes to the agent taking its turn. Claude Code answers each thing
 it is told with a turn of its own, so a word put in mid-turn is read within the same turn and
 the answer that comes back is the answer to it — the turn is over once the agent has answered
-everything it was told, not when it first stops. A backend handed its whole prompt up front
-says it cannot be talked to instead. An [anchored](remote-execution.md) agent ends its process
-with each turn, so its work reaches the target before the turn says it landed; it is therefore
-between turns rather than during one that it hears you.
+everything it was told, not when it first stops. Codex takes it as a steer on the turn its app
+server is running, and Kimi queues it and then steers it into the turn already running — which
+is why neither goes through a command line run per turn any more: such a run has ended by the
+time there is anything to say to it. An [anchored](remote-execution.md) Claude ends its process with
+each turn, so its work reaches the target before the turn says it landed; it is therefore
+between turns rather than during one that it hears you. An anchored Codex keeps one app server
+for the life of the agent and can be steered throughout, at the cost of the same guarantee: its
+work reaches the target whenever a command runs there, which for a coding agent is constantly,
+rather than at the end of every turn.
 
 Beside the transcript is what the flow is doing: which agent has the turn, the handovers
 between them as they happen, and what each model has cost with the rate it is costing it at.

@@ -1,28 +1,51 @@
-"""Codex: ``codex exec`` for a turn, and the app server behind ``/goal`` for a goal.
+"""Codex: every turn on the app server, which is the same binary its own client speaks to.
 
-``codex exec`` runs a turn and stops. A goal is a setting of the thread rather than a word in
-the prompt -- ``/goal`` is what the interactive client calls ``thread/goal/set`` from -- and
-``codex app-server`` is the same binary serving that client, so it is where a flow reaches the
-same feature from.
+``codex exec`` runs a turn and stops, which leaves nowhere to put a later word: by the time
+there is something to say to a turn, the process saying it has gone. ``codex app-server``
+holds the thread instead, so a turn is a message on a conversation that is still running --
+which is what ``turn/steer`` steers, and what ``thread/goal/set`` sets a goal on. Both are
+features of the thread rather than flags of a command line, and neither is a word in a prompt.
 """
 
 from __future__ import annotations
 
 import contextlib
+import itertools
 import json
 import queue
-import re
 import subprocess
 import sys
 import threading
 import weakref
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
-from .base import AgentBase, CommandSessionBase, say
+from .base import AgentBase, Event, SessionBase, say
 from .config import AgentConfig
 
-_SESSION_ID = re.compile(r"^session id: (\S+)$", re.MULTILINE)
+
+@dataclass
+class _Running:
+    """Which turn of which thread is under way, if one is.
+
+    Written by the turn as the server names it and cleared when it ends, read by whoever wants
+    to put a word in: a steer must name the thread and the turn it is for, and the server
+    refuses one naming a turn that has already moved on.
+    """
+
+    thread: str | None = None
+    turn: str | None = None
+
+
+#: What a turn is run under, sent with every one of them: a thread picked back up does not
+#: carry the settings it was started with, and a turn waiting on an approval nobody is there to
+#: give is a flow that has stopped. A flow watches its agent rather than answering it.
+_UNATTENDED = {
+    "approvalPolicy": "never",
+    "sandbox": "danger-full-access",
+    "serviceTier": "default",
+}
 
 #: How long a server being taken down is given to go before it is left to the operating system,
 #: and how long an idle thread is given to carry a goal on by itself before the goal is over.
@@ -44,6 +67,8 @@ class _AppServer:
             it would have been asked for failing at the first one instead.
         """
         self._argv = argv
+        #: Whose turns run here, so that what is teed can be what nobody is watching.
+        self._agents: list[AgentBase] = []
         self._proc = subprocess.Popen(
             argv,
             stdin=subprocess.PIPE,
@@ -53,7 +78,8 @@ class _AppServer:
             encoding="utf-8",
             errors="replace",
         )
-        self._pending = 0
+        self._pending = itertools.count(1)
+        self._writing = threading.Lock()  # a line is written whole or not at all
         self._messages: queue.Queue[dict[str, Any] | None] = queue.Queue()
         # Read from a thread of its own, so that a turn can wait on the server for a while
         # rather than only for as long as it takes.
@@ -78,8 +104,7 @@ class _AppServer:
           subprocess.CalledProcessError: If it refused the call, or stopped before answering.
         """
         with self._speaking:
-            self._pending += 1
-            ident = self._pending
+            ident = next(self._pending)
             self._write(
                 {"jsonrpc": "2.0", "id": ident, "method": method, "params": params}
             )
@@ -116,8 +141,7 @@ class _AppServer:
           subprocess.CalledProcessError: If the turn was refused, or the server stopped.
         """
         with self._speaking:
-            self._pending += 1
-            ident = self._pending
+            ident = next(self._pending)
             self._write(
                 {
                     "jsonrpc": "2.0",
@@ -150,6 +174,115 @@ class _AppServer:
             say(said, sys.stdout)  # where `codex exec` would have put the answer
             return said.strip()
 
+    def turn(self, params: dict[str, Any], running: _Running) -> Iterator[Event]:
+        """Runs one turn on a thread and says what the agent says as it says it.
+
+        Args:
+          params: What to start the turn with, naming the thread it is on.
+          running: Told the turn's own id as the server names it, and told again when the turn
+            is over -- which is what lets a word put in mid-turn say which turn it is for.
+
+        Yields:
+          What the agent said, and the answer it ended on.
+
+        Raises:
+          subprocess.CalledProcessError: If the turn was refused, failed, or was interrupted,
+            or if the server stopped.
+        """
+        thread = params["threadId"]
+        with self._speaking:
+            ident = next(self._pending)
+            self._write(
+                {
+                    "jsonrpc": "2.0",
+                    "id": ident,
+                    "method": "turn/start",
+                    "params": params,
+                }
+            )
+            said = ""
+            # A thread falls idle the moment it is opened, and that idle is still in the
+            # stream when a turn starts reading. A turn has not ended until it has begun.
+            begun = False
+            failed: str | None = None
+            try:
+                while (message := self._read()) is not None:
+                    if message.get("id") == ident and "method" not in message:
+                        self._answer(message, said)
+                    told = message.get("params") or {}
+                    # One server holds every session of the agent, and a turn one of them
+                    # abandoned still says so on this stream. What is not this thread's is
+                    # not this turn's.
+                    if told.get("threadId") not in (None, thread):
+                        continue
+                    if turn := told.get("turnId") or (told.get("turn") or {}).get("id"):
+                        running.turn = str(turn)
+                        begun = True
+                    match message.get("method"):
+                        case "item/started" if (
+                            told["item"].get("type") == "commandExecution"
+                        ):
+                            yield Event(
+                                kind="tool", text=told["item"].get("command", "")
+                            )
+                        case "item/completed":
+                            item = told["item"]
+                            if item.get("type") == "agentMessage":
+                                said = item["text"]
+                                yield Event(kind="text", text=said)
+                            elif item.get("type") == "reasoning":
+                                # Reasoning is a list of parts rather than one text.
+                                thought = " ".join(
+                                    item.get("content") or item.get("summary") or []
+                                )
+                                if thought:
+                                    yield Event(kind="reasoning", text=thought)
+                        case "error":
+                            failed = json.dumps(told.get("error"))
+                        case "turn/completed" if told.get("turn", {}).get(
+                            "status"
+                        ) not in (None, "completed"):
+                            # A turn can end by failing or by being interrupted, and the
+                            # thread goes idle either way: a turn that did not land must not
+                            # answer as if it had.
+                            turn_said = told["turn"]
+                            failed = json.dumps(
+                                turn_said.get("error") or turn_said.get("status")
+                            )
+                        case "thread/status/changed" if (
+                            begun and told["status"]["type"] == "idle"
+                        ):
+                            break
+            finally:
+                running.turn = None
+            if failed is not None:
+                raise subprocess.CalledProcessError(1, self._argv, said, failed)
+            yield Event(kind="result", text=said.strip())
+
+    def steer(self, thread: str, turn: str, text: str) -> None:
+        """Says something to a turn that is already running.
+
+        Written straight out rather than called: the turn holds the stream while it reads, and
+        what the server answers a steer with is picked up by that same reader and passed over.
+
+        Args:
+          thread: The thread the turn is on.
+          turn: The turn to steer, which the server refuses to confuse with any other.
+          text: What to say.
+        """
+        self._write(
+            {
+                "jsonrpc": "2.0",
+                "id": next(self._pending),
+                "method": "turn/steer",
+                "params": {
+                    "threadId": thread,
+                    "input": [{"type": "text", "text": text}],
+                    "expectedTurnId": turn,
+                },
+            }
+        )
+
     def stop(self) -> None:
         """Takes the server down, leaving the threads it held on disk."""
         self._proc.terminate()
@@ -169,8 +302,9 @@ class _AppServer:
         """
         assert self._proc.stdin is not None
         try:
-            self._proc.stdin.write(json.dumps(message) + "\n")
-            self._proc.stdin.flush()
+            with self._writing:
+                self._proc.stdin.write(json.dumps(message) + "\n")
+                self._proc.stdin.flush()
         except OSError as gone:
             raise subprocess.CalledProcessError(1, self._argv, "", str(gone)) from gone
 
@@ -179,11 +313,37 @@ class _AppServer:
         assert self._proc.stdout is not None
         for line in self._proc.stdout:
             message: dict[str, Any] = json.loads(line)
-            if message.get("method") == "item/agentMessage/delta":
+            if "id" in message and "method" in message:
+                # Something asked of us. Nothing here answers one, and a request left unanswered
+                # stalls the turn holding the stream -- and with it every session of the agent.
+                # Refusing is not the answer it wanted, but it is an answer.
+                self._write(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": message["id"],
+                        "error": {"code": -32601, "message": "a flow answers nothing"},
+                    }
+                )
+                continue
+            if (
+                message.get("method") == "item/agentMessage/delta"
+                and not self._watched()
+            ):
                 # So that a goal running for an hour stays as watchable as a turn that prints.
                 say(message["params"]["delta"], sys.stderr, end="")
             self._messages.put(message)
         self._messages.put(None)  # it has stopped, and nothing more is coming
+
+    def _watched(self) -> bool:
+        """Whether something is watching the agents this server runs turns for.
+
+        A watcher is given each message whole as the turn says it, so teeing the pieces as
+        well would show every message twice.
+
+        Returns:
+          Whether anything is watching.
+        """
+        return any(agent._watchers for agent in self._agents)
 
     def _read(self, timeout: float | None = None) -> dict[str, Any] | None:
         """Takes the next message the server sent.
@@ -233,53 +393,102 @@ class CodexAgentConfig(AgentConfig):
     """What Codex is configured with: the common model and effort, and nothing else."""
 
 
-class CodexSession(CommandSessionBase):
-    """A Codex conversation, addressed by the id ``codex exec`` announces before it starts work.
+class CodexSession(SessionBase):
+    """A Codex conversation, held as a thread by the app server the agent runs.
 
-    Codex has no way to pin the id up front and ``resume --last`` takes whichever session in
-    this directory is newest, so the id is read back from the first turn instead.
+    Every turn goes to the server rather than to a `codex exec` of its own, which is what
+    leaves the turn somewhere to be talked to: the thread is still there, still running, so
+    :meth:`interject` steers the turn under way instead of waiting for the next one.
     """
 
-    _agent: CodexAgent  # a goal is run on the app server this agent holds
+    _agent: CodexAgent  # every turn is run on the app server this agent holds
 
-    def _turn(self, prompt: str) -> tuple[list[str], str | None]:
-        """Builds ``codex exec [resume <id>]`` with the prompt on stdin."""
-        resume = ["resume", self._id] if self._id else []
-        return (
-            [
-                "codex",
-                "exec",
-                *resume,
-                "--dangerously-bypass-approvals-and-sandbox",
-                "--skip-git-repo-check",
-                "--model",
-                self._agent.config.model,
-                "-c",
-                f'model_reasoning_effort="{self._agent.config.effort}"',
-                "-c",
-                'service_tier="default"',
-                "-",  # take the prompt from stdin
-            ],
-            prompt,
-        )
+    def __init__(self, agent: AgentBase):
+        """Initializes a session holding no thread yet.
 
-    def _read_session_id(self, transcript: str) -> str:
-        """Reads ``session id: <uuid>`` out of the header Codex prints before it starts work.
+        Args:
+          agent: The agent whose config every turn of this session runs at.
+        """
+        super().__init__(agent)
+        #: The turn under way, which is what a word put in has to name.
+        self._running = _Running()
+
+    def _stream(self, prompt: str) -> Iterator[Event]:
+        """Sends one turn to the server, saying what the agent says as it says it.
+
+        Args:
+          prompt: The input prompt for this turn.
+
+        Yields:
+          What the agent said, in the order it said it.
 
         Raises:
-          RuntimeError: If the header is missing, which means the id cannot be resumed.
+          subprocess.CalledProcessError: If the turn was refused, or the server stopped.
         """
-        match = _SESSION_ID.search(transcript)
-        if match is None:
-            raise RuntimeError("codex exec printed no session id")
-        return match.group(1)
+        with self._lock:  # a conversation is a sequence: one turn at a time
+            thread = self._thread()
+            # Known before the turn starts, so a word put in has a thread to name even though
+            # the session is only opened once the turn has landed.
+            self._running.thread = thread
+            said = ""
+            for event in self._agent.server.turn(
+                {
+                    "threadId": thread,
+                    "input": [{"type": "text", "text": prompt}],
+                    "model": self._agent.config.model,
+                    "effort": self._agent.config.effort,
+                    **_UNATTENDED,
+                },
+                self._running,
+            ):
+                if event.kind == "result":
+                    said = event.text
+                else:
+                    yield event
+            if not self._agent._watchers:
+                # Where `codex exec` would have put the answer. Something watching the agent
+                # has had it already, as the turn said it.
+                say(said, sys.stdout)
+            self._adopt(thread)  # a turn has landed, so the session is open
+            yield Event(kind="result", text=said)
+
+    def interject(self, text: str) -> None:
+        """Steers the turn under way, which the server takes into the turn it is running.
+
+        Args:
+          text: What to say to the agent.
+
+        Raises:
+          RuntimeError: If no turn is running, so there is none for the server to steer.
+        """
+        running = self._running
+        if running.turn is None or running.thread is None:
+            raise RuntimeError("no turn is running to be talked to")
+        self._agent.server.steer(running.thread, running.turn, text)
+
+    def _thread(self) -> str:
+        """The thread this session is, started or picked back up as needed.
+
+        Returns:
+          The thread's id, which is also the session's.
+        """
+        server = self._agent.server
+        if (thread := self._id) is None:
+            return str(
+                server.call(
+                    "thread/start",
+                    {
+                        "cwd": self._workspace(),
+                        "model": self._agent.config.model,
+                        **_UNATTENDED,
+                    },
+                )["thread"]["id"]
+            )
+        server.call("thread/resume", {"threadId": thread})
+        return thread
 
     def pursue(self, objective: str) -> str:
         """Runs the turn under a goal of Codex's own, which its runtime steers until it is met.
-
-        The thread is the session either way -- one opened here is the one ``codex exec resume``
-        goes on with -- so a flow may set a goal on a session it has been running turns in, and
-        run turns in one it has set a goal on.
 
         Args:
           objective: What the agent is to have achieved before it stops.
@@ -294,23 +503,7 @@ class CodexSession(CommandSessionBase):
         with self._lock:  # a conversation is a sequence: one turn at a time
             server = self._agent.server
             config = self._agent.config
-            if (thread := self._id) is None:
-                thread = server.call(
-                    "thread/start",
-                    {
-                        "cwd": self._workspace(),
-                        "model": config.model,
-                        # What `codex exec` is run with here: a flow watches its agent rather
-                        # than answering it.
-                        "approvalPolicy": "never",
-                        "sandbox": "danger-full-access",
-                        "serviceTier": "default",
-                    },
-                )["thread"]["id"]
-            else:
-                # A session that has been running turns is one the server has never held, and
-                # a goal is set on a thread it is holding.
-                server.call("thread/resume", {"threadId": thread})
+            thread = self._thread()
             server.call("thread/goal/set", {"threadId": thread, "objective": objective})
             answer = server.pursue(
                 {
@@ -325,7 +518,7 @@ class CodexSession(CommandSessionBase):
 
 
 class CodexAgent(AgentBase):
-    """Codex, which takes the prompt on stdin and the effort via ``model_reasoning_effort``."""
+    """Codex, driven over the app server so that a turn can be steered while it runs."""
 
     def __init__(self, config: AgentConfig, *, name: str | None = None):
         """Initializes an agent whose app server is not running yet.
@@ -340,7 +533,7 @@ class CodexAgent(AgentBase):
 
     @property
     def server(self) -> _AppServer:
-        """The app server this agent's goals run on, started the first time one is asked for.
+        """The app server this agent's turns run on, started the first time one is needed.
 
         One per agent rather than one per session, so a flow that drops a session a turn does
         not start a server a turn; it is taken down when the agent is collected, or at exit for
@@ -356,6 +549,7 @@ class CodexAgent(AgentBase):
                 if (anchor := self.anchor) is not None:
                     argv = anchor.command(argv)
                 self._server = _AppServer(argv)
+                self._server._agents.append(self)
                 # Held by the finalizer alone, which is what takes the server down: when the
                 # agent is collected, and at exit for one held to the end.
                 weakref.finalize(self, self._server.stop)

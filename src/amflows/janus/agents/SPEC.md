@@ -148,6 +148,9 @@ class SessionBase(ABC):
 - `interject` MUST reach the turn already under way rather than starting another, and MUST
   raise `NotImplementedError` on a backend that takes a turn's whole prompt up front. A
   backend that can be talked to MUST raise `RuntimeError` when nothing is running to hear it.
+  A word that would be answered as a turn of its own once this one ended is a turn queued
+  behind rather than a word put in, and MUST be moved into the running turn where the backend
+  offers a way -- which every one driven through an app server does.
 - MUST NOT run a session in parallel; use a lock to ensure that only one turn is run at a time.
 - MUST add a session to its agent's `opened` as it opens, and never for a turn that failed.
 - A turn that fails MUST raise `subprocess.CalledProcessError`, whatever it was run through, so
@@ -253,7 +256,9 @@ class DummySession(CommandSessionBase): ...
 - A backend MUST be driven through its command line where that can express what an agent is
   configured with, and through the app server the backend serves its own client from where it
   cannot -- a model, an effort, a mode or a goal that has no flag is a setting of a session
-  there, and asking the model for it in the prompt is not the same feature.
+  there, and asking the model for it in the prompt is not the same feature. A turn that must
+  stay open to be talked to is such a case: a command line run per turn has ended by the time
+  there is anything to say to it.
 - Such a server MUST be started at most once per agent, only when a turn first needs one, so
   that a flow which needs none starts none; it MUST be started under the agent's anchor, and
   stopped when the agent is collected or the process exits.

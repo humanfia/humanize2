@@ -12,6 +12,8 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -44,6 +46,8 @@ def note(entry):
 note({"path": "argv", "body": sys.argv[1:], "token": None})
 GOAL = []
 POLLS = []
+QUEUED = []
+STEERED = []
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -58,11 +62,20 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         sent = json.loads(self.rfile.read(int(self.headers["Content-Length"])) or b"null")
         note({"path": self.path, "body": sent, "token": self.headers.get("Authorization")})
-        if self.path.endswith("/prompts"):
+        if self.path.endswith("/prompts:steer"):
+            # What was queued is moved into the turn already running, which is the whole
+            # difference between putting a word in and queueing a turn behind this one.
+            STEERED.extend(sent["prompt_ids"])
+            self.reply({"steered": True, "prompt_ids": sent["prompt_ids"]})
+        elif self.path.endswith("/prompts"):
             if sent["content"][0]["text"] == "boom":
                 self.reply(None, status=400)
             else:
-                self.reply({"user_message_id": "msg_0", "status": "running"})
+                QUEUED.append(sent["content"][0]["text"])
+                # Running while nothing else is, queued while a turn already has the session.
+                self.reply({"prompt_id": "p_%d" % len(QUEUED),
+                            "user_message_id": "msg_0",
+                            "status": "running" if len(QUEUED) == 1 else "queued"})
         elif self.path.endswith("/profile"):
             self.reply({})
         else:
@@ -72,7 +85,12 @@ class Handler(BaseHTTPRequestHandler):
         note({"path": self.path, "body": None, "token": self.headers.get("Authorization")})
         if "/status" in self.path:
             POLLS.append(None)
-            self.reply({"busy": len(POLLS) == 1})
+            if QUEUED and QUEUED[0] == "patient":
+                # Working until it is told something else, which is what makes a word put in
+                # mid-turn observable: the turn cannot end before it lands.
+                self.reply({"busy": not STEERED})
+            else:
+                self.reply({"busy": len(POLLS) == 1})
         elif self.path.endswith("/goal"):
             # Still being pursued the first time it is asked, as a goal is between its turns.
             GOAL.append(None)
@@ -83,10 +101,13 @@ class Handler(BaseHTTPRequestHandler):
                 {"type": "thinking", "thinking": "..."},
             ]}]})
         else:
+            answer = " answered "
+            if STEERED:
+                answer = " steered:" + QUEUED[-1] + " "
             self.reply({"items": [{"id": "msg_1", "role": "assistant", "content": [
                 {"type": "thinking", "thinking": "..."},
                 {"type": "tool_use", "tool_name": "Write"},
-                {"type": "text", "text": " answered "},
+                {"type": "text", "text": answer},
             ]}]})
 
     def log_message(self, *ignored):
@@ -127,16 +148,35 @@ for line in sys.stdin:
         STUCK.append(call["params"]["objective"] == "stuck")
     if call["method"] == "thread/start":
         send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
+    if call["method"] == "turn/steer":
+        # The turn was left open for this: what was put in is answered inside the same turn,
+        # and only then does the thread fall idle.
+        send({"method": "item/completed",
+              "params": {"item": {"type": "agentMessage",
+                                  "text": " steered:" + call["params"]["input"][0]["text"]}}})
+        send({"method": "turn/completed", "params": {}})
+        send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
     if call["method"] == "turn/start":
-        # Two turns of the model under one goal, which is what the objective took: Codex
-        # starts the second itself, off the idle the first one left behind.
-        send({"method": "turn/started", "params": {}})
+        send({"method": "turn/started", "params": {"turnId": "turn_fake"}})
+        if call["params"]["input"][0]["text"] == "doomed":
+            send({"method": "turn/completed",
+                  "params": {"turn": {"id": "turn_fake", "status": "failed",
+                                      "error": {"type": "usageLimitExceeded"}}}})
+            send({"method": "thread/status/changed",
+                  "params": {"status": {"type": "idle"}}})
+            continue
         send({"method": "item/agentMessage/delta", "params": {"delta": "working"}})
         send({"method": "item/completed",
               "params": {"item": {"type": "agentMessage", "text": " halfway "}}})
+        if not STUCK:
+            # An ordinary turn: left running, the way a real one is while the model works,
+            # so that a word put in has a turn to land in.
+            continue
+        # Two turns of the model under one goal, which is what the objective took: Codex
+        # starts the second itself, off the idle the first one left behind.
         send({"method": "turn/completed", "params": {}})
         send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
-        send({"method": "turn/started", "params": {}})
+        send({"method": "turn/started", "params": {"turnId": "turn_fake"}})
         send({"method": "item/completed",
               "params": {"item": {"type": "agentMessage", "text": " answered "}}})
         send({"method": "turn/completed", "params": {}})
@@ -354,9 +394,140 @@ def test_codex_resumes_the_thread_a_later_goal_is_set_on(codex: _FakeServer) -> 
     assert methods.count("thread/resume") == 1
 
 
-def test_codex_starts_no_app_server_for_a_flow_that_sets_no_goal(
+def test_codex_starts_no_app_server_until_a_turn_needs_one(
     codex: _FakeServer,
 ) -> None:
     CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
 
     assert not codex.log.exists()
+
+
+def test_codex_runs_an_ordinary_turn_on_the_thread(codex: _FakeServer) -> None:
+    """Not `codex exec`: the turn goes to the server, which is what leaves it steerable."""
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high"))
+    session = agent.launch()
+
+    # The turn stays open the way a real one does, so it is ended by putting a word in.
+    def finish() -> None:
+        for _ in range(200):
+            if session._running.turn is not None:
+                session.interject("go on")
+                return
+            time.sleep(0.02)
+
+    threading.Thread(target=finish, daemon=True).start()
+    assert session.run("do the task") == "steered:go on"
+
+    called = {call["method"]: call["params"] for call in codex.calls()}
+    assert called["thread/start"]["cwd"] == os.getcwd()
+    assert called["turn/start"]["input"] == [{"type": "text", "text": "do the task"}]
+    assert called["turn/start"]["effort"] == "high"
+    assert "thread/goal/set" not in called  # an ordinary turn sets no goal
+    assert session.id == "thread_fake"
+    assert agent.opened == ["thread_fake"]
+
+
+def test_codex_can_be_talked_to_while_a_turn_is_running(codex: _FakeServer) -> None:
+    """The point of running the turn on the server: a word put in reaches the turn under way."""
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+
+    said = []
+    for event in session.stream("count to sixty"):
+        if event.kind == "text" and not said:
+            session.interject("actually, stop")
+        said.append(event)
+
+    steered = next(call for call in codex.calls() if call["method"] == "turn/steer")
+    assert steered["params"] == {
+        "threadId": "thread_fake",
+        "input": [{"type": "text", "text": "actually, stop"}],
+        # Named, so the server refuses to steer a turn that has already moved on.
+        "expectedTurnId": "turn_fake",
+    }
+    assert "steered:actually, stop" in said[-1].text
+
+
+def test_a_codex_session_with_no_turn_running_cannot_be_talked_to() -> None:
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+
+    with pytest.raises(RuntimeError, match="no turn is running"):
+        session.interject("hello?")
+
+
+def test_a_codex_turn_that_failed_does_not_answer_as_if_it_landed(
+    codex: _FakeServer,
+) -> None:
+    """The thread goes idle either way, so a turn that failed must say so rather than "".
+
+    Otherwise a loop feeds an empty answer forward as the work of the turn before it.
+    """
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high"))
+    session = agent.launch()
+
+    with pytest.raises(subprocess.CalledProcessError) as failed:
+        session.run("doomed")
+
+    assert "usageLimitExceeded" in str(failed.value.stderr)
+    assert agent.opened == []  # a turn that failed opened nothing
+    with pytest.raises(RuntimeError):
+        _ = session.id
+
+
+def test_a_codex_turn_ignores_what_another_thread_is_saying(codex: _FakeServer) -> None:
+    """One server holds every session of the agent, and each turn is only its own thread's."""
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+    server = session._agent.server
+
+    # A straggler from a thread this turn is not on, of the kind that would otherwise end it.
+    server._messages.put(
+        {
+            "method": "thread/status/changed",
+            "params": {"status": {"type": "idle"}, "threadId": "somebody_else"},
+        }
+    )
+
+    def finish() -> None:
+        for _ in range(300):
+            if session._running.turn is not None:
+                session.interject("go on")
+                return
+            time.sleep(0.02)
+
+    threading.Thread(target=finish, daemon=True).start()
+    assert session.run("do the task") == "steered:go on"
+
+
+def test_kimi_steers_a_word_into_the_turn_already_running(kimi: _FakeServer) -> None:
+    """A prompt sent to a working session is queued; steering moves it into this turn.
+
+    Without the steer it would be answered as a turn of its own once this one ended, which is
+    a turn queued behind rather than a word put in.
+    """
+    session = KimiCodeCLIAgent(
+        KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
+    ).launch()
+
+    def put_in() -> None:
+        for _ in range(300):
+            if session._running.session is not None:
+                session.interject("actually, stop")
+                return
+            time.sleep(0.02)
+
+    threading.Thread(target=put_in, daemon=True).start()
+    answered = session.run("patient")
+
+    sent = [call for call in kimi.calls() if call["path"].endswith("/prompts:steer")]
+    assert [call["body"] for call in sent] == [{"prompt_ids": ["p_2"]}]
+    # The word went in as a prompt of its own and was then moved into the running turn, so
+    # the turn's answer is the answer to it.
+    assert answered == "steered:actually, stop"
+
+
+def test_a_kimi_session_with_no_turn_running_cannot_be_talked_to() -> None:
+    session = KimiCodeCLIAgent(
+        KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
+    ).launch()
+
+    with pytest.raises(RuntimeError, match="no turn is running"):
+        session.interject("hello?")

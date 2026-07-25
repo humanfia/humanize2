@@ -25,20 +25,10 @@ from amflows.janus import (
     AgentConfig,
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
-    CodexAgent,
-    CodexAgentConfig,
     CommandSessionBase,
 )
 from tests.janus.conftest import HereAnchor, ShellAgent
 
-# Verbatim from `codex exec`, which is where its session id comes from.
-CODEX_TRANSCRIPT = """OpenAI Codex v0.144.4
---------
-workdir: /tmp/probe
-model: gpt-5.6-sol
-session id: 019fa62b-d9e1-7b73-be84-bd70260e1cf6
---------
-"""
 CODEX_ID = "019fa62b-d9e1-7b73-be84-bd70260e1cf6"
 
 CONFIG = AgentConfig(model="m", effort="high")
@@ -99,7 +89,7 @@ class _Call:
 
 @dataclass(frozen=True)
 class _FakeCLIs:
-    """Fake `claude` and `codex` on PATH, each recording the calls it was made with."""
+    """A fake `claude` on PATH, recording the calls it was made with."""
 
     log: Path
 
@@ -114,7 +104,7 @@ def clis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeCLIs:
     binaries = tmp_path / "bin"
     binaries.mkdir()
     # Claude is held open and spoken to in JSON, so its fake answers a line at a time and
-    # records the launch and each thing said as calls of their own; codex is one run per turn.
+    # records the launch and each thing said as calls of their own.
     claude = (
         "import json, pathlib, sys\n"
         f"log = pathlib.Path({str(log)!r})\n"
@@ -134,17 +124,9 @@ def clis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeCLIs:
         # One answer per thing said, which is what the real one does.
         "    print(json.dumps({'type': 'result', 'result': said}), flush=True)\n"
     )
-    codex = (
-        "import json, pathlib, sys\n"
-        f"with pathlib.Path({str(log)!r}).open('a') as stream:\n"
-        "    json.dump({'argv': sys.argv[1:], 'stdin': sys.stdin.read()}, stream)\n"
-        "    stream.write('\\n')\n"
-        f"sys.stdout.write({CODEX_TRANSCRIPT!r})\n"
-    )
-    for name, source in (("claude", claude), ("codex", codex)):
-        fake = binaries / name
-        fake.write_text(f"#!{sys.executable}\n{source}")
-        fake.chmod(0o755)
+    fake = binaries / "claude"
+    fake.write_text(f"#!{sys.executable}\n{claude}")
+    fake.chmod(0o755)
     monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
     return _FakeCLIs(log)
 
@@ -399,21 +381,6 @@ def test_a_session_that_never_opened_cannot_be_talked_to() -> None:
         session.interject("hello?")
 
 
-def test_codex_opens_then_resumes(clis: _FakeCLIs) -> None:
-    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
-    session.run("hi")
-    session.run("again")
-
-    opened, resumed = clis.calls()
-    assert opened.argv[0] == "exec" and "resume" not in opened.argv
-    assert "--dangerously-bypass-approvals-and-sandbox" in opened.argv
-    assert "gpt-5-codex" in opened.argv
-    assert 'model_reasoning_effort="high"' in opened.argv
-    assert opened.argv[-1] == "-" and opened.stdin == "hi"  # prompt on stdin
-    assert session.id == CODEX_ID  # read back out of the header the first turn printed
-    assert resumed.argv[:3] == ["exec", "resume", CODEX_ID]
-
-
 def test_claude_pursues_through_its_own_goal_command(clis: _FakeCLIs) -> None:
     """`/goal` is Claude's, and print mode expands it: what a goal must not be is a prompt."""
     session = ClaudeCodeAgent(
@@ -443,12 +410,6 @@ def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -
     assert resumed[resumed.index("--resume") + 1] == session.id
     assert opened[-4:] == ["--model", "claude-opus-4-8", "--effort", "high"]
     assert [call.stdin for call in clis.calls() if call.stdin] == ["hi", "again"]
-
-
-def test_unreadable_session_id_raises() -> None:
-    session = CodexAgent(CONFIG).launch()
-    with pytest.raises(RuntimeError):
-        session._read_session_id("no session id here")
 
 
 def test_a_backend_without_a_goal_feature_says_so() -> None:

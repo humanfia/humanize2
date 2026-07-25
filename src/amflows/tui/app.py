@@ -233,7 +233,13 @@ class Amflows(App[None]):
         self.query_one("#transcript", RichLog).write(body)
 
     def _draw(self) -> None:
-        """Redraws the right-hand column and the status line."""
+        """Redraws the right-hand column and the status line.
+
+        Called on a timer, which keeps ticking while the interface is being taken down and
+        while a sheet is up in front of it -- so there may be nothing left to draw on.
+        """
+        if not self.is_running or not self.query("#side"):
+            return
         self.query_one("#side").set_class(
             bool(self._agents) or self._monitor.has_run(), "watching"
         )

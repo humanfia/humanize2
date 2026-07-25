@@ -1,10 +1,10 @@
 """Kimi Code: the app server it serves itself from, where a session is more than its prompts.
 
 ``kimi --prompt`` takes a prompt and nothing else. A ``/goal`` written into one is text the model
-reads rather than a goal its runtime keeps, there is no flag for swarm mode, and the effort an
-agent is configured with has nowhere to go. ``kimi web`` is the same binary serving the sessions
-its own browser client drives, and there all three are settings of the session a turn is
-submitted to.
+reads rather than a goal its runtime keeps, there is no flag for swarm mode, the effort an agent
+is configured with has nowhere to go, and a turn already running has nowhere to be talked to.
+``kimi web`` is the same binary serving the sessions its own browser client drives, and there
+all four are things done to the session a turn is submitted to.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import urllib.error
 import urllib.request
 import weakref
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from .base import AgentBase, Event, SessionBase, say
@@ -34,6 +34,20 @@ _LISTENING = re.compile(r"^Kimi server: (\S+)/#token=(\S+)$")
 #: What an effort is prefixed with to ask for swarm mode: `max` and `swarmmax` are the same
 #: thinking, run as one agent and as a fleet of them.
 _SWARM = "swarm"
+
+
+@dataclass
+class _Running:
+    """The turn under way, if one is: which session it is in, and what it is running at.
+
+    Written as the turn opens and cleared when it is over, read by whoever wants to put a word
+    in. A prompt sent to a session that is working is queued rather than run, and steering it
+    is what moves it into the turn already running instead of leaving it for the next one.
+    """
+
+    session: str | None = None
+    config: dict[str, Any] = field(default_factory=dict)
+
 
 #: How often a running turn is asked whether it is still running, how long one call may take,
 #: and how long a daemon being taken down is given to go before it is left to the system.
@@ -148,6 +162,45 @@ class KimiCodeCLISession(SessionBase):
 
     _agent: KimiCodeCLIAgent  # every turn is submitted to the server this agent holds
 
+    def __init__(self, agent: AgentBase):
+        """Initializes a session running nothing yet.
+
+        Args:
+          agent: The agent whose config every turn of this session runs at.
+        """
+        super().__init__(agent)
+        #: The turn under way, which is what a word put in is steered into.
+        self._running = _Running()
+
+    def interject(self, text: str) -> None:
+        """Puts a word into the turn already running, rather than into the next one.
+
+        A prompt sent to a session that is working is queued, and would be answered as a turn
+        of its own once this one ended. Steering moves it into the turn that is running, which
+        is what makes it a word put in rather than a turn queued behind.
+
+        Args:
+          text: What to say to the agent.
+
+        Raises:
+          RuntimeError: If no turn is running, so there is none to steer it into.
+          subprocess.CalledProcessError: If the daemon refuses either call.
+        """
+        running = self._running
+        if running.session is None:
+            raise RuntimeError("no turn is running to be talked to")
+        server = self._agent.server
+        queued = server.call(
+            "POST",
+            f"/sessions/{running.session}/prompts",
+            {"content": [{"type": "text", "text": text}], **running.config},
+        )
+        server.call(
+            "POST",
+            f"/sessions/{running.session}/prompts:steer",
+            {"prompt_ids": [queued["prompt_id"]]},
+        )
+
     def _stream(self, prompt: str) -> Iterator[Event]:
         """Sends one turn, opening the session on the first call and resuming it after.
 
@@ -193,74 +246,90 @@ class KimiCodeCLISession(SessionBase):
             "swarm_mode": effort.startswith(_SWARM),
         }
         with self._lock:  # a conversation is a sequence: one turn at a time
-            server = self._agent.server
-            # A session of its own per attempt while this one is unopened: an opening turn that
-            # failed leaves the daemon holding a conversation nothing landed in, and resuming
-            # that one would be resuming a turn that never happened.
-            if (session := self._id) is None:
-                session = server.call(
-                    "POST", "/sessions", {"metadata": {"cwd": self._workspace()}}
-                )["id"]
-            server.call(
-                "POST",
-                f"/sessions/{session}/profile",
-                {"agent_config": turn | ({"goal_objective": prompt} if goal else {})},
-            )
-            since = server.call(
-                "POST",
-                f"/sessions/{session}/prompts",
-                {"content": [{"type": "text", "text": prompt}], **turn},
-            )["user_message_id"]
-            answer = ""
-            shown: dict[str, int] = {}  # how much of each message has been passed on
-            settled = False
-            while True:
-                busy = server.call("GET", f"/sessions/{session}/status")["busy"]
-                if goal and not busy:
-                    # A goal runs through the quiet between its turns: Kimi starts the next one
-                    # itself once the session falls still, so a session that has stopped is a
-                    # goal that has stopped only when the goal is no longer being pursued.
-                    pursued = server.call("GET", f"/sessions/{session}/goal")
-                    busy = pursued is not None and pursued["status"] == "active"
-                said = server.call(
-                    "GET", f"/sessions/{session}/messages?after_id={since}"
-                )["items"]
-                # A message is readable while it is still being written, so the turn is read
-                # again from its own first message every poll rather than once: a message put
-                # aside as seen would be the one the agent had only started saying. Newest
-                # first, and a turn reads forwards; what has been passed on is not passed on
-                # twice.
-                for message in reversed(said):
-                    for block in message["content"][shown.get(message["id"], 0) :]:
-                        if block["type"] == "tool_use":
-                            say(block["tool_name"], sys.stderr)
-                        elif block["type"] == "text":
-                            say(block["text"], sys.stderr)
-                    shown[message["id"]] = len(message["content"])
-                # And the answer is taken fresh each time, so that it is what the agent ended
-                # up saying rather than what it had said when it was first readable.
-                for (
-                    message
-                ) in said:  # newest first: the last thing said that has any words
-                    text = "".join(
-                        block["text"]
-                        for block in message["content"]
-                        if block["type"] == "text"
-                    )
-                    if message["role"] == "assistant" and text:
-                        answer = text
-                        break
-                if settled:
-                    # Taken note of before it is passed on: a turn that landed is a session
-                    # this agent opened, whether or not there is anywhere left to say so.
-                    self._adopt(session)
-                    say(answer, sys.stdout)  # where the CLI would have put the response
-                    return answer.strip()
-                # A session says it has stopped before the last thing it said can be read
-                # back, so what it said is read once more after it stops rather than at the
-                # moment it does -- otherwise a turn returns everything but its answer.
-                settled = not busy
-                time.sleep(_POLL_SECONDS)
+            # A turn that failed is as over as one that landed: neither leaves
+            # anything for a word to be steered into.
+            try:
+                server = self._agent.server
+                # A session of its own per attempt while this one is unopened: an opening turn that
+                # failed leaves the daemon holding a conversation nothing landed in, and resuming
+                # that one would be resuming a turn that never happened.
+                if (session := self._id) is None:
+                    session = server.call(
+                        "POST", "/sessions", {"metadata": {"cwd": self._workspace()}}
+                    )["id"]
+                server.call(
+                    "POST",
+                    f"/sessions/{session}/profile",
+                    {
+                        "agent_config": turn
+                        | ({"goal_objective": prompt} if goal else {})
+                    },
+                )
+                # Said before the prompt goes in, so that a word put in has a session to be
+                # steered into from the moment there is a turn to interrupt.
+                self._running = _Running(session=session, config=turn)
+                since = server.call(
+                    "POST",
+                    f"/sessions/{session}/prompts",
+                    {"content": [{"type": "text", "text": prompt}], **turn},
+                )["user_message_id"]
+                answer = ""
+                shown: dict[
+                    str, int
+                ] = {}  # how much of each message has been passed on
+                settled = False
+                while True:
+                    busy = server.call("GET", f"/sessions/{session}/status")["busy"]
+                    if goal and not busy:
+                        # A goal runs through the quiet between its turns: Kimi starts the next one
+                        # itself once the session falls still, so a session that has stopped is a
+                        # goal that has stopped only when the goal is no longer being pursued.
+                        pursued = server.call("GET", f"/sessions/{session}/goal")
+                        busy = pursued is not None and pursued["status"] == "active"
+                    said = server.call(
+                        "GET", f"/sessions/{session}/messages?after_id={since}"
+                    )["items"]
+                    # A message is readable while it is still being written, so the turn is read
+                    # again from its own first message every poll rather than once: a message put
+                    # aside as seen would be the one the agent had only started saying. Newest
+                    # first, and a turn reads forwards; what has been passed on is not passed on
+                    # twice.
+                    for message in reversed(said):
+                        for block in message["content"][shown.get(message["id"], 0) :]:
+                            if block["type"] == "tool_use":
+                                say(block["tool_name"], sys.stderr)
+                            elif block["type"] == "text":
+                                say(block["text"], sys.stderr)
+                        shown[message["id"]] = len(message["content"])
+                    # And the answer is taken fresh each time, so that it is what the agent ended
+                    # up saying rather than what it had said when it was first readable.
+                    for (
+                        message
+                    ) in said:  # newest first: the last thing said that has any words
+                        text = "".join(
+                            block["text"]
+                            for block in message["content"]
+                            if block["type"] == "text"
+                        )
+                        if message["role"] == "assistant" and text:
+                            answer = text
+                            break
+                    if settled:
+                        # Taken note of before it is passed on: a turn that landed is a session
+                        # this agent opened, whether or not there is anywhere left to say so.
+                        self._adopt(session)
+                        say(
+                            answer, sys.stdout
+                        )  # where the CLI would have put the response
+                        return answer.strip()
+                    # A session says it has stopped before the last thing it said can be read
+                    # back, so what it said is read once more after it stops rather than at the
+                    # moment it does -- otherwise a turn returns everything but its answer.
+                    settled = not busy
+                    time.sleep(_POLL_SECONDS)
+
+            finally:
+                self._running = _Running()
 
 
 class KimiCodeCLIAgent(AgentBase):
