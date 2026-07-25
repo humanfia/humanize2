@@ -31,6 +31,9 @@ ALLOWED = {
     "amflows.talanton": {"amflows", "amflows.coganchor"},
     "amflows.oronyx": {"amflows"},
     "amflows.jetflow": {"amflows"},
+    # The interface is a second way in to the commands rather than a second copy of them, so
+    # it alone among the subpackages names the command line.
+    "amflows.tui": {"amflows", "amflows.cli", "amflows.janus"},
     "amflows.coganchor": {"amflows"},
     "amflows.coganchor.serve": {
         "amflows",

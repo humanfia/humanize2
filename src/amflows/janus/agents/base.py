@@ -4,18 +4,45 @@ from __future__ import annotations
 
 import contextlib
 import os
+import queue
 import subprocess
 import sys
 import threading
 import uuid
 import weakref
 from abc import ABC, abstractmethod
+from collections import Counter
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from dataclasses import dataclass, field
 from typing import IO, TYPE_CHECKING
 
 from .config import AgentConfig
 
 if TYPE_CHECKING:
     from amflows.coganchor import AnchorConfig
+
+
+@dataclass(frozen=True, slots=True)
+class Event:
+    """One thing an agent said while a turn was still running.
+
+    What a turn returns is its last word; this is the rest of them, in the order they were
+    said, so that a turn can be watched and talked to rather than only waited on.
+
+    Attributes:
+      kind: What was said. `text` is the agent talking, `reasoning` is it thinking aloud,
+        `tool` is it using one, and `result` is the answer the turn ends on -- exactly one
+        of which closes a turn. `failed` closes it the other way, carrying what went wrong
+        in place of an answer. A watcher sees two more: `begins` and `ends`, which bracket
+        the turn itself and are not part of what the agent said.
+      text: The words themselves, ready to be shown.
+      tokens: What the turn cost, as tokens spent per model. Only a `result` carries it, and
+        only from a backend that says.
+    """
+
+    kind: str
+    text: str
+    tokens: Mapping[str, int] = field(default_factory=dict)
 
 
 def say(text: str, sink: IO[str], *, end: str = "\n") -> None:
@@ -34,16 +61,31 @@ def say(text: str, sink: IO[str], *, end: str = "\n") -> None:
         sink.flush()
 
 
-def _tee(source: IO[str], sink: IO[str], captured: list[str]) -> None:
-    """Copies `source` into `sink` line by line, keeping every line in `captured`.
+def _tee(
+    source: IO[str],
+    sink: IO[str],
+    captured: list[str],
+    said: queue.Queue[Event | None] | None = None,
+    kind: str = "text",
+) -> None:
+    """Copies `source` into `sink` line by line, keeping every line and announcing it.
 
     A sink that has gone away stops the copying but not the reading: a pipe nobody drains
     blocks the agent writing to it, and the turn would then be waiting on an agent that is
-    itself waiting.
+    itself waiting. The None at the end is how a turn reading `said` knows this stream is
+    spent; a stream nobody is reading events from is drained and kept all the same.
     """
-    for line in source:
-        captured.append(line)
-        say(line, sink, end="")
+    with contextlib.suppress(OSError, ValueError):
+        # A source closed under us is a process that has ended, which is not a failure here.
+        for line in source:
+            captured.append(line)
+            if said is not None:
+                said.put(Event(kind=kind, text=line.rstrip("\n")))
+            say(line, sink, end="")
+    with contextlib.suppress(OSError, ValueError):
+        source.close()  # the reader closes what it read, whoever else has finished with it
+    if said is not None:
+        said.put(None)
 
 
 class SessionBase(ABC):
@@ -80,7 +122,6 @@ class SessionBase(ABC):
             raise RuntimeError("session has not run a turn yet")
         return self._id
 
-    @abstractmethod
     def run(self, prompt: str) -> str:
         """Sends one turn, opening the session on the first call and resuming it after.
 
@@ -94,6 +135,64 @@ class SessionBase(ABC):
           subprocess.CalledProcessError: If the turn fails, with whatever the backend said
             about it attached as a diagnostic.
         """
+        said = ""
+        for event in self.stream(prompt):
+            if event.kind == "result":
+                said = event.text
+        return said.strip()
+
+    def stream(self, prompt: str) -> Iterator[Event]:
+        """Sends one turn, saying what the agent says as it says it.
+
+        The turn is over when the iterator is, and its last `result` event is what
+        :meth:`run` answers with. A caller that only wants the answer wants :meth:`run`.
+
+        Everything said here reaches whoever is watching the agent, bracketed by the `begins`
+        and `ends` that say whose turn it was: a flow drives the sessions and answers to
+        nobody, so the turns going past are the only place a run can be watched from.
+
+        Args:
+          prompt: The input prompt for this turn.
+
+        Yields:
+          What the agent said, in the order it said it.
+
+        Raises:
+          subprocess.CalledProcessError: If the turn fails, as for :meth:`run`.
+        """
+        self._agent._heard(Event(kind="begins", text=prompt))
+        try:
+            for event in self._stream(prompt):
+                self._agent._heard(event)
+                yield event
+        finally:
+            self._agent._heard(Event(kind="ends", text=""))
+
+    @abstractmethod
+    def _stream(self, prompt: str) -> Iterator[Event]:
+        """Sends one turn, saying what the agent says as it says it.
+
+        Args:
+          prompt: The input prompt for this turn.
+
+        Yields:
+          What the agent said, in the order it said it.
+        """
+
+    def interject(self, text: str) -> None:
+        """Puts a word in while a turn is running, as typing at the agent would.
+
+        The agent reads it when it next looks, so a turn already under way takes it into
+        account rather than being restarted with it.
+
+        Args:
+          text: What to say to the agent.
+
+        Raises:
+          NotImplementedError: If this backend takes a turn's whole prompt up front and has
+            nowhere to put a later word.
+        """
+        raise NotImplementedError(f"{type(self).__name__} cannot be talked to mid-turn")
 
     def _workspace(self) -> str:
         """The project directory a turn of this session works in, as the backend will find it.
@@ -148,8 +247,8 @@ class SessionBase(ABC):
 class CommandSessionBase(SessionBase):
     """A session whose turns are one run of a coding agent's command line each."""
 
-    def run(self, prompt: str) -> str:
-        """Sends one turn, opening the session on the first call and resuming it after.
+    def _stream(self, prompt: str) -> Iterator[Event]:
+        """Sends one turn, saying each line the agent writes as it is written.
 
         Turns of one session are serialized, so a session shared by two threads holds one
         conversation rather than interleaving two. Both of the agent's streams are teed to ours
@@ -162,8 +261,8 @@ class CommandSessionBase(SessionBase):
         Args:
           prompt: The input prompt for this turn.
 
-        Returns:
-          The response generated by the agent, stripped.
+        Yields:
+          A line at a time as the agent writes it, and the whole of what it said last.
 
         Raises:
           subprocess.CalledProcessError: If the agent CLI exits nonzero. Both streams are
@@ -176,6 +275,9 @@ class CommandSessionBase(SessionBase):
                 # the process's signal handling with it, which a flow pumping turns from
                 # threads of its own has no way to lend it.
                 argv = anchor.command(argv)
+            out: list[str] = []
+            err: list[str] = []
+            said: queue.Queue[Event | None] = queue.Queue()
             with subprocess.Popen(
                 argv,
                 # No prompt on stdin means no stdin at all: inheriting ours would let the agent
@@ -189,14 +291,16 @@ class CommandSessionBase(SessionBase):
                 errors="replace",
             ) as proc:
                 assert proc.stdout is not None and proc.stderr is not None
-                out: list[str] = []
-                err: list[str] = []
                 # Every pipe drains from the moment the agent starts: it puts its progress on
                 # stderr and only the final message on stdout, and a prompt larger than the pipe
                 # buffer would deadlock against an agent that prints before reading all of it.
                 pumps = [
-                    threading.Thread(target=_tee, args=(proc.stdout, sys.stdout, out)),
-                    threading.Thread(target=_tee, args=(proc.stderr, sys.stderr, err)),
+                    threading.Thread(
+                        target=_tee, args=(proc.stdout, sys.stdout, out, said, "text")
+                    ),
+                    threading.Thread(
+                        target=_tee, args=(proc.stderr, sys.stderr, err, said, "tool")
+                    ),
                 ]
                 for pump in pumps:
                     pump.start()
@@ -209,6 +313,11 @@ class CommandSessionBase(SessionBase):
                             proc.stdin.write(stdin)
                         finally:
                             proc.stdin.close()
+                # Said as it arrives, from whichever stream got there first, until both have
+                # ended -- one None apiece, which is the only thing that ends this turn.
+                for _ in pumps:
+                    while (event := said.get()) is not None:
+                        yield event
                 for pump in pumps:
                     pump.join()
                 status = proc.wait()
@@ -220,7 +329,7 @@ class CommandSessionBase(SessionBase):
                 # Separated, so that a stdout without a trailing newline cannot glue the first
                 # line of stderr onto the last of stdout and hide a line the id is read from.
                 self._adopt(self._read_session_id(stdout + "\n" + "".join(err)))
-            return stdout.strip()
+            yield Event(kind="result", text=stdout.strip())
 
     @abstractmethod
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
@@ -244,6 +353,257 @@ class CommandSessionBase(SessionBase):
 
         Returns:
           The backend's session id, which every later turn resumes.
+        """
+
+
+class StreamSessionBase(SessionBase):
+    """A session that is one long-lived process, spoken to in JSON a line at a time.
+
+    A turn is a line written in rather than a command run, which is what leaves somewhere for
+    a later word to go: the agent is still there, still reading, so :meth:`interject` reaches
+    the turn already under way instead of waiting for the next one.
+    """
+
+    def __init__(self, agent: AgentBase):
+        """Initializes a session holding no process yet.
+
+        Args:
+          agent: The agent whose config every turn of this session runs at.
+        """
+        super().__init__(agent)
+        self._proc: subprocess.Popen[str] | None = None
+        self._writing = threading.Lock()  # a line is written whole or not at all
+        #: Answers still owed to us: the agent replies to each thing said with a turn of its
+        #: own, so a word put in mid-turn adds one, and the turn is over when none are left.
+        self._owed = 0
+        #: What the agent has complained about, which is what a failed turn is reported with.
+        self._complaints: list[str] = []
+        #: What ends the process if the session is dropped while it is still up.
+        self._reaper: weakref.finalize | None = None
+        #: Who is reading the process's complaints, so a failed turn can wait for the last.
+        self._draining: threading.Thread | None = None
+
+    def _stream(self, prompt: str) -> Iterator[Event]:
+        """Sends one turn as a line of JSON, and reads the agent's own back until it ends.
+
+        A word put in while the turn runs is a thing said too, and the agent answers each
+        thing said with a turn of its own. So the turn here is over when the agent has
+        answered everything it was told, not when it first stops -- which is both how what
+        was put in gets read at all, and how the next turn avoids picking up its answer.
+
+        Args:
+          prompt: The input prompt for this turn.
+
+        Yields:
+          What the agent said, in the order it said it.
+
+        Raises:
+          subprocess.CalledProcessError: If the agent exits rather than answering.
+        """
+        with self._lock:
+            argv = self._command()
+            proc = self._start(argv)
+            assert proc.stdout is not None
+            self._say(prompt)
+            said = ""
+            spent: Counter[str] = Counter()
+            settled = False
+            for line in proc.stdout:
+                for event in self._read(line):
+                    if event.kind == "failed":
+                        # The backend answered, and what it answered is that it could not.
+                        # A turn that returned this as its text would be a Ralph loop feeding
+                        # an error message forward as the work of the turn before it.
+                        status = proc.poll() or 1
+                        if self._draining is not None:
+                            # Waited on: what the agent said on its way out is the diagnostic,
+                            # and it may not have been read yet.
+                            self._draining.join(timeout=5)
+                        complained = "".join(self._complaints)
+                        self._close()
+                        raise subprocess.CalledProcessError(
+                            status, argv, event.text, complained
+                        )
+                    if event.kind == "result":
+                        said = event.text
+                        # Every answer in the turn cost something, the ones to a word put in
+                        # mid-turn included, and the turn is what all of it is charged to.
+                        spent.update(event.tokens)
+                        with self._writing:
+                            self._owed -= 1
+                            settled = self._owed <= 0
+                        if settled:
+                            break
+                        # An answer to something put in mid-turn: shown like anything else
+                        # the agent says, and the turn goes on to whatever it was told last.
+                        event = Event(kind="text", text=said)
+                    if not self._agent._watchers:
+                        # On stderr, where every other backend puts its progress: stdout is
+                        # the protocol here, and a turn nobody can watch is the point of all
+                        # this. Something watching the agent shows the turn itself, and would
+                        # then be showing it twice.
+                        say(event.text, sys.stderr)
+                    yield event
+                if settled:
+                    break
+            else:
+                # stdout ended instead: the agent is gone, and a turn it never answered is a
+                # failed turn rather than an empty one.
+                status = proc.wait()
+                if self._draining is not None:
+                    # Waited on, because a process that wrote its one explanation and left
+                    # may not have had it read yet -- and that explanation is the diagnostic.
+                    self._draining.join(timeout=5)
+                complained = "".join(self._complaints)
+                self._close()
+                raise subprocess.CalledProcessError(status or 1, argv, said, complained)
+            if self._agent.anchor is not None:
+                # An anchored turn has to be over when it says it is: coganchor pushes what the
+                # agent wrote when the session ends, so a process held open past the turn would
+                # leave that turn's work still on this machine. The cost is that an anchored
+                # session cannot be talked to between turns -- there is nothing there to hear.
+                self._close()
+            yield Event(kind="result", text=said, tokens=spent)
+
+    def interject(self, text: str) -> None:
+        """Says something to the agent now, whether or not a turn is running.
+
+        Args:
+          text: What to say to the agent.
+
+        Raises:
+          RuntimeError: If no process is up to hear it, which is a session no turn has opened.
+        """
+        self._say(text)
+
+    def _close(self) -> None:
+        """Ends the process, and with it the conversation it was holding."""
+        with self._writing:
+            # Taken together, so that nothing is written to a process on its way out and no
+            # answer is left owed by one that is gone.
+            proc, self._proc, self._owed = self._proc, None, 0
+        if proc is None:
+            return
+        with contextlib.suppress(OSError, ValueError):
+            if proc.stdin is not None:
+                proc.stdin.close()  # its stdin ending is how the agent knows to stop
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()  # reaped rather than left a zombie, one per turn of a long flow
+        # stdout is ours to close: the turn has finished reading it. stderr is not -- the
+        # reader is sitting in it, and closing a stream another thread is blocked on waits on
+        # that thread, which waits on whatever the agent left holding the write end. It is
+        # closed by the reader itself, when there is nothing left to come.
+        with contextlib.suppress(OSError, ValueError):
+            if proc.stdout is not None:
+                proc.stdout.close()
+
+    def _say(self, text: str) -> None:
+        """Writes one line of JSON to the agent, whole, whoever else is writing.
+
+        Counted once it has landed: the agent owes an answer for each thing said, and a turn
+        is not over until it has given them all -- so counting one that never arrived would
+        leave the next turn waiting for an answer nobody is going to give.
+
+        Args:
+          text: What to say.
+
+        Raises:
+          RuntimeError: If there is no process listening, or it stopped while being told.
+        """
+        with self._writing:
+            proc = self._proc
+            if proc is None or proc.stdin is None:
+                raise RuntimeError("no turn is running to be talked to")
+            try:
+                proc.stdin.write(self._write(text))
+                proc.stdin.flush()
+            except (OSError, ValueError) as gone:
+                # A stdin closed under us raises ValueError rather than BrokenPipeError.
+                raise RuntimeError("the agent is no longer listening") from gone
+            self._owed += 1
+
+    def _start(self, argv: list[str]) -> subprocess.Popen[str]:
+        """Starts the process if it is not up, and returns the one to speak to.
+
+        Args:
+          argv: The command to run, which this turn already asked for.
+
+        Returns:
+          The process to speak to, which is the one already up whenever there is one.
+        """
+        if self._proc is not None and self._proc.poll() is None:
+            return self._proc
+        if (anchor := self._agent.anchor) is not None:
+            argv = anchor.command(argv)
+        started = subprocess.Popen(
+            argv,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,  # a line at a time, which is what the protocol is made of
+        )
+        assert started.stderr is not None
+        with self._writing:
+            # A new process owes nothing for what was said to the one before it. Left standing,
+            # that count is an answer this session would wait for and never be given.
+            self._proc, self._owed, self._complaints = started, 0, []
+        self._restarted()
+        # Drained for as long as the process lives: stderr is not the protocol, but a pipe
+        # nobody reads fills and stops the agent writing to it, which would hang the turn.
+        self._draining = threading.Thread(
+            target=_tee,
+            args=(started.stderr, sys.stderr, self._complaints),
+            daemon=True,
+        )
+        self._draining.start()
+        # Held by the finalizer alone, so a flow that drops a session leaves no process behind.
+        # The one before it is let go, or a long flow keeps every process it ever started.
+        if self._reaper is not None:
+            self._reaper.detach()
+        self._reaper = weakref.finalize(self, started.kill)
+        return started
+
+    def _restarted(self) -> None:
+        """Told that a new process is up, for whatever the old one's numbers were measured
+        against.
+
+        Does nothing by default. A backend counting anything per process says so here.
+        """
+
+    @abstractmethod
+    def _command(self) -> list[str]:
+        """The command the session's one process is run as.
+
+        Returns:
+          The command to run, which must speak the protocol on stdin and stdout.
+        """
+
+    @abstractmethod
+    def _write(self, text: str) -> str:
+        """Renders something to say to the agent as the line to write.
+
+        Args:
+          text: What to say.
+
+        Returns:
+          The line, newline included.
+        """
+
+    @abstractmethod
+    def _read(self, line: str) -> Iterable[Event]:
+        """Reads one line the agent wrote.
+
+        Args:
+          line: The line, as written.
+
+        Returns:
+          Everything it said, which is nothing at all for a line saying nothing worth
+          showing, and more than one thing for a line carrying more than one.
         """
 
 
@@ -271,6 +631,7 @@ class AgentBase(ABC):
         self._id = name or f"{type(self).__name__}#{uuid.uuid4().hex[:8]}"
         self._sessions: list[weakref.ref[SessionBase]] = []
         self._opened: list[str] = []
+        self._watchers: list[Callable[[AgentBase, Event], None]] = []
         # The machine an isolated agent started, once its first turn has started one.
         self._anchor: AnchorConfig | None = None
         self._starting = threading.Lock()
@@ -326,6 +687,27 @@ class AgentBase(ABC):
         does not grow an agent by one session a turn for as long as it runs.
         """
         return [session for ref in self._sessions if (session := ref()) is not None]
+
+    def watch(self, listener: Callable[[AgentBase, Event], None]) -> None:
+        """Has everything this agent's turns say reach `listener` as they say it.
+
+        Args:
+          listener: What to tell, as this agent and the thing said.
+        """
+        self._watchers.append(listener)
+
+    def _heard(self, event: Event) -> None:
+        """Tells everyone watching what a turn of this agent just said.
+
+        A watcher that raises is a watcher's own problem: a flow must not fail because
+        something looking at it did.
+
+        Args:
+          event: What was said.
+        """
+        for listener in self._watchers:
+            with contextlib.suppress(Exception):
+                listener(self, event)
 
     @abstractmethod
     def launch(self) -> SessionBase:

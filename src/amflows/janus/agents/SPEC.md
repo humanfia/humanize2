@@ -14,8 +14,8 @@
 
 ## `__init__.py`
 
-Expose `AgentConfig`, `AgentBase`, `SessionBase`, `CommandSessionBase`, and all agent and
-session classes.
+Expose `AgentConfig`, `AgentBase`, `Event`, `SessionBase`, `CommandSessionBase`,
+`StreamSessionBase`, and all agent and session classes.
 
 ## `config.py`
 
@@ -100,7 +100,6 @@ class SessionBase(ABC):
     def id(self) -> str:
         raise NotImplementedError
 
-    @abstractmethod
     def run(self, prompt: str) -> str:
         """Runs one turn in the session.
 
@@ -109,6 +108,25 @@ class SessionBase(ABC):
 
         Returns:
             The agent's response.
+        """
+
+    @abstractmethod
+    def stream(self, prompt: str) -> Iterator[Event]:
+        """Runs one turn, saying what the agent says as it says it.
+
+        Args:
+            prompt: The prompt to send to the agent.
+
+        Yields:
+            What the agent said, in the order it said it.
+        """
+        raise NotImplementedError
+
+    def interject(self, text: str) -> None:
+        """Says something to the agent while a turn is running.
+
+        Args:
+            text: What to say.
         """
         raise NotImplementedError
 
@@ -124,6 +142,12 @@ class SessionBase(ABC):
         raise NotImplementedError
 ```
 
+- `stream` MUST be the one primitive: it MUST end with exactly one `result` event, which is
+  what `run` answers with, so that a turn read either way is the same turn. A backend that
+  says nothing until it is done MUST still say that.
+- `interject` MUST reach the turn already under way rather than starting another, and MUST
+  raise `NotImplementedError` on a backend that takes a turn's whole prompt up front. A
+  backend that can be talked to MUST raise `RuntimeError` when nothing is running to hear it.
 - MUST NOT run a session in parallel; use a lock to ensure that only one turn is run at a time.
 - MUST add a session to its agent's `opened` as it opens, and never for a turn that failed.
 - A turn that fails MUST raise `subprocess.CalledProcessError`, whatever it was run through, so
@@ -138,6 +162,44 @@ class SessionBase(ABC):
 - A backend that reports a turn finished before what it said can be read back MUST be read once
   more afterwards, and one that hands back a message still being written MUST be read again
   until it is not. Neither may leave a landed turn answering with nothing.
+
+### `StreamSessionBase`
+
+```python
+class StreamSessionBase(SessionBase):
+    @abstractmethod
+    def _command(self) -> list[str]:
+        """The command the session's one process is run as."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _write(self, text: str) -> str:
+        """Renders something to say to the agent as the line to write."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _read(self, line: str) -> Iterable[Event]:
+        """Reads one line the agent wrote."""
+        raise NotImplementedError
+```
+
+- A session MUST be one process held open across its turns, spoken to a line at a time, which
+  is what leaves the agent there for `interject` to reach.
+- A backend answering each thing it is told with a turn of its own MUST be read until it has
+  answered everything said in the turn, the words put in mid-turn included. Reading only as
+  far as the first answer loses what was put in and leaves the rest for the next turn to
+  take as its own.
+- Nothing MUST be counted as said until it has landed, and a new process MUST owe nothing for
+  what was said to the one before it: either mistake leaves a later turn waiting forever.
+- A process MUST NOT outlive the session, and MUST NOT leave its descriptors or its exit
+  status behind when a turn ends -- an anchored flow ends one per turn.
+- `_restarted` MUST be told when a new process is up, for whatever a backend counts per
+  process. Claude's own token totals restart with it, so a baseline kept across one would
+  read every later turn as having spent nothing.
+- An anchored session MUST end its process with each turn instead: coganchor pushes what the
+  agent wrote when the session ends, so a process held open past the turn would leave that
+  turn's work on this machine. Such a session therefore cannot be talked to between turns, and
+  MUST resume rather than reopen on the turn after.
 
 ### `CommandSessionBase`
 

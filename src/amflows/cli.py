@@ -20,28 +20,37 @@ import logging
 import os
 import sys
 from importlib.metadata import version
+from typing import TYPE_CHECKING
 
-__all__ = ["anchor_parser", "main"]
+if TYPE_CHECKING:
+    from amflows.janus import AgentBase
+
+__all__ = ["COMMANDS", "anchor_parser", "flow_and_agents", "main"]
 
 #: Addresses a target may be left listening on without a secret, because nothing off this
 #: machine can reach them.
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
-def _run(argv: list[str]) -> int:
-    """Runs the flow named on the command line, on the agents it names.
+def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
+    """Reads an `amflows run` line into the flow to drive, the agents to drive it with, and
+    what to have them do.
 
     A flow says how many agents it drives, and this is where they come from: one for each, in
-    the order the flow takes them, at the model and effort each is to run at.
+    the order the flow takes them, at the model and effort each is to run at. Public because
+    the terminal interface starts a flow the same way and then keeps the agents, which is what
+    lets a line typed while the flow runs reach the one working.
 
     Args:
       argv: What followed the command name.
 
     Returns:
-      Zero, once the flow has returned.
+      The flow's path, the agents to drive it with, and the task.
+
+    Raises:
+      SystemExit: If the line does not name a flow and an agent apiece, as argparse rejects it.
     """
     from amflows.janus.agents import (
-        AgentBase,
         ClaudeCodeAgent,
         ClaudeCodeAgentConfig,
         CodexAgent,
@@ -49,7 +58,6 @@ def _run(argv: list[str]) -> int:
         KimiCodeCLIAgent,
         KimiCodeCLIAgentConfig,
     )
-    from amflows.janus.runner import NotAFlow, Runner
 
     backends = {
         "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
@@ -91,15 +99,30 @@ def _run(argv: list[str]) -> int:
             parser.error(f"bad agent {spec!r}: expected BACKEND/MODEL/EFFORT")
         agent, config = backends[backend]
         agents.append(agent(config(model=model, effort=effort)))
+    return args.flow, agents, args.task
 
+
+def _run(argv: list[str]) -> int:
+    """Drives the flow named on the command line, on the agents it names.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      Zero, once the flow has returned.
+    """
+    from amflows.janus.runner import NotAFlow, Runner
+
+    path, agents, task = flow_and_agents(argv)
     try:
-        runner = Runner(args.flow, agents)
+        runner = Runner(path, agents)
     except NotAFlow as error:
         # A flow that is not there, or one that takes other agents than these, is a command
         # line that was wrong before anything ran, so it exits as argparse's own rejections
         # do. What the flow raises for itself is the flow's, and is left to say so itself.
-        parser.error(str(error))
-    runner.run(args.task)
+        print(f"amflows run: error: {error}", file=sys.stderr)
+        raise SystemExit(2) from error
+    runner.run(task)
     return 0
 
 
@@ -429,8 +452,9 @@ def _serve(argv: list[str]) -> int:
     return 0
 
 
-#: Each command, as what carries it out and the line a listing shows it as.
-_COMMANDS = {
+#: Each command, as what carries it out and the line a listing shows it as. Read by the
+#: terminal interface too, which offers the same commands at its own prompt.
+COMMANDS = {
     "run": (_run, "run an agent flow in this directory"),
     "collect": (
         _collect,
@@ -441,7 +465,7 @@ _COMMANDS = {
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Runs the command named on the command line, on the rest of it.
+    """Runs the command named on the command line, or the terminal interface if none is.
 
     Args:
       argv: The arguments to parse, defaulting to this process's own.
@@ -450,7 +474,15 @@ def main(argv: list[str] | None = None) -> int:
       The command's exit status.
     """
     arguments = sys.argv[1:] if argv is None else argv
-    if not arguments or arguments[0] not in _COMMANDS:
+    if not arguments and sys.stdout.isatty():
+        # Nothing asked for is not nothing to do: the interface is every command at one
+        # prompt, and is what `amflows` on its own means. Down a pipe there is nothing to
+        # draw it on, so that falls through to being told what this takes.
+        from amflows.tui import Amflows
+
+        Amflows().run()
+        return 0
+    if not arguments or arguments[0] not in COMMANDS:
         # There is nothing to route to, so this parser only has to say so. It knows the
         # commands by name and not by what they take -- each one answers
         # `amflows COMMAND --help` itself -- and whether it lists them or names the one that
@@ -464,8 +496,8 @@ def main(argv: list[str] | None = None) -> int:
             "--version", action="version", version=f"amflows {version('amflows')}"
         )
         commands = parser.add_subparsers(metavar="COMMAND", required=True)
-        for name, (_, summary) in _COMMANDS.items():
+        for name, (_, summary) in COMMANDS.items():
             commands.add_parser(name, help=summary, add_help=False)
         parser.parse_args(arguments)
 
-    return _COMMANDS[arguments[0]][0](arguments[1:])
+    return COMMANDS[arguments[0]][0](arguments[1:])

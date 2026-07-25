@@ -20,10 +20,11 @@ import time
 import urllib.error
 import urllib.request
 import weakref
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
-from .base import AgentBase, SessionBase, say
+from .base import AgentBase, Event, SessionBase, say
 from .config import AgentConfig
 
 #: The one line `kimi web` prints once it is listening, and the only place the port it took --
@@ -147,9 +148,13 @@ class KimiCodeCLISession(SessionBase):
 
     _agent: KimiCodeCLIAgent  # every turn is submitted to the server this agent holds
 
-    def run(self, prompt: str) -> str:
-        """Sends one turn, opening the session on the first call and resuming it after."""
-        return self._submit(prompt, goal=False)
+    def _stream(self, prompt: str) -> Iterator[Event]:
+        """Sends one turn, opening the session on the first call and resuming it after.
+
+        The server answers a turn whole, so a turn has one thing to say and says it at the end.
+        What the agent wrote on the way is teed as it arrives, the way it always was.
+        """
+        yield Event(kind="result", text=self._submit(prompt, goal=False))
 
     def pursue(self, objective: str) -> str:
         """Runs the turn under a goal of Kimi's own, which its runtime steers until it is met.

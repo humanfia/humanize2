@@ -11,7 +11,8 @@
 ├── janus
 ├── jetflow
 ├── oronyx
-└── talanton
+├── talanton
+└── tui
 ```
 
 Each subdirectory is a library and has a SPEC of its own. None of them MUST have a command
@@ -26,10 +27,11 @@ Expose nothing. A caller names the subpackage it wants.
 ## Commands
 
 ```shell
-amflows <command> [<args>...]
+amflows [<command> [<args>...]]
 ```
 
-- A line naming no command, or one that is not a command, MUST be a usage error listing the
+- A line naming no command at all MUST open the terminal interface, which is every command at
+  one prompt. A line naming something that is not a command MUST be a usage error listing the
   commands there are. Everything after the command name MUST reach that command untouched,
   `--help` included, so that each answers for its own arguments.
 - `__main__.py` MUST run this same command line, so that `python -m amflows` is `amflows`.

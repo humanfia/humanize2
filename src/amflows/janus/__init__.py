@@ -12,10 +12,12 @@ from .agents import (
     CodexAgentConfig,
     CodexSession,
     CommandSessionBase,
+    Event,
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
     KimiCodeCLISession,
     SessionBase,
+    StreamSessionBase,
 )
 from .runner import NotAFlow, Runner
 
@@ -29,10 +31,12 @@ __all__ = [
     "CodexAgentConfig",
     "CodexSession",
     "CommandSessionBase",
+    "Event",
     "KimiCodeCLIAgent",
     "KimiCodeCLIAgentConfig",
     "KimiCodeCLISession",
     "NotAFlow",
     "Runner",
     "SessionBase",
+    "StreamSessionBase",
 ]

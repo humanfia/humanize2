@@ -11,6 +11,7 @@ license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = [
     "dateparser>=1.4.1",
+    "textual>=8.2.8",
 ]
 
 [project.scripts]
@@ -23,6 +24,11 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "pytest-asyncio>=1.4.0",
     "pytest-timeout>=2.3",
     "ruff>=0.6",
 ]
+
+[tool.pytest.ini_options]
+# The interface is an async application, and its tests drive it as one.
+asyncio_mode = "auto"

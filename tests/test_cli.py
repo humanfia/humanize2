@@ -54,13 +54,13 @@ def test_a_command_is_given_the_rest_of_the_line_untouched(
 ) -> None:
     """Including the arguments a top-level parser would have eaten, such as `--help`."""
     carry_out = unittest.mock.Mock(return_value=0)
-    with unittest.mock.patch.dict(cli._COMMANDS, {command: (carry_out, "")}):
+    with unittest.mock.patch.dict(cli.COMMANDS, {command: (carry_out, "")}):
         assert cli.main([command, "--help", "-x", "task"]) == 0
     assert carry_out.call_args.args == (["--help", "-x", "task"],)
 
 
 def test_the_status_a_command_exits_with_is_the_one_that_is_returned() -> None:
-    with unittest.mock.patch.dict(cli._COMMANDS, {"anchor": (lambda argv: 130, "")}):
+    with unittest.mock.patch.dict(cli.COMMANDS, {"anchor": (lambda argv: 130, "")}):
         assert cli.main(["anchor", "claude"]) == 130
 
 
@@ -68,11 +68,24 @@ def test_the_status_a_command_exits_with_is_the_one_that_is_returned() -> None:
 def test_a_line_that_names_no_command_is_a_usage_error(
     argv: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """Including the empty line, when there is no terminal to open the interface on: a
+    full-screen application down a pipe is escape codes and a hang."""
     with pytest.raises(SystemExit) as stopped:
         cli.main(argv)
 
     assert stopped.value.code == 2
     assert "amflows" in capsys.readouterr().err
+
+
+def test_no_command_at_all_opens_the_interface() -> None:
+    """`amflows` on its own is not a line to correct: it is every command at one prompt."""
+    with (
+        unittest.mock.patch("sys.stdout.isatty", return_value=True),
+        unittest.mock.patch("amflows.tui.Amflows.run") as opened,
+    ):
+        assert cli.main([]) == 0
+
+    assert opened.called
 
 
 def test_the_help_lists_every_command(capsys: pytest.CaptureFixture[str]) -> None:

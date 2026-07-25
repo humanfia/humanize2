@@ -113,19 +113,37 @@ def clis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeCLIs:
     log = tmp_path / "calls.jsonl"
     binaries = tmp_path / "bin"
     binaries.mkdir()
-    for name, transcript in (
-        ("claude", ""),  # Claude prints no id: it takes the one it is given
-        ("codex", CODEX_TRANSCRIPT),
-    ):
+    # Claude is held open and spoken to in JSON, so its fake answers a line at a time and
+    # records the launch and each thing said as calls of their own; codex is one run per turn.
+    claude = (
+        "import json, pathlib, sys\n"
+        f"log = pathlib.Path({str(log)!r})\n"
+        "def note(argv, said):\n"
+        "    with log.open('a') as stream:\n"
+        "        json.dump({'argv': argv, 'stdin': said}, stream)\n"
+        "        stream.write('\\n')\n"
+        "note(sys.argv[1:], '')\n"
+        "flags = dict(zip(sys.argv, sys.argv[1:]))\n"
+        "pinned = flags.get('--session-id') or flags['--resume']\n"
+        "print(json.dumps({'type': 'system', 'session_id': pinned}), flush=True)\n"
+        "for line in sys.stdin:\n"
+        "    said = json.loads(line)['message']['content'][0]['text']\n"
+        "    note([], said)\n"
+        "    print(json.dumps({'type': 'assistant', 'message': {'content': "
+        "[{'type': 'text', 'text': 'working'}]}}), flush=True)\n"
+        # One answer per thing said, which is what the real one does.
+        "    print(json.dumps({'type': 'result', 'result': said}), flush=True)\n"
+    )
+    codex = (
+        "import json, pathlib, sys\n"
+        f"with pathlib.Path({str(log)!r}).open('a') as stream:\n"
+        "    json.dump({'argv': sys.argv[1:], 'stdin': sys.stdin.read()}, stream)\n"
+        "    stream.write('\\n')\n"
+        f"sys.stdout.write({CODEX_TRANSCRIPT!r})\n"
+    )
+    for name, source in (("claude", claude), ("codex", codex)):
         fake = binaries / name
-        fake.write_text(
-            f"#!{sys.executable}\n"
-            "import json, pathlib, sys\n"
-            f"with pathlib.Path({str(log)!r}).open('a') as stream:\n"
-            "    json.dump({'argv': sys.argv[1:], 'stdin': sys.stdin.read()}, stream)\n"
-            "    stream.write('\\n')\n"
-            f"sys.stdout.write({transcript!r})\n"
-        )
+        fake.write_text(f"#!{sys.executable}\n{source}")
         fake.chmod(0o755)
     monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
     return _FakeCLIs(log)
@@ -329,21 +347,56 @@ def test_a_prompt_larger_than_the_pipe_buffer_does_not_deadlock() -> None:
     assert len(_StubbornAgent(CONFIG).launch().run("P" * 300_000)) == 150_000
 
 
-def test_claude_opens_then_resumes(clis: _FakeCLIs) -> None:
+def test_claude_holds_one_process_for_the_whole_session(clis: _FakeCLIs) -> None:
+    """Two turns are two lines written to one Claude, not two runs of it: that is what
+    leaves the agent there to be talked to while a turn is still running."""
     session = ClaudeCodeAgent(
         ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
     ).launch()
-    session.run("hi")
-    session.run("again")
+    assert session.run("hi") == "hi"
+    assert session.run("again") == "again"
 
-    opened, resumed = clis.calls()
-    assert opened.argv[:2] == ["--print", "--session-id"]
-    assert opened.argv[2] == session.id  # the id is pinned before the session exists
-    assert "--dangerously-skip-permissions" in opened.argv
-    assert opened.argv[-4:] == ["--model", "claude-opus-4-8", "--effort", "high"]
-    assert opened.stdin == "hi"  # prompt on stdin
-    assert resumed.argv[:3] == ["--print", "--resume", session.id]
-    assert resumed.stdin == "again"
+    launch, first, second = clis.calls()
+    assert launch.argv[:2] == ["--print", "--input-format"]
+    assert launch.argv[launch.argv.index("--session-id") + 1] == session.id
+    assert "--dangerously-skip-permissions" in launch.argv
+    assert launch.argv[-4:] == ["--model", "claude-opus-4-8", "--effort", "high"]
+    assert "--resume" not in launch.argv  # nothing to resume: it never went away
+    assert [first.stdin, second.stdin] == ["hi", "again"]
+
+
+def test_claude_can_be_talked_to_while_a_turn_is_running(clis: _FakeCLIs) -> None:
+    """The point of holding the process open: a word put in reaches the turn under way."""
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+    ).launch()
+    said = []
+    for event in session.stream("start"):
+        if (
+            event.kind == "text" and not said
+        ):  # the turn is running, and Claude is listening
+            session.interject("actually, stop")
+        said.append(event.kind)
+
+    # One turn, however many things were said in it: what came back from the word put in is
+    # part of it, and only the last answer closes it.
+    assert said[-1] == "result"
+    assert said.count("result") == 1
+    assert [call.stdin for call in clis.calls() if call.stdin] == [
+        "start",
+        "actually, stop",
+    ]
+    assert (
+        session.run("after") == "after"
+    )  # the stream is still in step for the next turn
+
+
+def test_a_session_that_never_opened_cannot_be_talked_to() -> None:
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+    ).launch()
+    with pytest.raises(RuntimeError, match="no turn is running"):
+        session.interject("hello?")
 
 
 def test_codex_opens_then_resumes(clis: _FakeCLIs) -> None:
@@ -368,8 +421,9 @@ def test_claude_pursues_through_its_own_goal_command(clis: _FakeCLIs) -> None:
     ).launch()
     session.pursue("the suite passes")
 
-    (turn,) = clis.calls()
-    assert turn.stdin == "/goal the suite passes"
+    assert [call.stdin for call in clis.calls() if call.stdin] == [
+        "/goal the suite passes"
+    ]
 
 
 def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -> None:
@@ -381,19 +435,14 @@ def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -
     session.run("hi")
     session.run("again")
 
-    # What coganchor is given is the backend's own call, resumed session id and all.
-    tail = [
-        "--dangerously-skip-permissions",
-        "--model",
-        "claude-opus-4-8",
-        "--effort",
-        "high",
-    ]
-    assert anchor.seen == [
-        ["claude", "--print", "--session-id", session.id, *tail],
-        ["claude", "--print", "--resume", session.id, *tail],
-    ]
-    assert [call.stdin for call in clis.calls()] == ["hi", "again"]
+    # What coganchor is given is the backend's own call, resumed session id and all. An
+    # anchored turn ends with its process, so that what the agent wrote reaches the target
+    # before the turn says it landed -- which is what leaves the next turn a session to rejoin.
+    opened, resumed = anchor.seen
+    assert opened[opened.index("--session-id") + 1] == session.id
+    assert resumed[resumed.index("--resume") + 1] == session.id
+    assert opened[-4:] == ["--model", "claude-opus-4-8", "--effort", "high"]
+    assert [call.stdin for call in clis.calls() if call.stdin] == ["hi", "again"]
 
 
 def test_unreadable_session_id_raises() -> None:
@@ -405,3 +454,51 @@ def test_unreadable_session_id_raises() -> None:
 def test_a_backend_without_a_goal_feature_says_so() -> None:
     with pytest.raises(NotImplementedError):
         _EchoAgent(CONFIG).launch().pursue("the suite passes")
+
+
+#: A `claude` that answers with the error it is: `subtype` still reads "success", so the
+#: `is_error` flag is the whole of what says a turn did not land.
+REFUSING = (
+    "import json, sys\n"
+    "flags = dict(zip(sys.argv, sys.argv[1:]))\n"
+    "pinned = flags.get('--session-id') or flags['--resume']\n"
+    "print(json.dumps({'type': 'system', 'session_id': pinned}), flush=True)\n"
+    "sys.stderr.write('the model is not available\\n')\n"
+    "for line in sys.stdin:\n"
+    "    print(json.dumps({'type': 'result', 'subtype': 'success', 'is_error': True,\n"
+    "        'result': \"There's an issue with the selected model\"}), flush=True)\n"
+    "    break\n"
+    "raise SystemExit(1)\n"
+)
+
+
+@pytest.fixture
+def refusing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Puts a `claude` on PATH that answers every turn by saying it could not run it."""
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    fake = binaries / "claude"
+    fake.write_text(f"#!{sys.executable}\n{REFUSING}")
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
+
+
+def test_a_turn_the_backend_refuses_fails_rather_than_answering(
+    refusing: None,
+) -> None:
+    """Otherwise a loop feeds the sentence explaining the failure forward as the work."""
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="nonesuch", effort="high"))
+    session = agent.launch()
+
+    with pytest.raises(subprocess.CalledProcessError) as failed:
+        session.run("do the task")
+
+    assert "issue with the selected model" in str(failed.value.output)
+    assert (
+        "the model is not available" in failed.value.stderr
+    )  # what it said on its way out
+    # A turn that failed opened nothing: the session is still unopened, so the next attempt
+    # is a fresh one rather than a resume of a conversation that never started.
+    assert agent.opened == []
+    with pytest.raises(RuntimeError):
+        _ = session.id

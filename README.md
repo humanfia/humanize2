@@ -48,7 +48,16 @@ agent.launch().run("Read TASK.md and get started.")
 
 ### CLI
 
-Run a [flow](docs/flows.md) over the agents you name:
+`amflows` on its own opens a terminal interface — a coding agent's own terminal, with a flow
+underneath instead of one agent. A line starting with `/` is a command; any other line is said
+to the agent working right now. Beside the transcript is what the flow is doing: which agent
+has the turn, who handed to whom, and what each model is costing as it costs it.
+
+```sh
+amflows
+```
+
+Or name a command. Run a [flow](docs/flows.md) over the agents you name:
 
 ```sh
 amflows run -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "fix the build"

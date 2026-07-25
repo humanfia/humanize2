@@ -26,15 +26,15 @@ from tests.oronyx.conftest import labels
 
 CONFIG = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 
-#: A `claude --print` that writes the transcript its session id names, works, and answers.
+#: A `claude --print` speaking the streaming protocol: it writes the transcript its session id
+#: names, works, and answers, once per turn written to it.
 FAKE = """
 import datetime, json, os, pathlib, re, sys
 
 flags = dict(zip(sys.argv, sys.argv[1:]))  # every flag paired with what follows it
-cwd, now = pathlib.Path.cwd(), datetime.datetime.now(datetime.UTC)
+cwd = pathlib.Path.cwd()
 taken = flags.get("--session-id") or flags["--resume"]
-with pathlib.Path("landed.txt").open("a") as landed:  # the work, wherever the workspace is
-    landed.write(taken)
+print(json.dumps({"type": "system", "session_id": taken}), flush=True)
 path = (
     pathlib.Path(os.environ["CLAUDE_CONFIG_DIR"])
     / "projects"
@@ -42,30 +42,36 @@ path = (
     / f"{taken}.jsonl"
 )
 path.parent.mkdir(parents=True, exist_ok=True)
-path.write_text(
-    "".join(
-        json.dumps(record | {"cwd": str(cwd), "sessionId": taken}) + "\\n"
-        for record in (
-            {
-                "type": "user",
-                "timestamp": now.isoformat(),
-                "message": {"role": "user", "content": sys.stdin.read()},
-            },
-            {
-                "type": "assistant",
-                "timestamp": (now + datetime.timedelta(seconds=1)).isoformat(),
-                "requestId": taken,
-                "effort": flags["--effort"],
-                "message": {
-                    "id": taken,
-                    "model": flags["--model"],
-                    "content": [{"type": "text", "text": "done"}],
-                },
-            },
+for line in sys.stdin:
+    now = datetime.datetime.now(datetime.UTC)
+    said = json.loads(line)["message"]["content"][0]["text"]
+    with pathlib.Path("landed.txt").open("a") as landed:  # the work, wherever the workspace is
+        landed.write(taken)
+    with path.open("a") as trajectory:
+        trajectory.write(
+            "".join(
+                json.dumps(record | {"cwd": str(cwd), "sessionId": taken}) + "\\n"
+                for record in (
+                    {
+                        "type": "user",
+                        "timestamp": now.isoformat(),
+                        "message": {"role": "user", "content": said},
+                    },
+                    {
+                        "type": "assistant",
+                        "timestamp": (now + datetime.timedelta(seconds=1)).isoformat(),
+                        "requestId": taken,
+                        "effort": flags["--effort"],
+                        "message": {
+                            "id": taken,
+                            "model": flags["--model"],
+                            "content": [{"type": "text", "text": "done"}],
+                        },
+                    },
+                )
+            )
         )
-    )
-)
-print("done")
+    print(json.dumps({"type": "result", "result": "done"}), flush=True)
 """
 
 
