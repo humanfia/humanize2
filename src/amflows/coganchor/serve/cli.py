@@ -1,4 +1,4 @@
-"""``coganchor serve`` -- the target half.
+"""``amflows anchor`` -- the target half.
 
 Replays the filesystem, process and network operations that the agent's
 machine intercepts, over either an ssh pipe (``--stdio``) or a TCP socket
@@ -29,8 +29,8 @@ _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="coganchor serve",
-        description="Replay a coganchor session's operations on this machine.",
+        prog="amflows anchor",
+        description="Replay an `amflows moor` session's operations on this machine.",
     )
     parser.add_argument(
         "--export",
@@ -65,13 +65,13 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     logging.basicConfig(
         level=args.log_level.upper(),
-        format="%(asctime)s coganchor %(levelname)s %(message)s",
+        format="%(asctime)s amflows %(levelname)s %(message)s",
         stream=sys.stderr,
     )
     try:
         table = ExportTable.parse(args.export)
     except ValueError as exc:
-        print(f"coganchor: {exc}", file=sys.stderr)
+        print(f"amflows: {exc}", file=sys.stderr)
         return 2
 
     if args.stdio:
@@ -91,11 +91,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         host, port = _parse_listen(args.listen)
     except ValueError as exc:
-        print(f"coganchor: {exc}", file=sys.stderr)
+        print(f"amflows: {exc}", file=sys.stderr)
         return 2
     if host not in _LOOPBACK_HOSTS and not args.token:
         print(
-            "coganchor: refusing to listen on a non-loopback address without --token",
+            "amflows: refusing to listen on a non-loopback address without --token",
             file=sys.stderr,
         )
         return 2
@@ -159,7 +159,7 @@ def _serve_tcp(host: str, port: int, table: ExportTable, token: str | None) -> i
         listener = server_type((host, port), handler)
     except OSError as exc:
         print(
-            f"coganchor: cannot listen on {host}:{port}: {exc.strerror}",
+            f"amflows: cannot listen on {host}:{port}: {exc.strerror}",
             file=sys.stderr,
         )
         return 1
@@ -167,7 +167,7 @@ def _serve_tcp(host: str, port: int, table: ExportTable, token: str | None) -> i
         bound = server.server_address
         # Announce the bound port so `--listen :0` is usable from scripts.
         print(
-            f"coganchor serve listening {bound[0]} {bound[1]}",
+            f"amflows anchor listening {bound[0]} {bound[1]}",
             file=sys.stderr,
             flush=True,
         )

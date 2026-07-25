@@ -1,8 +1,8 @@
-"""``coganchor`` -- run a coding agent here, have it act on another machine.
+"""``amflows moor`` -- run a coding agent here, have it act on another machine.
 
-    coganchor --target ssh://build-box claude
-    coganchor --target ssh://gpu-01 codex exec "run the test suite"
-    coganchor --target ssh://build-box kimi
+    amflows moor --target ssh://build-box claude
+    amflows moor --target ssh://gpu-01 codex exec "run the test suite"
+    amflows moor --target ssh://build-box kimi
 
 Every option here is a field of :class:`~amflows.coganchor.anchor.AnchorConfig`,
 so what this parses is what :func:`~amflows.coganchor.anchor.connect` takes.
@@ -15,7 +15,6 @@ import logging
 import os
 import sys
 
-from amflows.coganchor import __version__
 from amflows.coganchor.anchor import AnchorConfig, check, connect
 from amflows.coganchor.proto import ProtocolError
 
@@ -24,13 +23,10 @@ __all__ = ["build_parser", "main"]
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="coganchor",
+        prog="amflows moor",
         description="Run a coding agent on this machine that acts on another one.",
-        epilog="Example: coganchor --target ssh://build-box claude --model opus",
+        epilog="Example: amflows moor --target ssh://build-box claude --model opus",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        "--version", action="version", version=f"coganchor {__version__}"
     )
     parser.add_argument(
         "--target",
@@ -126,9 +122,10 @@ def main(argv: list[str] | None = None) -> int:
     """
     arguments = sys.argv[1:] if argv is None else argv
     if arguments and arguments[0] == "serve":
-        # Routed before the agent half is reached: both ends of a session are this one
-        # program, but only this end needs ptrace and an x86-64 register map, which is what
-        # lets the same program serve a target of any architecture.
+        # `amflows anchor` under the name the target is started as, routed before the agent
+        # half is reached: both ends of a session are this one program, but only this end
+        # needs ptrace and an x86-64 register map, which is what lets the same program --
+        # the bundle shipped to the target -- serve a target of any architecture.
         from amflows.coganchor.serve.cli import main as serve
 
         return serve(arguments[1:])
@@ -137,11 +134,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(arguments)
     logging.basicConfig(
         level=args.log_level.upper(),
-        format="%(asctime)s coganchor %(levelname)s %(message)s",
+        format="%(asctime)s amflows %(levelname)s %(message)s",
         stream=sys.stderr,
     )
     if not args.command and not args.check:
-        parser.error("no agent given; try `coganchor claude`")
+        parser.error("no agent given; try `amflows moor claude`")
     try:
         # Every option is a setting, and every setting is an option.
         config = AnchorConfig(
@@ -175,5 +172,5 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         return 130
     except (ConnectionError, ProtocolError, OSError, ValueError) as exc:
-        print(f"coganchor: {exc}", file=sys.stderr)
+        print(f"amflows: {exc}", file=sys.stderr)
         return 1

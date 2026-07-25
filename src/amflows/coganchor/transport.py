@@ -11,7 +11,7 @@ Four ways in:
     machine like any other here; it needs no port, no secret and no cooperation
     beyond a ``python3``.
 ``tcp://host:port``
-    Attach to a ``coganchor serve --listen`` someone already started.
+    Attach to an ``amflows anchor --listen`` someone already started.
 ``local[:REAL]``
     Run ``serve`` as a child process on this machine.  Used for development and
     by the test suite, where ``REAL`` is the directory standing in for the

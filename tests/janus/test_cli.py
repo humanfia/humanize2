@@ -190,12 +190,12 @@ def test_a_flow_for_other_agents_than_these_is_refused_before_it_is_run(
         Runner(flow, [ShellAgent(AgentConfig(model="m", effort="high"))])
 
 
-def test_python_m_amflows_janus_is_the_janus_command(
+def test_python_m_amflows_janus_is_the_run_command(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
     monkeypatch.setattr(
-        sys, "argv", ["janus", "-f", flow, "-a", "claude/m/high", "task"]
+        sys, "argv", ["amflows run", "-f", flow, "-a", "claude/m/high", "task"]
     )
     runpy.run_module("amflows.janus", run_name="__main__")
     assert _seen(tmp_path)["task"] == "task"
@@ -205,9 +205,9 @@ def test_python_m_amflows_janus_is_the_janus_command(
 def test_every_example_runs_as_the_command_line_it_shows(
     flow: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Each example shows a janus command line, and it is one that would start that flow."""
-    shown = re.search(r"^\s*janus (?:.*\\\n)*.*", flow.read_text(), re.MULTILINE)
-    assert shown is not None, "no janus command line to be checked against"
+    """Each example shows an `amflows run` line, and it is one that would start that flow."""
+    shown = re.search(r"^\s*amflows run (?:.*\\\n)*.*", flow.read_text(), re.MULTILINE)
+    assert shown is not None, "no `amflows run` command line to be checked against"
     monkeypatch.chdir(flow.parent.parent)  # the paths it shows are this project's own
     monkeypatch.setattr(Runner, "run", lambda self, task: None)  # nothing is driven
-    main(shlex.split(shown[0].replace("\\\n", " "))[1:])
+    main(shlex.split(shown[0].replace("\\\n", " "))[2:])

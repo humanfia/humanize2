@@ -7,7 +7,7 @@ while true; do
     sleep 5
 done
 
-    janus -f examples/flame_chase.py \
+    amflows run -f examples/flame_chase.py \
         -a claude/claude-opus-4-8/max,codex/gpt-5.6-sol/max "$(cat TASK.md)"
 """
 

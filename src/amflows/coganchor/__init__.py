@@ -3,7 +3,7 @@
 The agent process stays local, keeping its credentials, its state directory
 and its link to its model provider.  A seccomp-filtered ptrace supervisor
 intercepts the cold syscalls that name a path, spawn a process or open a
-socket, and ``coganchor serve`` replays them on the target machine.
+socket, and ``amflows anchor`` replays them on the target machine.
 """
 
 from .anchor import AnchorConfig, check, connect

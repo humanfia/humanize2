@@ -1,6 +1,6 @@
-"""``janus`` -- run an agent flow in this directory.
+"""``amflows run`` -- run an agent flow in this directory.
 
-    janus -f flow.py -a claude/claude-opus-4-8/high,codex/gpt-5.6-sol/max "$(cat TASK.md)"
+    amflows run -f flow.py -a claude/claude-opus-4-8/high,codex/gpt-5.6-sol/max "$(cat TASK.md)"
 
 A flow says how many agents it drives, and this is where they come from: one for each, in the
 order the flow takes them, at the model and effort each is to run at.
@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> None:
       argv: The arguments to parse, defaulting to this process's own.
     """
     parser = argparse.ArgumentParser(
-        prog="janus", description="Run an agent flow in this directory."
+        prog="amflows run", description="Run an agent flow in this directory."
     )
     parser.add_argument(
         "-f",

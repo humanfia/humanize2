@@ -1,4 +1,4 @@
-"""Client for a connection to ``coganchor serve`` on the target.
+"""Client for a connection to ``amflows anchor`` on the target.
 
 One reader thread demultiplexes replies by message id.  Filesystem calls are
 synchronous -- the traced process is stopped anyway, so blocking the caller

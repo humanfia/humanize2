@@ -58,36 +58,37 @@ agent.launch().run("Read TASK.md and get started.")
 Run a [flow](docs/flows.md) over the agents you name:
 
 ```sh
-janus -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "fix the build"
+amflows run -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "fix the build"
 ```
 
 Collect what it left behind, and open the file in [ui.perfetto.dev](https://ui.perfetto.dev):
 
 ```sh
-exomyth collect
+amflows collect
 ```
 
-Anchor an agent onto [another machine](docs/remote-execution.md):
+Moor an agent to [another machine](docs/remote-execution.md), so that its work lands there:
 
 ```sh
-coganchor --target ssh://build-box claude
+amflows moor --target ssh://build-box claude
 ```
 
 ## Documentation
 
-- [Flows](docs/flows.md) — writing a flow and running it (`janus`)
-- [Agents](docs/agents.md) — sessions, goals, models and efforts, names (`janus`)
-- [Isolation](docs/isolation.md) — a container of the agent's own (`janus`)
-- [Remote execution](docs/remote-execution.md) — acting on another machine (`coganchor`)
-- [Tracing](docs/tracing.md) — trajectories into a trace (`exomyth`)
+- [Flows](docs/flows.md) — writing a flow and running it (`amflows run`)
+- [Agents](docs/agents.md) — sessions, goals, models and efforts, names
+- [Isolation](docs/isolation.md) — a container of the agent's own
+- [Remote execution](docs/remote-execution.md) — acting on another machine (`amflows moor`,
+  `amflows anchor`)
+- [Tracing](docs/tracing.md) — trajectories into a trace (`amflows collect`)
 
 ## Security
 
-**A `coganchor serve` port is equivalent to a shell on that machine.** An export bounds which files
+**An `amflows anchor` port is equivalent to a shell on that machine.** An export bounds which files
 a request may name; it does not confine the commands that request can run. Give `--token` a real
 secret, and prefer `ssh://` or `docker://`, which need no open port at all.
 
-**janus runs every agent with permission prompts disabled**, as flowbench does, and there is no
+**amflows runs every agent with permission prompts disabled**, as flowbench does, and there is no
 setting that turns them back on. Drive one only in a workspace you are willing to have rewritten —
 including under [isolation](docs/isolation.md), which confines the agent to a container of its own
 but mounts that workspace into it.

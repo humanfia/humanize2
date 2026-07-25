@@ -3,7 +3,7 @@
 ## Commands
 
 ```shell
-exomyth collect [<workspace>] [--session <session>[,<session>]...] [--output <output>] [--start <start>] [--end <end>]
+amflows collect [<workspace>] [--session <session>[,<session>]...] [--output <output>] [--start <start>] [--end <end>]
 ```
 
 Collects and aggregates agent trajectories and generates Chrome JSON trace files for visualization.
@@ -28,7 +28,7 @@ Environment Variables:
 exomyth.collect(workspace=None, *, sessions=None, agents=None, output=None, start=None, end=None)
 ```
 
-Carries out `exomyth collect` and returns the trace as a document. The command line is a shell around it.
+Carries out `amflows collect` and returns the trace as a document. The command line is a shell around it.
 
 Args:
 

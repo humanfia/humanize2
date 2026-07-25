@@ -21,7 +21,7 @@ config = ClaudeCodeAgentConfig(
 
 The container starts on the agent's first turn, is shared by every session that agent launches,
 and is removed when the agent is; each turn reaches it as a `docker://`
-[target](remote-execution.md). The image needs a `python3` for coganchor's target half, and
+[target](remote-execution.md). The image needs a `python3` for the [`amflows anchor`](remote-execution.md) half, and
 whatever else the agent is expected to reach for. What it leaves behind is
 [collected](tracing.md) by session.
 

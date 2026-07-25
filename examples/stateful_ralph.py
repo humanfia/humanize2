@@ -3,7 +3,7 @@
 kimi --prompt "$(cat TASK.md)"                                   # first turn opens the session
 while true; do kimi --continue --prompt "$(cat TASK.md)" || true; sleep 5; done
 
-    janus -f examples/stateful_ralph.py -a kimi/kimi-code/k3/high "$(cat TASK.md)"
+    amflows run -f examples/stateful_ralph.py -a kimi/kimi-code/k3/high "$(cat TASK.md)"
 """
 
 import subprocess

@@ -6,15 +6,15 @@ network from them — happens on the target. It needs no plugin and no cooperati
 Linux x86-64 here, and nothing but `python3` there.
 
 ```sh
-coganchor --target ssh://build-box claude
-coganchor --target ssh://gpu-01 codex exec "run the test suite"
+amflows moor --target ssh://build-box claude
+amflows moor --target ssh://gpu-01 codex exec "run the test suite"
 ```
 
 `--target` takes `ssh://HOST`, `docker://CONTAINER`, `tcp://HOST:PORT` or `local[:DIR]`;
 `--workspace` names the project directory as it exists on the target; `--check` connects, reports
 what it found, and exits; `--shadow` puts the local mirror somewhere other than the workspace path.
-A container is a target like any other: `docker://` runs `serve` inside a running one over
-`docker exec`, as whoever that container runs as, and needs no port and no secret.
+A container is a target like any other: `docker://` runs the target half inside a running one
+over `docker exec`, as whoever that container runs as, and needs no port and no secret.
 
 `amflows.coganchor.connect` runs that same session from Python, taking those settings as an
 `AnchorConfig` and returning the agent's exit status:
@@ -58,9 +58,9 @@ Instead of reconnecting over ssh each time, a target can be left listening:
 
 ```sh
 # on the target
-coganchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
+amflows anchor --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 # on this machine
-COGANCHOR_TOKEN=$SECRET coganchor --target tcp://build-box:7777 --workspace /srv/project claude
+COGANCHOR_TOKEN=$SECRET amflows moor --target tcp://build-box:7777 --workspace /srv/project claude
 ```
 
 Read [Security](../README.md#security) before opening one.

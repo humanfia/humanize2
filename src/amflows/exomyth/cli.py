@@ -1,4 +1,10 @@
-"""Command line interface of exomyth."""
+"""``amflows collect`` -- the trajectories agents left behind, as one trace.
+
+    amflows collect ~/myproject --start "3 days ago"
+
+A shell around :func:`~amflows.exomyth.collector.collect`, which is the same thing said in
+Python and does the whole of the work.
+"""
 
 from __future__ import annotations
 
@@ -8,38 +14,39 @@ import datetime
 from .collector import collect
 
 
-def main() -> None:
-    """Parses the command line and writes the aggregated trace file."""
+def main(argv: list[str] | None = None) -> None:
+    """Parses the command line and writes the aggregated trace file.
+
+    Args:
+      argv: The arguments to parse, defaulting to this process's own.
+    """
     parser = argparse.ArgumentParser(
-        prog="exomyth", description="Inspect agent flow trajectories."
+        prog="amflows collect",
+        description="Aggregate agent trajectories into a Chrome trace.",
     )
-    commands = parser.add_subparsers(dest="command", required=True)
-    command = commands.add_parser(
-        "collect", help="Aggregate agent trajectories into a Chrome trace."
-    )
-    command.add_argument(
+    parser.add_argument(
         "workspace",
         nargs="?",
         help="Workspace directory, defaults to the current one unless sessions are named.",
     )
-    command.add_argument(
+    parser.add_argument(
         "--session",
         action="append",
         dest="sessions",
         metavar="SESSION[,SESSION...]",
         help="Sessions to include, comma separated and repeatable, defaults to every session.",
     )
-    command.add_argument(
+    parser.add_argument(
         "--output",
         help="Trace file to write, defaults to .amflows/<datetime>.trace.json.",
     )
-    command.add_argument(
+    parser.add_argument(
         "--start", help="Earliest session time to include, e.g. '2 days ago'."
     )
-    command.add_argument(
+    parser.add_argument(
         "--end", help="Latest session time to include, e.g. 'yesterday 18:00'."
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     # One trace per run, named after the moment it was taken, so collecting twice keeps both
     # rather than writing over the first.
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")

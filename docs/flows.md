@@ -1,14 +1,15 @@
 # Flows
 
-A flow is a Python file with a `run(agents, task)` in it, and `janus` runs one in this directory:
+A flow is a Python file with a `run(agents, task)` in it, and `amflows run` runs one in this
+directory:
 
 ```sh
-janus -f|--flow <flow> -a|--agents <backend>/<model>/<effort>[,<backend>/<model>/<effort>...] <task>
+amflows run -f|--flow <flow> -a|--agents <backend>/<model>/<effort>[,<backend>/<model>/<effort>...] <task>
 ```
 
 ```sh
-janus -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "$(cat TASK.md)"
-janus -f examples/flame_chase.py -a claude/claude-opus-4-8/max,codex/gpt-5.6-sol/max "fix the build"
+amflows run -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "$(cat TASK.md)"
+amflows run -f examples/flame_chase.py -a claude/claude-opus-4-8/max,codex/gpt-5.6-sol/max "fix the build"
 ```
 
 `-a` takes as many agents as the flow drives, in the order it takes them; the option may be

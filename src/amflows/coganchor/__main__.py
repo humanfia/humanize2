@@ -1,4 +1,4 @@
-"""Entry point for ``python -m amflows.coganchor`` and the bootstrapped zipapp."""
+"""``amflows moor`` as ``python -m amflows.coganchor``, and the bootstrapped zipapp."""
 
 from amflows.coganchor.cli import main
 

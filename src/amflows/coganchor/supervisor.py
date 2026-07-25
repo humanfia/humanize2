@@ -221,7 +221,7 @@ class Supervisor:
         # Everything, deliberately: this is the forked child, and anything that escapes here
         # would run the parent's code a second time rather than report a failed launch.
         except BaseException as exc:  # noqa: BLE001
-            os.write(2, f"coganchor: cannot launch {launch.program}: {exc}\n".encode())
+            os.write(2, f"amflows: cannot launch {launch.program}: {exc}\n".encode())
         os._exit(127)
 
     def _await_initial_stop(self) -> None:

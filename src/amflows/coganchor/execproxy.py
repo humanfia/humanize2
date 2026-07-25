@@ -160,7 +160,7 @@ class ExecProxy:
 
     def _report_failure(self, error: OSError) -> None:
         message = (
-            f"coganchor: {' '.join(self._argv[:1]) or 'command'}: {error.strerror}\n"
+            f"amflows: {' '.join(self._argv[:1]) or 'command'}: {error.strerror}\n"
         )
         self._outbox.put((Stream.STDERR, message.encode()))
         # 126/127 match the shell's "found but not executable" / "not found".

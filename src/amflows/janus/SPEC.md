@@ -21,7 +21,7 @@ Expose `Runner`, `NotAFlow`, and everything `agents` exposes.
 ## Commands
 
 ```shell
-janus -f|--flow <flow> -a|--agents <backend>/<model>/<effort>[,<backend>/<model>/<effort>...] <task>
+amflows run -f|--flow <flow> -a|--agents <backend>/<model>/<effort>[,<backend>/<model>/<effort>...] <task>
 ```
 
 Runs a flow in the current directory, on the agents it is given.
@@ -42,7 +42,8 @@ Args:
   drives a different number than were given MUST be reported as a usage error, before any
   agent has run. Whatever else a flow does as it is imported is the flow's own, and MUST fail
   as it would anywhere.
-- `__main__.py` MUST run this same command line, so that `python -m amflows.janus` is `janus`.
+- `__main__.py` MUST run this same command line, so that `python -m amflows.janus` is
+  `amflows run`.
 
 ## `runner.py`
 

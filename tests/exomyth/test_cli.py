@@ -16,10 +16,9 @@ from tests.exomyth.conftest import loaded
 _DEFAULT = re.compile(r"\.amflows/\d{8}T\d{6}Z\.trace\.json")
 
 
-def run(monkeypatch: pytest.MonkeyPatch, *argv: str) -> None:
+def run(*argv: str) -> None:
     """Runs the command line with the given arguments."""
-    monkeypatch.setattr("sys.argv", ["exomyth", *argv])
-    cli.main()
+    cli.main(list(argv))
 
 
 @pytest.mark.parametrize(
@@ -68,7 +67,7 @@ def test_forwards_every_argument_to_collect(
     collect = unittest.mock.Mock(return_value={"otherData": {}})
     monkeypatch.setattr(cli, "collect", collect)
 
-    run(monkeypatch, "collect", *argv)
+    run(*argv)
 
     passed = dict(collect.call_args.kwargs)
     if options["output"] is None:  # the default is named after the moment it was taken
@@ -82,11 +81,10 @@ def test_writes_the_same_trace_as_the_library(
     homes: None,
     workspace: pathlib.Path,
     tmp_path: pathlib.Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output = tmp_path / "trace.json"
 
-    run(monkeypatch, "collect", str(workspace), "--output", str(output))
+    run(str(workspace), "--output", str(output))
 
     assert loaded(output) == exomyth.collect(workspace)
 
@@ -95,10 +93,9 @@ def test_writes_the_default_output_and_reports_it(
     homes: None,
     workspace: pathlib.Path,
     tmp_path: pathlib.Path,
-    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    run(monkeypatch, "collect", str(workspace))
+    run(str(workspace))
 
     written = list((tmp_path / ".amflows").glob("*.trace.json"))
     assert len(written) == 1  # the directory is made on the way, and holds one trace
@@ -111,10 +108,9 @@ def test_writes_the_default_output_and_reports_it(
 
 def test_reports_an_empty_workspace(
     workspace: pathlib.Path,
-    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    run(monkeypatch, "collect", str(workspace))
+    run(str(workspace))
 
     reported, _, counts = capsys.readouterr().out.partition(": ")
     assert _DEFAULT.fullmatch(reported)
@@ -123,18 +119,10 @@ def test_reports_an_empty_workspace(
 
 def test_rejects_a_time_it_cannot_read(
     workspace: pathlib.Path,
-    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as failure:
-        run(monkeypatch, "collect", str(workspace), "--start", "not a time at all!!")
+        run(str(workspace), "--start", "not a time at all!!")
 
     assert failure.value.code == 2
     assert "cannot parse time: not a time at all!!" in capsys.readouterr().err
-
-
-def test_requires_a_command(monkeypatch: pytest.MonkeyPatch) -> None:
-    with pytest.raises(SystemExit) as failure:
-        run(monkeypatch)
-
-    assert failure.value.code == 2

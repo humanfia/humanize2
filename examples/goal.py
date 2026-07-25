@@ -2,7 +2,7 @@
 
 while true; do { printf '/goal '; cat TASK.md; } | claude --print || true; sleep 5; done
 
-    janus -f examples/goal.py -a claude/claude-opus-4-8/max "$(cat TASK.md)"
+    amflows run -f examples/goal.py -a claude/claude-opus-4-8/max "$(cat TASK.md)"
 """
 
 import subprocess
