@@ -59,7 +59,7 @@ HOST_SPECIFIC_ENV = frozenset(
 )
 
 #: Prefixes of variables that are host-specific or belong to coganchor itself.
-HOST_SPECIFIC_PREFIXES = ("LD_", "SSH_", "XDG_", "COGANCHOR_")
+HOST_SPECIFIC_PREFIXES = ("LD_", "SSH_", "XDG_", "AMFLOWS_")
 
 
 def compose_env(remote_env: dict[str, str], cwd: str, tty: bool) -> dict[str, str]:

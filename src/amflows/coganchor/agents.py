@@ -49,8 +49,8 @@ _BY_NAME = {profile.name: profile for profile in PROFILES}
 #: Directories that hold per-user state for *any* agent and should never be
 #: mirrored, even when the workspace happens to contain them.
 COMMON_STATE_PATHS: tuple[str, ...] = (
-    "~/.cache/coganchor",
-    "~/.config/coganchor",
+    "~/.cache/amflows",
+    "~/.config/amflows",
 )
 
 

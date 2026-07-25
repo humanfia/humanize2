@@ -7,8 +7,8 @@ from collections.abc import Iterator
 
 import pytest
 
-from amflows import exomyth
-from tests.exomyth.conftest import (
+from amflows import oronyx
+from tests.oronyx.conftest import (
     CLAUDE_ELSEWHERE,
     CLAUDE_SESSION,
     CODEX_SUBTHREAD,
@@ -33,7 +33,7 @@ _ELSEWHERE = f"claude:{CLAUDE_ELSEWHERE}"
 def test_answers_to_every_spelling_of_an_id(
     claude_home: pathlib.Path, named: str
 ) -> None:
-    assert keys(exomyth.collect(sessions=named)) == set(_CLAUDE)
+    assert keys(oronyx.collect(sessions=named)) == set(_CLAUDE)
 
 
 @pytest.mark.parametrize(
@@ -55,17 +55,17 @@ def test_answers_to_every_spelling_of_an_id(
 def test_collects_the_named_sessions_wherever_they_ran(
     homes: None, named: list[str], expected: set[str]
 ) -> None:
-    assert keys(exomyth.collect(sessions=named)) == expected
+    assert keys(oronyx.collect(sessions=named)) == expected
 
 
 def test_draws_the_spawn_of_a_collected_sub_agent(codex_home: pathlib.Path) -> None:
-    document = exomyth.collect(sessions=[CODEX_THREAD])
+    document = oronyx.collect(sessions=[CODEX_THREAD])
 
     assert any(event["ph"] == "s" for event in document["traceEvents"])
 
 
 def test_puts_a_lone_sub_agent_on_a_sub_agent_track(codex_home: pathlib.Path) -> None:
-    document = exomyth.collect(sessions=[CODEX_SUBTHREAD])
+    document = oronyx.collect(sessions=[CODEX_SUBTHREAD])
 
     assert labels(document, "thread_name") == {"subagent"}
 
@@ -73,15 +73,15 @@ def test_puts_a_lone_sub_agent_on_a_sub_agent_track(codex_home: pathlib.Path) ->
 def test_narrows_named_sessions_to_a_workspace(
     claude_home: pathlib.Path, workspace: pathlib.Path, elsewhere: pathlib.Path
 ) -> None:
-    kept = exomyth.collect(elsewhere, sessions=[CLAUDE_ELSEWHERE])
+    kept = oronyx.collect(elsewhere, sessions=[CLAUDE_ELSEWHERE])
 
     assert keys(kept) == {_ELSEWHERE}
-    assert exomyth.collect(workspace, sessions=[CLAUDE_ELSEWHERE])["traceEvents"] == []
+    assert oronyx.collect(workspace, sessions=[CLAUDE_ELSEWHERE])["traceEvents"] == []
 
 
 def test_applies_the_time_window_to_named_sessions(claude_home: pathlib.Path) -> None:
-    whole = exomyth.collect(sessions=[CLAUDE_SESSION])
-    window = exomyth.collect(sessions=[CLAUDE_SESSION], end="2026-07-20 10:00:05+00:00")
+    whole = oronyx.collect(sessions=[CLAUDE_SESSION])
+    window = oronyx.collect(sessions=[CLAUDE_SESSION], end="2026-07-20 10:00:05+00:00")
 
     assert window["otherData"]["end"] == "2026-07-20T10:00:05+00:00"
     assert 0 < len(slices(window)) < len(slices(whole))
@@ -90,12 +90,12 @@ def test_applies_the_time_window_to_named_sessions(claude_home: pathlib.Path) ->
 def test_treats_no_named_session_as_every_session(
     homes: None, workspace: pathlib.Path
 ) -> None:
-    assert exomyth.collect(workspace, sessions=[]) == exomyth.collect(workspace)
+    assert oronyx.collect(workspace, sessions=[]) == oronyx.collect(workspace)
 
 
 def test_rejects_an_empty_session_id(homes: None) -> None:
     with pytest.raises(ValueError, match="session id cannot be empty"):
-        exomyth.collect(sessions=["", CLAUDE_SESSION])
+        oronyx.collect(sessions=["", CLAUDE_SESSION])
 
 
 def test_takes_the_sessions_from_any_iterable(
@@ -103,8 +103,8 @@ def test_takes_the_sessions_from_any_iterable(
 ) -> None:
     drained: Iterator[str] = iter([])
 
-    assert keys(exomyth.collect(sessions=iter([CLAUDE_SESSION]))) == set(_CLAUDE)
-    assert exomyth.collect(workspace, sessions=drained) == exomyth.collect(workspace)
+    assert keys(oronyx.collect(sessions=iter([CLAUDE_SESSION]))) == set(_CLAUDE)
+    assert oronyx.collect(workspace, sessions=drained) == oronyx.collect(workspace)
 
 
 @pytest.mark.parametrize(
@@ -118,17 +118,17 @@ def test_takes_the_sessions_from_any_iterable(
     ids=["comma", "padded", "listed", "repeated"],
 )
 def test_separates_sessions_on_commas(homes: None, named: str | list[str]) -> None:
-    assert keys(exomyth.collect(sessions=named)) == {*_CLAUDE, *_CODEX}
+    assert keys(oronyx.collect(sessions=named)) == {*_CLAUDE, *_CODEX}
 
 
 def test_rejects_a_session_missing_between_commas(homes: None) -> None:
     with pytest.raises(ValueError, match="session id cannot be empty"):
-        exomyth.collect(sessions=f"{CLAUDE_SESSION},,{KIMI_SESSION}")
+        oronyx.collect(sessions=f"{CLAUDE_SESSION},,{KIMI_SESSION}")
 
 
 def test_reports_the_scope_it_collected(homes: None, workspace: pathlib.Path) -> None:
-    named = exomyth.collect(sessions=f"{CLAUDE_SESSION},{KIMI_SESSION}")["otherData"]
-    both = exomyth.collect(workspace, sessions=[CLAUDE_SESSION])["otherData"]
+    named = oronyx.collect(sessions=f"{CLAUDE_SESSION},{KIMI_SESSION}")["otherData"]
+    both = oronyx.collect(workspace, sessions=[CLAUDE_SESSION])["otherData"]
 
     assert "workspace" not in named
     assert named["selected"] == f"{CLAUDE_SESSION}, {KIMI_SESSION}"

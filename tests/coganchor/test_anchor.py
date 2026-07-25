@@ -15,7 +15,8 @@ from typing import Any
 
 import pytest
 
-from amflows.coganchor import AnchorConfig, check, cli, connect
+from amflows import cli
+from amflows.coganchor import AnchorConfig, check, connect
 from tests.coganchor.conftest import DEFAULT_TIMEOUT, REPO_ROOT, Anchorage
 
 #: Every setting at once, none of them left at its default. The token is spelled the way one
@@ -45,10 +46,10 @@ def test_a_rendered_command_is_parsed_back_as_the_settings_it_came_from(
         seen.update(command=command, config=config)
         return 0
 
-    monkeypatch.setattr(cli, "connect", record)
+    monkeypatch.setattr("amflows.coganchor.anchor.connect", record)
     rendered = FULL.command(["claude", "--print"])
     # The interpreter running the flow, so the child is the one amflows is installed in.
-    assert rendered[:3] == [sys.executable, "-m", "amflows.coganchor"]
+    assert rendered[:4] == [sys.executable, "-m", "amflows", "moor"]
 
     assert cli.main(rendered[3:]) == 0
 
@@ -62,11 +63,11 @@ def test_an_agent_argument_is_never_read_as_one_of_ours() -> None:
 
     rendered = AnchorConfig(target="ssh://build-box", force=True).command(argv)
 
-    assert cli.build_parser().parse_args(rendered[3:]).command == argv
+    assert cli.moor_parser().parse_args(rendered[4:]).command == argv
 
 
 def test_a_default_anchor_says_only_where_the_work_lands() -> None:
-    assert AnchorConfig().command(["claude"])[3:] == [
+    assert AnchorConfig().command(["claude"])[4:] == [
         "--target=local",
         "--net=local",
         "claude",
@@ -128,7 +129,7 @@ def test_a_target_nobody_can_read_is_refused_the_way_argparse_refuses_an_argumen
     None
 ):
     with pytest.raises(SystemExit) as refused:
-        cli.main(["--target", "rsync://build-box", "claude"])
+        cli.main(["moor", "--target", "rsync://build-box", "claude"])
     assert refused.value.code == 2
 
 

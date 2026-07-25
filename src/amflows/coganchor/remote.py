@@ -76,7 +76,7 @@ class RemoteClient:
         if remote_version != PROTOCOL_VERSION:
             raise ProtocolError(
                 f"the target speaks protocol {remote_version}, "
-                f"this coganchor speaks {PROTOCOL_VERSION}"
+                f"this amflows speaks {PROTOCOL_VERSION}"
             )
         return self.info
 

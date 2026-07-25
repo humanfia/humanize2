@@ -43,7 +43,7 @@ its work. Name them, and each reports the sessions it opened, which is what tell
 [trace](tracing.md) apart:
 
 ```python
-from amflows.exomyth import collect
+from amflows.oronyx import collect
 
 config = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 actor = ClaudeCodeAgent(config, name="actor")

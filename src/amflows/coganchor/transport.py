@@ -42,7 +42,7 @@ __all__ = ["Target", "Transport", "build_bundle", "connect"]
 log = logging.getLogger(__name__)
 
 #: Where the bootstrapped copy is cached on the target machine.
-REMOTE_CACHE = "~/.cache/coganchor"
+REMOTE_CACHE = "~/.cache/amflows"
 
 #: Installing that copy, for a target reached by piping it there. Written under a name of its
 #: own and moved into place, so a session finds the whole archive or none of it, and a copy
@@ -136,8 +136,8 @@ def _connect_local(target: Target, exports: list[str], token: str | None) -> Tra
     command = [
         sys.executable,
         "-m",
-        coganchor.__name__,
-        "serve",
+        "amflows",
+        "anchor",
         "--stdio",
         *_export_args(exports),
     ]
@@ -147,7 +147,7 @@ def _connect_local(target: Target, exports: list[str], token: str | None) -> Tra
 def _connect_ssh(target: Target, exports: list[str], token: str | None) -> Transport:
     payload = build_bundle().read_bytes()
     digest = hashlib.sha256(payload).hexdigest()[:16]
-    remote_file = f"{REMOTE_CACHE}/coganchor-{digest}.pyz"
+    remote_file = f"{REMOTE_CACHE}/amflows-{digest}.pyz"
     ssh = [
         "ssh",
         *_SSH_OPTIONS,
@@ -161,7 +161,7 @@ def _connect_ssh(target: Target, exports: list[str], token: str | None) -> Trans
     )
     if result.returncode != 0:
         raise ConnectionError(
-            f"could not install coganchor on {target.host}: "
+            f"could not install amflows on {target.host}: "
             f"{result.stderr.decode(errors='replace').strip()}"
         )
 
@@ -170,7 +170,7 @@ def _connect_ssh(target: Target, exports: list[str], token: str | None) -> Trans
             "exec",
             "python3",
             remote_file,
-            "serve",
+            "anchor",
             "--stdio",
             *_export_args(exports, quote=True),
         ]
@@ -187,7 +187,7 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
     """
     payload = build_bundle().read_bytes()
     digest = hashlib.sha256(payload).hexdigest()[:16]
-    remote_file = f"/tmp/coganchor-{digest}.pyz"
+    remote_file = f"/tmp/amflows-{digest}.pyz"
     exec_in = ["docker", "exec", "-i", target.host]
 
     result = subprocess.run(
@@ -198,7 +198,7 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
     )
     if result.returncode != 0:
         raise ConnectionError(
-            f"could not install coganchor in {target.host}: "
+            f"could not install amflows in {target.host}: "
             f"{result.stderr.decode(errors='replace').strip()}"
         )
 
@@ -208,7 +208,7 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
         *exec_in,
         "python3",
         remote_file,
-        "serve",
+        "anchor",
         "--stdio",
         *_export_args(exports),
     ]
@@ -227,7 +227,7 @@ def _spawn(command: list[str], token: str | None) -> Transport:
     log.debug("starting the target: %s", " ".join(command))
     env = dict(os.environ)
     if token:
-        env["COGANCHOR_TOKEN"] = token
+        env["AMFLOWS_TOKEN"] = token
     process = subprocess.Popen(
         command,
         stdin=subprocess.PIPE,
@@ -255,18 +255,19 @@ def _export_args(exports: list[str], *, quote: bool = False) -> list[str]:
 
 
 def build_bundle(destination: Path | None = None) -> Path:
-    """Package coganchor as a runnable zipapp for the target.
+    """Package coganchor, and the command line reaching it, as a zipapp for the target.
 
-    The whole package ships, tracer half included, because pruning it would be
-    a list to keep in step with the source tree.  Nothing is lost by that: the
-    target only ever runs ``serve``, which :func:`amflows.coganchor.cli.main`
-    reaches without importing the modules that need ptrace or an x86-64 register
-    map, so the bundle runs on a target of any architecture.  It is pure stdlib,
-    so a host needs nothing but ``python3``.
+    The whole subpackage ships, tracer half included, because pruning it would
+    be a list to keep in step with the source tree.  Nothing is lost by that:
+    the target only ever runs ``anchor``, which :func:`amflows.cli.main` reaches
+    without importing the modules that need ptrace or an x86-64 register map --
+    nor any other subpackage, none of which is here -- so the bundle runs on a
+    target of any architecture.  It is pure stdlib, so a host needs nothing but
+    ``python3``.
     """
     if destination is None:
-        destination = Path(tempfile.gettempdir()) / f"coganchor-{os.getuid()}.pyz"
-    with tempfile.TemporaryDirectory(prefix="coganchor-bundle-") as staging:
+        destination = Path(tempfile.gettempdir()) / f"amflows-{os.getuid()}.pyz"
+    with tempfile.TemporaryDirectory(prefix="amflows-bundle-") as staging:
         root = Path(staging)
         # Laid out under the package's own dotted name, so that moving the package moves the
         # bundle with it rather than breaking on the target, which is where it would surface.
@@ -284,11 +285,18 @@ def build_bundle(destination: Path | None = None) -> Path:
             init.write_text(
                 f'"""{".".join(parts[:depth])}, cut down to {parts[depth]}."""\n'
             )
+        # The command line comes too, because it is the only one: what the target runs is the
+        # same ``amflows anchor`` a user would run there, and it names the other subpackages
+        # only from inside the commands that need them, none of which is this one.
+        # Taken off disk rather than imported, so that the serving half still names nothing
+        # above itself.
+        package = Path(coganchor.__file__).parent.parent
+        shutil.copy(package / "cli.py", root.joinpath(*parts[:-1]) / "cli.py")
         # Written by hand rather than via zipapp's ``main=`` shim, which calls
         # the entry point but throws its return value away -- a target that
         # failed to start would then look like a clean exit.
         (root / "__main__.py").write_text(
-            f"from {coganchor.__name__}.cli import main\n\nraise SystemExit(main())\n"
+            "from amflows.cli import main\n\nraise SystemExit(main())\n"
         )
         # One timestamp for everything, so the archive is a function of the source alone: the
         # bundle is addressed on the target by its digest, and a build stamp would miss that

@@ -8,7 +8,7 @@ the image's. It needs the `docker` command and a daemon to reach, on top of what
 
 ```python
 from amflows.janus import ClaudeCodeAgentConfig
-from amflows.janus.isolation import DockerIsolationConfig
+from amflows.talanton import DockerIsolationConfig
 
 config = ClaudeCodeAgentConfig(
     model="claude-opus-4-8",
@@ -26,4 +26,4 @@ whatever else the agent is expected to reach for. What it leaves behind is
 [collected](tracing.md) by session.
 
 A flow killed outright leaves its containers behind, labelled with the uid that started them:
-`docker rm -f $(docker ps -q --filter label=amflows.janus=$(id -u))` clears yours.
+`docker rm -f $(docker ps -q --filter label=amflows=$(id -u))` clears yours.

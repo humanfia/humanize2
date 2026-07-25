@@ -27,8 +27,9 @@ from .base import IsolationBase, IsolationConfig
 _IDLE = ("python3", "-c", "import time; time.sleep(2**31)")
 
 #: Marks a container as one of ours, and whose, for whoever has to clean up after a flow that
-#: was killed before it could.
-_LABEL = "amflows.janus"
+#: was killed before it could. Named for the project rather than for this subpackage, since it
+#: is read by whoever runs `docker ps`, to whom the subpackages are not a thing.
+_LABEL = "amflows"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -88,7 +89,7 @@ class DockerIsolation(IsolationBase):
         # mirrored. Nothing of the work lives in the mirror, so it goes with the container,
         # which is named after it so that the two read as one thing wherever they turn up.
         self._mirror = tempfile.TemporaryDirectory(
-            prefix="janus-", ignore_cleanup_errors=True
+            prefix="amflows-", ignore_cleanup_errors=True
         )
         self._name = os.path.basename(self._mirror.name)
         try:

@@ -160,7 +160,7 @@ def test_prepare_refuses_a_directory_with_unrelated_files(tmp_path: Path) -> Non
     root.mkdir()
     (root / "important.txt").write_text("do not delete me")
 
-    with pytest.raises(FileExistsError, match="not a coganchor mirror"):
+    with pytest.raises(FileExistsError, match="not an amflows mirror"):
         prepare_shadow_root(str(root))
     assert (root / "important.txt").exists()
 

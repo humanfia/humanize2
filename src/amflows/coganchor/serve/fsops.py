@@ -119,7 +119,7 @@ class FileWriter:
         os.makedirs(os.path.dirname(real) or "/", exist_ok=True)
         self._real = real
         self._mode = mode
-        self._temp = f"{real}.coganchor-{os.getpid()}-{next(_WRITER_SEQUENCE)}.tmp"
+        self._temp = f"{real}.amflows-{os.getpid()}-{next(_WRITER_SEQUENCE)}.tmp"
         self._handle = open(self._temp, "wb")  # noqa: SIM115 - closed by finish/abort
 
     def feed(self, data: bytes) -> None:

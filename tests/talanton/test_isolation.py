@@ -18,7 +18,7 @@ import pytest
 
 from amflows.coganchor import AnchorConfig, check
 from amflows.janus import AgentConfig
-from amflows.janus.isolation import (
+from amflows.talanton import (
     DockerIsolationConfig,
     IsolationBase,
     IsolationConfig,

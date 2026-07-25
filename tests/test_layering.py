@@ -1,13 +1,16 @@
 """The structural rules of the package tree, in one table.
 
 Two things nothing else can check. The subpackages are merged projects that keep their own
-dependencies: janus names the machine its agents act on, so it reads coganchor's settings, and
-nothing else crosses -- exomyth stays alone, and neither of the others may reach back up into
-janus. And ``coganchor serve`` runs on the target, which may be any architecture, while
-:mod:`amflows.coganchor.linux` picks a register map at import time and refuses anything but
-x86-64 -- so the serving half must not reach the agent half, nor may anything a caller imports
-to configure one. Both were package boundaries before the merge; now they are rules, so they are
-checked here.
+dependencies: janus names the machine its agents act on, so it reads coganchor's settings and
+talanton's, and talanton hands back an anchor, so it reads coganchor's too. Nothing else
+crosses -- oronyx stays alone, and none of them may reach back up into janus. And the target
+half runs on the target, which may be any architecture, while :mod:`amflows.coganchor.linux`
+picks a register map at import time and refuses anything but x86-64 -- so the serving half must
+not reach the agent half, nor may anything a caller imports to configure one. All were package
+boundaries before the merge; now they are rules, so they are checked here.
+
+The rules are on the subpackages alone. Above them sits the command line, which joins them
+and so may name any of them -- and which is checked instead by what a run of it actually loads.
 """
 
 from __future__ import annotations
@@ -24,8 +27,10 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 
 #: What each layer may import besides its own subtree. Longest matching layer wins.
 ALLOWED = {
-    "amflows.janus": {"amflows", "amflows.coganchor"},
-    "amflows.exomyth": {"amflows"},
+    "amflows.janus": {"amflows", "amflows.coganchor", "amflows.talanton"},
+    "amflows.talanton": {"amflows", "amflows.coganchor"},
+    "amflows.oronyx": {"amflows"},
+    "amflows.jetflow": {"amflows"},
     "amflows.coganchor": {"amflows"},
     "amflows.coganchor.serve": {
         "amflows",
@@ -34,11 +39,11 @@ ALLOWED = {
     },
 }
 
-#: What reaching ``serve`` costs besides: the entry point and the settings it routes through,
-#: which are held to the same bar as the package itself and import their machinery only when
-#: it is used. Loaded rather than imported, so it widens what a run may load and not what the
-#: serving half may name.
-STARTUP = {"amflows.coganchor.anchor", "amflows.coganchor.cli"}
+#: What reaching the target half costs besides: the one command line, and the settings module
+#: that coganchor's own `__init__` names on the way past. Both are held to the same bar as the
+#: package itself and import their machinery only when it is used. Loaded rather than imported,
+#: so this widens what a run may load and not what the serving half may name.
+STARTUP = {"amflows.cli", "amflows.coganchor.anchor"}
 
 
 def _module_name(source: Path) -> str:
@@ -107,16 +112,26 @@ def test_every_layer_imports_only_what_it_may() -> None:
     assert not offenders, f"these modules import outside their layer: {offenders}"
 
 
+def test_every_subpackage_is_a_layer_the_table_governs() -> None:
+    """One left out is unchecked, and reads from here exactly like one deliberately exempt."""
+    subpackages = {
+        f"amflows.{path.name}"
+        for path in (SRC / "amflows").iterdir()
+        if (path / "__init__.py").is_file()
+    }
+    assert subpackages <= set(ALLOWED)
+
+
 def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
-    """The static rule again, but against what a real ``serve`` run actually loads."""
+    """The static rule again, but against what a real target half actually loads."""
     bundle = build_bundle(tmp_path / "coganchor.pyz")
     probe = (
         "import contextlib, io, sys\n"
         "sys.path.insert(0, sys.argv[1])\n"
-        "from amflows.coganchor import cli\n"
+        "from amflows import cli\n"
         "with contextlib.redirect_stdout(io.StringIO()):\n"
         "    try:\n"
-        "        cli.main(['serve', '--help'])\n"
+        "        cli.main(['anchor', '--help'])\n"
         "    except SystemExit:\n"
         "        pass\n"
         "print('\\n'.join(m for m in sys.modules if m.split('.')[0] == 'amflows'))\n"
@@ -133,7 +148,7 @@ def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     loaded = set(result.stdout.split())
     serve = "amflows.coganchor.serve"
-    assert f"{serve}.cli" in loaded, "serve did not actually run"
+    assert f"{serve}.server" in loaded, "the target half did not actually run"
     assert loaded <= ALLOWED[serve] | STARTUP | {
         name for name in loaded if name.startswith(serve)
     }

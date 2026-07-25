@@ -41,9 +41,9 @@ log = logging.getLogger(__name__)
 #: Shadow roots are recorded here rather than marked in place, so the mirror
 #: stays byte-for-byte what the target has -- an agent listing the workspace
 #: must not see coganchor's own bookkeeping.
-REGISTRY_DIR = "~/.cache/coganchor/shadows"
+REGISTRY_DIR = "~/.cache/amflows/shadows"
 
-_FETCH_SUFFIX = ".coganchor-fetch"
+_FETCH_SUFFIX = ".amflows-fetch"
 
 #: Bound on symlink chasing, matching the kernel's own ``ELOOP`` limit.
 _MAX_LINK_HOPS = 40
@@ -411,7 +411,7 @@ def prepare_shadow_root(path: str, *, force: bool = False, target: str = "") -> 
     if previous is not None and previous != target and not force:
         raise FileExistsError(
             errno.EEXIST,
-            f"{path} mirrors {previous}, not {target}. coganchor replaces this "
+            f"{path} mirrors {previous}, not {target}. amflows replaces this "
             "directory with the new target's contents and would delete "
             "everything only the old one has. Use a different directory, or "
             "pass --force.",
@@ -424,8 +424,8 @@ def prepare_shadow_root(path: str, *, force: bool = False, target: str = "") -> 
     elif not force and previous is None and any(os.scandir(path)):
         raise FileExistsError(
             errno.EEXIST,
-            f"{path} already contains files and is not a coganchor mirror. "
-            "coganchor replaces this directory with the target's contents and "
+            f"{path} already contains files and is not an amflows mirror. "
+            "amflows replaces this directory with the target's contents and "
             "would delete them. Use an empty directory, or pass --force.",
             path,
         )

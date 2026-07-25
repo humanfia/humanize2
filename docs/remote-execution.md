@@ -60,7 +60,7 @@ Instead of reconnecting over ssh each time, a target can be left listening:
 # on the target
 amflows anchor --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 # on this machine
-COGANCHOR_TOKEN=$SECRET amflows moor --target tcp://build-box:7777 --workspace /srv/project claude
+AMFLOWS_TOKEN=$SECRET amflows moor --target tcp://build-box:7777 --workspace /srv/project claude
 ```
 
 Read [Security](../README.md#security) before opening one.

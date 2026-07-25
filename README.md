@@ -5,13 +5,6 @@
 
 Orchestrate, execute, and observe agent flows
 
-A flow is a coding agent driven in a loop. amflows is the three pieces that takes:
-
-- **`amflows.janus`** runs Claude Code, Codex and Kimi Code behind one interface, as agents that
-  hand out sessions.
-- **`amflows.exomyth`** turns the trajectories they leave behind into a Chrome JSON trace.
-- **`amflows.coganchor`** runs an agent on one machine and has it act on another.
-
 ## Table of Contents
 
 - [Install](#install)

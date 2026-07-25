@@ -1,8 +1,8 @@
 """The subpackages composed, which is the only place their fit is checked.
 
-exomyth imports neither of the others and neither imports it: a flow is what joins them, by
-handing exomyth what janus reports -- so nothing but this checks that an agent's `opened` really
-names the sessions exomyth files under that agent. janus does read coganchor's settings, but only
+oronyx imports neither of the others and neither imports it: a flow is what joins them, by
+handing oronyx what janus reports -- so nothing but this checks that an agent's `opened` really
+names the sessions oronyx files under that agent. janus does read coganchor's settings, but only
 as settings; that they still describe a session it can drive is checked here too.
 
 The flows are run for real against a fake `claude` that records a transcript where the real one
@@ -18,11 +18,11 @@ from pathlib import Path
 
 import pytest
 
-from amflows import exomyth
+from amflows import oronyx
 from amflows.coganchor import AnchorConfig
 from amflows.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
 from tests.coganchor.conftest import VIRTUAL_WORKSPACE
-from tests.exomyth.conftest import labels
+from tests.oronyx.conftest import labels
 
 CONFIG = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 
@@ -104,7 +104,7 @@ def test_a_flow_is_traced_as_the_agents_it_ran(
 ) -> None:
     workspace, agents = flow
 
-    document = exomyth.collect(workspace, agents=agents)
+    document = oronyx.collect(workspace, agents=agents)
 
     assert document["otherData"]["sessions"] == "2"
     assert labels(document, "process_name") == {
@@ -152,7 +152,7 @@ def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
         sandbox / "landed.txt"
     ).exists()  # nothing landed where the flow was started
 
-    document = exomyth.collect(sessions=session.id, agents={agent.id: agent.opened})
+    document = oronyx.collect(sessions=session.id, agents={agent.id: agent.opened})
 
     assert document["otherData"]["sessions"] == "1"
     assert labels(document, "process_name") == {

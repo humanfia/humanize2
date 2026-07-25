@@ -1,4 +1,4 @@
-"""Tests for the command line shell around exomyth.collect."""
+"""Tests for the command line shell around oronyx.collect."""
 
 from __future__ import annotations
 
@@ -8,9 +8,8 @@ import unittest.mock
 
 import pytest
 
-from amflows import exomyth
-from amflows.exomyth import cli
-from tests.exomyth.conftest import loaded
+from amflows import cli, oronyx
+from tests.oronyx.conftest import loaded
 
 #: Where a trace lands when none was asked for: this run, in this workspace.
 _DEFAULT = re.compile(r"\.amflows/\d{8}T\d{6}Z\.trace\.json")
@@ -18,7 +17,7 @@ _DEFAULT = re.compile(r"\.amflows/\d{8}T\d{6}Z\.trace\.json")
 
 def run(*argv: str) -> None:
     """Runs the command line with the given arguments."""
-    cli.main(list(argv))
+    cli.main(["collect", *argv])
 
 
 @pytest.mark.parametrize(
@@ -65,7 +64,7 @@ def test_forwards_every_argument_to_collect(
     options: dict[str, object],
 ) -> None:
     collect = unittest.mock.Mock(return_value={"otherData": {}})
-    monkeypatch.setattr(cli, "collect", collect)
+    monkeypatch.setattr("amflows.oronyx.collector.collect", collect)
 
     run(*argv)
 
@@ -86,7 +85,7 @@ def test_writes_the_same_trace_as_the_library(
 
     run(str(workspace), "--output", str(output))
 
-    assert loaded(output) == exomyth.collect(workspace)
+    assert loaded(output) == oronyx.collect(workspace)
 
 
 def test_writes_the_default_output_and_reports_it(

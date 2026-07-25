@@ -63,7 +63,7 @@ def _detect() -> Arch:
     arch = _SUPPORTED.get(machine)
     if arch is None:
         raise RuntimeError(
-            f"coganchor supports x86_64 only; this host reports {machine!r}. "
+            f"amflows supports x86_64 only; this host reports {machine!r}. "
             "Interception needs an architecture-specific register map."
         )
     return arch

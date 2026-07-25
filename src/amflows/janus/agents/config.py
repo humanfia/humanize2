@@ -9,8 +9,7 @@ if TYPE_CHECKING:
     # Named for the type only: an unanchored flow is the common one, and it should not pay to
     # import the half of coganchor that runs a session, nor the docker client behind isolation.
     from amflows.coganchor import AnchorConfig
-
-    from ..isolation import IsolationConfig
+    from amflows.talanton import IsolationConfig
 
 
 @dataclass(frozen=True, kw_only=True)

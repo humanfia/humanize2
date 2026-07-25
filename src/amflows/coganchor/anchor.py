@@ -38,7 +38,7 @@ class AnchorConfig:
         reachable, or `remote`. What it spawns always uses the target's network.
       net_allow: Hosts to keep local anyway when `net` is remote, as `HOST[:PORT]`.
       token: The shared secret a `tcp://` target expects. A spawned session falls back to
-        `$COGANCHOR_TOKEN` when this is None, the way the command line does.
+        `$AMFLOWS_TOKEN` when this is None, the way the command line does.
       force: Whether to use a mirror directory that already holds unrelated files.
     """
 
@@ -101,7 +101,7 @@ class AnchorConfig:
             options += [f"{flag}={value}" for value in values]
         if self.force:
             options.append("--force")
-        return [sys.executable, "-m", __package__, *options, *argv]
+        return [sys.executable, "-m", "amflows", "moor", *options, *argv]
 
     def mount(self) -> tuple[Target, str, str]:
         """Reads the target, and works out where the workspace is on each side of it.
@@ -212,11 +212,11 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
             argv=agent.argv,
             env=dict(os.environ)
             | {
-                "COGANCHOR": __version__,
-                "COGANCHOR_TARGET": target.describe(),
+                "AMFLOWS": __version__,
+                "AMFLOWS_TARGET": target.describe(),
                 "PWD": shadow_root,
                 # Agents surface this to the model; being explicit beats it guessing.
-                "COGANCHOR_WORKSPACE": workspace,
+                "AMFLOWS_WORKSPACE": workspace,
             },
             cwd=shadow_root,
         ),

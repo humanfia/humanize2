@@ -188,7 +188,7 @@ class Server:
                 frame,
                 OSError(
                     errno.EPROTO,
-                    f"client speaks protocol {version}, this coganchor speaks {PROTOCOL_VERSION}",
+                    f"client speaks protocol {version}, this amflows speaks {PROTOCOL_VERSION}",
                 ),
             )
             self._channel.close()

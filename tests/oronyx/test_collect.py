@@ -1,4 +1,4 @@
-"""Tests for the exomyth.collect library entry point."""
+"""Tests for the oronyx.collect library entry point."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ import pathlib
 
 import pytest
 
-from amflows import exomyth
-from amflows.exomyth import collector
-from tests.exomyth.conftest import (
+from amflows import oronyx
+from amflows.oronyx import collector
+from tests.oronyx.conftest import (
     CLAUDE_ELSEWHERE,
     CLAUDE_SESSION,
     FLOW,
@@ -21,12 +21,12 @@ from tests.exomyth.conftest import (
 
 
 def test_exposes_collect_as_the_public_api() -> None:
-    assert exomyth.__all__ == ["collect"]
-    assert exomyth.collect is collector.collect
+    assert oronyx.__all__ == ["collect"]
+    assert oronyx.collect is collector.collect
 
 
 def test_collects_every_agent(homes: None, workspace: pathlib.Path) -> None:
-    document = exomyth.collect(workspace)
+    document = oronyx.collect(workspace)
 
     summary = document["otherData"]
     assert summary["workspace"] == str(workspace)
@@ -42,7 +42,7 @@ def test_collects_every_agent(homes: None, workspace: pathlib.Path) -> None:
 def test_renders_one_session_slice_per_track(
     homes: None, workspace: pathlib.Path
 ) -> None:
-    document = exomyth.collect(workspace)
+    document = oronyx.collect(workspace)
 
     names = [str(event["name"]) for event in banners(document)]
     assert len(names) == 6
@@ -55,7 +55,7 @@ def test_renders_one_session_slice_per_track(
 def test_reports_claude_prompt_reasoning_and_tool(
     claude_home: pathlib.Path, workspace: pathlib.Path
 ) -> None:
-    document = exomyth.collect(workspace)
+    document = oronyx.collect(workspace)
 
     assert document["otherData"]["backends"] == "claude"
     turn = named(document, "turn: map the repo")
@@ -77,7 +77,7 @@ def test_reports_claude_prompt_reasoning_and_tool(
 def test_reports_codex_prompt_reasoning_and_tool(
     codex_home: pathlib.Path, workspace: pathlib.Path
 ) -> None:
-    document = exomyth.collect(workspace)
+    document = oronyx.collect(workspace)
 
     assert document["otherData"]["backends"] == "codex"
     turn = named(document, "turn: port the module")
@@ -96,7 +96,7 @@ def test_reports_codex_prompt_reasoning_and_tool(
 def test_reports_kimi_prompt_reasoning_and_tool(
     kimi_home: pathlib.Path, workspace: pathlib.Path
 ) -> None:
-    document = exomyth.collect(workspace)
+    document = oronyx.collect(workspace)
 
     assert document["otherData"]["backends"] == "kimi"
     assert named(document, "turn: wire up the loop")["args"]["origin"] == "cli"
@@ -113,7 +113,7 @@ def test_reports_kimi_prompt_reasoning_and_tool(
 def test_links_sub_agents_to_their_spawner(
     homes: None, workspace: pathlib.Path
 ) -> None:
-    document = exomyth.collect(workspace)
+    document = oronyx.collect(workspace)
 
     flows = [event for event in document["traceEvents"] if event["ph"] in ("s", "f")]
     assert len(flows) == 4
@@ -136,7 +136,7 @@ def test_links_sub_agents_to_their_spawner(
 
 
 def test_names_tracks_after_their_role(homes: None, workspace: pathlib.Path) -> None:
-    document = exomyth.collect(workspace)
+    document = oronyx.collect(workspace)
 
     tracks = {name.split(" ~")[0] for name in labels(document, "thread_name")}
     assert tracks == {"main", "subagent"}
@@ -150,7 +150,7 @@ def test_gathers_a_configuration_and_its_sub_agents_into_one_agent(
     The Explore under the Claude session answered at sonnet and medium, and is still part of
     the agent that started it: what a sub-agent is configured with is its parent's business.
     """
-    document = exomyth.collect(workspace)
+    document = oronyx.collect(workspace)
 
     assert labels(document, "process_name") == {
         "claude · claude-opus-5 · xhigh · 2 sessions",
@@ -163,7 +163,7 @@ def test_gathers_the_runs_of_one_configuration_into_one_agent(
     claude_home: pathlib.Path,
 ) -> None:
     """Two runs of one coding agent are one agent, whichever workspace each ran in."""
-    document = exomyth.collect(sessions=[CLAUDE_SESSION, CLAUDE_ELSEWHERE])
+    document = oronyx.collect(sessions=[CLAUDE_SESSION, CLAUDE_ELSEWHERE])
 
     assert labels(document, "process_name") == {
         "claude · claude-opus-5 · xhigh · 3 sessions"
@@ -176,7 +176,7 @@ def test_tells_apart_the_agents_a_flow_names(claude_home: pathlib.Path) -> None:
     The actor's two sessions are its own and the sub-agent it started, which it never had
     to claim: a sub-agent belongs to whoever ran the session that started it.
     """
-    document = exomyth.collect(sessions=[CLAUDE_SESSION, CLAUDE_ELSEWHERE], agents=FLOW)
+    document = oronyx.collect(sessions=[CLAUDE_SESSION, CLAUDE_ELSEWHERE], agents=FLOW)
 
     assert labels(document, "process_name") == {
         "actor · claude-opus-5 · xhigh · 2 sessions",
@@ -196,7 +196,7 @@ def test_names_the_agent_of_every_session_a_flow_claims(
     session it prints to resume, which its logs name a folder after. Codex ran outside the
     flow here, so it is read as the configuration it ran at.
     """
-    document = exomyth.collect(workspace, agents=FLOW)
+    document = oronyx.collect(workspace, agents=FLOW)
 
     assert labels(document, "process_name") == {
         "actor · claude-opus-5 · xhigh · 2 sessions",
@@ -215,15 +215,15 @@ def test_defaults_to_the_current_directory(
 ) -> None:
     monkeypatch.chdir(workspace)
 
-    assert exomyth.collect() == exomyth.collect(workspace)
+    assert oronyx.collect() == oronyx.collect(workspace)
 
 
 def test_accepts_a_workspace_string(homes: None, workspace: pathlib.Path) -> None:
-    assert exomyth.collect(str(workspace)) == exomyth.collect(workspace)
+    assert oronyx.collect(str(workspace)) == oronyx.collect(workspace)
 
 
 def test_ignores_another_workspace(homes: None, tmp_path: pathlib.Path) -> None:
-    document = exomyth.collect(tmp_path / "nowhere")
+    document = oronyx.collect(tmp_path / "nowhere")
 
     assert document == {
         "traceEvents": [],
@@ -240,14 +240,14 @@ def test_skips_agents_without_a_home(
 ) -> None:
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing"))
 
-    assert exomyth.collect(workspace)["otherData"]["backends"] == "claude"
+    assert oronyx.collect(workspace)["otherData"]["backends"] == "claude"
 
 
 def test_cuts_off_records_outside_the_window(
     homes: None, workspace: pathlib.Path
 ) -> None:
-    whole = exomyth.collect(workspace)
-    window = exomyth.collect(
+    whole = oronyx.collect(workspace)
+    window = oronyx.collect(
         workspace,
         start="2026-07-20 10:00:04+00:00",
         end="2026-07-20 10:00:08+00:00",
@@ -261,7 +261,7 @@ def test_cuts_off_records_outside_the_window(
 def test_returns_an_empty_document_for_an_empty_window(
     homes: None, workspace: pathlib.Path
 ) -> None:
-    document = exomyth.collect(workspace, end="2026-07-20 09:00:00+00:00")
+    document = oronyx.collect(workspace, end="2026-07-20 09:00:00+00:00")
 
     assert document["traceEvents"] == []
     assert document["otherData"] == {"workspace": str(workspace)}
@@ -269,7 +269,7 @@ def test_returns_an_empty_document_for_an_empty_window(
 
 def test_rejects_a_time_it_cannot_read(workspace: pathlib.Path) -> None:
     with pytest.raises(ValueError, match="cannot parse time: not a time at all!!"):
-        exomyth.collect(workspace, start="not a time at all!!")
+        oronyx.collect(workspace, start="not a time at all!!")
 
 
 def test_writes_the_output_file(
@@ -278,7 +278,7 @@ def test_writes_the_output_file(
     output = tmp_path / "nested" / "trace.json"
     output.parent.mkdir()
 
-    document = exomyth.collect(workspace, output=output)
+    document = oronyx.collect(workspace, output=output)
 
     assert loaded(output) == document
 
@@ -286,7 +286,7 @@ def test_writes_the_output_file(
 def test_writes_relative_output_next_to_the_caller(
     homes: None, workspace: pathlib.Path, tmp_path: pathlib.Path
 ) -> None:
-    document = exomyth.collect(workspace, output="trace.json")
+    document = oronyx.collect(workspace, output="trace.json")
 
     assert loaded(tmp_path / "trace.json") == document
 
@@ -294,7 +294,7 @@ def test_writes_relative_output_next_to_the_caller(
 def test_writes_nothing_without_an_output(
     homes: None, workspace: pathlib.Path, tmp_path: pathlib.Path
 ) -> None:
-    exomyth.collect(workspace)
+    oronyx.collect(workspace)
 
     assert list(tmp_path.glob("*.json")) == []
 
@@ -308,6 +308,6 @@ def test_keeps_unicode_readable(
         encoding="utf-8",
     )
 
-    exomyth.collect(workspace, output=tmp_path / "trace.json")
+    oronyx.collect(workspace, output=tmp_path / "trace.json")
 
     assert "接上循环" in (tmp_path / "trace.json").read_text(encoding="utf-8")
