@@ -26,6 +26,7 @@ from amflows.janus import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CommandSessionBase,
+    Stopped,
 )
 from tests.janus.conftest import HereAnchor, ShellAgent
 
@@ -463,3 +464,33 @@ def test_a_turn_the_backend_refuses_fails_rather_than_answering(
     assert agent.opened == []
     with pytest.raises(RuntimeError):
         _ = session.id
+
+
+def test_a_loop_that_swallows_a_failed_turn_does_not_swallow_being_stopped() -> None:
+    """What `/stop` rests on: a flow is a loop, and a loop that catches a failed turn goes
+    round again -- so being stopped must not arrive as a failed turn."""
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    session = agent.launch()
+
+    agent.stop()
+
+    with pytest.raises(Stopped):
+        session.run("anything")
+    # And it is not what a ralph loop suppresses, or the loop would never end.
+    assert not issubclass(Stopped, subprocess.CalledProcessError)
+
+
+def test_stopping_an_agent_ends_the_turn_it_is_taking(clis: _FakeCLIs) -> None:
+    """A model can think for minutes, so a stop that waited for the turn is not a stop.
+
+    This is what makes leaving the interface leave rather than hang: the flow's loop is in a
+    turn, and closing the screen without ending it would leave the work going behind it.
+    """
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    session = agent.launch()
+    session.run("hi")  # so that there is a process holding the conversation
+    assert session._proc is not None
+
+    agent.stop()
+
+    assert session._proc is None  # nothing left of it to wait on

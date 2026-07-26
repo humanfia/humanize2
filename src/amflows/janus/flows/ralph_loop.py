@@ -2,7 +2,7 @@
 
 while true; do claude --print < TASK.md || true; sleep 5; done
 
-    amflows run -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "$(cat TASK.md)"
+    amflows run -f ralph_loop -a claude/claude-opus-4-8/high "$(cat TASK.md)"
 """
 
 import subprocess

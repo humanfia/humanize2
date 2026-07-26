@@ -7,7 +7,7 @@ while true; do
     sleep 5
 done
 
-    amflows run -f examples/rlar.py \
+    amflows run -f rlar \
         -a claude/claude-opus-4-8/high,claude/claude-opus-4-8/high "$(cat TASK.md)"
 
 This is the flow the split pays off in: the actor must remember, the reviewer must not. Nothing

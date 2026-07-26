@@ -162,7 +162,21 @@ class ClaudeCodeSession(StreamSessionBase):
                 ):
                     yield Event(kind="reasoning", text=part["thinking"])
                 elif part.get("type") == "tool_use":
-                    yield Event(kind="tool", text=str(part.get("name") or "tool"))
+                    # The name and what it was called on, which is what a tool call reads
+                    # as: `Read src/x.py`, `Bash git status`. Only what will fit on a row.
+                    called = part.get("input") or {}
+                    about = next(
+                        (
+                            str(value)
+                            for value in called.values()
+                            if isinstance(value, str) and value.strip()
+                        ),
+                        "",
+                    )
+                    yield Event(
+                        kind="tool",
+                        text=f"{part.get('name') or 'tool'} {about}".strip()[:120],
+                    )
 
     def pursue(self, objective: str) -> str:
         """Runs the turn as Claude Code's own ``/goal``, which print mode expands like any other.

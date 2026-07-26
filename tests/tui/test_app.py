@@ -10,14 +10,16 @@ import asyncio
 import os
 import sys
 import time
+import unittest.mock
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from textual.pilot import Pilot
-from textual.widgets import Static
+from textual.widgets import OptionList, Static
 
 from amflows.tui import Amflows
+from amflows.tui.app import _OWN
 
 #: A flow that drives one agent for two turns, so a line can be typed while it is running.
 FLOW = """
@@ -118,7 +120,8 @@ async def test_a_line_typed_while_a_flow_runs_reaches_the_agent(
     (workspace / "flow.py").write_text(FLOW)
     app = Amflows()
     async with app.run_test() as driver:
-        await driver.press(*"/run -f flow.py -a claude/m/high start")
+        app._flow_named, app._models = "flow.py", ["claude/m/high"]
+        await driver.press(*"start")
         await driver.press("enter")
         # The turn will not end until it has been told something else, so this cannot race.
         await until(
@@ -140,7 +143,8 @@ async def test_a_line_with_nothing_running_says_so_rather_than_vanishing() -> No
         await driver.press("enter")
         await driver.pause()
 
-        assert "nothing is running" in _transcript(app)
+        # Nothing chosen and nothing running: a line has nowhere to go, and says so.
+        assert "pick a flow first" in _transcript(app)
 
 
 @pytest.mark.timeout(60)
@@ -155,29 +159,26 @@ async def test_a_command_that_is_not_one_is_said_so() -> None:
 
 
 @pytest.mark.timeout(60)
-async def test_a_bad_run_line_is_a_line_to_correct_and_not_the_end_of_the_session() -> (
-    None
-):
+async def test_a_flow_that_is_not_there_is_a_line_to_correct_and_not_the_end() -> None:
+    """A flow chosen that will not load is said so, and the interface stays up."""
     app = Amflows()
     async with app.run_test() as driver:
-        await driver.press(*"/run -f nowhere.py")  # no -a, and no task
+        app._flow_named, app._models = "nowhere.py", ["claude/m/high"]
+        await driver.press(*"do it")
         await driver.press("enter")
-        await driver.pause()
+        await until(lambda: "nowhere.py" in _transcript(app), driver)
 
         assert app.is_running  # still there to be typed at
-        assert "amflows run" in _transcript(app)
+        assert "nowhere.py" in _transcript(app)
 
 
-def test_a_flag_offers_what_it_is_for() -> None:
-    """A flow file and an agent are chosen by being offered, not by a dialog asking for them."""
+def test_only_the_flows_amflows_came_with_are_offered() -> None:
+    """A flow of your own is a path typed out, not something found by walking the tree."""
     from amflows.cli import COMMANDS
+    from amflows.janus.flows import prebuilt
     from amflows.tui.complete import offered
 
-    found = offered("/run -f ", tuple(COMMANDS))
-    assert any(path.endswith("ralph_loop.py") for path in found), found
-
-    agents = offered("/run -a claude/", tuple(COMMANDS))
-    assert all(spec.startswith("claude/") for spec in agents) and agents
+    assert offered("/agents ", tuple(COMMANDS)) == prebuilt()
 
 
 @pytest.mark.timeout(60)
@@ -186,7 +187,8 @@ async def test_what_the_flow_did_is_shown_beside_it(workspace: Path) -> None:
     (workspace / "flow.py").write_text(FLOW)
     app = Amflows()
     async with app.run_test() as driver:
-        await driver.press(*"/run -f flow.py -a claude/m/high start")
+        app._flow_named, app._models = "flow.py", ["claude/m/high"]
+        await driver.press(*"start")
         await driver.press("enter")
         await until(
             lambda: bool(app._agents and any(agent.sessions for agent in app._agents)),
@@ -211,19 +213,20 @@ async def test_a_half_typed_command_is_offered_the_rest_of_itself() -> None:
 
     app = Amflows()
     async with app.run_test() as driver:
-        await driver.press(*"/ru")
+        await driver.press(*"/ag")
         await driver.pause()
 
         offers = app.query_one("#offers", OptionList)
         assert offers.has_class("offering")
+        # The name is what is taken; what is shown is the name and what it is for.
         assert [
-            str(offers.get_option_at_index(i).prompt)
-            for i in range(offers.option_count)
-        ] == ["/run"]
+            str(offers.get_option_at_index(i).id) for i in range(offers.option_count)
+        ] == ["/agents"]
+        assert "Switch flow" in str(offers.get_option_at_index(0).prompt)
 
         await driver.press("tab")
 
-        assert app.query_one(Editor).text == "/run "
+        assert app.query_one(Editor).text == "/agents "
 
 
 @pytest.mark.timeout(60)
@@ -252,11 +255,119 @@ async def test_nothing_is_offered_for_what_is_not_a_command() -> None:
 
 @pytest.mark.timeout(60)
 async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None:
-    """A command the command line grows must be offered without being listed twice."""
+    """A command the command line grows must be offered without being listed twice.
+
+    Not every one of them, though: `run` is what the first thing you say already does, and
+    `tui` is this -- neither is a command to offer from inside the interface.
+    """
     from amflows.cli import COMMANDS
-    from amflows.tui.app import _OWN
-    from amflows.tui.complete import offered
+    from amflows.tui.complete import about, offered
 
     offers = offered("/", (*COMMANDS, *_OWN))
 
-    assert {f"/{name}" for name in COMMANDS} <= set(offers)
+    assert {f"/{name}" for name in COMMANDS if about(name)} <= set(offers)
+    assert "/run" not in offers and "/tui" not in offers
+
+
+@pytest.mark.timeout(60)
+async def test_stopping_nothing_says_so() -> None:
+    app = Amflows()
+    async with app.run_test() as driver:
+        await driver.press(*"/stop")
+        await driver.press("enter")
+        await driver.pause()
+
+        assert "nothing is running" in _transcript(app)
+
+
+@pytest.mark.timeout(60)
+async def test_exit_leaves() -> None:
+    """`/exit`, as opencode spells it."""
+    app = Amflows()
+    async with app.run_test() as driver:
+        await driver.press(*"/exit")
+        await driver.press("enter")
+        await driver.pause()
+
+        assert not app.is_running
+
+
+def test_what_the_agents_run_is_known_without_starting_one() -> None:
+    """Starting a backend to ask it costs a minute here, which no prompt can wait on.
+
+    `claude --help` took over thirty seconds on the machine this was written on, and
+    `codex app-server` seventy-six -- so what they run is known rather than asked for.
+    """
+    from amflows.tui.discover import installed
+
+    with unittest.mock.patch("subprocess.Popen") as started:
+        found = installed()
+
+    assert not started.called  # nothing was run to find this out
+    # And an effort a model does not take is not offered against it.
+    efforts = {model.name: model.efforts for model in found.get("codex", ())}
+    if efforts:
+        assert efforts["gpt-5.5"] != efforts["gpt-5.6-sol"]
+
+
+@pytest.mark.timeout(60)
+async def test_a_turn_reads_the_way_opencode_renders_one() -> None:
+    """The shapes were read off opencode itself, running, and are pinned here.
+
+    Watched at v1.18.14 against a stub provider: what you said goes down a `┃`; what the
+    agent said is bare and indented three; a tool call is three spaces, the icon opencode
+    picks for that tool, one space, the label; and the line closing a turn is `▣` and two
+    spaces before the parts, which a middle dot separates.
+    """
+    from amflows.janus import Event
+    from amflows.janus.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"), name="one")
+    app = Amflows()
+    async with app.run_test() as driver:
+        app._said_by_you("do it")
+        # From another thread, which is where a turn always says these from.
+        await asyncio.to_thread(
+            lambda: [
+                app._heard(agent, event)
+                for event in (
+                    Event(kind="text", text="Looking at math.py now."),
+                    Event(kind="tool", text="Read math.py"),
+                    Event(kind="tool", text="Bash ls -la"),
+                    Event(kind="ends", text=""),
+                )
+            ]
+        )
+        await driver.pause()
+        shown = _transcript(app)
+
+    assert "┃  do it" in shown
+    assert "\n   Looking at math.py now." in shown
+    assert (
+        "\n   → Read math.py\n   $ Bash ls -la" in shown
+    )  # rows pack, no blank between
+    assert "\n   ▣  one · m · " in shown
+
+
+@pytest.mark.timeout(90)
+async def test_tab_picks_a_flow_and_then_what_each_agent_runs() -> None:
+    """Tab switches flow the way opencode's tab switches agent, then `/models` follows.
+
+    Only the flows amflows came with are listed -- a flow of your own is a path typed out.
+    """
+    from amflows.janus.flows import prebuilt
+    from amflows.tui.pick import Flows
+
+    app = Amflows()
+    async with app.run_test() as driver:
+        await driver.press("tab")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        offered = [option.id for option in listing._options if option.id]
+
+        assert offered == prebuilt()
+        assert listing.highlighted == 1  # past the heading, on the first real choice
+
+        await driver.press("enter")
+        # Which lands on the models sheet, since a flow says how many agents it drives.
+        await until(lambda: app._flow_named == prebuilt()[0], driver)

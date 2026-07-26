@@ -61,7 +61,14 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     pass
 """
 
-EXAMPLES = sorted((Path(__file__).resolve().parents[2] / "examples").glob("*.py"))
+#: The flows amflows comes with, each of which shows the line that would start it.
+PREBUILT = sorted(
+    path
+    for path in (Path(__file__).resolve().parents[2] / "src/amflows/janus/flows").glob(
+        "*.py"
+    )
+    if not path.stem.startswith("_")
+)
 
 
 def _flow(tmp_path: Path, source: str) -> str:
@@ -215,13 +222,13 @@ def test_python_m_amflows_is_the_amflows_command(
     assert _seen(tmp_path)["task"] == "task"
 
 
-@pytest.mark.parametrize("flow", EXAMPLES, ids=lambda flow: flow.name)
+@pytest.mark.parametrize("flow", PREBUILT, ids=lambda flow: flow.name)
 def test_every_example_runs_as_the_command_line_it_shows(
     flow: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Each example shows an `amflows run` line, and it is one that would start that flow."""
+    """Each one shows an `amflows run` line, and it is one that would start that flow."""
     shown = re.search(r"^\s*amflows run (?:.*\\\n)*.*", flow.read_text(), re.MULTILINE)
     assert shown is not None, "no `amflows run` command line to be checked against"
-    monkeypatch.chdir(flow.parent.parent)  # the paths it shows are this project's own
+    monkeypatch.chdir(Path(__file__).resolve().parents[2])
     monkeypatch.setattr(Runner, "run", lambda self, task: None)  # nothing is driven
     main(shlex.split(shown[0].replace("\\\n", " "))[1:])

@@ -78,13 +78,10 @@ def test_a_line_that_names_no_command_is_a_usage_error(
     assert "amflows" in capsys.readouterr().err
 
 
-def test_no_command_at_all_opens_the_interface() -> None:
-    """`amflows` on its own is not a line to correct: it is every command at one prompt."""
-    with (
-        unittest.mock.patch("sys.stdout.isatty", return_value=True),
-        unittest.mock.patch("amflows.tui.Amflows.run") as opened,
-    ):
-        assert cli.main([]) == 0
+def test_the_interface_is_a_command_of_its_own() -> None:
+    """`amflows tui` rather than a bare `amflows`, so it cannot be reached by accident."""
+    with unittest.mock.patch("amflows.tui.Amflows.run") as opened:
+        assert cli.main(["tui"]) == 0
 
     assert opened.called
 

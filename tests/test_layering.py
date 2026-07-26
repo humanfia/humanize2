@@ -103,12 +103,15 @@ def test_every_layer_imports_only_what_it_may() -> None:
         )
         if not layer:
             continue
+        # A layer it may name covers the modules inside it: naming `amflows.janus` is
+        # leave to reach janus, and janus is what is inside it.
         bad = {
             name
             for name in _imports(source)
-            if name != layer
-            and not name.startswith(f"{layer}.")
-            and name not in ALLOWED[layer]
+            if not any(
+                name == allowed or name.startswith(f"{allowed}.")
+                for allowed in (layer, *ALLOWED[layer])
+            )
         }
         if bad:
             offenders[module] = bad

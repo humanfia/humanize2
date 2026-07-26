@@ -7,7 +7,7 @@ while true; do
     sleep 5
 done
 
-    amflows run -f examples/flame_chase.py \
+    amflows run -f flame_chase \
         -a claude/claude-opus-4-8/max,codex/gpt-5.6-sol/max "$(cat TASK.md)"
 """
 

@@ -555,6 +555,13 @@ class CodexAgent(AgentBase):
                 weakref.finalize(self, self._server.stop)
             return self._server
 
+    def stop(self) -> None:
+        """Takes no further turn, and takes down the server the turn under way is waiting on."""
+        super().stop()
+        if self._server is not None:
+            self._server.stop()
+            self._server = None
+
     def launch(self) -> CodexSession:
         """Creates a new Codex session."""
         return CodexSession(self)

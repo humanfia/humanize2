@@ -1,46 +1,98 @@
 """amflows as a coding agent's own terminal, with a flow underneath instead of one agent.
 
 Laid out the way opencode is, and no wider: a transcript, an editor under it, a status line
-under that, and what the flow is doing beside them. Nothing is chosen from a dialog -- a `/`
-offers the commands, and a flag offers whatever it takes -- so there is one way to say a thing
-and it is the way it is written down.
+under that, and what the flow is doing beside them. Tab picks a flow the way opencode's tab
+picks an agent, and `/models` sets what each of that flow's agents runs.
 
 The editor means both things at once: a line starting with `/` is a command, and any other
-line is said to the agent working right now.
+line is the task if nothing is running yet, or is said to the agent working right now.
 """
 
 from __future__ import annotations
 
+import contextlib
 import shlex
+import threading
+import time
 import traceback
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.markup import escape
-from textual import events, on
+from rich.text import Text
+from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import OptionList, RichLog, Static, TextArea
+from textual.widgets.option_list import Option
 
 from amflows.cli import COMMANDS, flow_and_agents
 
-from .complete import flows, offered
+from .complete import about, offered
+from .discover import installed
 from .monitor import Monitor, short
+from .pick import Flows, Models
 
 if TYPE_CHECKING:
     from amflows.janus import AgentBase, Event
 
-#: What the editor understands beyond the commands the command line has.
-_OWN = ("help", "clear", "quit")
+#: What the editor understands beyond the commands the command line has, named as opencode
+#: names them: its `/agents` switches which agent answers, and here that is which flow runs,
+#: since a flow is what answers; its `/models` sets what that runs on, and a flow runs on one
+#: model per agent it drives, so the same command asks once apiece.
+_OWN = (
+    "agents",
+    "models",
+    "stop",
+    "new",
+    "details",
+    "thinking",
+    "export",
+    "help",
+    "exit",
+)
 
 #: How often the right-hand column and the status line are redrawn, in seconds.
 _REFRESH = 0.5
 
-#: How a tool call reads in the transcript, which is one compact row rather than a block.
-_TOOL = "  [dim]⏺[/dim] "
+#: What opencode spins in a tool row, and what it spins in the status line -- which are two
+#: different spinners, as watching it run makes plain.
+_SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+_BLOCKS = 8
+
+#: What opencode draws a tool call with, read out of its own source: three spaces, then the
+#: icon its renderer picks for that tool, then one space, then the label. There is no `⏺` in
+#: opencode -- that glyph is another agent's -- and no per-tool checkmark.
+_ICONS = {
+    "bash": "$",
+    "read": "→",
+    "write": "←",
+    "edit": "←",
+    "glob": "✱",
+    "grep": "✱",
+    "webfetch": "%",
+    "websearch": "◈",
+    "task": "│",
+}
+
+#: What a tool amflows has never heard of is drawn with, as opencode draws its own unknowns.
+_UNKNOWN = "⚙"
+
+#: What is on screen before anything is typed, which is a wordmark and one tip.
+_WORDMARK = (
+    "█▀▀█ █▄ ▄█ █▀▀▀ █    █▀▀█ █   █ █▀▀▀",
+    "█▄▄█ █ █ █ █▀▀  █    █  █ █ █ █ ▀▀▀█",
+    "▀  ▀ ▀   ▀ ▀    ▀▀▀▀ ▀▀▀▀ ▀▀ ▀▀ ▀▀▀▀",
+)
+_TIP = "Press tab to pick a flow and the models it runs on, then say what it is to do"
+
+#: The bar opencode puts down the left of a user's message, and the dot it separates the
+#: parts of a summary line with.
+_BAR = "┃"
+_DOT = " · "
 
 
 def _thousands(count: int) -> str:
@@ -98,12 +150,16 @@ class Editor(TextArea):
         """
         listing = self.screen.query_one("#offers", OptionList)
         if not listing.has_class("offering"):
+            if event.key == "tab":
+                event.prevent_default()
+                event.stop()
+                self.app.action_agents()  # type: ignore[attr-defined]
             return
         if event.key == "tab":
             event.prevent_default()
             event.stop()
             if listing.highlighted is not None:
-                self.take(str(listing.get_option_at_index(listing.highlighted).prompt))
+                self.take(str(listing.get_option_at_index(listing.highlighted).id))
         elif event.key in ("up", "down"):
             event.prevent_default()
             event.stop()
@@ -136,18 +192,40 @@ class Amflows(App[None]):
     #side { width: 30; display: none; padding: 1 1 0 2; }
     #side.watching { display: block; }
 
-    #offers { display: none; max-height: 8; border: none; padding: 0 2; background: $panel; }
+    /* Above the editor, barred down both sides and nowhere else, at most ten rows: what
+       opencode draws its completions in. The row under the cursor is marked by its
+       background alone, which is what an option list does anyway. */
+    #offers { display: none; max-height: 10; margin: 0 2; padding: 0 1; background: $panel;
+              border: none; scrollbar-size: 0 0;
+              border-left: heavy $panel-lighten-2; border-right: heavy $panel-lighten-2; }
     #offers.offering { display: block; }
 
-    #editor { height: auto; max-height: 10; border: round $primary 60%; }
-    #editor:focus { border: round $primary; }
+    /* Not a box: one bar down the left, the flow named inside it under what is being
+       typed, and a capped shadow beneath -- which is how opencode draws its prompt. */
+    #prompt { height: auto; margin: 0 2; background: $panel; padding: 1 2 0 2;
+              border-left: heavy $primary 60%; }
+    #prompt:focus-within { border-left: heavy $primary; }
+    /* Bare: the bar around it is the prompt's, and a second one inside would be a box. */
+    #editor { height: auto; max-height: 10; border: none; padding: 0; background: $panel; }
+    #hint { height: 1; margin-top: 1; color: $text-muted; }
+    #shadow { height: 1; margin: 0 2; color: $panel; }
     #status { height: 1; padding: 0 2; color: $text-muted; }
     """
 
     BINDINGS: ClassVar = [
         ("ctrl+c", "quit", "quit"),
-        ("ctrl+l", "clear", "clear"),
     ]
+
+    def action_quit(self) -> None:  # type: ignore[override]
+        """Leaves, having first stopped whatever was running.
+
+        A flow is a loop and a turn can think for minutes, so leaving without stopping it
+        would leave the interface gone and the work going -- which reads as a hang.
+        """
+        for agent in self._agents:
+            agent.stop()
+        self._agents = []
+        self.exit()
 
     def __init__(self) -> None:
         """Initializes an interface holding no agents, because nothing is running yet."""
@@ -156,6 +234,18 @@ class Amflows(App[None]):
         self._agents: list[AgentBase] = []
         #: What the flow has done so far, which is what the right-hand column shows.
         self._monitor = Monitor()
+        #: Whether a tool call and whether the agent's thinking are shown, as opencode's
+        #: `/details` and `/thinking` toggle them.
+        self._details = True
+        self._thinking = True
+        #: The flow to run and what each of its agents runs. The first thing you say once
+        #: both are set is the task, which is what starts it.
+        self._flow_named = ""
+        self._models: list[str] = []
+        #: When each agent's turn started, for the line that closes it.
+        self._began: dict[str, float] = {}
+        #: Whether the last thing shown was a part that the next one may run on from.
+        self._packed = False
 
     def compose(self) -> ComposeResult:
         """The transcript and what the flow is doing, the offers, the editor, the status."""
@@ -165,7 +255,10 @@ class Amflows(App[None]):
                 yield Static(id="flow", classes="panel")
                 yield Static(id="spend", classes="panel")
         yield OptionList(id="offers")
-        yield Editor(id="editor", show_line_numbers=False)
+        with Vertical(id="prompt"):
+            yield Editor(id="editor", show_line_numbers=False)
+            yield Static(id="hint")
+        yield Static(id="shadow")
         yield Static(id="status")
 
     def on_mount(self) -> None:
@@ -173,8 +266,11 @@ class Amflows(App[None]):
         # Everything printed anywhere under this process lands in the transcript, which is what
         # makes a flow watchable: janus tees each agent's streams to ours as they arrive.
         self.begin_capture_print(self)
-        self.show("[b]amflows[/b]  [dim]a flow, and the agents running it[/dim]\n")
-        self.action_help()
+        # A wordmark and one tip, which is all opencode puts on screen before you type. The
+        # commands are behind `/`, so listing them here would only be in the way.
+        for row in _WORDMARK:
+            self.show(f"[dim]{row}[/dim]")
+        self.show(f"\n[yellow]●[/yellow] [b]Tip[/b] [dim]{_TIP}[/dim]\n")
         self._draw()
         self.set_interval(_REFRESH, self._draw)
         # The editor is the only thing to type at, so it is the only thing that takes focus:
@@ -182,14 +278,26 @@ class Amflows(App[None]):
         for elsewhere in self.query("#transcript, #offers"):
             elsewhere.can_focus = False
         self.query_one(Editor).focus()
-        # Found once, off the event loop, so that the first `/run -f` does not pay for a walk
-        # of this directory between one keystroke and the next.
-        self.run_worker(flows, thread=True)
 
     def on_print(self, event: events.Print) -> None:
-        """Puts something printed under this process into the transcript."""
+        """Puts something printed under this process into the transcript, as a barred block.
+
+        Output is barred rather than indented because that is what opencode does with it:
+        a command and what it said are one block, set apart from the words around them.
+        """
         if event.text.strip():
-            self.show(event.text.rstrip("\n"), "dim" if event.stderr else "default")
+            for line in escape(event.text.rstrip("\n")).splitlines():
+                self.show(f"[dim]{_BAR}[/dim]  [dim]{line}[/dim]")
+
+    def _said_by_you(self, text: str) -> None:
+        """Puts something you said in the transcript, down a bar as opencode draws it.
+
+        Args:
+          text: What was said.
+        """
+        self._packed = False  # what a turn says next starts its own part
+        for line in ("", *escape(text).splitlines(), ""):
+            self.show(f"[cyan]{_BAR}[/cyan]  {line}")
 
     def show(self, text: str, style: str = "") -> None:
         """Puts a line in the transcript.
@@ -218,7 +326,19 @@ class Amflows(App[None]):
         listing.clear_options()
         listing.set_class(bool(offers), "offering")
         if offers:
-            listing.add_options(offers)
+            # Name on the left and what it is for on the right, as opencode lists its own.
+            # The bare name is kept as the option's id, since that is what replaces the text.
+            listing.add_options(
+                [
+                    Option(
+                        f"{offer:<12}[dim]{escape(about(offer.lstrip('/')))}[/dim]"
+                        if about(offer.lstrip("/"))
+                        else offer,
+                        id=offer,
+                    )
+                    for offer in offers
+                ]
+            )
             listing.highlighted = 0
 
     def _draw(self) -> None:
@@ -250,26 +370,55 @@ class Amflows(App[None]):
         )
         spent = sum(spend.tokens for spend in spending)
         rate = sum(spend.rate for spend in spending)
+        # Left, first match wins, as opencode's status line resolves it: what is running if
+        # anything is, else where this is. Right, the usage. The two ends are pushed apart.
         working = ", ".join(self._monitor.now_working())
-        status = [f"[dim]{escape(str(Path.cwd()))}[/dim]"]
         if working:
-            status.append(f"[b]▶[/b] {escape(working)}")
-        if spent:
-            status.append(f"[dim]{_thousands(spent)} tokens · {rate:.0f}/s[/dim]")
-        self.query_one("#status", Static).update("   ".join(status), layout=False)
-
-    def action_clear(self) -> None:
-        """Empties the transcript, leaving whatever is running alone."""
-        self.query_one("#transcript", RichLog).clear()
+            at = int(time.monotonic() / _REFRESH) % (_BLOCKS * 2)
+            at = at if at < _BLOCKS else _BLOCKS * 2 - 1 - at  # there and back again
+            bar = "".join("■" if step == at else "⬝" for step in range(_BLOCKS))
+            left = (
+                f"[cyan]{bar}[/cyan]  {escape(working)}"
+                f"   [bold]esc[/bold] [dim]interrupt[/dim]"
+            )
+        elif self._set_up and not self._agents:
+            left = "[dim]waiting for a task[/dim]"
+        else:
+            left = f"[dim]{escape(str(Path.cwd()))}[/dim]"
+        # Inside the prompt, what is set up to run: the flow and who runs it, as opencode
+        # names the agent and model it would send to.
+        self.query_one("#hint", Static).update(
+            f"[cyan]{escape(self._flow_named or 'no flow')}[/cyan]"
+            f"{_DOT}[dim]{escape(', '.join(self._models) or 'tab picks a flow')}[/dim]"
+        )
+        self.query_one("#shadow", Static).update(
+            "╹" + "▀" * max(0, self.size.width - 1)
+        )
+        right = (
+            f"[dim]{_thousands(spent)} tokens · {rate:.0f}/s[/dim]"
+            if spent
+            else "[bold]tab[/bold] [dim]flows[/dim]  [bold]/[/bold] [dim]commands[/dim]"
+        )
+        # Measured as drawn rather than as written: markup is not what takes up columns.
+        gap = (
+            self.size.width
+            - 4
+            - sum(Text.from_markup(end).cell_len for end in (left, right))
+        )
+        self.query_one("#status", Static).update(
+            left + " " * max(2, gap) + right, layout=False
+        )
 
     def action_help(self) -> None:
         """Shows what the editor understands, which is the commands and everything else."""
         self.show(
-            "  [dim]"
-            + "  ".join(f"/{name}" for name in (*COMMANDS, *_OWN))
+            "   [dim]"
+            + "  ".join(f"/{name}" for name in (*COMMANDS, *_OWN) if about(name))
             + "[/dim]\n"
-            "  [dim]tab takes what is offered · enter sends · ctrl+j breaks the line[/dim]\n"
-            "  [dim]a line not starting with / is said to the agent working now[/dim]"
+            "   [dim]tab picks a flow, or takes what is offered · enter sends · "
+            "ctrl+j breaks the line[/dim]\n"
+            "   [dim]the first thing you say is the task; anything after it goes to "
+            "whoever has the turn[/dim]"
         )
 
     @on(Editor.Sent)
@@ -277,9 +426,9 @@ class Amflows(App[None]):
         """Takes what was typed as a command, or as something to say to the agent."""
         line = event.text
         if not line.startswith("/"):
-            self._interject(line)
+            self._said(line)
             return
-        self.show(f"\n[b]›[/b] {escape(line)}")
+        self._said_by_you(line)
         name, _, rest = line[1:].partition(" ")
         try:
             argv = shlex.split(rest)
@@ -288,18 +437,109 @@ class Amflows(App[None]):
         ) as error:  # an unbalanced quote is a line to correct, not a crash
             self.show(f"amflows: {error}", "red")
             return
-        if name == "quit":
-            self.exit()
+        if name == "exit":
+            self.action_quit()
         elif name == "help":
             self.action_help()
-        elif name == "clear":
-            self.action_clear()
-        elif name == "run":
-            self._flow(argv)
-        elif name in COMMANDS:
+        elif name == "new":
+            self.action_new()
+        elif name == "agents":
+            self.action_agents(argv[0] if argv else "")
+        elif name == "models":
+            self.action_models()
+        elif name == "details":
+            self._details = not self._details
+            self.show(f"[dim]tool calls {'shown' if self._details else 'hidden'}[/dim]")
+        elif name == "thinking":
+            self._thinking = not self._thinking
+            self.show(f"[dim]thinking {'shown' if self._thinking else 'hidden'}[/dim]")
+        elif name == "export":
+            self._export()
+        elif name == "stop":
+            self._stop()
+        elif name in COMMANDS and name != "run":
             self._background(lambda: COMMANDS[name][0](argv))
         else:
             self.show(f"amflows: no such command: /{name}", "red")
+
+    def action_new(self) -> None:
+        """Starts over: an empty transcript, no flow chosen, and nothing done."""
+        self._stop()
+        self.query_one("#transcript", RichLog).clear()
+        self._monitor = Monitor()
+        self._models = []
+        self._draw()
+
+    def _stop(self) -> None:
+        """Stops the flow, between turns rather than mid-edit.
+
+        Each agent is told to take no further turn, so the turn running now finishes what it
+        is doing and the loop driving it ends on the next one it asks for.
+        """
+        if not self._agents:
+            self.show("amflows: nothing is running", "red")
+            return
+        for agent in self._agents:
+            agent.stop()
+        self.show("[dim]stopping — the turn running now will finish first[/dim]")
+
+    def _export(self) -> None:
+        """Writes the transcript beside the trace files, as opencode writes its markdown."""
+        import datetime
+
+        stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+        where = Path(".amflows") / f"{stamp}.session.md"
+        where.parent.mkdir(parents=True, exist_ok=True)
+        where.write_text(
+            "\n".join(
+                line.text for line in self.query_one("#transcript", RichLog).lines
+            )
+        )
+        self.show(f"[dim]{where}[/dim]")
+
+    @work
+    async def action_agents(self, named: str = "") -> None:
+        """Switches which flow runs, as opencode's tab switches which agent answers.
+
+        Args:
+          named: A flow of your own, as a path. Left out, the ones amflows came with are
+            listed instead -- a path is typed, since guessing which files below here are
+            flows means reading all of them.
+        """
+        picked = named or await self.push_screen_wait(Flows(self._flow_named))
+        if picked is None:
+            return
+        chosen = picked if isinstance(picked, str) else picked[0]
+        self._flow_named = chosen
+        # What each agent runs is asked next, since a flow says for itself how many it
+        # drives. Its own worker, because a worker is what may put a screen up and wait.
+        self._models = []
+        self.action_models()
+
+    @work
+    async def action_models(self) -> None:
+        """Sets what each of the flow's agents runs, which is what `/models` is for."""
+        from amflows.janus.flows import find
+        from amflows.janus.runner import NotAFlow, drives
+
+        if not self._flow_named:
+            self.show("amflows: no flow yet — tab picks one", "red")
+            return
+        agents = installed()
+        if not agents:
+            self.show("amflows: no coding agent is installed here", "red")
+            return
+        try:
+            wanted = drives(find(self._flow_named))
+        except (NotAFlow, Exception) as why:  # noqa: BLE001 -- a flow that will not load
+            self.show(f"amflows: {why}", "red")
+            return
+        chosen = await self.push_screen_wait(Models(self._flow_named, wanted, agents))
+        if chosen is None:
+            return
+        self._models = list(chosen)
+        self.show("[dim]say what to do, and the flow starts on it[/dim]")
+        self._draw()
 
     def _flow(self, argv: list[str]) -> None:
         """Starts a flow, keeping its agents so that a typed line can reach one.
@@ -327,7 +567,8 @@ class Amflows(App[None]):
                 Runner(path, agents).run(task)
             finally:
                 self._agents = []
-                self.call_from_thread(self.show, "[dim]— the flow is done —[/dim]")
+                with contextlib.suppress(RuntimeError):
+                    self.call_from_thread(self.show, "[dim]— the flow is done —[/dim]")
             return 0
 
         self._background(drive)
@@ -347,15 +588,56 @@ class Amflows(App[None]):
             self._monitor.spend(agent.id, tokens, model=model)
         if event.kind == "begins":
             self._monitor.begins(agent.id, agent.config.model)
-            self.call_from_thread(self.show, f"\n[dim]{escape(short(agent.id))}[/dim]")
+            self._began[agent.id] = time.monotonic()
         elif event.kind == "ends":
             self._monitor.ends(agent.id)
-        elif event.kind == "tool":
-            self.call_from_thread(self.show, f"{_TOOL}{escape(event.text)}")
-        elif event.kind == "reasoning":
-            self.call_from_thread(self.show, event.text, "dim italic")
+            # The line opencode closes a message with: a filled square, two spaces, then the
+            # parts separated by a middle dot.
+            took = time.monotonic() - self._began.pop(agent.id, time.monotonic())
+            self.call_from_thread(
+                self._part,
+                f"   [dim]▣[/dim]  {escape(short(agent.id))}"
+                f"{_DOT}{escape(agent.config.model)}{_DOT}{took:.1f}s",
+                False,
+            )
+        elif event.kind == "tool" and self._details:
+            icon = _ICONS.get(
+                event.text.split()[0].lower() if event.text else "", _UNKNOWN
+            )
+            self.call_from_thread(
+                self._part, f"   [dim]{icon}[/dim] {escape(event.text)}", True
+            )
+        elif event.kind == "reasoning" and self._thinking:
+            self.call_from_thread(
+                self._part,
+                "\n".join(
+                    f"   [dim italic]{line}[/dim italic]"
+                    for line in escape(event.text).splitlines()
+                ),
+                False,
+            )
         elif event.kind == "text":
-            self.call_from_thread(self.show, escape(event.text))
+            # Bare, indented three: opencode gives an assistant message no prefix at all.
+            self.call_from_thread(
+                self._part,
+                "\n".join(f"   {line}" for line in escape(event.text).splitlines()),
+                False,
+            )
+
+    def _part(self, text: str, packs: bool) -> None:
+        """Puts one part of a turn in the transcript, spaced as opencode spaces its own.
+
+        A blank line goes between the parts, except between two that pack -- one-line tool
+        rows run together, and everything else is set apart.
+
+        Args:
+          text: The part, as markup.
+          packs: Whether this part is one that runs on from the one before it.
+        """
+        if not (packs and self._packed):
+            self.show("")
+        self._packed = packs
+        self.show(text)
 
     def _background(self, work: Callable[[], int]) -> None:
         """Runs something off the event loop, showing what it says rather than dying of it.
@@ -370,12 +652,41 @@ class Amflows(App[None]):
             except SystemExit as stopped:  # argparse rejecting the line, not a crash
                 status = int(stopped.code or 0)
             except Exception:  # noqa: BLE001 -- a flow fails any way it likes, and is shown
-                self.call_from_thread(self.show, traceback.format_exc().strip(), "red")
+                with contextlib.suppress(RuntimeError):  # or the interface has gone
+                    self.call_from_thread(
+                        self.show, traceback.format_exc().strip(), "red"
+                    )
                 return
             if status:
-                self.call_from_thread(self.show, f"— exited {status} —", "red")
+                with contextlib.suppress(RuntimeError):
+                    self.call_from_thread(self.show, f"— exited {status} —", "red")
 
-        self.run_worker(go, thread=True, exit_on_error=False)
+        # A thread of our own rather than a worker: a worker is joined on the way out, and a
+        # turn that is still thinking would hold the interpreter open behind a closed screen.
+        threading.Thread(target=go, daemon=True).start()
+
+    def _said(self, text: str) -> None:
+        """Takes a line that is not a command, which is a task or a word put in.
+
+        With a flow chosen and not yet running, it is the task that starts it -- the way a
+        first message to opencode is the thing it is asked to do. With one running, it goes
+        to the agent taking its turn.
+
+        Args:
+          text: What was said.
+        """
+        if self._agents:
+            self._interject(text)
+        elif self._set_up:
+            self._said_by_you(text)
+            self._flow(["-f", self._flow_named, "-a", ",".join(self._models), text])
+        else:
+            self.show("amflows: pick a flow first — tab does it", "red")
+
+    @property
+    def _set_up(self) -> bool:
+        """Whether there is a flow to start and something for each agent to run on."""
+        return bool(self._flow_named and self._models)
 
     def _interject(self, text: str) -> None:
         """Says something to the agent working right now.
@@ -396,7 +707,7 @@ class Amflows(App[None]):
         if not sessions:
             self.show("amflows: nothing is running to be told that", "red")
             return
-        self.show(f"\n[b]›[/b] {escape(text)}")
+        self._said_by_you(text)
 
         def put_in() -> int:
             # Off the event loop: this writes to the agent, and a large paste into a pipe the

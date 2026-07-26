@@ -3,7 +3,7 @@
 kimi --prompt "$(cat TASK.md)"                                   # first turn opens the session
 while true; do kimi --continue --prompt "continue" || true; sleep 5; done
 
-    amflows run -f examples/continue_loop.py -a kimi/kimi-code/k3/high "$(cat TASK.md)"
+    amflows run -f continue_loop -a kimi/kimi-code/k3/high "$(cat TASK.md)"
 """
 
 import subprocess

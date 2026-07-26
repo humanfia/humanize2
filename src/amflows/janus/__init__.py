@@ -17,6 +17,7 @@ from .agents import (
     KimiCodeCLIAgentConfig,
     KimiCodeCLISession,
     SessionBase,
+    Stopped,
     StreamSessionBase,
 )
 from .runner import NotAFlow, Runner
@@ -38,5 +39,6 @@ __all__ = [
     "NotAFlow",
     "Runner",
     "SessionBase",
+    "Stopped",
     "StreamSessionBase",
 ]

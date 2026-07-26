@@ -150,7 +150,7 @@ def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
         session.run("do the task") == "done"
     )  # the turn is the flow's, as it always was
     # A second turn resumes the conversation and reaches the target through the mirror the
-    # first one left behind, which is the shape every loop in examples/ runs in.
+    # first one left behind, which is the shape every flow amflows comes with runs in.
     assert session.run("keep going") == "done"
 
     assert (target / "landed.txt").read_text() == session.id * 2

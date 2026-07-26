@@ -8,8 +8,8 @@ amflows run -f|--flow <flow> -a|--agents <backend>/<model>/<effort>[,<backend>/<
 ```
 
 ```sh
-amflows run -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "$(cat TASK.md)"
-amflows run -f examples/flame_chase.py -a claude/claude-opus-4-8/max,codex/gpt-5.6-sol/max "fix the build"
+amflows run -f ralph_loop -a claude/claude-opus-4-8/high "$(cat TASK.md)"
+amflows run -f flame_chase -a claude/claude-opus-4-8/max,codex/gpt-5.6-sol/max "fix the build"
 ```
 
 `-a` takes as many agents as the flow drives, in the order it takes them; the option may be
@@ -42,7 +42,7 @@ between them as they happen, and what each model has cost with the rate it is co
 None of that is asked of the flow — a flow is a Python file that may branch any way it likes,
 so the turns going past are the only place its shape is ever visible.
 
-[examples/](../examples/) has the flow loops from flowbench written this way: `ralph_loop`, `goal`,
+amflows comes with the flow loops from flowbench written this way, run by name: `ralph_loop`, `goal`,
 `flame_chase`, `stateful_ralph`, `continue_loop` and `rlar`. See
 [Security](../README.md#security) before running one.
 
@@ -59,5 +59,5 @@ agents = [
     ClaudeCodeAgent(config, name="reviewer"),
 ]
 
-Runner("examples/rlar.py", agents).run("fix the build")
+Runner("rlar", agents).run("fix the build")
 ```

@@ -21,8 +21,7 @@ Orchestrate, execute, and observe agent flows
 pip install git+https://github.com/humanfia/amflows.git
 ```
 
-From source, with [uv](https://docs.astral.sh/uv/), which is also how you get
-[examples/](examples/):
+From source, with [uv](https://docs.astral.sh/uv/):
 
 ```sh
 git clone git@github.com:humanfia/amflows.git
@@ -48,19 +47,20 @@ agent.launch().run("Read TASK.md and get started.")
 
 ### CLI
 
-`amflows` on its own opens a terminal interface — a coding agent's own terminal, with a flow
-underneath instead of one agent. A line starting with `/` is a command; any other line is said
-to the agent working right now. Beside the transcript is what the flow is doing: which agent
-has the turn, who handed to whom, and what each model is costing as it costs it.
+`amflows tui` opens a terminal interface — a coding agent's own terminal, with a flow
+underneath instead of one agent. Tab picks a flow and what each of its agents runs; the first
+thing you say is what it is to do, and anything said after that goes to the agent taking its
+turn. A line starting with `/` is a command. Beside the transcript is what the flow is doing:
+which agent has the turn, who handed to whom, and what each model is costing as it costs it.
 
 ```sh
-amflows
+amflows tui
 ```
 
 Or name a command. Run a [flow](docs/flows.md) over the agents you name:
 
 ```sh
-amflows run -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "fix the build"
+amflows run -f ralph_loop -a claude/claude-opus-4-8/high "fix the build"
 ```
 
 Collect what it left behind, and open the file in [ui.perfetto.dev](https://ui.perfetto.dev):

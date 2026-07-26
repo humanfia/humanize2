@@ -1,9 +1,9 @@
 """``amflows`` -- the whole command line, over subpackages that have none of their own.
 
-    amflows run -f examples/ralph_loop.py -a claude/claude-opus-4-8/high "$(cat TASK.md)"
+    amflows run -f ralph_loop -a claude/claude-opus-4-8/high "$(cat TASK.md)"
     amflows collect
     amflows anchor --target ssh://build-box claude
-    amflows anchor serve --listen 7777 --export /srv/project
+    amflows tui
 
 A command imports the subpackage it needs when it is the one asked for, and no earlier. Two
 things turn on that: `amflows run` must not pay for a date parser it will not use, and
@@ -57,7 +57,7 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
         "--flow",
         required=True,
         metavar="PATH",
-        help="the Python file the flow is written in, as a run(agents, task) function",
+        help="the flow to drive: one that came with amflows, by name, or a file of your own",
     )
     parser.add_argument(
         "-a",
@@ -84,6 +84,7 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
         KimiCodeCLIAgent,
         KimiCodeCLIAgentConfig,
     )
+    from amflows.janus.flows import find
 
     built = {
         "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
@@ -100,7 +101,7 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
             parser.error(f"bad agent {spec!r}: expected BACKEND/MODEL/EFFORT")
         agent, config = built[backend]
         agents.append(agent(config(model=model, effort=effort)))
-    return args.flow, agents, args.task
+    return find(args.flow), agents, args.task
 
 
 def _run(argv: list[str]) -> int:
@@ -296,6 +297,27 @@ def anchor_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _tui(argv: list[str]) -> int:
+    """Opens the terminal interface, which is every command at one prompt.
+
+    Args:
+      argv: What followed the command name, which is nothing it takes.
+
+    Returns:
+      Zero, once the interface has been closed.
+    """
+    import argparse
+
+    argparse.ArgumentParser(
+        prog="amflows tui", description="Open the terminal interface."
+    ).parse_args(argv)
+
+    from amflows.tui import Amflows
+
+    Amflows().run()
+    return 0
+
+
 def _anchor(argv: list[str]) -> int:
     """Runs the agent named on the command line, with its work landing on another machine.
 
@@ -480,6 +502,7 @@ COMMANDS = {
         "aggregate the trajectories agents left behind into a Chrome trace",
     ),
     "anchor": (_anchor, "run an agent here that acts on another machine"),
+    "tui": (_tui, "open the terminal interface"),
 }
 
 
@@ -493,14 +516,6 @@ def main(argv: list[str] | None = None) -> int:
       The command's exit status.
     """
     arguments = sys.argv[1:] if argv is None else argv
-    if not arguments and sys.stdout.isatty():
-        # Nothing asked for is not nothing to do: the interface is every command at one
-        # prompt, and is what `amflows` on its own means. Down a pipe there is nothing to
-        # draw it on, so that falls through to being told what this takes.
-        from amflows.tui import Amflows
-
-        Amflows().run()
-        return 0
     if not arguments or arguments[0] not in COMMANDS:
         import argparse
 

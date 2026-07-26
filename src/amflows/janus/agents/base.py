@@ -22,6 +22,15 @@ if TYPE_CHECKING:
     from amflows.coganchor import AnchorConfig
 
 
+class Stopped(Exception):
+    """Raised in place of a turn, once the agent has been told to stop.
+
+    A flow is a loop, and a loop that catches a failed turn goes round again -- so stopping
+    one cannot be a failed turn. This is not a `CalledProcessError`, so the loops that carry
+    on past a turn that failed do not carry on past this.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class Event:
     """One thing an agent said while a turn was still running.
@@ -160,6 +169,8 @@ class SessionBase(ABC):
         Raises:
           subprocess.CalledProcessError: If the turn fails, as for :meth:`run`.
         """
+        if self._agent._stopped:
+            raise Stopped(f"{self._agent.id} was stopped")
         self._agent._heard(Event(kind="begins", text=prompt))
         try:
             for event in self._stream(prompt):
@@ -193,6 +204,13 @@ class SessionBase(ABC):
             nowhere to put a later word.
         """
         raise NotImplementedError(f"{type(self).__name__} cannot be talked to mid-turn")
+
+    def close(self) -> None:
+        """Ends whatever this session is holding, so that a turn under way stops waiting.
+
+        Does nothing by default: a session that is one command per turn holds nothing
+        between them.
+        """
 
     def _workspace(self) -> str:
         """The project directory a turn of this session works in, as the backend will find it.
@@ -420,7 +438,7 @@ class StreamSessionBase(SessionBase):
                             # and it may not have been read yet.
                             self._draining.join(timeout=5)
                         complained = "".join(self._complaints)
-                        self._close()
+                        self.close()
                         raise subprocess.CalledProcessError(
                             status, argv, event.text, complained
                         )
@@ -455,14 +473,14 @@ class StreamSessionBase(SessionBase):
                     # may not have had it read yet -- and that explanation is the diagnostic.
                     self._draining.join(timeout=5)
                 complained = "".join(self._complaints)
-                self._close()
+                self.close()
                 raise subprocess.CalledProcessError(status or 1, argv, said, complained)
             if self._agent.anchor is not None:
                 # An anchored turn has to be over when it says it is: coganchor pushes what the
                 # agent wrote when the session ends, so a process held open past the turn would
                 # leave that turn's work still on this machine. The cost is that an anchored
                 # session cannot be talked to between turns -- there is nothing there to hear.
-                self._close()
+                self.close()
             yield Event(kind="result", text=said, tokens=spent)
 
     def interject(self, text: str) -> None:
@@ -476,7 +494,7 @@ class StreamSessionBase(SessionBase):
         """
         self._say(text)
 
-    def _close(self) -> None:
+    def close(self) -> None:
         """Ends the process, and with it the conversation it was holding."""
         with self._writing:
             # Taken together, so that nothing is written to a process on its way out and no
@@ -488,7 +506,9 @@ class StreamSessionBase(SessionBase):
             if proc.stdin is not None:
                 proc.stdin.close()  # its stdin ending is how the agent knows to stop
         try:
-            proc.wait(timeout=5)
+            # Short: a process whose stdin has ended is already going, so this waits only for
+            # one that is not -- and that one is being stopped, which should read as stopped.
+            proc.wait(timeout=1)
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()  # reaped rather than left a zombie, one per turn of a long flow
@@ -632,6 +652,7 @@ class AgentBase(ABC):
         self._sessions: list[weakref.ref[SessionBase]] = []
         self._opened: list[str] = []
         self._watchers: list[Callable[[AgentBase, Event], None]] = []
+        self._stopped = False
         # The machine an isolated agent started, once its first turn has started one.
         self._anchor: AnchorConfig | None = None
         self._starting = threading.Lock()
@@ -687,6 +708,17 @@ class AgentBase(ABC):
         does not grow an agent by one session a turn for as long as it runs.
         """
         return [session for ref in self._sessions if (session := ref()) is not None]
+
+    def stop(self) -> None:
+        """Has this agent take no further turn, and ends the one it is taking.
+
+        A turn is where a flow spends its time -- a model can think for minutes -- so a stop
+        that waited for one would not read as a stop. What the turn was doing is left where
+        it got to; what ends is the agent's part in it.
+        """
+        self._stopped = True
+        for session in self.sessions:
+            session.close()
 
     def watch(self, listener: Callable[[AgentBase, Event], None]) -> None:
         """Has everything this agent's turns say reach `listener` as they say it.

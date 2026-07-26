@@ -240,7 +240,7 @@ class KimiCodeCLISession(SessionBase):
         turn: dict[str, Any] = {
             "model": self._agent.config.model,
             "thinking": effort.removeprefix(_SWARM),
-            # A flow watches its agent rather than answering it, as the loops in examples/ do.
+            # A flow watches its agent rather than answering it, as the flows amflows comes with do.
             "permission_mode": "auto",
             "plan_mode": False,
             "swarm_mode": effort.startswith(_SWARM),
@@ -376,6 +376,13 @@ class KimiCodeCLIAgent(AgentBase):
                 # agent is collected, and at exit for one held to the end.
                 weakref.finalize(self, self._server.stop)
             return self._server
+
+    def stop(self) -> None:
+        """Takes no further turn, and takes down the server the turn under way is waiting on."""
+        super().stop()
+        if self._server is not None:
+            self._server.stop()
+            self._server = None
 
     def launch(self) -> KimiCodeCLISession:
         """Creates a new Kimi Code session."""
