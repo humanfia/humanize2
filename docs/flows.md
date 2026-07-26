@@ -23,9 +23,10 @@ def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:  # two agents, 
 `AgentBase` has to be imported at runtime rather than under `TYPE_CHECKING`, so that the count it
 states can be read back.
 
-A running flow can be talked to. `amflows` with no command opens a prompt where `/run` starts a
-flow and anything else typed goes to the agent taking its turn. Claude Code answers each thing
-it is told with a turn of its own, so a word put in mid-turn is read within the same turn and
+A running flow can be talked to. `amflows tui` opens a prompt where tab picks a flow, the first
+thing you say starts it, and anything said after that goes to the agent taking its turn — held
+for the next one if none is open, so a line to a running flow is never dropped. Esc stops it.
+Claude Code answers each thing it is told with a turn of its own, so a word put in mid-turn is read within the same turn and
 the answer that comes back is the answer to it — the turn is over once the agent has answered
 everything it was told, not when it first stops. Codex takes it as a steer on the turn its app
 server is running, and Kimi queues it and then steers it into the turn already running — which

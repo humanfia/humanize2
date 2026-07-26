@@ -84,7 +84,6 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
         KimiCodeCLIAgent,
         KimiCodeCLIAgentConfig,
     )
-    from amflows.janus.flows import find
 
     built = {
         "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
@@ -101,7 +100,7 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
             parser.error(f"bad agent {spec!r}: expected BACKEND/MODEL/EFFORT")
         agent, config = built[backend]
         agents.append(agent(config(model=model, effort=effort)))
-    return find(args.flow), agents, args.task
+    return args.flow, agents, args.task
 
 
 def _run(argv: list[str]) -> int:
@@ -507,7 +506,7 @@ COMMANDS = {
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Runs the command named on the command line, or the terminal interface if none is.
+    """Runs the command named on the command line.
 
     Args:
       argv: The arguments to parse, defaulting to this process's own.

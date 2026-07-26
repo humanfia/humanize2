@@ -269,15 +269,54 @@ async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None
     assert "/run" not in offers and "/tui" not in offers
 
 
-@pytest.mark.timeout(60)
-async def test_stopping_nothing_says_so() -> None:
+@pytest.mark.timeout(90)
+async def test_escape_stops_the_flow_and_not_just_the_turn(workspace: Path) -> None:
+    """Esc ends the loop, rather than letting it hand on to the next agent.
+
+    A flow is a loop, so stopping the turn under way is not stopping anything: the loop
+    would go round again. Every agent is told, and the one that raises `Stopped` takes the
+    loop with it -- which is why `Stopped` is not the failed turn a flow's own `|| true`
+    catches.
+    """
+    (workspace / "flow.py").write_text(FLOW)
     app = Amflows()
     async with app.run_test() as driver:
-        await driver.press(*"/stop")
+        app._flow_named, app._models = "flow.py", ["claude/m/high"]
+        await driver.press(*"start")
+        await driver.press("enter")
+        await until(
+            lambda: bool(app._agents and any(agent.sessions for agent in app._agents)),
+            driver,
+        )
+        await driver.press("escape")
+        await until(lambda: not app._agents, driver)  # the flow itself is over
+
+        assert "stopping the flow" in _transcript(app)
+
+
+@pytest.mark.timeout(90)
+async def test_a_line_to_a_running_flow_is_never_turned_away(workspace: Path) -> None:
+    """Between two turns there is no turn to steer, and the line still has to land.
+
+    A flow that is running takes what is typed either way: into the turn under way, or into
+    whichever turn starts next. There is no third answer -- a flow that is not running is
+    what makes the first thing you say the task.
+    """
+    from amflows.janus.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    (workspace / "flow.py").write_text(FLOW)
+    app = Amflows()
+    async with app.run_test() as driver:
+        # A flow that is running, with nobody mid-turn: an agent that has launched nothing.
+        app._flow_named, app._models = "flow.py", ["claude/m/high"]
+        app._agents = [ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))]
+        app._queued = []
+        await driver.press(*"and this")
         await driver.press("enter")
         await driver.pause()
 
-        assert "nothing is running" in _transcript(app)
+        assert app._queued == ["and this"]  # held, not refused
+        assert "nothing is running to be told" not in _transcript(app)
 
 
 @pytest.mark.timeout(60)

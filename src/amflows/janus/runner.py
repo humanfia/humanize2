@@ -43,7 +43,7 @@ def _read(flow: str | os.PathLike[str]) -> tuple[Callable[..., None], int]:
     """Loads a flow and reads how many agents it declares.
 
     Args:
-      flow: The Python file the flow is written in.
+      flow: The flow: one that came with amflows, by name, or a file of your own.
 
     Returns:
       Its entry point, and how many agents that entry point drives.
@@ -52,6 +52,11 @@ def _read(flow: str | os.PathLike[str]) -> tuple[Callable[..., None], int]:
       NotAFlow: If the file is not there, is not a flow -- nothing called `run`, or one whose
         `agents` cannot be read or says nothing about how many it takes.
     """
+    from amflows.janus.flows import find
+
+    # Resolved here rather than by whoever is starting one, so that a name works wherever a
+    # flow is named -- a command line, an interface, a `Runner` written by hand.
+    flow = find(str(flow))
     if not os.path.isfile(flow):
         raise NotAFlow(f"{flow}: no Python file to read a flow from")
     run = runpy.run_path(str(flow)).get("run")

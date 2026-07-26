@@ -90,12 +90,12 @@ class Sheet(ModalScreen[list[str] | None]):
             # Escaped, since a model may be named with brackets in it.
             mark = "[cyan]●[/cyan] " if choice == current else "  "
             listing.add_option(Option(f"{mark}{escape(choice)}", id=choice))
-        # On the one in force, or on the first real choice -- never on a heading, which is
-        # why this is asked of the list rather than counted out of `choices`.
+        # On the one in force, or on the first that can be chosen -- never on a heading,
+        # which is what `action_first` is for.
         try:
             listing.highlighted = listing.get_option_index(current)
         except OptionDoesNotExist:
-            listing.highlighted = 1 if choices else 0
+            listing.action_first()
         listing.focus()
 
 

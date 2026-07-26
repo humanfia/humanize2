@@ -494,3 +494,23 @@ def test_stopping_an_agent_ends_the_turn_it_is_taking(clis: _FakeCLIs) -> None:
     agent.stop()
 
     assert session._proc is None  # nothing left of it to wait on
+
+
+def test_something_said_while_no_turn_was_open_goes_into_the_next_one(
+    clis: _FakeCLIs,
+) -> None:
+    """A line to a running flow lands even when nobody is mid-turn.
+
+    Between two turns there is no turn to steer, and writing to the session anyway would
+    have it answer on its own. So it is held, and asked for as the next turn starts: the
+    flow's own prompt is the only way into a turn that has not begun.
+    """
+    held = ["and also this"]
+    agent = ClaudeCodeAgent(CONFIG)
+    agent.waiting = lambda: [held.pop()] if held else []
+
+    said = agent.launch().run("do the thing")
+
+    # The turn was asked for, and answered, with both -- the flow's prompt and what was held.
+    assert said == "do the thing\n\nand also this"
+    assert agent.launch().run("next") == "next"  # taken once, not again

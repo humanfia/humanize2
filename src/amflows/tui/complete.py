@@ -15,7 +15,6 @@ __all__ = ["about", "offered"]
 _ABOUT = {
     "agents": "Switch flow",
     "models": "Set what each agent runs",
-    "stop": "Stop the running flow",
     "new": "New session",
     "details": "Toggle tool calls",
     "thinking": "Toggle reasoning",

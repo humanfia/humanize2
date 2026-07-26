@@ -46,7 +46,6 @@ if TYPE_CHECKING:
 _OWN = (
     "agents",
     "models",
-    "stop",
     "new",
     "details",
     "thinking",
@@ -58,9 +57,8 @@ _OWN = (
 #: How often the right-hand column and the status line are redrawn, in seconds.
 _REFRESH = 0.5
 
-#: What opencode spins in a tool row, and what it spins in the status line -- which are two
-#: different spinners, as watching it run makes plain.
-_SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+#: How many cells the bar opencode spins in its status line is wide. Blocks, not braille --
+#: watching it run is what says so.
 _BLOCKS = 8
 
 #: What opencode draws a tool call with, read out of its own source: three spaces, then the
@@ -214,6 +212,9 @@ class Amflows(App[None]):
 
     BINDINGS: ClassVar = [
         ("ctrl+c", "quit", "quit"),
+        # What the status line says while a flow runs, and what opencode's esc does there.
+        # The editor takes esc first while it is offering something, and only then.
+        Binding("escape", "stop_flow", "interrupt", show=False),
     ]
 
     def action_quit(self) -> None:  # type: ignore[override]
@@ -246,6 +247,8 @@ class Amflows(App[None]):
         self._began: dict[str, float] = {}
         #: Whether the last thing shown was a part that the next one may run on from.
         self._packed = False
+        #: Said while no turn was open, for whichever turn starts next to take.
+        self._queued: list[str] = []
 
     def compose(self) -> ComposeResult:
         """The transcript and what the flow is doing, the offers, the editor, the status."""
@@ -455,8 +458,6 @@ class Amflows(App[None]):
             self.show(f"[dim]thinking {'shown' if self._thinking else 'hidden'}[/dim]")
         elif name == "export":
             self._export()
-        elif name == "stop":
-            self._stop()
         elif name in COMMANDS and name != "run":
             self._background(lambda: COMMANDS[name][0](argv))
         else:
@@ -464,24 +465,24 @@ class Amflows(App[None]):
 
     def action_new(self) -> None:
         """Starts over: an empty transcript, no flow chosen, and nothing done."""
-        self._stop()
+        self.action_stop_flow()
         self.query_one("#transcript", RichLog).clear()
         self._monitor = Monitor()
         self._models = []
         self._draw()
 
-    def _stop(self) -> None:
-        """Stops the flow, between turns rather than mid-edit.
+    def action_stop_flow(self) -> None:
+        """Stops the whole flow, not just the turn -- which is what esc is for.
 
-        Each agent is told to take no further turn, so the turn running now finishes what it
-        is doing and the loop driving it ends on the next one it asks for.
+        Every agent is told to take no further turn, so the one running now is closed out and
+        the loop driving it ends rather than handing on to the next agent. Silent when
+        nothing is running: esc is pressed to dismiss things, and a complaint apiece would be
+        in the way.
         """
-        if not self._agents:
-            self.show("amflows: nothing is running", "red")
-            return
         for agent in self._agents:
             agent.stop()
-        self.show("[dim]stopping — the turn running now will finish first[/dim]")
+        if self._agents:
+            self.show("[dim]— stopping the flow —[/dim]")
 
     def _export(self) -> None:
         """Writes the transcript beside the trace files, as opencode writes its markdown."""
@@ -520,7 +521,7 @@ class Amflows(App[None]):
     async def action_models(self) -> None:
         """Sets what each of the flow's agents runs, which is what `/models` is for."""
         from amflows.janus.flows import find
-        from amflows.janus.runner import NotAFlow, drives
+        from amflows.janus.runner import drives
 
         if not self._flow_named:
             self.show("amflows: no flow yet — tab picks one", "red")
@@ -531,7 +532,7 @@ class Amflows(App[None]):
             return
         try:
             wanted = drives(find(self._flow_named))
-        except (NotAFlow, Exception) as why:  # noqa: BLE001 -- a flow that will not load
+        except Exception as why:  # noqa: BLE001 -- a flow that will not load
             self.show(f"amflows: {why}", "red")
             return
         chosen = await self.push_screen_wait(Models(self._flow_named, wanted, agents))
@@ -558,8 +559,15 @@ class Amflows(App[None]):
             return  # argparse has already said what was wrong, and it went to the transcript
         self._agents = agents
         self._monitor = Monitor()
+        self._queued = []
+
+        def take() -> list[str]:
+            held, self._queued = self._queued, []
+            return held
+
         for agent in agents:
             agent.watch(self._heard)
+            agent.waiting = take  # whichever turn starts next takes what was held
         self._draw()
 
         def drive() -> int:
@@ -647,10 +655,14 @@ class Amflows(App[None]):
         """
 
         def go() -> None:
+            from amflows.janus import Stopped
+
             try:
                 status = work()
             except SystemExit as stopped:  # argparse rejecting the line, not a crash
                 status = int(stopped.code or 0)
+            except Stopped:
+                return  # asked for: esc already said the flow was stopping
             except Exception:  # noqa: BLE001 -- a flow fails any way it likes, and is shown
                 with contextlib.suppress(RuntimeError):  # or the interface has gone
                     self.call_from_thread(
@@ -694,9 +706,6 @@ class Amflows(App[None]):
         Args:
           text: What to say.
         """
-        # Whoever has a turn open is who a typed line is for, and if nobody has, there is
-        # nobody to tell: an agent between turns still holds a session that would take the
-        # line without a word and say it back inside its own next turn.
         working = set(self._monitor.now_working())
         sessions = [
             session
@@ -704,10 +713,14 @@ class Amflows(App[None]):
             if agent.id in working
             for session in agent.sessions
         ]
-        if not sessions:
-            self.show("amflows: nothing is running to be told that", "red")
-            return
         self._said_by_you(text)
+        if not sessions:
+            # Between two turns, or inside a flow's own sleep. It is held rather than
+            # written to a session, which between turns would answer it on its own, and it
+            # goes into whichever turn starts next -- so a running flow never drops a line.
+            self._queued.append(text)
+            self.show("[dim]   held for the next turn[/dim]")
+            return
 
         def put_in() -> int:
             # Off the event loop: this writes to the agent, and a large paste into a pipe the

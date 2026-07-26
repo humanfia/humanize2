@@ -171,6 +171,12 @@ class SessionBase(ABC):
         """
         if self._agent._stopped:
             raise Stopped(f"{self._agent.id} was stopped")
+        # Anything said while nobody was working goes into this turn. A flow's own prompt is
+        # the only way into a turn that has not started, so it is asked for here rather than
+        # written to the session: a session between turns would answer it on its own.
+        held = self._agent.waiting() if self._agent.waiting is not None else []
+        if held:
+            prompt = "\n\n".join([prompt, *held])
         self._agent._heard(Event(kind="begins", text=prompt))
         try:
             for event in self._stream(prompt):
@@ -653,6 +659,10 @@ class AgentBase(ABC):
         self._opened: list[str] = []
         self._watchers: list[Callable[[AgentBase, Event], None]] = []
         self._stopped = False
+        #: Asked as each turn starts for anything said to this agent while no turn was open,
+        #: which goes into that turn. Left unset by a flow driven from the command line,
+        #: where there is nobody to say anything mid-run.
+        self.waiting: Callable[[], list[str]] | None = None
         # The machine an isolated agent started, once its first turn has started one.
         self._anchor: AnchorConfig | None = None
         self._starting = threading.Lock()

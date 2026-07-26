@@ -28,12 +28,10 @@ class Model:
     Attributes:
       name: What to ask the backend for.
       efforts: The efforts this model takes, which is not always all of them.
-      label: What to call it on screen, or "" to call it by its name.
     """
 
     name: str
     efforts: tuple[str, ...]
-    label: str = ""
 
 
 #: What Claude Code documents on its own command line, for every model it runs.
