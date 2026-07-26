@@ -8,6 +8,8 @@ of amflows' by taking its name, and a project may stand in for both.
 
 from __future__ import annotations
 
+import os
+from glob import glob
 from pathlib import Path
 
 __all__ = ["find", "found", "where"]
@@ -15,6 +17,11 @@ __all__ = ["find", "found", "where"]
 #: Where flows live, nearest first, and what to call each place on screen. Kept unresolved:
 #: the project one is relative to wherever amflows is being run, and `~` is whoever is
 #: running it, neither of which is settled when this is imported.
+#:
+#: Looked in with `os.path` and `glob` rather than `pathlib`: a place that cannot be read, or
+#: a `~` with no home behind it, is a place with no flows in it. The os functions say that;
+#: the pathlib ones raise, which would make an unreadable `.amflows/flows` in this directory
+#: the reason a flow amflows itself came with could not be found.
 where = (
     ("this project", ".amflows/flows"),
     ("yours", "~/.amflows/flows"),
@@ -33,11 +40,15 @@ def found() -> list[tuple[str, str]]:
     listed: list[tuple[str, str]] = []
     taken: set[str] = set()
     for whose, folder in where:
-        for path in sorted(Path(folder).expanduser().glob("*.py")):
-            if path.stem.startswith("_") or path.stem in taken:
+        for path in sorted(glob(os.path.join(os.path.expanduser(folder), "*.py"))):
+            named = os.path.basename(path).removesuffix(".py")
+            # The same test `find` applies, or the two disagree: a directory or a broken link
+            # named like a flow would be listed as one, take the name from the flow that
+            # really answers to it, and then not be there when it was picked.
+            if named.startswith("_") or named in taken or not os.path.isfile(path):
                 continue
-            taken.add(path.stem)
-            listed.append((whose, path.stem))
+            taken.add(named)
+            listed.append((whose, named))
     return listed
 
 
@@ -53,7 +64,7 @@ def find(named: str) -> str:
       is free to change the working directory the name was resolved against.
     """
     for _, folder in where:
-        beside = Path(folder).expanduser() / f"{named}.py"
-        if beside.is_file():
-            return str(beside.resolve())
+        beside = os.path.join(os.path.expanduser(folder), f"{named}.py")
+        if os.path.isfile(beside):
+            return os.path.realpath(beside)
     return named

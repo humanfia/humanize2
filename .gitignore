@@ -221,6 +221,5 @@ __marimo__/
 
 
 
-# Traces written by `amflows collect`
 .amflows/
 *.trace.json

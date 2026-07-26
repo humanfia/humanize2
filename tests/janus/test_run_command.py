@@ -284,3 +284,57 @@ def test_a_flow_of_your_own_runs_by_name(
 
     assert main(["run", "-f", "theirs", "-a", "claude/m/high", "do it"]) == 0
     assert driven == ["do it"]
+
+
+def test_a_failed_turn_is_taken_again_and_only_that_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A round is hours and a review is one question about it, so they retry separately.
+
+    Letting a failed review send the round back would pay for the expensive half twice to
+    recover from the cheap half.
+    """
+    import subprocess as sub
+
+    from amflows.janus.flows.rlcr import spoken
+
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    taken: list[str] = []
+
+    class _Flaky:
+        def run(self, prompt: str) -> str:
+            taken.append(prompt)
+            if len(taken) == 1:
+                raise sub.CalledProcessError(1, ["claude"])
+            if len(taken) == 2:
+                # How a streaming backend says its process died, which the builder runs on.
+                raise RuntimeError("the agent is no longer listening")
+            # Exited clean having said nothing, which is not an answer either: forwarding it
+            # would spend a round asking the other side to reply to silence.
+            return "" if len(taken) == 3 else "answered"
+
+    assert spoken(_Flaky(), "do it") == "answered"
+    assert taken == ["do it"] * 4  # the same turn, four times, and no other
+
+
+@pytest.mark.parametrize(
+    ("said", "accepted"),
+    [
+        ("COMPLETE", True),
+        ("complete.\n", True),
+        ("AC-1 has no negative test.", False),
+        # A review that quotes the word back while saying what it would take to earn it. Read
+        # a line at a time this would end the run; read whole, it is what it is -- a review.
+        (
+            "Answer with the single word\nCOMPLETE\nif it holds. It does not: AC-2.",
+            False,
+        ),
+    ],
+)
+def test_only_a_review_that_is_the_word_accepts_the_work(
+    said: str, accepted: bool
+) -> None:
+    """Nothing between the two agents parses anything, so one word has to carry the verdict."""
+    from amflows.janus.flows.rlcr import ACCEPTED
+
+    assert bool(ACCEPTED.fullmatch(said)) is accepted

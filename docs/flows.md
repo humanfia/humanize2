@@ -64,7 +64,10 @@ None of that is asked of the flow — a flow is a Python file that may branch an
 so the turns going past are the only place its shape is ever visible.
 
 amflows comes with the flow loops from flowbench written this way, run by name: `ralph_loop`, `goal`,
-`flame_chase`, `stateful_ralph`, `continue_loop` and `rlar`. See
+`flame_chase`, `stateful_ralph`, `continue_loop` and `rlar` — and with `rlcr`, which is
+[PolyArch/humanize](https://github.com/PolyArch/humanize) as one unattended run: an idea opened from
+six directions and picked on evidence, a plan converged between the builder and a reviewer that has
+to accept it, then built under a reviewer that checks first the claim and then the code. See
 [Security](../README.md#security) before running one.
 
 A name, an [anchor](remote-execution.md#anchoring-a-flow) and a
