@@ -5,9 +5,10 @@ a flow is here, so the same key switches flows. Its `/models` sets what that age
 that is what `/models` does here, except that a flow drives more than one agent, so it asks
 once apiece.
 
-Only the flows amflows came with are listed. A flow of your own is a path, and a path is
-typed rather than picked out of a walk of the directory -- which would be a guess about
-which files are flows, and slow to make.
+The flows listed are the ones amflows came with and the ones written down where flows live:
+`.amflows/flows` in this project, and the same under your home directory. A flow anywhere
+else is a path you type, rather than one picked out of a walk of the directory -- which would
+be a guess about which files are flows, and slow to make.
 """
 
 from __future__ import annotations
@@ -112,13 +113,13 @@ class Flows(Sheet):
         self._current = current
 
     def _ask(self) -> None:
-        """Lists the flows amflows came with, which are the ones there are to pick."""
-        from amflows.janus.flows import prebuilt
+        """Lists every flow there is, under where each came from."""
+        from amflows.janus.flows import found
 
         self._draw(
             "Select flow",
-            "enter chooses  esc cancels  ·  a flow of your own is a path you type",
-            [("amflows", name) for name in prebuilt()],
+            "enter chooses  esc cancels  ·  a flow anywhere else is a path you type",
+            found(),
             self._current,
         )
 

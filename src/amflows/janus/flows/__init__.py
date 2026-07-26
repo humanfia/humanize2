@@ -1,37 +1,59 @@
-"""The flows that come with amflows, which are the loops from flowbench written as flows.
+"""Where a flow is found, and what there is to find.
 
-Named rather than pathed: `amflows run -f ralph_loop` is one of these, and anything with a
-slash or an extension in it is a file of your own.
+Named rather than pathed: `amflows run -f ralph_loop` is a name, and anything with a slash or
+an extension in it is a file taken as given. A name is looked for in this project first, then
+in yours, then among the ones amflows came with -- so a flow of your own may stand in for one
+of amflows' by taking its name, and a project may stand in for both.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-__all__ = ["find", "prebuilt"]
+__all__ = ["find", "found", "where"]
+
+#: Where flows live, nearest first, and what to call each place on screen. Kept unresolved:
+#: the project one is relative to wherever amflows is being run, and `~` is whoever is
+#: running it, neither of which is settled when this is imported.
+where = (
+    ("this project", ".amflows/flows"),
+    ("yours", "~/.amflows/flows"),
+    ("amflows", str(Path(__file__).parent)),
+)
 
 
-def prebuilt() -> list[str]:
-    """The flows that come with amflows, by the name they are run under.
+def found() -> list[tuple[str, str]]:
+    """Every flow there is to run, and where each came from.
 
     Returns:
-      Every name, in alphabetical order.
+      One `(where it came from, its name)` pair apiece, nearest first and alphabetical
+      within each place. A name appears once: the nearest flow answering to it is the one
+      that runs, so the ones it stands in for are not offered as if they still did.
     """
-    return sorted(
-        path.stem
-        for path in Path(__file__).parent.glob("*.py")
-        if not path.stem.startswith("_")
-    )
+    listed: list[tuple[str, str]] = []
+    taken: set[str] = set()
+    for whose, folder in where:
+        for path in sorted(Path(folder).expanduser().glob("*.py")):
+            if path.stem.startswith("_") or path.stem in taken:
+                continue
+            taken.add(path.stem)
+            listed.append((whose, path.stem))
+    return listed
 
 
 def find(named: str) -> str:
-    """Where the flow called this is, whether it came with amflows or not.
+    """Where the flow called this is.
 
     Args:
-      named: A prebuilt flow's name, or the path to a file of your own.
+      named: A flow's name, or the path to a file taken as given.
 
     Returns:
-      The path to run, which is `named` itself unless it names a prebuilt flow.
+      The path to run: the nearest flow of that name, or `named` itself if nothing answers
+      to it -- which is what makes a path work wherever a name does. Resolved, since a flow
+      is free to change the working directory the name was resolved against.
     """
-    beside = Path(__file__).parent / f"{named}.py"
-    return str(beside) if beside.is_file() else named
+    for _, folder in where:
+        beside = Path(folder).expanduser() / f"{named}.py"
+        if beside.is_file():
+            return str(beside.resolve())
+    return named

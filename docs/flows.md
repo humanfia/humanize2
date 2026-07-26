@@ -23,20 +23,40 @@ def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:  # two agents, 
 `AgentBase` has to be imported at runtime rather than under `TYPE_CHECKING`, so that the count it
 states can be read back.
 
+## Where flows live
+
+`-f` takes a name or a path. A name is looked for in three places, nearest first:
+
+| | |
+| --- | --- |
+| `.amflows/flows/*.py` | this project's own |
+| `~/.amflows/flows/*.py` | yours, in every project |
+| — | the ones amflows came with |
+
+Nearest wins, so a flow of your own may stand in for one of amflows' by taking its name — a
+`.amflows/flows/rlar.py` is what `-f rlar` runs in that project. Anything with a slash or an
+extension in it is a path, taken as given:
+
+```sh
+mkdir -p .amflows/flows && cp my_loop.py .amflows/flows/
+amflows run -f my_loop -a claude/claude-opus-4-8/high "fix the build"
+amflows run -f ./somewhere/else.py -a claude/claude-opus-4-8/high "fix the build"
+```
+
 A running flow can be talked to. `amflows tui` opens a prompt where tab picks a flow, the first
 thing you say starts it, and anything said after that goes to the agent taking its turn — held
 for the next one if none is open, so a line to a running flow is never dropped. Esc stops it.
-Claude Code answers each thing it is told with a turn of its own, so a word put in mid-turn is read within the same turn and
-the answer that comes back is the answer to it — the turn is over once the agent has answered
-everything it was told, not when it first stops. Codex takes it as a steer on the turn its app
-server is running, and Kimi queues it and then steers it into the turn already running — which
-is why neither goes through a command line run per turn any more: such a run has ended by the
-time there is anything to say to it. An [anchored](remote-execution.md) Claude ends its process with
-each turn, so its work reaches the target before the turn says it landed; it is therefore
-between turns rather than during one that it hears you. An anchored Codex keeps one app server
-for the life of the agent and can be steered throughout, at the cost of the same guarantee: its
-work reaches the target whenever a command runs there, which for a coding agent is constantly,
-rather than at the end of every turn.
+Claude Code answers each thing it is told with a turn of its own, so a word put in mid-turn is
+read within the same turn and the answer that comes back is the answer to it — the turn is over
+once the agent has answered everything it was told, not when it first stops. Codex takes it as a
+steer on the turn its app server is running, and Kimi queues it and then steers it into the turn
+already running — which is why neither goes through a command line run per turn any more: such a
+run has ended by the time there is anything to say to it. An [anchored](remote-execution.md)
+Claude ends its process with each turn, so its work reaches the target before the turn says it
+landed; it is therefore between turns rather than during one that it hears you. An anchored
+Codex keeps one app server for the life of the agent and can be steered throughout, at the cost
+of the same guarantee: its work reaches the target whenever a command runs there, which for a
+coding agent is constantly, rather than at the end of every turn.
 
 Beside the transcript is what the flow is doing: which agent has the turn, the handovers
 between them as they happen, and what each model has cost with the rate it is costing it at.

@@ -232,3 +232,55 @@ def test_every_example_runs_as_the_command_line_it_shows(
     monkeypatch.chdir(Path(__file__).resolve().parents[2])
     monkeypatch.setattr(Runner, "run", lambda self, task: None)  # nothing is driven
     main(shlex.split(shown[0].replace("\\\n", " "))[1:])
+
+
+def test_a_flow_of_your_own_is_found_where_flows_live(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nearest wins: this project, then yours, then the ones amflows came with.
+
+    A flow written down beside the traces is one amflows knows about without being told
+    where it is -- and one taking a built-in's name stands in for it, which is what makes
+    a project able to mean its own `rlar` by `rlar`.
+    """
+    from amflows.janus.flows import find, found
+
+    home, project = tmp_path / "home", tmp_path / "project"
+    for where in (home / ".amflows/flows", project / ".amflows/flows"):
+        where.mkdir(parents=True)
+    mine = RECORD.replace("AGENTS", "AgentBase")
+    (home / ".amflows/flows/yours.py").write_text(mine)
+    (project / ".amflows/flows/theirs.py").write_text(mine)
+    (project / ".amflows/flows/rlar.py").write_text(mine)  # a name amflows uses
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.chdir(project)
+
+    listed = found()
+
+    assert ("this project", "theirs") in listed
+    assert ("yours", "yours") in listed
+    # Shadowed rather than listed twice: one name, and it is the nearest that answers to it.
+    assert ("this project", "rlar") in listed
+    assert ("amflows", "rlar") not in listed
+    assert find("rlar") == str((project / ".amflows/flows/rlar.py").resolve())
+    assert find("yours") == str((home / ".amflows/flows/yours.py").resolve())
+    assert find("goal").endswith("src/amflows/janus/flows/goal.py")
+    assert find("nowhere") == "nowhere"  # a path is taken as given
+
+
+def test_a_flow_of_your_own_runs_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The point of finding it: `-f theirs` starts it, with no path said anywhere."""
+    project = tmp_path / "project"
+    (project / ".amflows/flows").mkdir(parents=True)
+    (project / ".amflows/flows/theirs.py").write_text(
+        RECORD.replace("AGENTS", "AgentBase")
+    )
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.chdir(project)
+    driven: list[str] = []
+    monkeypatch.setattr(Runner, "run", lambda self, task: driven.append(task))
+
+    assert main(["run", "-f", "theirs", "-a", "claude/m/high", "do it"]) == 0
+    assert driven == ["do it"]

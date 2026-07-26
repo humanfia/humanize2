@@ -1,9 +1,10 @@
 """What the editor offers to finish, which is the only way anything is typed here.
 
 A command line is typed, never filled in on a form: `/` offers the commands, and `/agents`
-offers the flows amflows came with. A flow of your own is a path, and a path is typed --
-looking for one means reading every Python file below here to see which declare a flow,
-which is a guess, and far too slow to make between keystrokes.
+offers the flows there are -- the ones amflows came with and the ones under `.amflows/flows`
+here or in your home directory. A flow anywhere else is a path, and a path is typed: looking
+for one would mean reading every Python file below here to see which declare a flow, which is
+a guess, and far too slow to make between keystrokes.
 """
 
 from __future__ import annotations
@@ -60,7 +61,7 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
             if f"/{name}".startswith(tail) and name in _ABOUT
         ]
     if words[0] == "/agents":
-        from amflows.janus.flows import prebuilt
+        from amflows.janus.flows import found
 
-        return [name for name in prebuilt() if name.startswith(tail)]
+        return [name for _, name in found() if name.startswith(tail)]
     return []

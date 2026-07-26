@@ -175,10 +175,10 @@ async def test_a_flow_that_is_not_there_is_a_line_to_correct_and_not_the_end() -
 def test_only_the_flows_amflows_came_with_are_offered() -> None:
     """A flow of your own is a path typed out, not something found by walking the tree."""
     from amflows.cli import COMMANDS
-    from amflows.janus.flows import prebuilt
+    from amflows.janus.flows import found
     from amflows.tui.complete import offered
 
-    assert offered("/agents ", tuple(COMMANDS)) == prebuilt()
+    assert offered("/agents ", tuple(COMMANDS)) == [name for _, name in found()]
 
 
 @pytest.mark.timeout(60)
@@ -394,7 +394,7 @@ async def test_tab_picks_a_flow_and_then_what_each_agent_runs() -> None:
 
     Only the flows amflows came with are listed -- a flow of your own is a path typed out.
     """
-    from amflows.janus.flows import prebuilt
+    from amflows.janus.flows import found
     from amflows.tui.pick import Flows
 
     app = Amflows()
@@ -404,9 +404,9 @@ async def test_tab_picks_a_flow_and_then_what_each_agent_runs() -> None:
         listing = app.screen.query_one("#choices", OptionList)
         offered = [option.id for option in listing._options if option.id]
 
-        assert offered == prebuilt()
+        assert offered == [name for _, name in found()]
         assert listing.highlighted == 1  # past the heading, on the first real choice
 
         await driver.press("enter")
         # Which lands on the models sheet, since a flow says how many agents it drives.
-        await until(lambda: app._flow_named == prebuilt()[0], driver)
+        await until(lambda: app._flow_named == found()[0][1], driver)

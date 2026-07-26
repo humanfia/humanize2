@@ -63,6 +63,9 @@ Or name a command. Run a [flow](docs/flows.md) over the agents you name:
 amflows run -f ralph_loop -a claude/claude-opus-4-8/high "fix the build"
 ```
 
+`-f` takes the name of a flow amflows came with, one of your own under `.amflows/flows` here or
+in your home directory, or the path to a file anywhere else.
+
 Collect what it left behind, and open the file in [ui.perfetto.dev](https://ui.perfetto.dev):
 
 ```sh
