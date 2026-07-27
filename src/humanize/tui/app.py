@@ -31,7 +31,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
+import pyfiglet
+from rich.box import ROUNDED
+from rich.console import Group
 from rich.markup import escape
+from rich.panel import Panel
+from rich.text import Text
 from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -453,25 +458,55 @@ class Humanize(App[None]):
         self.query_one(Editor).focus()
 
     def _welcome(self) -> None:
-        """The box Claude Code opens with, saying what this is set up to do instead.
+        """The box this opens with: the name in full, then what it is set up to do.
 
         Its title rides in the top border and its corners are round, which is the one boxed
-        thing on the screen: everything after it is text down the terminal.
+        thing on the screen: everything after it is text down the terminal. Drawn as a panel
+        rather than as lines of rules, so that every side of it is measured against the same
+        width at the moment it is rendered -- lines written to a width guessed before the
+        screen was laid out come out of the transcript split down the right-hand edge. And
+        it is only as wide as what is in it: a box ruled the whole way across an empty screen
+        is mostly rule.
         """
         from importlib.metadata import version
 
-        # The transcript's own width, which is the screen less whatever it scrolls with.
-        width = max(40, (self.query_one("#transcript", RichLog).size.width or 80) - 1)
-        title = f" humanize v{version('humanize')} "
         agents = ", ".join(self._models) or "no coding agent installed here"
-        self.show(f"[dim]╭──{title}{'─' * max(0, width - 5 - len(title))}╮[/]")
-        for line in (
-            f"{self._flow_named}{_DOT}{agents}",
-            str(Path.cwd()),
-        ):
-            room = max(0, width - 4 - len(line))
-            self.show(f"[dim]│[/] {escape(line)}{' ' * room} [dim]│[/]")
-        self.show(f"[dim]╰{'─' * (width - 2)}╯[/]")
+        self.query_one("#transcript", RichLog).write(
+            Panel(
+                Group(
+                    Text(self._banner(), style="blue", no_wrap=True),
+                    Text(""),
+                    Text(f"{self._flow_named}{_DOT}{agents}"),
+                    Text(str(Path.cwd())),
+                ),
+                # Room around it, above and below and at both ends: the name drawn large is
+                # the first thing on the screen and reads as cramped without any.
+                padding=(1, 4),
+                box=ROUNDED,
+                border_style="dim",
+                title=f"[dim]humanize v{version('humanize')}[/dim]",
+                title_align="left",
+                expand=False,
+            ),
+            shrink=False,
+        )
+
+    def _banner(self) -> str:
+        """The name, drawn large.
+
+        Returns:
+          The word as block letters where the terminal is wide enough to hold them, and as
+          the small face where it is not. Two of them and no more: a banner that wrapped
+          would be worse than no banner, and one that is picked from a dozen faces by width
+          is a dozen ways for it to be wrong.
+        """
+        for face in ("ansi_shadow", "small"):
+            art = pyfiglet.figlet_format("humanize", font=face).rstrip("\n")
+            drawn = [line for line in art.splitlines() if line.strip()]
+            # Against what is left after the box: a border and four columns of room a side.
+            if max(len(line) for line in drawn) <= self.size.width - 10:
+                return "\n".join(drawn)
+        return "\n".join(drawn)
 
     def on_print(self, event: events.Print) -> None:
         """Puts something printed under this process into the transcript, as a barred block.
@@ -773,6 +808,7 @@ class Humanize(App[None]):
         running is left running, and what it has done so far is still beside it.
         """
         self.query_one("#transcript", RichLog).clear()
+        self._welcome()  # a cleared screen is a screen just opened, and one opens with this
         self._draw()
 
     def action_stop_flow(self) -> None:
