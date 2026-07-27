@@ -48,6 +48,7 @@ from .discover import Model, installed
 from .history import History
 from .monitor import Monitor, short
 from .pick import Flows, Models
+from .settings import Settings
 from .tally import Tally
 
 if TYPE_CHECKING:
@@ -412,8 +413,11 @@ class Humanize(App[None]):
         #: Not the hardest effort, which is what the picker's cursor starts on: that is the
         #: one to reach for, and this is the one to spend before anyone has asked for
         #: anything. `high` is an effort every model of every backend here takes.
-        self._flow_named = _STARTS_ON
-        self._models = [
+        #: What this workspace was last set up to run, so that opening it again finds it
+        #: that way rather than back at the default.
+        self.settings = Settings()
+        self._flow_named = self.settings.flow or _STARTS_ON
+        self._models = self.settings.agents(self._flow_named) or [
             f"{backend}/{_starts_at(models)}:high"
             for backend, models in list(installed().items())[:1]
         ]
@@ -710,7 +714,10 @@ class Humanize(App[None]):
         # As many agents as the flow drives, all running what the first one was running. If
         # this workspace has run this flow before, what it ran is what it runs again.
         self._flow_named = switching
-        self._models = [self._models[0]] * len(named_by)
+        self._models = self.settings.agents(switching) or [self._models[0]] * len(
+            named_by
+        )
+        self.settings.remember(switching, named_by, self._models)
         self._draw()
 
     @on(Editor.Sent)
@@ -860,6 +867,7 @@ class Humanize(App[None]):
                 if (switching, list(chosen)) != (self._flow_named, self._models):
                     self.action_stop_flow()
                 self._flow_named, self._models = switching, list(chosen)
+                self.settings.remember(switching, wanted, self._models)
                 self.show("[dim]say what to do, and the flow starts on it[/dim]")
                 self._draw()
                 return
