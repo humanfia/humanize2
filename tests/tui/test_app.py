@@ -1036,6 +1036,63 @@ async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
 @unittest.mock.patch(
     "humanize.tui.app.installed",
     return_value={
+        "claude": (Model("claude-opus-5", ("ultracode", "max", "high")),),
+        "kimi": (Model("kimi-code/k3", ("max", "low"), swarms=True),),
+    },
+)
+async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
+    _installed: unittest.mock.MagicMock,
+) -> None:
+    """Claude's ultracode is an effort; Kimi's swarm mode is a second thing, so it is a key.
+
+    How hard a turn thinks and how wide it runs are not two ends of one dial: a swarm at low
+    effort is a real thing to ask for, and a list that mixed them could not say it.
+    """
+    from textual.widgets import OptionList
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/flow")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        sheet = app.screen
+        await until(
+            lambda: bool(sheet.query_one("#choices", OptionList).options), driver
+        )
+        tuning = sheet.query_one("#tuning", Label)
+
+        # Claude opens on ultracode, which is the hardest thing it takes, and has no swarm.
+        assert "ultracode effort" in str(tuning.content)
+        assert "swarm" not in str(tuning.content)
+        await driver.press("tab")  # nothing to toggle, so nothing happens
+        await driver.pause()
+        assert "swarm" not in str(tuning.content)
+
+        # Kimi has one, and tab is what turns it on.
+        await driver.press("down")
+        await driver.pause()
+        assert "swarm mode off" in str(tuning.content)
+        await driver.press("tab")
+        await driver.pause()
+        assert "swarm mode on" in str(tuning.content)
+        await driver.press("left")  # and it is still on at another effort
+        await driver.pause()
+        assert "low effort" in str(tuning.content)
+        assert "swarm mode on" in str(tuning.content)
+
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    # One turn, at one effort, run wide -- which is how Kimi is asked for a fleet.
+    assert sheet._chosen == ["kimi/kimi-code/k3:swarmlow"]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={
         "claude": (
             Model("claude-opus-5", ("high",)),
             Model("claude-haiku-4-5", ("high",)),

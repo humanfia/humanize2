@@ -29,15 +29,22 @@ class Model:
     Attributes:
       name: What to ask the backend for.
       efforts: The efforts this model takes, which is not always all of them.
+      swarms: Whether it also runs a turn as a fleet of subagents rather than as one agent,
+        which is a second thing to say about a turn and not a harder version of the first --
+        so it is chosen alongside the effort rather than among them.
     """
 
     name: str
     efforts: tuple[str, ...]
+    swarms: bool = False
 
 
-#: What Claude Code documents on its own command line, for every model it runs. Hardest
-#: first, as every effort here is: the one to reach for is the one at the top.
-_CLAUDE_EFFORTS = ("max", "xhigh", "high", "medium", "low")
+#: What Claude Code documents on its own command line, for every model it runs, and above
+#: them the one it does not document but takes: `ultracode` is `xhigh` with the turn opted
+#: into orchestrating a fleet of its own, which is more work than any single-agent effort and
+#: so is the top of this list. Hardest first, as every effort here is: the one to reach for
+#: is the one at the top.
+_CLAUDE_EFFORTS = ("ultracode", "max", "xhigh", "high", "medium", "low")
 
 #: What each backend runs, as each of them reported it. Codex says which efforts each of its
 #: models takes and they differ, so they are written down as it gave them.
@@ -67,9 +74,11 @@ _RUNS: dict[str, tuple[Model, ...]] = {
         Model("gpt-5.5", ("xhigh", "high", "medium", "low")),
     ),
     "kimi": (
-        Model("kimi-code/k3", ("max", "high", "medium", "low")),
-        Model("kimi-code/k3-256k", ("max", "high", "medium", "low")),
-        Model("kimi-code/kimi-for-coding", ("max", "high", "medium", "low")),
+        Model("kimi-code/k3", ("max", "high", "medium", "low"), swarms=True),
+        Model("kimi-code/k3-256k", ("max", "high", "medium", "low"), swarms=True),
+        Model(
+            "kimi-code/kimi-for-coding", ("max", "high", "medium", "low"), swarms=True
+        ),
     ),
 }
 

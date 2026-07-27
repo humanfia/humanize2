@@ -24,10 +24,13 @@ from typing import TYPE_CHECKING, ClassVar
 from rich.markup import escape
 from textual import events, on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
+
+from humanize.janus import SWARM
 
 from .monitor import short, thousands
 
@@ -291,6 +294,10 @@ class Models(Sheet):
         ("escape", "back", "back"),
         ("left", "easier", "less effort"),
         ("right", "harder", "more effort"),
+        # Not an arrow, because swarm mode is not a step along the efforts: it is a second
+        # thing to say about a turn -- how wide it runs, rather than how hard -- and a turn
+        # that is both is written down as both.
+        Binding("tab", "swarm", "swarm mode", priority=True),
     ]
 
     def __init__(
@@ -313,6 +320,9 @@ class Models(Sheet):
         ]
         self._chosen: list[str] = []
         self._effort = 0
+        #: Whether the turn runs as a fleet rather than as one agent, for a model that takes
+        #: it. Held here rather than among the efforts, and asked of each agent afresh.
+        self._swarm = False
         self._counting = len(str(len(self._runs)))
         #: The ones the letters typed so far have left, which is what the cursor is walking.
         self._shown = list(self._runs)
@@ -327,6 +337,7 @@ class Models(Sheet):
             "runs at. Two agents at one model are still two agents."
         )
         self._effort = 0
+        self._swarm = False
         self._typed = ""  # each agent is asked about from the whole list again
         self._fill()
         self.query_one("#choices", OptionList).focus()
@@ -351,12 +362,19 @@ class Models(Sheet):
         self._drawn = at
         efforts = self._efforts()
         self._effort = min(self._effort, len(efforts) - 1) if efforts else 0
-        self.query_one("#tuning", Label).update(
+        tuned = (
             f"[$secondary]◉[/] {efforts[self._effort]} effort  "
             f"[$text-muted]←/→ to adjust[/]"
             if efforts
             else ""
         )
+        if tuned and self._swarms():
+            said = "on" if self._swarm else "off"
+            tuned += (
+                f"{_DOT}[$secondary]◉[/] swarm mode {said}  "
+                f"[$text-muted]tab to toggle[/]"
+            )
+        self.query_one("#tuning", Label).update(tuned)
         self.query_one("#keys", Label).update(
             f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
             + (f"{_DOT}{escape(' · '.join(self._chosen))}" if self._chosen else "")
@@ -367,12 +385,23 @@ class Models(Sheet):
         under = self._under()
         return under.efforts if under is not None else ()
 
+    def _swarms(self) -> bool:
+        """Whether the model under the cursor runs a turn as a fleet as well as as an agent."""
+        under = self._under()
+        return under is not None and under.swarms
+
     def _under(self) -> Model | None:
         """The model the cursor is on, or None where the letters typed have left none."""
         if not self._shown:
             return None
         listing = self.query_one("#choices", OptionList)
         return self._shown[min(listing.highlighted or 0, len(self._shown) - 1)][1]
+
+    def action_swarm(self) -> None:
+        """Turns swarm mode on or off, for a model that has one to turn on."""
+        if self._swarms():
+            self._swarm = not self._swarm
+            self._fill()
 
     def action_harder(self) -> None:
         """Moves one along the efforts, towards the one that thinks hardest."""
@@ -391,7 +420,10 @@ class Models(Sheet):
         Args:
           event: What was chosen.
         """
-        self._chosen.append(f"{event.option.id}:{self._efforts()[self._effort]}")
+        # `swarm` in front of the effort is how Kimi is asked for a fleet: one turn at one
+        # effort, run wide. A model that does not take it is chosen at the effort alone.
+        wide = SWARM if self._swarm and self._swarms() else ""
+        self._chosen.append(f"{event.option.id}:{wide}{self._efforts()[self._effort]}")
         if len(self._chosen) < len(self._wanted):
             self._ask()
             return

@@ -33,7 +33,7 @@ _LISTENING = re.compile(r"^Kimi server: (\S+)/#token=(\S+)$")
 
 #: What an effort is prefixed with to ask for swarm mode: `max` and `swarmmax` are the same
 #: thinking, run as one agent and as a fleet of them.
-_SWARM = "swarm"
+SWARM = "swarm"
 
 
 @dataclass
@@ -324,11 +324,11 @@ class KimiCodeCLISession(SessionBase):
         effort = self._agent.config.effort
         turn: dict[str, Any] = {
             "model": self._agent.config.model,
-            "thinking": effort.removeprefix(_SWARM),
+            "thinking": effort.removeprefix(SWARM),
             # A flow watches its agent rather than answering it, as the flows humanize comes with do.
             "permission_mode": "auto",
             "plan_mode": False,
-            "swarm_mode": effort.startswith(_SWARM),
+            "swarm_mode": effort.startswith(SWARM),
         }
         with self._lock:  # a conversation is a sequence: one turn at a time
             # A turn that failed is as over as one that landed: neither leaves

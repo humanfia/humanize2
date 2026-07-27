@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .agents import (
+    SWARM,
     AgentBase,
     AgentConfig,
     ClaudeCodeAgent,
@@ -27,6 +28,7 @@ from .cycle import Cycle, cycles, opened
 from .runner import NotAFlow, Runner
 
 __all__ = [
+    "SWARM",
     "AgentBase",
     "AgentConfig",
     "ClaudeCodeAgent",

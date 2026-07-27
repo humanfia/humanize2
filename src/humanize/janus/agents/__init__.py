@@ -15,9 +15,10 @@ from .claude import ClaudeCodeAgent, ClaudeCodeAgentConfig, ClaudeCodeSession
 from .codex import CodexAgent, CodexAgentConfig, CodexSession
 from .config import AgentConfig
 from .human import HumanAgent, HumanSession
-from .kimi import KimiCodeCLIAgent, KimiCodeCLIAgentConfig, KimiCodeCLISession
+from .kimi import SWARM, KimiCodeCLIAgent, KimiCodeCLIAgentConfig, KimiCodeCLISession
 
 __all__ = [
+    "SWARM",
     "AgentBase",
     "AgentConfig",
     "ClaudeCodeAgent",
