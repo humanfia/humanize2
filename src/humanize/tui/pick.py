@@ -22,7 +22,7 @@ from itertools import zip_longest
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.markup import escape
-from textual import on
+from textual import events, on
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
@@ -92,6 +92,63 @@ class Sheet(ModalScreen[list[str] | None]):
     _drawn: int | None = None
     #: How many columns the numbering takes, so that every row starts in the same one.
     _counting = 1
+    #: What has been typed to narrow the list down. A list of every model of every CLI is
+    #: longer than a screen, and a list you walk to the end of to find one thing is one you
+    #: read rather than use -- so the letters go into it instead of nowhere.
+    _typed = ""
+
+    def fits(self, *fields: str) -> bool:
+        """Whether a row is one of the ones still worth showing.
+
+        Args:
+          fields: Everything the row says, which is all of it that is searched: what a thing
+            is called, and where it came from.
+
+        Returns:
+          True if what has been typed is spread through one of them in order -- `cop` finds
+          `claude-opus-5`, since nobody types a model id out to narrow a list of them. One of
+          them rather than all of them run together, or a search would run off the end of the
+          name it was narrowing to and finish itself in the word beside it: `chat` would find
+          `flame_chase builtin`, which is a match nobody typed.
+        """
+        if not self._typed:
+            return True
+        wanted = self._typed.lower()
+        for field in fields:
+            looking, at = field.lower(), 0
+            for letter in wanted:
+                at = looking.find(letter, at) + 1
+                if not at:
+                    break
+            else:
+                return True
+        return False
+
+    def searching(self) -> str:
+        """What to say about the letters typed so far, which is nothing until some are."""
+        return f"{_DOT}{escape(self._typed)}" if self._typed else ""
+
+    def on_key(self, event: events.Key) -> None:
+        """Takes a letter as something to narrow the list with.
+
+        The arrows walk it, enter takes what is under the cursor, and everything else that
+        is a character is searching: there is nothing else to type at here, so nothing is
+        being taken away from anything.
+
+        Args:
+          event: The key.
+        """
+        if event.key == "backspace":
+            self._typed = self._typed[:-1]
+        elif event.is_printable and event.character:
+            self._typed += event.character
+        else:
+            return
+        event.prevent_default()
+        event.stop()
+        self.query_one("#choices", OptionList).highlighted = 0
+        self._drawn = 0
+        self._fill()
 
     def compose(self) -> ComposeResult:
         """The rule, the question, what there is to choose, what is tuned, and the keys."""
@@ -109,7 +166,16 @@ class Sheet(ModalScreen[list[str] | None]):
         self._ask()
 
     def action_back(self) -> None:
-        """Leaves, there being nothing before the one thing this sheet asks."""
+        """Clears what was typed, or leaves once there is nothing left to clear.
+
+        A search narrowed to nothing is the one place esc has something to step back to:
+        leaving from there would throw away the walk in as well as the wrong letters.
+        """
+        if self._typed:
+            self._typed = ""
+            self._drawn = 0
+            self._fill()
+            return
         self.dismiss(None)
 
     def _row(
@@ -181,7 +247,6 @@ class Flows(Sheet):
             "chosen is what it is to do. A flow anywhere else is a path you type."
         )
         self.query_one("#tuning", Label).update("")
-        self.query_one("#keys", Label).update("Enter to choose · Esc to cancel")
         self._fill()
 
     def _fill(self) -> None:
@@ -192,7 +257,8 @@ class Flows(Sheet):
         if not self._named:
             self._named = [(name, whose) for whose, name in found()]
             self._counting = len(str(len(self._named)))
-        at = listing.highlighted or 0
+        shown = [pair for pair in self._named if self.fits(*pair)]
+        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
         listing.set_options(
             Option(
                 self._row(
@@ -200,10 +266,13 @@ class Flows(Sheet):
                 ),
                 id=name,
             )
-            for seen, (name, whose) in enumerate(self._named)
+            for seen, (name, whose) in enumerate(shown)
         )
-        listing.highlighted = at
+        listing.highlighted = at if shown else None
         self._drawn = at
+        self.query_one("#keys", Label).update(
+            f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
+        )
 
     @on(OptionList.OptionSelected)
     def _took(self, event: OptionList.OptionSelected) -> None:
@@ -245,6 +314,8 @@ class Models(Sheet):
         self._chosen: list[str] = []
         self._effort = 0
         self._counting = len(str(len(self._runs)))
+        #: The ones the letters typed so far have left, which is what the cursor is walking.
+        self._shown = list(self._runs)
 
     def _ask(self) -> None:
         """Asks for one more agent, from the models down."""
@@ -256,37 +327,52 @@ class Models(Sheet):
             "runs at. Two agents at one model are still two agents."
         )
         self._effort = 0
+        self._typed = ""  # each agent is asked about from the whole list again
         self._fill()
         self.query_one("#choices", OptionList).focus()
 
     def _fill(self) -> None:
         """Puts the models up, and under them the effort the arrows move along."""
         listing = self.query_one("#choices", OptionList)
-        at = listing.highlighted or 0
+        self._shown = [
+            (backend, model)
+            for backend, model in self._runs
+            if self.fits(model.name, backend)
+        ]
+        at = min(listing.highlighted or 0, max(len(self._shown) - 1, 0))
         listing.set_options(
             Option(
                 self._row(seen, model.name, backend, here=seen == at, inforce=False),
                 id=f"{backend}/{model.name}",
             )
-            for seen, (backend, model) in enumerate(self._runs)
+            for seen, (backend, model) in enumerate(self._shown)
         )
-        listing.highlighted = at
+        listing.highlighted = at if self._shown else None
         self._drawn = at
-        self._effort = min(self._effort, len(self._efforts()) - 1)
+        efforts = self._efforts()
+        self._effort = min(self._effort, len(efforts) - 1) if efforts else 0
         self.query_one("#tuning", Label).update(
-            f"[$secondary]◉[/] {self._efforts()[self._effort]} effort  "
+            f"[$secondary]◉[/] {efforts[self._effort]} effort  "
             f"[$text-muted]←/→ to adjust[/]"
+            if efforts
+            else ""
         )
         self.query_one("#keys", Label).update(
-            "Enter to choose · Esc to cancel"
-            + (f"  ·  {escape(' · '.join(self._chosen))}" if self._chosen else "")
+            f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
+            + (f"{_DOT}{escape(' · '.join(self._chosen))}" if self._chosen else "")
         )
 
     def _efforts(self) -> tuple[str, ...]:
-        """What the model under the cursor takes, hardest first."""
+        """What the model under the cursor takes, hardest first, or none where none is."""
+        under = self._under()
+        return under.efforts if under is not None else ()
+
+    def _under(self) -> Model | None:
+        """The model the cursor is on, or None where the letters typed have left none."""
+        if not self._shown:
+            return None
         listing = self.query_one("#choices", OptionList)
-        _, model = self._runs[listing.highlighted or 0]
-        return model.efforts
+        return self._shown[min(listing.highlighted or 0, len(self._shown) - 1)][1]
 
     def action_harder(self) -> None:
         """Moves one along the efforts, towards the one that thinks hardest."""
@@ -295,7 +381,7 @@ class Models(Sheet):
 
     def action_easier(self) -> None:
         """Moves one along the efforts, towards the one that thinks least."""
-        self._effort = min(self._effort + 1, len(self._efforts()) - 1)
+        self._effort = min(self._effort + 1, max(len(self._efforts()) - 1, 0))
         self._fill()
 
     @on(OptionList.OptionSelected)

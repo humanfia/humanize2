@@ -1033,6 +1033,63 @@ async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
 
 
 @pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={
+        "claude": (
+            Model("claude-opus-5", ("high",)),
+            Model("claude-haiku-4-5", ("high",)),
+        ),
+        "codex": (Model("gpt-5.6-sol", ("high",)),),
+    },
+)
+async def test_a_list_too_long_to_walk_is_narrowed_by_typing_at_it(
+    _installed: unittest.mock.MagicMock,
+) -> None:
+    """Every model of every CLI is longer than a screen, so the letters go into it."""
+    from textual.widgets import OptionList
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/flow")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        sheet = app.screen
+        listing = sheet.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        every = listing.option_count
+
+        await driver.press("c", "h", "a", "t")
+        await driver.pause()
+        assert [str(option.id) for option in listing.options] == ["chat"]
+
+        await driver.press("backspace")  # and one letter back is a wider list again
+        await driver.pause()
+        assert listing.option_count > 1
+
+        await driver.press("z", "z")  # narrowed to nothing rather than to everything
+        await driver.pause()
+        assert listing.option_count == 0
+
+        await driver.press("escape")  # which esc steps back out of before it leaves
+        await driver.pause()
+        assert listing.option_count == every
+        assert isinstance(app.screen, Flows)
+
+        # Spread through the name in order, rather than a prefix: `hk` finds `claude-haiku`.
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        await driver.press("h", "k")
+        await driver.pause()
+
+        assert [str(option.id) for option in listing.options] == [
+            "claude/claude-haiku-4-5"
+        ]
+
+
+@pytest.mark.timeout(60)
 async def test_the_cursor_can_be_seen_in_the_lists_that_are_chosen_from() -> None:
     """A list you cannot see the cursor in is one you choose from blind.
 
