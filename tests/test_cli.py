@@ -15,11 +15,11 @@ import unittest.mock
 
 import pytest
 
-from amflows import cli
+from humanize import cli
 
 #: Every command, and the one subpackage its work is really done in.
 COMMANDS = [
-    ("run", "janus"),
+    ("exec", "janus"),
     ("collect", "oronyx"),
     ("anchor", "coganchor"),
 ]
@@ -29,17 +29,17 @@ COMMANDS = [
 def test_a_command_reaches_only_the_subpackage_it_is_carried_out_in(
     command: str, subpackage: str
 ) -> None:
-    """`amflows run` must not pay for a date parser, nor `amflows anchor` for any of it."""
+    """`hmz exec` must not pay for a date parser, nor `hmz anchor` for any of it."""
     probe = (
         "import contextlib, io, sys\n"
-        "from amflows import cli\n"
+        "from humanize import cli\n"
         # The help itself goes to stdout, so it is swallowed: what is wanted is the list below.
         "with contextlib.redirect_stdout(io.StringIO()):\n"
         "    try:\n"
         f"        cli.main([{command!r}, '--help'])\n"
         "    except SystemExit:\n"
         "        pass\n"
-        "print(' '.join(m for m in sys.modules if m.startswith('amflows.')))\n"
+        "print(' '.join(m for m in sys.modules if m.startswith('humanize.')))\n"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
@@ -65,25 +65,24 @@ def test_the_status_a_command_exits_with_is_the_one_that_is_returned() -> None:
         assert cli.main(["anchor", "claude"]) == 130
 
 
-@pytest.mark.parametrize("argv", [[], ["fly"], ["--target", "ssh://build-box"]])
-def test_a_line_that_names_no_command_is_a_usage_error(
+@pytest.mark.parametrize("argv", [["fly"], ["--target", "ssh://build-box"]])
+def test_a_line_that_names_something_that_is_not_a_command_is_a_usage_error(
     argv: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Including the empty line, when there is no terminal to open the interface on: a
-    full-screen application down a pipe is escape codes and a hang."""
     with pytest.raises(SystemExit) as stopped:
         cli.main(argv)
 
     assert stopped.value.code == 2
-    assert "amflows" in capsys.readouterr().err
+    assert "hmz" in capsys.readouterr().err
 
 
-def test_the_interface_is_a_command_of_its_own() -> None:
-    """`amflows tui` rather than a bare `amflows`, so it cannot be reached by accident."""
-    with unittest.mock.patch("amflows.tui.Amflows.run") as opened:
-        assert cli.main(["tui"]) == 0
+def test_a_line_naming_no_command_opens_the_interface() -> None:
+    """`hmz` on its own, which is the way in: there is no command that opens it too."""
+    with unittest.mock.patch("humanize.tui.Humanize.run") as opened:
+        assert cli.main([]) == 0
 
     assert opened.called
+    assert "tui" not in cli.COMMANDS
 
 
 def test_the_help_lists_every_command(capsys: pytest.CaptureFixture[str]) -> None:

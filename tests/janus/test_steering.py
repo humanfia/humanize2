@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from amflows.janus import (
+from humanize.janus import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,
@@ -29,7 +29,7 @@ CONFIG = ClaudeCodeAgentConfig(model="claude-haiku-4-5-20251001", effort="low")
 @pytest.mark.agent
 @pytest.mark.timeout(300)
 def test_a_word_put_in_reaches_the_turn_and_leaves_the_stream_in_step() -> None:
-    session = ClaudeCodeAgent(CONFIG).launch()
+    session = ClaudeCodeAgent(CONFIG).new()
 
     # Put in at the first thing the agent says rather than after a wait: the turn is provably
     # under way by then, however fast the model happens to be today.
@@ -47,7 +47,7 @@ def test_a_word_put_in_reaches_the_turn_and_leaves_the_stream_in_step() -> None:
         sum(event.kind == "result" for event in said) == 1
     )  # one turn, two things said
     # And nothing of it was left behind for the next turn to pick up as its own.
-    assert "SECOND" in session.run("Reply with exactly: SECOND")
+    assert "SECOND" in session("Reply with exactly: SECOND")
 
 
 @pytest.mark.agent
@@ -55,7 +55,7 @@ def test_a_word_put_in_reaches_the_turn_and_leaves_the_stream_in_step() -> None:
 def test_codex_takes_a_word_put_into_the_turn_it_is_running() -> None:
     """Codex steers the turn itself, which is why its turns run on the app server: a
     `codex exec` per turn has ended by the time there is anything to say to it."""
-    session = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low")).launch()
+    session = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low")).new()
 
     said = []
     for event in session.stream(
@@ -79,7 +79,7 @@ def test_kimi_steers_a_word_into_the_turn_it_is_running() -> None:
     """
     session = KimiCodeCLIAgent(
         KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
-    ).launch()
+    ).new()
 
     def put_in() -> None:
         for _ in range(600):
@@ -92,7 +92,7 @@ def test_kimi_steers_a_word_into_the_turn_it_is_running() -> None:
             time.sleep(0.05)
 
     threading.Thread(target=put_in, daemon=True).start()
-    answered = session.run(
+    answered = session(
         "Count slowly from 1 to 60, one number per line. Do not use any tools."
     )
 

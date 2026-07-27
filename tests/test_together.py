@@ -18,9 +18,9 @@ from pathlib import Path
 
 import pytest
 
-from amflows import oronyx
-from amflows.coganchor import AnchorConfig
-from amflows.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from humanize import oronyx
+from humanize.coganchor import AnchorConfig
+from humanize.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
 from tests.coganchor.conftest import VIRTUAL_WORKSPACE
 from tests.oronyx.conftest import labels
 
@@ -100,8 +100,8 @@ def flow(sandbox: Path) -> tuple[Path, dict[str, list[str]]]:
     # The rlar shape, at one model and one effort: what nothing in a transcript tells apart.
     actor = ClaudeCodeAgent(CONFIG, name="actor")
     reviewer = ClaudeCodeAgent(CONFIG, name="reviewer")
-    actor.launch().run("do the task")
-    reviewer.launch().run("review the work")
+    actor.new()("do the task")
+    reviewer.new()("review the work")
     return sandbox, {agent.id: agent.opened for agent in (actor, reviewer)}
 
 
@@ -144,14 +144,12 @@ def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
         ),
         name="actor",
     )
-    session = agent.launch()
+    session = agent.new()
 
-    assert (
-        session.run("do the task") == "done"
-    )  # the turn is the flow's, as it always was
+    assert session("do the task") == "done"  # the turn is the flow's, as it always was
     # A second turn resumes the conversation and reaches the target through the mirror the
-    # first one left behind, which is the shape every flow amflows comes with runs in.
-    assert session.run("keep going") == "done"
+    # first one left behind, which is the shape every flow humanize comes with runs in.
+    assert session("keep going") == "done"
 
     assert (target / "landed.txt").read_text() == session.id * 2
     assert not (

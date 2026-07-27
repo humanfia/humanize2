@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from amflows.coganchor.proto import Frame, Kind, Op, RemoteOSError
-from amflows.coganchor.serve import fsops
-from amflows.coganchor.serve.exports import Export, ExportTable
-from amflows.coganchor.serve.sessions import compose_env
+from humanize.coganchor.proto import Frame, Kind, Op, RemoteOSError
+from humanize.coganchor.serve import fsops
+from humanize.coganchor.serve.exports import Export, ExportTable
+from humanize.coganchor.serve.sessions import compose_env
 from tests.coganchor.conftest import Link
 
 # --------------------------------------------------------------------- exports

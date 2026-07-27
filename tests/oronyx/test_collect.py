@@ -6,8 +6,8 @@ import pathlib
 
 import pytest
 
-from amflows import oronyx
-from amflows.oronyx import collector
+from humanize import oronyx
+from humanize.oronyx import collector
 from tests.oronyx.conftest import (
     CLAUDE_ELSEWHERE,
     CLAUDE_SESSION,

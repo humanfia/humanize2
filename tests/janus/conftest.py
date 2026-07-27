@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from amflows.coganchor import AnchorConfig
-from amflows.janus import AgentBase, CommandSessionBase
+from humanize.coganchor import AnchorConfig
+from humanize.janus import AgentBase, CommandSessionBase
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -40,5 +40,5 @@ class ShellSession(CommandSessionBase):
 
 
 class ShellAgent(AgentBase):
-    def launch(self) -> ShellSession:
+    def new(self) -> ShellSession:
         return ShellSession(self)

@@ -8,11 +8,11 @@ import unittest.mock
 
 import pytest
 
-from amflows import cli, oronyx
+from humanize import cli, oronyx
 from tests.oronyx.conftest import loaded
 
 #: Where a trace lands when none was asked for: this run, in this workspace.
-_DEFAULT = re.compile(r"\.amflows/\d{8}T\d{6}Z\.trace\.json")
+_DEFAULT = re.compile(r"\.humanize/\d{8}T\d{6}Z\.trace\.json")
 
 
 def run(*argv: str) -> None:
@@ -66,7 +66,7 @@ def test_forwards_every_argument_to_collect(
     options: dict[str, object],
 ) -> None:
     collect = unittest.mock.Mock(return_value={"otherData": {}})
-    monkeypatch.setattr("amflows.oronyx.collector.collect", collect)
+    monkeypatch.setattr("humanize.oronyx.collector.collect", collect)
 
     run(*argv)
 
@@ -86,14 +86,14 @@ def test_the_run_says_whose_sessions_were_whose(
     Two agents at one configuration are one agent to a collector reading the logs alone, so
     the last run in this workspace is read for what it wrote down about itself.
     """
-    from amflows.janus.cycle import Cycle
+    from humanize.janus.cycle import Cycle
 
     monkeypatch.chdir(tmp_path)
     cycle = Cycle("rlar", [], "go")
     cycle.write("opened", agent="actor", backend="claude", session="one")
     cycle.write("opened", agent="reviewer", backend="claude", session="two")
     collect = unittest.mock.Mock(return_value={"otherData": {}})
-    monkeypatch.setattr("amflows.oronyx.collector.collect", collect)
+    monkeypatch.setattr("humanize.oronyx.collector.collect", collect)
 
     run()
 
@@ -123,11 +123,11 @@ def test_writes_the_default_output_and_reports_it(
 ) -> None:
     run(str(workspace))
 
-    written = list((tmp_path / ".amflows").glob("*.trace.json"))
+    written = list((tmp_path / ".humanize").glob("*.trace.json"))
     assert len(written) == 1  # the directory is made on the way, and holds one trace
     summary = loaded(written[0])["otherData"]
     assert capsys.readouterr().out == (
-        f".amflows/{written[0].name}: {summary['sessions']} sessions, "
+        f".humanize/{written[0].name}: {summary['sessions']} sessions, "
         f"{summary['slices']} slices\n"
     )
 

@@ -7,7 +7,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from amflows import oronyx
+from humanize import oronyx
 from tests.oronyx.conftest import (
     CLAUDE_ELSEWHERE,
     CLAUDE_SESSION,

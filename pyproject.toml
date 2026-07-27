@@ -1,5 +1,5 @@
 [project]
-name = "amflows"
+name = "humanize"
 version = "0.1.0"
 description = "Orchestrate, execute, and observe agent flows"
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-amflows = "amflows.cli:main"
+hmz = "humanize.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.28,<0.12.0"]

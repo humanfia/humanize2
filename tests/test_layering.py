@@ -4,7 +4,7 @@ Two things nothing else can check. The subpackages are merged projects that keep
 dependencies: janus names the machine its agents act on, so it reads coganchor's settings and
 talanton's, and talanton hands back an anchor, so it reads coganchor's too. Nothing else
 crosses -- oronyx stays alone, and none of them may reach back up into janus. And the target
-half runs on the target, which may be any architecture, while :mod:`amflows.coganchor.linux`
+half runs on the target, which may be any architecture, while :mod:`humanize.coganchor.linux`
 picks a register map at import time and refuses anything but x86-64 -- so the serving half must
 not reach the agent half, nor may anything a caller imports to configure one. All were package
 boundaries before the merge; now they are rules, so they are checked here.
@@ -21,24 +21,24 @@ import subprocess
 import sys
 from pathlib import Path
 
-from amflows.coganchor.transport import build_bundle
+from humanize.coganchor.transport import build_bundle
 
 SRC = Path(__file__).resolve().parent.parent / "src"
 
 #: What each layer may import besides its own subtree. Longest matching layer wins.
 ALLOWED = {
-    "amflows.janus": {"amflows", "amflows.coganchor", "amflows.talanton"},
-    "amflows.talanton": {"amflows", "amflows.coganchor"},
-    "amflows.oronyx": {"amflows"},
-    "amflows.jetflow": {"amflows"},
+    "humanize.janus": {"humanize", "humanize.coganchor", "humanize.talanton"},
+    "humanize.talanton": {"humanize", "humanize.coganchor"},
+    "humanize.oronyx": {"humanize"},
+    "humanize.jetflow": {"humanize"},
     # The interface is a second way in to the commands rather than a second copy of them, so
     # it alone among the subpackages names the command line.
-    "amflows.tui": {"amflows", "amflows.cli", "amflows.janus"},
-    "amflows.coganchor": {"amflows"},
-    "amflows.coganchor.serve": {
-        "amflows",
-        "amflows.coganchor",
-        "amflows.coganchor.proto",
+    "humanize.tui": {"humanize", "humanize.cli", "humanize.janus"},
+    "humanize.coganchor": {"humanize"},
+    "humanize.coganchor.serve": {
+        "humanize",
+        "humanize.coganchor",
+        "humanize.coganchor.proto",
     },
 }
 
@@ -46,7 +46,7 @@ ALLOWED = {
 #: that coganchor's own `__init__` names on the way past. Both are held to the same bar as the
 #: package itself and import their machinery only when it is used. Loaded rather than imported,
 #: so this widens what a run may load and not what the serving half may name.
-STARTUP = {"amflows.cli", "amflows.coganchor.anchor"}
+STARTUP = {"humanize.cli", "humanize.coganchor.anchor"}
 
 
 def _module_name(source: Path) -> str:
@@ -60,7 +60,7 @@ def _imports(source: Path) -> set[str]:
 
     Relative spellings are resolved rather than skipped: ``from ..supervisor import Supervisor``
     inside ``serve/`` reaches the agent half just as surely as the absolute spelling, and is the
-    form a refactoring tool would write. ``from amflows.coganchor import supervisor`` names that
+    form a refactoring tool would write. ``from humanize.coganchor import supervisor`` names that
     module too, so a from-import that resolves to a file on disk counts as naming it.
     """
     package = _module_name(source)
@@ -79,7 +79,7 @@ def _imports(source: Path) -> set[str]:
             named.update(f"{module}.{alias.name}" for alias in node.names)
     # A from-import names a module only when one exists on disk; the rest are the objects in it.
     return {
-        name for name in named if name.split(".")[0] == "amflows" and _is_module(name)
+        name for name in named if name.split(".")[0] == "humanize" and _is_module(name)
     }
 
 
@@ -90,8 +90,8 @@ def _is_module(dotted: str) -> bool:
 
 
 def test_the_package_is_marked_as_typed() -> None:
-    """Without the marker, type checking amflows -- here or downstream -- silently checks nothing."""
-    assert (SRC / "amflows" / "py.typed").is_file()
+    """Without the marker, type checking humanize -- here or downstream -- silently checks nothing."""
+    assert (SRC / "humanize" / "py.typed").is_file()
 
 
 def test_every_layer_imports_only_what_it_may() -> None:
@@ -103,7 +103,7 @@ def test_every_layer_imports_only_what_it_may() -> None:
         )
         if not layer:
             continue
-        # A layer it may name covers the modules inside it: naming `amflows.janus` is
+        # A layer it may name covers the modules inside it: naming `humanize.janus` is
         # leave to reach janus, and janus is what is inside it.
         bad = {
             name
@@ -121,8 +121,8 @@ def test_every_layer_imports_only_what_it_may() -> None:
 def test_every_subpackage_is_a_layer_the_table_governs() -> None:
     """One left out is unchecked, and reads from here exactly like one deliberately exempt."""
     subpackages = {
-        f"amflows.{path.name}"
-        for path in (SRC / "amflows").iterdir()
+        f"humanize.{path.name}"
+        for path in (SRC / "humanize").iterdir()
         if (path / "__init__.py").is_file()
     }
     assert subpackages <= set(ALLOWED)
@@ -134,14 +134,14 @@ def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
     probe = (
         "import contextlib, io, sys\n"
         "sys.path.insert(0, sys.argv[1])\n"
-        "from amflows import cli\n"
+        "from humanize import cli\n"
         "with contextlib.redirect_stdout(io.StringIO()):\n"
         # A line it reads all the way through rather than `--help`, which now exits before the
         # serving half is reached at all: what is checked is what a run of it loads. The line
         # is refused for its port, which is a return rather than an exit.
         "    cli.main(['anchor', 'serve', '--export', '/project:/tmp',\n"
         "              '--listen', 'not-a-port'])\n"
-        "print('\\n'.join(m for m in sys.modules if m.split('.')[0] == 'amflows'))\n"
+        "print('\\n'.join(m for m in sys.modules if m.split('.')[0] == 'humanize'))\n"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe, str(bundle)],
@@ -154,7 +154,7 @@ def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     loaded = set(result.stdout.split())
-    serve = "amflows.coganchor.serve"
+    serve = "humanize.coganchor.serve"
     assert f"{serve}.server" in loaded, "the target half did not actually run"
     assert loaded <= ALLOWED[serve] | STARTUP | {
         name for name in loaded if name.startswith(serve)

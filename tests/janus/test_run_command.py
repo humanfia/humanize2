@@ -17,8 +17,8 @@ from typing import Any
 
 import pytest
 
-from amflows.cli import main
-from amflows.janus import AgentConfig, NotAFlow, Runner
+from humanize.cli import main
+from humanize.janus import AgentConfig, NotAFlow, Runner
 from tests.janus.conftest import ShellAgent
 
 #: A flow that drives nothing and writes down what it was handed, next to its own file. AGENTS
@@ -28,7 +28,7 @@ import json
 import os
 from pathlib import Path
 
-from amflows.janus import AgentBase
+from humanize.janus import AgentBase
 
 
 def run(agents: tuple[AGENTS], task: str) -> None:
@@ -46,6 +46,35 @@ def run(agents: tuple[AGENTS], task: str) -> None:
     )
 """
 
+#: The same flow, declaring its agents as a named tuple: as many as there are places, and what
+#: each of them is for. It reaches them by name to prove it was handed the type it asked for.
+NAMED = """
+import json
+import os
+from pathlib import Path
+from typing import NamedTuple
+
+from humanize.janus import AgentBase
+
+
+class Agents(NamedTuple):
+    builder: AgentBase
+    reviewer: AgentBase
+
+
+def run(agents: Agents, task: str) -> None:
+    Path(__file__).with_suffix(".json").write_text(
+        json.dumps(
+            {
+                "agents": [[agents.builder.id], [agents.reviewer.id]],
+                "held": type(agents).__name__,
+                "task": task,
+                "cwd": os.getcwd(),
+            }
+        )
+    )
+"""
+
 #: A flow that declares its agents where only a type checker looks, which is nowhere the count
 #: it declares can be read back from.
 UNREADABLE = """
@@ -54,17 +83,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from amflows.janus import AgentBase
+    from humanize.janus import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
     pass
 """
 
-#: The flows amflows comes with, each of which shows the line that would start it.
+#: The flows humanize comes with, each of which shows the line that would start it.
 PREBUILT = sorted(
     path
-    for path in (Path(__file__).resolve().parents[2] / "src/amflows/janus/flows").glob(
+    for path in (Path(__file__).resolve().parents[2] / "src/humanize/janus/flows").glob(
         "*.py"
     )
     if not path.stem.startswith("_")
@@ -90,11 +119,13 @@ def test_it_drives_the_flow_with_the_agents_the_command_line_names(
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase, AgentBase"))
     main(
         [
-            "run",
+            "exec",
             "-f",
             flow,
             "-a",
-            "claude/claude-opus-4-8/high,kimi/kimi-code/k3/swarmmax",
+            "claude/claude-opus-4-8:high",
+            "-a",
+            "kimi/kimi-code/k3:swarmmax",
             "fix the build",
         ]
     )
@@ -107,17 +138,19 @@ def test_it_drives_the_flow_with_the_agents_the_command_line_names(
     assert seen["held"] == "tuple"  # a flow unpacks what it was promised
 
 
-def test_the_agents_may_be_given_in_one_option_or_several(tmp_path: Path) -> None:
+def test_one_option_is_one_agent_however_it_is_written(tmp_path: Path) -> None:
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase, AgentBase, AgentBase"))
     main(
         [
-            "run",
+            "exec",
             "-f",
             flow,
             "-a",
-            "claude/m/high,codex/m/high",
+            "cli=claude,model=m,effort=high",
             "-a",
-            "kimi/m/high",
+            "codex/m:high",
+            "-a",
+            "kimi/m:high",
             "task",
         ]
     )
@@ -128,10 +161,39 @@ def test_the_agents_may_be_given_in_one_option_or_several(tmp_path: Path) -> Non
     ]
 
 
+def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(
+    tmp_path: Path,
+) -> None:
+    """A flow that named its agents is handed the type it asked for, and they answer to it."""
+    from humanize.janus.runner import drives
+
+    flow = _flow(tmp_path, NAMED)
+    assert drives(flow) == ("builder", "reviewer")
+
+    main(["exec", "-f", flow, "-a", "claude/m:high", "-a", "codex/m:high", "task"])
+
+    seen = _seen(tmp_path)
+    assert seen["held"] == "Agents"  # the named tuple, not a plain one
+    # And the agents took those names, so a trace groups each one's sessions under a word
+    # rather than under a hex tail.
+    assert seen["agents"] == [["builder"], ["reviewer"]]
+
+
+def test_a_plain_tuple_says_how_many_agents_and_nothing_more(tmp_path: Path) -> None:
+    from humanize.janus.runner import drives
+
+    assert drives(
+        _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase, AgentBase"))
+    ) == (
+        "",
+        "",
+    )
+
+
 def test_two_agents_of_one_spelling_are_two_agents(tmp_path: Path) -> None:
     """An actor and the reviewer reading its work are one configuration and not one agent."""
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase, AgentBase"))
-    main(["run", "-f", flow, "-a", "claude/m/high,claude/m/high", "task"])
+    main(["exec", "-f", flow, "-a", "claude/m:high", "-a", "claude/m:high", "task"])
     ids = {agent[3] for agent in _seen(tmp_path)["agents"]}
     assert len(ids) == 2
 
@@ -144,7 +206,7 @@ def test_the_flow_runs_where_the_command_was_given(
     workspace.mkdir()
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
     monkeypatch.chdir(workspace)
-    main(["run", "-f", flow, "-a", "claude/m/high", "task"])
+    main(["exec", "-f", flow, "-a", "claude/m:high", "task"])
     assert Path(_seen(tmp_path)["cwd"]).resolve() == workspace.resolve()
 
 
@@ -162,7 +224,7 @@ def test_a_file_that_is_not_the_flow_asked_for_is_a_usage_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], source: str, complaint: str
 ) -> None:
     with pytest.raises(SystemExit) as stopped:
-        main(["run", "-f", _flow(tmp_path, source), "-a", "claude/m/high", "task"])
+        main(["exec", "-f", _flow(tmp_path, source), "-a", "claude/m:high", "task"])
     assert stopped.value.code == 2
     assert complaint in capsys.readouterr().err
     assert not (tmp_path / "flow.json").exists()  # refused before anything was driven
@@ -172,21 +234,30 @@ def test_a_flow_that_is_not_there_is_a_usage_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with pytest.raises(SystemExit) as stopped:
-        main(["run", "-f", str(tmp_path / "nowhere.py"), "-a", "claude/m/high", "task"])
+        main(
+            ["exec", "-f", str(tmp_path / "nowhere.py"), "-a", "claude/m:high", "task"]
+        )
     assert stopped.value.code == 2
     assert "nowhere.py" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
     "spec",
-    ["claude/claude-opus-4-8", "claude", "gemini/g/high", "/m/high", "claude/m/"],
+    [
+        "claude/claude-opus-4-8",
+        "claude",
+        "gemini/g:high",
+        "/m:high",
+        "claude/m:",
+        "cli=claude,model=m,effort=high,mode=x",
+    ],
 )
-def test_an_agent_that_is_not_backend_model_and_effort_is_a_usage_error(
+def test_an_agent_that_is_not_cli_model_and_effort_is_a_usage_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], spec: str
 ) -> None:
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
     with pytest.raises(SystemExit) as stopped:
-        main(["run", "-f", flow, "-a", spec, "task"])
+        main(["exec", "-f", flow, "-a", spec, "task"])
     assert stopped.value.code == 2
     assert f"bad agent {spec!r}" in capsys.readouterr().err
 
@@ -197,7 +268,7 @@ def test_a_flow_fails_as_it_would_anywhere_when_it_is_the_flow_that_failed(
     """A flow whose own setup cannot find a file has not been mistyped on the command line."""
     flow = _flow(tmp_path, "open('nowhere/prompt.md')\n")
     with pytest.raises(FileNotFoundError):
-        main(["run", "-f", flow, "-a", "claude/m/high", "task"])
+        main(["exec", "-f", flow, "-a", "claude/m:high", "task"])
 
 
 def test_a_flow_for_other_agents_than_these_is_refused_before_it_is_run(
@@ -209,15 +280,15 @@ def test_a_flow_for_other_agents_than_these_is_refused_before_it_is_run(
         Runner(flow, [ShellAgent(AgentConfig(model="m", effort="high"))])
 
 
-def test_python_m_amflows_is_the_amflows_command(
+def test_python_m_humanize_is_the_humanize_command(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
     monkeypatch.setattr(
-        sys, "argv", ["amflows", "run", "-f", flow, "-a", "claude/m/high", "task"]
+        sys, "argv", ["hmz", "exec", "-f", flow, "-a", "claude/m:high", "task"]
     )
     with pytest.raises(SystemExit) as stopped:
-        runpy.run_module("amflows", run_name="__main__")
+        runpy.run_module("humanize", run_name="__main__")
     assert stopped.value.code == 0
     assert _seen(tmp_path)["task"] == "task"
 
@@ -226,9 +297,9 @@ def test_python_m_amflows_is_the_amflows_command(
 def test_every_example_runs_as_the_command_line_it_shows(
     flow: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Each one shows an `amflows run` line, and it is one that would start that flow."""
-    shown = re.search(r"^\s*amflows run (?:.*\\\n)*.*", flow.read_text(), re.MULTILINE)
-    assert shown is not None, "no `amflows run` command line to be checked against"
+    """Each one shows an `hmz exec` line, and it is one that would start that flow."""
+    shown = re.search(r"^\s*hmz exec (?:.*\\\n)*.*", flow.read_text(), re.MULTILINE)
+    assert shown is not None, "no `hmz exec` command line to be checked against"
     monkeypatch.chdir(Path(__file__).resolve().parents[2])
     monkeypatch.setattr(Runner, "run", lambda self, task: None)  # nothing is driven
     main(shlex.split(shown[0].replace("\\\n", " "))[1:])
@@ -237,34 +308,34 @@ def test_every_example_runs_as_the_command_line_it_shows(
 def test_a_flow_of_your_own_is_found_where_flows_live(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Nearest wins: this project, then yours, then the ones amflows came with.
+    """Nearest wins: this project, then yours, then the ones humanize came with.
 
-    A flow written down beside the traces is one amflows knows about without being told
+    A flow written down beside the traces is one humanize knows about without being told
     where it is -- and one taking a built-in's name stands in for it, which is what makes
     a project able to mean its own `rlar` by `rlar`.
     """
-    from amflows.janus.flows import find, found
+    from humanize.janus.flows import find, found
 
     home, project = tmp_path / "home", tmp_path / "project"
-    for where in (home / ".amflows/flows", project / ".amflows/flows"):
+    for where in (home / ".humanize/flows", project / ".humanize/flows"):
         where.mkdir(parents=True)
     mine = RECORD.replace("AGENTS", "AgentBase")
-    (home / ".amflows/flows/yours.py").write_text(mine)
-    (project / ".amflows/flows/theirs.py").write_text(mine)
-    (project / ".amflows/flows/rlar.py").write_text(mine)  # a name amflows uses
+    (home / ".humanize/flows/yours.py").write_text(mine)
+    (project / ".humanize/flows/theirs.py").write_text(mine)
+    (project / ".humanize/flows/rlar.py").write_text(mine)  # a name humanize uses
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.chdir(project)
 
     listed = found()
 
-    assert ("this project", "theirs") in listed
-    assert ("yours", "yours") in listed
+    assert ("local", "theirs") in listed
+    assert ("user", "yours") in listed
     # Shadowed rather than listed twice: one name, and it is the nearest that answers to it.
-    assert ("this project", "rlar") in listed
-    assert ("amflows", "rlar") not in listed
-    assert find("rlar") == str((project / ".amflows/flows/rlar.py").resolve())
-    assert find("yours") == str((home / ".amflows/flows/yours.py").resolve())
-    assert find("goal").endswith("src/amflows/janus/flows/goal.py")
+    assert ("local", "rlar") in listed
+    assert ("builtin", "rlar") not in listed
+    assert find("rlar") == str((project / ".humanize/flows/rlar.py").resolve())
+    assert find("yours") == str((home / ".humanize/flows/yours.py").resolve())
+    assert find("goal").endswith("src/humanize/janus/flows/goal.py")
     assert find("nowhere") == "nowhere"  # a path is taken as given
 
 
@@ -273,8 +344,8 @@ def test_a_flow_of_your_own_runs_by_name(
 ) -> None:
     """The point of finding it: `-f theirs` starts it, with no path said anywhere."""
     project = tmp_path / "project"
-    (project / ".amflows/flows").mkdir(parents=True)
-    (project / ".amflows/flows/theirs.py").write_text(
+    (project / ".humanize/flows").mkdir(parents=True)
+    (project / ".humanize/flows/theirs.py").write_text(
         RECORD.replace("AGENTS", "AgentBase")
     )
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
@@ -282,7 +353,7 @@ def test_a_flow_of_your_own_runs_by_name(
     driven: list[str] = []
     monkeypatch.setattr(Runner, "run", lambda self, task: driven.append(task))
 
-    assert main(["run", "-f", "theirs", "-a", "claude/m/high", "do it"]) == 0
+    assert main(["exec", "-f", "theirs", "-a", "claude/m:high", "do it"]) == 0
     assert driven == ["do it"]
 
 
@@ -296,19 +367,20 @@ def test_a_failed_turn_is_taken_again_and_only_that_turn(
     """
     import subprocess as sub
 
-    from amflows.janus.flows.rlcr import spoken
+    from humanize.janus.flows.humanize1 import spoken
 
     monkeypatch.setattr("time.sleep", lambda _: None)
     taken: list[str] = []
 
     class _Flaky:
-        def run(self, prompt: str) -> str:
+        def __call__(self, prompt: str, *, suppress: bool = False) -> str:
             taken.append(prompt)
-            if len(taken) == 1:
-                raise sub.CalledProcessError(1, ["claude"])
-            if len(taken) == 2:
-                # How a streaming backend says its process died, which the builder runs on.
-                raise RuntimeError("the agent is no longer listening")
+            if len(taken) <= 2:
+                if not suppress:
+                    # The flow has to ask for the turn suppressed, or a loop that runs for
+                    # days ends on the first turn that failed.
+                    raise sub.CalledProcessError(1, ["claude"])
+                return ""  # what a suppressed turn that failed answers with
             # Exited clean having said nothing, which is not an answer either: forwarding it
             # would spend a round asking the other side to reply to silence.
             return "" if len(taken) == 3 else "answered"
@@ -335,6 +407,40 @@ def test_only_a_review_that_is_the_word_accepts_the_work(
     said: str, accepted: bool
 ) -> None:
     """Nothing between the two agents parses anything, so one word has to carry the verdict."""
-    from amflows.janus.flows.rlcr import ACCEPTED
+    from humanize.janus.flows.humanize1 import ACCEPTED
 
     assert bool(ACCEPTED.fullmatch(said)) is accepted
+
+
+def test_the_chat_flow_is_one_session_for_as_long_as_it_is_told_things(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Talking to a coding agent, with no loop around it: the turns are a conversation."""
+    from humanize.janus.flows.chat import run as chat
+
+    agent = ShellAgent(AgentConfig(model="m", effort="high"))
+    said = ["echo third", "echo second"]
+    agent.prompting = said.pop
+
+    chat((agent,), "echo first")
+
+    # One session for all three, so the agent had the earlier turns in context: a second
+    # would have opened a second id. And the run ended when there was nothing left to be
+    # told, rather than looping on nothing.
+    assert len(agent.opened) == 1
+    assert said == []
+
+
+def test_the_chat_flow_run_from_a_command_line_does_the_one_thing_it_was_given(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nobody is at a prompt there, so there is nothing to wait for and it returns."""
+    from humanize.janus.flows.chat import run as chat
+
+    agent = ShellAgent(AgentConfig(model="m", effort="high"))
+
+    chat(
+        (agent,), "echo once"
+    )  # returns rather than waiting on a prompt that is not there
+
+    assert len(agent.opened) == 1

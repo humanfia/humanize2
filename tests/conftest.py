@@ -13,13 +13,13 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _amflows_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _humanize_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Keeps what outlives a run out of the home directory of whoever runs the tests.
 
     A run writes down its cycle and what was typed at it, and neither belongs in the history
     of the person who only asked for the suite to pass.
     """
-    monkeypatch.setenv("AMFLOWS_HOME", str(tmp_path / "amflows-home"))
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize-home"))
 
 
 def pytest_configure(config: pytest.Config) -> None:

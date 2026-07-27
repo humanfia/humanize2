@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from amflows.coganchor import AnchorConfig, check
-from amflows.janus import AgentConfig
-from amflows.talanton import (
+from humanize.coganchor import AnchorConfig, check
+from humanize.janus import AgentConfig
+from humanize.talanton import (
     DockerIsolationConfig,
     IsolationBase,
     IsolationConfig,
@@ -63,8 +63,8 @@ def test_a_machine_is_started_for_the_first_turn_and_shared_by_the_rest() -> Non
     agent = ShellAgent(AgentConfig(model="m", effort="high", isolation=isolation))
     assert isolation.built == []  # configuring an agent starts nothing
 
-    agent.launch().run("echo one")
-    agent.launch().run("echo two")  # a second session, and still one machine
+    agent.new()("echo one")
+    agent.new()("echo two")  # a second session, and still one machine
     assert len(isolation.built) == 1
     assert isolation.built[0].started == 1
     assert agent.anchor is isolation.built[0].anchor
@@ -78,7 +78,7 @@ def test_a_machine_is_started_for_the_first_turn_and_shared_by_the_rest() -> Non
 def test_a_machine_is_taken_down_with_the_agent_that_started_it() -> None:
     isolation = _StubIsolationConfig(built=[])
     agent = ShellAgent(AgentConfig(model="m", effort="high", isolation=isolation))
-    agent.launch().run("echo one")
+    agent.new()("echo one")
     assert isolation.built[0].stopped == 0  # while the agent may still run a turn
 
     del agent
@@ -162,7 +162,7 @@ def test_a_turn_runs_in_the_container_and_leaves_its_work_in_the_workspace(
     )
     # `hostname` is spawned, so it runs on the target; the redirection is the shell's own, so
     # the file is written in the mirror and pushed from there.
-    answer = agent.launch().run("hostname > stamp.txt; cat stamp.txt")
+    answer = agent.new()("hostname > stamp.txt; cat stamp.txt")
 
     assert (
         answer and answer != socket.gethostname()

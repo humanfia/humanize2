@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from amflows.janus import AgentConfig, Runner, Stopped, cycles, opened
+from humanize.janus import AgentConfig, Runner, Stopped, cycles, opened
 
 from .conftest import ShellAgent
 
@@ -21,12 +21,12 @@ CONFIG = AgentConfig(model="m", effort="high")
 
 #: A flow that opens one session per agent, each of which names itself as it lands.
 FLOW = """
-from amflows.janus import AgentBase
+from humanize.janus import AgentBase
 
 
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     for at, agent in enumerate(agents):
-        agent.launch().run(f"echo session-{at}")
+        agent.new()(f"echo session-{at}")
 """
 
 
@@ -85,7 +85,7 @@ def test_a_run_that_was_interrupted_says_so(
     """Esc ends a flow, and a cycle that ended that way is not one that finished."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "flow.py").write_text(
-        "from amflows.janus import AgentBase, Stopped\n\n\n"
+        "from humanize.janus import AgentBase, Stopped\n\n\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
         '    raise Stopped("stopped")\n'
     )
@@ -103,9 +103,9 @@ def test_a_run_that_failed_says_so(
     """A turn that failed takes the flow with it, and the cycle says how it went."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "flow.py").write_text(
-        "from amflows.janus import AgentBase\n\n\n"
+        "from humanize.janus import AgentBase\n\n\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    agents[0].launch().run("exit 3")\n'
+        '    agents[0].new()("exit 3")\n'
     )
 
     with pytest.raises(subprocess.CalledProcessError):
@@ -135,7 +135,7 @@ def test_an_agent_driven_by_hand_is_not_a_run_of_anything(tmp_path: Path) -> Non
     """A session opened outside a flow belongs to no cycle, and writes to none."""
     agent = ShellAgent(CONFIG)
 
-    agent.launch().run("echo alone")
+    agent.new()("echo alone")
 
     assert agent.opened == ["alone"]
     assert cycles(tmp_path) == []

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from amflows.janus import (
+from humanize.janus import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,
@@ -35,9 +35,9 @@ def test_claude_answers_the_goal_command_itself() -> None:
     """Print mode expands `/goal`: an unanswerable one is answered by Claude, not by the model."""
     session = ClaudeCodeAgent(
         ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="low")
-    ).launch()
+    ).new()
 
-    assert "no goal set" in session.run("/goal").lower()
+    assert "no goal set" in session("/goal").lower()
 
 
 def test_kimi_reaches_for_its_goal_tools(
@@ -47,7 +47,7 @@ def test_kimi_reaches_for_its_goal_tools(
     monkeypatch.chdir(tmp_path)
     KimiCodeCLIAgent(
         KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
-    ).launch().pursue(OBJECTIVE)
+    ).new().pursue(OBJECTIVE)
 
     assert (
         "Goal" in capfd.readouterr().err
@@ -62,7 +62,7 @@ def test_kimi_answers_with_the_last_turn_a_goal_took(
     monkeypatch.chdir(tmp_path)
     answer = (
         KimiCodeCLIAgent(KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="off"))
-        .launch()
+        .new()
         .pursue(
             "Write the word BANANA in two separate assistant messages. Use no tools. "
             "The goal is met only after the second such message."
@@ -84,8 +84,8 @@ def test_kimi_runs_a_swarm_when_the_effort_says_to(
     agent = KimiCodeCLIAgent(
         KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="swarmmax")
     )
-    session = agent.launch()
-    session.run("Reply with the word ready and do nothing else.")
+    session = agent.new()
+    session("Reply with the word ready and do nothing else.")
 
     status = agent.server.call("GET", f"/sessions/{session.id}/status")
     assert status["swarm_mode"] is True
@@ -99,7 +99,7 @@ def test_codex_answers_with_the_last_turn_a_goal_took(
     monkeypatch.chdir(tmp_path)
     answer = (
         CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low"))
-        .launch()
+        .new()
         .pursue(
             "Write the word BANANA in two separate assistant messages. Use no tools. "
             "The goal is met only after the second such message."
@@ -118,7 +118,7 @@ def test_codex_leaves_the_goal_on_the_thread(
     """A goal is thread state, so the thread is what is asked afterwards whether it had one."""
     monkeypatch.chdir(tmp_path)
     agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low"))
-    session = agent.launch()
+    session = agent.new()
     session.pursue(OBJECTIVE)
 
     server = agent.server

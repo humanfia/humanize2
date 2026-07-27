@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from amflows.coganchor.policy import Layout, Router
-from amflows.coganchor.shadow import ShadowTree, prepare_shadow_root
+from humanize.coganchor.policy import Layout, Router
+from humanize.coganchor.shadow import ShadowTree, prepare_shadow_root
 from tests.coganchor.conftest import VIRTUAL_EXPORT, Link
 
 
@@ -160,7 +160,7 @@ def test_prepare_refuses_a_directory_with_unrelated_files(tmp_path: Path) -> Non
     root.mkdir()
     (root / "important.txt").write_text("do not delete me")
 
-    with pytest.raises(FileExistsError, match="not an amflows mirror"):
+    with pytest.raises(FileExistsError, match="not an humanize mirror"):
         prepare_shadow_root(str(root))
     assert (root / "important.txt").exists()
 

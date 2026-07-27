@@ -9,7 +9,7 @@ from typing import IO, cast
 
 import pytest
 
-from amflows.coganchor.proto import (
+from humanize.coganchor.proto import (
     Channel,
     Frame,
     Kind,

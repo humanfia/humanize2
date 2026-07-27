@@ -15,8 +15,8 @@ from typing import Any
 
 import pytest
 
-from amflows import cli
-from amflows.coganchor import AnchorConfig, check, connect
+from humanize import cli
+from humanize.coganchor import AnchorConfig, check, connect
 from tests.coganchor.conftest import DEFAULT_TIMEOUT, REPO_ROOT, Anchorage
 
 #: Every setting at once, none of them left at its default. The token is spelled the way one
@@ -46,10 +46,10 @@ def test_a_rendered_command_is_parsed_back_as_the_settings_it_came_from(
         seen.update(command=command, config=config)
         return 0
 
-    monkeypatch.setattr("amflows.coganchor.anchor.connect", record)
+    monkeypatch.setattr("humanize.coganchor.anchor.connect", record)
     rendered = FULL.command(["claude", "--print"])
-    # The interpreter running the flow, so the child is the one amflows is installed in.
-    assert rendered[:4] == [sys.executable, "-m", "amflows", "anchor"]
+    # The interpreter running the flow, so the child is the one humanize is installed in.
+    assert rendered[:4] == [sys.executable, "-m", "humanize", "anchor"]
 
     assert cli.main(rendered[3:]) == 0
 
@@ -83,7 +83,7 @@ def test_connect_runs_the_agent_without_a_command_line(anchorage: Anchorage) -> 
         shadow=str(anchorage.mirror),
     )
     program = (
-        "from amflows.coganchor import AnchorConfig, connect\n"
+        "from humanize.coganchor import AnchorConfig, connect\n"
         "raise SystemExit(connect(['bash', '-c', 'cat greeting.txt; echo back > answer.txt'],"
         f" {config!r}))\n"  # a config reads back as itself, which is how it crosses
     )

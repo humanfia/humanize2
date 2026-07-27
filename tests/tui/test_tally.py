@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from amflows.janus import (
+from humanize.janus import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,
@@ -23,8 +23,8 @@ from amflows.janus import (
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
 )
-from amflows.tui.monitor import Monitor
-from amflows.tui.tally import Tally
+from humanize.tui.monitor import Monitor
+from humanize.tui.tally import Tally
 
 
 def _rows(path: Path, *rows: dict[str, object]) -> None:
@@ -69,7 +69,7 @@ def test_a_claude_turn_is_counted_while_it_is_still_being_written(home: Path) ->
     log = home / "claude_config_dir" / "projects" / "-tmp-work" / "s1.jsonl"
     _rows(log, _said("claude-opus-5", 300))
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="opus", effort="high"))
-    session = agent.launch()
+    session = agent.new()
     session._adopt("s1")
     monitor = Monitor()
     tally = Tally([agent], monitor)
@@ -98,7 +98,7 @@ def test_a_sub_agent_is_counted_as_the_model_it_ran_on(home: Path) -> None:
         projects / "s1" / "subagents" / "agent-one.jsonl", _said("claude-haiku-4-5", 40)
     )
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="opus", effort="high"))
-    agent.launch()._adopt("s1")
+    agent.new()._adopt("s1")
     monitor = Monitor()
 
     Tally([agent], monitor).read()
@@ -130,7 +130,7 @@ def test_a_codex_thread_is_counted_from_the_rollout_it_writes(home: Path) -> Non
         },
     )
     agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low"))
-    agent.launch()._adopt("t1")
+    agent.new()._adopt("t1")
     monitor = Monitor()
     tally = Tally([agent], monitor)
 
@@ -177,7 +177,7 @@ def test_a_kimi_session_is_counted_from_the_steps_its_daemon_writes(home: Path) 
         },
     )
     agent = KimiCodeCLIAgent(KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="max"))
-    agent.launch()._adopt("session_k1")
+    agent.new()._adopt("session_k1")
     monitor = Monitor()
 
     Tally([agent], monitor).read()
@@ -194,7 +194,7 @@ def test_a_row_that_is_only_half_written_is_left_for_the_next_read(home: Path) -
             json.dumps(_said("claude-opus-5", 500))[:40]
         )  # still being written
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="opus", effort="high"))
-    agent.launch()._adopt("s1")
+    agent.new()._adopt("s1")
     monitor = Monitor()
     tally = Tally([agent], monitor)
 
@@ -214,7 +214,7 @@ def test_a_row_that_is_only_half_written_is_left_for_the_next_read(home: Path) -
 def test_a_session_with_no_log_to_read_is_left_to_its_backend(home: Path) -> None:
     """An agent working on another machine keeps its log there, and says so itself."""
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="opus", effort="high"))
-    agent.launch()._adopt("nowhere")
+    agent.new()._adopt("nowhere")
     monitor = Monitor()
 
     Tally([agent], monitor).read()

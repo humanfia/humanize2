@@ -1,6 +1,6 @@
 """What was typed here before, and the walking back through it.
 
-One file holds it all, under amflows' own home, and each line says where it was typed. What is
+One file holds it all, under humanize' own home, and each line says where it was typed. What is
 walked is what was typed here, or everything ever typed anywhere while nothing has been typed
 here -- settled when the interface starts, so that the first thing typed here cannot move the
 ground under whoever is walking.
@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from amflows import home
-from amflows.tui.history import History
+from humanize import home
+from humanize.tui.history import History
 
 
 def _texts(at: Path) -> list[str]:
@@ -23,7 +23,7 @@ def _texts(at: Path) -> list[str]:
 
 
 def test_what_is_typed_is_written_down_with_where_it_was_typed(tmp_path: Path) -> None:
-    """One file, under amflows' own home: a project is not a place to keep this.
+    """One file, under humanize' own home: a project is not a place to keep this.
 
     Which is why the directory goes on the line -- it is the only thing telling what was
     typed here from what was typed anywhere else.
@@ -35,7 +35,7 @@ def test_what_is_typed_is_written_down_with_where_it_was_typed(tmp_path: Path) -
     said = json.loads((home() / "history.jsonl").read_text().strip())
     assert said["text"] == "run the tests"
     assert said["workdir"] == str(tmp_path.resolve())
-    assert not (tmp_path / ".amflows").exists()  # and nothing is left in the project
+    assert not (tmp_path / ".humanize").exists()  # and nothing is left in the project
 
 
 def test_the_arrows_walk_back_through_it_and_forward_again(tmp_path: Path) -> None:
@@ -122,7 +122,7 @@ def test_a_history_nobody_can_write_is_not_a_prompt_to_lose(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Writing it down is worth nothing at the price of what was typed."""
-    monkeypatch.setenv("AMFLOWS_HOME", "/proc/nowhere/at/all")
+    monkeypatch.setenv("HUMANIZE_HOME", "/proc/nowhere/at/all")
     history = History(Path("/proc/nowhere"))  # nothing may be written under /proc
 
     history.add("still here")

@@ -6,8 +6,8 @@ network from them — happens on the target. It needs no plugin and no cooperati
 Linux x86-64 here, and nothing but `python3` there.
 
 ```sh
-amflows anchor --target ssh://build-box claude
-amflows anchor --target ssh://gpu-01 codex exec "run the test suite"
+hmz anchor --target ssh://build-box claude
+hmz anchor --target ssh://gpu-01 codex exec "run the test suite"
 ```
 
 `--target` takes `ssh://HOST`, `docker://CONTAINER`, `tcp://HOST:PORT` or `local[:DIR]`;
@@ -16,11 +16,11 @@ what it found, and exits; `--shadow` puts the local mirror somewhere other than 
 A container is a target like any other: `docker://` runs the target half inside a running one
 over `docker exec`, as whoever that container runs as, and needs no port and no secret.
 
-`amflows.coganchor.connect` runs that same session from Python, taking those settings as an
+`humanize.coganchor.connect` runs that same session from Python, taking those settings as an
 `AnchorConfig` and returning the agent's exit status:
 
 ```python
-from amflows.coganchor import AnchorConfig, connect
+from humanize.coganchor import AnchorConfig, connect
 
 connect(
     ["claude", "--print"],
@@ -28,7 +28,7 @@ connect(
 )
 ```
 
-`amflows.coganchor.check` is `--check` from Python: it returns what the target says about
+`humanize.coganchor.check` is `--check` from Python: it returns what the target says about
 itself, without running anything there.
 
 ## Anchoring a flow
@@ -37,8 +37,8 @@ Give an [agent](agents.md#machines)'s config an `anchor` and its agents work on 
 without any other change to the [flow](flows.md):
 
 ```python
-from amflows.coganchor import AnchorConfig
-from amflows.janus import ClaudeCodeAgentConfig
+from humanize.coganchor import AnchorConfig
+from humanize.janus import ClaudeCodeAgentConfig
 
 config = ClaudeCodeAgentConfig(
     model="claude-opus-4-8",
@@ -58,9 +58,9 @@ Instead of reconnecting over ssh each time, a target can be left listening:
 
 ```sh
 # on the target
-amflows anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
+hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 # on this machine
-AMFLOWS_TOKEN=$SECRET amflows anchor --target tcp://build-box:7777 --workspace /srv/project claude
+HUMANIZE_TOKEN=$SECRET hmz anchor --target tcp://build-box:7777 --workspace /srv/project claude
 ```
 
 Read [Security](../README.md#security) before opening one.

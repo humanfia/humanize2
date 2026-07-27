@@ -28,11 +28,11 @@ from typing import Any
 
 import pytest
 
-from amflows.coganchor import AnchorConfig
-from amflows.coganchor.proto import Channel
-from amflows.coganchor.remote import RemoteClient
-from amflows.coganchor.serve.exports import ExportTable
-from amflows.coganchor.serve.server import Server
+from humanize.coganchor import AnchorConfig
+from humanize.coganchor.proto import Channel
+from humanize.coganchor.remote import RemoteClient
+from humanize.coganchor.serve.exports import ExportTable
+from humanize.coganchor.serve.server import Server
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 

@@ -20,13 +20,13 @@ from typing import Any
 
 import pytest
 
-from amflows.janus import (
+from humanize.janus import (
     CodexAgent,
     CodexAgentConfig,
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
 )
-from amflows.janus.agents import codex as appservers
+from humanize.janus.agents import codex as appservers
 
 #: A `kimi web` that says where it is listening and then serves the calls a turn is made of,
 #: recording each one. A prompt of `boom` is refused, which is how a failed turn is spelled.
@@ -48,6 +48,10 @@ GOAL = []
 POLLS = []
 QUEUED = []
 STEERED = []
+# One question, put up while the turn runs and taken down once it has been answered.
+ASKED = [{"question_id": "q_0", "questions": [{
+    "id": "which", "header": "Which", "question": "Which way?",
+    "options": [{"id": "o_l", "label": "left"}, {"id": "o_r", "label": "right"}]}]}]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -62,7 +66,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         sent = json.loads(self.rfile.read(int(self.headers["Content-Length"])) or b"null")
         note({"path": self.path, "body": sent, "token": self.headers.get("Authorization")})
-        if self.path.endswith("/prompts:steer"):
+        if "/questions/" in self.path:
+            # Answered, so the turn is no longer waiting on it and it goes down.
+            ASKED.clear()
+            self.reply({"resolved": True})
+        elif self.path.endswith("/prompts:steer"):
             # What was queued is moved into the turn already running, which is the whole
             # difference between putting a word in and queueing a turn behind this one.
             STEERED.extend(sent["prompt_ids"])
@@ -91,6 +99,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"busy": not STEERED})
             else:
                 self.reply({"busy": len(POLLS) == 1})
+        elif self.path.endswith("/questions"):
+            # What the turn has stopped to ask, which is nothing unless a test says so.
+            self.reply({"items": ASKED[:1]})
         elif self.path.endswith("/goal"):
             # Still being pursued the first time it is asked, as a goal is between its turns.
             GOAL.append(None)
@@ -146,6 +157,14 @@ for line in sys.stdin:
     with LOG.open("a") as stream:
         json.dump(call, stream)
         stream.write("\\n")
+    if "method" not in call:
+        # An answer to something the server asked of us. The turn was waiting on it, and what
+        # it answers with is what the turn goes on to say.
+        send({"method": "item/completed", "params": {"item": {
+            "type": "agentMessage", "text": json.dumps(call["result"]["answers"])}}})
+        send({"method": "turn/completed", "params": {}})
+        send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
+        continue
     if "id" not in call:
         continue
     send({"jsonrpc": "2.0", "id": call["id"], "result": RESULTS.get(call["method"], {})})
@@ -163,6 +182,13 @@ for line in sys.stdin:
         send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
     if call["method"] == "turn/start":
         send({"method": "turn/started", "params": {"turnId": "turn_fake"}})
+        if call["params"]["input"][0]["text"] == "asking":
+            # A turn stopping to ask its user something, which the server puts to the client
+            # as a request of its own and waits on.
+            send({"id": "ask_1", "method": "item/tool/requestUserInput", "params": {
+                "itemId": "item_0", "threadId": "thread_fake", "turnId": "turn_fake",
+                "questions": [{"id": "which", "header": "Way", "question": "Which way?",
+                               "options": [{"label": "left"}, {"label": "right"}]}]}})
         if call["params"]["input"][0]["text"] == "doomed":
             send({"method": "turn/completed",
                   "params": {"turn": {"id": "turn_fake", "status": "failed",
@@ -220,6 +246,13 @@ for line in sys.stdin:
         send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
     if call["method"] == "turn/start":
         send({"method": "turn/started", "params": {"turnId": "turn_fake"}})
+        if call["params"]["input"][0]["text"] == "asking":
+            # A turn stopping to ask its user something, which the server puts to the client
+            # as a request of its own and waits on.
+            send({"id": "ask_1", "method": "item/tool/requestUserInput", "params": {
+                "itemId": "item_0", "threadId": "thread_fake", "turnId": "turn_fake",
+                "questions": [{"id": "which", "header": "Way", "question": "Which way?",
+                               "options": [{"label": "left"}, {"label": "right"}]}]}})
         send({"method": "item/started", "params": {
             "threadId": "thread_fake", "turnId": "turn_fake", "startedAtMs": 0, "item": {
                 "id": "item_0", "type": "userMessage", "content": "do the task"}}})
@@ -335,9 +368,9 @@ def working(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
 
 
 def test_kimi_opens_then_resumes(kimi: _FakeServer) -> None:
-    session = _agent().launch()
-    assert session.run("hi") == "answered"
-    session.run("again")
+    session = _agent().new()
+    assert session("hi") == "answered"
+    session("again")
 
     started, *calls = kimi.calls()
     # A port of its own, so that two flows on one machine cannot collide over the default one.
@@ -371,7 +404,7 @@ def test_a_kimi_turn_says_what_it_is_doing_and_what_it_came_to(
     And what it cost is asked of the session it ran in, which is the only place the daemon
     says: a flow that cannot see what it is spending is a flow nobody can stop in time.
     """
-    session = _agent().launch()
+    session = _agent().new()
 
     shown = [(event.kind, event.text) for event in session.stream("hi")]
 
@@ -385,7 +418,7 @@ def test_what_a_kimi_turn_spent_is_charged_to_the_turn_that_spent_it(
     kimi: _FakeServer,
 ) -> None:
     """The daemon counts the session, which is every turn of it, so take the rise."""
-    session = _agent().launch()
+    session = _agent().new()
 
     spent = [event.tokens for event in session.stream("hi") if event.kind == "result"]
 
@@ -399,7 +432,7 @@ def test_kimi_effort_says_how_hard_to_think_and_how_wide(
     kimi: _FakeServer, effort: str, thinking: str, swarm: bool
 ) -> None:
     """Swarm is a mode of the session, so the effort an agent runs at is where it can be said."""
-    _agent(effort).launch().run("hi")
+    _agent(effort).new()("hi")
 
     (profile,), (prompt,) = _bodies(kimi, "/profile"), _bodies(kimi, "/prompts")
     assert profile["agent_config"]["thinking"] == thinking
@@ -410,7 +443,7 @@ def test_kimi_effort_says_how_hard_to_think_and_how_wide(
 
 def test_kimi_pursues_by_setting_a_goal_on_the_session(kimi: _FakeServer) -> None:
     """The goal is the session's, not a `/goal` the model would read as a line of the prompt."""
-    _agent("swarmmax").launch().pursue("the suite passes")
+    _agent("swarmmax").new().pursue("the suite passes")
 
     (profile,), (prompt,) = _bodies(kimi, "/profile"), _bodies(kimi, "/prompts")
     assert profile["agent_config"]["goal_objective"] == "the suite passes"
@@ -423,12 +456,12 @@ def test_kimi_reads_a_message_again_until_it_has_been_finished(
 ) -> None:
     """The daemon hands back a message that is still being written, so once is not enough."""
     # The stand-in has nothing to say the first time it is read, and the answer the second.
-    assert _agent().launch().run("hi") == "answered"
+    assert _agent().new()("hi") == "answered"
 
 
 def test_kimi_pursues_past_a_session_that_has_fallen_still(kimi: _FakeServer) -> None:
     """A goal runs on through the quiet between its turns, so that quiet must not end the turn."""
-    _agent().launch().pursue("the suite passes")
+    _agent().new().pursue("the suite passes")
 
     # Asked again after it answered that the goal was still being pursued, rather than the
     # session having been taken for finished the first time it fell quiet.
@@ -436,9 +469,9 @@ def test_kimi_pursues_past_a_session_that_has_fallen_still(kimi: _FakeServer) ->
 
 
 def test_kimi_runs_without_setting_one(kimi: _FakeServer) -> None:
-    KimiCodeCLIAgent(
-        KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
-    ).launch().run("hi")
+    KimiCodeCLIAgent(KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")).new()(
+        "hi"
+    )
 
     profiles = [call for call in kimi.calls() if call["path"].endswith("/profile")]
     assert all(
@@ -450,9 +483,9 @@ def test_a_kimi_turn_the_server_refuses_leaves_the_session_unopened(
     kimi: _FakeServer,
 ) -> None:
     agent = _agent()
-    session = agent.launch()
+    session = agent.new()
     with pytest.raises(subprocess.CalledProcessError) as refused:
-        session.run("boom")
+        session("boom")
 
     assert refused.value.returncode == 400
     assert (
@@ -465,7 +498,7 @@ def test_a_kimi_turn_the_server_refuses_leaves_the_session_unopened(
 def test_codex_pursues_by_setting_a_goal_on_the_thread(codex: _FakeServer) -> None:
     """`/goal` is `thread/goal/set`, which is the app server's rather than `codex exec`'s."""
     agent = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high"))
-    session = agent.launch()
+    session = agent.new()
     # The last thing it said, not the first: an idle mid-goal is where Codex carries on.
     assert session.pursue("the suite passes") == "answered"
 
@@ -490,14 +523,14 @@ def test_codex_gives_up_on_a_goal_that_has_gone_quiet(
 ) -> None:
     """A turn that ends saying nothing about the goal must not leave a flow waiting forever."""
     monkeypatch.setattr(appservers, "_QUIET_SECONDS", 0.2)
-    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
 
     assert session.pursue("stuck") == "answered"  # the turn is lost, the loop is not
 
 
 def test_codex_resumes_the_thread_a_later_goal_is_set_on(codex: _FakeServer) -> None:
     """A goal is set on a thread the server holds, and one it opened earlier it has let go."""
-    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
     session.pursue("the suite passes")
     session.pursue("and stays passing")
 
@@ -511,7 +544,7 @@ def test_codex_resumes_the_thread_a_later_goal_is_set_on(codex: _FakeServer) -> 
 def test_codex_starts_no_app_server_until_a_turn_needs_one(
     codex: _FakeServer,
 ) -> None:
-    CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+    CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
 
     assert not codex.log.exists()
 
@@ -519,7 +552,7 @@ def test_codex_starts_no_app_server_until_a_turn_needs_one(
 def test_codex_runs_an_ordinary_turn_on_the_thread(codex: _FakeServer) -> None:
     """Not `codex exec`: the turn goes to the server, which is what leaves it steerable."""
     agent = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high"))
-    session = agent.launch()
+    session = agent.new()
 
     # The turn stays open the way a real one does, so it is ended by putting a word in.
     def finish() -> None:
@@ -530,7 +563,7 @@ def test_codex_runs_an_ordinary_turn_on_the_thread(codex: _FakeServer) -> None:
             time.sleep(0.02)
 
     threading.Thread(target=finish, daemon=True).start()
-    assert session.run("do the task") == "steered:go on"
+    assert session("do the task") == "steered:go on"
 
     called = {call["method"]: call["params"] for call in codex.calls()}
     assert called["thread/start"]["cwd"] == os.getcwd()
@@ -543,7 +576,7 @@ def test_codex_runs_an_ordinary_turn_on_the_thread(codex: _FakeServer) -> None:
 
 def test_codex_can_be_talked_to_while_a_turn_is_running(codex: _FakeServer) -> None:
     """The point of running the turn on the server: a word put in reaches the turn under way."""
-    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
 
     said = []
     for event in session.stream("count to sixty"):
@@ -569,7 +602,7 @@ def test_a_codex_turn_says_what_it_is_doing_while_it_is_doing_it(
     Every item the server reports is shown, including a kind of item this has never heard
     of: the alternative is a turn that reads as a hang until it answers.
     """
-    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
 
     shown = [(event.kind, event.text) for event in session.stream("do the task")]
 
@@ -601,7 +634,7 @@ def test_what_a_codex_turn_spent_is_charged_to_the_turn_that_spent_it(
     working: _FakeServer,
 ) -> None:
     """The server counts the thread, which is every turn of the session, so take the rise."""
-    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
 
     first = [event for event in session.stream("do the task") if event.kind == "result"]
     second = [event for event in session.stream("and again") if event.kind == "result"]
@@ -611,7 +644,7 @@ def test_what_a_codex_turn_spent_is_charged_to_the_turn_that_spent_it(
 
 
 def test_a_codex_session_with_no_turn_running_cannot_be_talked_to() -> None:
-    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
 
     with pytest.raises(RuntimeError, match="no turn is running"):
         session.interject("hello?")
@@ -625,10 +658,10 @@ def test_a_codex_turn_that_failed_does_not_answer_as_if_it_landed(
     Otherwise a loop feeds an empty answer forward as the work of the turn before it.
     """
     agent = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high"))
-    session = agent.launch()
+    session = agent.new()
 
     with pytest.raises(subprocess.CalledProcessError) as failed:
-        session.run("doomed")
+        session("doomed")
 
     assert "usageLimitExceeded" in str(failed.value.stderr)
     assert agent.opened == []  # a turn that failed opened nothing
@@ -638,7 +671,7 @@ def test_a_codex_turn_that_failed_does_not_answer_as_if_it_landed(
 
 def test_a_codex_turn_ignores_what_another_thread_is_saying(codex: _FakeServer) -> None:
     """One server holds every session of the agent, and each turn is only its own thread's."""
-    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
     server = session._agent.server
 
     # A straggler from a thread this turn is not on, of the kind that would otherwise end it.
@@ -657,7 +690,7 @@ def test_a_codex_turn_ignores_what_another_thread_is_saying(codex: _FakeServer) 
             time.sleep(0.02)
 
     threading.Thread(target=finish, daemon=True).start()
-    assert session.run("do the task") == "steered:go on"
+    assert session("do the task") == "steered:go on"
 
 
 def test_kimi_steers_a_word_into_the_turn_already_running(kimi: _FakeServer) -> None:
@@ -668,7 +701,7 @@ def test_kimi_steers_a_word_into_the_turn_already_running(kimi: _FakeServer) -> 
     """
     session = KimiCodeCLIAgent(
         KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
-    ).launch()
+    ).new()
 
     def put_in() -> None:
         for _ in range(300):
@@ -678,7 +711,7 @@ def test_kimi_steers_a_word_into_the_turn_already_running(kimi: _FakeServer) -> 
             time.sleep(0.02)
 
     threading.Thread(target=put_in, daemon=True).start()
-    answered = session.run("patient")
+    answered = session("patient")
 
     sent = [call for call in kimi.calls() if call["path"].endswith("/prompts:steer")]
     assert [call["body"] for call in sent] == [{"prompt_ids": ["p_2"]}]
@@ -690,7 +723,50 @@ def test_kimi_steers_a_word_into_the_turn_already_running(kimi: _FakeServer) -> 
 def test_a_kimi_session_with_no_turn_running_cannot_be_talked_to() -> None:
     session = KimiCodeCLIAgent(
         KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
-    ).launch()
+    ).new()
 
     with pytest.raises(RuntimeError, match="no turn is running"):
         session.interject("hello?")
+
+
+def test_codex_puts_a_question_to_whoever_is_driving_the_agent(
+    codex: _FakeServer,
+) -> None:
+    """A turn that stopped to ask waits on the answer, so the server has to be given one."""
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high"))
+    asked: list[str] = []
+
+    def answer(question: Any) -> str:
+        asked.append(question.text)
+        return "right"
+
+    agent.ask = answer
+
+    # What the turn answered is what the server was told, keyed by the id it gave the
+    # question and given as a list, since a question may take more than one of its options.
+    assert agent("asking") == json.dumps({"which": {"answers": ["right"]}})
+    assert asked == ["Which way?"]
+
+
+def test_codex_is_told_nobody_answered_rather_than_left_waiting(
+    codex: _FakeServer,
+) -> None:
+    """A turn waiting on an answer that is not coming is a flow that has stopped."""
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high"))
+
+    assert agent("asking") == json.dumps({"which": {"answers": []}})
+
+
+def test_kimi_answers_a_question_the_turn_stopped_on(kimi: _FakeServer) -> None:
+    """The daemon holds the question and the turn waits on it, so a poll that only read the
+    messages would be reading a session that has stopped moving."""
+    agent = _agent()
+    agent.ask = lambda question: "right"
+
+    assert agent("hi") == "answered"
+
+    # Answered by the option it names, since a question that offered options need not take
+    # anything else.
+    assert _bodies(kimi, "/questions/q_0") == [
+        {"answers": {"which": {"kind": "single", "option_id": "o_r"}}}
+    ]

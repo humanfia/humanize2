@@ -8,7 +8,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from amflows.coganchor.netproxy import NetProxy
+from humanize.coganchor.netproxy import NetProxy
 from tests.coganchor.conftest import Anchorage, Link
 
 

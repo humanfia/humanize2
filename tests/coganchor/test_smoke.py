@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from amflows.coganchor import standin
+from humanize.coganchor import standin
 from tests.coganchor.conftest import Anchorage
 from tests.coganchor.tasks import SMOKE_TASKS, SmokeTask
 
