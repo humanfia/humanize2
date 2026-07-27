@@ -12,7 +12,7 @@ runs, and both take a command line of their own.
 
 from __future__ import annotations
 
-__all__ = ["about", "offered"]
+__all__ = ["about", "hinted", "offered"]
 
 #: What each command does, shown beside its name.
 _ABOUT = {
@@ -90,3 +90,23 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
     else:
         return []
     return [offer for offer in offers if offer.startswith(tail) and offer != tail]
+
+
+def hinted(typed: str, commands: tuple[str, ...]) -> str:
+    """The command a line is writing, for as long as it is still being written.
+
+    Args:
+      typed: The line as it stands.
+      commands: The commands there are, without their slashes.
+
+    Returns:
+      The command the line names, without its slash, or "" if it names none. Shown rather
+      than offered: the line about a command says what it takes after its name, which is the
+      half of it that matters most while that part is being typed -- and a list that empties
+      the moment the name is finished takes it away exactly then. Nothing about it is taken,
+      so enter over one sends the line as it always did.
+    """
+    if not typed.startswith("/"):
+        return ""
+    named = typed[1:].partition(" ")[0]
+    return named if named in commands and about(named) else ""

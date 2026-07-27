@@ -49,7 +49,7 @@ from textual.widgets.option_list import Option
 
 from humanize.cli import flow_and_agents
 
-from .complete import about, offered, takes
+from .complete import about, hinted, offered, takes
 from .discover import Model, installed
 from .history import History
 from .monitor import Monitor, short, thousands
@@ -229,6 +229,15 @@ class Editor(TextArea):
         """Breaks the line, which is what enter would do anywhere else."""
         self.insert("\n")
 
+    #: Whether what is in the editor was put there by walking what was typed here before,
+    #: rather than typed. Nothing is offered against it while that is so: a line walked to
+    #: is a line that already exists, and a list opening over it would take the arrows that
+    #: are walking it -- one step back through a command, and there is no step forward.
+    #: Sticky, because the message saying the text changed is posted rather than called: a
+    #: flag held only around the assignment is clear again by the time it arrives. The next
+    #: key that is not an arrow is a key that is typing, and clears it.
+    walking = False
+
     async def _on_key(self, event: events.Key) -> None:
         """Gives tab and the arrows to the offers, but only while there are any.
 
@@ -239,6 +248,8 @@ class Editor(TextArea):
         -- so that a prompt of several lines is still moved around in. Tab is the offers'
         alone: stepping between flows is shift+tab, which nothing here wants.
         """
+        if event.key not in ("up", "down"):
+            self.walking = False
         listing = self.screen.query_one("#offers", OptionList)
         if not listing.has_class("offering"):
             if event.key in ("up", "down"):
@@ -254,6 +265,7 @@ class Editor(TextArea):
                     return  # nothing that way, so the key is the editor's as it always was
                 event.prevent_default()
                 event.stop()
+                self.walking = True
                 self.text = said
                 self.move_cursor(self.document.end)
             return
@@ -303,7 +315,7 @@ class Humanize(App[None]):
        half-typed command in. The row under the cursor is coloured, not filled. */
     #offers { display: none; max-height: 10; padding: 0 2; background: $background;
               border: none; scrollbar-size: 0 0; }
-    #offers.offering { display: block; }
+    #offers.offering, #offers.hinting { display: block; }
     #offers > .option-list--option-highlighted {
         background: $background; color: $primary; text-style: none; }
 
@@ -552,32 +564,48 @@ class Humanize(App[None]):
         """
         editor = self.query_one(Editor)
         typed = editor.text
-        at_end = editor.cursor_location == editor.document.end
+        # At the end of what is being typed, and being typed rather than walked to.
+        at_end = editor.cursor_location == editor.document.end and not editor.walking
         offers = offered(typed, _OWN) if at_end else []
+        # Nothing left to finish, but a command still being written: its own line stays up,
+        # since what it takes after its name is written there and is what is wanted just
+        # then. Shown and not offered -- `offering` is what says a key is the list's.
+        hint = hinted(typed, _OWN) if at_end and not offers else ""
         listing = self.query_one("#offers", OptionList)
         listing.clear_options()
         listing.set_class(bool(offers), "offering")
+        listing.set_class(bool(hint), "hinting")
+        if hint:
+            listing.add_option(self._offer_of(f"/{hint}"))
         if offers:
             # Name on the left and what it is for on the right, as opencode lists its own.
             # The bare name is kept as the option's id, since that is what replaces the text.
             # The name and what it takes on the left, what it is for on the right. The bare
             # name is the option's id, since that is what replaces the text: taking an offer
             # must not type the arguments in as well.
-            listing.add_options(
-                [
-                    Option(
-                        # Escaped: what a command takes is written in brackets, and a
-                        # bracket left as it is would be read as markup and swallowed --
-                        # which is what `[path]` did. Padded first, since the escaping adds
-                        # characters that are not columns.
-                        escape(f"{f'{offer} {takes(named)}'.rstrip():<19}")
-                        + f"[dim]{escape(about(named))}[/dim]",
-                        id=offer,
-                    )
-                    for offer, named in ((one, one.removeprefix("/")) for one in offers)
-                ]
-            )
+            listing.add_options([self._offer_of(offer) for offer in offers])
             listing.highlighted = 0
+
+    @staticmethod
+    def _offer_of(offer: str) -> Option:
+        """One row of the list: what would be typed, and what it is for.
+
+        Args:
+          offer: What taking it would leave in the editor, in full.
+
+        Returns:
+          The row. The bare name is its id, since that is what replaces the text -- taking
+          an offer must not type the arguments in as well.
+        """
+        named = offer.removeprefix("/")
+        # Escaped: what a command takes is written in brackets, and a bracket left as it is
+        # would be read as markup and swallowed -- which is what `[path]` did. Padded first,
+        # since the escaping adds characters that are not columns.
+        return Option(
+            escape(f"{f'{offer} {takes(named)}'.rstrip():<19}")
+            + f"[dim]{escape(about(named))}[/dim]",
+            id=offer,
+        )
 
     def _draw(self) -> None:
         """Redraws the lines around the editor: what is above it, the rules, the status.
