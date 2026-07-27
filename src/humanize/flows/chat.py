@@ -26,7 +26,10 @@ class Chat(NamedTuple):
 
 def run(agents: Chat, task: str) -> None:
     # One session, so the turns are a conversation rather than a series of first turns.
-    session = agents.assistant.new()
+    conversation = agents.assistant.new()
     said = task
     while said:
-        said = agents.human(session(said, suppress=True))
+        answered = conversation(said, suppress=True)
+        # Saying that to the person is asking what to say next, and what they answer with is
+        # what they typed -- or nothing, which is a conversation that is over.
+        said = agents.human(answered)

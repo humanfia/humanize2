@@ -13,8 +13,9 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     session = agent.new()
     prompt = task
     while True:
+        answered = session(prompt, suppress=True)
         # Until a turn lands, the task is sent again: "continue" on its own would open a
         # session that never saw it.
-        if session(prompt, suppress=True):
+        if answered:
             prompt = "continue"
         time.sleep(5)

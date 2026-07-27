@@ -39,11 +39,13 @@ def run(agents: Agents, task: str) -> None:
     working = agents.actor.new()
     prompt = task
     while True:
+        worked = working(prompt, suppress=True)
         # Only a landed turn earns a review, and the reviewer's is the actor's next prompt.
         # A turn that failed answers with nothing, so the round is taken again rather than
         # advanced past a review the actor never saw -- the opening one included.
-        if working(prompt, suppress=True):
+        if worked:
             # A new session each round, so the reviewer reads the repository rather than its
             # own earlier reviews -- and is handed the task again, never having seen it.
-            prompt = agents.reviewer(REVIEW_PROMPT + task, suppress=True) or prompt
+            review = agents.reviewer(REVIEW_PROMPT + task, suppress=True)
+            prompt = review or prompt
         time.sleep(5)

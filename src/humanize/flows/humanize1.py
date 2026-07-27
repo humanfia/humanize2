@@ -205,9 +205,10 @@ def spoken(agent: AgentBase | SessionBase, prompt: str) -> str:
       What it answered.
     """
     while True:
+        said = agent(prompt, suppress=True)
         # A turn that exits clean having said nothing has not answered either, and passing that
         # on would spend a round asking the other side to reply to silence.
-        if said := agent(prompt, suppress=True):
+        if said:
             return said
         time.sleep(5)
 
@@ -218,9 +219,11 @@ def run(agents: Agents, task: str) -> None:
 
     # The task is handed over rather than quoted back: a retelling by whoever chose the direction
     # is not what a reviewer needs to judge the direction against.
-    chosen = f"{task}\n\nWhat it chose to build:\n{spoken(building, IDEA + task)}"
+    direction = spoken(building, IDEA + task)
+    chosen = f"{task}\n\nWhat it chose to build:\n{direction}"
 
-    told = WRITE_PLAN + spoken(reviewer, ANALYSE + chosen)
+    analysis = spoken(reviewer, ANALYSE + chosen)
+    told = WRITE_PLAN + analysis
     while True:
         spoken(building, told)
         told = spoken(reviewer, CHALLENGE + chosen)
@@ -235,7 +238,8 @@ def run(agents: Agents, task: str) -> None:
     told = BUILD
     while True:
         said = spoken(building, told)
-        told = spoken(reviewer, f"{REVIEW}{base}\n\nIts summary of the round:\n{said}")
+        asked = f"{REVIEW}{base}\n\nIts summary of the round:\n{said}"
+        told = spoken(reviewer, asked)
         if ACCEPTED.fullmatch(told):
             break
 
@@ -243,9 +247,8 @@ def run(agents: Agents, task: str) -> None:
     # put it to a reviewer that was not there for the answer, and two reviewers that each
     # remember nothing can go on undoing one another for as long as they are both asked.
     while True:
-        told = spoken(
-            reviewer, f"{CODE_REVIEW}{base}\n\nWhat it says it has done:\n{said}"
-        )
+        asked = f"{CODE_REVIEW}{base}\n\nWhat it says it has done:\n{said}"
+        told = spoken(reviewer, asked)
         if ACCEPTED.fullmatch(told):
             return
         said = spoken(building, told)
