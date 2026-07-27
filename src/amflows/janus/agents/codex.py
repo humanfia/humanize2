@@ -17,7 +17,7 @@ import subprocess
 import sys
 import threading
 import weakref
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -52,6 +52,49 @@ _UNATTENDED = {
 _STOP_SECONDS = 5.0
 _QUIET_SECONDS = 60.0
 
+#: The items that are the agent talking rather than the agent doing something. They are shown
+#: as they complete, there being no words in one before that; everything else is shown as it
+#: starts, since watching a thing run is the point of showing it at all.
+_TALKING = ("agentMessage", "reasoning")
+
+#: The items that are not the agent working at all: what it was told, and what a hook dressed
+#: that up with. Showing one would be showing the prompt back.
+_OURS = ("userMessage", "hookPrompt")
+
+#: What an item says about itself that says nothing about what the agent did: an id names it,
+#: a status says how far along it is, and neither is worth a row of a transcript.
+_NAMING = ("id", "itemId", "status", "threadId", "turnId", "type")
+
+#: Where the words are in each kind of item, read off the schema the server generates for its
+#: own protocol -- the field that says what the agent reached for, rather than the first one it
+#: happens to serialise. An item of a kind that is not here is shown under whatever it does
+#: name itself with: the server grows kinds, and a new one is still work being done.
+_ABOUT = {
+    "collabAgentToolCall": "tool",
+    "commandExecution": "command",
+    "dynamicToolCall": "tool",
+    "fileChange": "changes",
+    "imageGeneration": "revisedPrompt",
+    "imageView": "path",
+    "mcpToolCall": "tool",
+    "plan": "text",
+    "subAgentActivity": "agentPath",
+    "webSearch": "query",
+}
+
+#: What the items every other backend also has are called there, so that one flow's transcript
+#: reads as one transcript -- and so an interface picks the icon it picks for that tool anywhere
+#: else. An item that is not here is shown under the name the server gave it.
+_CALLED = {
+    "collabAgentToolCall": "Task",
+    "commandExecution": "Bash",
+    "dynamicToolCall": "Task",
+    "fileChange": "Edit",
+    "imageView": "Read",
+    "mcpToolCall": "Task",
+    "webSearch": "WebSearch",
+}
+
 
 class _AppServer:
     """A `codex app-server` of our own, spoken to in JSON-RPC over its stdio."""
@@ -80,6 +123,9 @@ class _AppServer:
         )
         self._pending = itertools.count(1)
         self._writing = threading.Lock()  # a line is written whole or not at all
+        #: What each thread has spent so far, as the server counts it: a running total, so
+        #: what one turn cost is the rise across it.
+        self._counted: dict[str, int] = {}
         self._messages: queue.Queue[dict[str, Any] | None] = queue.Queue()
         # Read from a thread of its own, so that a turn can wait on the server for a while
         # rather than only for as long as it takes.
@@ -205,6 +251,8 @@ class _AppServer:
             # stream when a turn starts reading. A turn has not ended until it has begun.
             begun = False
             failed: str | None = None
+            before = self._counted.get(thread, 0)
+            started: set[Any] = set()  # the items this turn has already shown
             try:
                 while (message := self._read()) is not None:
                     if message.get("id") == ident and "method" not in message:
@@ -219,24 +267,73 @@ class _AppServer:
                         running.turn = str(turn)
                         begun = True
                     match message.get("method"):
-                        case "item/started" if (
-                            told["item"].get("type") == "commandExecution"
-                        ):
-                            yield Event(
-                                kind="tool", text=told["item"].get("command", "")
-                            )
-                        case "item/completed":
-                            item = told["item"]
-                            if item.get("type") == "agentMessage":
-                                said = item["text"]
+                        case "item/started" | "item/completed":
+                            item = told.get("item") or {}
+                            kind = str(item.get("type") or "")
+                            done = message["method"] == "item/completed"
+                            # Shown once apiece: as it starts, a thing worth showing being a
+                            # thing worth watching run, and otherwise as it completes -- the
+                            # server need not have started everything it finishes. An item
+                            # that names itself with nothing is not the item shown before it,
+                            # so it is shown rather than taken for one already seen.
+                            marked = item.get("id")
+                            twice = done and marked is not None and marked in started
+                            if marked is not None:
+                                started.add(marked)
+                            if kind == "agentMessage" and done:
+                                said = str(item.get("text") or "")
                                 yield Event(kind="text", text=said)
-                            elif item.get("type") == "reasoning":
+                            elif kind == "reasoning" and done:
                                 # Reasoning is a list of parts rather than one text.
                                 thought = " ".join(
-                                    item.get("content") or item.get("summary") or []
+                                    str(part)
+                                    for part in item.get("content")
+                                    or item.get("summary")
+                                    or []
                                 )
-                                if thought:
+                                if thought.strip():
                                     yield Event(kind="reasoning", text=thought)
+                            elif kind not in (*_TALKING, *_OURS) and not twice:
+                                # Every other item is the agent reaching for something, and
+                                # every one of them is shown: a turn spends its minutes here,
+                                # and an item this has never heard of is still work being done
+                                # rather than a silence to sit through.
+                                named = item.get(_ABOUT.get(kind, ""))
+                                if isinstance(named, list):
+                                    # One entry per file changed: the paths are the words.
+                                    named = " ".join(
+                                        str(part.get("path", part))
+                                        if isinstance(part, dict)
+                                        else str(part)
+                                        for part in named
+                                    )
+                                about = str(named or "") or next(
+                                    (
+                                        value
+                                        for name, value in item.items()
+                                        if name not in _NAMING
+                                        and isinstance(value, str)
+                                        and value.strip()
+                                    ),
+                                    "",
+                                )
+                                yield Event(
+                                    kind="tool",
+                                    text=f"{_CALLED.get(kind, kind)} {about}".strip()[
+                                        :120
+                                    ],
+                                )
+                        case "thread/tokenUsage/updated":
+                            # Sent as the turn spends it. `total` is the thread, every turn of
+                            # it; `last` is the one request that just came back. Cached input
+                            # is counted inside the input rather than beside it, so the total
+                            # the server states is the whole of what crossed the wire.
+                            usage = (told.get("tokenUsage") or {}).get("total") or {}
+                            if total := int(usage.get("totalTokens") or 0) or sum(
+                                int(usage.get(name) or 0)
+                                for name in ("inputTokens", "outputTokens")
+                            ):
+                                self._counted[thread] = total
                         case "error":
                             failed = json.dumps(told.get("error"))
                         case "turn/completed" if told.get("turn", {}).get(
@@ -257,7 +354,16 @@ class _AppServer:
                 running.turn = None
             if failed is not None:
                 raise subprocess.CalledProcessError(1, self._argv, said, failed)
-            yield Event(kind="result", text=said.strip())
+            # What the turn cost is the rise across it, charged to the model it ran on: the
+            # server counts the thread, and a thread is every turn this session has taken.
+            spent = self._counted.get(thread, 0) - before
+            yield Event(
+                kind="result",
+                text=said.strip(),
+                tokens={str(params.get("model") or "codex"): spent}
+                if spent > 0
+                else {},
+            )
 
     def steer(self, thread: str, turn: str, text: str) -> None:
         """Says something to a turn that is already running.
@@ -413,6 +519,11 @@ class CodexSession(SessionBase):
         #: The turn under way, which is what a word put in has to name.
         self._running = _Running()
 
+    @property
+    def named(self) -> str | None:
+        """The thread this session is, which the server names before the turn starts."""
+        return self._id or self._running.thread
+
     def _stream(self, prompt: str) -> Iterator[Event]:
         """Sends one turn to the server, saying what the agent says as it says it.
 
@@ -431,6 +542,7 @@ class CodexSession(SessionBase):
             # the session is only opened once the turn has landed.
             self._running.thread = thread
             said = ""
+            spent: Mapping[str, int] = {}
             for event in self._agent.server.turn(
                 {
                     "threadId": thread,
@@ -442,15 +554,21 @@ class CodexSession(SessionBase):
                 self._running,
             ):
                 if event.kind == "result":
-                    said = event.text
-                else:
-                    yield event
+                    said, spent = event.text, event.tokens
+                    continue
+                if not self._agent._watchers:
+                    # On stderr, where every other backend puts its progress: a turn nobody
+                    # can watch is a flow that reads as hung for as long as the turn takes.
+                    # Something watching the agent shows the turn itself, and would then be
+                    # showing it twice.
+                    say(event.text, sys.stderr)
+                yield event
             if not self._agent._watchers:
                 # Where `codex exec` would have put the answer. Something watching the agent
                 # has had it already, as the turn said it.
                 say(said, sys.stdout)
             self._adopt(thread)  # a turn has landed, so the session is open
-            yield Event(kind="result", text=said)
+            yield Event(kind="result", text=said, tokens=spent)
 
     def interject(self, text: str) -> None:
         """Steers the turn under way, which the server takes into the turn it is running.

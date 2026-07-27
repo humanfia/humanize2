@@ -1,6 +1,6 @@
 """What the editor offers to finish, which is the only way anything is typed here.
 
-A command line is typed, never filled in on a form: `/` offers the commands, and `/agents`
+A command line is typed, never filled in on a form: `/` offers the commands, and `/flow`
 offers the flows there are -- the ones amflows came with and the ones under `.amflows/flows`
 here or in your home directory. A flow anywhere else is a path, and a path is typed: looking
 for one would mean reading every Python file below here to see which declare a flow, which is
@@ -14,8 +14,8 @@ __all__ = ["about", "offered"]
 #: What each command does, shown beside its name. A command with nothing said about it is
 #: not offered: `run` is what the first thing you say already does, and `tui` is this.
 _ABOUT = {
-    "agents": "Switch flow",
-    "models": "Set what each agent runs",
+    "flow": "Switch flow",
+    "agents": "Set what each agent runs",
     "new": "New session",
     "details": "Toggle tool calls",
     "thinking": "Toggle reasoning",
@@ -48,20 +48,22 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
 
     Returns:
       Everything the last word could become, in full, so that taking one replaces what was
-      typed rather than being appended to it.
+      typed rather than being appended to it. Never the word itself: a word that is already
+      what it would become is finished, and enter over an open list takes what is under the
+      cursor rather than sending the line.
     """
     if not typed.startswith("/"):
         return []
     words = typed.split(" ")
     tail = words[-1]
     if len(words) == 1:  # still naming the command
-        return [
-            f"/{name}"
-            for name in commands
-            if f"/{name}".startswith(tail) and name in _ABOUT
-        ]
-    if words[0] == "/agents":
+        offers = [f"/{name}" for name in commands if name in _ABOUT]
+    # The flow is the one thing `/flow` takes, so it is offered while that word is the one
+    # being typed and not after it: a line that already names a flow is a finished line.
+    elif words[0] == "/flow" and len(words) == 2:
         from amflows.janus.flows import found
 
-        return [name for _, name in found() if name.startswith(tail)]
-    return []
+        offers = [name for _, name in found()]
+    else:
+        return []
+    return [offer for offer in offers if offer.startswith(tail) and offer != tail]

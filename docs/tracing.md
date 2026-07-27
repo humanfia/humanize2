@@ -26,6 +26,13 @@ together with every sub-agent it started, so a loop of one-shot sessions reads a
 rather than a hundred. A flow that drove the sessions itself knows better, and says so by passing
 [`agents=`](agents.md#names), which is what tells two agents run at the same configuration apart.
 
+`amflows collect` takes that from the last run in the workspace rather than being told it. Every
+run of a flow is one **cycle**, written to `~/.amflows/cycles/<workspace>/<datetime>-<id>.jsonl`
+as it happens — one line for the run, one for each session an agent opened, one for how it ended
+— so the sessions of a run can be told apart afterwards by whose they were rather than by what
+they were run at. A cycle covers one run: it closes when the flow finishes, fails or is
+interrupted, and running the flow again is another cycle.
+
 Trajectories are read from the backends' own home directories, named by `CLAUDE_CONFIG_DIR`,
 `CODEX_HOME` and `KIMI_CODE_HOME` and falling back to `~/.claude`, `~/.codex` and `~/.kimi-code`;
 a missing one is skipped. `amflows.oronyx.collect` takes the same arguments plus `agents`,

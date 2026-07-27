@@ -28,6 +28,7 @@ def run(*argv: str) -> None:
             None,
             {
                 "sessions": None,
+                "agents": None,  # nothing has run here, so nobody claims a session
                 "output": None,  # stands for the generated default, matched below
                 "start": None,
                 "end": None,
@@ -50,6 +51,7 @@ def run(*argv: str) -> None:
             "/tmp/ws",
             {
                 "sessions": ["one,two", "three"],
+                "agents": None,
                 "output": "out.json",
                 "start": "1am",
                 "end": "2am",
@@ -74,6 +76,31 @@ def test_forwards_every_argument_to_collect(
         passed["output"] = None
     assert collect.call_args.args == (target,)
     assert passed == options
+
+
+def test_the_run_says_whose_sessions_were_whose(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A trace of a flow needs what only the flow knows: which agent opened which session.
+
+    Two agents at one configuration are one agent to a collector reading the logs alone, so
+    the last run in this workspace is read for what it wrote down about itself.
+    """
+    from amflows.janus.cycle import Cycle
+
+    monkeypatch.chdir(tmp_path)
+    cycle = Cycle("rlar", [], "go")
+    cycle.write("opened", agent="actor", backend="claude", session="one")
+    cycle.write("opened", agent="reviewer", backend="claude", session="two")
+    collect = unittest.mock.Mock(return_value={"otherData": {}})
+    monkeypatch.setattr("amflows.oronyx.collector.collect", collect)
+
+    run()
+
+    assert collect.call_args.kwargs["agents"] == {
+        "actor": ["one"],
+        "reviewer": ["two"],
+    }
 
 
 def test_writes_the_same_trace_as_the_library(

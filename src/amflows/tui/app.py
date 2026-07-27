@@ -2,7 +2,7 @@
 
 Laid out the way opencode is, and no wider: a transcript, an editor under it, a status line
 under that, and what the flow is doing beside them. Tab picks a flow the way opencode's tab
-picks an agent, and `/models` sets what each of that flow's agents runs.
+picks an agent, and `/agents` sets what each of that flow's agents runs.
 
 The editor means both things at once: a line starting with `/` is a command, and any other
 line is the task if nothing is running yet, or is said to the agent working right now.
@@ -33,19 +33,21 @@ from amflows.cli import COMMANDS, flow_and_agents
 
 from .complete import about, offered
 from .discover import installed
+from .history import History
 from .monitor import Monitor, short
 from .pick import Flows, Models
+from .tally import Tally
 
 if TYPE_CHECKING:
     from amflows.janus import AgentBase, Event
 
 #: What the editor understands beyond the commands the command line has, named as opencode
-#: names them: its `/agents` switches which agent answers, and here that is which flow runs,
-#: since a flow is what answers; its `/models` sets what that runs on, and a flow runs on one
-#: model per agent it drives, so the same command asks once apiece.
+#: names them, one step along: what answers here is a flow rather than an agent, so opencode's
+#: `/agents` is `/flow`, and what a flow runs on is an agent apiece rather than one model, so
+#: its `/models` is `/agents` -- which asks once for each agent the flow drives.
 _OWN = (
+    "flow",
     "agents",
-    "models",
     "new",
     "details",
     "thinking",
@@ -130,7 +132,16 @@ class Editor(TextArea):
             self.text = text
 
     def action_send(self) -> None:
-        """Sends what is in the editor and empties it."""
+        """Takes what is offered, if anything is, and otherwise sends what is in the editor.
+
+        Enter means over the offers what it means over any list: take the one under the
+        cursor. What was typed goes when the offers are gone -- which is a line they have
+        nothing more to add to, or esc, which puts them away.
+        """
+        listing = self.screen.query_one("#offers", OptionList)
+        if listing.has_class("offering") and listing.highlighted is not None:
+            self.take(str(listing.get_option_at_index(listing.highlighted).id))
+            return
         said, self.text = self.text.strip(), ""
         if said:
             self.post_message(self.Sent(said))
@@ -144,14 +155,31 @@ class Editor(TextArea):
 
         Bound here rather than on the application, and only when the list is showing: a key
         the offers are not using is the editor's, and a prompt of more than one line needs
-        its arrows back.
+        its arrows back. With nothing offered they walk what was typed here before, and only
+        from the ends of what is being typed now -- up off the first line, down off the last
+        -- so that a prompt of several lines is still moved around in.
         """
         listing = self.screen.query_one("#offers", OptionList)
         if not listing.has_class("offering"):
             if event.key == "tab":
                 event.prevent_default()
                 event.stop()
-                self.app.action_agents()  # type: ignore[attr-defined]
+                self.app.action_flow()  # type: ignore[attr-defined]
+            elif event.key in ("up", "down"):
+                history = self.app.history  # type: ignore[attr-defined]
+                row, _ = self.cursor_location
+                if event.key == "up" and row == 0:
+                    said = history.back(self.text)
+                elif event.key == "down" and row == self.document.line_count - 1:
+                    said = history.forward()
+                else:
+                    return  # inside a prompt of more than one line, which is the editor's
+                if said is None:
+                    return  # nothing that way, so the key is the editor's as it always was
+                event.prevent_default()
+                event.stop()
+                self.text = said
+                self.move_cursor(self.document.end)
             return
         if event.key == "tab":
             event.prevent_default()
@@ -233,8 +261,10 @@ class Amflows(App[None]):
         super().__init__()
         #: The agents of the flow running now, which is who a typed line is said to.
         self._agents: list[AgentBase] = []
-        #: What the flow has done so far, which is what the right-hand column shows.
+        #: What the flow has done so far, which is what the right-hand column shows, and who
+        #: reads the agents' own logs into it while it runs.
         self._monitor = Monitor()
+        self._tally = Tally([], self._monitor)
         #: Whether a tool call and whether the agent's thinking are shown, as opencode's
         #: `/details` and `/thinking` toggle them.
         self._details = True
@@ -243,6 +273,10 @@ class Amflows(App[None]):
         #: both are set is the task, which is what starts it.
         self._flow_named = ""
         self._models: list[str] = []
+        #: What has been typed here before, which the arrows walk. Read now rather than each
+        #: time it is asked for: a run started here writes this project's own history into
+        #: being, and what is being walked must not change under whoever is walking it.
+        self.history = History()
         #: When each agent's turn started, for the line that closes it.
         self._began: dict[str, float] = {}
         #: Whether the last thing shown was a part that the next one may run on from.
@@ -375,13 +409,23 @@ class Amflows(App[None]):
         rate = sum(spend.rate for spend in spending)
         # Left, first match wins, as opencode's status line resolves it: what is running if
         # anything is, else where this is. Right, the usage. The two ends are pushed apart.
-        working = ", ".join(self._monitor.now_working())
-        if working:
+        working = self._monitor.now_working()
+        if working or self._agents:
             at = int(time.monotonic() / _REFRESH) % (_BLOCKS * 2)
             at = at if at < _BLOCKS else _BLOCKS * 2 - 1 - at  # there and back again
             bar = "".join("■" if step == at else "⬝" for step in range(_BLOCKS))
+            # Whoever is talking and how long their turn has been going, or -- between two
+            # turns -- the flow itself and how long the run has. A flow sleeps off a round,
+            # commits, reads what the last turn wrote, and none of that is a flow that has
+            # stopped: a clock still moving is what says so.
+            since = min(
+                (self._began[who] for who in working if who in self._began),
+                default=self._monitor.began,
+            )
             left = (
-                f"[cyan]{bar}[/cyan]  {escape(working)}"
+                f"[cyan]{bar}[/cyan]  "
+                f"{escape(', '.join(short(who) for who in working) or self._flow_named)}"
+                f"{_DOT}{time.monotonic() - since:.0f}s"
                 f"   [bold]esc[/bold] [dim]interrupt[/dim]"
             )
         elif self._set_up and not self._agents:
@@ -428,6 +472,9 @@ class Amflows(App[None]):
     def _sent(self, event: Editor.Sent) -> None:
         """Takes what was typed as a command, or as something to say to the agent."""
         line = event.text
+        # Written down whatever it turns out to be: a task, a word put into a running flow,
+        # a command. All three were typed, and any of them may be worth typing again.
+        self.history.add(line)
         if not line.startswith("/"):
             self._said(line)
             return
@@ -446,10 +493,10 @@ class Amflows(App[None]):
             self.action_help()
         elif name == "new":
             self.action_new()
+        elif name == "flow":
+            self.action_flow(argv[0] if argv else "")
         elif name == "agents":
-            self.action_agents(argv[0] if argv else "")
-        elif name == "models":
-            self.action_models()
+            self.action_agents()
         elif name == "details":
             self._details = not self._details
             self.show(f"[dim]tool calls {'shown' if self._details else 'hidden'}[/dim]")
@@ -499,48 +546,59 @@ class Amflows(App[None]):
         self.show(f"[dim]{where}[/dim]")
 
     @work
-    async def action_agents(self, named: str = "") -> None:
-        """Switches which flow runs, as opencode's tab switches which agent answers.
+    async def action_flow(self, named: str = "") -> None:
+        """Switches which flow runs, and then what each of its agents runs.
+
+        The two are asked as one walk rather than as two dialogs: what each agent runs is
+        asked next because a flow says for itself how many it drives, and esc off the first
+        thing that asks is a step back to the flows -- since a flow chosen by mistake is what
+        you would be walking back from.
 
         Args:
           named: A flow of your own, as a path. Left out, the ones amflows came with are
             listed instead -- a path is typed, since guessing which files below here are
             flows means reading all of them.
         """
-        picked = named or await self.push_screen_wait(Flows(self._flow_named))
-        if picked is None:
-            return
-        chosen = picked if isinstance(picked, str) else picked[0]
-        self._flow_named = chosen
-        # What each agent runs is asked next, since a flow says for itself how many it
-        # drives. Its own worker, because a worker is what may put a screen up and wait.
-        self._models = []
-        self.action_models()
-
-    @work
-    async def action_models(self) -> None:
-        """Sets what each of the flow's agents runs, which is what `/models` is for."""
         from amflows.janus.flows import find
         from amflows.janus.runner import drives
 
+        while True:
+            picked = named or await self.push_screen_wait(Flows(self._flow_named))
+            if picked is None:
+                return
+            self._flow_named = picked if isinstance(picked, str) else picked[0]
+            self._models = []
+            agents = installed()
+            if not agents:
+                self.show("amflows: no coding agent is installed here", "red")
+                return
+            try:
+                wanted = drives(find(self._flow_named))
+            except Exception as why:  # noqa: BLE001 -- a flow that will not load
+                self.show(f"amflows: {why}", "red")
+                return
+            chosen = await self.push_screen_wait(
+                Models(self._flow_named, wanted, agents)
+            )
+            if chosen is not None:
+                self._models = list(chosen)
+                self.show("[dim]say what to do, and the flow starts on it[/dim]")
+                self._draw()
+                return
+            if named:
+                return  # a flow of your own: there is no list to step back into
+            # And otherwise round again, which is the step back off the leftmost column.
+
+    def action_agents(self) -> None:
+        """Sets what each of the flow's agents runs, which is what `/agents` is for.
+
+        The flow itself is not asked for again, so esc is a way out rather than a step back
+        into a list this did not come through.
+        """
         if not self._flow_named:
             self.show("amflows: no flow yet — tab picks one", "red")
             return
-        agents = installed()
-        if not agents:
-            self.show("amflows: no coding agent is installed here", "red")
-            return
-        try:
-            wanted = drives(find(self._flow_named))
-        except Exception as why:  # noqa: BLE001 -- a flow that will not load
-            self.show(f"amflows: {why}", "red")
-            return
-        chosen = await self.push_screen_wait(Models(self._flow_named, wanted, agents))
-        if chosen is None:
-            return
-        self._models = list(chosen)
-        self.show("[dim]say what to do, and the flow starts on it[/dim]")
-        self._draw()
+        self.action_flow(self._flow_named)
 
     def _flow(self, argv: list[str]) -> None:
         """Starts a flow, keeping its agents so that a typed line can reach one.
@@ -559,6 +617,10 @@ class Amflows(App[None]):
             return  # argparse has already said what was wrong, and it went to the transcript
         self._agents = agents
         self._monitor = Monitor()
+        # What the run costs is read from the logs the agents keep, which they write as they
+        # go: a backend only says what a turn cost once the turn is over, and a turn is long.
+        self._tally = Tally(agents, self._monitor)
+        self._tally.watch()
         self._queued = []
 
         def take() -> list[str]:
@@ -570,10 +632,15 @@ class Amflows(App[None]):
             agent.waiting = take  # whichever turn starts next takes what was held
         self._draw()
 
+        # This run's, whatever is being watched by the time it ends.
+        watching, tally = self._monitor, self._tally
+
         def drive() -> int:
             try:
                 Runner(path, agents).run(task)
             finally:
+                tally.stops()  # read once more, for what the last turn wrote on its way out
+                watching.stops()  # the clock the rate is over is the run's, and it is over
                 self._agents = []
                 with contextlib.suppress(RuntimeError):
                     self.call_from_thread(self.show, "[dim]— the flow is done —[/dim]")

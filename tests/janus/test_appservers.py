@@ -95,6 +95,11 @@ class Handler(BaseHTTPRequestHandler):
             # Still being pursued the first time it is asked, as a goal is between its turns.
             GOAL.append(None)
             self.reply({"status": "active"} if len(GOAL) == 1 else None)
+        elif self.path.endswith("/sessions/session_fake"):
+            # The session itself, which is where the daemon keeps what it has cost so far.
+            self.reply({"id": "session_fake", "usage": {
+                "input_tokens": 300, "output_tokens": 100, "cache_read_tokens": 600,
+                "cache_creation_tokens": 0, "turn_count": 1}})
         elif len(POLLS) < 2:
             # Readable while it is still being written: what it will say is not there yet.
             self.reply({"items": [{"id": "msg_1", "role": "assistant", "content": [
@@ -187,6 +192,81 @@ for line in sys.stdin:
 """
 
 
+#: A `codex app-server` that runs a turn the way a working one goes: it reaches for things, it
+#: thinks, it says what it spent, and only at the end does it answer. Every message is shaped as
+#: `codex app-server generate-json-schema` says the real one shapes it -- the items carry what
+#: that schema says they carry, and the spending is the thread's running total under
+#: `tokenUsage.total`. The item nobody has heard of is there on purpose: the server grows kinds,
+#: and a turn must not go quiet over one.
+_CODEX_WORKING = """
+import json, sys
+
+SPENT = [1000, 1500]
+
+
+def send(message):
+    sys.stdout.write(json.dumps(message) + "\\n")
+    sys.stdout.flush()
+
+
+for line in sys.stdin:
+    call = json.loads(line)
+    if "id" not in call:
+        continue
+    send({"jsonrpc": "2.0", "id": call["id"],
+          "result": {"thread": {"id": "thread_fake"}}
+          if call["method"] == "thread/start" else {}})
+    if call["method"] == "thread/start":
+        send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
+    if call["method"] == "turn/start":
+        send({"method": "turn/started", "params": {"turnId": "turn_fake"}})
+        send({"method": "item/started", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "startedAtMs": 0, "item": {
+                "id": "item_0", "type": "userMessage", "content": "do the task"}}})
+        send({"method": "item/started", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "startedAtMs": 0, "item": {
+                "id": "item_1", "type": "commandExecution", "status": "inProgress",
+                "cwd": "/somewhere/else", "aggregatedOutput": "3 passed",
+                "command": "pytest -q"}}})
+        send({"method": "item/started", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "startedAtMs": 0, "item": {
+                "id": "item_2", "type": "flightOfFancy", "note": "something new"}}})
+        send({"method": "item/completed", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "completedAtMs": 1, "item": {
+                "id": "item_1", "type": "commandExecution", "status": "completed",
+                "exitCode": 0, "command": "pytest -q"}}})
+        send({"method": "item/completed", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "completedAtMs": 1, "item": {
+                "id": "item_3", "type": "fileChange", "status": "completed", "changes": [
+                    {"path": "src/x.py", "kind": "update", "diff": "@@ -1 +1 @@"}]}}})
+        send({"method": "item/completed", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "completedAtMs": 1, "item": {
+                "type": "webSearch", "status": "completed", "query": "what a nameless one is"}}})
+        send({"method": "item/completed", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "completedAtMs": 1, "item": {
+                "type": "webSearch", "status": "completed", "query": "and the one after it"}}})
+        send({"method": "item/completed", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "completedAtMs": 1, "item": {
+                "id": "item_4", "type": "reasoning", "summary": [],
+                "content": ["weighing it up"]}}})
+        send({"method": "thread/tokenUsage/updated", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "tokenUsage": {
+                "modelContextWindow": 258400,
+                "last": {"inputTokens": 900, "cachedInputTokens": 800, "outputTokens": 100,
+                         "reasoningOutputTokens": 0, "totalTokens": 1000},
+                "total": {"inputTokens": 900, "cachedInputTokens": 800, "outputTokens": 100,
+                          "reasoningOutputTokens": 0,
+                          "totalTokens": SPENT.pop(0) if SPENT else 1500}}}})
+        send({"method": "item/completed", "params": {
+            "threadId": "thread_fake", "turnId": "turn_fake", "completedAtMs": 1, "item": {
+                "id": "item_5", "type": "agentMessage", "text": "done"}}})
+        send({"method": "turn/completed", "params": {
+            "threadId": "thread_fake", "turn": {"id": "turn_fake", "status": "completed",
+                                                "items": []}}})
+        send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
+"""
+
+
 @dataclass(frozen=True)
 class _FakeServer:
     """A stand-in backend on PATH, and everything it was asked for."""
@@ -249,6 +329,11 @@ def codex(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
     return _install("codex", _CODEX, tmp_path, monkeypatch)
 
 
+@pytest.fixture
+def working(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
+    return _install("codex", _CODEX_WORKING, tmp_path, monkeypatch)
+
+
 def test_kimi_opens_then_resumes(kimi: _FakeServer) -> None:
     session = _agent().launch()
     assert session.run("hi") == "answered"
@@ -276,6 +361,35 @@ def test_kimi_opens_then_resumes(kimi: _FakeServer) -> None:
         prompt["path"] == f"/api/v1/sessions/{session.id}/prompts" for prompt in prompts
     )
     assert all(call["token"] == "Bearer secret" for call in calls)
+
+
+def test_a_kimi_turn_says_what_it_is_doing_and_what_it_came_to(
+    kimi: _FakeServer,
+) -> None:
+    """A turn is read back as it is written, rather than kept until it has an answer.
+
+    And what it cost is asked of the session it ran in, which is the only place the daemon
+    says: a flow that cannot see what it is spending is a flow nobody can stop in time.
+    """
+    session = _agent().launch()
+
+    shown = [(event.kind, event.text) for event in session.stream("hi")]
+
+    assert ("reasoning", "...") in shown  # thought
+    assert ("tool", "Write") in shown  # reached for something
+    assert ("text", " answered ") in shown  # and said so, before the turn was over
+    assert shown[-1] == ("result", "answered")
+
+
+def test_what_a_kimi_turn_spent_is_charged_to_the_turn_that_spent_it(
+    kimi: _FakeServer,
+) -> None:
+    """The daemon counts the session, which is every turn of it, so take the rise."""
+    session = _agent().launch()
+
+    spent = [event.tokens for event in session.stream("hi") if event.kind == "result"]
+
+    assert spent == [{"kimi-code/k3": 1000}]  # every kind of token, in and out alike
 
 
 @pytest.mark.parametrize(
@@ -445,6 +559,55 @@ def test_codex_can_be_talked_to_while_a_turn_is_running(codex: _FakeServer) -> N
         "expectedTurnId": "turn_fake",
     }
     assert "steered:actually, stop" in said[-1].text
+
+
+def test_a_codex_turn_says_what_it_is_doing_while_it_is_doing_it(
+    working: _FakeServer,
+) -> None:
+    """A turn is minutes of work and one answer, and the minutes are what is watched.
+
+    Every item the server reports is shown, including a kind of item this has never heard
+    of: the alternative is a turn that reads as a hang until it answers.
+    """
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+
+    shown = [(event.kind, event.text) for event in session.stream("do the task")]
+
+    assert ("tool", "Bash pytest -q") in shown  # named as every other backend names it
+    assert (
+        "tool",
+        "flightOfFancy something new",
+    ) in shown  # and one nobody has heard of
+    assert (
+        "tool",
+        "Edit src/x.py",
+    ) in shown  # and one only ever completed, never started
+    assert ("reasoning", "weighing it up") in shown
+    assert shown[-1] == ("result", "done")
+    # What it ran, rather than the directory or the output the server sends beside it.
+    assert not [
+        row for row in shown if "somewhere/else" in row[1] or "3 passed" in row[1]
+    ]
+    assert not [row for row in shown if "do the task" in row[1]]  # nor the prompt, back
+    # Started and then completed is one thing done, and reads as one row rather than two.
+    assert shown.count(("tool", "Bash pytest -q")) == 1
+    # An item naming itself with nothing is not the nameless one before it: two of them are
+    # two things done, and the second is not swallowed as one already seen.
+    assert ("tool", "WebSearch what a nameless one is") in shown
+    assert ("tool", "WebSearch and the one after it") in shown
+
+
+def test_what_a_codex_turn_spent_is_charged_to_the_turn_that_spent_it(
+    working: _FakeServer,
+) -> None:
+    """The server counts the thread, which is every turn of the session, so take the rise."""
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).launch()
+
+    first = [event for event in session.stream("do the task") if event.kind == "result"]
+    second = [event for event in session.stream("and again") if event.kind == "result"]
+
+    assert first[-1].tokens == {"gpt-5-codex": 1000}
+    assert second[-1].tokens == {"gpt-5-codex": 500}  # 1500 all told, 1000 of it before
 
 
 def test_a_codex_session_with_no_turn_running_cannot_be_talked_to() -> None:

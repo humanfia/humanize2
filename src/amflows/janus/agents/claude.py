@@ -40,6 +40,11 @@ class ClaudeCodeSession(StreamSessionBase):
         #: The id Claude says this session has, taken only once a turn has landed in it.
         self._named: str | None = None
 
+    @property
+    def named(self) -> str | None:
+        """What Claude called this session, which it says on the first line it writes."""
+        return self._id or self._named
+
     def _command(self) -> list[str]:
         """Builds the ``claude --print`` that reads turns from stdin and says events on stdout.
 

@@ -21,6 +21,8 @@ from .config import AgentConfig
 if TYPE_CHECKING:
     from amflows.coganchor import AnchorConfig
 
+    from ..cycle import Cycle
+
 
 class Stopped(Exception):
     """Raised in place of a turn, once the agent has been told to stop.
@@ -129,6 +131,19 @@ class SessionBase(ABC):
         """
         if self._id is None:
             raise RuntimeError("session has not run a turn yet")
+        return self._id
+
+    @property
+    def named(self) -> str | None:
+        """What the backend calls this conversation, as soon as it has called it anything.
+
+        Which is earlier than :attr:`id`: a session is opened by a turn that lands in it, and
+        the backend names it when the turn starts. Between those two is the whole of the first
+        turn -- the minutes of it, and the log the backend is writing all the while.
+
+        Returns:
+          The backend's id, or None before the backend has said one.
+        """
         return self._id
 
     def run(self, prompt: str) -> str:
@@ -246,6 +261,10 @@ class SessionBase(ABC):
         if self._id is None:  # an id is fixed for the life of the session it names
             self._id = session_id
             self._agent._opened.append(session_id)
+            if self._agent.cycle is not None:
+                # The run is the only thing that knows this session was one of its own: the
+                # backend logs it under this id and never says whose it was.
+                self._agent.cycle.opened(self._agent, session_id)
 
     def pursue(self, objective: str) -> str:
         """Runs the session under a goal, which the agent then keeps itself going toward.
@@ -663,6 +682,10 @@ class AgentBase(ABC):
         #: which goes into that turn. Left unset by a flow driven from the command line,
         #: where there is nobody to say anything mid-run.
         self.waiting: Callable[[], list[str]] | None = None
+        #: The run this agent is part of, set by whatever is driving the flow and told of
+        #: every session this agent opens. Left unset by an agent driven by hand, which is
+        #: not a run of anything.
+        self.cycle: Cycle | None = None
         # The machine an isolated agent started, once its first turn has started one.
         self._anchor: AnchorConfig | None = None
         self._starting = threading.Lock()
@@ -671,6 +694,30 @@ class AgentBase(ABC):
     def id(self) -> str:
         """What this agent is called, and what a trace groups its sessions under."""
         return self._id
+
+    @property
+    def stopped(self) -> bool:
+        """Whether this agent has been told to take no further turn.
+
+        Which is not the same as the turn it was taking having failed, though that is how it
+        looks from inside one: a process killed under a turn is a turn that could not finish.
+        """
+        return self._stopped
+
+    @property
+    def backend(self) -> str:
+        """The coding agent this drives, named as a command line names it.
+
+        Read off the class rather than written down twice: `ClaudeCodeAgent` drives `claude`,
+        and an agent whose class says otherwise would be the one thing nobody could check.
+        """
+        return (
+            type(self)
+            .__name__.removesuffix("Agent")
+            .removesuffix("CLI")
+            .removesuffix("Code")
+            .lower()
+        )
 
     @property
     def opened(self) -> list[str]:

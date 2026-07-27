@@ -7,6 +7,7 @@ drawn -- the interface's own job being to have one line mean both of those thing
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import time
@@ -18,8 +19,11 @@ import pytest
 from textual.pilot import Pilot
 from textual.widgets import OptionList, Static
 
+from amflows.janus import cycles
 from amflows.tui import Amflows
 from amflows.tui.app import _OWN
+from amflows.tui.discover import Model
+from amflows.tui.pick import Models
 
 #: A flow that drives one agent for two turns, so a line can be typed while it is running.
 FLOW = """
@@ -178,7 +182,7 @@ def test_only_the_flows_amflows_came_with_are_offered() -> None:
     from amflows.janus.flows import found
     from amflows.tui.complete import offered
 
-    assert offered("/agents ", tuple(COMMANDS)) == [name for _, name in found()]
+    assert offered("/flow ", tuple(COMMANDS)) == [name for _, name in found()]
 
 
 @pytest.mark.timeout(60)
@@ -213,7 +217,7 @@ async def test_a_half_typed_command_is_offered_the_rest_of_itself() -> None:
 
     app = Amflows()
     async with app.run_test() as driver:
-        await driver.press(*"/ag")
+        await driver.press(*"/fl")
         await driver.pause()
 
         offers = app.query_one("#offers", OptionList)
@@ -221,12 +225,107 @@ async def test_a_half_typed_command_is_offered_the_rest_of_itself() -> None:
         # The name is what is taken; what is shown is the name and what it is for.
         assert [
             str(offers.get_option_at_index(i).id) for i in range(offers.option_count)
-        ] == ["/agents"]
+        ] == ["/flow"]
         assert "Switch flow" in str(offers.get_option_at_index(0).prompt)
 
         await driver.press("tab")
 
-        assert app.query_one(Editor).text == "/agents "
+        assert app.query_one(Editor).text == "/flow "
+
+
+@pytest.mark.timeout(60)
+async def test_enter_takes_what_is_offered_rather_than_sending_the_half_typed_line() -> (
+    None
+):
+    """Over an open list, enter means take what is under the cursor -- as it does anywhere.
+
+    And the offers run out, so enter goes back to sending: `/flow` takes one flow, and a
+    line that already names it has nothing left to be finished with.
+    """
+    from amflows.janus.flows import found
+    from amflows.tui.app import Editor
+
+    app = Amflows()
+    async with app.run_test() as driver:
+        editor = app.query_one(Editor)
+
+        await driver.press(*"/fl")
+        await driver.press("enter")
+        await driver.pause()
+
+        assert editor.text == "/flow "  # taken, not sent
+        assert "no such command" not in _transcript(app)
+
+        await driver.press("enter")  # and again, for the flow it is offering now
+        await driver.pause()
+
+        assert editor.text == f"/flow {found()[0][1]} "
+
+        await driver.press("enter")  # nothing left to offer, so this is the line going
+        await driver.pause()
+
+        assert editor.text == ""
+        assert f"/flow {found()[0][1]}" in _transcript(app)
+
+
+@pytest.mark.timeout(60)
+async def test_the_arrows_walk_what_was_typed_before_it() -> None:
+    """Up for older and down for newer, and what was half typed is given back at the end.
+
+    Which is the whole reason the draft is kept: an arrow pressed by mistake over a prompt
+    somebody spent five minutes writing must not be what takes it away.
+    """
+    from amflows.tui.app import Editor
+
+    app = Amflows()
+    async with app.run_test() as driver:
+        editor = app.query_one(Editor)
+        for said in ("first", "second"):
+            await driver.press(*said)
+            await driver.press("enter")
+        await driver.press(*"half written")
+
+        await driver.press("up")
+        assert editor.text == "second"  # newest first
+
+        await driver.press("up")
+        assert editor.text == "first"
+
+        await driver.press("up")
+        assert editor.text == "first"  # the far end of it, and nothing is lost there
+
+        await driver.press("down")
+        assert editor.text == "second"
+
+        await driver.press("down")
+        assert editor.text == "half written"  # what was being typed, back again
+
+
+@pytest.mark.timeout(60)
+async def test_the_arrows_are_the_editor_s_own_inside_a_prompt_of_more_than_one_line() -> (
+    None
+):
+    """A prompt of several lines is moved around in; only its ends walk the history."""
+    from amflows.tui.app import Editor
+
+    app = Amflows()
+    async with app.run_test() as driver:
+        editor = app.query_one(Editor)
+        await driver.press(*"remembered")
+        await driver.press("enter")
+        editor.text = "one\ntwo"
+        editor.move_cursor((1, 3))  # the end of the second line, which is the last
+
+        await driver.press("up")  # up the prompt, not back through what was typed
+
+        assert editor.text == "one\ntwo"
+        assert editor.cursor_location[0] == 0
+
+        await driver.press(
+            "up"
+        )  # and off the top of it, which is the history after all
+
+        assert editor.text == "remembered"
 
 
 @pytest.mark.timeout(60)
@@ -267,6 +366,8 @@ async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None
 
     assert {f"/{name}" for name in COMMANDS if about(name)} <= set(offers)
     assert "/run" not in offers and "/tui" not in offers
+    # And a command typed in full has nothing left to be finished with, so enter sends it.
+    assert offered("/exit", (*COMMANDS, *_OWN)) == []
 
 
 @pytest.mark.timeout(90)
@@ -292,6 +393,13 @@ async def test_escape_stops_the_flow_and_not_just_the_turn(workspace: Path) -> N
         await until(lambda: not app._agents, driver)  # the flow itself is over
 
         assert "stopping the flow" in _transcript(app)
+        # And the run is over with it: a cycle is one run of one flow, and esc ends one.
+        (cycle,) = cycles(workspace)
+        assert json.loads(cycle.read_text().splitlines()[-1]) == {
+            "event": "ended",
+            "at": unittest.mock.ANY,
+            "how": "stopped",
+        }
 
 
 @pytest.mark.timeout(90)
@@ -388,9 +496,54 @@ async def test_a_turn_reads_the_way_opencode_renders_one() -> None:
     assert "\n   ▣  one · m · " in shown
 
 
+@pytest.mark.timeout(60)
+async def test_a_flow_between_two_turns_is_a_flow_that_is_running() -> None:
+    """It sleeps off a round, commits, reads what the last turn wrote -- and that is the run.
+
+    Which is why the rate is measured over the whole of it: the status line says the same
+    thing, naming the flow and how long the run has been going rather than falling back to
+    saying where it is, as if nothing were happening.
+    """
+    from amflows.janus.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    app = Amflows()
+    async with app.run_test() as driver:
+        # A flow that is running, with nobody mid-turn: the flow's own code has the time.
+        app._flow_named = "rlcr"
+        app._agents = [ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))]
+        app._monitor.began = time.monotonic() - 90
+        app._draw()
+        await driver.pause()
+
+        status = str(app.query_one("#status", Static).content)
+
+    assert "rlcr" in status  # what is running
+    assert "90s" in status  # and for how long the run has been going, turn or no turn
+
+
+@pytest.mark.timeout(60)
+async def test_a_turn_that_has_gone_quiet_still_reads_as_one_that_is_running() -> None:
+    """A model thinks for minutes without a word, and the clock is what says it is alive."""
+    from amflows.janus import Event
+    from amflows.janus.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"), name="one")
+    app = Amflows()
+    async with app.run_test() as driver:
+        app._heard(agent, Event(kind="begins", text="do it"))
+        app._began["one"] = time.monotonic() - 42  # a turn that started a while ago
+        app._draw()
+        await driver.pause()
+
+        status = str(app.query_one("#status", Static).content)
+
+    assert "one" in status  # who is working
+    assert "42s" in status  # and for how long, which a turn saying nothing does not say
+
+
 @pytest.mark.timeout(90)
 async def test_tab_picks_a_flow_and_then_what_each_agent_runs() -> None:
-    """Tab switches flow the way opencode's tab switches agent, then `/models` follows.
+    """Tab switches flow the way opencode's tab switches agent, then `/agents` follows.
 
     Only the flows amflows came with are listed -- a flow of your own is a path typed out.
     """
@@ -410,3 +563,113 @@ async def test_tab_picks_a_flow_and_then_what_each_agent_runs() -> None:
         await driver.press("enter")
         # Which lands on the models sheet, since a flow says how many agents it drives.
         await until(lambda: app._flow_named == found()[0][1], driver)
+
+
+@pytest.mark.timeout(60)
+async def test_the_flow_itself_is_walked_back_into_from_what_it_runs_on() -> None:
+    """The walk is one walk: esc off the first thing asked about a flow is that flow again.
+
+    Rather than a way out of both, which would mean picking the flow over from tab.
+    """
+    from amflows.tui.pick import Flows
+
+    app = Amflows()
+    # Whatever this machine has installed, since the sheet is only put up if there is one.
+    with unittest.mock.patch(
+        "amflows.tui.app.installed",
+        return_value={"claude": (Model("opus", ("high",)),)},
+    ):
+        async with app.run_test() as driver:
+            await driver.press("tab")
+            await until(lambda: isinstance(app.screen, Flows), driver)
+            await driver.press("enter")
+            await until(lambda: isinstance(app.screen, Models), driver)
+
+            await driver.press("escape")
+            await until(lambda: isinstance(app.screen, Flows), driver)
+
+            assert isinstance(app.screen, Flows)  # back in the list, not out of both
+            assert app._models == []
+
+
+def _column(sheet: Models, part: str) -> list[str]:
+    """What one column of the models sheet is holding, bare.
+
+    Args:
+      sheet: The sheet to read.
+      part: Which of its columns.
+
+    Returns:
+      The choices in it, in the order they read.
+    """
+    return [
+        str(option.id) for option in sheet.query_one(f"#{part}", OptionList).options
+    ]
+
+
+@pytest.mark.timeout(60)
+async def test_what_an_agent_runs_is_chosen_a_part_at_a_time() -> None:
+    """Three columns, each holding what the one to its left has under the cursor.
+
+    Rather than one list of every backend crossed with every model crossed with every
+    effort, which is what a flat list of them would be.
+    """
+    app = Amflows()
+    async with app.run_test() as driver:
+        sheet = Models(
+            "flow.py",
+            1,
+            {
+                "claude": (Model("opus", ("low", "high")),),
+                "codex": (Model("gpt-5.6-sol", ("max",)),),
+            },
+        )
+        app.push_screen(sheet)
+        await driver.pause()
+
+        assert _column(sheet, "agent") == ["claude", "codex"]
+        assert _column(sheet, "model") == ["opus"]
+        assert _column(sheet, "effort") == ["low", "high"]
+
+        await driver.press("down")  # to codex, which runs something else
+        await driver.pause()
+
+        assert _column(sheet, "model") == ["gpt-5.6-sol"]
+        assert _column(sheet, "effort") == ["max"]  # and takes only the one effort
+
+
+@pytest.mark.timeout(60)
+async def test_a_choice_made_is_walked_back_rather_than_started_over() -> None:
+    """Esc steps left, and off the leftmost column back into the agent chosen before it.
+
+    Which is the whole of it: a flow driving two agents used to mean that the first one,
+    once answered, could not be answered again.
+    """
+    app = Amflows()
+    async with app.run_test() as driver:
+        sheet = Models("flow.py", 2, {"claude": (Model("opus", ("low", "high")),)})
+        app.push_screen(sheet)
+        await driver.pause()
+
+        for key in ("enter", "enter", "down", "enter"):  # agent, model, high, taken
+            await driver.press(key)
+            await driver.pause()
+
+        assert sheet._chosen == ["claude/opus/high"]
+        assert (
+            sheet.focused is not None and sheet.focused.id == "agent"
+        )  # onto the next
+
+        await driver.press(
+            "escape"
+        )  # off the leftmost column, back into the first agent
+        await driver.pause()
+
+        assert sheet._chosen == []
+        assert sheet.focused is not None and sheet.focused.id == "effort"
+        assert sheet._picked("effort") == "high"  # as it was left
+
+        await driver.press("escape")  # and left again, through the columns
+        await driver.pause()
+
+        assert sheet.focused is not None and sheet.focused.id == "model"

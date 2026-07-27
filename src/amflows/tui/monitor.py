@@ -14,9 +14,10 @@ from dataclasses import dataclass, field
 
 __all__ = ["Monitor", "Spend", "short"]
 
-#: How far back the rate is measured. Long enough to survive the gap between two turns, short
-#: enough that a flow which has stopped reads as stopped.
-_WINDOW = 30.0
+#: How far back the rate is measured. Five minutes is long enough to carry across the gaps a
+#: flow leaves -- a turn that thinks, a round it sleeps off, a commit it makes -- and short
+#: enough that a run which has gone quiet reads as quiet.
+_WINDOW = 300.0
 
 
 def short(agent: str) -> str:
@@ -42,7 +43,10 @@ class Spend:
     Attributes:
       model: The model the tokens were spent on.
       tokens: Every token spent on it, in and out alike.
-      rate: Tokens a second over the last window, which is zero once it falls quiet.
+      rate: Tokens a second over the last five minutes, or over the whole run while the run
+        is younger than that. Seconds on the clock, not seconds an agent was talking: a flow
+        sleeps between rounds, commits, reads what the last turn wrote, and that time is time
+        the tokens were spent over.
     """
 
     model: str
@@ -65,9 +69,26 @@ class Monitor:
     models: dict[str, str] = field(default_factory=dict)
     #: Tokens spent per model, all told.
     spent: Counter[str] = field(default_factory=Counter)
-    #: Recent spending as (when, model, tokens), for the rate. Bounded by the window, not by
-    #: the length of the run: a flow going for days keeps a few seconds of history.
+    #: What each source says has been spent on each model so far. Two of them say: the
+    #: backends, as each turn ends, and the logs those backends keep, as they write them. They
+    #: are counting the same tokens, so what was spent is the higher of the two rather than
+    #: the sum -- and whichever has seen further is the one that is right.
+    totals: dict[tuple[str, str], int] = field(default_factory=dict)
+    #: Recent spending as (when, model, tokens), which is what the rate is measured over.
+    #: Bounded by the window rather than by the length of the run: a flow going for days
+    #: keeps five minutes of it.
     recent: deque[tuple[float, str, int]] = field(default_factory=deque)
+    #: The rate per model as it was last worked out, and what it was worked out from: the rate
+    #: is worked out again when something it is made of moves, and not on any clock of its own.
+    rates: dict[str, float] = field(default_factory=dict)
+    figured: int | None = None
+    #: How many times what has been spent has changed, which is what `figured` is against.
+    changed: int = 0
+    #: When the run began, which is when this was made: one of these is made for one flow.
+    began: float = field(default_factory=time.monotonic)
+    #: When it ended, or None while it is still going -- so that a run that is over reads as
+    #: what it was doing when it ended rather than as a rate decaying to nothing after it.
+    until: float | None = None
     #: The agent whose turn ended last, which is who the next one was handed from.
     _last: str | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
@@ -99,6 +120,12 @@ class Monitor:
                 self.working[agent] -= 1
             self._last = agent
 
+    def stops(self) -> None:
+        """Notes that the run is over, which is what stops the clock the rate is read at."""
+        with self._lock:
+            self.until = time.monotonic()
+            self.figured = None  # so the last rate shown is the one it ended on
+
     def spend(
         self,
         agent: str,
@@ -106,7 +133,7 @@ class Monitor:
         model: str | None = None,
         now: float | None = None,
     ) -> None:
-        """Notes tokens spent by an agent, on whichever model it ran them on.
+        """Notes tokens an agent's backend has just reported spending.
 
         Args:
           agent: Who spent them.
@@ -117,14 +144,42 @@ class Monitor:
         """
         if tokens <= 0:
             return
+        if model is not None:
+            self.models[agent] = model
+        model = self.models.get(agent, agent)
+        # Added up here rather than there, so that what a backend reports a turn at a time
+        # arrives as the same kind of thing a log read from the top does: a total.
+        self.counted("told", model, self.totals.get(("told", model), 0) + tokens, now)
+
+    def counted(
+        self, source: str, model: str, total: int, now: float | None = None
+    ) -> None:
+        """Notes what one source has now seen spent on one model, all told.
+
+        A total rather than an addition, because a log is read again and again: what it says
+        the second time is what it said the first time and more, and adding that would count
+        the first of it twice.
+
+        Args:
+          source: Who says so, which is either the backends or their logs.
+          model: What the tokens were spent on.
+          total: Every token that source has seen spent on it.
+          now: When, defaulting to this moment. Given only so a test can say.
+        """
         with self._lock:
-            if model is not None:
-                self.models[agent] = model
-            model = self.models.get(agent, agent)
-            self.spent[model] += tokens
-            self.recent.append(
-                (time.monotonic() if now is None else now, model, tokens)
+            if total <= self.totals.get((source, model), 0):
+                return
+            self.totals[(source, model)] = total
+            # The most any source has seen, which is what has been spent: two sources counting
+            # the same tokens are not two lots of tokens.
+            seen = max(
+                held for (_, named), held in self.totals.items() if named == model
             )
+            if (risen := seen - self.spent[model]) <= 0:
+                return
+            self.spent[model] = seen
+            self.recent.append((time.monotonic() if now is None else now, model, risen))
+            self.changed += 1
 
     def spending(self, now: float | None = None) -> list[Spend]:
         """What each model has cost, and how fast, biggest spender first.
@@ -133,17 +188,36 @@ class Monitor:
           now: The moment to measure the rate at, defaulting to this one.
 
         Returns:
-          One entry per model anything has been spent on.
+          One entry per model anything has been spent on. How fast is worked out again when
+          something it is made of has moved -- tokens counted, or old ones falling out of the
+          window -- and stands the rest of the time, rather than being worked out on a clock.
         """
         moment = time.monotonic() if now is None else now
+        if self.until is not None:
+            moment = min(
+                moment, self.until
+            )  # a run that is over is read at its own end
         with self._lock:
+            aged = False
             while self.recent and self.recent[0][0] < moment - _WINDOW:
                 self.recent.popleft()
-            lately: Counter[str] = Counter()
-            for _, model, tokens in self.recent:
-                lately[model] += tokens
+                aged = True
+            if aged or self.figured != self.changed:
+                # Seconds on the clock: the window holds the turns and the flow's own code
+                # alike, so what a flow spent between two turns -- sleeping off a round,
+                # committing, reading what the last turn wrote -- is time it is measured over.
+                # Under five minutes old, the run itself is the window it has had.
+                over = min(_WINDOW, moment - self.began)
+                lately: Counter[str] = Counter()
+                for _, model, tokens in self.recent:
+                    lately[model] += tokens
+                self.rates = {
+                    model: lately[model] / over if over > 0 else 0.0
+                    for model in self.spent
+                }
+                self.figured = self.changed
             return [
-                Spend(model=model, tokens=tokens, rate=lately[model] / _WINDOW)
+                Spend(model=model, tokens=tokens, rate=self.rates.get(model, 0.0))
                 for model, tokens in self.spent.most_common()
             ]
 

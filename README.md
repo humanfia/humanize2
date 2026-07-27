@@ -50,8 +50,10 @@ agent.launch().run("Read TASK.md and get started.")
 `amflows tui` opens a terminal interface — a coding agent's own terminal, with a flow
 underneath instead of one agent. Tab picks a flow and what each of its agents runs; the first
 thing you say is what it is to do, and anything said after that goes to the agent taking its
-turn. A line starting with `/` is a command. Beside the transcript is what the flow is doing:
-which agent has the turn, who handed to whom, and what each model is costing as it costs it.
+turn. A line starting with `/` is a command, and the up and down arrows walk back through what
+you have typed before — here if you have typed anything here, and anywhere otherwise. Beside
+the transcript is what the flow is doing: which agent has the turn, who handed to whom, and
+what each model is costing as it costs it.
 
 ```sh
 amflows tui
@@ -66,7 +68,9 @@ amflows run -f ralph_loop -a claude/claude-opus-4-8/high "fix the build"
 `-f` takes the name of a flow amflows came with, one of your own under `.amflows/flows` here or
 in your home directory, or the path to a file anywhere else.
 
-Collect what it left behind, and open the file in [ui.perfetto.dev](https://ui.perfetto.dev):
+Every run is one cycle, written down under `~/.amflows/cycles` as it happens: the flow, the
+agents, and every session they opened. Collect what it left behind, and open the file in
+[ui.perfetto.dev](https://ui.perfetto.dev):
 
 ```sh
 amflows collect

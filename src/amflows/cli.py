@@ -169,17 +169,25 @@ def _collect(argv: list[str]) -> int:
 
     import datetime
 
+    from amflows.janus.cycle import cycles, opened
     from amflows.oronyx.collector import collect
 
     # One trace per run, named after the moment it was taken, so collecting twice keeps both
     # rather than writing over the first.
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
     output = args.output or f".amflows/{stamp}.trace.json"
+    # Who ran what, taken from the last flow run here: the backends log a session under an id
+    # and never say whose it was, so two agents at one configuration are one agent to a trace
+    # unless the run itself says otherwise -- and the run wrote down that it did.
+    agents: dict[str, list[str]] = {}
+    for cycle in cycles(args.workspace):
+        agents = opened(cycle) or agents
 
     try:
         document = collect(
             args.workspace,
             sessions=args.sessions,
+            agents=agents or None,
             output=output,
             start=args.start,
             end=args.end,

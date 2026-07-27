@@ -112,11 +112,24 @@ class Runner:
             raise NotAFlow(f"{flow}: run() drives {drives} agents, {len(agents)} given")
         self._run: Callable[[tuple[AgentBase, ...], str], None] = run
         self._agents = tuple(agents)
+        self._flow = str(
+            flow
+        )  # as it was named, which is what a run of it is named after
 
     def run(self, task: str) -> None:
         """Runs the flow in this directory, for as long as it keeps running.
 
+        The run is written down as it happens: which agents were driven, at what, and which
+        sessions each of them opened. Nothing else knows a session was part of a run -- the
+        backends log them one by one, under ids of their own -- and the run is over the moment
+        this returns, however it returns.
+
         Args:
           task: What the flow is to have its agents do.
         """
-        self._run(self._agents, task)
+        from .cycle import Cycle
+
+        with Cycle(self._flow, self._agents, task) as cycle:
+            for agent in self._agents:
+                agent.cycle = cycle
+            self._run(self._agents, task)
