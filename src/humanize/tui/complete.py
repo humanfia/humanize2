@@ -83,7 +83,7 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
     # The flow is the one thing `/flow` takes, so it is offered while that word is the one
     # being typed and not after it: a line that already names a flow is a finished line.
     elif words[0] == "/flow" and len(words) == 2:
-        from humanize.janus.flows import found
+        from humanize.flows import found
 
         offers = [name for _, name in found()]
     else:

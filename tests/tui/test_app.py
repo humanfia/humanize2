@@ -180,7 +180,7 @@ async def test_a_flow_that_is_not_there_is_a_line_to_correct_and_not_the_end() -
 
 def test_only_the_flows_humanize_came_with_are_offered() -> None:
     """A flow of your own is a path typed out, not something found by walking the tree."""
-    from humanize.janus.flows import found
+    from humanize.flows import found
     from humanize.tui.complete import offered
 
     assert offered("/flow ", _OWN) == [name for _, name in found()]
@@ -243,7 +243,7 @@ async def test_enter_takes_what_is_offered_rather_than_sending_the_half_typed_li
     And the offers run out, so enter goes back to sending: `/flow` takes one flow, and a
     line that already names it has nothing left to be finished with.
     """
-    from humanize.janus.flows import found
+    from humanize.flows import found
     from humanize.tui.app import Editor
 
     app = Humanize()
@@ -1023,7 +1023,7 @@ async def test_the_cursor_can_be_seen_in_the_lists_that_are_chosen_from() -> Non
 @pytest.mark.timeout(60)
 async def test_shift_tab_steps_through_the_flows_without_asking() -> None:
     """A short list is stepped through, not opened: `/flow` is there for picking by name."""
-    from humanize.janus.flows import found
+    from humanize.flows import found
 
     named = [name for _, name in found()]
     with unittest.mock.patch(

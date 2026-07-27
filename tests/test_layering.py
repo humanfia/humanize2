@@ -2,7 +2,9 @@
 
 Two things nothing else can check. The subpackages are merged projects that keep their own
 dependencies: janus names the machine its agents act on, so it reads coganchor's settings and
-talanton's, and talanton hands back an anchor, so it reads coganchor's too. Nothing else
+talanton's, and talanton hands back an anchor, so it reads coganchor's too. The flows are
+written against the agents janus hands them, and janus's runner is what finds a flow by the
+name a command line gave it, so those two name each other and nothing else. Otherwise nothing
 crosses -- oronyx stays alone, and none of them may reach back up into janus. And the target
 half runs on the target, which may be any architecture, while :mod:`humanize.coganchor.linux`
 picks a register map at import time and refuses anything but x86-64 -- so the serving half must
@@ -27,7 +29,16 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 
 #: What each layer may import besides its own subtree. Longest matching layer wins.
 ALLOWED = {
-    "humanize.janus": {"humanize", "humanize.coganchor", "humanize.talanton"},
+    "humanize.janus": {
+        "humanize",
+        "humanize.coganchor",
+        "humanize.talanton",
+        # A flow is named on a command line and looked up by the runner, so the runner names
+        # where they are found. The other way round is the real dependency: a flow is written
+        # against the agents janus hands it, and that is all it may name.
+        "humanize.flows",
+    },
+    "humanize.flows": {"humanize", "humanize.janus"},
     "humanize.talanton": {"humanize", "humanize.coganchor"},
     "humanize.oronyx": {"humanize"},
     "humanize.jetflow": {"humanize"},

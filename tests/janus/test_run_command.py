@@ -93,7 +93,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 #: The flows humanize comes with, each of which shows the line that would start it.
 PREBUILT = sorted(
     path
-    for path in (Path(__file__).resolve().parents[2] / "src/humanize/janus/flows").glob(
+    for path in (Path(__file__).resolve().parents[2] / "src/humanize/flows").glob(
         "*.py"
     )
     if not path.stem.startswith("_")
@@ -314,7 +314,7 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     where it is -- and one taking a built-in's name stands in for it, which is what makes
     a project able to mean its own `rlar` by `rlar`.
     """
-    from humanize.janus.flows import find, found
+    from humanize.flows import find, found
 
     home, project = tmp_path / "home", tmp_path / "project"
     for where in (home / ".humanize/flows", project / ".humanize/flows"):
@@ -335,7 +335,7 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     assert ("builtin", "rlar") not in listed
     assert find("rlar") == str((project / ".humanize/flows/rlar.py").resolve())
     assert find("yours") == str((home / ".humanize/flows/yours.py").resolve())
-    assert find("goal").endswith("src/humanize/janus/flows/goal.py")
+    assert find("goal").endswith("src/humanize/flows/goal.py")
     assert find("nowhere") == "nowhere"  # a path is taken as given
 
 
@@ -367,7 +367,7 @@ def test_a_failed_turn_is_taken_again_and_only_that_turn(
     """
     import subprocess as sub
 
-    from humanize.janus.flows.humanize1 import spoken
+    from humanize.flows.humanize1 import spoken
 
     monkeypatch.setattr("time.sleep", lambda _: None)
     taken: list[str] = []
@@ -407,7 +407,7 @@ def test_only_a_review_that_is_the_word_accepts_the_work(
     said: str, accepted: bool
 ) -> None:
     """Nothing between the two agents parses anything, so one word has to carry the verdict."""
-    from humanize.janus.flows.humanize1 import ACCEPTED
+    from humanize.flows.humanize1 import ACCEPTED
 
     assert bool(ACCEPTED.fullmatch(said)) is accepted
 
@@ -416,7 +416,7 @@ def test_the_chat_flow_is_one_session_for_as_long_as_it_is_told_things(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Talking to a coding agent, with no loop around it: the turns are a conversation."""
-    from humanize.janus.flows.chat import run as chat
+    from humanize.flows.chat import run as chat
 
     agent = ShellAgent(AgentConfig(model="m", effort="high"))
     said = ["echo third", "echo second"]
@@ -435,7 +435,7 @@ def test_the_chat_flow_run_from_a_command_line_does_the_one_thing_it_was_given(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Nobody is at a prompt there, so there is nothing to wait for and it returns."""
-    from humanize.janus.flows.chat import run as chat
+    from humanize.flows.chat import run as chat
 
     agent = ShellAgent(AgentConfig(model="m", effort="high"))
 

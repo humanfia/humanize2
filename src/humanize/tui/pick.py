@@ -163,7 +163,7 @@ class Flows(Sheet):
 
     def _fill(self) -> None:
         """Puts the flows up, with the marker beside the one the cursor is on."""
-        from humanize.janus.flows import found
+        from humanize.flows import found
 
         listing = self.query_one("#choices", OptionList)
         if not self._named:

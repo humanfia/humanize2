@@ -56,7 +56,7 @@ def _read(
       NotAFlow: If the file is not there, is not a flow -- nothing called `run`, or one whose
         `agents` cannot be read or says nothing about how many it takes.
     """
-    from humanize.janus.flows import find
+    from humanize.flows import find
 
     # Resolved here rather than by whoever is starting one, so that a name works wherever a
     # flow is named -- a command line, an interface, a `Runner` written by hand.

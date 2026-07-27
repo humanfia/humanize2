@@ -692,7 +692,7 @@ class Humanize(App[None]):
         a flow that drives more of them gets the same one again -- so a step is a step and
         not a form to fill in. `/flow` is still there for choosing one by name.
         """
-        from humanize.janus.flows import find, found
+        from humanize.flows import find, found
         from humanize.janus.runner import drives
 
         named = [name for _, name in found()]
@@ -829,7 +829,7 @@ class Humanize(App[None]):
             listed instead -- a path is typed, since guessing which files below here are
             flows means reading all of them.
         """
-        from humanize.janus.flows import find
+        from humanize.flows import find
         from humanize.janus.runner import drives
 
         while True:
