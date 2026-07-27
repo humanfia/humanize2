@@ -18,6 +18,7 @@ is a rule across, fields down the left and their values lined up beside them.
 from __future__ import annotations
 
 import time
+from itertools import zip_longest
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.markup import escape
@@ -324,16 +325,20 @@ class Status(ModalScreen[None]):
     CSS = _SHEET
     BINDINGS: ClassVar = [("escape", "back", "back")]
 
-    def __init__(self, flow: str, models: list[str], monitor: Monitor):
+    def __init__(
+        self, flow: str, named: tuple[str, ...], models: list[str], monitor: Monitor
+    ):
         """Reads one run.
 
         Args:
           flow: The flow being run.
+          named: What that flow calls each agent it drives, "" apiece where it names none.
           models: What each of its agents runs, as `cli/model:effort`.
           monitor: The run itself, read again each time this is redrawn.
         """
         super().__init__()
         self._flow = flow
+        self._named = named
         self._models = models
         self._monitor = monitor
 
@@ -366,7 +371,17 @@ class Status(ModalScreen[None]):
         groups: list[list[tuple[str, list[str]]]] = [
             [
                 ("Flow", [escape(self._flow)]),
-                ("Agents", [escape(one) for one in self._models] or ["none installed"]),
+                (
+                    "Agents",
+                    [
+                        f"{escape(named)}{_DOT if named else ''}{escape(runs)}"
+                        for named, runs in zip_longest(
+                            self._named, self._models, fillvalue=""
+                        )
+                        if runs
+                    ]
+                    or ["none installed"],
+                ),
             ],
             [
                 (

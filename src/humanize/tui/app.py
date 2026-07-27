@@ -28,6 +28,7 @@ import threading
 import time
 import traceback
 from collections.abc import Callable
+from itertools import zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
@@ -321,7 +322,7 @@ class Humanize(App[None]):
 
     /* The prompt: a rule across, what you are typing behind a `❯`, a rule across. Which is
        how Claude Code draws its own -- no box, no bar, no shadow. */
-    #above { height: 1; padding: 0 1; color: $text-muted; text-align: right; }
+    #above { height: auto; padding: 0 1; color: $text-muted; text-align: right; }
     .rule { height: 1; color: $text-muted; }
     #prompt { height: auto; background: $background; }
     #caret { width: 2; color: $text-muted; }
@@ -420,6 +421,11 @@ class Humanize(App[None]):
             f"{backend}/{_starts_at(models)}:high"
             for backend, models in list(installed().items())[:1]
         ]
+        #: What the flow calls each of them, which is "" apiece for a flow that said how many
+        #: it drives and nothing more. Kept beside the models rather than read off the flow
+        #: each time the line above the prompt is drawn: that means loading and running a
+        #: Python file, and this is drawn twice a second.
+        self._named_by = self._names_for(self._flow_named)
         #: What has been typed here before, which the arrows walk. Read now rather than each
         #: time it is asked for: a run started here writes this project's own history into
         #: being, and what is being walked must not change under whoever is walking it.
@@ -437,6 +443,25 @@ class Humanize(App[None]):
         #: than at the next tick, and whether a flow is waiting to be told at all.
         self._spoke = threading.Event()
         self._awaiting = False
+
+    def _names_for(self, flow: str) -> tuple[str, ...]:
+        """What a flow calls each agent it drives.
+
+        Args:
+          flow: The flow, by name or as a path.
+
+        Returns:
+          One name apiece, "" where the flow named none of them -- and one "" per agent
+          already in hand for a flow that will not load, since a name is a label on something
+          that runs and not a reason for anything to stop.
+        """
+        from humanize.flows import find
+        from humanize.janus.runner import drives
+
+        try:
+            return drives(find(flow))
+        except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
+            return ("",) * len(self._models)
 
     def compose(self) -> ComposeResult:
         """The transcript, the offers, the editor, the status. The width is the transcript's.
@@ -645,10 +670,18 @@ class Humanize(App[None]):
             )
         else:
             left = f"[$secondary]◉[/] {escape(self._flow_named)}"
-        # Above the prompt on the right, where Claude Code says what it is running as.
+        # Above the prompt on the right, where Claude Code says what it is running as. One
+        # agent to a line rather than a row of them separated by commas: a flow drives several
+        # and they are read one at a time, against the name the flow calls each one by.
+        lines = [
+            f"{escape(named)}{_DOT if named else ''}{escape(runs)}"
+            for named, runs in zip_longest(self._named_by, self._models, fillvalue="")
+            if runs
+        ] or ["no agent installed"]
+        if spent:
+            lines.append(f"{thousands(spent)} tokens{_DOT}{rate:.0f}/s")
         self.query_one("#above", Static).update(
-            f"[$text-muted]{escape(', '.join(self._models) or 'no agent installed')}[/]"
-            + (f"{_DOT}{thousands(spent)} tokens{_DOT}{rate:.0f}/s" if spent else "")
+            "[$text-muted]" + "\n".join(lines) + "[/]"
         )
         for ruled in self.query(".rule").results(Static):
             ruled.update(_RULE * self.size.width)
@@ -742,7 +775,9 @@ class Humanize(App[None]):
         Unlike the two that choose something: this one is read and changes nothing, so there
         is nothing for it to conflict with.
         """
-        self.push_screen(Status(self._flow_named, self._models, self._monitor))
+        self.push_screen(
+            Status(self._flow_named, self._named_by, self._models, self._monitor)
+        )
 
     def action_cycle_flow(self) -> None:
         """Moves to the next flow there is, without asking anything.
@@ -775,6 +810,7 @@ class Humanize(App[None]):
         self._models = self.settings.agents(switching) or [self._models[0]] * len(
             named_by
         )
+        self._named_by = named_by
         self.settings.remember(switching, named_by, self._models)
         self._draw()
 
@@ -930,6 +966,7 @@ class Humanize(App[None]):
                 if (switching, list(chosen)) != (self._flow_named, self._models):
                     self.action_stop_flow()
                 self._flow_named, self._models = switching, list(chosen)
+                self._named_by = wanted
                 self.settings.remember(switching, wanted, self._models)
                 self.show("[dim]say what to do, and the flow starts on it[/dim]")
                 self._draw()
