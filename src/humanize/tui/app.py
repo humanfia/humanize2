@@ -1047,9 +1047,19 @@ class Humanize(App[None]):
             self.show("hmz: a flow is already running", "red")
             return
         try:
-            path, agents, task = flow_and_agents(argv)
+            path, chosen, task = flow_and_agents(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
+        try:
+            # Loaded here rather than on the thread it will run on, so that the agents it
+            # drives are in hand before anything is hooked up to them: a flow that says it
+            # talks to the person drives one more than was chosen, and the person is reached
+            # through this interface like everything else.
+            runner = Runner(path, chosen)
+        except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
+            self.show(f"hmz: {why}", "red")
+            return
+        agents = list(runner.agents)
         self._agents = agents
         self._monitor = Monitor()
         # What the run costs is read from the logs the agents keep, which they write as they
@@ -1073,7 +1083,7 @@ class Humanize(App[None]):
 
         def drive() -> int:
             try:
-                Runner(path, agents).run(task)
+                runner.run(task)
             finally:
                 tally.stops()  # read once more, for what the last turn wrote on its way out
                 watching.stops()  # the clock the rate is over is the run's, and it is over

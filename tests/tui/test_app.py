@@ -801,9 +801,10 @@ async def test_every_line_typed_between_turns_is_a_turn_of_one_conversation(
         await driver.press("enter")
         await until(lambda: "heard second" in _transcript(app), driver)
 
-        # One agent, one session: the second turn resumed the first rather than opening
-        # another, so the agent had the first in context.
-        (agent,) = app._agents
+        # One agent and the person, one session: the second turn resumed the first rather
+        # than opening another, so the agent had the first in context.
+        agent, person = app._agents
+        assert person.backend == "human"
         assert agent.opened == [agent.opened[0]]
         assert "held for the next turn" not in _transcript(app)
 

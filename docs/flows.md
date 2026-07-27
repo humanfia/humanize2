@@ -44,6 +44,10 @@ def run(agents: Agents, task: str) -> None:
     working = agents.actor.new()
 ```
 
+A place annotated `HumanAgent` is the person at the prompt rather than a coding agent. It is
+handed over like the rest and nobody is asked what it runs, so it is not one of the agents `-a`
+names — see [agents](agents.md#the-person-as-an-agent).
+
 ## Where flows live
 
 `-f` takes a name or a path. A name is looked for in three places, nearest first:

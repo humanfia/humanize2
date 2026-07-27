@@ -7,18 +7,26 @@ then waits to be told again. It is the flow the terminal interface opens on, so 
 something is all it takes to start. A line typed while a turn is running is put into that turn
 rather than becoming another, as it is under any flow.
 
-Run from a command line, where nobody is at a prompt to say anything more, it does the one
-thing it was given and stops.
+Two agents, then, and the second of them is you: saying something to the person is asking what
+to say next, and what they answer is what they typed. Run from a command line, where nobody is
+at a prompt, they answer with nothing and the flow does the one thing it was given and stops.
 """
 
-from humanize.janus import AgentBase
+from typing import NamedTuple
+
+from humanize.janus import AgentBase, HumanAgent
 
 
-def run(agents: tuple[AgentBase], task: str) -> None:
-    (agent,) = agents
+class Chat(NamedTuple):
+    """The two sides of a conversation."""
+
+    assistant: AgentBase
+    human: HumanAgent
+
+
+def run(agents: Chat, task: str) -> None:
     # One session, so the turns are a conversation rather than a series of first turns.
-    session = agent.new()
-    said: str | None = task
+    session = agents.assistant.new()
+    said = task
     while said:
-        session(said, suppress=True)
-        said = agent.prompted()
+        said = agents.human(session(said, suppress=True))

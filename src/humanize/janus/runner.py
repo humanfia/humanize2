@@ -22,7 +22,7 @@ class NotAFlow(ValueError):
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
-    """What a flow calls each of the agents it drives, in the order it takes them.
+    """What a flow calls each of the coding agents it drives, in the order it takes them.
 
     Read without being given any, so that a caller can ask before it has them -- which is
     what choosing the agents for a flow means.
@@ -31,26 +31,33 @@ def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
       flow: The Python file the flow is written in. It is run to be read.
 
     Returns:
-      One name per agent its entry point declares, which is how many it drives. A flow that
-      declares a plain tuple has not named them, and each is "" -- the count is all it said.
+      One name per agent its entry point declares that somebody has to choose, which is how
+      many it has to be given. A flow that declares a plain tuple has not named them, and each
+      is "" -- the count is all it said. A place it declared as a :class:`HumanAgent` is not
+      among them: nobody chooses what the person at the prompt runs, so nobody is asked.
 
     Raises:
       NotAFlow: If the file is not there, or is not a flow.
     """
-    return _read(flow)[1]
+    return tuple(name for name, person in _read(flow)[1] if not person)
 
 
 def _read(
     flow: str | os.PathLike[str],
-) -> tuple[Callable[..., None], tuple[str, ...], Callable[..., tuple[AgentBase, ...]]]:
+) -> tuple[
+    Callable[..., None],
+    tuple[tuple[str, bool], ...],
+    Callable[..., tuple[AgentBase, ...]],
+]:
     """Loads a flow and reads what it says about the agents it drives.
 
     Args:
       flow: The flow: one that came with humanize, by name, or a file of your own.
 
     Returns:
-      Its entry point, what it calls each agent it drives, and what to hand those agents
-      over as -- the named tuple the flow declared, or a plain one where it declared that.
+      Its entry point, one (name, is the person) per agent it drives, and what to hand those
+      agents over as -- the named tuple the flow declared, or a plain one where it declared
+      that.
 
     Raises:
       NotAFlow: If the file is not there, is not a flow -- nothing called `run`, or one whose
@@ -81,7 +88,12 @@ def _read(
     # is where it says it. `_make` builds one from a sequence, exactly as `tuple` does, so
     # the flow is handed the type it asked for either way.
     if run is not None and (fields := getattr(declared, "_fields", None)):
-        return run, tuple(fields), declared._make
+        kinds = getattr(declared, "__annotations__", {})
+        return (
+            run,
+            tuple((at, _is_person(kinds.get(at))) for at in fields),
+            declared._make,
+        )
     # `tuple[AgentBase, ...]` is any number of them, which is no answer to the question.
     declares = get_args(declared)
     if run is None or get_origin(declared) is not tuple or Ellipsis in declares:
@@ -90,7 +102,24 @@ def _read(
             "tuple of a fixed length -- how many agents the flow drives -- or with a "
             "NamedTuple of them, which also says what each one is for"
         )
-    return run, ("",) * len(declares), tuple
+    return run, tuple(("", _is_person(kind)) for kind in declares), tuple
+
+
+def _is_person(kind: object) -> bool:
+    """Whether a place in a flow's agents is the person at the prompt.
+
+    Args:
+      kind: What the flow annotated that place with, which is the class itself, or its name
+        where the flow put its annotations off until they are asked for.
+
+    Returns:
+      True if it is a `HumanAgent`, which is a place nobody is asked to configure.
+    """
+    from .agents import HumanAgent
+
+    if isinstance(kind, str):
+        return kind.rpartition(".")[2] == HumanAgent.__name__
+    return kind is HumanAgent
 
 
 class Runner:
@@ -117,21 +146,38 @@ class Runner:
             whose ``agents`` cannot be read or says nothing about how many it takes -- or is a
             flow that drives a different number of agents than were given.
         """
-        run, names, make = _read(flow)
-        if len(names) != len(agents):
+        from .agents import HumanAgent
+
+        run, places, make = _read(flow)
+        wanted = [name for name, person in places if not person]
+        if len(wanted) != len(agents):
             raise NotAFlow(
-                f"{flow}: run() drives {len(names)} agents, {len(agents)} given"
+                f"{flow}: run() drives {len(wanted)} agents, {len(agents)} given"
             )
-        for agent, called in zip(agents, names, strict=True):
+        # The person at the prompt is made here rather than given: nobody chooses what they
+        # run, so nothing upstream of this was ever asked about them.
+        given = iter(agents)
+        driven = [HumanAgent() if person else next(given) for _, person in places]
+        for agent, (called, _) in zip(driven, places, strict=True):
             if called:
                 agent.rename(called)
         self._run: Callable[[tuple[AgentBase, ...], str], None] = run
         # As the flow declared them: a flow whose agents are a NamedTuple reaches them by
         # name, and one that unpacks a plain tuple sees no difference.
-        self._agents = make(agents)
+        self._agents = make(driven)
         self._flow = str(
             flow
         )  # as it was named, which is what a run of it is named after
+
+    @property
+    def agents(self) -> tuple[AgentBase, ...]:
+        """Every agent this drives, in the order the flow takes them.
+
+        Which is not what it was given: a flow that says it talks to the person is driving
+        one more agent than anybody chose, and whatever is driving the flow has to reach
+        that one too -- it is the one thing here that answers with what was typed.
+        """
+        return tuple(self._agents)
 
     def run(self, task: str) -> None:
         """Runs the flow in this directory, for as long as it keeps running.

@@ -14,6 +14,7 @@ from .base import (
 from .claude import ClaudeCodeAgent, ClaudeCodeAgentConfig, ClaudeCodeSession
 from .codex import CodexAgent, CodexAgentConfig, CodexSession
 from .config import AgentConfig
+from .human import HumanAgent, HumanSession
 from .kimi import KimiCodeCLIAgent, KimiCodeCLIAgentConfig, KimiCodeCLISession
 
 __all__ = [
@@ -27,6 +28,8 @@ __all__ = [
     "CodexSession",
     "CommandSessionBase",
     "Event",
+    "HumanAgent",
+    "HumanSession",
     "KimiCodeCLIAgent",
     "KimiCodeCLIAgentConfig",
     "KimiCodeCLISession",

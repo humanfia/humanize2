@@ -179,6 +179,56 @@ def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(
     assert seen["agents"] == [["builder"], ["reviewer"]]
 
 
+#: A flow that says one of the agents it drives is the person at the prompt.
+PEOPLED = """
+import json
+import os
+from pathlib import Path
+from typing import NamedTuple
+
+from humanize.janus import AgentBase, HumanAgent
+
+
+class Agents(NamedTuple):
+    assistant: AgentBase
+    human: HumanAgent
+
+
+def run(agents: Agents, task: str) -> None:
+    agents.human.prompting = ["", "and then this"].pop
+    Path(__file__).with_suffix(".json").write_text(
+        json.dumps(
+            {
+                "agents": [[type(a).__name__, a.id] for a in agents],
+                "held": type(agents).__name__,
+                "said": [agents.human(task), agents.human(task)],
+                "task": task,
+                "cwd": os.getcwd(),
+            }
+        )
+    )
+"""
+
+
+def test_the_person_at_the_prompt_is_an_agent_nobody_is_asked_to_configure(
+    tmp_path: Path,
+) -> None:
+    """A flow says it talks to them; it is handed one, and what they answer with is typed."""
+    from humanize.janus.runner import drives
+
+    flow = _flow(tmp_path, PEOPLED)
+    # Two places, one of them the person -- so one agent is asked for and one is given.
+    assert drives(flow) == ("assistant",)
+
+    main(["exec", "-f", flow, "-a", "claude/m:high", "task"])
+
+    seen = _seen(tmp_path)
+    assert seen["agents"] == [["ClaudeCodeAgent", "assistant"], ["HumanAgent", "human"]]
+    # Said to like any other agent, and its answer is what was typed -- then "" for a
+    # conversation that is over, which is what ends a flow that is one.
+    assert seen["said"] == ["and then this", ""]
+
+
 def test_a_plain_tuple_says_how_many_agents_and_nothing_more(tmp_path: Path) -> None:
     from humanize.janus.runner import drives
 
@@ -416,13 +466,17 @@ def test_the_chat_flow_is_one_session_for_as_long_as_it_is_told_things(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Talking to a coding agent, with no loop around it: the turns are a conversation."""
+    from humanize.flows.chat import Chat
     from humanize.flows.chat import run as chat
+    from humanize.janus import HumanAgent
 
     agent = ShellAgent(AgentConfig(model="m", effort="high"))
     said = ["echo third", "echo second"]
-    agent.prompting = said.pop
+    # The person is an agent like any other, and what they answer with is what they typed.
+    person = HumanAgent()
+    person.prompting = said.pop
 
-    chat((agent,), "echo first")
+    chat(Chat(agent, person), "echo first")
 
     # One session for all three, so the agent had the earlier turns in context: a second
     # would have opened a second id. And the run ended when there was nothing left to be
@@ -435,12 +489,13 @@ def test_the_chat_flow_run_from_a_command_line_does_the_one_thing_it_was_given(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Nobody is at a prompt there, so there is nothing to wait for and it returns."""
+    from humanize.flows.chat import Chat
     from humanize.flows.chat import run as chat
+    from humanize.janus import HumanAgent
 
     agent = ShellAgent(AgentConfig(model="m", effort="high"))
 
-    chat(
-        (agent,), "echo once"
-    )  # returns rather than waiting on a prompt that is not there
+    # Nothing is hooked up to the person, so they answer with nothing the first time.
+    chat(Chat(agent, HumanAgent()), "echo once")
 
     assert len(agent.opened) == 1

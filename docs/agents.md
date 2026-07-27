@@ -50,15 +50,34 @@ carries on rather than waiting on a reply that is not coming.
 agent.ask = lambda question: input(f"{question.text} {question.options} ")
 ```
 
-A flow that is a conversation rather than a loop asks for its next prompt the same way. Leave
-`prompting` unset — as a flow run from the command line does — and the flow does what it was
-given and stops, since there is nobody to be told anything more by.
+## The person as an agent
+
+A flow that is a conversation rather than a loop has two sides, and the second of them is you.
+Declare a `HumanAgent` among the agents the flow drives and it is handed one: saying something to
+it is asking what to say next, and what it answers with is what was typed.
 
 ```python
-agent.prompting = lambda: input("> ") or None
+class Chat(NamedTuple):
+    assistant: AgentBase
+    human: HumanAgent
+
+
+def run(agents: Chat, task: str) -> None:
+    conversation = agents.assistant.new()
+    said = task
+    while said:
+        answered = conversation(said, suppress=True)
+        said = agents.human(answered)
 ```
 
+Nobody is asked what the person runs, so a `HumanAgent` is not one of the agents `-a` names: the
+flow above is run with one `-a` and drives two. Run from a command line, where nobody is at a
+prompt, they answer with nothing — so the flow does the one thing it was given and stops.
+
 ## Efforts
+
+Claude Code takes `ultracode` as well as the efforts it documents: `xhigh` thinking with the turn
+opted into orchestrating a fleet of its own.
 
 Kimi Code's effort says how wide to run as well as how hard to think: `max` is one agent, and
 `swarmmax` is the same thinking at the width of a fleet of subagents.
