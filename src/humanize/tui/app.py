@@ -1,8 +1,9 @@
 """humanize as a coding agent's own terminal, with a flow underneath instead of one agent.
 
-Laid out the way opencode is, and no wider: a transcript, an editor under it, a status line
-under that, and what the flow is doing beside them. Tab picks a flow the way opencode's tab
-picks an agent, and `/agents` sets what each of that flow's agents runs.
+Laid out the way Claude Code is, and no wider: a transcript the width of the terminal, an
+editor under it between two rules, and a status line under that. Nothing sits beside them --
+how the run is going is on `/status`. Shift+tab steps through the flows, and `/agents` sets
+what each of the flow's agents runs.
 
 It opens on the flow that is only talking to one agent, so that saying something is all it
 takes to start. A flow is what you reach for once talking to one agent is not the shape of
@@ -34,7 +35,7 @@ from rich.markup import escape
 from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal
 from textual.content import Content
 from textual.message import Message
 from textual.theme import Theme
@@ -46,8 +47,8 @@ from humanize.cli import flow_and_agents
 from .complete import about, offered, takes
 from .discover import Model, installed
 from .history import History
-from .monitor import Monitor, short
-from .pick import Flows, Models
+from .monitor import Monitor, short, thousands
+from .pick import Flows, Models, Status
 from .settings import Settings
 from .tally import Tally
 
@@ -63,6 +64,7 @@ if TYPE_CHECKING:
 _OWN = (
     "flow",
     "agents",
+    "status",
     "clear",
     "details",
     "afk",
@@ -72,23 +74,6 @@ _OWN = (
 
 #: How often the right-hand column and the status line are redrawn, in seconds.
 _REFRESH = 0.5
-
-
-def _thousands(count: int) -> str:
-    """Renders a token count short enough for a status line.
-
-    Args:
-      count: How many tokens.
-
-    Returns:
-      The count, abbreviated once it stops fitting.
-    """
-    if count < 1000:
-        return str(count)
-    if count < 1_000_000:
-        return f"{count / 1000:.1f}k"
-    return f"{count / 1_000_000:.2f}M"
-
 
 #: How long a second ctrl+c still counts as the same one, in seconds.
 _AGAIN = 2.0
@@ -295,7 +280,7 @@ class Editor(TextArea):
 
 
 class Humanize(App[None]):
-    """A transcript, an editor, a status line, and what the flow is doing beside them."""
+    """A transcript, an editor under it, and a status line under that."""
 
     CSS = """
     /* Nothing here names a colour of its own. Every surface is the terminal's, and what has
@@ -307,10 +292,7 @@ class Humanize(App[None]):
        blending -- which over a transparent screen blends with nothing. Named, so a sheet is
        a sheet rather than something the transcript reads through. */
     ModalScreen { background: $background; }
-    #transcript { width: 1fr; padding: 0; }
-    .panel { margin-bottom: 1; }
-    #side { width: 30; display: none; padding: 0 0 0 2; }
-    #side.watching { display: block; }
+    #transcript { width: 1fr; height: 1fr; padding: 0; }
 
     /* Above the prompt and unbordered, at most ten rows: what Claude Code offers a
        half-typed command in. The row under the cursor is coloured, not filled. */
@@ -440,12 +422,13 @@ class Humanize(App[None]):
         self._awaiting = False
 
     def compose(self) -> ComposeResult:
-        """The transcript and what the flow is doing, the offers, the editor, the status."""
-        with Horizontal():
-            yield RichLog(id="transcript", wrap=True, markup=True)
-            with Vertical(id="side"):
-                yield Static(id="flow", classes="panel")
-                yield Static(id="spend", classes="panel")
+        """The transcript, the offers, the editor, the status. The width is the transcript's.
+
+        Nothing sits beside it. What the flow is doing is on `/status`, which is opened when
+        it is wanted: a column saying so the whole time costs a fifth of every line of every
+        transcript, to say something that has usually not changed since it was last looked at.
+        """
+        yield RichLog(id="transcript", wrap=True, markup=True)
         yield OptionList(id="offers")
         yield Static(id="above")
         yield Static(id="rule-above", classes="rule")
@@ -562,32 +545,14 @@ class Humanize(App[None]):
             listing.highlighted = 0
 
     def _draw(self) -> None:
-        """Redraws the right-hand column and the status line.
+        """Redraws the lines around the editor: what is above it, the rules, the status.
 
         Called on a timer, which keeps ticking while the interface is being taken down -- so
         there may be nothing left to draw on.
         """
         if not self.is_running:
             return
-        graph = self._monitor.graph()
-        self.query_one("#side").set_class(bool(self._agents or graph), "watching")
-        self.query_one("#flow", Static).update(
-            "\n".join(["[b]flow[/b]", *(graph or ["[dim]nothing yet[/dim]"])])
-        )
         spending = self._monitor.spending()
-        self.query_one("#spend", Static).update(
-            "\n".join(
-                ["[b]tokens[/b]"]
-                + (
-                    [
-                        f"{escape(spend.model[:22])}\n"
-                        f"  [dim]{_thousands(spend.tokens)}   {spend.rate:.0f}/s[/dim]"
-                        for spend in spending
-                    ]
-                    or ["[dim]nothing spent yet[/dim]"]
-                )
-            )
-        )
         spent = sum(spend.tokens for spend in spending)
         rate = sum(spend.rate for spend in spending)
         # Left, first match wins, as opencode's status line resolves it: what is running if
@@ -620,7 +585,7 @@ class Humanize(App[None]):
         # Above the prompt on the right, where Claude Code says what it is running as.
         self.query_one("#above", Static).update(
             f"[$text-muted]{escape(', '.join(self._models) or 'no agent installed')}[/]"
-            + (f"{_DOT}{_thousands(spent)} tokens{_DOT}{rate:.0f}/s" if spent else "")
+            + (f"{_DOT}{thousands(spent)} tokens{_DOT}{rate:.0f}/s" if spent else "")
         )
         for ruled in self.query(".rule").results(Static):
             ruled.update(_RULE * self.size.width)
@@ -678,7 +643,8 @@ class Humanize(App[None]):
                 if self._agents
                 else "enter start"
             )
-        keys.append("shift+tab flow")
+        if not self._agents:
+            keys.append("shift+tab flow")
         keys.append("/ commands")
         keys.append("ctrl+j newline")
         if self._agents:
@@ -688,6 +654,33 @@ class Humanize(App[None]):
         )
         return keys
 
+    def _mid_run(self, what: str) -> bool:
+        """Whether a flow is running, and says so where that is why nothing happened.
+
+        Which is the answer for anything that would change what is running while it runs.
+        A flow holds the agents it was handed and drives them by its own control flow: swapped
+        underneath it, the run carries on against the ones it already has, and the interface
+        starts saying it is running something it is not. Stop it, then choose.
+
+        Args:
+          what: The command being turned down, so that the line says which one.
+
+        Returns:
+          True if a flow is running, having said so.
+        """
+        if not self._agents:
+            return False
+        self.show(f"hmz: {what} while a flow is running: esc stops it first", "red")
+        return True
+
+    def action_status(self) -> None:
+        """Opens the sheet saying how the run is going, which is readable while it runs.
+
+        Unlike the two that choose something: this one is read and changes nothing, so there
+        is nothing for it to conflict with.
+        """
+        self.push_screen(Status(self._flow_named, self._models, self._monitor))
+
     def action_cycle_flow(self) -> None:
         """Moves to the next flow there is, without asking anything.
 
@@ -696,6 +689,8 @@ class Humanize(App[None]):
         a flow that drives more of them gets the same one again -- so a step is a step and
         not a form to fill in. `/flow` is still there for choosing one by name.
         """
+        if self._mid_run("no switching flow"):
+            return
         from humanize.flows import find, found
         from humanize.janus.runner import drives
 
@@ -747,6 +742,8 @@ class Humanize(App[None]):
             self.action_flow(argv[0] if argv else "")
         elif name == "agents":
             self.action_agents()
+        elif name == "status":
+            self.action_status()
         elif name == "details":
             if (switched := self._switched(argv, self._details)) is None:
                 return
@@ -839,6 +836,8 @@ class Humanize(App[None]):
         from humanize.flows import find
         from humanize.janus.runner import drives
 
+        if self._mid_run("no choosing a flow"):
+            return
         while True:
             picked = named or await self.push_screen_wait(Flows(self._flow_named))
             if picked is None:
@@ -881,6 +880,8 @@ class Humanize(App[None]):
         The flow itself is not asked for again, so esc is a way out rather than a step back
         into a list this did not come through.
         """
+        if self._mid_run("no setting agents"):
+            return
         self.action_flow(self._flow_named)
 
     def _take(self) -> list[str]:

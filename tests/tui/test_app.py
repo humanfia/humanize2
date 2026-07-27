@@ -187,7 +187,7 @@ def test_only_the_flows_humanize_came_with_are_offered() -> None:
 
 
 @pytest.mark.timeout(60)
-async def test_what_the_flow_did_is_shown_beside_it(workspace: Path) -> None:
+async def test_what_the_flow_did_is_on_status(workspace: Path) -> None:
     """Who worked, who handed to whom, and what it cost -- none of which the flow reports."""
     (workspace / "flow.py").write_text(FLOW)
     app = Humanize()
@@ -202,10 +202,13 @@ async def test_what_the_flow_did_is_shown_beside_it(workspace: Path) -> None:
         await driver.press(*"and this")
         await driver.press("enter")
         await until(lambda: bool((workspace / "said.txt").exists()), driver)
-        app._draw()
 
-        beside = str(app.query_one("#flow", Static).content)
-        assert "×1" in beside  # the one agent, and its one turn
+        # Read while the flow is still running, which is the whole point of a sheet for it.
+        app.action_status()
+        await driver.pause()
+        said = str(app.screen.query_one("#said", Label).content)
+        assert "×1" in said  # the one agent, and its one turn
+        assert "flow.py" in said
         assert app._monitor.turns.total() == 1
 
 
@@ -369,6 +372,40 @@ async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None
     assert not {f"/{name}" for name in COMMANDS} & set(offers)
     # And a command typed in full has nothing left to be finished with, so enter sends it.
     assert offered("/exit", _OWN) == []
+
+
+@pytest.mark.timeout(90)
+async def test_what_is_running_is_not_swapped_underneath_itself(
+    workspace: Path,
+) -> None:
+    """A flow drives the agents it was handed, so choosing others mid-run changes nothing.
+
+    Except what the interface says it is running, which would then be a lie. Stop it first.
+    """
+    (workspace / "flow.py").write_text(FLOW)
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._flow_named, app._models = "flow.py", ["claude/m:high"]
+        await driver.press(*"start")
+        await driver.press("enter")
+        await until(
+            lambda: bool(app._agents and any(agent.sessions for agent in app._agents)),
+            driver,
+        )
+
+        app.action_agents()
+        app.action_cycle_flow()
+        await driver.press(*"/flow")
+        await driver.press("enter")
+        await driver.pause()
+
+        assert app._flow_named == "flow.py"  # none of the three got anywhere
+        assert app._models == ["claude/m:high"]
+        assert _transcript(app).count("while a flow is running") == 3
+        # And `/status` is not one of them: it is read, so there is nothing to conflict with.
+        app.action_status()
+        await driver.pause()
+        assert "flow.py" in str(app.screen.query_one("#said", Label).content)
 
 
 @pytest.mark.timeout(90)

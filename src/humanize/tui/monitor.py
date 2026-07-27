@@ -12,12 +12,28 @@ import time
 from collections import Counter, deque
 from dataclasses import dataclass, field
 
-__all__ = ["Monitor", "Spend", "short"]
+__all__ = ["Monitor", "Spend", "short", "thousands"]
 
 #: How far back the rate is measured. Five minutes is long enough to carry across the gaps a
 #: flow leaves -- a turn that thinks, a round it sleeps off, a commit it makes -- and short
 #: enough that a run which has gone quiet reads as quiet.
 _WINDOW = 300.0
+
+
+def thousands(count: int) -> str:
+    """Renders a token count short enough for a status line.
+
+    Args:
+      count: How many tokens.
+
+    Returns:
+      The count, abbreviated once it stops fitting.
+    """
+    if count < 1000:
+        return str(count)
+    if count < 1_000_000:
+        return f"{count / 1000:.1f}k"
+    return f"{count / 1_000_000:.2f}M"
 
 
 def short(agent: str) -> str:

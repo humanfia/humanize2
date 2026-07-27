@@ -1,4 +1,4 @@
-"""The two things there are to choose: which flow, and what each of its agents runs.
+"""The sheets: which flow, what each of its agents runs, and how the run is going.
 
 Drawn as Claude Code draws its own `/model`, which is the same question one step along: a rule
 of `▔` across the top, the question and a line about it indented three, the choices numbered
@@ -10,10 +10,14 @@ What one agent runs is a CLI, a model and an effort. The first two are one choic
 than two, because they are one choice in fact: a model belongs to the CLI that runs it, and a
 list of the pairs is shorter than a walk through two columns. The effort is the line with the
 arrows on it, exactly as Claude Code's is.
+
+`/status` is the third of them, and is read rather than answered -- Claude Code's own, which
+is a rule across, fields down the left and their values lined up beside them.
 """
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.markup import escape
@@ -24,24 +28,40 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
+from .monitor import short, thousands
+
 if TYPE_CHECKING:
     from .discover import Model
+    from .monitor import Monitor
 
-__all__ = ["Flows", "Models", "Sheet"]
+__all__ = ["Flows", "Models", "Sheet", "Status"]
 
 #: What Claude Code rules the top of a sheet with, and how far in everything under it sits.
 _RULE = "▔"
 _INDENT = "   "
 
+#: The dot Claude Code separates the parts of a line with.
+_DOT = " · "
+
 #: The marker against the choice under the cursor, and against the one already in force.
 _HERE = "❯"
 _INFORCE = "✔"
 
-#: How wide the column of names is before the line about each one starts.
-_LABEL = 24
+#: How wide the column of names is before the line about each one starts. A model id
+#: may hold slashes of its own -- Kimi Code's are `kimi-code/k3` -- and is shown as the
+#: CLI is given it, since a name shortened here is not the name of anything.
+_LABEL = 26
+
+#: How wide the column of field names on `/status` is, so their values line up beside them.
+_FIELD = 18
+
+#: How often `/status` is redrawn, in seconds. It is read while a flow is running, which is
+#: the whole point of it: a sheet that froze what it said the moment it opened would be a
+#: snapshot of a run, and the run is what is being watched.
+_LIVE = 0.5
 
 _SHEET = """
-Flows, Models { align: center middle; background: $background; }
+Flows, Models, Status { align: center middle; background: $background; }
 #sheet { width: 100%; height: auto; padding: 0; }
 #rule { height: 1; color: $primary; }
 #asked { padding: 0 0 0 3; text-style: bold; color: $primary; }
@@ -53,6 +73,8 @@ OptionList { border: none; background: $background; max-height: 14; scrollbar-si
     background: $background; color: $foreground; text-style: none; }
 #tuning { padding: 1 0 1 3; }
 #keys { padding: 0 0 0 3; color: $text-muted; }
+/* The fields carry their own indent, as the numbered rows above them do. */
+#said { padding: 0 0 1 0; }
 """
 
 
@@ -287,3 +309,93 @@ class Models(Sheet):
             self._ask()
             return
         self.dismiss(self._chosen)
+
+
+class Status(ModalScreen[None]):
+    """How the run is going: who is working, who handed to whom, and what it has cost.
+
+    Which is where the column that used to sit beside the transcript went. What a flow is
+    doing is worth a look now and then and not worth a fifth of the screen the whole time:
+    the transcript is what is being read, and the column was taking width off it to say
+    something that mostly had not changed since the last glance. Opened while a flow runs,
+    since that is when there is anything to see, and redrawn while it is open.
+    """
+
+    CSS = _SHEET
+    BINDINGS: ClassVar = [("escape", "back", "back")]
+
+    def __init__(self, flow: str, models: list[str], monitor: Monitor):
+        """Reads one run.
+
+        Args:
+          flow: The flow being run.
+          models: What each of its agents runs, as `cli/model:effort`.
+          monitor: The run itself, read again each time this is redrawn.
+        """
+        super().__init__()
+        self._flow = flow
+        self._models = models
+        self._monitor = monitor
+
+    def compose(self) -> ComposeResult:
+        """The rule, what this is, the fields, and the way out."""
+        with Vertical(id="sheet"):
+            yield Label(id="rule")
+            yield Label(id="asked")
+            yield Label(id="said")
+            yield Label(id="keys")
+
+    def on_mount(self) -> None:
+        """Rules the top of the sheet across, says what it is, and starts redrawing."""
+        self.query_one("#rule", Label).update(_RULE * self.size.width)
+        self.query_one("#asked", Label).update("Status")
+        self.query_one("#keys", Label).update("Esc to close")
+        self._draw()
+        self.set_interval(_LIVE, self._draw)
+
+    def action_back(self) -> None:
+        """Leaves, there being nothing here to answer."""
+        self.dismiss(None)
+
+    def _draw(self) -> None:
+        """Puts up what the run looks like as of now."""
+        over = (self._monitor.until or time.monotonic()) - self._monitor.began
+        spending = self._monitor.spending()
+        # Grouped as Claude Code groups its own: what is set up, what is happening, what it
+        # has cost, with a blank line between one group and the next.
+        groups: list[list[tuple[str, list[str]]]] = [
+            [
+                ("Flow", [escape(self._flow)]),
+                ("Agents", [escape(one) for one in self._models] or ["none installed"]),
+            ],
+            [
+                (
+                    "Working",
+                    [short(who) for who in self._monitor.now_working()]
+                    or ["[$text-muted]nobody[/]"],
+                ),
+                ("Running", [f"{over:.0f}s"]),
+                ("Turns", self._monitor.graph() or ["[$text-muted]nothing yet[/]"]),
+            ],
+            [
+                (
+                    "Tokens",
+                    [
+                        f"{escape(spend.model):<26}{thousands(spend.tokens):>8}"
+                        f"   [$text-muted]{spend.rate:.0f}/s[/]"
+                        for spend in spending
+                    ]
+                    or ["[$text-muted]nothing spent yet[/]"],
+                ),
+            ],
+        ]
+        lines = []
+        for group in groups:
+            for field, values in group:
+                for at, value in enumerate(values):
+                    # The field is named against the first of its values and the rest are
+                    # left to line up under it, which is how a list reads as one field.
+                    head = f"{field}:" if at == 0 else ""
+                    lines.append(f"{_INDENT}[$text-muted]{head:<{_FIELD}}[/]{value}")
+            lines.append("")
+        self.query_one("#said", Label).update("\n".join(lines))
