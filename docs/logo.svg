@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="humanize">
+  <title>humanize</title>
+  <path d="M 30 24 L 60 50 L 30 76" fill="none" stroke="#608ab1" stroke-width="13"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 92 76 L 68 76" fill="none" stroke="#608ab1" stroke-width="13"
+        stroke-linecap="round"/>
+</svg>

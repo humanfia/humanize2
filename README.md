@@ -1,4 +1,6 @@
-# humanize ii
+# humanize
+
+![humanize](https://socialify.git.ci/humanfia/humanize/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2Fhumanfia%2Fhumanize%2Fraw%2Frefs%2Fheads%2Fmain%2Fdocs%2Flogo.svg&name=1&owner=1&pattern=Circuit+Board&pulls=1&stargazers=1&theme=Auto)
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
@@ -41,6 +43,8 @@ To use the TUI:
 ```sh
 hmz
 ```
+
+![The humanize TUI: a transcript, an editor under it, and a status line under that](docs/tui.svg)
 
 If you don't want to use the TUI, you can run a [flow](docs/flows.md) over the agents you name, one `-a` apiece:
 
