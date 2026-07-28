@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,7 +40,7 @@ def test_directory_materialises_with_target_metadata(fixture: Fixture) -> None:
     mirrored = fixture.local("readme.md")
     assert mirrored.stat().st_size == 1234, "stat must report the target's size"
     assert fixture.local("src").is_dir()
-    assert os.readlink(fixture.local("link")) == "readme.md"
+    assert fixture.local("link").readlink() == Path("readme.md")
 
 
 def test_placeholder_holds_no_content_until_opened(fixture: Fixture) -> None:

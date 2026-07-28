@@ -18,6 +18,7 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 __all__ = ["Model", "installed"]
 
@@ -118,16 +119,18 @@ def _claude() -> tuple[Model, ...]:
     """
     known = [model.name for model in _RUNS["claude"]]
     try:
-        held = json.loads(_CLAUDE_CACHE.read_text())
+        held: Any = json.loads(_CLAUDE_CACHE.read_text())
     except (OSError, ValueError):
         held = {}
     # `claude-fable-5[1m]` is that model at its largest window, which is a setting and not a
     # model: the id is what the backend answers to, and the window rides along with it.
     account = sorted(
         {
-            _WINDOW.sub("", str(option["value"]))
-            for option in held.get("additionalModelOptionsCache") or []
-            if isinstance(option, dict) and option.get("value")
+            _WINDOW.sub("", str(cast("dict[str, Any]", option)["value"]))
+            for option in cast(
+                "list[Any]", held.get("additionalModelOptionsCache") or []
+            )
+            if isinstance(option, dict) and cast("dict[str, Any]", option).get("value")
         }
     )
     named = known + [name for name in account if name not in known]

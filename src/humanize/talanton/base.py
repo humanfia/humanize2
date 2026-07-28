@@ -37,7 +37,7 @@ class IsolationConfig(ABC):
 class IsolationBase(ABC):
     """One isolated machine, from the turn that needs it until the agent holding it is gone."""
 
-    def __init__(self, config: IsolationConfig):
+    def __init__(self, config: IsolationConfig) -> None:
         """Initializes a backend that has started nothing.
 
         Args:

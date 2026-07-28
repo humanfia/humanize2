@@ -8,7 +8,7 @@ from humanize.coganchor.policy import Layout, Router
 
 
 def make_router(**kwargs: object) -> Router:
-    return Router(layouts=(Layout.create("/mirror", "/project"),), **kwargs)  # type: ignore[arg-type]
+    return Router(layouts=(Layout.create("/mirror", "/project"),), **kwargs)  # pyright: ignore[reportArgumentType]
 
 
 def test_identity_layout_keeps_paths_unchanged() -> None:

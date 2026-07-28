@@ -19,6 +19,10 @@ __all__ = ["Monitor", "Spend", "short", "thousands"]
 #: enough that a run which has gone quiet reads as quiet.
 _WINDOW = 300.0
 
+#: Where a count stops fitting and starts being abbreviated.
+_THOUSAND = 1000
+_MILLION = 1_000_000
+
 
 def thousands(count: int) -> str:
     """Renders a token count short enough for a status line.
@@ -29,11 +33,11 @@ def thousands(count: int) -> str:
     Returns:
       The count, abbreviated once it stops fitting.
     """
-    if count < 1000:
+    if count < _THOUSAND:
         return str(count)
-    if count < 1_000_000:
-        return f"{count / 1000:.1f}k"
-    return f"{count / 1_000_000:.2f}M"
+    if count < _MILLION:
+        return f"{count / _THOUSAND:.1f}k"
+    return f"{count / _MILLION:.2f}M"
 
 
 def short(agent: str) -> str:
@@ -76,27 +80,33 @@ class Monitor:
 
     #: Who is working right now, counted rather than listed: an agent may hold two sessions,
     #: and one of them ending does not mean the agent has stopped.
-    working: Counter[str] = field(default_factory=Counter)
+    working: Counter[str] = field(default_factory=Counter[str])
     #: How many turns each agent has taken.
-    turns: Counter[str] = field(default_factory=Counter)
+    turns: Counter[str] = field(default_factory=Counter[str])
     #: Which agent handed to which, and how often, as the flow went from one to the next.
-    handovers: Counter[tuple[str, str]] = field(default_factory=Counter)
+    handovers: Counter[tuple[str, str]] = field(
+        default_factory=Counter[tuple[str, str]]
+    )
     #: The model each agent runs at, so that spending can be named by model.
-    models: dict[str, str] = field(default_factory=dict)
+    models: dict[str, str] = field(default_factory=dict[str, str])
     #: Tokens spent per model, all told.
-    spent: Counter[str] = field(default_factory=Counter)
+    spent: Counter[str] = field(default_factory=Counter[str])
     #: What each source says has been spent on each model so far. Two of them say: the
     #: backends, as each turn ends, and the logs those backends keep, as they write them. They
     #: are counting the same tokens, so what was spent is the higher of the two rather than
     #: the sum -- and whichever has seen further is the one that is right.
-    totals: dict[tuple[str, str], int] = field(default_factory=dict)
+    totals: dict[tuple[str, str], int] = field(
+        default_factory=dict[tuple[str, str], int]
+    )
     #: Recent spending as (when, model, tokens), which is what the rate is measured over.
     #: Bounded by the window rather than by the length of the run: a flow going for days
     #: keeps five minutes of it.
-    recent: deque[tuple[float, str, int]] = field(default_factory=deque)
+    recent: deque[tuple[float, str, int]] = field(
+        default_factory=deque[tuple[float, str, int]]
+    )
     #: The rate per model as it was last worked out, and what it was worked out from: the rate
     #: is worked out again when something it is made of moves, and not on any clock of its own.
-    rates: dict[str, float] = field(default_factory=dict)
+    rates: dict[str, float] = field(default_factory=dict[str, float])
     figured: int | None = None
     #: How many times what has been spent has changed, which is what `figured` is against.
     changed: int = 0

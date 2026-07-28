@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-import pathlib
 import re
 import unittest.mock
+from typing import TYPE_CHECKING
 
 import pytest
 
 from humanize import cli, oronyx
 from tests.oronyx.conftest import loaded
+
+if TYPE_CHECKING:
+    import pathlib
 
 #: Where a trace lands when none was asked for: this run, in this workspace.
 _DEFAULT = re.compile(r"\.humanize/\d{8}T\d{6}Z\.trace\.json")

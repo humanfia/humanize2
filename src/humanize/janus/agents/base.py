@@ -1,5 +1,9 @@
 """The base classes: an agent is structure, a session is the history that structure runs on."""
 
+# A session and the agent holding it are two halves of one object declared in one
+# file, which is what the underscore keeps out of the package rather than out of them.
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import contextlib
@@ -12,19 +16,19 @@ import uuid
 import weakref
 from abc import ABC, abstractmethod
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import IO, TYPE_CHECKING
-
-from .config import AgentConfig
+from typing import IO, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Iterator, Mapping
+
     from humanize.coganchor import AnchorConfig
+    from humanize.janus.cycle import Cycle
 
-    from ..cycle import Cycle
+    from .config import AgentConfig
 
 
-class Stopped(Exception):
+class Stopped(Exception):  # noqa: N818  -- not an error: an agent asked to stop has stopped
     """Raised in place of a turn, once the agent has been told to stop.
 
     A flow is a loop, and a loop that catches a failed turn goes round again -- so stopping
@@ -53,7 +57,7 @@ class Event:
 
     kind: str
     text: str
-    tokens: Mapping[str, int] = field(default_factory=dict)
+    tokens: Mapping[str, int] = field(default_factory=dict[str, int])
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,7 +126,7 @@ class SessionBase(ABC):
     a new instance starts from nothing.
     """
 
-    def __init__(self, agent: AgentBase):
+    def __init__(self, agent: AgentBase) -> None:
         """Initializes an unopened session and registers it with its agent.
 
         Args:
@@ -252,7 +256,7 @@ class SessionBase(ABC):
         """
         raise NotImplementedError(f"{type(self).__name__} cannot be talked to mid-turn")
 
-    def close(self) -> None:
+    def close(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
         """Ends whatever this session is holding, so that a turn under way stops waiting.
 
         Does nothing by default: a session that is one command per turn holds nothing
@@ -272,7 +276,9 @@ class SessionBase(ABC):
         """
         anchor = self._agent.anchor
         mirror = (anchor.shadow or anchor.workspace) if anchor else None
-        return os.path.abspath(mirror or os.getcwd())
+        # `abspath` rather than `Path.resolve`: a session opens at the directory it was
+        # given, and one reached through a symlink is not a request for what it points at.
+        return os.path.abspath(mirror or os.getcwd())  # noqa: PTH100, PTH109
 
     def _adopt(self, session_id: str) -> None:
         """Takes the name the backend gave this session, the first time a turn lands in it.
@@ -379,7 +385,8 @@ class CommandSessionBase(SessionBase):
                 # turn, whatever encoding the machine running the flow happens to be set to.
                 errors="replace",
             ) as proc:
-                assert proc.stdout is not None and proc.stderr is not None
+                assert proc.stdout is not None  # noqa: S101
+                assert proc.stderr is not None  # noqa: S101
                 # Every pipe drains from the moment the agent starts: it puts its progress on
                 # stderr and only the final message on stdout, and a prompt larger than the pipe
                 # buffer would deadlock against an agent that prints before reading all of it.
@@ -394,7 +401,7 @@ class CommandSessionBase(SessionBase):
                 for pump in pumps:
                     pump.start()
                 if stdin is not None:
-                    assert proc.stdin is not None
+                    assert proc.stdin is not None  # noqa: S101
                     # An agent that exits before reading the prompt is a failed turn, reported
                     # by its exit status rather than as a broken pipe here.
                     with contextlib.suppress(BrokenPipeError):
@@ -453,7 +460,7 @@ class StreamSessionBase(SessionBase):
     the turn already under way instead of waiting for the next one.
     """
 
-    def __init__(self, agent: AgentBase):
+    def __init__(self, agent: AgentBase) -> None:
         """Initializes a session holding no process yet.
 
         Args:
@@ -468,7 +475,7 @@ class StreamSessionBase(SessionBase):
         #: What the agent has complained about, which is what a failed turn is reported with.
         self._complaints: list[str] = []
         #: What ends the process if the session is dropped while it is still up.
-        self._reaper: weakref.finalize | None = None
+        self._reaper: weakref.finalize[..., Any] | None = None
         #: Who is reading the process's complaints, so a failed turn can wait for the last.
         self._draining: threading.Thread | None = None
 
@@ -492,7 +499,7 @@ class StreamSessionBase(SessionBase):
         with self._lock:
             argv = self._command()
             proc = self._start(argv)
-            assert proc.stdout is not None
+            assert proc.stdout is not None  # noqa: S101
             try:
                 self._say(prompt)
             except RuntimeError as gone:
@@ -675,7 +682,7 @@ class StreamSessionBase(SessionBase):
             errors="replace",
             bufsize=1,  # a line at a time, which is what the protocol is made of
         )
-        assert started.stderr is not None
+        assert started.stderr is not None  # noqa: S101
         with self._writing:
             # A new process owes nothing for what was said to the one before it. Left standing,
             # that count is an answer this session would wait for and never be given.
@@ -697,8 +704,7 @@ class StreamSessionBase(SessionBase):
         return started
 
     def _restarted(self) -> None:
-        """Told that a new process is up, for whatever the old one's numbers were measured
-        against.
+        """Told that a new process is up, for whatever was measured against the old one.
 
         Does nothing by default. A backend counting anything per process says so here.
         """
@@ -745,7 +751,7 @@ class AgentBase(ABC):
     across turns is a stateful one.
     """
 
-    def __init__(self, config: AgentConfig, *, name: str | None = None):
+    def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent that has opened nothing yet.
 
         Args:

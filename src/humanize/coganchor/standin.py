@@ -27,10 +27,13 @@ import errno
 import logging
 import os
 import signal
+from typing import TYPE_CHECKING
 
 from humanize.coganchor.linux import procfs, ptrace
-from humanize.coganchor.linux.ptrace import Registers
 from humanize.coganchor.linux.syscalls import NR
+
+if TYPE_CHECKING:
+    from humanize.coganchor.linux.ptrace import Registers
 
 __all__ = ["STUB_PROGRAM", "park"]
 

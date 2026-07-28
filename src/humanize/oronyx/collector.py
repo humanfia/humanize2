@@ -6,13 +6,16 @@ import json
 import math
 import os
 import pathlib
-from collections.abc import Iterable, Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import dateparser
 
 from . import claude, codex, kimi, trace
-from .session import Session
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
+    from .session import Session
 
 _HOMES = (
     ("CLAUDE_CONFIG_DIR", ".claude", claude.collect),
@@ -86,7 +89,9 @@ def collect(
     root = (
         None
         if workspace is None and names
-        else pathlib.Path(os.path.abspath(workspace or "."))
+        # `abspath` rather than `Path.resolve`: sessions are matched against the path a
+        # flow was run under, which is the name it was given rather than what it links to.
+        else pathlib.Path(os.path.abspath(workspace or "."))  # noqa: PTH100
     )
 
     window = (bounds[0], bounds[1])

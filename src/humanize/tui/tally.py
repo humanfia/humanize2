@@ -19,7 +19,7 @@ import threading
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -67,8 +67,8 @@ def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
       request cost -- zero for a row that is not one of these.
     """
     if backend == "claude":
-        message = row.get("message") or {}
-        usage = message.get("usage") or {}
+        message: dict[str, Any] = row.get("message") or {}
+        usage: dict[str, Any] = message.get("usage") or {}
         return str(message.get("model") or "") or None, sum(
             int(usage.get(name) or 0)
             for name in (
@@ -78,13 +78,15 @@ def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
                 "cache_creation_input_tokens",
             )
         )
-    payload = row.get("payload") or (row.get("envelope") or {}).get("payload") or {}
+    envelope: dict[str, Any] = row.get("envelope") or {}
+    payload: dict[str, Any] = row.get("payload") or envelope.get("payload") or {}
     if backend == "codex":
-        counted = (payload.get("info") or {}).get("last_token_usage") or {}
+        info: dict[str, Any] = payload.get("info") or {}
+        counted: dict[str, Any] = info.get("last_token_usage") or {}
         return None, int(counted.get("total_tokens") or 0)
-    usage = payload.get("usage") or {}
+    spent: dict[str, Any] = payload.get("usage") or {}
     return None, sum(
-        int(usage.get(name) or 0)
+        int(spent.get(name) or 0)
         for name in ("inputOther", "output", "inputCacheRead", "inputCacheCreation")
     )
 
@@ -94,13 +96,13 @@ class _Reading:
     """One log being read: how far into it we are, and what it has come to so far."""
 
     at: int = 0
-    spent: Counter[str] = field(default_factory=Counter)
+    spent: Counter[str] = field(default_factory=Counter[str])
 
 
 class Tally:
     """The logs of the sessions a flow has open, read as the agents write them."""
 
-    def __init__(self, agents: Sequence[AgentBase], monitor: Monitor):
+    def __init__(self, agents: Sequence[AgentBase], monitor: Monitor) -> None:
         """Initializes a tally that has read nothing yet.
 
         Args:
@@ -146,8 +148,10 @@ class Tally:
             # Every session this agent has going, named as the backend names it -- which it
             # does as the turn starts rather than when the turn lands -- and every one it has
             # let go of, whose last rows are still worth reading.
-            idents = {session.named for session in agent.sessions} | set(agent.opened)
-            for ident in sorted(idents - {None}):
+            idents = {
+                session.named for session in agent.sessions if session.named is not None
+            } | set(agent.opened)
+            for ident in sorted(idents):
                 for pattern in patterns:
                     for path in sorted(home.glob(pattern.format(ident=ident))):
                         self._take(path, backend, agent.config.model)
@@ -177,11 +181,11 @@ class Tally:
         reading.at += len(written)
         for line in written.splitlines():
             try:
-                row = json.loads(line)
+                loaded: object = json.loads(line)
             except ValueError:
                 continue
-            if not isinstance(row, dict):
+            if not isinstance(loaded, dict):
                 continue
-            named, tokens = _spent(backend, row)
+            named, tokens = _spent(backend, cast("dict[str, Any]", loaded))
             if tokens > 0:
                 reading.spent[named or model] += tokens

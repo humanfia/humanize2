@@ -11,11 +11,14 @@ import contextlib
 import itertools
 import os
 import stat as stat_module
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from humanize.coganchor.proto import CHUNK_SIZE
-from humanize.coganchor.serve.exports import ExportTable
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from humanize.coganchor.serve.exports import ExportTable
 
 __all__ = [
     "FileWriter",
@@ -69,6 +72,7 @@ def describe(real: str, *, name: str | None = None) -> dict[str, Any]:
 
 
 def stat(table: ExportTable, path: str) -> dict[str, Any]:
+    """Metadata for one exported path."""
     return describe(table.resolve(path))
 
 
@@ -150,7 +154,8 @@ class FileWriter:
             return None
 
 
-def mkdir(table: ExportTable, path: str, mode: int, parents: bool) -> dict[str, Any]:
+def mkdir(table: ExportTable, path: str, mode: int, *, parents: bool) -> dict[str, Any]:
+    """Make a directory, and the ones above it when asked for."""
     real = table.resolve(path)
     if parents:
         os.makedirs(real, mode=mode, exist_ok=True)
@@ -160,16 +165,19 @@ def mkdir(table: ExportTable, path: str, mode: int, parents: bool) -> dict[str, 
 
 
 def rmdir(table: ExportTable, path: str) -> dict[str, Any]:
+    """Remove a directory, which has to be empty."""
     os.rmdir(table.resolve(path))
     return {}
 
 
 def unlink(table: ExportTable, path: str) -> dict[str, Any]:
+    """Remove a file."""
     os.unlink(table.resolve(path))
     return {}
 
 
-def rename(table: ExportTable, src: str, dst: str, replace: bool) -> dict[str, Any]:
+def rename(table: ExportTable, src: str, dst: str, *, replace: bool) -> dict[str, Any]:
+    """Move a path, over whatever is already at the destination unless told not to."""
     real_src, real_dst = table.resolve(src), table.resolve(dst)
     if replace:
         os.replace(real_src, real_dst)
@@ -179,25 +187,30 @@ def rename(table: ExportTable, src: str, dst: str, replace: bool) -> dict[str, A
 
 
 def symlink(table: ExportTable, target: str, path: str) -> dict[str, Any]:
+    """Make a symbolic link at ``path`` naming ``target``, which is not resolved here."""
     os.symlink(target, table.resolve(path))
     return {}
 
 
 def link(table: ExportTable, src: str, dst: str) -> dict[str, Any]:
+    """Make a second name for one file."""
     os.link(table.resolve(src), table.resolve(dst))
     return {}
 
 
 def readlink(table: ExportTable, path: str) -> dict[str, Any]:
+    """What a symbolic link names, as it names it."""
     return {"target": os.readlink(table.resolve(path))}
 
 
 def chmod(table: ExportTable, path: str, mode: int) -> dict[str, Any]:
+    """Set a path's permission bits, and only those."""
     os.chmod(table.resolve(path), stat_module.S_IMODE(mode))
     return {}
 
 
 def truncate(table: ExportTable, path: str, size: int) -> dict[str, Any]:
+    """Cut a file down to a size, or extend it out to one."""
     os.truncate(table.resolve(path), size)
     return {}
 

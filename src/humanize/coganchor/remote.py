@@ -7,6 +7,10 @@ costs nothing -- while :meth:`RemoteClient.start_exec` and
 run for minutes and must never stall the supervisor.
 """
 
+# A handle and the client it came off are two halves of one object declared in one
+# file, which is what the underscore keeps out of the package rather than out of them.
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import errno
@@ -100,7 +104,7 @@ class RemoteClient:
     def read_file(self, path: str, sink: BinaryIO) -> dict[str, Any]:
         """Stream a remote file into ``sink``; returns its metadata."""
 
-        def on_chunk(stream: Stream, data: bytes) -> None:
+        def on_chunk(stream: Stream, data: bytes) -> None:  # noqa: ARG001
             sink.write(data)
 
         msg_id, pending = self._register(on_chunk, None)
@@ -171,7 +175,7 @@ class RemoteClient:
     def listdir(self, path: str) -> dict[str, Any]:
         return self.call(Op.LISTDIR, path=path)
 
-    def mkdir(self, path: str, mode: int = 0o777, parents: bool = False) -> None:
+    def mkdir(self, path: str, mode: int = 0o777, *, parents: bool = False) -> None:
         self.call(Op.MKDIR, path=path, mode=mode, parents=parents)
 
     def rmdir(self, path: str) -> None:
@@ -180,7 +184,7 @@ class RemoteClient:
     def unlink(self, path: str) -> None:
         self.call(Op.UNLINK, path=path)
 
-    def rename(self, src: str, dst: str, replace: bool = True) -> None:
+    def rename(self, src: str, dst: str, *, replace: bool = True) -> None:
         self.call(Op.RENAME, src=src, dst=dst, replace=replace)
 
     def symlink(self, target: str, path: str) -> None:

@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import pathlib
-from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    import pathlib
+    from collections.abc import Iterator
+
+#: How many of a list a trace keeps before saying how many it dropped.
+_ITEMS = 32
 
 _LABEL_KEYS = (
     "description",
@@ -44,7 +49,7 @@ class Action:
     category: str
     start: float
     end: float
-    args: dict[str, Any] = dataclasses.field(default_factory=dict)
+    args: dict[str, Any] = dataclasses.field(default_factory=dict[str, Any])
     spawn: str | None = None
 
 
@@ -78,8 +83,8 @@ class Session:
     title: str
     parent: str | None = None
     agent: str = ""
-    args: dict[str, Any] = dataclasses.field(default_factory=dict)
-    actions: list[Action] = dataclasses.field(default_factory=list)
+    args: dict[str, Any] = dataclasses.field(default_factory=dict[str, Any])
+    actions: list[Action] = dataclasses.field(default_factory=list[Action])
 
 
 def records(path: pathlib.Path) -> Iterator[dict[str, Any]]:
@@ -117,18 +122,20 @@ def truncate(value: Any, limit: int = 4096) -> Any:
             return value
         return f"{value[:limit]}… (+{len(value) - limit} chars)"
     if isinstance(value, dict):
-        return {str(key): truncate(item, limit) for key, item in value.items()}
+        held = cast("dict[Any, Any]", value)
+        return {str(key): truncate(item, limit) for key, item in held.items()}
     if isinstance(value, list):
-        clipped = [truncate(item, limit) for item in value[:32]]
-        if len(value) > 32:
-            clipped.append(f"… (+{len(value) - 32} items)")
+        listed = cast("list[Any]", value)
+        clipped = [truncate(item, limit) for item in listed[:_ITEMS]]
+        if len(listed) > _ITEMS:
+            clipped.append(f"… (+{len(listed) - _ITEMS} items)")
         return clipped
     return value
 
 
 def mapping(value: Any) -> dict[str, Any]:
     """Reads a log field as a mapping, treating anything else as an absent one."""
-    return value if isinstance(value, dict) else {}
+    return cast("dict[str, Any]", value) if isinstance(value, dict) else {}
 
 
 def text_of(content: Any) -> str:
@@ -139,20 +146,22 @@ def text_of(content: Any) -> str:
         return content
     if isinstance(content, list):
         parts: list[str] = []
-        for block in content:
+        for block in cast("list[Any]", content):
             if isinstance(block, str):
                 parts.append(block)
                 continue
             if not isinstance(block, dict):
                 continue
+            named = cast("dict[str, Any]", block)
             for key in ("text", "think", "thinking", "output", "content"):
-                value = block.get(key)
+                value = named.get(key)
                 if isinstance(value, str):
                     parts.append(value)
                     break
         return "\n".join(part for part in parts if part)
     if isinstance(content, dict):
-        return text_of(content.get("text") or content.get("content"))
+        held_content = cast("dict[str, Any]", content)
+        return text_of(held_content.get("text") or held_content.get("content"))
     return json.dumps(content, ensure_ascii=False)
 
 
@@ -161,8 +170,9 @@ def label(tool: str, tool_input: Any) -> str:
     if isinstance(tool_input, str) and tool_input.strip():
         return f"{tool}: {summarize(tool_input)}"
     if isinstance(tool_input, dict):
+        named_input = cast("dict[str, Any]", tool_input)
         for key in _LABEL_KEYS:
-            value = tool_input.get(key)
+            value = named_input.get(key)
             if isinstance(value, str) and value.strip():
                 return f"{tool}: {summarize(value)}"
     return tool

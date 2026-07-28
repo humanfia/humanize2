@@ -61,7 +61,10 @@ def test_a_command_is_given_the_rest_of_the_line_untouched(
 
 
 def test_the_status_a_command_exits_with_is_the_one_that_is_returned() -> None:
-    with unittest.mock.patch.dict(cli.COMMANDS, {"anchor": (lambda argv: 130, "")}):
+    def refused(_argv: list[str]) -> int:
+        return 130
+
+    with unittest.mock.patch.dict(cli.COMMANDS, {"anchor": (refused, "")}):
         assert cli.main(["anchor", "claude"]) == 130
 
 

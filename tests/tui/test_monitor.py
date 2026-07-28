@@ -42,7 +42,8 @@ def test_the_graph_is_who_handed_to_whom_and_how_often() -> None:
 
     graph = "\n".join(monitor.graph())
 
-    assert "actor" in graph and "reviewer" in graph
+    assert "actor" in graph
+    assert "reviewer" in graph
     assert monitor.handovers[("actor", "reviewer")] == 2
     assert monitor.handovers[("reviewer", "actor")] == 1  # the second round back round
     assert monitor.turns["actor"] == 2

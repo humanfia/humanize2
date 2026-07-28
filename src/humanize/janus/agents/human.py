@@ -28,7 +28,7 @@ __all__ = ["HumanAgent", "HumanSession"]
 class HumanSession(SessionBase):
     """One conversation with the person: said to, and answered when they answer."""
 
-    def stream(self, prompt: str) -> Iterator[Event]:
+    def stream(self, prompt: str) -> Iterator[Event]:  # noqa: ARG002
         """Says something to the person and waits for what they say back.
 
         Overridden rather than implemented through `_stream`, so that this is not bracketed
@@ -69,7 +69,7 @@ class HumanAgent(AgentBase):
     returns, rather than waiting on somebody who is not there.
     """
 
-    def __init__(self, *, name: str = "human"):
+    def __init__(self, *, name: str = "human") -> None:
         """Initializes the person as an agent.
 
         Args:

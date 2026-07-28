@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import pathlib
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -18,6 +17,10 @@ from tests.oronyx.conftest import (
     labels,
     slices,
 )
+
+if TYPE_CHECKING:
+    import pathlib
+    from collections.abc import Iterator
 
 _CLAUDE = (f"claude:{CLAUDE_SESSION}", f"claude:{CLAUDE_SESSION}:agent-abc12345")
 _CODEX = (f"codex:{CODEX_THREAD}", f"codex:{CODEX_SUBTHREAD}")
@@ -48,7 +51,7 @@ def test_answers_to_every_spelling_of_an_id(
         ([CODEX_SUBTHREAD, "abc12345"], {_CODEX[1], _CLAUDE[1]}),
         ([KIMI_SESSION[8:16]], set(_KIMI)),
         ([_KIMI[1]], {_KIMI[1]}),
-        (["nope"], set()),
+        (["nope"], set[str]()),
     ],
     ids=["agents", "workspaces", "children", "alone", "shortened", "one", "unknown"],
 )

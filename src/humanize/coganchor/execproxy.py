@@ -13,6 +13,7 @@ exited -- it just happened on another machine.
 
 from __future__ import annotations
 
+import errno
 import fcntl
 import logging
 import os
@@ -21,13 +22,16 @@ import selectors
 import struct
 import termios
 import threading
-from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from humanize.coganchor.proto import CHUNK_SIZE, Stream
-from humanize.coganchor.remote import ExecHandle, RemoteClient
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from humanize.coganchor.remote import ExecHandle, RemoteClient
 
 __all__ = ["ExecProxy", "ExecResult"]
 
@@ -162,7 +166,7 @@ class ExecProxy:
         message = f"hmz: {' '.join(self._argv[:1]) or 'command'}: {error.strerror}\n"
         self._outbox.put((Stream.STDERR, message.encode()))
         # 126/127 match the shell's "found but not executable" / "not found".
-        self._result = ExecResult(exit_code=127 if error.errno == 2 else 126)
+        self._result = ExecResult(exit_code=127 if error.errno == errno.ENOENT else 126)
 
     # ------------------------------------------------------------------- pumps
 

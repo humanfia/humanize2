@@ -61,8 +61,8 @@ class ResolvedAgent:
     profile: AgentProfile
     program: str
     argv: list[str]
-    local_paths: list[str] = field(default_factory=list)
-    local_programs: list[str] = field(default_factory=list)
+    local_paths: list[str] = field(default_factory=list[str])
+    local_programs: list[str] = field(default_factory=list[str])
 
 
 def profile_for(name: str) -> AgentProfile:

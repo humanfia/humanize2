@@ -27,6 +27,9 @@ __all__ = ["COMMANDS", "anchor_parser", "flow_and_agents", "main"]
 #: machine can reach them.
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
+#: The top of the port range, above which a number is not a port at all.
+_MAX_PORT = 65535
+
 #: What `-a` may call each coding agent, as the command that drives it. A CLI is named twice
 #: because both spellings are what people call it, and neither is ambiguous.
 _CLIS = {
@@ -39,8 +42,7 @@ _CLIS = {
 
 
 def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
-    """Reads an `hmz exec` line into the flow to drive, the agents to drive it with, and
-    what to have them do.
+    """Reads an `hmz exec` line into a flow, the agents to drive it, and the task.
 
     A flow says how many agents it drives, and this is where they come from: one for each, in
     the order the flow takes them, at the model and effort each is to run at. Public because
@@ -407,12 +409,13 @@ def _anchor(argv: list[str]) -> int:
         for export in found.get("exports", []):
             print(f"export      {export['virtual']} -> {export['real']}")
         print(f"workspace   {found['workspace']} ({found['entries']} entries)")
-        return 0
     except KeyboardInterrupt:
         return 130
     except (ConnectionError, ProtocolError, OSError, ValueError) as exc:
         print(f"hmz: {exc}", file=sys.stderr)
         return 1
+    else:
+        return 0
 
 
 def _serve(argv: list[str]) -> int:
@@ -495,7 +498,7 @@ def _serve(argv: list[str]) -> int:
     if not sep:
         host, port = "127.0.0.1", args.listen
     host = host.strip("[]") or "127.0.0.1"
-    if not port.isdigit() or not 0 <= int(port) <= 65535:
+    if not port.isdigit() or not 0 <= int(port) <= _MAX_PORT:
         print(
             f"hmz: malformed listen address {args.listen!r}; expected [HOST:]PORT",
             file=sys.stderr,

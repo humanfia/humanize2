@@ -27,10 +27,9 @@ import sys
 import threading
 import time
 import traceback
-from collections.abc import Callable
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import pyfiglet
 from rich.box import ROUNDED
@@ -59,6 +58,8 @@ from .settings import Settings
 from .tally import Tally
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from humanize.janus import AgentBase, Event, Question
 
 #: What the editor understands, named as opencode names them, one step along: what answers
@@ -201,7 +202,7 @@ class Editor(TextArea):
     class Sent(Message):
         """What was typed, now that it has been sent."""
 
-        def __init__(self, text: str):
+        def __init__(self, text: str) -> None:
             """Initializes the message.
 
             Args:
@@ -254,7 +255,12 @@ class Editor(TextArea):
         listing = self.screen.query_one("#offers", OptionList)
         if not listing.has_class("offering"):
             if event.key in ("up", "down"):
-                history = self.app.history  # type: ignore[attr-defined]
+                # textual types the property off the bare generic, so what it hands
+                # back is an `App` of nothing in particular.
+                history = cast(
+                    "Humanize",
+                    self.app,  # pyright: ignore[reportUnknownMemberType]
+                ).history
                 row, _ = self.cursor_location
                 if event.key == "up" and row == 0:
                     said = history.back(self.text)
@@ -284,7 +290,8 @@ class Editor(TextArea):
         elif event.key == "escape":
             event.prevent_default()
             event.stop()
-            listing.set_class(False, "offering")
+            # Positional because textual's is: the class names follow it as *args.
+            listing.set_class(False, "offering")  # noqa: FBT003
 
     def take(self, whole: str) -> None:
         """Replaces the part being finished with what was offered for it.
@@ -339,7 +346,7 @@ class Humanize(App[None]):
         Binding("shift+tab", "cycle_flow", "flow", priority=True),
     ]
 
-    def action_quit(self) -> None:  # type: ignore[override]
+    def action_quit(self) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Leaves, having first stopped whatever was running.
 
         A flow is a loop and a turn can think for minutes, so leaving without stopping it
@@ -697,7 +704,7 @@ class Humanize(App[None]):
             left + " " * max(2, gap) + right, layout=False
         )
 
-    def _switched(self, argv: list[str], now: bool) -> bool | None:
+    def _switched(self, argv: list[str], *, now: bool) -> bool | None:
         """What a switch becomes: what was asked for, or the other of what it is.
 
         A toggle is what you reach for at a prompt and the wrong thing to write down: a line
@@ -728,7 +735,7 @@ class Humanize(App[None]):
         """
         if self.query_one("#offers", OptionList).has_class("offering"):
             return ["↑↓ move", "tab take", "esc dismiss"]
-        keys = []
+        keys: list[str] = []
         if self.query_one(Editor).text:
             # Enter does nothing with nothing typed, and a key that does nothing is not one
             # to offer: what it would do next is what it is called here.
@@ -844,13 +851,13 @@ class Humanize(App[None]):
         elif name == "status":
             self.action_status()
         elif name == "details":
-            if (switched := self._switched(argv, self._details)) is None:
+            if (switched := self._switched(argv, now=self._details)) is None:
                 return
             self._details = switched
             shown = "shown" if self._details else "hidden"
             self.show(f"[dim]tool calls and thinking {shown}[/dim]")
         elif name == "afk":
-            if (switched := self._switched(argv, self._afk)) is None:
+            if (switched := self._switched(argv, now=self._afk)) is None:
                 return
             self._afk = switched
             self.show(
@@ -1128,7 +1135,7 @@ class Humanize(App[None]):
                 self._part,
                 f"[dim]{_WORKED} Worked for {took:.0f}s"
                 f"{_DOT}{escape(short(agent.id))}[/]",
-                False,
+                packs=False,
             )
         elif event.kind == "tool" and self._details:
             # The tool on the bullet, what it came back with under it -- Claude Code's shape.
@@ -1136,7 +1143,7 @@ class Humanize(App[None]):
             self.call_from_thread(
                 self._part,
                 f"[green]{_SAID}[/] {named}[dim]({about})[/]",
-                True,
+                packs=True,
             )
         elif event.kind == "reasoning" and self._details:
             self.call_from_thread(
@@ -1144,13 +1151,13 @@ class Humanize(App[None]):
                 "\n".join(
                     f"[dim italic]{line}[/]" for line in escape(event.text).splitlines()
                 ),
-                False,
+                packs=False,
             )
         elif event.kind == "asks":
             self.call_from_thread(
                 self._part,
                 f"[yellow]{_SAID}[/] {escape(event.text)}",
-                False,
+                packs=False,
             )
         elif event.kind == "text":
             # The bullet on the first line, two spaces under it for the rest, which is how
@@ -1159,12 +1166,15 @@ class Humanize(App[None]):
             self.call_from_thread(
                 self._part,
                 "\n".join(
-                    [f"[green]{_SAID}[/] {said[0]}", *(f"  {l}" for l in said[1:])]
+                    [
+                        f"[green]{_SAID}[/] {said[0]}",
+                        *(f"  {line}" for line in said[1:]),
+                    ]
                 ),
-                False,
+                packs=False,
             )
 
-    def _part(self, text: str, packs: bool) -> None:
+    def _part(self, text: str, *, packs: bool) -> None:
         """Puts one part of a turn in the transcript, spaced as opencode spaces its own.
 
         A blank line goes between the parts, except between two that pack -- one-line tool

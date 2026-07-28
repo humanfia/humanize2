@@ -25,15 +25,16 @@ import os
 import socket
 import struct
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from humanize.coganchor.linux import procfs
-from humanize.coganchor.linux.ptrace import Registers
 from humanize.coganchor.linux.syscalls import NR, syscall_name
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle only matters for typing
+    from collections.abc import Callable
+
+    from humanize.coganchor.linux.ptrace import Registers
     from humanize.coganchor.supervisor import Supervisor, Tracee
 
 __all__ = ["ALLOW", "STALL", "Action", "SyscallDispatcher", "fails"]
@@ -52,6 +53,9 @@ O_ACCMODE = 0o3
 
 _CREAT_FLAGS = O_CREAT | O_WRONLY | O_TRUNC
 
+#: The flags field of ``struct open_how``, which is the first ``u64`` of it.
+_OPEN_HOW_FLAGS = 8
+
 
 @dataclass(frozen=True, slots=True)
 class Action:
@@ -66,6 +70,7 @@ STALL = Action("stall")
 
 
 def fails(code: int) -> Action:
+    """The action that fails a syscall with this errno, or EIO when it names none."""
     return Action("errno", code or errno.EIO)
 
 
@@ -140,8 +145,8 @@ class SyscallDispatcher:
 
     def _openat2(self, tracee: Tracee, registers: Registers) -> Action:
         path = self._path(tracee.pid, registers.signed_arg(0), registers.arg(1))
-        raw = procfs.read_bytes(tracee.pid, registers.arg(2), 8)
-        flags = int.from_bytes(raw, "little") if len(raw) == 8 else 0
+        raw = procfs.read_bytes(tracee.pid, registers.arg(2), _OPEN_HOW_FLAGS)
+        flags = int.from_bytes(raw, "little") if len(raw) == _OPEN_HOW_FLAGS else 0
         return self._prepare_open(path, flags)
 
     def _creat(self, tracee: Tracee, registers: Registers) -> Action:
@@ -465,8 +470,8 @@ class SyscallDispatcher:
         if address == 0:
             now = time.time_ns()
             return (now, now)
-        raw = procfs.read_bytes(pid, address, 32)
-        if len(raw) < 32:
+        raw = procfs.read_bytes(pid, address, _TIMES_PAIR)
+        if len(raw) < _TIMES_PAIR:
             return (None, None)
         atime_s, atime_frac, mtime_s, mtime_frac = struct.unpack("<qqqq", raw)
         if micro:
@@ -476,6 +481,9 @@ class SyscallDispatcher:
             )
         return (_timespec_ns(atime_s, atime_frac), _timespec_ns(mtime_s, mtime_frac))
 
+
+#: The pair of times ``utimensat`` takes, sixteen bytes apiece.
+_TIMES_PAIR = 32
 
 #: ``UTIME_NOW``/``UTIME_OMIT`` sentinels from <sys/stat.h>.
 _UTIME_NOW = (1 << 30) - 1
@@ -515,21 +523,29 @@ def _as_mapping(entries: list[str]) -> dict[str, str]:
     return env
 
 
+#: What a ``sockaddr`` holds up to the part read here: family, port and four bytes of
+#: address for IPv4; the same past a flow label and sixteen bytes for IPv6, which is
+#: twenty-eight bytes whole.
+_SOCKADDR_IN = 8
+_SOCKADDR_IN6 = 24
+_SOCKADDR_IN6_SIZE = 28
+
+
 def _read_sockaddr(pid: int, address: int, length: int) -> tuple[int, str, int] | None:
     """Decode an IPv4/IPv6 ``connect`` target, ignoring anything else."""
-    if address == 0 or length < 8:
+    if address == 0 or length < _SOCKADDR_IN:
         return None
     try:
-        raw = procfs.read_bytes(pid, address, min(length, 28))
+        raw = procfs.read_bytes(pid, address, min(length, _SOCKADDR_IN6_SIZE))
     except OSError:
         return None
-    if len(raw) < 8:
+    if len(raw) < _SOCKADDR_IN:
         return None
     family = struct.unpack_from("<H", raw, 0)[0]
     port = struct.unpack_from("!H", raw, 2)[0]
     if family == socket.AF_INET:
         return family, socket.inet_ntop(socket.AF_INET, raw[4:8]), port
-    if family == socket.AF_INET6 and len(raw) >= 24:
+    if family == socket.AF_INET6 and len(raw) >= _SOCKADDR_IN6:
         return family, socket.inet_ntop(socket.AF_INET6, raw[8:24]), port
     return None
 

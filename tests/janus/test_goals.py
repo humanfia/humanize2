@@ -10,7 +10,7 @@ These cost tokens and need network access, so they only run with ``pytest --run-
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -22,6 +22,9 @@ from humanize.janus import (
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 pytestmark = pytest.mark.agent
 
@@ -73,7 +76,8 @@ def test_kimi_answers_with_the_last_turn_a_goal_took(
     # from a turn the runtime started itself -- and an empty one is a message read back before
     # the agent had finished writing it.
     assert "BANANA" in capfd.readouterr().err
-    assert answer and answer != "BANANA"
+    assert answer
+    assert answer != "BANANA"
 
 
 def test_kimi_runs_a_swarm_when_the_effort_says_to(
@@ -109,7 +113,8 @@ def test_codex_answers_with_the_last_turn_a_goal_took(
     # The first turn says BANANA and nothing else, so an answer that is anything more is one
     # from a turn the runtime started itself rather than the first it was given.
     assert "BANANA" in capfd.readouterr().err
-    assert answer and answer != "BANANA"
+    assert answer
+    assert answer != "BANANA"
 
 
 def test_codex_leaves_the_goal_on_the_thread(

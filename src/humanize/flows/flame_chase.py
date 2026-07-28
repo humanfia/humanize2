@@ -1,7 +1,7 @@
 """Flame chase (flowbench: flame_chase) -- two agents take turns on the same task.
 
-    hmz exec -f flame_chase \
-        -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
+hmz exec -f flame_chase \
+    -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
 """
 
 import time

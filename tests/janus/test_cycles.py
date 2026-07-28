@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import json
 import subprocess
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from humanize.janus import AgentConfig, Runner, Stopped, cycles, opened
 
 from .conftest import ShellAgent
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 CONFIG = AgentConfig(model="m", effort="high")
 
@@ -118,8 +121,7 @@ def test_a_run_that_failed_says_so(
 def test_the_cycles_of_one_workspace_are_not_another_workspace_s(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """They are kept under the workspace they ran in, since that is what anyone has to look
-    them up by."""
+    """They are kept under the workspace they ran in, which is what looks them up."""
     here, there = tmp_path / "here", tmp_path / "there"
     for where in (here, there):
         where.mkdir()

@@ -23,6 +23,7 @@ import pytest
 from humanize.janus import (
     CodexAgent,
     CodexAgentConfig,
+    Event,
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
 )
@@ -385,7 +386,7 @@ def test_kimi_opens_then_resumes(kimi: _FakeServer) -> None:
     opened = [call for call in calls if call["path"] == "/api/v1/sessions"]
     prompts = [call for call in calls if call["path"].endswith("/prompts")]
     assert len(opened) == 1  # one session, resumed rather than reopened
-    assert opened[0]["body"] == {"metadata": {"cwd": os.getcwd()}}
+    assert opened[0]["body"] == {"metadata": {"cwd": str(Path.cwd())}}
     assert [prompt["body"]["content"][0]["text"] for prompt in prompts] == [
         "hi",
         "again",
@@ -503,7 +504,7 @@ def test_codex_pursues_by_setting_a_goal_on_the_thread(codex: _FakeServer) -> No
     assert session.pursue("the suite passes") == "answered"
 
     called = {call["method"]: call["params"] for call in codex.calls()}
-    assert called["thread/start"]["cwd"] == os.getcwd()
+    assert called["thread/start"]["cwd"] == str(Path.cwd())
     assert called["thread/start"]["model"] == "gpt-5-codex"
     assert called["thread/goal/set"] == {
         "threadId": "thread_fake",
@@ -566,7 +567,7 @@ def test_codex_runs_an_ordinary_turn_on_the_thread(codex: _FakeServer) -> None:
     assert session("do the task") == "steered:go on"
 
     called = {call["method"]: call["params"] for call in codex.calls()}
-    assert called["thread/start"]["cwd"] == os.getcwd()
+    assert called["thread/start"]["cwd"] == str(Path.cwd())
     assert called["turn/start"]["input"] == [{"type": "text", "text": "do the task"}]
     assert called["turn/start"]["effort"] == "high"
     assert "thread/goal/set" not in called  # an ordinary turn sets no goal
@@ -578,7 +579,7 @@ def test_codex_can_be_talked_to_while_a_turn_is_running(codex: _FakeServer) -> N
     """The point of running the turn on the server: a word put in reaches the turn under way."""
     session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
 
-    said = []
+    said: list[Event] = []
     for event in session.stream("count to sixty"):
         if event.kind == "text" and not said:
             session.interject("actually, stop")
@@ -758,8 +759,10 @@ def test_codex_is_told_nobody_answered_rather_than_left_waiting(
 
 
 def test_kimi_answers_a_question_the_turn_stopped_on(kimi: _FakeServer) -> None:
-    """The daemon holds the question and the turn waits on it, so a poll that only read the
-    messages would be reading a session that has stopped moving."""
+    """The daemon holds the question and the turn waits on it.
+
+    A poll that only read the messages would be reading a session that has stopped moving.
+    """
     agent = _agent()
     agent.ask = lambda question: "right"
 

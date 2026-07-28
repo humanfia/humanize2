@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from humanize.coganchor import AnchorConfig
 from humanize.janus import AgentBase, CommandSessionBase
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -17,7 +20,7 @@ class HereAnchor(AnchorConfig):
     what janus owes it is the whole call the backend built, which is what this records.
     """
 
-    seen: list[list[str]] = field(default_factory=list)
+    seen: list[list[str]] = field(default_factory=list[list[str]])
 
     def command(self, argv: Sequence[str]) -> list[str]:
         self.seen.append(list(argv))
@@ -27,7 +30,7 @@ class HereAnchor(AnchorConfig):
 class ShellSession(CommandSessionBase):
     """Runs the prompt as a shell script, so each test spells the agent it stands in for."""
 
-    def __init__(self, agent: AgentBase):
+    def __init__(self, agent: AgentBase) -> None:
         super().__init__(agent)
         self.reads = 0
 

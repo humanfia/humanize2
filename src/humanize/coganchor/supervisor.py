@@ -22,18 +22,20 @@ import queue
 import select
 import signal
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from humanize.coganchor import standin
 from humanize.coganchor.execproxy import ExecProxy, ExecResult
 from humanize.coganchor.handlers import STALL, Action, SyscallDispatcher
 from humanize.coganchor.linux import procfs, ptrace, seccomp
-from humanize.coganchor.linux.ptrace import Registers
 from humanize.coganchor.linux.syscalls import NR, TRAPPED_SYSCALLS, syscall_name
-from humanize.coganchor.netproxy import NetProxy
-from humanize.coganchor.policy import Router
-from humanize.coganchor.remote import RemoteClient
-from humanize.coganchor.shadow import ShadowTree
+
+if TYPE_CHECKING:
+    from humanize.coganchor.linux.ptrace import Registers
+    from humanize.coganchor.netproxy import NetProxy
+    from humanize.coganchor.policy import Router
+    from humanize.coganchor.remote import RemoteClient
+    from humanize.coganchor.shadow import ShadowTree
 
 __all__ = ["Launch", "Supervisor", "Tracee"]
 
@@ -161,8 +163,8 @@ class Supervisor:
         """
         try:
             pushed = self.shadow.flush()
-        except OSError as exc:
-            log.error("could not push final changes to the target: %s", exc)
+        except OSError:
+            log.exception("could not push final changes to the target")
         else:
             if pushed:
                 log.info("pushed %d file(s) to the target at exit", pushed)
@@ -217,7 +219,9 @@ class Supervisor:
             ptrace.traceme()
             seccomp.install(TRAPPED_SYSCALLS)
             os.kill(os.getpid(), signal.SIGSTOP)
-            os.execve(launch.program, launch.argv, launch.env)
+            # Becoming the traced program is the whole errand of this fork, and it is an
+            # argv rather than a command line, so there is no shell for one to go through.
+            os.execve(launch.program, launch.argv, launch.env)  # noqa: S606
         # Everything, deliberately: this is the forked child, and anything that escapes here
         # would run the parent's code a second time rather than report a failed launch.
         except BaseException as exc:  # noqa: BLE001

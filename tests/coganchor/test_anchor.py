@@ -114,7 +114,8 @@ def test_checking_reports_the_target_without_running_anything(
     found = check(config)
 
     assert found["target"] == f"local:{anchorage.target}"
-    assert found["workspace"] == anchorage.workspace and found["entries"] == 2
+    assert found["workspace"] == anchorage.workspace
+    assert found["entries"] == 2
     assert found["exports"] == [
         {"virtual": anchorage.workspace, "real": str(anchorage.target)}
     ]
@@ -142,7 +143,7 @@ def test_a_target_nobody_can_read_is_refused_the_way_argparse_refuses_an_argumen
     ids=["a target nobody can read", "a net that is neither"],
 )
 def test_settings_no_session_could_run_under_are_refused_as_they_are_written(
-    settings: dict[str, str], complaint: str
+    settings: dict[str, Any], complaint: str
 ) -> None:
     """Both spellings refuse the same thing: the command line by parsing, this by construction."""
     with pytest.raises(ValueError, match=complaint):

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import datetime
 import math
-import pathlib
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .session import Action, Session, summarize
+
+if TYPE_CHECKING:
+    import pathlib
 
 _LANE_STRIDE = 100
 

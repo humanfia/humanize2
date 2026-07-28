@@ -12,10 +12,12 @@ from __future__ import annotations
 import ctypes
 import os
 import struct
-from collections.abc import Iterable
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from humanize.coganchor.linux.syscalls import ARCH, NR
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 __all__ = ["build_program", "install"]
 

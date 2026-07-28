@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import datetime
 import json
-import pathlib
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .session import (
     Action,
@@ -20,6 +19,9 @@ from .session import (
     truncate,
     wanted,
 )
+
+if TYPE_CHECKING:
+    import pathlib
 
 _INFO_FIELDS = ("cwd", "version", "gitBranch", "sessionId")
 _SYSTEM_FIELDS = (
@@ -147,8 +149,12 @@ def _parse(
             info["title"] = record["aiTitle"]
         message = mapping(record.get("message"))
         content = message.get("content")
-        blocks = (
-            [block for block in content if isinstance(block, dict)]
+        blocks: list[dict[str, Any]] = (
+            [
+                cast("dict[str, Any]", block)
+                for block in cast("list[Any]", content)
+                if isinstance(block, dict)
+            ]
             if isinstance(content, list)
             else []
         )

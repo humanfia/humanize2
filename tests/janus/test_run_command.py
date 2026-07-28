@@ -13,12 +13,12 @@ import runpy
 import shlex
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from humanize.cli import main
-from humanize.janus import AgentConfig, NotAFlow, Runner
+from humanize.janus import AgentConfig, NotAFlow, Runner, SessionBase
 from tests.janus.conftest import ShellAgent
 
 #: A flow that drives nothing and writes down what it was handed, next to its own file. AGENTS
@@ -351,7 +351,11 @@ def test_every_example_runs_as_the_command_line_it_shows(
     shown = re.search(r"^\s*hmz exec (?:.*\\\n)*.*", flow.read_text(), re.MULTILINE)
     assert shown is not None, "no `hmz exec` command line to be checked against"
     monkeypatch.chdir(Path(__file__).resolve().parents[2])
-    monkeypatch.setattr(Runner, "run", lambda self, task: None)  # nothing is driven
+
+    def nothing(_self: Runner, _task: str) -> None:
+        """Every line is checked as far as the entry point, and no further."""
+
+    monkeypatch.setattr(Runner, "run", nothing)
     main(shlex.split(shown[0].replace("\\\n", " "))[1:])
 
 
@@ -401,7 +405,11 @@ def test_a_flow_of_your_own_runs_by_name(
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.chdir(project)
     driven: list[str] = []
-    monkeypatch.setattr(Runner, "run", lambda self, task: driven.append(task))
+
+    def record(_self: Runner, task: str) -> None:
+        driven.append(task)
+
+    monkeypatch.setattr(Runner, "run", record)
 
     assert main(["exec", "-f", "theirs", "-a", "claude/m:high", "do it"]) == 0
     assert driven == ["do it"]
@@ -419,7 +427,10 @@ def test_a_failed_turn_is_taken_again_and_only_that_turn(
 
     from humanize.flows.humanize1 import spoken
 
-    monkeypatch.setattr("time.sleep", lambda _: None)
+    def instant(_seconds: float) -> None:
+        """The wait between rounds, taken out of the test."""
+
+    monkeypatch.setattr("time.sleep", instant)
     taken: list[str] = []
 
     class _Flaky:
@@ -435,7 +446,7 @@ def test_a_failed_turn_is_taken_again_and_only_that_turn(
             # would spend a round asking the other side to reply to silence.
             return "" if len(taken) == 3 else "answered"
 
-    assert spoken(_Flaky(), "do it") == "answered"
+    assert spoken(cast("SessionBase", _Flaky()), "do it") == "answered"
     assert taken == ["do it"] * 4  # the same turn, four times, and no other
 
 

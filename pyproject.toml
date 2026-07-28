@@ -13,8 +13,16 @@ dependencies = [
     "dateparser>=1.4.1",
     "pyfiglet>=1.0",
     "pyyaml>=6.0.3",
+    # Named because the interface imports it directly. It arrives with textual either
+    # way, but a dependency you import is one you declare.
+    "rich>=15",
     "textual>=8.2.8",
 ]
+
+[project.urls]
+Homepage = "https://github.com/humanfia/humanize"
+Repository = "https://github.com/humanfia/humanize"
+Issues = "https://github.com/humanfia/humanize/issues"
 
 [project.scripts]
 hmz = "humanize.cli:main"
@@ -25,12 +33,125 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4",
+    "pyright>=1.1.411",
     "pytest>=8",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=6",
     "pytest-timeout>=2.3",
-    "ruff>=0.6",
+    "ruff>=0.16",
 ]
 
 [tool.pytest.ini_options]
 # The interface is an async application, and its tests drive it as one.
 asyncio_mode = "auto"
+# A marker nobody registered is a typo, and a typo in `-m` selects nothing.
+# `-ra` names what was skipped, so a test that quietly stops running says so.
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+
+[tool.ruff]
+# The formatter wraps at 88; `pycodestyle` below lets prose the formatter cannot
+# split run to 100 rather than forcing a reflow of every docstring in the tree.
+line-length = 88
+
+[tool.ruff.lint]
+# Everything, less what this codebase has a reason to be without. A rule is off
+# here only where it argues with something the code does on purpose.
+select = ["ALL"]
+# The prompt glyph the interface draws, and the sign that means times.
+allowed-confusables = ["❯", "×"]
+ignore = [
+    # The formatter owns trailing commas and implicit concatenation; linting them
+    # too makes the two tools rewrite each other's lines.
+    "COM812",
+    "ISC001",
+    # LICENSE says it once. A header per file says it a hundred and twenty times.
+    "CPY001",
+    # Google style documents a class where it is declared and leaves the class
+    # docstring to cover __init__, dunders, and the one-line accessors.
+    "D102",
+    "D105",
+    "D107",
+    # Each subcommand imports what only it needs, so `hmz` starts without loading
+    # the interface, the tracer, and the sandbox to run a command that uses none.
+    "PLC0415",
+    # `Any` is what a wire protocol carries. Pyright's strict mode governs the rest.
+    "ANN401",
+    # Between them these want an exception class per message. The messages are
+    # one-offs and read better at the raise than three files away.
+    "TRY003",
+    "EM101",
+    "EM102",
+    # Every subprocess here is an argv list, never a shell string, and looking up
+    # `ssh` or `docker` on PATH is the point rather than the oversight.
+    "S603",
+    "S607",
+    # The counters. A reader of somebody else's stream format is one `match` over
+    # the items that format has, and a launch takes what `execve` takes; splitting
+    # either to bring a number down hides the shape of the thing being mirrored.
+    # Set `mccabe.max-complexity` and the `pylint` maxima to put a ceiling back.
+    "C901",
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+    "PLR0917",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The syscall layer's domain type is the string path: it reads them out of ptrace
+# registers and puts them on a wire, so `pathlib` would only convert them twice.
+"src/humanize/coganchor/**" = ["PTH"]
+# A handle and the client it came off, a session and its agent: each pair is two
+# halves of one object declared in one file, and the underscore keeps the halves
+# out of the package's public surface rather than out of each other's.
+"src/humanize/coganchor/remote.py" = ["SLF001"]
+"src/humanize/janus/agents/base.py" = ["SLF001"]
+"src/humanize/janus/agents/codex.py" = ["SLF001"]
+"src/humanize/janus/agents/kimi.py" = ["SLF001"]
+# Looking for a flow is allowed to find nothing. `os.path` answers False for a
+# directory it cannot read where `Path` raises, and the module says so at `where`.
+"src/humanize/flows/__init__.py" = ["PTH"]
+# A flow is a module with one `run` in it, and the module docstring is about that
+# `run` -- how the flow loops, what each agent is for, and the line that starts it.
+"src/humanize/flows/*.py" = ["D103"]
+# What a command line writes, it prints.
+"src/humanize/cli.py" = ["T201"]
+"tests/**" = [
+    "S101",    # an assert is what a test is
+    "SLF001",  # a test reaches for what it tests, private or not
+    "PLR2004", # the literal a test compares against is the expectation
+    "D1",      # the name of a test is what it documents
+    "ARG",     # pytest passes a fixture by name, whether the body names it or not
+    "FBT",     # a parametrized test takes its parameters however `parametrize` gives them
+    "S105",    # a fake credential
+    "S106",
+    "S108",    # and a fake temp path
+]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 100
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "strict"
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+# The only checker here is pyright, so a suppression names a pyright rule.
+# `# type: ignore[whatever]` silences the whole line whatever is in the brackets.
+enableTypeIgnoreComments = false
+reportUnnecessaryTypeIgnoreComment = "error"
+
+# A test reaches for what it tests, private or not, which is the one thing it may
+# do that its subject's callers may not. The root goes back on the path because a
+# test names its fixtures from the top: `tests.coganchor.conftest`.
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["."]
+reportPrivateUsage = "none"
+# An autouse fixture is used by being declared, and nothing names it anywhere.
+reportUnusedFunction = "none"

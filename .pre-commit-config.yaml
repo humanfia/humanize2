@@ -1,0 +1,64 @@
+# The first gate: what a commit is held to. The file hygiene hooks, the formatter, the
+# linter, and the type checker -- everything that answers in seconds. The tests are the
+# second gate's, and run in CI over every file and every Python the package claims.
+#
+# Install with `uv run pre-commit install`.
+#
+# ruff and pyright run out of this project's own environment rather than one pre-commit
+# builds: `uv.lock` already pins the version, and a second pin here is a second thing to
+# bump and a second thing to drift. Bump them with `uv lock --upgrade-package ruff`.
+
+default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      # `--frozen` below runs what the lockfile says without asking whether the lockfile
+      # still says what pyproject.toml says. This asks, and only when one of the two moved.
+      - id: uv-lock-check
+        name: uv lock --check
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+
+      # The linter first: `--fix` can emit code the formatter then wants to reflow, so
+      # lint-then-format settles in one pass where the other order takes two.
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen ruff check --force-exclude --fix
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --frozen ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      # Whole-project rather than per-file: a type checker reads what a file imports, so
+      # checking only what was touched checks the wrong half of the change. `pyproject`
+      # is in the trigger because its own configuration and the dependencies it resolves
+      # against both live there.
+      - id: pyright
+        name: pyright (strict)
+        entry: uv run --frozen pyright
+        language: system
+        types_or: [python, pyi, pyproject]
+        pass_filenames: false
+        require_serial: true

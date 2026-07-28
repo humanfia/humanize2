@@ -21,6 +21,8 @@ from humanize.janus import AgentBase, SessionBase
 
 
 class Agents(NamedTuple):
+    """The two the flow drives: one that remembers the run, and one that never does."""
+
     builder: AgentBase
     reviewer: AgentBase
 

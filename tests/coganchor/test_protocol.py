@@ -89,7 +89,7 @@ def test_frames_reassemble_across_short_reads() -> None:
     """Pipes hand back partial buffers; frames must still reassemble."""
     payload = b"z" * 5000
     reader = cast(
-        IO[bytes], _ShortReader(Frame.chunk(2, Stream.DATA, payload).encode())
+        "IO[bytes]", _ShortReader(Frame.chunk(2, Stream.DATA, payload).encode())
     )
     channel = Channel(reader, io.BytesIO())
     frame = channel.recv()
@@ -109,7 +109,7 @@ def test_send_is_thread_safe() -> None:
         thread.join()
 
     reader = Channel(io.BytesIO(sink.getvalue()), io.BytesIO())
-    seen = []
+    seen: list[int] = []
     while (frame := reader.recv()) is not None:
         seen.append(frame.msg_id)
     assert sorted(seen) == list(range(50))

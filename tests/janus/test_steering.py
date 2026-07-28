@@ -18,6 +18,7 @@ from humanize.janus import (
     ClaudeCodeAgentConfig,
     CodexAgent,
     CodexAgentConfig,
+    Event,
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
 )
@@ -33,7 +34,7 @@ def test_a_word_put_in_reaches_the_turn_and_leaves_the_stream_in_step() -> None:
 
     # Put in at the first thing the agent says rather than after a wait: the turn is provably
     # under way by then, however fast the model happens to be today.
-    said = []
+    said: list[Event] = []
     for event in session.stream("Count from 1 to 40, one number per line. No tools."):
         if not said:
             session.interject("STOP. Ignore the counting. Reply with exactly: STEERED")
@@ -53,11 +54,13 @@ def test_a_word_put_in_reaches_the_turn_and_leaves_the_stream_in_step() -> None:
 @pytest.mark.agent
 @pytest.mark.timeout(300)
 def test_codex_takes_a_word_put_into_the_turn_it_is_running() -> None:
-    """Codex steers the turn itself, which is why its turns run on the app server: a
-    `codex exec` per turn has ended by the time there is anything to say to it."""
+    """Codex steers the turn itself, which is why its turns run on the app server.
+
+    A `codex exec` per turn has ended by the time there is anything to say to it.
+    """
     session = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low")).new()
 
-    said = []
+    said: list[Event] = []
     for event in session.stream(
         "Count from 1 to 60, one number per line. Do not use any tools."
     ):

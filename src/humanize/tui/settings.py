@@ -15,7 +15,7 @@ reviewer's model to the builder.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -27,7 +27,7 @@ __all__ = ["Settings"]
 class Settings:
     """What one workspace was last set up to run, read once and written as it changes."""
 
-    def __init__(self, workspace: Path | None = None):
+    def __init__(self, workspace: Path | None = None) -> None:
         """Reads what was kept, if anything was.
 
         Args:
@@ -52,11 +52,14 @@ class Settings:
           One `cli/model:effort` apiece, in the order the flow takes them, and nothing at all
           for a flow this workspace has not run.
         """
-        kept = (self._mine().get("flows") or {}).get(flow) or {}
-        said = []
-        for agent in (kept.get("agents") or {}).values():
-            if not isinstance(agent, dict):
+        flows: dict[str, Any] = self._mine().get("flows") or {}
+        kept: dict[str, Any] = flows.get(flow) or {}
+        agents: dict[str, Any] = kept.get("agents") or {}
+        said: list[str] = []
+        for raw in agents.values():
+            if not isinstance(raw, dict):
                 return []  # written by hand and not the way this writes it
+            agent = cast("dict[str, Any]", raw)
             cli, model, effort = (
                 agent.get("cli"),
                 agent.get("model"),
@@ -94,10 +97,10 @@ class Settings:
         """This workspace's entry, made if it is not there and replaced if it is not one."""
         if not isinstance(self._held.get("workspaces"), dict):
             self._held["workspaces"] = {}
-        workspaces = self._held["workspaces"]
+        workspaces = cast("dict[str, Any]", self._held["workspaces"])
         if not isinstance(workspaces.get(self._where), dict):
             workspaces[self._where] = {}
-        return workspaces[self._where]
+        return cast("dict[str, Any]", workspaces[self._where])
 
     def _read(self) -> dict[str, Any]:
         """Everything the file holds, which is nothing at all when it cannot be read.
@@ -109,7 +112,7 @@ class Settings:
             held = yaml.safe_load(self._file.read_text(encoding="utf-8"))
         except (OSError, yaml.YAMLError):
             return {}
-        return held if isinstance(held, dict) else {}
+        return cast("dict[str, Any]", held) if isinstance(held, dict) else {}
 
     def _write(self) -> None:
         """Puts the whole file back, keeping every other workspace's entry as it was.

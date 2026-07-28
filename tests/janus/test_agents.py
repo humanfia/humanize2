@@ -16,7 +16,7 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -30,6 +30,9 @@ from humanize.janus import (
     Stopped,
 )
 from tests.janus.conftest import HereAnchor, ShellAgent
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 CODEX_ID = "019fa62b-d9e1-7b73-be84-bd70260e1cf6"
 
@@ -332,8 +335,10 @@ def test_a_prompt_larger_than_the_pipe_buffer_does_not_deadlock() -> None:
 
 
 def test_claude_holds_one_process_for_the_whole_session(clis: _FakeCLIs) -> None:
-    """Two turns are two lines written to one Claude, not two runs of it: that is what
-    leaves the agent there to be talked to while a turn is still running."""
+    """Two turns are two lines written to one Claude, rather than two runs of it.
+
+    That is what leaves the agent there to be talked to while a turn is still running.
+    """
     session = ClaudeCodeAgent(
         ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
     ).new()
@@ -354,7 +359,7 @@ def test_claude_can_be_talked_to_while_a_turn_is_running(clis: _FakeCLIs) -> Non
     session = ClaudeCodeAgent(
         ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
     ).new()
-    said = []
+    said: list[str] = []
     for event in session.stream("start"):
         if (
             event.kind == "text" and not said
@@ -466,8 +471,10 @@ def test_a_turn_the_backend_refuses_fails_rather_than_answering(
 
 
 def test_a_loop_that_swallows_a_failed_turn_does_not_swallow_being_stopped() -> None:
-    """What `/stop` rests on: a flow is a loop, and a loop that catches a failed turn goes
-    round again -- so being stopped must not arrive as a failed turn."""
+    """What `/stop` rests on: being stopped must not arrive as a failed turn.
+
+    A flow is a loop, and a loop that catches a failed turn goes round again.
+    """
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
     session = agent.new()
 

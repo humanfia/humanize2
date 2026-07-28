@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import errno
 import os
-from collections.abc import Iterable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -13,7 +12,12 @@ from humanize.coganchor.proto import Frame, Kind, Op, RemoteOSError
 from humanize.coganchor.serve import fsops
 from humanize.coganchor.serve.exports import Export, ExportTable
 from humanize.coganchor.serve.sessions import compose_env
-from tests.coganchor.conftest import Link
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
+
+    from tests.coganchor.conftest import Link
 
 # --------------------------------------------------------------------- exports
 
@@ -107,9 +111,10 @@ def test_write_is_atomic_and_leaves_no_debris(
 def test_concurrent_writers_to_one_path_do_not_share_a_temporary(
     table: ExportTable, tmp_path: Path
 ) -> None:
-    """``--listen`` serves every connection from one process, so two sessions
-    can be writing the same path at once; a per-process temporary name would
-    have them overwrite each other's bytes."""
+    """``--listen`` serves every connection from one process, so two may share a path.
+
+    A per-process temporary name would have them overwrite each other's bytes.
+    """
     first = fsops.FileWriter(table, "/project/out.txt", 0o644)
     second = fsops.FileWriter(table, "/project/out.txt", 0o644)
     assert first._temp != second._temp
@@ -193,12 +198,12 @@ def test_file_round_trip_over_the_channel(link: Link) -> None:
     source = link.target / "source.bin"
     source.write_bytes(payload)
 
-    with open(source, "rb") as handle:
+    with source.open("rb") as handle:
         link.client.write_file("/project/copy.bin", handle, 0o644)
     assert (link.target / "copy.bin").read_bytes() == payload
 
     sink = link.target / "back.bin"
-    with open(sink, "wb") as handle:
+    with sink.open("wb") as handle:
         meta = link.client.read_file("/project/copy.bin", handle)
     assert sink.read_bytes() == payload
     assert meta["size"] == len(payload)

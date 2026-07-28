@@ -11,11 +11,14 @@ typed as a no-op. Every test therefore starts with nothing installed until it sa
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 import humanize.tui.app
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.fixture(autouse=True)

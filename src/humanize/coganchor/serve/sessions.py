@@ -22,10 +22,12 @@ import subprocess
 import termios
 import threading
 from contextlib import suppress
-from typing import IO, Any
+from typing import IO, TYPE_CHECKING, Any
 
 from humanize.coganchor.proto import CHUNK_SIZE, Channel, Frame, Stream
-from humanize.coganchor.serve.exports import ExportTable
+
+if TYPE_CHECKING:
+    from humanize.coganchor.serve.exports import ExportTable
 
 __all__ = ["ExecSession", "Session", "TunnelSession", "compose_env"]
 
@@ -62,7 +64,7 @@ HOST_SPECIFIC_ENV = frozenset(
 HOST_SPECIFIC_PREFIXES = ("LD_", "SSH_", "XDG_", "HUMANIZE_")
 
 
-def compose_env(remote_env: dict[str, str], cwd: str, tty: bool) -> dict[str, str]:
+def compose_env(remote_env: dict[str, str], cwd: str, *, tty: bool) -> dict[str, str]:
     """Build the environment for a remote command.
 
     Starts from this machine's environment -- so ``PATH``, ``HOME`` and friends
@@ -177,7 +179,7 @@ class ExecSession(Session):
         self._argv = [self._table.rewrite(item) for item in self._argv]
         self._program = self._table.rewrite(self._program) if self._program else None
         self._env = {name: self._table.rewrite(v) for name, v in self._env.items()}
-        env = compose_env(self._env, cwd, self._tty)
+        env = compose_env(self._env, cwd, tty=self._tty)
         master, slave = pty.openpty() if self._tty else (None, None)
         if master is not None and self._winsize:
             rows, cols = self._winsize
@@ -281,7 +283,8 @@ class ExecSession(Session):
         if master is not None:
             selector.register(master, selectors.EVENT_READ, Stream.STDOUT)
         else:
-            assert process.stdout is not None and process.stderr is not None
+            assert process.stdout is not None  # noqa: S101
+            assert process.stderr is not None  # noqa: S101
             selector.register(process.stdout, selectors.EVENT_READ, Stream.STDOUT)
             selector.register(process.stderr, selectors.EVENT_READ, Stream.STDERR)
         try:
@@ -312,7 +315,7 @@ class TunnelSession(Session):
         self._socket: socket.socket | None = None
         self._ready = threading.Event()
 
-    def feed(self, stream: Stream, data: bytes) -> None:
+    def feed(self, stream: Stream, data: bytes) -> None:  # noqa: ARG002
         if not self._ready.wait(timeout=30.0) or self._socket is None:
             return
         try:
@@ -320,7 +323,7 @@ class TunnelSession(Session):
         except OSError:
             self.shutdown()
 
-    def end_input(self, stream: Stream) -> None:
+    def end_input(self, stream: Stream) -> None:  # noqa: ARG002
         if self._socket is not None:
             with suppress(OSError):
                 self._socket.shutdown(socket.SHUT_WR)

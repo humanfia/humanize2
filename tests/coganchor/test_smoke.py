@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from humanize.coganchor import standin
-from tests.coganchor.conftest import Anchorage
 from tests.coganchor.tasks import SMOKE_TASKS, SmokeTask
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from tests.coganchor.conftest import Anchorage
 
 
 def test_catalogue_is_large_enough() -> None:

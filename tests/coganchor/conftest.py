@@ -21,10 +21,9 @@ import os
 import socket
 import subprocess
 import threading
-from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -33,6 +32,9 @@ from humanize.coganchor.proto import Channel
 from humanize.coganchor.remote import RemoteClient
 from humanize.coganchor.serve.exports import ExportTable
 from humanize.coganchor.serve.server import Server
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 

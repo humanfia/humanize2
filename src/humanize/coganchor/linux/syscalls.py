@@ -48,7 +48,7 @@ X86_64 = Arch(
     audit_arch=0xC000003E,
     number_index=_X86_64_INDEX["orig_rax"],
     result_index=_X86_64_INDEX["rax"],
-    arg_indices=tuple(  # type: ignore[arg-type]
+    arg_indices=tuple(  # pyright: ignore[reportArgumentType]
         _X86_64_INDEX[name] for name in ("rdi", "rsi", "rdx", "r10", "r8", "r9")
     ),
     stack_index=_X86_64_INDEX["rsp"],

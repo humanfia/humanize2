@@ -13,10 +13,13 @@ import socket
 import socketserver
 import sys
 import threading
+from typing import TYPE_CHECKING
 
 from humanize.coganchor.proto import Channel
-from humanize.coganchor.serve.exports import ExportTable
 from humanize.coganchor.serve.server import Server
+
+if TYPE_CHECKING:
+    from humanize.coganchor.serve.exports import ExportTable
 
 __all__ = ["serve_forever"]
 
@@ -82,7 +85,9 @@ def serve_forever(host: str, port: int, table: ExportTable, token: str | None) -
     )
     with server_type((host, port), handler) as server:
         bound = server.server_address
-        print(
+        # Not a message but a handshake: whoever started this reads the port it landed on
+        # off this line, a port of 0 having been the way to ask for any free one.
+        print(  # noqa: T201
             f"hmz anchor serve listening {bound[0]} {bound[1]}",
             file=sys.stderr,
             flush=True,

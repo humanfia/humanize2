@@ -65,7 +65,7 @@ def collect(
             key = f"kimi:{ident}:{agent_id}"
             if not wanted(sessions, key, ident.removeprefix("session_")):
                 continue
-            details = entry if isinstance(entry, dict) else {}
+            details = mapping(entry)
             wire = pathlib.Path(str(details.get("homedir") or "")) / "wire.jsonl"
             if not wire.is_file():
                 wire = state_path.parent / "agents" / str(agent_id) / "wire.jsonl"

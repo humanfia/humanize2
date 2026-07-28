@@ -36,6 +36,9 @@ _TAKES = {
     "flow": "[path]",
 }
 
+#: `/flow` and the name being typed after it. A third word is a line that has moved on.
+_FLOW_AND_NAME = 2
+
 
 def takes(name: str) -> str:
     """What a command takes after its name.
@@ -83,7 +86,7 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
         offers = sorted(f"/{name}" for name in commands if name in _ABOUT)
     # The flow is the one thing `/flow` takes, so it is offered while that word is the one
     # being typed and not after it: a line that already names a flow is a finished line.
-    elif words[0] == "/flow" and len(words) == 2:
+    elif words[0] == "/flow" and len(words) == _FLOW_AND_NAME:
         from humanize.flows import found
 
         offers = [name for _, name in found()]

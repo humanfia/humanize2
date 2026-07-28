@@ -40,7 +40,7 @@ import struct
 import threading
 from contextlib import suppress
 from dataclasses import dataclass, field
-from typing import IO, Any
+from typing import IO, Any, cast
 
 __all__ = [
     "CHUNK_SIZE",
@@ -146,7 +146,7 @@ class Frame:
 
     kind: Kind
     msg_id: int
-    meta: dict[str, Any] = field(default_factory=dict)
+    meta: dict[str, Any] = field(default_factory=dict[str, Any])
     body: bytes = b""
 
     @property
@@ -240,18 +240,19 @@ class Channel:
         if meta_len > payload_len or payload_len > MAX_FRAME_BYTES:
             raise ProtocolError(f"implausible frame header: {payload_len}/{meta_len}")
         payload = self._read_exactly(payload_len)
-        assert payload is not None
+        assert payload is not None  # noqa: S101
         try:
             meta = json.loads(payload[:meta_len])
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ProtocolError(f"malformed frame metadata: {exc}") from exc
         if not isinstance(meta, dict):
             raise ProtocolError("frame metadata is not an object")
+        named = cast("dict[str, Any]", meta)
         try:
-            kind = Kind(meta.pop("k"))
+            kind = Kind(named.pop("k"))
         except (KeyError, ValueError) as exc:
             raise ProtocolError(f"invalid frame kind: {exc}") from exc
-        return Frame(kind, msg_id, meta, payload[meta_len:])
+        return Frame(kind, msg_id, named, payload[meta_len:])
 
     def close(self) -> None:
         """Close the channel, waking any thread parked in :meth:`recv`.

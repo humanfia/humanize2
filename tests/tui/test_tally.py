@@ -11,7 +11,7 @@ Codex rollout's `token_count`, a Kimi server event's completed step.
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -25,6 +25,9 @@ from humanize.janus import (
 )
 from humanize.tui.monitor import Monitor
 from humanize.tui.tally import Tally
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _rows(path: Path, *rows: dict[str, object]) -> None:

@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime
 import json
 from pathlib import Path
+from typing import Any, cast
 
 from humanize import home
 
@@ -26,7 +27,7 @@ __all__ = ["History"]
 class History:
     """What was typed before, and where in it the editor has walked to."""
 
-    def __init__(self, workspace: Path | None = None):
+    def __init__(self, workspace: Path | None = None) -> None:
         """Reads what there is to walk, which is what was typed here if anything was.
 
         Args:
@@ -131,12 +132,15 @@ class History:
             ).splitlines()
         except OSError:
             return []
-        said = []
+        said: list[tuple[str, str]] = []
         for line in lines:
             try:
                 held = json.loads(line)
             except ValueError:
                 continue
-            if isinstance(held, dict) and isinstance(held.get("text"), str):
-                said.append((str(held.get("workdir") or ""), held["text"]))
+            if not isinstance(held, dict):
+                continue
+            row = cast("dict[str, Any]", held)
+            if isinstance(row.get("text"), str):
+                said.append((str(row.get("workdir") or ""), row["text"]))
         return said

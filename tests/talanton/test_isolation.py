@@ -12,7 +12,7 @@ import os
 import socket
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -25,6 +25,9 @@ from humanize.talanton import (
 )
 from tests.janus.conftest import HereAnchor, ShellAgent
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 #: Small, and has the `python3` a target needs. Pulled by hand rather than by the test, so a
 #: machine without it skips instead of spending a minute on a download.
 IMAGE = "python:3.12-slim"
@@ -33,7 +36,7 @@ IMAGE = "python:3.12-slim"
 class _StubIsolation(IsolationBase):
     """A machine that is only ever said to be started, and records that it was."""
 
-    def __init__(self, config: _StubIsolationConfig):
+    def __init__(self, config: _StubIsolationConfig) -> None:
         super().__init__(config)
         self.anchor = HereAnchor(target="tcp://stub:0")
         self.started = 0
@@ -164,7 +167,6 @@ def test_a_turn_runs_in_the_container_and_leaves_its_work_in_the_workspace(
     # the file is written in the mirror and pushed from there.
     answer = agent.new()("hostname > stamp.txt; cat stamp.txt")
 
-    assert (
-        answer and answer != socket.gethostname()
-    )  # the container's, not this machine's
+    assert answer
+    assert answer != socket.gethostname()
     assert (tmp_path / "stamp.txt").read_text().strip() == answer

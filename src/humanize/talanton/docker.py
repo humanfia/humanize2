@@ -17,6 +17,7 @@ import os
 import subprocess
 import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 
 from humanize.coganchor import AnchorConfig, check
 
@@ -53,7 +54,7 @@ class DockerIsolation(IsolationBase):
 
     _config: DockerIsolationConfig
 
-    def __init__(self, config: DockerIsolationConfig):
+    def __init__(self, config: DockerIsolationConfig) -> None:
         """Initializes a backend holding no container.
 
         Args:
@@ -77,8 +78,10 @@ class DockerIsolation(IsolationBase):
           OSError: If the container cannot serve the workspace it was mounted, which is a turn
             that would fail on its first file, reported before the first turn instead.
         """
-        workspace = os.path.abspath(self._config.workspace or os.getcwd())
-        if not os.path.isdir(workspace):
+        # `abspath` rather than `Path.resolve`: what is mounted is the directory named, and
+        # a workspace reached through a symlink is not a request to mount what it points at.
+        workspace = os.path.abspath(self._config.workspace or os.getcwd())  # noqa: PTH100, PTH109
+        if not Path(workspace).is_dir():
             # Said here because docker would not say it: a mount whose source is missing is
             # created for you, owned by root, inside the directories this user owns.
             raise FileNotFoundError(
@@ -91,7 +94,7 @@ class DockerIsolation(IsolationBase):
         self._mirror = tempfile.TemporaryDirectory(
             prefix="humanize-", ignore_cleanup_errors=True
         )
-        self._name = os.path.basename(self._mirror.name)
+        self._name = Path(self._mirror.name).name
         try:
             started = subprocess.run(
                 [
@@ -123,14 +126,16 @@ class DockerIsolation(IsolationBase):
                 check=False,
             )
             if started.returncode != 0:
-                raise RuntimeError(
+                # Raised here rather than below: everything in this block has a container
+                # behind it by now, and the handler is what takes that container back down.
+                raise RuntimeError(  # noqa: TRY301
                     f"could not start a container of {self._config.image}: "
                     f"{started.stderr.strip()}"
                 )
             anchor = AnchorConfig(
                 target=f"docker://{self._name}",
                 workspace=workspace,
-                shadow=os.path.join(self._mirror.name, "shadow"),
+                shadow=str(Path(self._mirror.name) / "shadow"),
             )
             check(anchor)  # raises unless it is the workspace we mounted that it serves
         except BaseException:

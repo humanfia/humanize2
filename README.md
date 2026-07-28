@@ -2,6 +2,7 @@
 
 ![humanize](https://socialify.git.ci/humanfia/humanize/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2Fhumanfia%2Fhumanize%2Fraw%2Frefs%2Fheads%2Fmain%2Fdocs%2Flogo.svg&name=1&owner=1&pattern=Circuit+Board&pulls=1&stargazers=1&theme=Auto)
 
+[![CI](https://github.com/humanfia/humanize/actions/workflows/ci.yml/badge.svg)](https://github.com/humanfia/humanize/actions/workflows/ci.yml)
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
@@ -103,11 +104,22 @@ mounts that workspace into it.
 ## Contributing
 
 PRs accepted. Ask a question or discuss a substantial change first in
-[issues](https://github.com/humanfia/humanize/issues). A change must pass:
+[issues](https://github.com/humanfia/humanize/issues).
+
+Install the hooks once, and every commit is checked before it is made:
 
 ```sh
-uvx ruff format && uvx ruff check && uv run pytest
-uv run pytest --run-agents  # also drives claude, codex and kimi for real
+uv sync
+uv run pre-commit install
+```
+
+A commit runs the formatter, the linter and the type checker. CI runs those over every file,
+and the tests on each Python the package claims. To run any of it by hand:
+
+```sh
+uv run pre-commit run --all-files   # format, lint, types
+uv run pytest                       # the tests
+uv run pytest --run-agents          # also drives claude, codex and kimi for real
 ```
 
 If you edit this README, please conform to the

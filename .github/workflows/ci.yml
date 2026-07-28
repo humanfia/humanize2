@@ -1,0 +1,72 @@
+# The second gate. The first is `.pre-commit-config.yaml`; this runs the same hooks over
+# every file rather than the ones one commit touched, and it is the only place the tests
+# run, on every Python the package claims.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: The lockfile says what pyproject.toml says
+        run: uv lock --check
+
+      - run: uv sync --frozen
+
+      # Everything a commit is held to, over the whole tree rather than over the files
+      # one commit happened to touch.
+      - name: pre-commit
+        run: uv run --frozen pre-commit run --all-files --show-diff-on-failure
+
+      - name: The package still builds
+        run: uv build
+
+  test:
+    name: test (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every stable minor at or above the floor `requires-python` sets. A new one
+        # ships, a new one goes here -- that is what the README promises.
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python }}
+
+      - run: uv sync --frozen
+
+      # Everything except the `agent`-marked tests, which drive real coding agents and
+      # need `--run-agents`. `-ra` in pyproject names whatever got skipped.
+      - name: pytest
+        run: >
+          uv run --frozen pytest -q
+          --cov=humanize --cov-report=term-missing --cov-report=xml

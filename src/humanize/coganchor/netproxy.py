@@ -22,10 +22,12 @@ import logging
 import selectors
 import socket
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from humanize.coganchor.proto import CHUNK_SIZE, Stream
-from humanize.coganchor.remote import RemoteClient
+
+if TYPE_CHECKING:
+    from humanize.coganchor.remote import RemoteClient
 
 __all__ = ["NetProxy"]
 
@@ -84,7 +86,7 @@ class NetProxy:
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind((_loopback(family), 0))
         listener.listen(64)
-        listener.setblocking(False)
+        listener.setblocking(False)  # noqa: FBT003  -- the socket module's own signature
         local_port = listener.getsockname()[1]
         self._listeners[(host, port)] = listener
         # The destination rides on the selector key rather than a port lookup:
@@ -106,7 +108,7 @@ class NetProxy:
                 if key.data is None:
                     self._wake_read.recv(4096)
                     continue
-                self._accept(key.fileobj, key.data)  # type: ignore[arg-type]
+                self._accept(key.fileobj, key.data)  # pyright: ignore[reportArgumentType]
         self._shutdown()
 
     def _accept(self, listener: socket.socket, destination: tuple[str, int]) -> None:
@@ -160,13 +162,13 @@ class _Relay:
             self._closed.wait(timeout=30.0)
             _close(self._socket)
 
-    def _on_data(self, stream: Stream, data: bytes) -> None:
+    def _on_data(self, stream: Stream, data: bytes) -> None:  # noqa: ARG002
         try:
             self._socket.sendall(data)
         except OSError:
             self._closed.set()
 
-    def _on_close(self, result: dict[str, Any] | None, error: OSError | None) -> None:
+    def _on_close(self, result: dict[str, Any] | None, error: OSError | None) -> None:  # noqa: ARG002
         if error is not None:
             log.debug("tunnel to %s:%d ended: %s", self._host, self._port, error)
         self._closed.set()

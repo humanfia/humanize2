@@ -101,7 +101,7 @@ def _is_module(dotted: str) -> bool:
 
 
 def test_the_package_is_marked_as_typed() -> None:
-    """Without the marker, type checking humanize -- here or downstream -- silently checks nothing."""
+    """Without the marker, type checking humanize -- here or downstream -- checks nothing."""
     assert (SRC / "humanize" / "py.typed").is_file()
 
 

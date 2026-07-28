@@ -7,6 +7,10 @@ which is what ``turn/steer`` steers, and what ``thread/goal/set`` sets a goal on
 features of the thread rather than flags of a command line, and neither is a word in a prompt.
 """
 
+# A session and the agent holding it are two halves of one object declared in one
+# file, which is what the underscore keeps out of the package rather than out of them.
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import contextlib
@@ -17,12 +21,14 @@ import subprocess
 import sys
 import threading
 import weakref
-from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .base import AgentBase, Event, Question, SessionBase, say
 from .config import AgentConfig
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Mapping
 
 #: What the server calls a turn stopping to ask its user something. Every other request it
 #: makes of a client is an approval, which an unattended flow does not stop for.
@@ -103,7 +109,7 @@ _CALLED = {
 class _AppServer:
     """A `codex app-server` of our own, spoken to in JSON-RPC over its stdio."""
 
-    def __init__(self, argv: list[str]):
+    def __init__(self, argv: list[str]) -> None:
         """Starts the server and introduces this flow to it.
 
         Args:
@@ -219,6 +225,8 @@ class _AppServer:
                         pursuing = False
                     case "thread/status/changed":
                         idle = message["params"]["status"]["type"] == "idle"
+                    case _:  # every other method the server has is not this loop's
+                        pass
                 if idle and not pursuing:
                     break
             say(said, sys.stdout)  # where `codex exec` would have put the answer
@@ -261,18 +269,19 @@ class _AppServer:
                 while (message := self._read()) is not None:
                     if message.get("id") == ident and "method" not in message:
                         self._answer(message, said)
-                    told = message.get("params") or {}
+                    told: dict[str, Any] = message.get("params") or {}
                     # One server holds every session of the agent, and a turn one of them
                     # abandoned still says so on this stream. What is not this thread's is
                     # not this turn's.
                     if told.get("threadId") not in (None, thread):
                         continue
-                    if turn := told.get("turnId") or (told.get("turn") or {}).get("id"):
+                    named_turn: dict[str, Any] = told.get("turn") or {}
+                    if turn := told.get("turnId") or named_turn.get("id"):
                         running.turn = str(turn)
                         begun = True
                     match message.get("method"):
                         case "item/started" | "item/completed":
-                            item = told.get("item") or {}
+                            item: dict[str, Any] = told.get("item") or {}
                             kind = str(item.get("type") or "")
                             done = message["method"] == "item/completed"
                             # Shown once apiece: as it starts, a thing worth showing being a
@@ -289,12 +298,10 @@ class _AppServer:
                                 yield Event(kind="text", text=said)
                             elif kind == "reasoning" and done:
                                 # Reasoning is a list of parts rather than one text.
-                                thought = " ".join(
-                                    str(part)
-                                    for part in item.get("content")
-                                    or item.get("summary")
-                                    or []
+                                parts: list[Any] = (
+                                    item.get("content") or item.get("summary") or []
                                 )
+                                thought = " ".join(str(part) for part in parts)
                                 if thought.strip():
                                     yield Event(kind="reasoning", text=thought)
                             elif kind not in (*_TALKING, *_OURS) and not twice:
@@ -305,11 +312,16 @@ class _AppServer:
                                 named = item.get(_ABOUT.get(kind, ""))
                                 if isinstance(named, list):
                                     # One entry per file changed: the paths are the words.
+                                    listed = cast("list[Any]", named)
                                     named = " ".join(
-                                        str(part.get("path", part))
+                                        str(
+                                            cast("dict[str, Any]", part).get(
+                                                "path", part
+                                            )
+                                        )
                                         if isinstance(part, dict)
                                         else str(part)
-                                        for part in named
+                                        for part in listed
                                     )
                                 about = str(named or "") or next(
                                     (
@@ -332,7 +344,8 @@ class _AppServer:
                             # it; `last` is the one request that just came back. Cached input
                             # is counted inside the input rather than beside it, so the total
                             # the server states is the whole of what crossed the wire.
-                            usage = (told.get("tokenUsage") or {}).get("total") or {}
+                            counted: dict[str, Any] = told.get("tokenUsage") or {}
+                            usage: dict[str, Any] = counted.get("total") or {}
                             if total := int(usage.get("totalTokens") or 0) or sum(
                                 int(usage.get(name) or 0)
                                 for name in ("inputTokens", "outputTokens")
@@ -354,6 +367,8 @@ class _AppServer:
                             begun and told["status"]["type"] == "idle"
                         ):
                             break
+                        case _:  # the rest of the stream is not this turn's to show
+                            pass
             finally:
                 running.turn = None
             if failed is not None:
@@ -410,7 +425,7 @@ class _AppServer:
         Raises:
           subprocess.CalledProcessError: If the server has stopped reading.
         """
-        assert self._proc.stdin is not None
+        assert self._proc.stdin is not None  # noqa: S101
         try:
             with self._writing:
                 self._proc.stdin.write(json.dumps(message) + "\n")
@@ -420,7 +435,7 @@ class _AppServer:
 
     def _pump(self) -> None:
         """Reads the server's whole stream, teeing the agent's words to ours as they arrive."""
-        assert self._proc.stdout is not None
+        assert self._proc.stdout is not None  # noqa: S101
         for line in self._proc.stdout:
             message: dict[str, Any] = json.loads(line)
             if "id" in message and "method" in message:
@@ -464,14 +479,16 @@ class _AppServer:
         Args:
           message: The `item/tool/requestUserInput` request, as read.
         """
-        told = message.get("params") or {}
+        told: dict[str, Any] = message.get("params") or {}
         answers: dict[str, dict[str, list[str]]] = {}
-        for question in told.get("questions") or []:
-            offered = tuple(
-                str(option.get("label"))
-                for option in question.get("options") or []
-                if isinstance(option, dict) and option.get("label")
-            )
+        questions: list[Any] = told.get("questions") or []
+        for question in questions:
+            labelled: list[str] = []
+            for raw in cast("list[Any]", question.get("options") or []):
+                option = cast("dict[str, Any]", raw)
+                if isinstance(raw, dict) and option.get("label"):
+                    labelled.append(str(option["label"]))
+            offered = tuple(labelled)
             wanted = str(question.get("question") or question.get("header") or "")
             answer = (
                 self._agents[0].asked(Question(text=wanted, options=offered))
@@ -552,7 +569,7 @@ class CodexSession(SessionBase):
 
     _agent: CodexAgent  # every turn is run on the app server this agent holds
 
-    def __init__(self, agent: AgentBase):
+    def __init__(self, agent: AgentBase) -> None:
         """Initializes a session holding no thread yet.
 
         Args:
@@ -681,7 +698,7 @@ class CodexSession(SessionBase):
 class CodexAgent(AgentBase):
     """Codex, driven over the app server so that a turn can be steered while it runs."""
 
-    def __init__(self, config: AgentConfig, *, name: str | None = None):
+    def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent whose app server is not running yet.
 
         Args:

@@ -30,14 +30,14 @@ class SmokeTask:
     runner: str = "bash"
     #: Files placed on the target before the agent runs.  They exist nowhere
     #: else, so reading them proves the data crossed the connection.
-    seed: dict[str, str] = field(default_factory=dict)
+    seed: dict[str, str] = field(default_factory=dict[str, str])
     #: Substrings the agent's output must contain.
     stdout: tuple[str, ...] = ()
     #: Substrings the agent's output must not contain.
     absent: tuple[str, ...] = ()
     exit_code: int = 0
     #: Exact file contents expected on the target afterwards.
-    target_files: dict[str, str] = field(default_factory=dict)
+    target_files: dict[str, str] = field(default_factory=dict[str, str])
     #: Paths that must not exist on the target afterwards.
     target_missing: tuple[str, ...] = ()
     stdin: bytes = b""

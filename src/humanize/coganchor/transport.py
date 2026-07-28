@@ -132,7 +132,7 @@ def _connect_tcp(target: Target) -> Transport:
     return Transport(Channel.from_socket(sock))
 
 
-def _connect_local(target: Target, exports: list[str], token: str | None) -> Transport:
+def _connect_local(target: Target, exports: list[str], token: str | None) -> Transport:  # noqa: ARG001
     command = [
         sys.executable,
         "-m",
@@ -189,7 +189,9 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
     """
     payload = build_bundle().read_bytes()
     digest = hashlib.sha256(payload).hexdigest()[:16]
-    remote_file = f"/tmp/humanize-{digest}.pyz"
+    # Inside the container rather than on this host, and named after what it holds, so two
+    # pushes of the same bundle land on the same file instead of racing for one name.
+    remote_file = f"/tmp/humanize-{digest}.pyz"  # noqa: S108
     exec_in = ["docker", "exec", "-i", target.host]
 
     result = subprocess.run(
@@ -239,7 +241,8 @@ def _spawn(command: list[str], token: str | None) -> Transport:
         env=env,
         close_fds=True,
     )
-    assert process.stdin is not None and process.stdout is not None
+    assert process.stdin is not None  # noqa: S101
+    assert process.stdout is not None  # noqa: S101
     return Transport(Channel(process.stdout, process.stdin), process)
 
 

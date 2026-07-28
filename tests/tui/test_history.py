@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from humanize import home
 from humanize.tui.history import History
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def _texts(at: Path) -> list[str]:

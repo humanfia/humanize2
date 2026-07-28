@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -23,6 +23,9 @@ from humanize.coganchor import AnchorConfig
 from humanize.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
 from tests.coganchor.conftest import VIRTUAL_WORKSPACE
 from tests.oronyx.conftest import labels
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 CONFIG = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 

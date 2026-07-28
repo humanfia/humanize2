@@ -56,7 +56,7 @@ class Cycle:
         agents: Sequence[AgentBase],
         task: str,
         workspace: Path | None = None,
-    ):
+    ) -> None:
         """Opens a cycle, and writes down what it is a run of.
 
         Args:

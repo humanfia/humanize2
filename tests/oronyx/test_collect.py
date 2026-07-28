@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import pathlib
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -18,6 +18,9 @@ from tests.oronyx.conftest import (
     named,
     slices,
 )
+
+if TYPE_CHECKING:
+    import pathlib
 
 
 def test_exposes_collect_as_the_public_api() -> None:

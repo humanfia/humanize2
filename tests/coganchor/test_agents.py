@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import shutil
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.coganchor.conftest import Anchorage
+if TYPE_CHECKING:
+    from tests.coganchor.conftest import Anchorage
 
 pytestmark = pytest.mark.agent
 
@@ -41,11 +43,13 @@ class AgentTask:
 
     name: str
     prompt: str
-    seed: dict[str, str] = field(default_factory=dict)
+    seed: dict[str, str] = field(default_factory=dict[str, str])
     #: Substrings the agent's answer must contain (case-insensitive).
     answer: tuple[str, ...] = ()
     #: Substrings that must appear in a target file afterwards.
-    target_contains: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    target_contains: dict[str, tuple[str, ...]] = field(
+        default_factory=dict[str, tuple[str, ...]]
+    )
     target_missing: tuple[str, ...] = ()
 
 

@@ -16,6 +16,8 @@ from humanize.janus import AgentBase
 
 
 class Agents(NamedTuple):
+    """The two the flow drives: one that works in a session, and one that arrives fresh."""
+
     actor: AgentBase
     reviewer: AgentBase
 

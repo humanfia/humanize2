@@ -27,12 +27,14 @@ import logging
 import os
 import shutil
 import stat as stat_module
-from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from humanize.coganchor.policy import Layout, Router
-from humanize.coganchor.remote import RemoteClient
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from humanize.coganchor.policy import Layout, Router
+    from humanize.coganchor.remote import RemoteClient
 
 __all__ = ["ShadowTree", "prepare_shadow_root"]
 
@@ -254,7 +256,10 @@ class ShadowTree:
     # ---------------------------------------------------------------- internals
 
     def _apply_listing(
-        self, layout: Layout, local_dir: str, listing: dict[str, Any]
+        self,
+        layout: Layout,  # noqa: ARG002  -- the caller resolved against it already
+        local_dir: str,
+        listing: dict[str, Any],
     ) -> None:
         os.makedirs(local_dir, exist_ok=True)
         expected: set[str] = set()

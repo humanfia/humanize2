@@ -177,7 +177,7 @@ def _parse(
         elif item == "token_count" and think is not None:
             counts = payload.get("info")
             if isinstance(counts, dict):
-                think.args["usage"] = counts.get("last_token_usage")
+                think.args["usage"] = mapping(counts).get("last_token_usage")
         else:
             prev, think = _add_event(
                 actions, kind, item, payload, at, prev, think, pending, ident, spawns
@@ -240,7 +240,7 @@ def _add_event(
             parsed = json.loads(raw) if isinstance(raw, str) else raw
         except json.JSONDecodeError:
             parsed = raw
-        target = parsed.get("task_name") if isinstance(parsed, dict) else None
+        target = mapping(parsed).get("task_name")
         if at > prev and not pending:
             actions.append(Action("generate", "llm", prev, at, {"emits": name}))
         call = Action(

@@ -12,11 +12,9 @@ import os
 import sys
 import time
 import unittest.mock
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import pytest
-from textual.pilot import Pilot
 from textual.widgets import Label, Static
 
 from humanize.janus import cycles
@@ -24,6 +22,12 @@ from humanize.tui import Humanize
 from humanize.tui.app import _OWN, Editor
 from humanize.tui.discover import Model
 from humanize.tui.pick import Flows, Models
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from textual.pilot import Pilot
 
 #: A flow that drives one agent for two turns, so a line can be typed while it is running.
 FLOW = """
@@ -114,7 +118,7 @@ async def test_the_command_line_own_commands_are_not_commands_here(
 
         assert "no such command: /collect" in _transcript(app)
         assert app.is_running  # and a line to correct leaves the interface up
-    assert not list(workspace.glob(".humanize/*.trace.json"))
+    assert not list(workspace.glob(".humanize/*.trace.json"))  # noqa: ASYNC240
 
 
 @pytest.mark.timeout(60)
@@ -613,10 +617,11 @@ async def test_an_agent_that_stops_to_ask_reaches_the_prompt(asking: Path) -> No
         await until(lambda: "Which way?" in _transcript(app), driver)
 
         # The question and what it offers are shown, and the next line typed is the answer.
-        assert "left" in _transcript(app) and "right" in _transcript(app)
+        assert "left" in _transcript(app)
+        assert "right" in _transcript(app)
         await driver.press(*"right")
         await driver.press("enter")
-        await until(lambda: (asking / "said.txt").exists(), driver)
+        await until((asking / "said.txt").exists, driver)
 
     # Which reached the tool as its answer, against the question it was asked.
     assert json.loads((asking / "said.txt").read_text())["updatedInput"]["answers"] == {
@@ -641,7 +646,7 @@ async def test_away_means_the_agent_is_told_nobody_is_there_rather_than_waiting(
 
         await driver.press(*"start")
         await driver.press("enter")
-        await until(lambda: (asking / "said.txt").exists(), driver)
+        await until((asking / "said.txt").exists, driver)
 
     # Nobody answered, so the tool was declined and the turn carried on from that.
     assert json.loads((asking / "said.txt").read_text())["behavior"] == "deny"
@@ -708,9 +713,12 @@ async def test_details_covers_the_thinking_as_well_as_the_tools() -> None:
 def test_only_model_ids_are_offered(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """An alias is whichever model is newest today and something else tomorrow, and a window
-    written on the end of one is a setting rather than a model -- a backend asked for either
-    answers that there is no such model, and a cycle that recorded one says nothing."""
+    """An alias is whichever model is newest today, and something else tomorrow.
+
+    A window written on the end of one is a setting rather than a model -- a backend asked
+    for either answers that there is no such model, and a cycle that recorded one says
+    nothing.
+    """
     from humanize.tui import discover
 
     cache = tmp_path / ".claude.json"
@@ -718,7 +726,11 @@ def test_only_model_ids_are_offered(
         json.dumps({"additionalModelOptionsCache": [{"value": "claude-fable-5[1m]"}]})
     )
     monkeypatch.setattr(discover, "_CLAUDE_CACHE", cache)
-    monkeypatch.setattr(discover.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    def which(name: str) -> str:
+        return f"/usr/bin/{name}"
+
+    monkeypatch.setattr(discover.shutil, "which", which)
 
     named = [model.name for model in discover.installed()["claude"]]
 
@@ -937,7 +949,7 @@ def test_the_terminal_theme_names_no_colour_of_its_own() -> None:
         ),
     ]
     assert named  # or this checks nothing
-    assert all(colour.startswith("ansi_") for colour in named), named
+    assert all(colour and colour.startswith("ansi_") for colour in named), named
 
 
 @pytest.mark.timeout(60)
@@ -972,9 +984,8 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
     assert (
         "● Bash(git status)" in shown
     )  # a tool on the bullet, its argument in brackets
-    assert (
-        "● one" in shown and "\n  two" in shown
-    )  # the bullet, then two spaces under it
+    assert "● one" in shown
+    assert "\n  two" in shown
     assert "✻ Worked for" in shown  # and the line Claude Code closes a turn with
 
 
@@ -987,7 +998,7 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
     },
 )
 async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
-    _installed: unittest.mock.MagicMock,
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """As Claude Code's `/model` is: the models numbered, the effort on its own line.
 
@@ -1014,7 +1025,9 @@ async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
             "claude/claude-opus-5",
             "codex/gpt-5.6-sol",
         ]
-        assert "❯" in rows[0] and "1." in rows[0] and "❯" not in rows[1]
+        assert "❯" in rows[0]
+        assert "1." in rows[0]
+        assert "❯" not in rows[1]
 
         # The effort is adjusted rather than chosen, and starts on the hardest.
         tuning = sheet.query_one("#tuning", Label)
@@ -1029,7 +1042,7 @@ async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
 
-    assert sheet._chosen == ["claude/claude-opus-5:max"]
+    assert cast("Models", sheet)._chosen == ["claude/claude-opus-5:max"]
 
 
 @pytest.mark.timeout(60)
@@ -1041,7 +1054,7 @@ async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
     },
 )
 async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
-    _installed: unittest.mock.MagicMock,
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """Claude's ultracode is an effort; Kimi's swarm mode is a second thing, so it is a key.
 
@@ -1086,7 +1099,7 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
         await until(lambda: not isinstance(app.screen, Models), driver)
 
     # One turn, at one effort, run wide -- which is how Kimi is asked for a fleet.
-    assert sheet._chosen == ["kimi/kimi-code/k3:swarmlow"]
+    assert cast("Models", sheet)._chosen == ["kimi/kimi-code/k3:swarmlow"]
 
 
 @pytest.mark.timeout(60)
@@ -1101,7 +1114,7 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
     },
 )
 async def test_a_list_too_long_to_walk_is_narrowed_by_typing_at_it(
-    _installed: unittest.mock.MagicMock,
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """Every model of every CLI is longer than a screen, so the letters go into it."""
     from textual.widgets import OptionList

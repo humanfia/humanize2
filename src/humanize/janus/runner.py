@@ -5,14 +5,15 @@ from __future__ import annotations
 import inspect
 import os
 import runpy
-from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, get_args, get_origin, get_type_hints
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
     from .agents import AgentBase
 
 
-class NotAFlow(ValueError):
+class NotAFlow(ValueError):  # noqa: N818  -- the name SPEC.md gives it
     """What a command line named, when it was not a flow for the agents it was given.
 
     Its own kind of error, so that a flow failing as it is imported -- one that reads a prompt
@@ -68,7 +69,9 @@ def _read(
     # Resolved here rather than by whoever is starting one, so that a name works wherever a
     # flow is named -- a command line, an interface, a `Runner` written by hand.
     flow = find(str(flow))
-    if not os.path.isfile(flow):
+    # The same test `humanize.flows` applies, and for the same reason: a place that cannot
+    # be read holds no flow, which `Path.is_file` would raise about rather than answer.
+    if not os.path.isfile(flow):  # noqa: PTH113
         raise NotAFlow(f"{flow}: no Python file to read a flow from")
     run = runpy.run_path(str(flow)).get("run")
     try:
@@ -87,7 +90,11 @@ def _read(
     # A named tuple is a tuple that also says what each of its places is for, and `_fields`
     # is where it says it. `_make` builds one from a sequence, exactly as `tuple` does, so
     # the flow is handed the type it asked for either way.
-    if run is not None and (fields := getattr(declared, "_fields", None)):
+    if (
+        run is not None
+        and declared is not None
+        and (fields := getattr(declared, "_fields", None))
+    ):
         kinds = getattr(declared, "__annotations__", {})
         return (
             run,
@@ -133,7 +140,9 @@ class Runner:
     its agents is for, and they are called that from here on.
     """
 
-    def __init__(self, flow: str | os.PathLike[str], agents: Sequence[AgentBase]):
+    def __init__(
+        self, flow: str | os.PathLike[str], agents: Sequence[AgentBase]
+    ) -> None:
         """Loads the flow and holds the agents to drive it with.
 
         Args:

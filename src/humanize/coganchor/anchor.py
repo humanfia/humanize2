@@ -9,11 +9,12 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from humanize.coganchor.transport import Target
 
 __all__ = ["AnchorConfig", "check", "connect"]

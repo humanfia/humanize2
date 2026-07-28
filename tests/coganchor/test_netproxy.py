@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import socket
 import threading
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from humanize.coganchor.netproxy import NetProxy
-from tests.coganchor.conftest import Anchorage, Link
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from tests.coganchor.conftest import Anchorage, Link
 
 
 def _routable_address() -> str:

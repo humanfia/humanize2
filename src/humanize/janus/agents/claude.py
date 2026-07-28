@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .base import AgentBase, Event, Question, StreamSessionBase
 from .config import AgentConfig
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 #: The tool Claude reaches for when it wants a person rather than a file. Its input is a list
 #: of questions and its answer is that same input with the answers written into it, which is
@@ -33,7 +35,7 @@ class ClaudeCodeSession(StreamSessionBase):
     is already there, and so is anything said to it while a turn is running.
     """
 
-    def __init__(self, agent: AgentBase):
+    def __init__(self, agent: AgentBase) -> None:
         """Initializes a session that has spent nothing yet.
 
         Args:
@@ -110,7 +112,8 @@ class ClaudeCodeSession(StreamSessionBase):
           Tokens spent per model since the previous turn, models that did not move omitted.
         """
         spent: dict[str, int] = {}
-        for model, usage in (said.get("modelUsage") or {}).items():
+        used: dict[str, Any] = said.get("modelUsage") or {}
+        for model, usage in used.items():
             total = sum(
                 int(usage.get(kind) or 0)
                 for kind in (
@@ -177,7 +180,7 @@ class ClaudeCodeSession(StreamSessionBase):
                 elif part.get("type") == "tool_use":
                     # The name and what it was called on, which is what a tool call reads
                     # as: `Read src/x.py`, `Bash git status`. Only what will fit on a row.
-                    called = part.get("input") or {}
+                    called: dict[str, Any] = part.get("input") or {}
                     about = next(
                         (
                             str(value)
@@ -203,16 +206,19 @@ class ClaudeCodeSession(StreamSessionBase):
         Args:
           said: The `control_request`, as read.
         """
-        asked = said.get("request") or {}
-        called = asked.get("input") or {}
+        asked: dict[str, Any] = said.get("request") or {}
+        called: dict[str, Any] = asked.get("input") or {}
         answers: dict[str, str] = {}
         if asked.get("tool_name") == _ASKS:
-            for question in called.get("questions") or []:
+            for raw in cast("list[Any]", called.get("questions") or []):
+                question = cast("dict[str, Any]", raw)
                 wanted = str(question.get("question") or question.get("header") or "")
+                offers: list[Any] = question.get("options") or []
                 offered = tuple(
-                    str(option.get("label"))
-                    for option in question.get("options") or []
-                    if isinstance(option, dict) and option.get("label")
+                    str(cast("dict[str, Any]", option)["label"])
+                    for option in offers
+                    if isinstance(option, dict)
+                    and cast("dict[str, Any]", option).get("label")
                 )
                 answer = self._agent.asked(Question(text=wanted, options=offered))
                 if answer is None:

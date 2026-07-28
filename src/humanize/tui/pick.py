@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING, ClassVar
 
 from rich.markup import escape
 from textual import events, on
-from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
@@ -35,6 +34,8 @@ from humanize.janus import SWARM
 from .monitor import short, thousands
 
 if TYPE_CHECKING:
+    from textual.app import ComposeResult
+
     from .discover import Model
     from .monitor import Monitor
 
@@ -232,7 +233,7 @@ class Sheet(ModalScreen[list[str] | None]):
 class Flows(Sheet):
     """Which flow to run, which is what tab switches between."""
 
-    def __init__(self, current: str):
+    def __init__(self, current: str) -> None:
         """Initializes the switching.
 
         Args:
@@ -302,7 +303,7 @@ class Models(Sheet):
 
     def __init__(
         self, flow: str, wanted: tuple[str, ...], agents: dict[str, tuple[Model, ...]]
-    ):
+    ) -> None:
         """Initializes the configuring.
 
         Args:
@@ -445,7 +446,7 @@ class Status(ModalScreen[None]):
 
     def __init__(
         self, flow: str, named: tuple[str, ...], models: list[str], monitor: Monitor
-    ):
+    ) -> None:
         """Reads one run.
 
         Args:
@@ -522,7 +523,7 @@ class Status(ModalScreen[None]):
                 ),
             ],
         ]
-        lines = []
+        lines: list[str] = []
         for group in groups:
             for field, values in group:
                 for at, value in enumerate(values):

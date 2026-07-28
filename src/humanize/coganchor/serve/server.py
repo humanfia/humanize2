@@ -14,8 +14,7 @@ import os
 import platform
 import sys
 import threading
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from humanize.coganchor.proto import (
     PROTOCOL_VERSION,
@@ -27,8 +26,12 @@ from humanize.coganchor.proto import (
     Stream,
 )
 from humanize.coganchor.serve import fsops
-from humanize.coganchor.serve.exports import ExportTable
 from humanize.coganchor.serve.sessions import ExecSession, Session, TunnelSession
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from humanize.coganchor.serve.exports import ExportTable
 
 __all__ = ["Server"]
 
@@ -39,11 +42,13 @@ _SIMPLE_OPS: dict[Op, Callable[[ExportTable, dict[str, Any]], dict[str, Any]]] =
     Op.STAT: lambda t, m: fsops.stat(t, m["path"]),
     Op.LISTDIR: lambda t, m: fsops.listdir(t, m["path"]),
     Op.MKDIR: lambda t, m: fsops.mkdir(
-        t, m["path"], m.get("mode", 0o777), m.get("parents", False)
+        t, m["path"], m.get("mode", 0o777), parents=m.get("parents", False)
     ),
     Op.RMDIR: lambda t, m: fsops.rmdir(t, m["path"]),
     Op.UNLINK: lambda t, m: fsops.unlink(t, m["path"]),
-    Op.RENAME: lambda t, m: fsops.rename(t, m["src"], m["dst"], m.get("replace", True)),
+    Op.RENAME: lambda t, m: fsops.rename(
+        t, m["src"], m["dst"], replace=m.get("replace", True)
+    ),
     Op.SYMLINK: lambda t, m: fsops.symlink(t, m["target"], m["path"]),
     Op.LINK: lambda t, m: fsops.link(t, m["src"], m["dst"]),
     Op.READLINK: lambda t, m: fsops.readlink(t, m["path"]),
@@ -63,10 +68,10 @@ class _WriteSink:
         self._channel = channel
         self._writer = writer
 
-    def feed(self, stream: Stream, data: bytes) -> None:
+    def feed(self, stream: Stream, data: bytes) -> None:  # noqa: ARG002
         self._writer.feed(data)
 
-    def end_input(self, stream: Stream) -> None:
+    def end_input(self, stream: Stream) -> None:  # noqa: ARG002
         try:
             result = self._writer.finish()
         except OSError as exc:

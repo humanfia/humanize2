@@ -1,0 +1,28 @@
+# What CI pins, kept fresh. Monthly and grouped: one pull request per ecosystem when
+# something moves, rather than a stream of them. The `pre-commit-hooks` rev in
+# .pre-commit-config.yaml is not covered by either ecosystem -- `pre-commit autoupdate`
+# is still the way to move that one.
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      python:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore
+      include: scope

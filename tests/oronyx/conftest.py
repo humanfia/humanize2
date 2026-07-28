@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import datetime
 import json
-import pathlib
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
+
+if TYPE_CHECKING:
+    import pathlib
 
 _BASE = datetime.datetime(2026, 7, 20, 10, 0, tzinfo=datetime.UTC)
 CLAUDE_SESSION = "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9"

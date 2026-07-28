@@ -7,6 +7,10 @@ is configured with has nowhere to go, and a turn already running has nowhere to 
 all four are things done to the session a turn is submitted to.
 """
 
+# A session and the agent holding it are two halves of one object declared in one
+# file, which is what the underscore keeps out of the package rather than out of them.
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import collections
@@ -20,12 +24,14 @@ import time
 import urllib.error
 import urllib.request
 import weakref
-from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .base import AgentBase, Event, Question, SessionBase, say
 from .config import AgentConfig
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 #: The one line `kimi web` prints once it is listening, and the only place the port it took --
 #: asked for as 0, so that two flows on one machine cannot collide -- and its token are said.
@@ -46,7 +52,7 @@ class _Running:
     """
 
     session: str | None = None
-    config: dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict[str, Any])
 
 
 #: How often a running turn is asked whether it is still running, how long one call may take,
@@ -72,7 +78,7 @@ _BLOCKS = {"text": "text", "thinking": "reasoning", "tool_use": "tool"}
 class _AppServer:
     """A `kimi web` daemon of our own, and the calls one turn of a session is made of."""
 
-    def __init__(self, argv: list[str]):
+    def __init__(self, argv: list[str]) -> None:
         """Starts the daemon and waits for it to say where it is listening.
 
         Args:
@@ -93,7 +99,7 @@ class _AppServer:
             encoding="utf-8",
             errors="replace",
         )
-        assert self._proc.stdout is not None
+        assert self._proc.stdout is not None  # noqa: S101
         for line in self._proc.stdout:
             if (listening := _LISTENING.match(line.strip())) is not None:
                 self._base = f"{listening[1]}/api/v1"
@@ -125,7 +131,9 @@ class _AppServer:
             a failed turn however it failed -- reported the way every other backend reports one,
             so that a flow catches turns rather than transports.
         """
-        request = urllib.request.Request(
+        # The address is the one this process just watched its own server announce, so the
+        # scheme is http and the host is loopback whatever the audit rule fears.
+        request = urllib.request.Request(  # noqa: S310
             self._base + path,
             data=None if body is None else json.dumps(body).encode(),
             method=method,
@@ -135,7 +143,7 @@ class _AppServer:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=_CALL_SECONDS) as response:
+            with urllib.request.urlopen(request, timeout=_CALL_SECONDS) as response:  # noqa: S310
                 return json.load(response)["data"]
         except urllib.error.HTTPError as refused:
             raise subprocess.CalledProcessError(
@@ -175,7 +183,7 @@ class KimiCodeCLISession(SessionBase):
 
     _agent: KimiCodeCLIAgent  # every turn is submitted to the server this agent holds
 
-    def __init__(self, agent: AgentBase):
+    def __init__(self, agent: AgentBase) -> None:
         """Initializes a session running nothing yet.
 
         Args:
@@ -246,15 +254,24 @@ class KimiCodeCLISession(SessionBase):
         held = server.call("GET", f"/sessions/{session}/questions")
         # A list or a list under `items`, depending on the daemon: what is wanted is the
         # questions, and a daemon that has none of them has nothing to answer either.
-        waiting = held.get("items") or [] if isinstance(held, dict) else held or []
-        for pending in waiting:
+        waiting: list[Any] = (
+            cast("dict[str, Any]", held).get("items") or []
+            if isinstance(held, dict)
+            else held or []
+        )
+        for raw in waiting:
+            pending = cast("dict[str, Any]", raw)
             if not pending.get("question_id"):
                 continue  # not a question, whatever else the daemon answered with
             answers: dict[str, dict[str, Any]] = {}
-            for question in pending.get("questions") or []:
+            for asked in cast("list[Any]", pending.get("questions") or []):
+                question = cast("dict[str, Any]", asked)
+                offers: list[Any] = question.get("options") or []
                 options = {
-                    str(option.get("label", "")).lower(): option.get("id")
-                    for option in question.get("options") or []
+                    str(cast("dict[str, Any]", option).get("label", "")).lower(): cast(
+                        "dict[str, Any]", option
+                    ).get("id")
+                    for option in offers
                     if isinstance(option, dict)
                 }
                 said = self._agent.asked(
@@ -263,9 +280,10 @@ class KimiCodeCLISession(SessionBase):
                             question.get("question") or question.get("header") or ""
                         ),
                         options=tuple(
-                            str(option.get("label"))
-                            for option in question.get("options") or []
-                            if isinstance(option, dict) and option.get("label")
+                            str(cast("dict[str, Any]", option)["label"])
+                            for option in offers
+                            if isinstance(option, dict)
+                            and cast("dict[str, Any]", option).get("label")
                         ),
                     )
                 )
@@ -325,7 +343,7 @@ class KimiCodeCLISession(SessionBase):
         turn: dict[str, Any] = {
             "model": self._agent.config.model,
             "thinking": effort.removeprefix(SWARM),
-            # A flow watches its agent rather than answering it, as the flows humanize comes with do.
+            # A flow watches its agent rather than answering it, as humanize' own flows do.
             "permission_mode": "auto",
             "plan_mode": False,
             "swarm_mode": effort.startswith(SWARM),
@@ -435,12 +453,12 @@ class KimiCodeCLISession(SessionBase):
                         spent: dict[str, int] = {}
                         with contextlib.suppress(subprocess.CalledProcessError):
                             held = server.call("GET", f"/sessions/{session}")
-                            usage = (
-                                held.get("usage") if isinstance(held, dict) else None
+                            usage: dict[str, Any] = (
+                                cast("dict[str, Any]", held).get("usage") or {}
+                                if isinstance(held, dict)
+                                else {}
                             )
-                            total = sum(
-                                int((usage or {}).get(name) or 0) for name in _COUNTED
-                            )
+                            total = sum(int(usage.get(name) or 0) for name in _COUNTED)
                             if (risen := total - self._counted) > 0:
                                 spent[self._agent.config.model] = risen
                             self._counted = total
@@ -459,7 +477,7 @@ class KimiCodeCLISession(SessionBase):
 class KimiCodeCLIAgent(AgentBase):
     """Kimi Code, driven through an app server of its own so a whole session is settable."""
 
-    def __init__(self, config: AgentConfig, *, name: str | None = None):
+    def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent whose server is not running yet.
 
         Args:

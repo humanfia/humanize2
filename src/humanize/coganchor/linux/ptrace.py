@@ -171,10 +171,12 @@ def traceme() -> None:
 
 
 def setoptions(pid: int, options: int = OPTIONS) -> None:
+    """Set what the tracer is told about, which holds until it is set again."""
     _ptrace(_SETOPTIONS, pid, 0, options)
 
 
 def getregs(pid: int) -> Registers:
+    """Read the registers of a tracee that is stopped."""
     buffer = (ctypes.c_ulonglong * ARCH.register_count)()
     iov = _Iovec(ctypes.cast(buffer, ctypes.c_void_p), ctypes.sizeof(buffer))
     _ptrace(_GETREGSET, pid, _NT_PRSTATUS, ctypes.addressof(iov))
@@ -182,12 +184,14 @@ def getregs(pid: int) -> Registers:
 
 
 def setregs(pid: int, registers: Registers) -> None:
+    """Write registers back, which is how a syscall is answered or redirected."""
     buffer = registers.buffer
     iov = _Iovec(ctypes.cast(buffer, ctypes.c_void_p), ctypes.sizeof(buffer))
     _ptrace(_SETREGSET, pid, _NT_PRSTATUS, ctypes.addressof(iov))
 
 
 def cont(pid: int, signal: int = 0) -> None:
+    """Resume until the next stop, delivering a signal on the way if one is given."""
     _ptrace(_CONT, pid, 0, signal)
 
 

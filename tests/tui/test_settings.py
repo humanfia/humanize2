@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import yaml
 
 from humanize import home
 from humanize.tui.settings import Settings
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_a_workspace_that_has_run_nothing_remembers_nothing(tmp_path: Path) -> None:
