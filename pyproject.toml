@@ -1,5 +1,5 @@
 [project]
-name = "humanize"
+name = "hmz"
 version = "0.1.0"
 description = "Orchestrate, execute, and observe agent flows"
 readme = "README.md"
@@ -30,6 +30,12 @@ hmz = "humanize.cli:main"
 [build-system]
 requires = ["uv_build>=0.11.28,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# The distribution is `hmz`, after the command; what it installs is still `humanize`.
+# Named here because the backend would otherwise look for the module under the
+# distribution's own name.
+module-name = "humanize"
 
 [dependency-groups]
 dev = [

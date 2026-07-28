@@ -555,7 +555,7 @@ def main(argv: list[str] | None = None) -> int:
             # else here put together -- so it is reached only when it is what was asked for.
             from importlib.metadata import version
 
-            print(f"hmz {version('humanize')}")
+            print(f"hmz {version('hmz')}")
             return 0
         # Anything else naming no command it knows: argparse says which was meant and exits,
         # so nothing below it runs. `--version` is handled above precisely because it is the

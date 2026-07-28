@@ -528,7 +528,7 @@ class Humanize(App[None]):
                 padding=(1, 4),
                 box=ROUNDED,
                 border_style="dim",
-                title=f"[dim]humanize v{version('humanize')}[/dim]",
+                title=f"[dim]humanize v{version('hmz')}[/dim]",
                 title_align="left",
                 expand=False,
             ),
