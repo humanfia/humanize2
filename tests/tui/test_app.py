@@ -1419,3 +1419,88 @@ async def test_a_machine_nothing_here_can_see_is_a_target_that_is_typed(
         await driver.pause()
 
         assert [str(option.id) for option in listing.options] == ["=docker://box"]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={
+        "claude": (Model("claude-opus-5", ("max", "high")),),
+        "codex": (Model("gpt-5.6-sol", ("xhigh",)),),
+    },
+)
+async def test_the_box_at_the_top_says_what_is_set_up_to_run_now(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """Walking out of `/agents` and finding the old setup still under the name is the bug."""
+    from textual.widgets import OptionList
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        assert "claude/claude-opus-5:high" in _transcript(app)
+
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        await driver.press("down")  # codex, at the effort it starts on
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+        await driver.pause()
+
+        shown = _transcript(app)
+        assert "codex/gpt-5.6-sol:xhigh" in shown
+        assert "claude/claude-opus-5" not in shown  # and not the one it opened on
+        # Drawn again rather than added to: the screen is the one it would have opened with.
+        assert shown.count("humanize v") == 1
+        assert "say what to do" in shown  # and what was said about it is still under it
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
+)
+async def test_stepping_through_the_flows_says_which_one_under_the_name(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """shift+tab asks nothing, so the box is the only place it can say what it moved to."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        opened = app._flow_named
+        await driver.press("shift+tab")
+        await until(lambda: app._flow_named != opened, driver)
+        await driver.pause()
+
+        shown = _transcript(app)
+        assert app._flow_named in shown
+        assert shown.count("humanize v") == 1
+
+
+@pytest.mark.timeout(60)
+async def test_a_screen_that_has_run_something_keeps_what_it_said(
+    workspace: Path,
+) -> None:
+    """The transcript is a record: the box was true when it was drawn, and stays as it was."""
+    (workspace / "flow.py").write_text(FLOW)
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
+        await driver.press(*"start")
+        await driver.press("enter")
+        await until(lambda: bool(app._agents), driver)
+        await driver.press("escape")
+        await until(lambda: not app._agents, driver)
+
+        was = app._flow_named
+        await driver.press("shift+tab")
+        await until(lambda: app._flow_named != was, driver)
+        await driver.pause()
+
+        # Nothing is rewritten: what the run said is still there, under the box it opened in,
+        # and that box still says what was true when it was drawn.
+        shown = _transcript(app)
+        assert "start" in shown
+        assert "flow.py" in shown
+        assert shown.count("humanize v") == 1

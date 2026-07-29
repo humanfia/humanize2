@@ -440,6 +440,10 @@ class Humanize(App[None]):
         #: time it is asked for: a run started here writes this project's own history into
         #: being, and what is being walked must not change under whoever is walking it.
         self.history = History()
+        #: Whether nothing has run on this screen since it was opened or cleared, which is
+        #: what makes the box at the top of it still the box the interface opened with rather
+        #: than a record of anything.
+        self._untouched = True
         #: When each agent's turn started, for the line that closes it.
         self._began: dict[str, float] = {}
         #: Whether the last thing shown was a part that the next one may run on from.
@@ -525,7 +529,10 @@ class Humanize(App[None]):
         from importlib.metadata import version
 
         agents = (
-            ", ".join(runs.spec for runs in self._models)
+            ", ".join(
+                f"{runs.spec} on {runs.anchor}" if runs.anchor else runs.spec
+                for runs in self._models
+            )
             or "no coding agent installed here"
         )
         self.query_one("#transcript", RichLog).write(
@@ -547,6 +554,25 @@ class Humanize(App[None]):
             ),
             shrink=False,
         )
+
+    def _reopened(self) -> None:
+        """Draws the opening box again, once what it says about the setup has changed.
+
+        The box names the flow and what each of its agents runs, and choosing another of
+        either makes what it says untrue -- which is what walking back out of `/flow`,
+        `/agents` or shift+tab and finding the old one still there is.
+
+        The transcript is a record and is not rewritten, so this only redraws a screen that
+        is still the one the interface opened with: nothing has run on it, so there is
+        nothing on it to lose, and what comes back is the screen you would have opened had
+        it been set up this way from the start. A screen that has run something keeps what it
+        says, which was true when it said it; what is set up now is above the prompt, where
+        it is redrawn twice a second.
+        """
+        if not self._untouched:
+            return
+        self.query_one("#transcript", RichLog).clear()
+        self._welcome()
 
     def _banner(self) -> str:
         """The name, drawn large.
@@ -828,6 +854,7 @@ class Humanize(App[None]):
         )
         self._wanted = places
         self.settings.remember(switching, self._named_by, self._models)
+        self._reopened()  # the box at the top names the flow, so it names this one now
         self._draw()
 
     @on(Editor.Sent)
@@ -889,6 +916,9 @@ class Humanize(App[None]):
         """
         self.query_one("#transcript", RichLog).clear()
         self._welcome()  # a cleared screen is a screen just opened, and one opens with this
+        # And is one nothing has run on: what was on it went with everything else, so a flow
+        # chosen after this may draw the box again rather than leave it saying the old one.
+        self._untouched = True
         self._draw()
 
     def action_stop_flow(self) -> None:
@@ -985,6 +1015,8 @@ class Humanize(App[None]):
                 self._flow_named, self._models = switching, list(chosen)
                 self._wanted = places
                 self.settings.remember(switching, self._named_by, self._models)
+                # Before the line below, since redrawing the screen would clear it away.
+                self._reopened()
                 self.show("[dim]say what to do, and the flow starts on it[/dim]")
                 self._draw()
                 return
@@ -1114,6 +1146,9 @@ class Humanize(App[None]):
             return
         agents = list(runner.agents)
         self._agents = agents
+        # From here the screen is a record of a run rather than the one the interface opened
+        # with, so the box at the top of it stays as it was: it was true when it was drawn.
+        self._untouched = False
         self._monitor = Monitor()
         # What the run costs is read from the logs the agents keep, which they write as they
         # go: a backend only says what a turn cost once the turn is over, and a turn is long.
