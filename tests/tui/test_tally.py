@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.janus import (
+from humanize.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,

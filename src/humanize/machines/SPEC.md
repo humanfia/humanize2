@@ -1,0 +1,67 @@
+# Machines
+
+## File Structure
+
+```
+.
+├── __init__.py
+├── anchored.py
+├── base.py
+└── docker.py
+```
+
+## `__init__.py`
+
+Expose `MachineBase`, `MachineConfig`, and all machine and machine config classes.
+
+## `base.py`
+
+```python
+@dataclass(frozen=True, kw_only=True)
+class MachineConfig(ABC):
+    @abstractmethod
+    def create(self) -> MachineBase:
+        raise NotImplementedError
+
+
+class MachineBase(ABC):
+    def __init__(self, config: MachineConfig): ...
+
+    @abstractmethod
+    def start(self) -> AnchorConfig:
+        """Brings the machine up.
+
+        Returns:
+            The anchor that reaches it.
+        """
+        raise NotImplementedError
+
+    def stop(self) -> None:
+        """Takes the machine down, for one that was brought up here."""
+```
+
+- Where an agent's turns land MUST be one setting, not two: a machine that is already running
+  and a machine started for the agent are one answer to one question, and an agent given both
+  would be a state nothing could act on.
+- The setting and the machine MUST be two objects. One config drives as many agents as it is
+  given to, and each of them MUST get a machine of its own.
+- `start` MUST leave the machine ready for a turn to be run against it, and MUST take down
+  whatever it created if it cannot.
+- `stop` MUST leave the workspace behind, and MUST do nothing at all for a machine that was
+  already running: one nobody here brought up is not one anybody here may take down.
+
+## `anchored.py` / `docker.py` / ... - Concrete Machines
+
+```python
+@dataclass(frozen=True, kw_only=True)
+class DummyConfig(MachineConfig): ...
+
+
+class Dummy(MachineBase): ...
+```
+
+- A machine that is already running MUST be named by the anchor that reaches it, and MUST
+  bring up nothing.
+- A machine started for the agent MUST be given the project directory itself rather than a
+  copy of it, so the work outlives the machine, and a container MUST run as the calling user,
+  so the workspace stays that user's.

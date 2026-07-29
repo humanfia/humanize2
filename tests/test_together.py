@@ -1,12 +1,12 @@
-"""The subpackages composed, which is the only place their fit is checked.
+"""The layers composed, which is the only place their fit is checked.
 
-oronyx imports neither of the others and neither imports it: a flow is what joins them, by
-handing oronyx what janus reports -- so nothing but this checks that an agent's `opened` really
-names the sessions oronyx files under that agent. janus does read coganchor's settings, but only
+tracing imports none of the others and none imports it: a flow is what joins them, by handing
+tracing what the agents report -- so nothing but this checks that an agent's `opened` really
+names the sessions tracing files under that agent. An agent does read coganchor's settings, but only
 as settings; that they still describe a session it can drive is checked here too.
 
 The flows are run for real against a fake `claude` that records a transcript where the real one
-would and writes a file where it is told to, which is the whole path: the id janus pins, the
+would and writes a file where it is told to, which is the whole path: the id an agent pins, the
 transcript that id names, the agent that says it opened it, and the machine the work landed on.
 """
 
@@ -18,11 +18,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize import oronyx
+from humanize import tracing
+from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 from humanize.coganchor import AnchorConfig
-from humanize.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from humanize.machines import AnchoredConfig
 from tests.coganchor.conftest import VIRTUAL_WORKSPACE
-from tests.oronyx.conftest import labels
+from tests.tracing.conftest import labels
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -113,7 +114,7 @@ def test_a_flow_is_traced_as_the_agents_it_ran(
 ) -> None:
     workspace, agents = flow
 
-    document = oronyx.collect(workspace, agents=agents)
+    document = tracing.collect(workspace, agents=agents)
 
     assert document["otherData"]["sessions"] == "2"
     assert labels(document, "process_name") == {
@@ -139,10 +140,12 @@ def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
         ClaudeCodeAgentConfig(
             model="claude-opus-4-8",
             effort="high",
-            anchor=AnchorConfig(
-                target=f"local:{target}",
-                workspace=VIRTUAL_WORKSPACE,
-                shadow=str(mirror),
+            machine=AnchoredConfig(
+                anchor=AnchorConfig(
+                    target=f"local:{target}",
+                    workspace=VIRTUAL_WORKSPACE,
+                    shadow=str(mirror),
+                )
             ),
         ),
         name="actor",
@@ -159,7 +162,7 @@ def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
         sandbox / "landed.txt"
     ).exists()  # nothing landed where the flow was started
 
-    document = oronyx.collect(sessions=session.id, agents={agent.id: agent.opened})
+    document = tracing.collect(sessions=session.id, agents={agent.id: agent.opened})
 
     assert document["otherData"]["sessions"] == "1"
     assert labels(document, "process_name") == {

@@ -14,7 +14,7 @@ at a prompt, they answer with nothing and the flow does the one thing it was giv
 
 from typing import NamedTuple
 
-from humanize.janus import AgentBase, HumanAgent
+from humanize.agents import AgentBase, HumanAgent
 
 
 class Chat(NamedTuple):

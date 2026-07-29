@@ -5,7 +5,7 @@ hmz exec -f stateful_ralph -a kimi/kimi-code/k3:high "$(cat TASK.md)"
 
 import time
 
-from humanize.janus import AgentBase
+from humanize.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:

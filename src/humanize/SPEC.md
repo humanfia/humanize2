@@ -6,23 +6,102 @@
 .
 ├── __init__.py
 ├── __main__.py
-├── cli.py
+├── agents
+├── backends.py
+├── cli
 ├── coganchor
-├── janus
-├── jetflow
-├── oronyx
-├── talanton
+├── cycle.py
+├── flows
+├── machines
+├── runner.py
+├── tracing
 └── tui
 ```
 
-Each subdirectory is a library and has a SPEC of its own. None of them MUST have a command
-line: `cli.py` is the whole of it, and MUST reach a subpackage only from inside the command
-carried out in it, so that a command pays for no subpackage but its own -- and so that the
-same file serves as the target half of a session, where it is the only one installed.
+Each subdirectory is a library and has a SPEC of its own; the modules beside them are
+specified here. None of them MUST have a command line: `cli` is the whole of it, one module
+per command that takes a parser of its own, and it MUST reach a layer only from inside the
+command carried out in it, so that a command pays for no layer but its own -- and so that the
+same package serves as the target half of a session, where it is the only one installed.
+
+No two layers MUST name each other. A pair that does is two things put in one place, not one
+thing above another, and is what `tests/test_layering.py` refuses.
+
+Every module MUST be named for what it holds. `coganchor` alone is a name of its own, being a
+program that ships to a target and could be lifted out whole.
 
 ## `__init__.py`
 
-Expose nothing. A caller names the subpackage it wants.
+Expose `home`, and nothing else. A caller names the layer it wants.
+
+## `backends.py`
+
+Every fact about a coding agent CLI that is not code: what it is called, what a command line
+may call it, what it runs, where it keeps its home and which files under it a session is
+logged to.
+
+- It MUST be the only place any of those is written down, and MUST import nothing but the
+  standard library, so that reading a fact costs nothing of the layer the fact is about.
+- Code that acts on a fact MUST live where its purpose does: driving a backend in `agents`,
+  reading its logs back in `tracing`.
+
+## `cycle.py`
+
+What one run of one flow was, written down as it happens: which flow, on what, by which
+agents, and which sessions each of them opened. Not what the sessions said -- the backend's
+own log is the turn-by-turn record and this MUST NOT be a second copy of it.
+
+- One cycle MUST be one run. It opens when the flow starts and closes when the flow stops,
+  however it stops -- finished, failed, or interrupted. A closed cycle MUST NOT be reopened.
+
+## `runner.py`
+
+```python
+class NotAFlow(ValueError): ...
+
+
+def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
+    """What the flow calls each agent it drives, in the order it takes them."""
+
+
+def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
+    """Reads an `hmz exec` line into a flow, the agents to drive it, and the task."""
+
+
+class Runner:
+    def __init__(self, flow: str | os.PathLike[str], agents: Sequence[AgentBase]): ...
+
+    def run(self, task: str) -> None:
+        """Runs the flow, until it returns.
+
+        Args:
+            task: What the flow is to have its agents do.
+        """
+```
+
+- A flow MUST be a Python file whose entry point is `run(agents: tuple[...], task: str)`, and
+  that tuple MUST be of a fixed length, which is how many agents the flow drives: it is the one
+  thing about a flow a command line running it cannot otherwise know. It MUST be readable where
+  the flow runs rather than only where a type checker looks, since a count nothing can read
+  back is not one a command line can be held to.
+- A `NamedTuple` of agents MUST be accepted in its place, and MUST additionally say what the
+  flow calls each of them. `drives` MUST report those names, so that whatever asks for the
+  agents asks for them by what they are for rather than by their place in a line; a plain
+  tuple MUST report a name apiece that is empty, having said nothing but how many.
+- `__init__` MUST load the flow and MUST raise `NotAFlow` unless the file is there and has
+  such an entry point, declaring as many agents as it was given, so that a flow started with
+  the wrong number of them fails before its first turn rather than partway through a loop.
+- An agent that was not named where it was made MUST take the name the flow gives it, before
+  anything is written down about the run: a name is what a trace groups an agent's sessions
+  under, and `builder` says what a hex tail does not. One named already MUST keep that name.
+- Whatever the flow itself raises as it is loaded MUST be left alone, so that a flow whose own
+  setup fails is not answered with a command line to correct.
+- `run` MUST call the entry point with the agents as the tuple the flow declared -- the named
+  one where it named them -- in the order they were given, and the task.
+- `flow_and_agents` MUST read the same `hmz exec` line the command takes, and MUST be here
+  rather than in `cli`: the terminal interface starts a flow from that line and then keeps the
+  agents, and a reader that lived in the command line would be one the interface reached up
+  into.
 
 ## Commands
 

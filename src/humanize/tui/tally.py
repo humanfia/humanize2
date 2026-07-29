@@ -14,34 +14,22 @@ counting the same tokens, and whichever has seen more is what has been spent.
 from __future__ import annotations
 
 import json
-import os
 import threading
 from collections import Counter
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
+
+from humanize import backends
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
-    from humanize.janus import AgentBase
+    from humanize.agents import AgentBase
 
     from .monitor import Monitor
 
 __all__ = ["Tally"]
-
-#: Where each backend keeps the log of one session: the variable that moves its home, where
-#: that home is by default, and the logs one session id is written to under it. Claude gets two
-#: -- a sub-agent it starts writes its own transcript, and the tokens it spends are the run's.
-_LOGS: dict[str, tuple[str, str, tuple[str, ...]]] = {
-    "claude": (
-        "CLAUDE_CONFIG_DIR",
-        ".claude",
-        ("projects/*/{ident}.jsonl", "projects/*/{ident}/subagents/**/*.jsonl"),
-    ),
-    "codex": ("CODEX_HOME", ".codex", ("sessions/**/rollout-*{ident}.jsonl",)),
-    "kimi": ("KIMI_CODE_HOME", ".kimi-code", ("server/events/{ident}.jsonl",)),
-}
 
 #: How often the logs are looked at. Often enough that a turn's spending shows while the turn
 #: is still running, and cheap because only what has been appended since is ever read.
@@ -140,11 +128,10 @@ class Tally:
         of the run, so anything that goes wrong is left for the next read to find gone.
         """
         for agent in self._agents:
-            backend = agent.backend
-            if backend not in _LOGS:
+            profile = backends.named(agent.backend)
+            if profile is None:
                 continue
-            variable, under, patterns = _LOGS[backend]
-            home = Path(os.environ.get(variable) or Path.home() / under)
+            home = profile.directory()
             # Every session this agent has going, named as the backend names it -- which it
             # does as the turn starts rather than when the turn lands -- and every one it has
             # let go of, whose last rows are still worth reading.
@@ -152,9 +139,9 @@ class Tally:
                 session.named for session in agent.sessions if session.named is not None
             } | set(agent.opened)
             for ident in sorted(idents):
-                for pattern in patterns:
+                for pattern in profile.logs:
                     for path in sorted(home.glob(pattern.format(ident=ident))):
-                        self._take(path, backend, agent.config.model)
+                        self._take(path, profile.name, agent.config.model)
         totals: Counter[str] = Counter()
         for reading in self._read.values():
             totals.update(reading.spent)

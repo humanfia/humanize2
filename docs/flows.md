@@ -109,7 +109,8 @@ A name, an [anchor](remote-execution.md#anchoring-a-flow) and a
 `-a` does not reach them. A flow that needs one is handed [agents](agents.md) built in Python:
 
 ```python
-from humanize.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig, Runner
+from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from humanize.runner import Runner
 
 config = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 agents = [

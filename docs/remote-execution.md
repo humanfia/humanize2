@@ -33,17 +33,20 @@ itself, without running anything there.
 
 ## Anchoring a flow
 
-Give an [agent](agents.md#machines)'s config an `anchor` and its agents work on another machine,
-without any other change to the [flow](flows.md):
+Give an [agent](agents.md#machines)'s config an anchored `machine` and its agents work on another
+one, without any other change to the [flow](flows.md):
 
 ```python
+from humanize.agents import ClaudeCodeAgentConfig
 from humanize.coganchor import AnchorConfig
-from humanize.janus import ClaudeCodeAgentConfig
+from humanize.machines import AnchoredConfig
 
 config = ClaudeCodeAgentConfig(
     model="claude-opus-4-8",
     effort="high",
-    anchor=AnchorConfig(target="ssh://build-box", workspace="/srv/project"),
+    machine=AnchoredConfig(
+        anchor=AnchorConfig(target="ssh://build-box", workspace="/srv/project")
+    ),
 )
 ```
 

@@ -35,5 +35,5 @@ interrupted, and running the flow again is another cycle.
 
 Trajectories are read from the backends' own home directories, named by `CLAUDE_CONFIG_DIR`,
 `CODEX_HOME` and `KIMI_CODE_HOME` and falling back to `~/.claude`, `~/.codex` and `~/.kimi-code`;
-a missing one is skipped. `humanize.oronyx.collect` takes the same arguments plus `agents`,
+a missing one is skipped. `humanize.tracing.collect` takes the same arguments plus `agents`,
 returns the trace document, and writes a file only when `output` is given.

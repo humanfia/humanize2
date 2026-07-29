@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -73,9 +72,9 @@ class AnchorConfig:
     def command(self, argv: Sequence[str]) -> list[str]:
         """Renders the invocation that runs `argv` under this anchor in a process of its own.
 
-        What :func:`connect` does in this one, for callers that cannot lend it theirs. The
-        interpreter is named explicitly, so the child is the one humanize is installed in
-        whether or not the console script is on PATH.
+        What :func:`connect` does in this one, for callers that cannot lend it theirs. A
+        method rather than the function it calls, so that a caller holding a stand-in for
+        these settings can answer for what a turn is spawned as.
 
         Args:
           argv: The agent to run and its own arguments.
@@ -83,26 +82,9 @@ class AnchorConfig:
         Returns:
           The command to spawn, which exits with the agent's own status.
         """
-        # Joined to their flag rather than following it, so that a setting reading as an
-        # option of ours -- a token that happens to start with a dash -- is still its value.
-        options = [f"--target={self.target}", f"--net={self.net}"]
-        for flag, value in (
-            ("--workspace", self.workspace),
-            ("--remote-path", self.remote_path),
-            ("--shadow", self.shadow),
-            ("--token", self.token),
-        ):
-            if value is not None:
-                options.append(f"{flag}={value}")
-        for flag, values in (
-            ("--local-path", self.local_paths),
-            ("--local-exec", self.local_execs),
-            ("--net-allow", self.net_allow),
-        ):
-            options += [f"{flag}={value}" for value in values]
-        if self.force:
-            options.append("--force")
-        return [sys.executable, "-m", "humanize", "anchor", *options, *argv]
+        from humanize.coganchor.argv import render
+
+        return render(self, argv)
 
     def mount(self) -> tuple[Target, str, str]:
         """Reads the target, and works out where the workspace is on each side of it.
@@ -178,7 +160,7 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
     """
     # Imported here rather than at the top: this half needs ptrace and an x86-64 register
     # map, which the machines reading the settings above are not required to have.
-    from humanize.coganchor import __version__, agents, transport
+    from humanize.coganchor import __version__, statepaths, transport
     from humanize.coganchor.netproxy import NetProxy
     from humanize.coganchor.policy import Layout, Router
     from humanize.coganchor.remote import RemoteClient
@@ -187,7 +169,7 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
 
     config = config or AnchorConfig()
     target, workspace, export = config.mount()
-    agent = agents.resolve(list(command))
+    agent = statepaths.resolve(list(command))
     shadow_root = os.path.abspath(config.shadow) if config.shadow else workspace
     router = Router(
         layouts=(Layout.create(shadow_root, workspace),),

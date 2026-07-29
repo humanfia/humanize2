@@ -1,4 +1,4 @@
-"""The one gate every subpackage's agent-driving tests share.
+"""The one gate every suite's agent-driving tests share.
 
 `pytest_addoption` is honoured only in a root conftest, so `--run-agents` has to live
 here rather than beside the tests it gates; the `agent` marker it keys on is registered

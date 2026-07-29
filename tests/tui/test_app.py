@@ -17,10 +17,10 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from textual.widgets import Label, Static
 
-from humanize.janus import cycles
+from humanize.backends import Model
+from humanize.cycle import cycles
 from humanize.tui import Humanize
 from humanize.tui.app import _OWN, Editor
-from humanize.tui.discover import Model
 from humanize.tui.pick import Flows, Models
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 FLOW = """
 from pathlib import Path
 
-from humanize.janus import AgentBase
+from humanize.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -452,7 +452,7 @@ async def test_a_line_to_a_running_flow_is_never_turned_away(workspace: Path) ->
     whichever turn starts next. There is no third answer -- a flow that is not running is
     what makes the first thing you say the task.
     """
-    from humanize.janus.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from humanize.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     (workspace / "flow.py").write_text(FLOW)
     app = Humanize()
@@ -507,7 +507,7 @@ async def test_a_flow_between_two_turns_is_a_flow_that_is_running() -> None:
     thing, naming the flow and how long the run has been going rather than falling back to
     saying where it is, as if nothing were happening.
     """
-    from humanize.janus.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from humanize.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -527,8 +527,8 @@ async def test_a_flow_between_two_turns_is_a_flow_that_is_running() -> None:
 @pytest.mark.timeout(60)
 async def test_a_turn_that_has_gone_quiet_still_reads_as_one_that_is_running() -> None:
     """A model thinks for minutes without a word, and the clock is what says it is alive."""
-    from humanize.janus import Event
-    from humanize.janus.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from humanize.agents import Event
+    from humanize.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"), name="one")
     app = Humanize()
@@ -959,8 +959,8 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
     Which is Claude Code's own shape, read off its own screen: no bars, no boxes, nothing
     indented -- every line starts where the terminal does.
     """
-    from humanize.janus import Event
-    from humanize.janus.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from humanize.agents import Event
+    from humanize.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     async with app.run_test() as driver:

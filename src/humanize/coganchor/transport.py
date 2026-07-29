@@ -292,12 +292,16 @@ def build_bundle(destination: Path | None = None) -> Path:
                 f'"""{".".join(parts[:depth])}, cut down to {parts[depth]}."""\n'
             )
         # The command line comes too, because it is the only one: what the target runs is the
-        # same ``hmz anchor`` a user would run there, and it names the other subpackages
-        # only from inside the commands that need them, none of which is this one.
+        # same ``hmz anchor`` a user would run there, and each of its commands names the layers
+        # it needs only from inside itself, none of which is this one.
         # Taken off disk rather than imported, so that the serving half still names nothing
         # above itself.
         package = Path(coganchor.__file__).parent.parent
-        shutil.copy(package / "cli.py", root.joinpath(*parts[:-1]) / "cli.py")
+        shutil.copytree(
+            package / "cli",
+            root.joinpath(*parts[:-1]) / "cli",
+            ignore=shutil.ignore_patterns("__pycache__", "*.md"),
+        )
         # Written by hand rather than via zipapp's ``main=`` shim, which calls
         # the entry point but throws its return value away -- a target that
         # failed to start would then look like a clean exit.

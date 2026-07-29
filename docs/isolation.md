@@ -1,19 +1,19 @@
 # Isolation
 
-Give an [agent](agents.md#machines)'s config an `isolation` and the agent brings its own machine: a
+Give an [agent](agents.md#machines)'s config a `DockerConfig` machine and the agent brings its own: a
 container of the image you name, holding this project directory at the path it already has and
 running as you, so the work it leaves behind is yours in your own workspace and everything else is
 the image's. It needs the `docker` command and a daemon to reach, on top of what
 [remote execution](remote-execution.md) needs.
 
 ```python
-from humanize.janus import ClaudeCodeAgentConfig
-from humanize.talanton import DockerIsolationConfig
+from humanize.agents import ClaudeCodeAgentConfig
+from humanize.machines import DockerConfig
 
 config = ClaudeCodeAgentConfig(
     model="claude-opus-4-8",
     effort="high",
-    isolation=DockerIsolationConfig(image="python:3.12"),
+    machine=DockerConfig(image="python:3.12"),
 )
 ```
 

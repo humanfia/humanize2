@@ -1,18 +1,19 @@
 """The structural rules of the package tree, in one table.
 
-Two things nothing else can check. The subpackages are merged projects that keep their own
-dependencies: janus names the machine its agents act on, so it reads coganchor's settings and
-talanton's, and talanton hands back an anchor, so it reads coganchor's too. The flows are
-written against the agents janus hands them, and janus's runner is what finds a flow by the
-name a command line gave it, so those two name each other and nothing else. Otherwise nothing
-crosses -- oronyx stays alone, and none of them may reach back up into janus. And the target
-half runs on the target, which may be any architecture, while :mod:`humanize.coganchor.linux`
-picks a register map at import time and refuses anything but x86-64 -- so the serving half must
-not reach the agent half, nor may anything a caller imports to configure one. All were package
-boundaries before the merge; now they are rules, so they are checked here.
+Two things nothing else can check. The layers keep the dependencies the merged projects had:
+`agents` names the machine its turns land on, so it reads `machines`, and a machine hands back
+an anchor, so `machines` reads `coganchor`. A flow is written against the agents it is handed
+and names nothing else; `runner` is what finds one by the name a command line gave it, and
+writes the run down as `cycle`. `tracing` reads the logs back afterwards and needs only where
+they are. Nothing points both ways, which is checked here too.
 
-The rules are on the subpackages alone. Above them sits the command line, which joins them
-and so may name any of them -- and which is checked instead by what a run of it actually loads.
+And the target half runs on the target, which may be any architecture, while
+:mod:`humanize.coganchor.linux` picks a register map at import time and refuses anything but
+x86-64 -- so the serving half must not reach the agent half, nor may anything a caller imports
+to configure one.
+
+The rules are on the layers alone. Above them sits the command line, which joins them and so
+may name any of them -- and which is checked instead by what a run of it actually loads.
 """
 
 from __future__ import annotations
@@ -27,37 +28,42 @@ from humanize.coganchor.transport import build_bundle
 
 SRC = Path(__file__).resolve().parent.parent / "src"
 
-#: What each layer may import besides its own subtree. Longest matching layer wins.
-ALLOWED = {
-    "humanize.janus": {
-        "humanize",
-        "humanize.coganchor",
-        "humanize.talanton",
-        # A flow is named on a command line and looked up by the runner, so the runner names
-        # where they are found. The other way round is the real dependency: a flow is written
-        # against the agents janus hands it, and that is all it may name.
+#: What each layer may import besides its own subtree and :mod:`humanize` itself. Longest
+#: matching layer wins, and a layer it may name covers the modules inside that layer.
+ALLOWED: dict[str, set[str]] = {
+    "humanize.agents": {"humanize.coganchor", "humanize.machines"},
+    "humanize.backends": set(),
+    "humanize.coganchor": set(),
+    "humanize.coganchor.serve": {"humanize.coganchor", "humanize.coganchor.proto"},
+    "humanize.cycle": {"humanize.agents"},
+    "humanize.flows": {"humanize.agents"},
+    "humanize.machines": {"humanize.coganchor"},
+    "humanize.runner": {
+        "humanize.agents",
+        "humanize.backends",
+        "humanize.cycle",
         "humanize.flows",
     },
-    "humanize.flows": {"humanize", "humanize.janus"},
-    "humanize.talanton": {"humanize", "humanize.coganchor"},
-    "humanize.oronyx": {"humanize"},
-    "humanize.jetflow": {"humanize"},
-    # The interface is a second way in to the commands rather than a second copy of them, so
-    # it alone among the subpackages names the command line.
-    "humanize.tui": {"humanize", "humanize.cli", "humanize.janus"},
-    "humanize.coganchor": {"humanize"},
-    "humanize.coganchor.serve": {
-        "humanize",
-        "humanize.coganchor",
-        "humanize.coganchor.proto",
+    "humanize.tracing": {"humanize.backends"},
+    "humanize.tui": {
+        "humanize.agents",
+        "humanize.backends",
+        "humanize.flows",
+        "humanize.runner",
     },
 }
 
-#: What reaching the target half costs besides: the one command line, and the settings module
-#: that coganchor's own `__init__` names on the way past. Both are held to the same bar as the
-#: package itself and import their machinery only when it is used. Loaded rather than imported,
-#: so this widens what a run may load and not what the serving half may name.
-STARTUP = {"humanize.cli", "humanize.coganchor.anchor"}
+#: What reaching the target half costs besides: the two modules of the command line that route
+#: to it, and the settings module that coganchor's own `__init__` names on the way past. All
+#: are held to the same bar as the package itself and import their machinery only when it is
+#: used. Loaded rather than imported, so this widens what a run may load and not what the
+#: serving half may name.
+STARTUP = {
+    "humanize",
+    "humanize.cli",
+    "humanize.cli.anchor",
+    "humanize.coganchor.anchor",
+}
 
 
 def _module_name(source: Path) -> str:
@@ -100,6 +106,11 @@ def _is_module(dotted: str) -> bool:
     return path.with_suffix(".py").is_file() or (path / "__init__.py").is_file()
 
 
+def _covers(layer: str, name: str) -> bool:
+    """Whether naming `layer` is leave to name `name`, which is it or anything inside it."""
+    return name == layer or name.startswith(f"{layer}.")
+
+
 def test_the_package_is_marked_as_typed() -> None:
     """Without the marker, type checking humanize -- here or downstream -- checks nothing."""
     assert (SRC / "humanize" / "py.typed").is_file()
@@ -110,33 +121,50 @@ def test_every_layer_imports_only_what_it_may() -> None:
     for source in sorted(SRC.rglob("*.py")):
         module = _module_name(source)
         layer = max(
-            (name for name in ALLOWED if module.startswith(name)), key=len, default=""
+            (name for name in ALLOWED if _covers(name, module)), key=len, default=""
         )
         if not layer:
             continue
-        # A layer it may name covers the modules inside it: naming `humanize.janus` is
-        # leave to reach janus, and janus is what is inside it.
         bad = {
             name
             for name in _imports(source)
-            if not any(
-                name == allowed or name.startswith(f"{allowed}.")
-                for allowed in (layer, *ALLOWED[layer])
-            )
+            # `humanize` itself, which is where `home()` is, is every layer's to name. It is
+            # answered here rather than written into the table: its name is the prefix of
+            # every other, so an entry saying it would silently say all of them.
+            if name != "humanize"
+            and not any(_covers(allowed, name) for allowed in (layer, *ALLOWED[layer]))
         }
         if bad:
             offenders[module] = bad
     assert not offenders, f"these modules import outside their layer: {offenders}"
 
 
-def test_every_subpackage_is_a_layer_the_table_governs() -> None:
-    """One left out is unchecked, and reads from here exactly like one deliberately exempt."""
-    subpackages = {
-        f"humanize.{path.name}"
-        for path in (SRC / "humanize").iterdir()
-        if (path / "__init__.py").is_file()
+def test_no_two_layers_name_each_other() -> None:
+    """A table meant to read as a DAG is one: a pair pointing both ways is a packaging error.
+
+    It is what tells a layer that is genuinely below another from two that were put in one
+    place and are now holding each other up.
+    """
+    both = {
+        (one, other)
+        for one, may in ALLOWED.items()
+        for other in may
+        if any(_covers(other, named) for named in ALLOWED.get(one, set()))
+        and any(_covers(one, named) for named in ALLOWED.get(other, set()))
     }
-    assert subpackages <= set(ALLOWED)
+    assert not both, f"these layers name each other: {both}"
+
+
+def test_every_module_at_the_top_is_a_layer_the_table_governs() -> None:
+    """One left out is unchecked, and reads from here exactly like one deliberately exempt."""
+    named = {
+        f"humanize.{path.stem}"
+        for path in (SRC / "humanize").iterdir()
+        if not path.name.startswith("_")
+        and (path.suffix == ".py" or (path / "__init__.py").is_file())
+    }
+    # The command line joins the layers and so may name any of them.
+    assert named - {"humanize.cli"} <= set(ALLOWED)
 
 
 def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:

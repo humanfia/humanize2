@@ -4,7 +4,7 @@ An agent runs at a model and an effort; a session is one conversation with it. W
 [flow](flows.md) holds decides what it remembers.
 
 ```python
-from humanize.janus import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
 agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high"))
 
@@ -90,7 +90,7 @@ its work. Name them, and each reports the sessions it opened, which is what tell
 them for you, so this is for the ones built by hand:
 
 ```python
-from humanize.oronyx import collect
+from humanize.tracing import collect
 
 config = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 actor = ClaudeCodeAgent(config, name="actor")
@@ -104,7 +104,7 @@ loop dropped a turn later — ids, so a flow running for days remembers them in 
 
 ## Machines
 
-A config also says where the agent's turns land: an `anchor` puts them on
-[another machine](remote-execution.md#anchoring-a-flow), an `isolation` puts them in a
-[container of the agent's own](isolation.md). One or the other, never both — a config given both
-is refused.
+A config also says where the agent's turns land, as one `machine`: an `AnchoredConfig` puts them
+on [another machine](remote-execution.md#anchoring-a-flow) that is already running, a
+`DockerConfig` puts them in a [container of the agent's own](isolation.md). One setting, because
+it is one question.

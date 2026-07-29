@@ -70,7 +70,7 @@ class Anchorage:
         """Run ``command`` as the agent under full interception.
 
         Spawned the way a flow spawns it, through :meth:`AnchorConfig.command`, so the
-        settings this suite drives coganchor with are the ones janus renders.
+        settings this suite drives coganchor with are the ones an anchored agent renders.
         """
         config = AnchorConfig(
             target=f"local:{self.target}",

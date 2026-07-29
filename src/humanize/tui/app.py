@@ -47,10 +47,11 @@ from textual.theme import Theme
 from textual.widgets import OptionList, RichLog, Static, TextArea
 from textual.widgets.option_list import Option
 
-from humanize.cli import flow_and_agents
+from humanize.backends import Model
+from humanize.runner import flow_and_agents
 
 from .complete import about, hinted, offered, takes
-from .discover import Model, installed
+from .discover import installed
 from .history import History
 from .monitor import Monitor, short, thousands
 from .pick import Flows, Models, Status
@@ -60,7 +61,8 @@ from .tally import Tally
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from humanize.janus import AgentBase, Event, Question
+    from humanize.agents import AgentBase, Event, Question
+    from humanize.backends import Model
 
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
@@ -463,7 +465,7 @@ class Humanize(App[None]):
           that runs and not a reason for anything to stop.
         """
         from humanize.flows import find
-        from humanize.janus.runner import drives
+        from humanize.runner import drives
 
         try:
             return drives(find(flow))
@@ -490,7 +492,7 @@ class Humanize(App[None]):
     def on_mount(self) -> None:
         """Says what this understands, then waits to be told something."""
         # Everything printed anywhere under this process lands in the transcript, which is what
-        # makes a flow watchable: janus tees each agent's streams to ours as they arrive.
+        # makes a flow watchable: a session tees each agent's streams to ours as they arrive.
         self.begin_capture_print(self)
         self._welcome()
         self._draw()
@@ -797,7 +799,7 @@ class Humanize(App[None]):
         if self._mid_run("no switching flow"):
             return
         from humanize.flows import find, found
-        from humanize.janus.runner import drives
+        from humanize.runner import drives
 
         named = [name for _, name in found()]
         if not named or not self._models:
@@ -941,7 +943,7 @@ class Humanize(App[None]):
             flows means reading all of them.
         """
         from humanize.flows import find
-        from humanize.janus.runner import drives
+        from humanize.runner import drives
 
         if self._mid_run("no choosing a flow"):
             return
@@ -1048,7 +1050,7 @@ class Humanize(App[None]):
         Args:
           argv: The command line, as `hmz exec` takes it.
         """
-        from humanize.janus import Runner
+        from humanize.runner import Runner
 
         if self._agents:
             self.show("hmz: a flow is already running", "red")
@@ -1197,7 +1199,7 @@ class Humanize(App[None]):
         """
 
         def go() -> None:
-            from humanize.janus import Stopped
+            from humanize.agents import Stopped
 
             try:
                 status = work()

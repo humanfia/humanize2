@@ -29,14 +29,15 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-from humanize.janus import SWARM
+from humanize.agents import SWARM
 
 from .monitor import short, thousands
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
 
-    from .discover import Model
+    from humanize.backends import Model
+
     from .monitor import Monitor
 
 __all__ = ["Flows", "Models", "Sheet", "Status"]

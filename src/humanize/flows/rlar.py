@@ -12,7 +12,7 @@ the point -- a trace reads the actor's session and the reviewer's rounds as two.
 import time
 from typing import NamedTuple
 
-from humanize.janus import AgentBase
+from humanize.agents import AgentBase
 
 
 class Agents(NamedTuple):

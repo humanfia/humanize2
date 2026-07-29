@@ -17,7 +17,7 @@ import re
 import time
 from typing import NamedTuple
 
-from humanize.janus import AgentBase, SessionBase
+from humanize.agents import AgentBase, SessionBase
 
 
 class Agents(NamedTuple):

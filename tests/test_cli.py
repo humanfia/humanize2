@@ -2,9 +2,9 @@
 
 What each command does with the rest of the line is its own file's; what is checked here is
 that the name reaches it, that the rest arrives untouched, that a line naming no command is
-refused rather than guessed at, and that reaching one command imports no other subpackage --
-which is what lets this same file be the target half of a session, where no other subpackage
-is installed.
+refused rather than guessed at, and that reaching one command imports no other layer -- which
+is what lets this same package be the target half of a session, where no other layer is
+installed.
 """
 
 from __future__ import annotations
@@ -17,17 +17,18 @@ import pytest
 
 from humanize import cli
 
-#: Every command, and the one subpackage its work is really done in.
+#: Every command, and what reaching it may load besides `cli` itself: the layers its work is
+#: really done in, and nothing of any other command's.
 COMMANDS = [
-    ("exec", "janus"),
-    ("collect", "oronyx"),
-    ("anchor", "coganchor"),
+    ("exec", {"runner", "backends"}),
+    ("collect", set[str]()),
+    ("anchor", {"coganchor"}),
 ]
 
 
-@pytest.mark.parametrize(("command", "subpackage"), COMMANDS, ids=lambda value: value)
-def test_a_command_reaches_only_the_subpackage_it_is_carried_out_in(
-    command: str, subpackage: str
+@pytest.mark.parametrize(("command", "layers"), COMMANDS, ids=lambda value: value)
+def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
+    command: str, layers: set[str]
 ) -> None:
     """`hmz exec` must not pay for a date parser, nor `hmz anchor` for any of it."""
     probe = (
@@ -46,12 +47,12 @@ def test_a_command_reaches_only_the_subpackage_it_is_carried_out_in(
     )
     reached = {name.split(".")[1] for name in result.stdout.split()}
     assert reached, "the command imported nothing, so this checks nothing"
-    assert reached <= {subpackage, "cli"}
+    assert reached <= layers | {"cli"}
 
 
-@pytest.mark.parametrize(("command", "subpackage"), COMMANDS, ids=lambda value: value)
+@pytest.mark.parametrize(("command", "layers"), COMMANDS, ids=lambda value: value)
 def test_a_command_is_given_the_rest_of_the_line_untouched(
-    command: str, subpackage: str
+    command: str, layers: set[str]
 ) -> None:
     """Including the arguments a top-level parser would have eaten, such as `--help`."""
     carry_out = unittest.mock.Mock(return_value=0)

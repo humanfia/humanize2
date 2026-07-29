@@ -112,9 +112,9 @@ ignore = [
 # halves of one object declared in one file, and the underscore keeps the halves
 # out of the package's public surface rather than out of each other's.
 "src/humanize/coganchor/remote.py" = ["SLF001"]
-"src/humanize/janus/agents/base.py" = ["SLF001"]
-"src/humanize/janus/agents/codex.py" = ["SLF001"]
-"src/humanize/janus/agents/kimi.py" = ["SLF001"]
+"src/humanize/agents/base.py" = ["SLF001"]
+"src/humanize/agents/codex.py" = ["SLF001"]
+"src/humanize/agents/kimi.py" = ["SLF001"]
 # Looking for a flow is allowed to find nothing. `os.path` answers False for a
 # directory it cannot read where `Path` raises, and the module says so at `where`.
 "src/humanize/flows/__init__.py" = ["PTH"]
@@ -122,7 +122,7 @@ ignore = [
 # `run` -- how the flow loops, what each agent is for, and the line that starts it.
 "src/humanize/flows/*.py" = ["D103"]
 # What a command line writes, it prints.
-"src/humanize/cli.py" = ["T201"]
+"src/humanize/cli/**" = ["T201"]
 "tests/**" = [
     "S101",    # an assert is what a test is
     "SLF001",  # a test reaches for what it tests, private or not

@@ -1,7 +1,7 @@
 """The Python call and the command line, which are one thing said twice.
 
-Everything the CLI parses is a field of :class:`AnchorConfig`, and everything a config renders is
-parsed back by the CLI -- a flow spawns what an operator types. The rest of this suite runs
+Everything the parser reads is a field of :class:`AnchorConfig`, and everything a config renders
+is read back by that parser -- a flow spawns what an operator types. The rest of this suite runs
 through both, so what is left to check here is that the two spellings still mean the same, and
 that :func:`connect` is reachable without a command line at all.
 """
@@ -17,6 +17,7 @@ import pytest
 
 from humanize import cli
 from humanize.coganchor import AnchorConfig, check, connect
+from humanize.coganchor.argv import parser
 from tests.coganchor.conftest import DEFAULT_TIMEOUT, REPO_ROOT, Anchorage
 
 #: Every setting at once, none of them left at its default. The token is spelled the way one
@@ -63,7 +64,7 @@ def test_an_agent_argument_is_never_read_as_one_of_ours() -> None:
 
     rendered = AnchorConfig(target="ssh://build-box", force=True).command(argv)
 
-    assert cli.anchor_parser().parse_args(rendered[4:]).command == argv
+    assert parser().parse_args(rendered[4:]).command == argv
 
 
 def test_a_default_anchor_says_only_where_the_work_lands() -> None:

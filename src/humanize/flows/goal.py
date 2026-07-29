@@ -5,7 +5,7 @@ hmz exec -f goal -a claude/claude-opus-4-8:max "$(cat TASK.md)"
 
 import time
 
-from humanize.janus import AgentBase
+from humanize.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
