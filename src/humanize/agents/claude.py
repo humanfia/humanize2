@@ -5,11 +5,12 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Question
+from .hooks import EVERYWHERE, Moment
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -18,6 +19,25 @@ if TYPE_CHECKING:
 #: of questions and its answer is that same input with the answers written into it, which is
 #: what the permission prompt of an interactive Claude fills in.
 _ASKS = "AskUserQuestion"
+
+
+def _about(called: dict[str, Any]) -> str:
+    """What a tool was called with, as the one line a row of a transcript has room for.
+
+    Args:
+      called: The tool's input, as Claude sent it.
+
+    Returns:
+      The first thing in it that is words -- the path, the command, the query -- or "".
+    """
+    return next(
+        (
+            str(value)
+            for value in called.values()
+            if isinstance(value, str) and value.strip()
+        ),
+        "",
+    )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -182,17 +202,11 @@ class ClaudeCodeSession(StreamSessionBase):
                     # The name and what it was called on, which is what a tool call reads
                     # as: `Read src/x.py`, `Bash git status`. Only what will fit on a row.
                     called: dict[str, Any] = part.get("input") or {}
-                    about = next(
-                        (
-                            str(value)
-                            for value in called.values()
-                            if isinstance(value, str) and value.strip()
-                        ),
-                        "",
-                    )
                     yield Event(
                         kind="tool",
-                        text=f"{part.get('name') or 'tool'} {about}".strip()[:120],
+                        text=f"{part.get('name') or 'tool'} {_about(called)}".strip()[
+                            :120
+                        ],
                     )
 
     def _answer(self, said: dict[str, Any]) -> None:
@@ -200,9 +214,11 @@ class ClaudeCodeSession(StreamSessionBase):
 
         Only one kind is worth putting to a person: the tool Claude uses to ask one. Every
         other request is a permission, and a flow watches its agent rather than gating it --
-        so those are allowed with the input they came with. A question nobody is there to
-        answer is refused, which Claude reads as the tool having been declined and carries
-        on from, rather than waiting on a reply that is not coming.
+        so those are allowed with the input they came with, unless something hung on
+        `PermissionRequest` says otherwise. That is the one moment where a refusal actually
+        stops the agent doing something, because it is the one the backend waits on. A
+        question nobody is there to answer is refused, which Claude reads as the tool having
+        been declined and carries on from, rather than waiting on a reply that is not coming.
 
         Args:
           said: The `control_request`, as read.
@@ -210,7 +226,24 @@ class ClaudeCodeSession(StreamSessionBase):
         asked: dict[str, Any] = said.get("request") or {}
         called: dict[str, Any] = asked.get("input") or {}
         answers: dict[str, str] = {}
-        if asked.get("tool_name") == _ASKS:
+        tool = str(asked.get("tool_name") or "")
+        if tool != _ASKS:
+            asking = self._fire(
+                Moment.PERMISSION_REQUEST,
+                tool=tool,
+                about=_about(called),
+                called=called,
+            )
+            if asking.refused:
+                self._reply(
+                    said,
+                    {
+                        "behavior": "deny",
+                        "message": asking.because or f"{tool} was refused",
+                    },
+                )
+                return
+        else:
             for raw in cast("list[Any]", called.get("questions") or []):
                 question = cast("dict[str, Any]", raw)
                 wanted = str(question.get("question") or question.get("header") or "")
@@ -266,6 +299,11 @@ class ClaudeCodeSession(StreamSessionBase):
 
 class ClaudeCodeAgent(AgentBase):
     """Claude Code, driven over its streaming JSON protocol so a turn can be talked to."""
+
+    #: Every moment a turn passes through, and one more: Claude asks before it uses a tool,
+    #: over the same stream the turn is read from, and waits for the answer. So this is the
+    #: one backend here where a hook can say no to something and have the agent hear it.
+    moments: ClassVar[frozenset[Moment]] = EVERYWHERE | {Moment.PERMISSION_REQUEST}
 
     def new(self) -> ClaudeCodeSession:
         """Opens a new Claude Code session."""

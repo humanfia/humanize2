@@ -41,12 +41,12 @@ a target and could be lifted out whole, so it has a name of its own.
 | Layer | Is | Entry points |
 | --- | --- | --- |
 | `backends.py` | Names, aliases, models, efforts, home directories and log globs for `claude`, `codex` and `kimi`. Facts, not code — standard library only. | `PROFILES`, `named()`, `read()` |
-| `agents/` | What a flow is written against (`AgentBase`, `SessionBase`, `Event`, `Question`) and one driver per backend. | everything in `__init__` |
+| `agents/` | What a flow is written against (`AgentBase`, `SessionBase`, `Event`, `Question`, `Moment`) and one driver per backend. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
 | `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |
 | `flows/` | Content. Eight flows, each a `run(agents, task)`. | — |
 | `cycle.py` | The run journal. Written by `runner`, read by `tracing` and `cli`. | `Cycle`, `cycles`, `opened` |
-| `runner.py` | Loading a flow, checking its arity, naming its agents, running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. | `Runner`, `drives`, `flow_and_agents`, `NotAFlow` |
+| `runner.py` | Loading a flow, checking its arity and what it asks of each agent, naming them, running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. | `Runner`, `drives`, `wanted`, `Place`, `flow_and_agents`, `NotAFlow` |
 | `tracing/` | Reading the backends' logs back and rendering a Chrome trace. | `collect` |
 | `tui/` | The terminal interface. | `Humanize` |
 | `cli/` | The one command line, over layers that have none of their own. | `main`, `COMMANDS` |
@@ -56,8 +56,9 @@ a target and could be lifted out whole, so it has a name of its own.
 ```
 agents/
 ├── event.py      Event, Question, Stopped, say — values, no behaviour, imported by every driver
+├── hooks.py      Moment, Occasion, Verdict, Hooks — the same, for what a turn stops at
 ├── base.py       AgentBase and SessionBase: two halves of one object, declared in one file
-├── config.py     AgentConfig
+├── config.py     AgentConfig, anchored
 └── claude.py codex.py kimi.py human.py
 
 coganchor/

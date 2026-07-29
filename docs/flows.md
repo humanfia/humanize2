@@ -10,6 +10,8 @@ branch, sleep, read files, shell out, and give up, because it is just a function
 
 - [The contract](#the-contract)
 - [How many agents, and what they are for](#how-many-agents-and-what-they-are-for)
+- [Asking for an agent that can do something](#asking-for-an-agent-that-can-do-something)
+- [Hooks in a flow](#hooks-in-a-flow)
 - [The person at the prompt](#the-person-at-the-prompt)
 - [Running one](#running-one)
 - [Where flows live](#where-flows-live)
@@ -98,6 +100,68 @@ agent uses them:
 An agent that was named where it was made keeps that name; one that was not takes the name the
 flow gives it, before anything is written down about the run.
 
+## Asking for an agent that can do something
+
+Not every backend runs every [moment](agents.md#hooks). A flow that hangs a hook on one only
+some of them run says so where it declares the place, by writing the moment beside the type:
+
+```python
+from typing import Annotated, NamedTuple
+
+from humanize.agents import AgentBase, Moment
+
+
+class Agents(NamedTuple):
+    """The two this drives: one that is gated, and one that reads its work."""
+
+    builder: Annotated[AgentBase, Moment.PERMISSION_REQUEST]
+    reviewer: AgentBase
+```
+
+`Annotated` is the whole of it: the type is still `AgentBase`, so the flow reads and type-checks
+exactly as it did, and what is written beside it is what the place asks of whoever fills it.
+Several moments are several arguments.
+
+It is checked before the first turn, for the same reason the count is:
+
+```console
+$ hmz exec -f gated -a codex/gpt-5.6-sol:high -a codex/gpt-5.6-sol:high "fix the build"
+hmz exec: error: /.../gated.py: builder has to run PermissionRequest, which codex does not
+```
+
+and the interface's `/agents` offers only the CLIs that would work for that place, so it cannot
+be chosen wrong there at all.
+
+## Hooks in a flow
+
+A flow holds the agents, so it can hang a hook on one and take it down again as it goes. This
+is a Ralph loop that will not let a turn stop while the task file still says there is work:
+
+```python
+from pathlib import Path
+
+from humanize.agents import AgentBase, Moment, Occasion, Verdict
+
+
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+
+    def unfinished(occasion: Occasion) -> Verdict | None:
+        if occasion.again < 5 and "- [ ]" in Path("TASK.md").read_text():
+            return Verdict(refused=True, because="TASK.md still has unticked boxes.")
+        return None
+
+    with agent.hooks.on(Moment.STOP, unfinished):
+        while "- [ ]" in Path("TASK.md").read_text():
+            agent(task, suppress=True)
+```
+
+Everything a hook can do is in [Agents › Hooks](agents.md#hooks). Two things worth saying here:
+
+- Hooks are on the **agent**, not the session, so one covers every session that agent opens —
+  including the fresh one a Ralph loop makes each turn.
+- A hook runs on the turn's own thread. One that takes a while is a turn that takes a while.
+
 ## The person at the prompt
 
 A place annotated `HumanAgent` is you, driven as an agent — which is what you are to a flow.
@@ -180,7 +244,14 @@ that starts it in its own docstring.
 | `rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. Nothing between them parses anything — the review *is* the actor's next prompt, word for word. |
 | `humanize1` | `builder`, `reviewer` | RLCR: an idea is opened, planned against review, then built against it. Anchored to the commit the plan is committed in; every review reads what came after it. Run it in a git repository. |
 
-`humanize1` is [PolyArch/humanize](https://github.com/PolyArch/humanize) as one unattended run.
+`humanize1` is [PolyArch/humanize](https://github.com/PolyArch/humanize) as one unattended run:
+its three commands in order — `gen-idea` opens a loose idea into a repo-grounded draft,
+`gen-plan` turns that draft into a plan both sides converged on, and `start-rlcr-loop` builds it
+under review. The plugin blocks Claude's exit and puts the round to Codex in a Stop hook; so does
+this, with a [`Moment.STOP` hook](#hooks-in-a-flow) on the builder. A round is the builder
+believing the whole plan is done and trying to stop, and what the reviewer says is what it hears
+instead.
+
 Read [Security](../README.md#security) before starting any of them.
 
 Their source is the best documentation of this API there is — `src/humanize/flows/` in a

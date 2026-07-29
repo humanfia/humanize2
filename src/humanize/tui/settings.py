@@ -15,11 +15,16 @@ reviewer's model to the builder.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import yaml
 
 from humanize import home
+
+from .pick import Runs
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 __all__ = ["Settings"]
 
@@ -42,20 +47,20 @@ class Settings:
         """The flow this workspace was last run with, or "" if it never has been."""
         return str(self._mine().get("flow") or "")
 
-    def agents(self, flow: str) -> list[str]:
-        """What each agent of one flow was last running here.
+    def agents(self, flow: str) -> list[Runs]:
+        """What each agent of one flow was last running here, and where its turns landed.
 
         Args:
           flow: The flow they were driving.
 
         Returns:
-          One `cli/model:effort` apiece, in the order the flow takes them, and nothing at all
-          for a flow this workspace has not run.
+          One `cli/model:effort` apiece with the machine it was anchored to, in the order the
+          flow takes them, and nothing at all for a flow this workspace has not run.
         """
         flows: dict[str, Any] = self._mine().get("flows") or {}
         kept: dict[str, Any] = flows.get(flow) or {}
         agents: dict[str, Any] = kept.get("agents") or {}
-        said: list[str] = []
+        said: list[Runs] = []
         for raw in agents.values():
             if not isinstance(raw, dict):
                 return []  # written by hand and not the way this writes it
@@ -67,27 +72,36 @@ class Settings:
             )
             if not (cli and model and effort):
                 return []
-            said.append(f"{cli}/{model}:{effort}")
+            # An anchor is what a workspace that has one has: an entry written before there
+            # were any is a workspace whose agents work here, which is what leaving it out
+            # already meant.
+            said.append(Runs(f"{cli}/{model}:{effort}", str(agent.get("anchor") or "")))
         return said
 
-    def remember(self, flow: str, names: tuple[str, ...], models: list[str]) -> None:
+    def remember(
+        self, flow: str, names: tuple[str, ...], models: Sequence[Runs]
+    ) -> None:
         """Writes down what this workspace is set up to run, so that it opens that way.
 
         Args:
           flow: The flow to run.
           names: What that flow calls each agent it drives, which is "" apiece for a flow
             that said how many it drives and nothing more.
-          models: One `cli/model:effort` apiece, in the order the flow takes them.
+          models: What each of them runs and where, in the order the flow takes them.
         """
         agents: dict[str, dict[str, str]] = {}
-        for at, spec in enumerate(models):
+        for at, runs in enumerate(models):
             # Read from both ends, as a command line reads one: a model may hold slashes of
             # its own, while a CLI and an effort never do.
-            cli, _, rest = spec.partition("/")
+            cli, _, rest = runs.spec.partition("/")
             model, _, effort = rest.rpartition(":")
             # By what the flow calls it, or by where it comes in the line when it has no name.
             named = names[at] if at < len(names) and names[at] else str(at + 1)
             agents[named] = {"cli": cli, "model": model, "effort": effort}
+            if runs.anchor:
+                # Only where there is one: an agent that works here says nothing about a
+                # machine, which is what a file written before there were any also says.
+                agents[named]["anchor"] = runs.anchor
         mine = self._mine()
         mine["flow"] = flow
         mine.setdefault("flows", {})[flow] = {"agents": agents}

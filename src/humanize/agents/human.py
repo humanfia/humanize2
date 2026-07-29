@@ -14,7 +14,7 @@ runs, so a flow that names one is handed one.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
@@ -22,6 +22,8 @@ from .event import Event
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from .hooks import Moment
 
 __all__ = ["HumanAgent", "HumanSession"]
 
@@ -69,6 +71,11 @@ class HumanAgent(AgentBase):
     they are asked -- so a flow that is a conversation does the one thing it was given and
     returns, rather than waiting on somebody who is not there.
     """
+
+    #: None. A moment is a point in a turn of a model, and the person takes no such turn:
+    #: there is no tool to be told about, nothing to send them on from, and a prompt that
+    #: refused them would be an interface refusing what was typed at it.
+    moments: ClassVar[frozenset[Moment]] = frozenset()
 
     def __init__(self, *, name: str = "human") -> None:
         """Initializes the person as an agent.

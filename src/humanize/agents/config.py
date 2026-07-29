@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     # client behind a container.
     from humanize.machines import MachineConfig
 
+__all__ = ["AgentConfig", "anchored"]
+
 
 @dataclass(frozen=True, kw_only=True)
 class AgentConfig:
@@ -32,3 +34,30 @@ class AgentConfig:
     model: str
     effort: str
     machine: MachineConfig | None = None
+
+
+def anchored(target: str) -> MachineConfig | None:
+    """The machine an agent's turns land on, named the way a target is written.
+
+    A machine that is already running is the answer whoever is at a prompt has: they name
+    where the work goes -- a container, a host, this machine -- and nothing is brought up or
+    taken down for them. Here rather than beside the machines themselves so that a caller
+    which may not name that layer can still say where an agent works.
+
+    Args:
+      target: Where the work lands, as `ssh://HOST`, `docker://CONTAINER`, `tcp://HOST:PORT`
+        or `local[:DIR]`, or "" for this machine.
+
+    Returns:
+      The machine to configure an agent with, or None to run its turns here.
+
+    Raises:
+      ValueError: If the target cannot be read, said where it is written rather than hours
+        into the flow that was configured with it.
+    """
+    if not target:
+        return None
+    from humanize.coganchor import AnchorConfig
+    from humanize.machines import AnchoredConfig
+
+    return AnchoredConfig(anchor=AnchorConfig(target=target))

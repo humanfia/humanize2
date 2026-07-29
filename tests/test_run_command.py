@@ -230,6 +230,72 @@ def test_the_person_at_the_prompt_is_an_agent_nobody_is_asked_to_configure(
     assert seen["said"] == ["and then this", ""]
 
 
+#: A flow that says one of its agents has to be one a hook can say no to, which is what
+#: writing the moment beside the type in the annotation means.
+DEMANDING = """
+import json
+from pathlib import Path
+from typing import Annotated, NamedTuple
+
+from humanize.agents import AgentBase, Moment, Verdict
+
+
+class Agents(NamedTuple):
+    builder: Annotated[AgentBase, Moment.PERMISSION_REQUEST]
+    reviewer: AgentBase
+
+
+def run(agents: Agents, task: str) -> None:
+    agents.builder.hooks.on(Moment.PERMISSION_REQUEST, lambda _: Verdict(refused=True))
+    Path(__file__).with_suffix(".json").write_text(
+        json.dumps({"agents": [[a.id] for a in agents], "task": task})
+    )
+"""
+
+
+def test_a_flow_says_what_each_agent_has_to_be_able_to_do(tmp_path: Path) -> None:
+    """Beside the type, where the flow declares the place -- and read back before the run."""
+    from humanize.agents import Moment
+    from humanize.runner import drives, wanted
+
+    flow = _flow(tmp_path, DEMANDING)
+
+    assert drives(flow) == ("builder", "reviewer")
+    assert [place.moments for place in wanted(flow)] == [
+        frozenset({Moment.PERMISSION_REQUEST}),
+        frozenset(),
+    ]
+
+
+def test_an_agent_that_cannot_do_what_its_place_asks_is_refused_before_the_run(
+    tmp_path: Path,
+) -> None:
+    """Before the first turn, for the reason the count is: not hours into a loop."""
+    flow = _flow(tmp_path, DEMANDING)
+
+    with pytest.raises(SystemExit):
+        main(["exec", "-f", flow, "-a", "codex/m:high", "-a", "codex/m:high", "task"])
+
+    assert not (tmp_path / "flow.json").exists()  # nothing ran
+
+    # And the one backend that does ask before it uses a tool is taken.
+    main(["exec", "-f", flow, "-a", "claude/m:high", "-a", "codex/m:high", "task"])
+    assert _seen(tmp_path)["agents"] == [["builder"], ["reviewer"]]
+
+
+def test_what_a_place_asks_for_is_said_where_it_is_refused(tmp_path: Path) -> None:
+    from humanize.agents import CodexAgent, CodexAgentConfig
+
+    flow = _flow(tmp_path, DEMANDING)
+    agents = [
+        CodexAgent(CodexAgentConfig(model="m", effort="high")),
+        CodexAgent(CodexAgentConfig(model="m", effort="high")),
+    ]
+
+    with pytest.raises(NotAFlow, match="builder has to run PermissionRequest"):
+        Runner(flow, agents)
+
+
 def test_a_plain_tuple_says_how_many_agents_and_nothing_more(tmp_path: Path) -> None:
     from humanize.runner import drives
 
@@ -511,3 +577,61 @@ def test_the_chat_flow_run_from_a_command_line_does_the_one_thing_it_was_given(
     chat(Chat(agent, HumanAgent()), "echo once")
 
     assert len(agent.opened) == 1
+
+
+def test_the_rlcr_loop_is_what_a_round_runs_into_when_it_tries_to_stop() -> None:
+    """A round ends where the builder would have ended it, which is what the plugin does too.
+
+    The work is read against the plan until nothing is required, and then what was built is
+    read as code until nothing is left to fix -- both in the same hook, because both are the
+    same sentence: not yet.
+    """
+    from humanize.agents import AgentBase, Moment, Occasion, Verdict
+    from humanize.flows.humanize1 import ALIGNING, ROUNDS, Loop
+
+    answers = [
+        "AC-2 has no negative test",
+        "COMPLETE",
+        "[P1] no test takes the error path",
+    ]
+    asked: list[str] = []
+
+    class _Reviewer:
+        def __call__(self, prompt: str, *, suppress: bool = False) -> str:
+            asked.append(prompt)
+            return answers.pop(0) if answers else "COMPLETE"
+
+    loop = Loop(cast("AgentBase", _Reviewer()), base="c0ffee")
+    stopping = Occasion(
+        moment=Moment.STOP, agent="builder", said="what I did this round"
+    )
+
+    # Judged against the plan, and what the review said is what the builder hears instead.
+    assert loop(stopping) == Verdict(refused=True, because="AC-2 has no negative test")
+    # The round that settles the claim goes straight on to the code review, in one call.
+    assert loop(stopping) == Verdict(
+        refused=True, because="[P1] no test takes the error path"
+    )
+    # And a code review with nothing to fix is the turn being let go of at last.
+    assert loop(stopping) is None
+    assert loop.rounds == 3
+    assert loop.told == [
+        "AC-2 has no negative test",
+        "[P1] no test takes the error path",
+    ]
+    assert (
+        "c0ffee" in asked[0]
+    )  # every review reads the work since the plan's own commit
+
+    # Every fifth round is a check that the work is still the work, not a review of the round.
+    aligning = Loop(cast("AgentBase", _Reviewer()), base="c0ffee")
+    aligning.rounds = ALIGNING - 2
+    at = len(asked)
+    aligning(stopping)
+    assert "still the work" in asked[at]
+
+    # And the loop gets as many rounds as it gets: what is not done by then is not done.
+    ending = Loop(cast("AgentBase", _Reviewer()), base="c0ffee")
+    ending.rounds = ROUNDS - 1
+    assert ending(stopping) is None
+    assert ending.told == []  # nothing was even asked

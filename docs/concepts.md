@@ -95,6 +95,8 @@ A turn is the unit that:
 - **can be watched** — everything the agent says arrives as it says it, not at the end;
 - **can be talked to** — a line said while a turn is running goes *into* that turn rather than
   starting another;
+- **can be hooked** — it passes through named [moments](agents.md#hooks) a flow may hang a
+  callable on, and take down again while the flow is running;
 - **can fail** — a failed turn raises, and leaves the session unopened so the next attempt
   retries it rather than resuming something that may not exist.
 
@@ -113,7 +115,8 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 The annotation on `agents` is load-bearing. Its length is how many agents the flow drives —
 the one thing about a flow that the command line starting it cannot otherwise know — so it is
 checked before the first turn rather than hours into a loop. A `NamedTuple` says what each one
-is *for* as well as how many there are.
+is *for* as well as how many there are, and an `Annotated[AgentBase, Moment.…]` says what that
+one has to be able to do, which is checked at the same moment.
 
 A flow is ordinary Python and may branch any way it likes. Nothing asks it what it is doing;
 what a run looks like is read off the turns going past.

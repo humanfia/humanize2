@@ -11,14 +11,21 @@ from __future__ import annotations
 import inspect
 import os
 import runpy
-from typing import TYPE_CHECKING, get_args, get_origin, get_type_hints
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    NamedTuple,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from humanize import backends
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-    from .agents import AgentBase
+    from .agents import AgentBase, Moment
 
 
 class NotAFlow(ValueError):  # noqa: N818  -- the name SPEC.md gives it
@@ -28,6 +35,22 @@ class NotAFlow(ValueError):  # noqa: N818  -- the name SPEC.md gives it
     file beside it and does not find it -- is left to fail as it would anywhere, rather than
     being reported as a command line to correct.
     """
+
+
+class Place(NamedTuple):
+    """One of the agents a flow drives, as the flow's own annotation declared it.
+
+    Attributes:
+      name: What the flow calls it, or "" for a flow that said how many it drives and no more.
+      person: Whether it is the person at the prompt, who is handed over rather than chosen.
+      moments: The moments the agent filling it has to run, which the flow said by writing
+        `Annotated[AgentBase, Moment.PERMISSION_REQUEST]` where it declared the place. Empty
+        where it asked for nothing in particular, which is most places.
+    """
+
+    name: str
+    person: bool
+    moments: frozenset[Moment]
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
@@ -48,14 +71,33 @@ def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
     Raises:
       NotAFlow: If the file is not there, or is not a flow.
     """
-    return tuple(name for name, person in _read(flow)[1] if not person)
+    return tuple(place.name for place in wanted(flow))
+
+
+def wanted(flow: str | os.PathLike[str]) -> tuple[Place, ...]:
+    """Every agent a flow needs chosen for it, and what each of them has to be able to do.
+
+    What :func:`drives` says, and what the flow asked of each place besides a name: a flow
+    that hangs a hook on a moment only some backends run says so in the annotation, and
+    whoever is choosing the agents can then offer only the ones that would work.
+
+    Args:
+      flow: The Python file the flow is written in. It is run to be read.
+
+    Returns:
+      One place per agent somebody has to choose, in the order the flow takes them.
+
+    Raises:
+      NotAFlow: If the file is not there, or is not a flow.
+    """
+    return tuple(place for place in _read(flow)[1] if not place.person)
 
 
 def _read(
     flow: str | os.PathLike[str],
 ) -> tuple[
     Callable[..., None],
-    tuple[tuple[str, bool], ...],
+    tuple[Place, ...],
     Callable[..., tuple[AgentBase, ...]],
 ]:
     """Loads a flow and reads what it says about the agents it drives.
@@ -64,9 +106,8 @@ def _read(
       flow: The flow: one that came with humanize, by name, or a file of your own.
 
     Returns:
-      Its entry point, one (name, is the person) per agent it drives, and what to hand those
-      agents over as -- the named tuple the flow declared, or a plain one where it declared
-      that.
+      Its entry point, one place per agent it drives, and what to hand those agents over as
+      -- the named tuple the flow declared, or a plain one where it declared that.
 
     Raises:
       NotAFlow: If the file is not there, is not a flow -- nothing called `run`, or one whose
@@ -85,8 +126,11 @@ def _read(
     try:
         # A function, so that what is read below is what the entry point will be called
         # with: a class or a partial answers with annotations that are somebody else's.
+        # Extras and all: what a flow wrote beside the type is what it asks of the agent.
         declared = (
-            get_type_hints(run).get("agents") if inspect.isfunction(run) else None
+            get_type_hints(run, include_extras=True).get("agents")
+            if inspect.isfunction(run)
+            else None
         )
     except NameError as unresolved:
         # A flow whose agents are imported under TYPE_CHECKING states how many it drives
@@ -103,10 +147,10 @@ def _read(
         and declared is not None
         and (fields := getattr(declared, "_fields", None))
     ):
-        kinds = getattr(declared, "__annotations__", {})
+        kinds = _kinds(declared, run)
         return (
             run,
-            tuple((at, _is_person(kinds.get(at))) for at in fields),
+            tuple(_place(at, kinds.get(at)) for at in fields),
             declared._make,
         )
     # `tuple[AgentBase, ...]` is any number of them, which is no answer to the question.
@@ -117,7 +161,66 @@ def _read(
             "tuple of a fixed length -- how many agents the flow drives -- or with a "
             "NamedTuple of them, which also says what each one is for"
         )
-    return run, tuple(("", _is_person(kind)) for kind in declares), tuple
+    return run, tuple(_place("", kind) for kind in declares), tuple
+
+
+def _kinds(declared: type, run: Callable[..., None]) -> dict[str, object]:
+    """What a flow annotated each place of its agents with, resolved where it can be.
+
+    Against the flow's own globals, which are where its names are: a flow loaded by running
+    the file is not a module anything can look up, so the class cannot resolve its own
+    annotations on its own.
+
+    Args:
+      declared: The named tuple the flow declared its agents as.
+      run: Its entry point, which is what carries those globals.
+
+    Returns:
+      One annotation per place, resolved if they could be resolved and as they were written
+      if they could not -- a name that will not resolve is still a name to read.
+    """
+    try:
+        return dict(
+            get_type_hints(
+                declared, globalns=dict(run.__globals__), include_extras=True
+            )
+        )
+    except (NameError, TypeError):
+        return dict(getattr(declared, "__annotations__", {}))
+
+
+def _place(name: str, kind: object) -> Place:
+    """One place in a flow's agents, read off what the flow annotated it with.
+
+    Args:
+      name: What the flow calls it, or "" where it named none of them.
+      kind: The annotation, which may be an `Annotated` carrying what the flow asks of
+        whoever fills the place.
+
+    Returns:
+      The place.
+    """
+    moments = frozenset(_moments(kind))
+    if get_origin(kind) is Annotated:
+        kind = get_args(kind)[0]
+    return Place(name=name, person=_is_person(kind), moments=moments)
+
+
+def _moments(kind: object) -> tuple[Moment, ...]:
+    """The moments a flow asked the agent filling a place to run.
+
+    Args:
+      kind: What the flow annotated the place with.
+
+    Returns:
+      Whatever moments it wrote beside the type, in the order it wrote them, and nothing at
+      all for a place it annotated with the type alone.
+    """
+    from .agents import Moment
+
+    if get_origin(kind) is not Annotated:
+        return ()
+    return tuple(said for said in get_args(kind)[1:] if isinstance(said, Moment))
 
 
 def _is_person(kind: object) -> bool:
@@ -133,7 +236,10 @@ def _is_person(kind: object) -> bool:
     from .agents import HumanAgent
 
     if isinstance(kind, str):
-        return kind.rpartition(".")[2] == HumanAgent.__name__
+        # Read by the word it names rather than by what that word means, which is all there
+        # is to go on: the first thing inside an `Annotated[...]` is the type it is about.
+        said = kind.removeprefix("Annotated[").split(",")[0].strip()
+        return said.rpartition(".")[2] == HumanAgent.__name__
     return kind is HumanAgent
 
 
@@ -161,23 +267,33 @@ class Runner:
         Raises:
           NotAFlow: If the file is not there, is not a flow -- nothing called ``run``, or one
             whose ``agents`` cannot be read or says nothing about how many it takes -- or is a
-            flow that drives a different number of agents than were given.
+            flow that drives a different number of agents than were given, or one of them
+            cannot run a moment the flow said that place has to.
         """
         from .agents import HumanAgent
 
         run, places, make = _read(flow)
-        wanted = [name for name, person in places if not person]
-        if len(wanted) != len(agents):
+        asked = [place for place in places if not place.person]
+        if len(asked) != len(agents):
             raise NotAFlow(
-                f"{flow}: run() drives {len(wanted)} agents, {len(agents)} given"
+                f"{flow}: run() drives {len(asked)} agents, {len(agents)} given"
             )
+        # Before the first turn, for the reason the count is: a flow that hangs a hook on a
+        # moment its agent does not run would otherwise find out hours into a loop, from a
+        # hook that raised where it was hung rather than from the line that chose the agent.
+        for agent, place in zip(agents, asked, strict=True):
+            if short := place.moments - type(agent).moments:
+                raise NotAFlow(
+                    f"{flow}: {place.name or 'the agent'} has to run "
+                    f"{', '.join(sorted(short))}, which {agent.backend} does not"
+                )
         # The person at the prompt is made here rather than given: nobody chooses what they
         # run, so nothing upstream of this was ever asked about them.
         given = iter(agents)
-        driven = [HumanAgent() if person else next(given) for _, person in places]
-        for agent, (called, _) in zip(driven, places, strict=True):
-            if called:
-                agent.rename(called)
+        driven = [HumanAgent() if place.person else next(given) for place in places]
+        for agent, place in zip(driven, places, strict=True):
+            if place.name:
+                agent.rename(place.name)
         self._run: Callable[[tuple[AgentBase, ...], str], None] = run
         # As the flow declared them: a flow whose agents are a NamedTuple reaches them by
         # name, and one that unpacks a plain tuple sees no difference.
@@ -261,26 +377,14 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
 
     # Only now that the line is known to name agents: `--help` has already exited, and it
     # should not have paid for three backends to say what it takes.
-    from .agents import (
-        ClaudeCodeAgent,
-        ClaudeCodeAgentConfig,
-        CodexAgent,
-        CodexAgentConfig,
-        KimiCodeCLIAgent,
-        KimiCodeCLIAgentConfig,
-    )
+    from .agents import DRIVEN
 
-    built = {
-        "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
-        "codex": (CodexAgent, CodexAgentConfig),
-        "kimi": (KimiCodeCLIAgent, KimiCodeCLIAgentConfig),
-    }
     agents: list[AgentBase] = []
     for spec in args.agents:
         try:
             profile, model, effort = backends.read(spec)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
-        agent, config = built[profile.name]
+        agent, config = DRIVEN[profile.name]
         agents.append(agent(config(model=model, effort=effort)))
     return args.flow, agents, args.task

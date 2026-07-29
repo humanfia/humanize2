@@ -14,6 +14,7 @@ Everything here is importable from `humanize.agents`.
 - [Watching a turn as it happens](#watching-a-turn-as-it-happens)
 - [Talking to a turn already running](#talking-to-a-turn-already-running)
 - [Goals](#goals)
+- [Hooks](#hooks)
 - [Questions](#questions)
 - [Stopping](#stopping)
 - [Names, and what a run left behind](#names-and-what-a-run-left-behind)
@@ -176,6 +177,85 @@ that stopped early.
 On a backend with no goal feature it raises `NotImplementedError`, whether or not `suppress` is
 set: asking for a feature that is not there is a flow to correct.
 
+## Hooks
+
+A turn passes through a handful of **moments**, and a hook is a Python callable hung on one of
+them. Claude Code, Codex and Kimi Code each take a table of shell commands for the same moments;
+these are the same idea held here instead — hung on a live agent, taken down again while it
+runs, and written in the language the flow is written in.
+
+```python
+from humanize.agents import Moment, Occasion, Verdict
+
+def no_force_push(occasion: Occasion) -> Verdict | None:
+    if "push --force" in occasion.about:
+        return Verdict(refused=True, because="not on this branch")
+    return None
+
+agent.hooks.on(Moment.PERMISSION_REQUEST, no_force_push, tool="Bash")
+```
+
+`on` answers with a handle, so a hook wanted only for a while says so in one line:
+
+```python
+with agent.hooks.on(Moment.STOP, keep_going):
+    agent(task)              # and it is down again after the block
+```
+
+`hung.off()` takes one down by hand; taking down what is already down is not an error. Hooks are
+on the **agent**, so one covers every session it holds, and hanging one mid-run is the point.
+
+### The moments
+
+| Moment | When | What a verdict does |
+| --- | --- | --- |
+| `SESSION_START` | a session is about to take its first turn | — |
+| `USER_PROMPT_SUBMIT` | a prompt is about to go to the agent | `refused` skips the turn; `adds` goes into the prompt |
+| `PRE_TOOL_USE` | the agent has reached for a tool | — |
+| `PERMISSION_REQUEST` | the backend is asking whether a tool may run | `refused` denies it, with `because` as the reason |
+| `NOTIFICATION` | the agent has stopped to ask its user something | — |
+| `STOP` | a turn has ended | `refused` sends the agent on, with `because` as the next prompt |
+| `SESSION_END` | a session has been closed | — |
+
+A refused `STOP` is what a [goal](#goals) is, written by hand: the turn is not over until the
+hook lets it be. `occasion.again` counts how many times this turn has already been sent on, so a
+hook that keeps refusing can decide to stop.
+
+```python
+def keep_going(occasion: Occasion) -> Verdict | None:
+    if occasion.again < 3 and "TODO" in Path("TASK.md").read_text():
+        return Verdict(refused=True, because="There is still a TODO in TASK.md.")
+    return None
+```
+
+A hook is told an `Occasion` — `moment`, `agent`, `session`, `prompt`, `tool`, `about`, `input`,
+`said`, `again` — and answers with a `Verdict` or with `None`, which says nothing. Two hooks on
+one moment are one verdict: refused if either refused, and adding everything either added.
+
+A hook that raises has said nothing. A flow must not fail because something hung off it did —
+with one exception: a hook that drove an agent which has been [stopped](#stopping) lets
+`Stopped` out, so a run ended by hand reads as ended by hand rather than as one that finished.
+
+### Not every backend runs every moment
+
+`agent.moments` is what this one runs, and `hooks.on` refuses a moment that is not in it —
+where the hook is hung, rather than by quietly never firing.
+
+| Moment | Claude Code | Codex | Kimi Code | you |
+| --- | --- | --- | --- | --- |
+| everything above except `PERMISSION_REQUEST` | yes | yes | yes | no |
+| `PERMISSION_REQUEST` | yes | no | no | no |
+
+Claude Code asks before it uses a tool, over the same stream the turn is read from, and waits
+for the answer — so it is the one backend here where a refusal reaches the agent. The others are
+driven unattended, which is what a flow watching its agent rather than gating it means.
+`HumanAgent` runs none of them: a moment is a point in a turn of a model, and the person takes
+no such turn.
+
+A flow says which moments it needs where it declares the agents it drives, and is refused before
+its first turn if it was given one that cannot run them — see
+[Flows](flows.md#asking-for-an-agent-that-can-do-something).
+
 ## Questions
 
 An agent may stop mid-turn to ask its user something. Set `ask` and it reaches you:
@@ -297,6 +377,7 @@ the interface offers each model only the efforts it takes.
 | Driven through | its command line, held open | its app server | its app server |
 | [`interject`](#talking-to-a-turn-already-running) | yes — answered within the same turn | yes — a steer on the running turn | yes — queued, then steered in |
 | [`pursue`](#goals) | yes | yes | yes |
+| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | yes | no | no |
 | Sub-agents in a trace | yes | yes | yes |
 
 A backend is driven through its command line where that can express what an agent is configured
@@ -325,6 +406,8 @@ See [Machines](machines.md).
 
 ```python
 class AgentBase:
+    moments: ClassVar[frozenset[Moment]]   # the ones a hook may be hung on here
+
     id: str                 # what this agent is called
     backend: str            # "claude", "codex", "kimi"
     config: AgentConfig     # model, effort, machine
@@ -332,6 +415,7 @@ class AgentBase:
     sessions: list[SessionBase]
     stopped: bool
     anchor: AnchorConfig | None
+    hooks: Hooks            # what is hung on its moments
 
     def __call__(prompt: str, *, suppress: bool = False) -> str
     def pursue(objective: str, *, suppress: bool = False) -> str
@@ -372,6 +456,42 @@ class Question:
 
 
 class Stopped(Exception): ...
+
+
+class Hooks:
+    moments: frozenset[Moment]
+
+    def on(moment: Moment, hook: Hook, *, tool: str = "") -> Hung
+    def off(hung: Hung) -> None
+    def hooked(moment: Moment) -> bool
+    def fire(occasion: Occasion) -> Verdict
+
+
+class Hung:                 # what `on` answers with, and a context manager
+    def off() -> None
+
+
+@dataclass(frozen=True)
+class Occasion:
+    moment: Moment
+    agent: str
+    session: str
+    prompt: str
+    tool: str
+    about: str
+    input: Mapping[str, Any]
+    said: str
+    again: int
+
+
+@dataclass(frozen=True)
+class Verdict:
+    refused: bool
+    because: str
+    adds: str
+
+
+class Unhooked(ValueError): ...   # a moment this backend does not run
 ```
 
 `CommandSessionBase` and `StreamSessionBase` are the two shapes a backend is driven in — one

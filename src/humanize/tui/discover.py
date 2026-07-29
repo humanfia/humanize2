@@ -1,4 +1,4 @@
-"""Which agents are installed here, and what each one runs.
+"""Which agents are installed here, what each one runs, and where their turns could land.
 
 Nothing is typed in: a backend that is not on this machine is not offered, and an effort a
 model does not take is not offered against it. What each backend runs is written down in
@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -24,7 +25,11 @@ from humanize.backends import PROFILES, Model
 if TYPE_CHECKING:
     from humanize.backends import Profile
 
-__all__ = ["installed"]
+__all__ = ["installed", "machines"]
+
+#: How long the machines around here are given to name themselves before the list goes up
+#: without them. A docker daemon that is not answering is not a reason to sit at a sheet.
+_LOOKING_SECONDS = 2.0
 
 #: Where Claude Code keeps the models this account may run.
 _CLAUDE_CACHE = Path.home() / ".claude.json"
@@ -48,6 +53,64 @@ def installed() -> dict[str, tuple[Model, ...]]:
         for profile in PROFILES
         if shutil.which(profile.name) is not None
     }
+
+
+def machines() -> list[tuple[str, str]]:
+    """Where an agent's turns could land, besides this machine.
+
+    Found rather than typed, for the same reason the models are: a container that is not
+    running and a host with no entry in your ssh config are not places work can go, and a
+    list of what is actually there is shorter than the one you would have to remember. What
+    is not found is still typed -- a target is a string, and any string that reads as one is
+    taken.
+
+    Returns:
+      One `(target, where it came from)` pair apiece, containers first and then hosts, in the
+      order each source gave them. Empty where there is no docker and no ssh config, which is
+      a machine that only runs its own turns.
+    """
+    found: list[tuple[str, str]] = [
+        (f"docker://{named}", "container") for named in _containers()
+    ]
+    found.extend((f"ssh://{host}", "ssh config") for host in _hosts())
+    return found
+
+
+def _containers() -> list[str]:
+    """The containers running here, which are the ones a turn could be run in."""
+    try:
+        listed = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+            timeout=_LOOKING_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []  # no docker here, or none that answered: no containers to offer
+    return [named for named in listed.stdout.split() if named]
+
+
+def _hosts() -> list[str]:
+    """The hosts named in this user's ssh config, in the order they are written there.
+
+    A pattern is not a host: `Host *` is what the settings under it apply to rather than
+    somewhere to send a turn, and choosing it would send one nowhere.
+    """
+    named: list[str] = []
+    try:
+        written = (Path.home() / ".ssh" / "config").read_text(encoding="utf-8")
+    except OSError:
+        return []
+    for line in written.splitlines():
+        said = line.strip()
+        if said.lower().startswith("host ") and not said.startswith("#"):
+            named.extend(
+                host
+                for host in said.split()[1:]
+                if not set(host) & set("*?!") and host not in named
+            )
+    return named
 
 
 def _claude(profile: Profile) -> tuple[Model, ...]:

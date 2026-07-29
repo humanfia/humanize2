@@ -18,29 +18,43 @@ is a rule across, fields down the left and their values lined up beside them.
 from __future__ import annotations
 
 import time
-from itertools import zip_longest
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, NamedTuple, cast
 
 from rich.markup import escape
-from textual import events, on
+from textual import events, on, work
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-from humanize.agents import SWARM
+from humanize.agents import DRIVEN, SWARM, Moment, anchored
 
+from .discover import machines
 from .monitor import short, thousands
 
 if TYPE_CHECKING:
-    from textual.app import ComposeResult
+    from textual.app import App, ComposeResult
 
     from humanize.backends import Model
+    from humanize.runner import Place
 
     from .monitor import Monitor
 
-__all__ = ["Flows", "Models", "Sheet", "Status"]
+__all__ = ["Anchors", "Flows", "Models", "Runs", "Sheet", "Status", "reads"]
+
+
+class Runs(NamedTuple):
+    """What one agent of a flow was set up to run, and where its turns land.
+
+    Attributes:
+      spec: The agent itself, as `cli/model:effort` -- the same word a command line takes.
+      anchor: The machine its work lands on, as a target, or "" to work on this one.
+    """
+
+    spec: str
+    anchor: str = ""
+
 
 #: What Claude Code rules the top of a sheet with, and how far in everything under it sits.
 _RULE = "▔"
@@ -66,8 +80,36 @@ _FIELD = 18
 #: snapshot of a run, and the run is what is being watched.
 _LIVE = 0.5
 
+
+def reads(named: tuple[str, ...], runs: list[Runs]) -> list[str]:
+    """One line per agent a flow drives: what it is called, what it runs, and where.
+
+    In one place because it is read in two -- above the prompt while a flow runs, and on
+    `/status` -- and an agent that read as two different things in them would be two.
+
+    Args:
+      named: What the flow calls each of them, "" apiece where it names none.
+      runs: What each of them runs, and where its turns land.
+
+    Returns:
+      One line apiece, in the order the flow takes them.
+    """
+    return [
+        _DOT.join(
+            escape(part)
+            for part in (
+                named[at] if at < len(named) else "",
+                one.spec,
+                one.anchor,
+            )
+            if part
+        )
+        for at, one in enumerate(runs)
+    ]
+
+
 _SHEET = """
-Flows, Models, Status { align: center middle; background: $background; }
+Anchors, Flows, Models, Status { align: center middle; background: $background; }
 #sheet { width: 100%; height: auto; padding: 0; }
 #rule { height: 1; color: $primary; }
 #asked { padding: 0 0 0 3; text-style: bold; color: $primary; }
@@ -84,8 +126,12 @@ OptionList { border: none; background: $background; max-height: 14; scrollbar-si
 """
 
 
-class Sheet(ModalScreen[list[str] | None]):
-    """One question drawn the way Claude Code draws one, answered by picking a line."""
+class Sheet[T](ModalScreen[T | None]):
+    """One question drawn the way Claude Code draws one, answered by picking a line.
+
+    What answering it comes to is the sheet's own: a flow is a name, an agent is what it runs
+    and where, and walking out without answering is None wherever it is asked.
+    """
 
     CSS = _SHEET
     BINDINGS: ClassVar = [("escape", "back", "back")]
@@ -231,7 +277,7 @@ class Sheet(ModalScreen[list[str] | None]):
         raise NotImplementedError
 
 
-class Flows(Sheet):
+class Flows(Sheet[list[str]]):
     """Which flow to run, which is what tab switches between."""
 
     def __init__(self, current: str) -> None:
@@ -289,7 +335,7 @@ class Flows(Sheet):
         self.dismiss([str(event.option.id)])
 
 
-class Models(Sheet):
+class Models(Sheet[list[Runs]]):
     """What each of the flow's agents runs, asked once apiece as `/agents` does."""
 
     BINDINGS: ClassVar = [
@@ -300,17 +346,22 @@ class Models(Sheet):
         # thing to say about a turn -- how wide it runs, rather than how hard -- and a turn
         # that is both is written down as both.
         Binding("tab", "swarm", "swarm mode", priority=True),
+        # Nor is where the work lands a way of running the model, so it is neither an arrow
+        # nor a row: it is a second question about this agent, and it opens a sheet of its
+        # own. A chord rather than a letter, because the letters are searching.
+        Binding("ctrl+a", "anchor", "anchor", priority=True),
     ]
 
     def __init__(
-        self, flow: str, wanted: tuple[str, ...], agents: dict[str, tuple[Model, ...]]
+        self, flow: str, wanted: tuple[Place, ...], agents: dict[str, tuple[Model, ...]]
     ) -> None:
         """Initializes the configuring.
 
         Args:
           flow: The flow whose agents these are.
-          wanted: What the flow calls each agent it drives, in the order it takes them, which
-            is "" apiece for a flow that said how many it drives and nothing more.
+          wanted: One place per agent the flow drives, in the order it takes them: what the
+            flow calls each -- "" apiece for a flow that said how many it drives and nothing
+            more -- and the moments it needs that one to run.
           agents: The CLIs installed here, and what each says it runs.
         """
         super().__init__()
@@ -320,11 +371,13 @@ class Models(Sheet):
         self._runs = [
             (backend, model) for backend in sorted(agents) for model in agents[backend]
         ]
-        self._chosen: list[str] = []
+        self._chosen: list[Runs] = []
         self._effort = 0
         #: Whether the turn runs as a fleet rather than as one agent, for a model that takes
         #: it. Held here rather than among the efforts, and asked of each agent afresh.
         self._swarm = False
+        #: Where this one's turns land, which is this machine until it is said otherwise.
+        self._anchor = ""
         self._counting = len(str(len(self._runs)))
         #: The ones the letters typed so far have left, which is what the cursor is walking.
         self._shown = list(self._runs)
@@ -332,24 +385,52 @@ class Models(Sheet):
     def _ask(self) -> None:
         """Asks for one more agent, from the models down."""
         at = len(self._chosen)
-        named = self._wanted[at] or f"agent {at + 1} of {len(self._wanted)}"
+        named = self._wanted[at].name or f"agent {at + 1} of {len(self._wanted)}"
         self.query_one("#asked", Label).update(f"Select what {named} runs")
+        needs = self._wanted[at].moments
         self.query_one("#about", Label).update(
             f"Which coding agent takes this one's turns in {self._flow}, and the model it "
             "runs at. Two agents at one model are still two agents."
+            + (
+                f" This one has to run {', '.join(sorted(needs))}, so only the CLIs that do "
+                "are listed."
+                if needs
+                else ""
+            )
         )
         self._effort = 0
         self._swarm = False
+        self._anchor = ""
         self._typed = ""  # each agent is asked about from the whole list again
         self._fill()
         self.query_one("#choices", OptionList).focus()
+
+    def _able(self) -> list[tuple[str, Model]]:
+        """The models that could take this agent's turns, which is not always all of them.
+
+        A flow that hangs a hook on a moment only some backends run said so where it declared
+        the place; a CLI that does not run that moment is not one to offer for it, since
+        choosing it is a flow that would refuse to start.
+
+        Returns:
+          One `(cli, model)` pair per model still worth showing.
+        """
+        # The last one again once every place is answered: putting the rows up moves the
+        # cursor, and that asks for them again -- after the last choice has been taken.
+        at = min(len(self._chosen), len(self._wanted) - 1)
+        needs = self._wanted[at].moments if self._wanted else frozenset[Moment]()
+        return [
+            (backend, model)
+            for backend, model in self._runs
+            if not needs or (backend in DRIVEN and needs <= DRIVEN[backend][0].moments)
+        ]
 
     def _fill(self) -> None:
         """Puts the models up, and under them the effort the arrows move along."""
         listing = self.query_one("#choices", OptionList)
         self._shown = [
             (backend, model)
-            for backend, model in self._runs
+            for backend, model in self._able()
             if self.fits(model.name, backend)
         ]
         at = min(listing.highlighted or 0, max(len(self._shown) - 1, 0))
@@ -376,11 +457,39 @@ class Models(Sheet):
                 f"{_DOT}[$secondary]◉[/] swarm mode {said}  "
                 f"[$text-muted]tab to toggle[/]"
             )
+        if tuned:
+            tuned += (
+                f"{_DOT}[$secondary]◉[/] on {escape(self._anchor or 'this machine')}  "
+                f"[$text-muted]ctrl+a to move[/]"
+            )
         self.query_one("#tuning", Label).update(tuned)
         self.query_one("#keys", Label).update(
             f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
-            + (f"{_DOT}{escape(' · '.join(self._chosen))}" if self._chosen else "")
+            + (
+                f"{_DOT}{escape(' · '.join(runs.spec for runs in self._chosen))}"
+                if self._chosen
+                else ""
+            )
         )
+
+    @work
+    async def action_anchor(self) -> None:
+        """Asks where this agent's turns land, and comes back here either way.
+
+        A walk out of the anchors without choosing leaves this one where it was: the machine
+        is a second question about the agent, and declining to answer it is not declining to
+        choose the agent.
+        """
+        # textual types the property off the bare generic, so what it hands back is an `App`
+        # of nothing in particular.
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        where = await showing.push_screen_wait(Anchors(self._anchor))
+        if where is not None:
+            self._anchor = where
+            self._fill()
 
     def _efforts(self) -> tuple[str, ...]:
         """What the model under the cursor takes, hardest first, or none where none is."""
@@ -425,11 +534,97 @@ class Models(Sheet):
         # `swarm` in front of the effort is how Kimi is asked for a fleet: one turn at one
         # effort, run wide. A model that does not take it is chosen at the effort alone.
         wide = SWARM if self._swarm and self._swarms() else ""
-        self._chosen.append(f"{event.option.id}:{wide}{self._efforts()[self._effort]}")
+        self._chosen.append(
+            Runs(
+                spec=f"{event.option.id}:{wide}{self._efforts()[self._effort]}",
+                anchor=self._anchor,
+            )
+        )
         if len(self._chosen) < len(self._wanted):
             self._ask()
             return
         self.dismiss(self._chosen)
+
+
+class Anchors(Sheet[str]):
+    """Where one agent's turns land: this machine, or one an anchor reaches.
+
+    The agent itself runs here whatever is chosen -- its credentials, its state directory and
+    its link to its model provider stay put. What moves is the project it reads and the
+    commands it runs, which is why this is a question about the agent rather than about the
+    flow: two agents of one flow may work on two machines.
+
+    Listed rather than typed where the machine is one this one can see -- a container that is
+    running, a host with an entry in the ssh config -- and typed where it is not: a target is
+    a string, and the row for what has been typed appears as soon as it reads as one.
+    """
+
+    def __init__(self, current: str) -> None:
+        """Initializes the moving.
+
+        Args:
+          current: The target this agent is on now, or "" for this machine.
+        """
+        super().__init__()
+        self._current = current
+        self._found: list[tuple[str, str]] | None = None
+
+    def _ask(self) -> None:
+        """Lists the machines there are to work on, and says what choosing one does."""
+        self.query_one("#asked", Label).update("Select where this agent works")
+        self.query_one("#about", Label).update(
+            "The machine its work lands on. The agent still runs here; what moves is the "
+            "project it reads and the commands it runs. Anywhere else is a target you type "
+            "-- ssh://HOST, docker://CONTAINER, tcp://HOST:PORT."
+        )
+        self.query_one("#tuning", Label).update("")
+        self._fill()
+
+    def _fill(self) -> None:
+        """Puts the machines up, with whatever has been typed among them if it reads as one."""
+        listing = self.query_one("#choices", OptionList)
+        if self._found is None:
+            # Once: looking costs a `docker ps`, and this is redrawn on every keystroke.
+            self._found = machines()
+        rows: list[tuple[str, str, str]] = [("", "this machine", "nothing moves")]
+        rows.extend((target, target, whose) for target, whose in self._found)
+        shown = [row for row in rows if self.fits(row[1], row[2])]
+        if self._typed and not any(row[0] == self._typed for row in shown):
+            # What has been typed, as soon as it is a target: a machine nobody here can see
+            # is still a machine, and this is the only way to name one.
+            try:
+                anchored(self._typed)
+            except ValueError:
+                pass
+            else:
+                shown.append((self._typed, self._typed, "as typed"))
+        self._counting = len(str(len(shown)))
+        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
+        listing.set_options(
+            Option(
+                self._row(
+                    seen, label, whose, here=seen == at, inforce=target == self._current
+                ),
+                # Every row is a target, and "" is this machine -- which an id of its own
+                # keeps tellable from a row that was never chosen.
+                id=f"={target}",
+            )
+            for seen, (target, label, whose) in enumerate(shown)
+        )
+        listing.highlighted = at if shown else None
+        self._drawn = at
+        self.query_one("#keys", Label).update(
+            f"Type a target · Enter to choose · Esc to cancel{self.searching()}"
+        )
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Answers with the target that was picked.
+
+        Args:
+          event: What was chosen.
+        """
+        self.dismiss(str(event.option.id).removeprefix("="))
 
 
 class Status(ModalScreen[None]):
@@ -446,14 +641,14 @@ class Status(ModalScreen[None]):
     BINDINGS: ClassVar = [("escape", "back", "back")]
 
     def __init__(
-        self, flow: str, named: tuple[str, ...], models: list[str], monitor: Monitor
+        self, flow: str, named: tuple[str, ...], models: list[Runs], monitor: Monitor
     ) -> None:
         """Reads one run.
 
         Args:
           flow: The flow being run.
           named: What that flow calls each agent it drives, "" apiece where it names none.
-          models: What each of its agents runs, as `cli/model:effort`.
+          models: What each of its agents runs, and where its turns land.
           monitor: The run itself, read again each time this is redrawn.
         """
         super().__init__()
@@ -491,17 +686,7 @@ class Status(ModalScreen[None]):
         groups: list[list[tuple[str, list[str]]]] = [
             [
                 ("Flow", [escape(self._flow)]),
-                (
-                    "Agents",
-                    [
-                        f"{escape(named)}{_DOT if named else ''}{escape(runs)}"
-                        for named, runs in zip_longest(
-                            self._named, self._models, fillvalue=""
-                        )
-                        if runs
-                    ]
-                    or ["none installed"],
-                ),
+                ("Agents", reads(self._named, self._models) or ["none installed"]),
             ],
             [
                 (

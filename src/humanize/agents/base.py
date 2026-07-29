@@ -16,12 +16,13 @@ import uuid
 import weakref
 from abc import ABC, abstractmethod
 from collections import Counter
-from typing import IO, TYPE_CHECKING, Any, Protocol
+from typing import IO, TYPE_CHECKING, Any, ClassVar, Protocol
 
 from .event import Event, Question, Stopped, say
+from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator, Mapping
 
     from humanize.coganchor import AnchorConfig
 
@@ -87,6 +88,10 @@ class SessionBase(ABC):
         self._lock = (
             threading.Lock()
         )  # a conversation is a sequence: one turn at a time
+        #: Whether a turn has been started in this session, and whether it has been closed:
+        #: the two moments that bracket a conversation are each said once.
+        self._started = False
+        self._ended = False
         # A session drops itself from its agent when it is collected, so the agent neither holds
         # a flow's discarded sessions nor has to prune them while someone is reading them.
         agent._sessions.append(weakref.ref(self, agent._forget))
@@ -155,6 +160,11 @@ class SessionBase(ABC):
         and `ends` that say whose turn it was: a flow drives the sessions and answers to
         nobody, so the turns going past are the only place a run can be watched from.
 
+        It is also where the moments of a turn are: the prompt going in, each tool the agent
+        reaches for, and the turn stopping. A hook hung on `Stop` that refuses is what sends
+        the agent on again, so one call here is as many turns of the model as the hooks allow
+        -- and still one `result` at the end of it, which is the last of them.
+
         Args:
           prompt: The input prompt for this turn.
 
@@ -172,13 +182,96 @@ class SessionBase(ABC):
         held = self._agent.waiting() if self._agent.waiting is not None else []
         if held:
             prompt = "\n\n".join([prompt, *held])
+        if not self._started:
+            self._started = True
+            self._fire(Moment.SESSION_START, prompt=prompt)
+        submitted = self._fire(Moment.USER_PROMPT_SUBMIT, prompt=prompt)
+        if submitted.adds:
+            prompt = f"{prompt}\n\n{submitted.adds}"
         self._agent._heard(Event(kind="begins", text=prompt))
         try:
-            for event in self._stream(prompt):
-                self._agent._heard(event)
-                yield event
+            if submitted.refused:
+                # The turn does not run, and what the hook said instead is what it answers
+                # with: a turn that was refused still has to end on one `result`, or a flow
+                # reading it would be waiting for an answer nobody is going to give.
+                yield self._heard(Event(kind="result", text=submitted.because))
+                return
+            again = 0
+            while True:
+                answered = Event(kind="result", text="")
+                for event in self._stream(prompt):
+                    if event.kind == "result":
+                        # Held back: a hook may yet send the agent on, and a turn that was
+                        # sent on has not answered.
+                        answered = event
+                        continue
+                    self._heard(event)
+                    if event.kind == "tool":
+                        named, _, about = event.text.partition(" ")
+                        self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
+                    yield event
+                # Heard whether or not it is passed on, because what a turn cost is on it.
+                self._heard(answered)
+                stopping = self._fire(
+                    Moment.STOP, said=answered.text, prompt=prompt, again=again
+                )
+                if not (stopping.refused and stopping.because):
+                    yield answered
+                    return
+                prompt, again = stopping.because, again + 1
         finally:
             self._agent._heard(Event(kind="ends", text=""))
+
+    def _heard(self, event: Event) -> Event:
+        """Tells whoever is watching the agent what was said, and answers with it.
+
+        Args:
+          event: What was said.
+
+        Returns:
+          The same event, so that saying it and passing it on is one line.
+        """
+        self._agent._heard(event)
+        return event
+
+    def _fire(
+        self,
+        moment: Moment,
+        *,
+        prompt: str = "",
+        tool: str = "",
+        about: str = "",
+        called: Mapping[str, Any] | None = None,
+        said: str = "",
+        again: int = 0,
+    ) -> Verdict:
+        """Tells whatever is hung on one of this agent's moments that it has arrived.
+
+        Args:
+          moment: Which moment it is.
+          prompt: What the agent is about to be told, where that is what the moment is about.
+          tool: What it reached for, where the moment is about a tool.
+          about: What it reached for it with.
+          called: What the tool was called with, where the backend says.
+          said: What the agent said last.
+          again: How many times this turn has already been sent on rather than let stop.
+
+        Returns:
+          What the hooks said, which is nothing at all where none is hung.
+        """
+        return self._agent.hooks.fire(
+            Occasion(
+                moment=moment,
+                agent=self._agent.id,
+                session=self._id or "",
+                prompt=prompt,
+                tool=tool,
+                about=about,
+                input=called or {},
+                said=said,
+                again=again,
+            )
+        )
 
     @abstractmethod
     def _stream(self, prompt: str) -> Iterator[Event]:
@@ -206,8 +299,22 @@ class SessionBase(ABC):
         """
         raise NotImplementedError(f"{type(self).__name__} cannot be talked to mid-turn")
 
-    def close(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
-        """Ends whatever this session is holding, so that a turn under way stops waiting.
+    def close(self) -> None:
+        """Ends the conversation, so that a turn under way stops waiting.
+
+        `SessionEnd` is said once here, and only for a session that ever started: a session
+        opened and dropped without a turn in it never began, and one closed twice did not end
+        twice. What holds the conversation open is let go of in :meth:`_shut`, which a
+        backend that has to end its process between turns reaches for instead -- ending the
+        process is not ending the conversation.
+        """
+        if self._started and not self._ended:
+            self._ended = True
+            self._fire(Moment.SESSION_END)
+        self._shut()
+
+    def _shut(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
+        """Lets go of whatever is holding this conversation open.
 
         Does nothing by default: a session that is one command per turn holds nothing
         between them.
@@ -474,7 +581,7 @@ class StreamSessionBase(SessionBase):
                             # and it may not have been read yet.
                             self._draining.join(timeout=5)
                         complained = "".join(self._complaints)
-                        self.close()
+                        self._shut()
                         raise subprocess.CalledProcessError(
                             status, argv, event.text, complained
                         )
@@ -513,14 +620,15 @@ class StreamSessionBase(SessionBase):
                     # may not have had it read yet -- and that explanation is the diagnostic.
                     self._draining.join(timeout=5)
                 complained = "".join(self._complaints)
-                self.close()
+                self._shut()
                 raise subprocess.CalledProcessError(status or 1, argv, said, complained)
             if self._agent.anchor is not None:
                 # An anchored turn has to be over when it says it is: coganchor pushes what the
                 # agent wrote when the session ends, so a process held open past the turn would
                 # leave that turn's work still on this machine. The cost is that an anchored
                 # session cannot be talked to between turns -- there is nothing there to hear.
-                self.close()
+                # The process, not the conversation: the next turn resumes it.
+                self._shut()
             if not self._agent._watchers:
                 # Where the backend's own command line would have put the answer, as the other
                 # backends put it: the turn that settled the answer broke out of the reading
@@ -541,8 +649,8 @@ class StreamSessionBase(SessionBase):
         """
         self._say(text)
 
-    def close(self) -> None:
-        """Ends the process, and with it the conversation it was holding."""
+    def _shut(self) -> None:
+        """Ends the process, which is what was holding the conversation open."""
         with self._writing:
             # Taken together, so that nothing is written to a process on its way out and no
             # answer is left owed by one that is gone.
@@ -701,6 +809,11 @@ class AgentBase(ABC):
     across turns is a stateful one.
     """
 
+    #: The moments of a turn a hook may be hung on here. Every backend reaches the ones that
+    #: are read off the turn itself; one that also lets a turn be answered mid-flight names
+    #: more, and a flow that needs one of those says so where it declares the agents it drives.
+    moments: ClassVar[frozenset[Moment]] = EVERYWHERE
+
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent that has opened nothing yet.
 
@@ -719,6 +832,10 @@ class AgentBase(ABC):
         self._sessions: list[weakref.ref[SessionBase]] = []
         self._opened: list[str] = []
         self._watchers: list[Callable[[AgentBase, Event], None]] = []
+        #: What is hung on this agent's moments, which a flow adds to and takes from while
+        #: the agent is running: the hooks are the flow's own callables rather than a table
+        #: the backend read out of a settings file before anything started.
+        self._hooks = Hooks(type(self).moments, self._id)
         self._stopped = False
         #: Asked as each turn starts for anything said to this agent while no turn was open,
         #: which goes into that turn. Left unset by a flow driven from the command line,
@@ -758,6 +875,20 @@ class AgentBase(ABC):
         """
         if not self._named:
             self._id = name
+            self._hooks.agent = name
+
+    @property
+    def hooks(self) -> Hooks:
+        """What is hung on this agent's moments, to be hung on and taken from as it runs.
+
+        On the agent rather than on a session, so that a hook covers every conversation the
+        agent holds -- and so that a flow which has already started can hang one, which is
+        the whole reason these are callables rather than a table in a settings file::
+
+            with agents.builder.hooks.on(Moment.STOP, keep_going):
+                agents.builder(task)
+        """
+        return self._hooks
 
     @property
     def stopped(self) -> bool:
@@ -893,6 +1024,11 @@ class AgentBase(ABC):
           coming is a flow that has stopped.
         """
         self._heard(Event(kind="asks", text=question.text))
+        # An agent that has stopped to ask is an agent that wants a person, which is the one
+        # thing a flow running unattended has to be able to hear about.
+        self._hooks.fire(
+            Occasion(moment=Moment.NOTIFICATION, agent=self._id, said=question.text)
+        )
         if self.ask is None:
             return None
         try:

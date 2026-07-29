@@ -21,7 +21,7 @@ from humanize.backends import Model
 from humanize.cycle import cycles
 from humanize.tui import Humanize
 from humanize.tui.app import _OWN, Editor
-from humanize.tui.pick import Flows, Models
+from humanize.tui.pick import Flows, Models, Runs
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -129,7 +129,7 @@ async def test_a_line_typed_while_a_flow_runs_reaches_the_agent(
     (workspace / "flow.py").write_text(FLOW)
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "flow.py", ["claude/m:high"]
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
         await driver.press(*"start")
         await driver.press("enter")
         # The turn will not end until it has been told something else, so this cannot race.
@@ -173,7 +173,7 @@ async def test_a_flow_that_is_not_there_is_a_line_to_correct_and_not_the_end() -
     """A flow chosen that will not load is said so, and the interface stays up."""
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "nowhere.py", ["claude/m:high"]
+        app._flow_named, app._models = "nowhere.py", [Runs("claude/m:high")]
         await driver.press(*"do it")
         await driver.press("enter")
         await until(lambda: "nowhere.py" in _transcript(app), driver)
@@ -196,7 +196,7 @@ async def test_what_the_flow_did_is_on_status(workspace: Path) -> None:
     (workspace / "flow.py").write_text(FLOW)
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "flow.py", ["claude/m:high"]
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
         await driver.press(*"start")
         await driver.press("enter")
         await until(
@@ -389,7 +389,7 @@ async def test_what_is_running_is_not_swapped_underneath_itself(
     (workspace / "flow.py").write_text(FLOW)
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "flow.py", ["claude/m:high"]
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
         await driver.press(*"start")
         await driver.press("enter")
         await until(
@@ -404,7 +404,7 @@ async def test_what_is_running_is_not_swapped_underneath_itself(
         await driver.pause()
 
         assert app._flow_named == "flow.py"  # none of the three got anywhere
-        assert app._models == ["claude/m:high"]
+        assert app._models == [Runs("claude/m:high")]
         assert _transcript(app).count("while a flow is running") == 3
         # And `/status` is not one of them: it is read, so there is nothing to conflict with.
         app.action_status()
@@ -424,7 +424,7 @@ async def test_escape_stops_the_flow_and_not_just_the_turn(workspace: Path) -> N
     (workspace / "flow.py").write_text(FLOW)
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "flow.py", ["claude/m:high"]
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
         await driver.press(*"start")
         await driver.press("enter")
         await until(
@@ -458,7 +458,7 @@ async def test_a_line_to_a_running_flow_is_never_turned_away(workspace: Path) ->
     app = Humanize()
     async with app.run_test() as driver:
         # A flow that is running, with nobody mid-turn: an agent that has launched nothing.
-        app._flow_named, app._models = "flow.py", ["claude/m:high"]
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
         app._agents = [ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))]
         app._queued = []
         await driver.press(*"and this")
@@ -611,7 +611,7 @@ async def test_an_agent_that_stops_to_ask_reaches_the_prompt(asking: Path) -> No
     (asking / "flow.py").write_text(FLOW)
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "flow.py", ["claude/m:high"]
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
         await driver.press(*"start")
         await driver.press("enter")
         await until(lambda: "Which way?" in _transcript(app), driver)
@@ -637,7 +637,7 @@ async def test_away_means_the_agent_is_told_nobody_is_there_rather_than_waiting(
     (asking / "flow.py").write_text(FLOW)
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "flow.py", ["claude/m:high"]
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
         await driver.press(*"/afk")
         await driver.press("enter")
         assert (
@@ -680,7 +680,7 @@ async def test_ctrl_c_with_nothing_half_typed_stops_the_flow(workspace: Path) ->
     (workspace / "flow.py").write_text(FLOW)
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "flow.py", ["claude/m:high"]
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
         await driver.press(*"start")
         await driver.press("enter")
         await until(
@@ -781,7 +781,7 @@ async def test_it_opens_ready_to_be_talked_to(talking: Path) -> None:
         assert app._flow_named == "chat"
         # The first agent installed, at the first model it runs -- but never at the hardest
         # effort, which is a thing to ask for rather than to spend before anyone has.
-        assert app._models == ["claude/claude-opus-5:high"]
+        assert app._models == [Runs("claude/claude-opus-5:high")]
 
 
 @pytest.mark.timeout(60)
@@ -865,7 +865,7 @@ async def test_clearing_the_screen_clears_the_screen_and_nothing_else(
         # The screen, and only the screen: what was set up to run is still set up to run,
         # and what is running is still running.
         assert app._flow_named == "chat"
-        assert app._models == ["claude/claude-opus-5:high"]
+        assert app._models == [Runs("claude/claude-opus-5:high")]
         assert (
             app._agents
         )  # the flow the first line started was not stopped with the screen
@@ -1042,7 +1042,7 @@ async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
 
-    assert cast("Models", sheet)._chosen == ["claude/claude-opus-5:max"]
+    assert cast("Models", sheet)._chosen == [Runs("claude/claude-opus-5:max")]
 
 
 @pytest.mark.timeout(60)
@@ -1099,7 +1099,7 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
         await until(lambda: not isinstance(app.screen, Models), driver)
 
     # One turn, at one effort, run wide -- which is how Kimi is asked for a fleet.
-    assert cast("Models", sheet)._chosen == ["kimi/kimi-code/k3:swarmlow"]
+    assert cast("Models", sheet)._chosen == [Runs("kimi/kimi-code/k3:swarmlow")]
 
 
 @pytest.mark.timeout(60)
@@ -1328,3 +1328,94 @@ async def test_taking_an_offer_types_the_command_and_not_its_arguments() -> None
         await driver.pause()
 
         assert app.query_one(Editor).text == "/afk "  # not `/afk [on|off]`
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.pick.machines", return_value=[("ssh://box", "ssh config")]
+)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
+)
+async def test_where_an_agent_works_is_set_beside_what_it_runs(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    _machines: unittest.mock.MagicMock,  # noqa: PT019
+) -> None:
+    """A second question about the agent, so it is a key on the same sheet and not a row."""
+    from textual.widgets import OptionList
+
+    from humanize.tui.pick import Anchors
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        sheet = app.screen
+        tuning = sheet.query_one("#tuning", Label)
+        await until(lambda: "effort" in str(tuning.content), driver)
+        assert "on this machine" in str(tuning.content)
+
+        await driver.press("ctrl+a")
+        await until(lambda: isinstance(app.screen, Anchors), driver)
+        anchors = app.screen
+        listing = anchors.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        # This machine first, then the ones there are to be found.
+        assert [str(option.id) for option in listing.options] == ["=", "=ssh://box"]
+
+        await driver.press("down")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await until(lambda: "ssh://box" in str(tuning.content), driver)
+
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    # It rides along with what the agent runs, and is what the line above the prompt says.
+    assert cast("Models", sheet)._chosen == [
+        Runs("claude/claude-opus-5:max", "ssh://box")
+    ]
+    assert app._models == [Runs("claude/claude-opus-5:max", "ssh://box")]
+    assert app.settings.agents(app._flow_named) == [
+        Runs("claude/claude-opus-5:max", "ssh://box")
+    ]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.tui.pick.machines", return_value=[])
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
+)
+async def test_a_machine_nothing_here_can_see_is_a_target_that_is_typed(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    _machines: unittest.mock.MagicMock,  # noqa: PT019
+) -> None:
+    """The list is a convenience; a target is a string, and any string that reads as one goes."""
+    from textual.widgets import OptionList
+
+    from humanize.tui.pick import Anchors
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await driver.press("ctrl+a")
+        await until(lambda: isinstance(app.screen, Anchors), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+
+        await driver.press(*"nonsense")
+        await driver.pause()
+        # Not a target and not a row, so there is nothing there to choose.
+        assert [str(option.id) for option in listing.options] == []
+
+        for _ in range(len("nonsense")):
+            await driver.press("backspace")
+        await driver.press(*"docker://box")
+        await driver.pause()
+
+        assert [str(option.id) for option in listing.options] == ["=docker://box"]

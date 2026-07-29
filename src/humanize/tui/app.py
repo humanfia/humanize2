@@ -27,7 +27,6 @@ import sys
 import threading
 import time
 import traceback
-from itertools import zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, cast
 
@@ -54,7 +53,7 @@ from .complete import about, hinted, offered, takes
 from .discover import installed
 from .history import History
 from .monitor import Monitor, short, thousands
-from .pick import Flows, Models, Status
+from .pick import Flows, Models, Runs, Status, reads
 from .settings import Settings
 from .tally import Tally
 
@@ -63,6 +62,7 @@ if TYPE_CHECKING:
 
     from humanize.agents import AgentBase, Event, Question
     from humanize.backends import Model
+    from humanize.runner import Place
 
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
@@ -427,14 +427,15 @@ class Humanize(App[None]):
         self.settings = Settings()
         self._flow_named = self.settings.flow or _STARTS_ON
         self._models = self.settings.agents(self._flow_named) or [
-            f"{backend}/{_starts_at(models)}:high"
+            Runs(f"{backend}/{_starts_at(models)}:high")
             for backend, models in list(installed().items())[:1]
         ]
-        #: What the flow calls each of them, which is "" apiece for a flow that said how many
-        #: it drives and nothing more. Kept beside the models rather than read off the flow
-        #: each time the line above the prompt is drawn: that means loading and running a
-        #: Python file, and this is drawn twice a second.
-        self._named_by = self._names_for(self._flow_named)
+        #: One place per agent the flow drives: what the flow calls it, which is "" apiece
+        #: for a flow that said how many it drives and nothing more, and the moments it needs
+        #: that one to run. Kept beside the models rather than read off the flow each time the
+        #: line above the prompt is drawn: that means loading and running a Python file, and
+        #: this is drawn twice a second.
+        self._wanted = self._places_of(self._flow_named)
         #: What has been typed here before, which the arrows walk. Read now rather than each
         #: time it is asked for: a run started here writes this project's own history into
         #: being, and what is being walked must not change under whoever is walking it.
@@ -453,24 +454,31 @@ class Humanize(App[None]):
         self._spoke = threading.Event()
         self._awaiting = False
 
-    def _names_for(self, flow: str) -> tuple[str, ...]:
-        """What a flow calls each agent it drives.
+    def _places_of(self, flow: str) -> tuple[Place, ...]:
+        """The agents a flow drives: what it calls each one, and what each has to be able to do.
 
         Args:
           flow: The flow, by name or as a path.
 
         Returns:
-          One name apiece, "" where the flow named none of them -- and one "" per agent
-          already in hand for a flow that will not load, since a name is a label on something
-          that runs and not a reason for anything to stop.
+          One place apiece -- and one unnamed place per agent already in hand for a flow that
+          will not load, since a name is a label on something that runs and not a reason for
+          anything to stop.
         """
         from humanize.flows import find
-        from humanize.runner import drives
+        from humanize.runner import Place, wanted
 
         try:
-            return drives(find(flow))
+            return wanted(find(flow))
         except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
-            return ("",) * len(self._models)
+            return tuple(
+                Place(name="", person=False, moments=frozenset()) for _ in self._models
+            )
+
+    @property
+    def _named_by(self) -> tuple[str, ...]:
+        """What the flow calls each agent it drives, which is what a line about one says."""
+        return tuple(place.name for place in self._wanted)
 
     def compose(self) -> ComposeResult:
         """The transcript, the offers, the editor, the status. The width is the transcript's.
@@ -516,7 +524,10 @@ class Humanize(App[None]):
         """
         from importlib.metadata import version
 
-        agents = ", ".join(self._models) or "no coding agent installed here"
+        agents = (
+            ", ".join(runs.spec for runs in self._models)
+            or "no coding agent installed here"
+        )
         self.query_one("#transcript", RichLog).write(
             Panel(
                 Group(
@@ -682,11 +693,7 @@ class Humanize(App[None]):
         # Above the prompt on the right, where Claude Code says what it is running as. One
         # agent to a line rather than a row of them separated by commas: a flow drives several
         # and they are read one at a time, against the name the flow calls each one by.
-        lines = [
-            f"{escape(named)}{_DOT if named else ''}{escape(runs)}"
-            for named, runs in zip_longest(self._named_by, self._models, fillvalue="")
-            if runs
-        ] or ["no agent installed"]
+        lines = reads(self._named_by, self._models) or ["no agent installed"]
         if spent:
             lines.append(f"{thousands(spent)} tokens{_DOT}{rate:.0f}/s")
         self.query_one("#above", Static).update(
@@ -799,7 +806,7 @@ class Humanize(App[None]):
         if self._mid_run("no switching flow"):
             return
         from humanize.flows import find, found
-        from humanize.runner import drives
+        from humanize.runner import wanted
 
         named = [name for _, name in found()]
         if not named or not self._models:
@@ -808,7 +815,7 @@ class Humanize(App[None]):
         at = named.index(self._flow_named) if self._flow_named in named else -1
         switching = named[(at + 1) % len(named)]
         try:
-            named_by = drives(find(switching))
+            places = wanted(find(switching))
         except Exception as why:  # noqa: BLE001 -- a flow that will not load
             self.show(f"hmz: {why}", "red")
             return
@@ -817,10 +824,10 @@ class Humanize(App[None]):
         # this workspace has run this flow before, what it ran is what it runs again.
         self._flow_named = switching
         self._models = self.settings.agents(switching) or [self._models[0]] * len(
-            named_by
+            places
         )
-        self._named_by = named_by
-        self.settings.remember(switching, named_by, self._models)
+        self._wanted = places
+        self.settings.remember(switching, self._named_by, self._models)
         self._draw()
 
     @on(Editor.Sent)
@@ -943,7 +950,7 @@ class Humanize(App[None]):
             flows means reading all of them.
         """
         from humanize.flows import find
-        from humanize.runner import drives
+        from humanize.runner import wanted
 
         if self._mid_run("no choosing a flow"):
             return
@@ -960,13 +967,14 @@ class Humanize(App[None]):
                 self.show("hmz: no coding agent is installed here", "red")
                 return
             try:
-                # What the flow calls each agent it drives, which is a name apiece where it
-                # declared them as a named tuple and how many there are either way.
-                wanted = drives(find(switching))
+                # One place per agent the flow drives: what it calls each -- a name apiece
+                # where it declared them as a named tuple -- how many there are either way,
+                # and what it needs each of them to be able to do.
+                places = wanted(find(switching))
             except Exception as why:  # noqa: BLE001 -- a flow that will not load
                 self.show(f"hmz: {why}", "red")
                 return
-            chosen = await self.push_screen_wait(Models(switching, wanted, agents))
+            chosen = await self.push_screen_wait(Models(switching, places, agents))
             if chosen is not None:
                 # A flow is chosen in order to be run, so whatever is running stops: the
                 # interface opens on one already, and a choice that quietly went to the back
@@ -975,8 +983,8 @@ class Humanize(App[None]):
                 if (switching, list(chosen)) != (self._flow_named, self._models):
                     self.action_stop_flow()
                 self._flow_named, self._models = switching, list(chosen)
-                self._named_by = wanted
-                self.settings.remember(switching, wanted, self._models)
+                self._wanted = places
+                self.settings.remember(switching, self._named_by, self._models)
                 self.show("[dim]say what to do, and the flow starts on it[/dim]")
                 self._draw()
                 return
@@ -1044,6 +1052,37 @@ class Humanize(App[None]):
         finally:
             self._awaiting = False
 
+    def _on_their_machines(self, chosen: list[AgentBase]) -> list[AgentBase]:
+        """Puts each agent on the machine it was anchored to, where one was chosen.
+
+        Done to the agents rather than said on the line that made them: where an agent works
+        is a setting of the agent, and `hmz exec` reads a line that says what each one runs
+        and nothing about where. An agent that works here is left exactly as it was.
+
+        Args:
+          chosen: The agents the line named, in the order the flow takes them.
+
+        Returns:
+          The same agents, or one anchored in place of any that was given a machine.
+
+        Raises:
+          ValueError: If a target cannot be read, before any of them has run.
+        """
+        from dataclasses import replace
+
+        from humanize.agents import anchored
+
+        moved: list[AgentBase] = []
+        for at, agent in enumerate(chosen):
+            where = self._models[at].anchor if at < len(self._models) else ""
+            if not where:
+                moved.append(agent)
+                continue
+            # The config is frozen, so an agent that works elsewhere is another agent at the
+            # same model and effort -- which is what it is.
+            moved.append(type(agent)(replace(agent.config, machine=anchored(where))))
+        return moved
+
     def _flow(self, argv: list[str]) -> None:
         """Starts a flow, keeping its agents so that a typed line can reach one.
 
@@ -1059,6 +1098,11 @@ class Humanize(App[None]):
             path, chosen, task = flow_and_agents(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
+        try:
+            chosen = self._on_their_machines(chosen)
+        except ValueError as why:  # a target that cannot be read is a line to correct
+            self.show(f"hmz: {why}", "red")
+            return
         try:
             # Loaded here rather than on the thread it will run on, so that the agents it
             # drives are in hand before anything is hooked up to them: a flow that says it
@@ -1241,7 +1285,7 @@ class Humanize(App[None]):
             self._interject(text)
         elif self._set_up:
             self._said_by_you(text)
-            named = [part for model in self._models for part in ("-a", model)]
+            named = [part for runs in self._models for part in ("-a", runs.spec)]
             self._flow(["-f", self._flow_named, *named, text])
         else:
             self.show("hmz: no coding agent is installed here", "red")

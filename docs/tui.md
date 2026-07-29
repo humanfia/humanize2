@@ -15,6 +15,7 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 - [Questions, and being away](#questions-and-being-away)
 - [Completion](#completion)
 - [History](#history)
+- [Where each agent works](#where-each-agent-works)
 - [What it remembers](#what-it-remembers)
 - [Colours](#colours)
 - [What it will not do](#what-it-will-not-do)
@@ -36,7 +37,8 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 ```
 
 **Above the editor**, one line per agent the flow drives: the name the flow calls it, then what
-it runs as `cli/model:effort`. Under them, what the run has cost so far and the rate it is
+it runs as `cli/model:effort`, then the machine its turns land on where that is not this one.
+Under them, what the run has cost so far and the rate it is
 costing it at — per model, since two agents at one model are one bill, and over a recent window
 only, so a flow that has stopped reads as stopped.
 
@@ -75,7 +77,7 @@ list appears under the editor with a line about each.
 | Command | Takes | What it does |
 | --- | --- | --- |
 | `/flow` | `[path]` | Switches which flow runs, then asks what each of its agents runs. With a path, takes that file. Stops whatever was running — a flow is chosen in order to be run. Looking and leaving without choosing changes nothing. |
-| `/agents` | | Sets what each agent of the current flow runs, one at a time, by the name the flow calls it. |
+| `/agents` | | Sets what each agent of the current flow runs, one at a time, by the name the flow calls it — and, on **ctrl+a**, [where its turns land](#where-each-agent-works). |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
@@ -154,11 +156,34 @@ been typed here yet, everything ever typed anywhere, so a fresh project still ha
 walk back through. Which of the two it is is settled when the interface starts, so a history
 cannot change under you mid-session.
 
+## Where each agent works
+
+On the `/agents` sheet, **ctrl+a** asks where that agent's turns land. It is a second question
+about the same agent rather than a way of running the model, which is why it is a key and not a
+row: the tuning line under the models says `◉ on this machine · ctrl+a to move`.
+
+The sheet lists what this machine can see — each container that is running, each host with an
+entry in your `~/.ssh/config` — and anything else is a target you type:
+
+| Typed | Where the work goes |
+| --- | --- |
+| *(nothing)* | this machine |
+| `docker://<container>` | a container that is already running |
+| `ssh://<host>` | a host you can reach |
+| `tcp://<host>:<port>` | a coganchor target listening there |
+
+The agent itself still runs here whatever you choose — its credentials, its state directory and
+its link to its model provider stay put. What moves is the project it reads and the commands it
+runs. See [Remote execution](remote-execution.md).
+
+Two agents of one flow may work on two machines, since it is a setting of the agent. A target
+that cannot be read is said so when the flow is started, before any turn has run.
+
 ## What it remembers
 
 Opening the interface again in the same project finds it set up the way you left it: the flow
 that was last run there, and for each flow that workspace has run, what each of its agents was
-running.
+running and where its turns landed.
 
 Kept per flow rather than per workspace alone, because what an agent runs is only meaningful
 against the flow driving it — a flow's second agent is its reviewer, and the flow before it had
