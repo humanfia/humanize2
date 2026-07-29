@@ -35,7 +35,8 @@ uv sync
 ### Dependencies
 
 Python ≥ 3.12, and the coding agent CLIs you intend to drive (`claude`, `codex`, `kimi`) on your
-PATH. [Isolation](docs/isolation.md) and [remote execution](docs/remote-execution.md) ask for more.
+PATH. A [container of the agent's own](docs/machines.md) and
+[remote execution](docs/remote-execution.md) ask for more.
 
 ## Usage
 
@@ -79,11 +80,30 @@ hmz anchor --target ssh://build-box claude
 
 ## Documentation
 
+Everything is under [docs/](docs/README.md), which indexes it by what you came for.
+
+**Start here**
+
+- [Getting started](docs/getting-started.md) — install it, run something, read the trace
+- [Concepts](docs/concepts.md) — the words the rest of it uses
+
+**Guides**
+
 - [Flows](docs/flows.md) — writing a flow and running it (`hmz exec`)
-- [Agents](docs/agents.md) — sessions, goals, models and efforts, names
-- [Isolation](docs/isolation.md) — a container of the agent's own
+- [Agents](docs/agents.md) — sessions, turns, goals, questions, efforts, names
+- [Machines](docs/machines.md) — where an agent's turns land
 - [Remote execution](docs/remote-execution.md) — acting on another machine (`hmz anchor`)
 - [Tracing](docs/tracing.md) — trajectories into a trace (`hmz collect`)
+- [Troubleshooting](docs/troubleshooting.md) — what went wrong, and what to do
+
+**Reference**
+
+- [CLI](docs/cli.md) — every command, flag, variable and file
+- [TUI](docs/tui.md) — every key and `/command`
+
+**Contributing**
+
+- [Architecture](docs/architecture.md) — the layers, and the rules that keep them
 
 ## Security
 
@@ -94,8 +114,8 @@ secret, and prefer `ssh://` or `docker://`, which need no open port at all.
 **humanize runs every agent with permission prompts disabled**, as flowbench does, and there is no
 setting that turns them back on — `/afk` governs whether an agent may ask you a question, not
 whether it may act. Drive one only in a workspace you are willing to have rewritten — including
-under [isolation](docs/isolation.md), which confines the agent to a container of its own but
-mounts that workspace into it.
+in a [container of the agent's own](docs/machines.md), which confines it to that image but
+mounts your workspace into it.
 
 ## Maintainers
 
