@@ -104,6 +104,24 @@ _STARTS_ON = "chat"
 _STARTS_AT = ("claude-opus-5", "gpt-5.6-sol", "kimi-code/k3")
 
 
+def _where() -> str:
+    """The directory this is working in, as somebody reading a status line wants it.
+
+    Read each time rather than kept: a flow is a Python file and may change directory under
+    the interface, and the one thing this line must not do is name the wrong one.
+
+    Returns:
+      The path, with a home directory written as `~` -- the shortening every shell does, and
+      the only one that shortens without losing anything.
+    """
+    here = Path.cwd()
+    try:
+        home = Path.home()
+    except RuntimeError:
+        return str(here)  # nobody's home directory, so nothing to shorten it against
+    return str("~" / here.relative_to(home)) if here.is_relative_to(home) else str(here)
+
+
 def _starts_at(models: tuple[Model, ...]) -> str:
     """Which of a CLI's models the interface opens talking to.
 
@@ -520,15 +538,15 @@ class Humanize(App[None]):
         self.query_one(Editor).focus()
 
     def _welcome(self) -> None:
-        """The box this opens with: what this is, where it is, and how to begin.
+        """The box this opens with: what this is, and how to begin.
 
         The description is the one the package was built with rather than a second copy of
         it, so the sentence this answers to is the sentence it was published under.
 
-        What is set up to run is not in it. That is above the prompt, where it is redrawn
-        twice a second, and a second copy of it here could only be the copy that was true
-        when the interface opened -- the transcript is append-only, so a line written into
-        it is a line about the moment it was written.
+        What is set up to run is not in it, nor is where it would run. Those are on the lines
+        round the editor, where they are redrawn twice a second, and a second copy of either
+        here could only be the copy that was true when the interface opened -- the transcript
+        is append-only, so a line written into it is a line about the moment it was written.
 
         Its title rides in the top border and its corners are round, which is the one boxed
         thing on the screen: everything after it is text down the terminal. Drawn as a panel
@@ -546,7 +564,6 @@ class Humanize(App[None]):
                     Text(self._banner(), style="blue", no_wrap=True),
                     Text(""),
                     Text(str(metadata("hmz")["Summary"] or "")),
-                    Text(str(Path.cwd()), style="dim"),
                     Text(""),
                     *(Text(line, style="dim") for line in _HELP),
                 ),
@@ -703,7 +720,13 @@ class Humanize(App[None]):
                 f"[$text-muted]({time.monotonic() - since:.0f}s{_DOT}esc to interrupt)[/]"
             )
         else:
-            left = f"[$secondary]◉[/] {escape(self._flow_named)}"
+            # The flow that is set up to run, and the directory it would run in. Only with
+            # nothing running: the two lines above are about a run once there is one, and
+            # where it is working has not changed since it started.
+            left = (
+                f"[$secondary]◉[/] {escape(self._flow_named)}"
+                f"[$text-muted]{_DOT}{escape(_where())}[/]"
+            )
         # Above the prompt on the right, where Claude Code says what it is running as. One
         # agent to a line rather than a row of them separated by commas: a flow drives several
         # and they are read one at a time, against the name the flow calls each one by.

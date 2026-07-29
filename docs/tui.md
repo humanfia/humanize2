@@ -36,10 +36,10 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**At the top**, the box it opens with: the name drawn large, the version, what humanize is,
-this directory, and two lines on how to begin. Nothing about what is set up to run — the
-transcript is a record, so a copy of the setup up there could only ever be the copy that was
-true when you opened it. That is on the two lines round the editor, which are redrawn.
+**At the top**, the box it opens with: the name drawn large, the version, what humanize is, and
+two lines on how to begin. Nothing about what is set up to run or where it would run — the
+transcript is a record, so a copy of either up there could only ever be the copy that was true
+when you opened it. Both are on the lines round the editor, which are redrawn.
 
 **Above the editor**, one line per agent the flow drives: the name the flow calls it, then what
 it runs as `cli/model:effort`, then the machine its turns land on where that is not this one.
@@ -51,7 +51,8 @@ only, so a flow that has stopped reads as stopped.
 has been going. Between two turns it names the flow and how long the run has been going, since
 a flow that sleeps off a round, commits, and reads what the last turn wrote has not stopped. A
 flow that has run out of things to do until you say something says `waiting for you`. With
-nothing running at all, it names the flow that is set up to run.
+nothing running at all, it names the flow that is set up to run and the directory it would run
+in, with your home written as `~`.
 
 **The status line, right:** the keys that do something *right now*, and only those. A shortcut
 listed in a state it does nothing in is worse than one that is not listed at all, and there is

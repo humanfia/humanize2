@@ -20,7 +20,7 @@ from textual.widgets import Label, Static
 from humanize.backends import Model
 from humanize.cycle import cycles
 from humanize.tui import Humanize
-from humanize.tui.app import _HELP, _OWN, Editor
+from humanize.tui.app import _HELP, _OWN, Editor, _where
 from humanize.tui.pick import Flows, Models, Runs
 
 if TYPE_CHECKING:
@@ -1436,7 +1436,6 @@ async def test_the_box_at_the_top_says_what_this_is_and_not_what_is_set_up(
     the copy that was true when the interface opened. It is on the two lines round the editor
     instead, which are redrawn twice a second.
     """
-    import pathlib
     from importlib.metadata import metadata
 
     app = Humanize()
@@ -1444,10 +1443,12 @@ async def test_the_box_at_the_top_says_what_this_is_and_not_what_is_set_up(
         opened = _transcript(app)
         assert "humanize v" in opened
         assert str(metadata("hmz")["Summary"]) in opened  # what it was published as
-        assert str(pathlib.Path.cwd()) in opened
         for line in _HELP:
             assert line in opened
         assert "claude/claude-opus-5" not in opened
+        assert (
+            _where() not in opened
+        )  # where it works is on the status line, and only there
 
         # And stepping to another flow leaves the box alone, there being nothing in it to
         # correct. What is set up is on the two lines round the editor: the agents above it,
@@ -1461,4 +1462,7 @@ async def test_the_box_at_the_top_says_what_this_is_and_not_what_is_set_up(
         assert "claude/claude-opus-5:high" in str(
             app.query_one("#above", Static).content
         )
-        assert app._flow_named in str(app.query_one("#status", Static).content)
+        # The flow, and beside it the directory it would run in.
+        status = str(app.query_one("#status", Static).content)
+        assert app._flow_named in status
+        assert _where() in status
