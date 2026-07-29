@@ -36,11 +36,10 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**At the top**, the box it opens with: the name drawn large, then the flow and what each of its
-agents runs, then this directory. Choosing another flow or another agent before anything has run
-draws it again, so it says what is set up rather than what was set up when you opened it. Once a
-flow has run, the screen is a record and is left alone — what is set up then is above the editor,
-which is redrawn twice a second.
+**At the top**, the box it opens with: the name drawn large, the version, what humanize is,
+this directory, and two lines on how to begin. Nothing about what is set up to run — the
+transcript is a record, so a copy of the setup up there could only ever be the copy that was
+true when you opened it. That is on the two lines round the editor, which are redrawn.
 
 **Above the editor**, one line per agent the flow drives: the name the flow calls it, then what
 it runs as `cli/model:effort`, then the machine its turns land on where that is not this one.

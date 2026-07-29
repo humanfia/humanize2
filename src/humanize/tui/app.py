@@ -81,6 +81,14 @@ _OWN = (
     "exit",
 )
 
+#: What the box this opens with says about how to begin. The model of the thing rather than
+#: the keys: what a key does right now is on the status line, and is only worth saying in one
+#: place -- so these are the two nouns instead, which are the ones a flow is written in.
+_HELP = (
+    "Say what to do, and the flow starts on it.",
+    "/flow chooses the loop, /agents what it drives.",
+)
+
 #: How often the right-hand column and the status line are redrawn, in seconds.
 _REFRESH = 0.5
 
@@ -440,10 +448,6 @@ class Humanize(App[None]):
         #: time it is asked for: a run started here writes this project's own history into
         #: being, and what is being walked must not change under whoever is walking it.
         self.history = History()
-        #: Whether nothing has run on this screen since it was opened or cleared, which is
-        #: what makes the box at the top of it still the box the interface opened with rather
-        #: than a record of anything.
-        self._untouched = True
         #: When each agent's turn started, for the line that closes it.
         self._began: dict[str, float] = {}
         #: Whether the last thing shown was a part that the next one may run on from.
@@ -516,7 +520,15 @@ class Humanize(App[None]):
         self.query_one(Editor).focus()
 
     def _welcome(self) -> None:
-        """The box this opens with: the name in full, then what it is set up to do.
+        """The box this opens with: what this is, where it is, and how to begin.
+
+        The description is the one the package was built with rather than a second copy of
+        it, so the sentence this answers to is the sentence it was published under.
+
+        What is set up to run is not in it. That is above the prompt, where it is redrawn
+        twice a second, and a second copy of it here could only be the copy that was true
+        when the interface opened -- the transcript is append-only, so a line written into
+        it is a line about the moment it was written.
 
         Its title rides in the top border and its corners are round, which is the one boxed
         thing on the screen: everything after it is text down the terminal. Drawn as a panel
@@ -524,24 +536,19 @@ class Humanize(App[None]):
         width at the moment it is rendered -- lines written to a width guessed before the
         screen was laid out come out of the transcript split down the right-hand edge. And
         it is only as wide as what is in it: a box ruled the whole way across an empty screen
-        is mostly rule.
+        is mostly rule, and nothing in it is wider than the name drawn across the top.
         """
-        from importlib.metadata import version
+        from importlib.metadata import metadata, version
 
-        agents = (
-            ", ".join(
-                f"{runs.spec} on {runs.anchor}" if runs.anchor else runs.spec
-                for runs in self._models
-            )
-            or "no coding agent installed here"
-        )
         self.query_one("#transcript", RichLog).write(
             Panel(
                 Group(
                     Text(self._banner(), style="blue", no_wrap=True),
                     Text(""),
-                    Text(f"{self._flow_named}{_DOT}{agents}"),
-                    Text(str(Path.cwd())),
+                    Text(str(metadata("hmz")["Summary"] or "")),
+                    Text(str(Path.cwd()), style="dim"),
+                    Text(""),
+                    *(Text(line, style="dim") for line in _HELP),
                 ),
                 # Room around it, above and below and at both ends: the name drawn large is
                 # the first thing on the screen and reads as cramped without any.
@@ -554,25 +561,6 @@ class Humanize(App[None]):
             ),
             shrink=False,
         )
-
-    def _reopened(self) -> None:
-        """Draws the opening box again, once what it says about the setup has changed.
-
-        The box names the flow and what each of its agents runs, and choosing another of
-        either makes what it says untrue -- which is what walking back out of `/flow`,
-        `/agents` or shift+tab and finding the old one still there is.
-
-        The transcript is a record and is not rewritten, so this only redraws a screen that
-        is still the one the interface opened with: nothing has run on it, so there is
-        nothing on it to lose, and what comes back is the screen you would have opened had
-        it been set up this way from the start. A screen that has run something keeps what it
-        says, which was true when it said it; what is set up now is above the prompt, where
-        it is redrawn twice a second.
-        """
-        if not self._untouched:
-            return
-        self.query_one("#transcript", RichLog).clear()
-        self._welcome()
 
     def _banner(self) -> str:
         """The name, drawn large.
@@ -854,7 +842,6 @@ class Humanize(App[None]):
         )
         self._wanted = places
         self.settings.remember(switching, self._named_by, self._models)
-        self._reopened()  # the box at the top names the flow, so it names this one now
         self._draw()
 
     @on(Editor.Sent)
@@ -916,9 +903,6 @@ class Humanize(App[None]):
         """
         self.query_one("#transcript", RichLog).clear()
         self._welcome()  # a cleared screen is a screen just opened, and one opens with this
-        # And is one nothing has run on: what was on it went with everything else, so a flow
-        # chosen after this may draw the box again rather than leave it saying the old one.
-        self._untouched = True
         self._draw()
 
     def action_stop_flow(self) -> None:
@@ -1015,8 +999,6 @@ class Humanize(App[None]):
                 self._flow_named, self._models = switching, list(chosen)
                 self._wanted = places
                 self.settings.remember(switching, self._named_by, self._models)
-                # Before the line below, since redrawing the screen would clear it away.
-                self._reopened()
                 self.show("[dim]say what to do, and the flow starts on it[/dim]")
                 self._draw()
                 return
@@ -1146,9 +1128,6 @@ class Humanize(App[None]):
             return
         agents = list(runner.agents)
         self._agents = agents
-        # From here the screen is a record of a run rather than the one the interface opened
-        # with, so the box at the top of it stays as it was: it was true when it was drawn.
-        self._untouched = False
         self._monitor = Monitor()
         # What the run costs is read from the logs the agents keep, which they write as they
         # go: a backend only says what a turn cost once the turn is over, and a turn is long.
