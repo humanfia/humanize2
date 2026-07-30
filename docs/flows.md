@@ -10,6 +10,7 @@ branch, sleep, read files, shell out, and give up, because it is just a function
 
 - [The contract](#the-contract)
 - [How many agents, and what they are for](#how-many-agents-and-what-they-are-for)
+- [Settings of the flow's own](#settings-of-the-flows-own)
 - [Asking for an agent that can do something](#asking-for-an-agent-that-can-do-something)
 - [Hooks in a flow](#hooks-in-a-flow)
 - [The person at the prompt](#the-person-at-the-prompt)
@@ -99,6 +100,72 @@ agent uses them:
 
 An agent that was named where it was made keeps that name; one that was not takes the name the
 flow gives it, before anything is written down about the run.
+
+## Settings of the flow's own
+
+A flow that has settings says so by taking a third argument, annotated with a
+[pydantic](https://docs.pydantic.dev/) model or `None`:
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from humanize.agents import AgentBase
+
+
+class Config(BaseModel):
+    """What this flow takes."""
+
+    rounds: int = Field(default=3, ge=1, le=9, description="how many times round")
+    mode: Literal["fast", "slow"] = Field(default="fast", description="which way")
+
+
+def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> None:
+    setting = config or Config()
+    ...
+```
+
+That is the whole of it. The model is what asks: the fields are the questions, their types say
+how each one is answered, `description` is the line shown beside it, and whatever the model
+refuses is what the flow will not run.
+
+- `/config` in the interface is that model with a cursor on it, and `/flow` walks through it
+  between choosing the flow and choosing its agents. See [TUI › Setting a flow
+  up](tui.md#setting-a-flow-up).
+- What you set is [remembered per flow](tui.md#what-it-remembers), so a flow of twenty
+  settings is not one to answer again every morning.
+- `None` means nobody set it up, and is what the flow gets from `hmz exec`. Fall back to the
+  model's own defaults, as above, and the flow runs the same either way.
+
+A flow with many settings groups them, so the sheet has parts rather than one long list:
+
+```python
+    gen_idea: bool = Field(
+        default=True,
+        description="open the idea into a repo-grounded draft",
+        json_schema_extra={"section": "gen-idea  ·  open the idea into a draft"},
+    )
+```
+
+Combinations the flow cannot run belong in the model, not in `run`:
+
+```python
+    @model_validator(mode="after")
+    def _settles(self) -> "Config":
+        if self.fast and self.careful:
+            raise ValueError("fast and careful do not go together")
+        return self
+```
+
+which is refused where it was typed rather than an hour into the run.
+
+Two rules, both for the same reason the agents annotation has them: the model has to be
+readable at runtime — import `pydantic` normally, not under `if TYPE_CHECKING` — and it is
+read by running the file, so the class the interface asked with is not the same object as the
+class the run is handed. What is carried across is the fields, which `Runner` reads back into
+the model the flow has just declared. A flow handed a config of another model is refused
+before its first turn, as a flow handed the wrong number of agents is.
 
 ## Asking for an agent that can do something
 
@@ -215,9 +282,21 @@ Picking one stops whatever was running — a flow is chosen in order to be run.
 | — | the ones humanize came with |
 
 Nearest wins, so a flow of your own may stand in for one of humanize's by taking its name — a
-`.humanize/flows/rlar.py` is what `-f rlar` runs *in that project*. A name appears once in the
-list of flows: the nearest one answering to it is the one that runs, so the ones it stands in
-for are not offered as if they still did.
+`.humanize/flows/rlar.py` is what `-f rlar` runs *in that project*.
+
+What a flow is **called** is another question. Only the ones humanize came with are called by a
+bare name — those names are humanize's and mean one file each. A flow of yours is called by its
+path, short enough to read:
+
+| | |
+| --- | --- |
+| `rlar` | one humanize came with |
+| `.humanize/flows/rlar.py` | this project's own |
+| `~/.humanize/flows/rlar.py` | yours, in every project |
+
+So yours is listed beside humanize's rather than instead of it, `-f` takes either, and what
+each was [set up to run](tui.md#what-it-remembers) is remembered apart — a flow of yours cannot
+quietly inherit the agents or the settings of the one it shares a name with.
 
 Anything with a slash or an extension in it is a path, taken as given. A file whose name starts
 with `_` is not a flow.
@@ -242,7 +321,7 @@ that starts it in its own docstring.
 | `goal` | 1 | Ralph, with the task set as the agent's [own goal](agents.md#goals). The loop only starts it over when it stopped without having met it. |
 | `flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. |
 | `rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. Nothing between them parses anything — the review *is* the actor's next prompt, word for word. |
-| `humanize1` | `builder`, `reviewer` | RLCR: an idea is opened, planned against review, then built against it. Anchored to the commit the plan is committed in; every review reads what came after it. Run it in a git repository. |
+| `humanize1` | `drafter`, `planner`, `analyst`, `builder`, `reviewer` | RLCR: an idea is opened, planned against review, then built against it. [PolyArch/humanize](https://github.com/PolyArch/humanize) as one unattended run, with every flag it takes on `/config`. Run it in a git repository. |
 
 `humanize1` is [PolyArch/humanize](https://github.com/PolyArch/humanize) as one unattended run:
 its three commands in order — `gen-idea` opens a loose idea into a repo-grounded draft,
@@ -250,7 +329,18 @@ its three commands in order — `gen-idea` opens a loose idea into a repo-ground
 under review. The plugin blocks Claude's exit and puts the round to Codex in a Stop hook; so does
 this, with a [`Moment.STOP` hook](#hooks-in-a-flow) on the builder. A round is the builder
 believing the whole plan is done and trying to stop, and what the reviewer says is what it hears
-instead.
+instead. Its tool validators are hooks too, on `Moment.PermissionRequest`, which is why the
+builder has to be a backend that runs it.
+
+Each of the three phases can be turned off, and every flag the plugin takes is a field on
+`/config` under the plugin's own name for it — `--max`, `--full-review-round`, `--skip-impl`,
+`--agent-teams`, `--yolo`, and the rest. Each phase is set up on its own agents: the `drafter`
+opens the idea, the `planner` writes the plan against what the `analyst` reads out of the
+repository, and the `builder` builds it under the `reviewer`. What passes between them is a
+file, as it is in the plugin — the draft, then the plan.
+
+It writes what the plugin writes, where the plugin writes it: `.humanize/rlcr/<timestamp>/`
+with `state.md`, `goal-tracker.md`, and a prompt, summary, contract and review per round.
 
 Read [Security](../README.md#security) before starting any of them.
 

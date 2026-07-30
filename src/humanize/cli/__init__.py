@@ -1,6 +1,7 @@
 """``hmz`` -- the whole command line, over layers that have none of their own.
 
     hmz
+    hmz -f humanize1 -c setup.yaml -a claude/claude-opus-5:max ...
     hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
     hmz collect
     hmz anchor --target ssh://build-box claude
@@ -19,6 +20,10 @@ same line.
 from __future__ import annotations
 
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from argparse import ArgumentParser
 
 __all__ = ["COMMANDS", "main"]
 
@@ -34,9 +39,9 @@ def _exec(argv: list[str]) -> int:
     """
     from humanize.runner import NotAFlow, Runner, flow_and_agents
 
-    path, agents, task = flow_and_agents(argv)
+    path, agents, task, config = flow_and_agents(argv)
     try:
-        runner = Runner(path, agents)
+        runner = Runner(path, agents, config)
     except NotAFlow as error:
         # A flow that is not there, or one that takes other agents than these, is a command
         # line that was wrong before anything ran, so it exits as argparse's own rejections
@@ -75,15 +80,105 @@ def _anchor(argv: list[str]) -> int:
     return anchor(argv)
 
 
-def _tui() -> int:
-    """Opens the terminal interface, which is what a line naming no command opens.
+def _line() -> ArgumentParser:
+    """The line `hmz` itself takes, which is how the interface is opened set up.
+
+    Built here rather than where it is parsed because it is read in two places: the line that
+    opens the interface is parsed with it, and the help asks it what `hmz` takes. A second
+    copy of these three flags would be one to keep in step, and the one somebody typing
+    `hmz --help` was shown would be the one that drifted.
 
     Returns:
-      Zero, once the interface has been closed.
+      The parser, without the commands: whoever wants those adds them.
     """
-    from humanize.tui import Humanize
+    import argparse
 
-    Humanize().run()
+    parser = argparse.ArgumentParser(
+        prog="hmz",
+        description="Orchestrate, execute, and observe agent flows. Naming no command opens "
+        "the terminal interface, set up as the line says.",
+        epilog="Run `hmz COMMAND --help` for what a command takes.",
+    )
+    parser.add_argument(
+        "-f",
+        "--flow",
+        default="",
+        metavar="PATH",
+        help="the flow to open on: one that came with humanize, by name, or a file of your own",
+    )
+    parser.add_argument(
+        "-a",
+        "--agent",
+        action="append",
+        default=[],
+        dest="agents",
+        metavar="CLI/MODEL:EFFORT",
+        help="what one of that flow's agents runs, repeated once for each it drives, in the "
+        "order it takes them; needs -f",
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        metavar="PATH",
+        help="a YAML file of what to set that flow up with, as `/config` would ask for it; "
+        "needs -f",
+    )
+    return parser
+
+
+def _tui(argv: list[str]) -> int:
+    """Opens the terminal interface, set up the way the line says if it says anything.
+
+    A line naming no command opens it as it was left; one naming a flow, what to run it on,
+    or what to set it up with opens it that way instead -- so a run that is always the same
+    run is one line rather than three walks through the sheets. Nothing is started: the
+    interface opens ready, and what starts it is still the first thing said.
+
+    Args:
+      argv: The whole line, which names no command.
+
+    Returns:
+      Zero, once the interface has been closed, or two for a line to correct.
+    """
+    from humanize.flows import find
+    from humanize.runner import configures, set_up_from, wanted
+    from humanize.tui import Humanize
+    from humanize.tui.pick import Runs
+
+    parser = _line()
+    args = parser.parse_args(argv)
+
+    flow = args.flow or ""
+    if args.agents and not flow:
+        parser.error("-a says what runs the flow, so it needs -f")
+    if args.config is not None and not flow:
+        parser.error("-c says how the flow runs, so it needs -f")
+    setting = None
+    if args.config is not None:
+        try:
+            model = configures(find(flow))
+        except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
+            parser.error(str(why))
+        if model is None:
+            parser.error(
+                f"{flow} takes no setting up, so there is nothing for -c to say"
+            )
+        try:
+            setting = model.model_validate(set_up_from(args.config))
+        except ValueError as refused:
+            parser.error(f"{args.config}: {refused}")
+    if args.agents:
+        try:
+            places = wanted(find(flow))
+        except Exception as why:  # noqa: BLE001
+            parser.error(str(why))
+        if len(places) != len(args.agents):
+            parser.error(
+                f"{flow} drives {len(places)} agents, {len(args.agents)} given"
+            )
+    Humanize(
+        flow=flow, agents=[Runs(spec) for spec in args.agents], config=setting
+    ).run()
     return 0
 
 
@@ -110,10 +205,17 @@ def main(argv: list[str] | None = None) -> int:
     """
     arguments = sys.argv[1:] if argv is None else argv
     if not arguments:
-        return _tui()
+        return _tui([])
+    # A line that names no command and starts with a flag is the interface being set up: what
+    # flow, what runs it, how it is set up. Two flags on their own are not: `--version` says
+    # the version, and `--help` lists the commands, which is what somebody typing it wants.
+    if arguments[0].startswith("-") and arguments not in (
+        ["--version"],
+        ["--help"],
+        ["-h"],
+    ):
+        return _tui(arguments)
     if arguments[0] not in COMMANDS:
-        import argparse
-
         if arguments == ["--version"]:
             # Read from the installed metadata, which costs more to reach than everything
             # else here put together -- so it is reached only when it is what was asked for.
@@ -126,16 +228,11 @@ def main(argv: list[str] | None = None) -> int:
         # one flag this parser no longer carries, and would otherwise fall through to a
         # command lookup that has nothing to look up.
 
-        # There is nothing to route to, so this parser only has to say so. It knows the
-        # commands by name and not by what they take -- each one answers
-        # `hmz COMMAND --help` itself -- and whether it lists them or names the one that
-        # was meant, it exits rather than returning here.
-        parser = argparse.ArgumentParser(
-            prog="hmz",
-            description="Orchestrate, execute, and observe agent flows. "
-            "Naming no command opens the terminal interface.",
-            epilog="Run `hmz COMMAND --help` for what a command takes.",
-        )
+        # The same line `hmz` itself takes, with the commands added: one help, saying both
+        # what may be opened and what may be run, since both are `hmz` and somebody typing
+        # `hmz --help` is asking about the whole of it. It knows the commands by name and not
+        # by what they take -- each one answers `hmz COMMAND --help` itself.
+        parser = _line()
         commands = parser.add_subparsers(metavar="COMMAND", required=True)
         for name, (_, summary) in COMMANDS.items():
             commands.add_parser(name, help=summary, add_help=False)

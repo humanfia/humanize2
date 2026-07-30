@@ -434,6 +434,10 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     A flow written down beside the traces is one humanize knows about without being told
     where it is -- and one taking a built-in's name stands in for it, which is what makes
     a project able to mean its own `rlar` by `rlar`.
+
+    What each of them is *called* is another question: only the ones humanize came with are
+    called by a bare name, and a flow of yours is called by its path -- so one of yours
+    sharing a name with one of humanize's is listed beside it rather than instead of it.
     """
     from humanize.flows import find, found
 
@@ -449,14 +453,22 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
 
     listed = found()
 
-    assert ("local", "theirs") in listed
-    assert ("user", "yours") in listed
-    # Shadowed rather than listed twice: one name, and it is the nearest that answers to it.
-    assert ("local", "rlar") in listed
-    assert ("builtin", "rlar") not in listed
+    assert ("local", ".humanize/flows/theirs.py") in listed
+    assert ("user", "~/.humanize/flows/yours.py") in listed
+    # Both, under names of their own: one is not offered as if it were the other.
+    assert ("local", ".humanize/flows/rlar.py") in listed
+    assert ("builtin", "rlar") in listed
+    # `-f` still takes a bare name, and the nearest flow answering to it is what runs.
     assert find("rlar") == str((project / ".humanize/flows/rlar.py").resolve())
     assert find("yours") == str((home / ".humanize/flows/yours.py").resolve())
     assert find("goal").endswith("src/humanize/flows/goal.py")
+    # And it takes what the list calls one, which is a path, `~` and all.
+    assert find("~/.humanize/flows/yours.py") == str(
+        (home / ".humanize/flows/yours.py").resolve()
+    )
+    assert find(".humanize/flows/theirs.py") == str(
+        (project / ".humanize/flows/theirs.py").resolve()
+    )
     assert find("nowhere") == "nowhere"  # a path is taken as given
 
 
@@ -513,31 +525,9 @@ def test_a_failed_turn_is_taken_again_and_only_that_turn(
             # would spend a round asking the other side to reply to silence.
             return "" if len(taken) == 3 else "answered"
 
-    assert spoken(cast("SessionBase", _Flaky()), "do it") == "answered"
+    said, _ = spoken(cast("SessionBase", _Flaky()), "do it")
+    assert said == "answered"
     assert taken == ["do it"] * 4  # the same turn, four times, and no other
-
-
-@pytest.mark.parametrize(
-    ("said", "accepted"),
-    [
-        ("COMPLETE", True),
-        ("complete.\n", True),
-        ("AC-1 has no negative test.", False),
-        # A review that quotes the word back while saying what it would take to earn it. Read
-        # a line at a time this would end the run; read whole, it is what it is -- a review.
-        (
-            "Answer with the single word\nCOMPLETE\nif it holds. It does not: AC-2.",
-            False,
-        ),
-    ],
-)
-def test_only_a_review_that_is_the_word_accepts_the_work(
-    said: str, accepted: bool
-) -> None:
-    """Nothing between the two agents parses anything, so one word has to carry the verdict."""
-    from humanize.flows.humanize1 import ACCEPTED
-
-    assert bool(ACCEPTED.fullmatch(said)) is accepted
 
 
 def test_the_chat_flow_is_one_session_for_as_long_as_it_is_told_things(
@@ -577,61 +567,3 @@ def test_the_chat_flow_run_from_a_command_line_does_the_one_thing_it_was_given(
     chat(Chat(agent, HumanAgent()), "echo once")
 
     assert len(agent.opened) == 1
-
-
-def test_the_rlcr_loop_is_what_a_round_runs_into_when_it_tries_to_stop() -> None:
-    """A round ends where the builder would have ended it, which is what the plugin does too.
-
-    The work is read against the plan until nothing is required, and then what was built is
-    read as code until nothing is left to fix -- both in the same hook, because both are the
-    same sentence: not yet.
-    """
-    from humanize.agents import AgentBase, Moment, Occasion, Verdict
-    from humanize.flows.humanize1 import ALIGNING, ROUNDS, Loop
-
-    answers = [
-        "AC-2 has no negative test",
-        "COMPLETE",
-        "[P1] no test takes the error path",
-    ]
-    asked: list[str] = []
-
-    class _Reviewer:
-        def __call__(self, prompt: str, *, suppress: bool = False) -> str:
-            asked.append(prompt)
-            return answers.pop(0) if answers else "COMPLETE"
-
-    loop = Loop(cast("AgentBase", _Reviewer()), base="c0ffee")
-    stopping = Occasion(
-        moment=Moment.STOP, agent="builder", said="what I did this round"
-    )
-
-    # Judged against the plan, and what the review said is what the builder hears instead.
-    assert loop(stopping) == Verdict(refused=True, because="AC-2 has no negative test")
-    # The round that settles the claim goes straight on to the code review, in one call.
-    assert loop(stopping) == Verdict(
-        refused=True, because="[P1] no test takes the error path"
-    )
-    # And a code review with nothing to fix is the turn being let go of at last.
-    assert loop(stopping) is None
-    assert loop.rounds == 3
-    assert loop.told == [
-        "AC-2 has no negative test",
-        "[P1] no test takes the error path",
-    ]
-    assert (
-        "c0ffee" in asked[0]
-    )  # every review reads the work since the plan's own commit
-
-    # Every fifth round is a check that the work is still the work, not a review of the round.
-    aligning = Loop(cast("AgentBase", _Reviewer()), base="c0ffee")
-    aligning.rounds = ALIGNING - 2
-    at = len(asked)
-    aligning(stopping)
-    assert "still the work" in asked[at]
-
-    # And the loop gets as many rounds as it gets: what is not done by then is not done.
-    ending = Loop(cast("AgentBase", _Reviewer()), base="c0ffee")
-    ending.rounds = ROUNDS - 1
-    assert ending(stopping) is None
-    assert ending.told == []  # nothing was even asked

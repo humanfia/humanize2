@@ -17,6 +17,7 @@ __all__ = ["about", "hinted", "offered"]
 #: What each command does, shown beside its name.
 _ABOUT = {
     "flow": "Switch flow",
+    "config": "Set up how the flow runs",
     "agents": "Set what each agent runs",
     "status": "Show how the run is going",
     "clear": "Clear the screen",

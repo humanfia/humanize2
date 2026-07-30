@@ -586,12 +586,17 @@ def test_codex_can_be_talked_to_while_a_turn_is_running(codex: _FakeServer) -> N
         said.append(event)
 
     steered = next(call for call in codex.calls() if call["method"] == "turn/steer")
+    named = steered["params"].pop("clientUserMessageId")
     assert steered["params"] == {
         "threadId": "thread_fake",
         "input": [{"type": "text", "text": "actually, stop"}],
         # Named, so the server refuses to steer a turn that has already moved on.
         "expectedTurnId": "turn_fake",
     }
+    # And named again, this time so that the server can say which word it has taken in: it
+    # plays a steered word back as a `userMessage` item carrying this id, and that item is
+    # the only thing that says the model has it rather than the server.
+    assert named
     assert "steered:actually, stop" in said[-1].text
 
 

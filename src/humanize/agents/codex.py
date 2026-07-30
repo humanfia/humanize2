@@ -29,7 +29,7 @@ from .config import AgentConfig
 from .event import Event, Question, say
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping
+    from collections.abc import Callable, Iterator, Mapping
 
 #: What the server calls a turn stopping to ask its user something. Every other request it
 #: makes of a client is an approval, which an unattended flow does not stop for.
@@ -47,6 +47,10 @@ class _Running:
 
     thread: str | None = None
     turn: str | None = None
+    #: The session's own book of words put into this turn, asked whenever one comes back
+    #: around: the server holds every session of the agent, so the turn loop has no other way
+    #: to know whose word it is reading.
+    took: Callable[[str], str | None] | None = None
 
 
 #: What a turn is run under, sent with every one of them: a thread picked back up does not
@@ -297,7 +301,15 @@ class _AppServer:
                             twice = done and marked is not None and marked in started
                             if marked is not None:
                                 started.add(marked)
-                            if kind == "agentMessage" and done:
+                            if kind == "userMessage" and not done and running.took:
+                                # A word put into this turn, come back around: the server
+                                # says so once the model has it, under the name it was sent
+                                # with. Everything else on a `userMessage` is the turn's own
+                                # prompt, which nobody is waiting to hear about.
+                                words = running.took(str(item.get("clientId") or ""))
+                                if words is not None:
+                                    yield Event(kind="took", text=words)
+                            elif kind == "agentMessage" and done:
                                 said = str(item.get("text") or "")
                                 yield Event(kind="text", text=said)
                             elif kind == "reasoning" and done:
@@ -388,7 +400,7 @@ class _AppServer:
                 else {},
             )
 
-    def steer(self, thread: str, turn: str, text: str) -> None:
+    def steer(self, thread: str, turn: str, text: str, ticket: str) -> None:
         """Says something to a turn that is already running.
 
         Written straight out rather than called: the turn holds the stream while it reads, and
@@ -398,6 +410,8 @@ class _AppServer:
           thread: The thread the turn is on.
           turn: The turn to steer, which the server refuses to confuse with any other.
           text: What to say.
+          ticket: What the server is to name it by when it says the turn has it, which comes
+            back on the `userMessage` item as its `clientId`.
         """
         self._write(
             {
@@ -408,6 +422,7 @@ class _AppServer:
                     "threadId": thread,
                     "input": [{"type": "text", "text": text}],
                     "expectedTurnId": turn,
+                    "clientUserMessageId": ticket,
                 },
             }
         )
@@ -603,8 +618,10 @@ class CodexSession(SessionBase):
         with self._lock:  # a conversation is a sequence: one turn at a time
             thread = self._thread()
             # Known before the turn starts, so a word put in has a thread to name even though
-            # the session is only opened once the turn has landed.
+            # the session is only opened once the turn has landed. The book goes with it: the
+            # server reads every session's stream, and only this one knows what it put in.
             self._running.thread = thread
+            self._running.took = self.took
             said = ""
             spent: Mapping[str, int] = {}
             for event in self._agent.server.turn(
@@ -640,13 +657,22 @@ class CodexSession(SessionBase):
         Args:
           text: What to say to the agent.
 
+        The server takes it and answers at once, and that answer is not the agent having
+        heard: it says only that the word is bound to the turn. What says the model has it is
+        the `userMessage` item the turn plays back, which is a `took` event.
+
         Raises:
           RuntimeError: If no turn is running, so there is none for the server to steer.
         """
         running = self._running
         if running.turn is None or running.thread is None:
             raise RuntimeError("no turn is running to be talked to")
-        self._agent.server.steer(running.thread, running.turn, text)
+        ticket = self.steering(text)
+        try:
+            self._agent.server.steer(running.thread, running.turn, text, ticket)
+        except BaseException:
+            self.took(ticket)
+            raise
 
     def _thread(self) -> str:
         """The thread this session is, started or picked back up as needed.

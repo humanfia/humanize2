@@ -122,8 +122,16 @@ neither is a thing to do to a flow that is running.
 
 ### A line I typed did not reach the agent
 
-It did — it is held for the next turn if none was open. A line to a running flow is never
-dropped. It reaches whichever agent has a turn *open*, not whichever was named last.
+Look at whether it is still [pinned above the prompt](tui.md#talking-to-a-running-flow): a line
+sits there, rather than in the transcript, until somebody has actually taken it — the next turn
+if none was open, or the running turn saying the words are in front of it. A line to a running
+flow is never dropped, and one nothing ever took is written down as never sent rather than
+left to look like it went. It reaches whichever agent has a turn *open*, not whichever was
+named last.
+
+Several lines typed in a row go one at a time, so the ones behind the first sit pinned for a
+turn or two before their own answer comes back. That is deliberate: handed over together they
+would be run together and answered once.
 
 If the agent is anchored and is Claude, it hears you **between** turns rather than during one:
 an anchored Claude ends its process with each turn so that its work reaches the target before

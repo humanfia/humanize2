@@ -37,6 +37,28 @@ hmz --help           # lists the commands
 
 There is no command that opens the interface. Naming nothing at all is how it opens.
 
+It opens on whatever this workspace was [last set up to run](tui.md#what-it-remembers) — or on
+what the line says, for a run that is always the same run:
+
+```
+hmz -f|--flow <flow> [-c|--config <path>] [-a|--agent <spec>]...
+```
+
+| Argument | |
+| --- | --- |
+| `-f`, `--flow <flow>` | The flow to open on. |
+| `-c`, `--config <path>` | A YAML file of what to set that flow up with, as [`/config`](tui.md#setting-a-flow-up) would have asked for it. Needs `-f`. |
+| `-a`, `--agent <spec>` | What each of that flow's agents runs, in the order it takes them — as many as it drives. Needs `-f`. |
+
+Nothing is started: the interface opens ready, and the first thing you say is still what starts
+it. What the line says is checked before the interface opens — a flow that will not load, a
+config the flow refuses, the wrong number of agents — so a line that is wrong is a line, not a
+sheet to walk back out of.
+
+```sh
+hmz -f humanize1 -c setup.yaml
+```
+
 ## `hmz exec`
 
 Runs a [flow](flows.md) in the current directory, on the agents it is given.
@@ -47,7 +69,8 @@ hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] <task>
 
 | Argument | |
 | --- | --- |
-| `-f`, `--flow <flow>` | **Required.** The flow to drive: a name, or the path to a file. See [where flows live](flows.md#where-flows-live). |
+| `-f`, `--flow <flow>` | **Required.** The flow to drive: the name of one humanize came with, or the path to a file — which is what a flow of your own is called. See [where flows live](flows.md#where-flows-live). |
+| `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](flows.md#settings-of-the-flows-own). The flow's own model checks it before the first turn. |
 | `-a`, `--agent <spec>` | **Required, and repeated once for each agent the flow drives**, in the order it takes them. |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
 
@@ -93,6 +116,8 @@ hmz exec -f flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "
 hmz exec -f rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 hmz exec -f ./flows/mine.py -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high -- "--force is not a flag here"
+hmz exec -f humanize1 -c setup.yaml -a claude/claude-opus-5:max -a claude/claude-opus-5:max \
+    -a codex/gpt-5.6-sol:xhigh -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:xhigh "add undo"
 ```
 
 Nobody is at a prompt, so an agent that stops to ask is told nobody answered and carries on.

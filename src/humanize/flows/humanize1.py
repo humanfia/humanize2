@@ -1,451 +1,975 @@
-"""RLCR (humanize 1) -- an idea is opened, planned against review, then built against it.
+"""RLCR (humanize 1) -- PolyArch/humanize as one unattended run, set up before it starts.
 
     hmz exec -f humanize1 \
-        -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "add undo/redo to the editor"
+        -a claude/claude-opus-4-8:max -a claude/claude-opus-4-8:max \
+        -a codex/gpt-5.6-sol:max -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max \
+        "add undo/redo to the editor"
 
-Written against PolyArch/humanize, which is the same three phases as a Claude Code plugin:
-`gen-idea` opens a loose idea into a repo-grounded draft, `gen-plan` turns that draft into a
-plan both sides have converged on, and `start-rlcr-loop` builds the plan under review until
-nothing is left to say. Here they are one Python file and two agents.
+which is the drafter, the planner and the analyst that reads it, and the builder and the
+reviewer that reads it, in that order, since that is the order the flow takes them. Add
+`-c setup.yaml` to run it set up rather than as it comes, and `hmz -f humanize1 -c setup.yaml`
+opens the interface on the same setup.
 
-Run in a git repository: the work is anchored to the commit the plan is committed in, and every
+Three phases, which are the plugin's three commands: `gen-idea` opens a loose idea into a
+repo-grounded draft, `gen-plan` turns that draft into a plan both sides have converged on, and
+`start-rlcr-loop` builds the plan under review until nothing is left to say. Each of them can
+be turned off, and everything either of them can be told is on `/config` -- one field per flag
+the plugin takes, under the name the plugin gives it.
+
+Run in a git repository: the work is anchored to the commit the plan was fixed in, and every
 review reads what came after it.
 
-The builder remembers and the reviewer does not. One session builds, holding the whole run from
-the first reading of the idea; every review is a session that has just started, reads the
-repository itself, and is told nothing about how the work was arrived at. The only thing read
-out of a review is whether it is the word COMPLETE; anything else is the builder's next prompt,
-word for word.
+Each phase is set up on its own: `/agents` asks what the drafter runs, what the planner and
+the analyst that reads it run, and what the builder and the reviewer run. What passes between
+the phases is a file, as it is in the plugin -- the draft, then the plan -- so a run may open
+an idea on one model and build it on another.
+
+The side that writes remembers and the side that reads does not. The planner holds one session
+for the whole of the planning and the builder holds one for the whole of the loop; every review
+is a session that has just started, reads the repository itself, and is told nothing about how
+the work was arrived at.
 
 The loop itself is a hook. The plugin blocks Claude's exit and puts the round to Codex there;
 so does this -- a `Stop` hook on the builder, which is the same sentence: a round ends when the
 builder believes the whole plan is done and tries to stop, and what the reviewer says is what
-it hears instead of stopping.
+it hears instead of stopping. The plugin's tool validators are hooks too, on the one moment a
+refusal reaches the agent, so the plan stays fixed and the state file stays the loop's. Every
+gate its stop hook runs is run here, in the order it runs them, in its own words -- and what it
+writes is written where it writes it, so `humanize monitor rlcr` reads a run of this.
+
+Four things are the plugin's mechanism rather than its behaviour, and are done another way:
+
+- `codex review --base <ref>` takes no prompt and is a Codex feature. Here the reviewer is
+  whichever agent was chosen, so the code review is asked for -- in a prompt that asks for
+  exactly the `[P0-9]` output the loop then reads the same way.
+- `--codex-timeout` cannot cut a turn short from here: a review that ran over is treated as a
+  review that failed, which is the state the plugin's own timeout leaves the round in.
+- A task the plan tags `analyze` is `/humanize:ask-codex` there, which is a shell script the
+  builder runs. Here the builder has no way to reach the reviewer mid-round, so it is told to
+  put the question in its round summary, where the reviewer answers it.
+- Its `PostToolUse` hook patches the session id into `state.md` so a later hook can tell whose
+  loop it is. This flow is holding the loop, so there is nothing to look up.
+
+`ask-codex`, `ask-gemini`, `refine-plan` and `cancel-rlcr-loop` are commands of their own
+rather than phases of this one, and are not here: stopping the flow is what cancels it.
 """
 
-import re
-import time
-from dataclasses import dataclass, field
-from typing import NamedTuple
+from __future__ import annotations
 
-from humanize.agents import AgentBase, Moment, Occasion, SessionBase, Verdict
+import os
+import re
+import shutil
+from pathlib import Path
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple
+
+from pydantic import BaseModel, Field, model_validator
+
+from humanize.agents import AgentBase, HumanAgent, Moment, SessionBase
+from humanize.flows._rlcr import guards, loop, planning, prompts
+from humanize.flows._rlcr.loop import Loop, State, git, spoken
+from humanize.flows._rlcr.prompts import render
+
+if TYPE_CHECKING:
+    from pydantic.config import JsonDict
 
 
 class Agents(NamedTuple):
-    """The two the flow drives: one that remembers the run, and one that never does."""
+    """One agent per side of each phase, and the person at the prompt.
 
-    builder: AgentBase
+    The plugin's three commands are three commands: `gen-idea` is one agent exploring, and
+    `gen-plan` and `start-rlcr-loop` are each an agent writing against an agent reading. What
+    passes between them is a file -- the draft, then the plan -- so each phase is set up on
+    its own, and a run may open an idea on one model and build it on another.
+
+    The builder has to run `PermissionRequest`: the plugin's validators are what keep the plan
+    fixed and the loop's state out of the builder's hands, and a hook that cannot say no to a
+    tool is not one of them. The plugin is a Claude Code plugin for the same reason.
+    """
+
+    drafter: AgentBase
+    planner: AgentBase
+    analyst: AgentBase
+    builder: Annotated[AgentBase, Moment.PERMISSION_REQUEST]
     reviewer: AgentBase
+    human: HumanAgent
 
 
-#: Where the run keeps what outlives a turn. Named for the agents rather than opened here -- an
-#: agent may be working on another machine, where this directory is the only one that exists.
-DRAFT = ".humanize/rlcr/draft.md"
-PLAN = ".humanize/rlcr/plan.md"
-TRACKER = ".humanize/rlcr/goal-tracker.md"
+#: Every language the plugin will write a translated plan in, by name and by ISO code.
+LANGUAGES = {
+    "chinese": "zh",
+    "korean": "ko",
+    "japanese": "ja",
+    "spanish": "es",
+    "french": "fr",
+    "german": "de",
+    "portuguese": "pt",
+    "russian": "ru",
+    "arabic": "ar",
+}
 
-#: How many orthogonal directions the idea is opened from, as `gen-idea --n` defaults to.
-DIRECTIONS = 6
-
-#: How many rounds each loop is given. Planning converges or it does not: three rounds of
-#: challenge is the plugin's cap, and a fourth is a plan being polished rather than settled.
-#: Building is given the plugin's own forty-two, which is a day of rounds and not a budget.
+#: How many rounds `gen-plan` gives its convergence loop, which is the plugin's own maximum.
 CONVERGING = 3
-ROUNDS = 42
-
-#: How often a round is a full alignment check rather than a review of the round: every fifth,
-#: at rounds 4, 9, 14, as the plugin schedules them.
-ALIGNING = 5
-
-#: A reviewer with nothing to require. Matched against the whole answer rather than a line of it:
-#: a review that quotes the word back while explaining what it would take to earn it would
-#: otherwise end the run, where a review that meant to accept and said more only costs a round.
-ACCEPTED = re.compile(r"\W*COMPLETE\W*", re.IGNORECASE)
-
-RELAYED = """Otherwise write what is wrong and what to do about it, citing files, lines and \
-commands. What you write is passed to that agent word for word and is all it will hear from you, \
-so leave nothing to be inferred."""
-
-IDEA = f"""Read this repository -- its README, its AGENTS.md or CLAUDE.md, its top-level layout \
--- and then open the idea below from {DIRECTIONS} orthogonal directions.
-
-A direction is an angle on the idea, not a restatement of it: two that would lead to the same \
-code are one direction, and one of them should be replaced; "the same thing but better" is not a \
-direction at all. Explore each against this repository and gather objective evidence -- paths \
-that already do something like it, prior art to extend, the surface it would touch. Explore them \
-at once rather than one after another if you can: they are independent, and each is a reading of \
-this repository under a different question. Read only: write nothing, change nothing, other than \
-the one file this ends by writing. This is the phase that decides what to build, and a repository \
-that has already been changed decides it for you. Do not invent references; a direction with no \
-precedent here says so in those words -- exploratory, no concrete precedent -- rather than \
-reaching for one.
-
-Then pick the one to build, and pick it on that evidence, in this order: how much of it is \
-grounded in code that is already here, how well it extends what this repository already does, \
-how small its surface is, and how sure you are of it.
-
-Write the draft to {DRAFT} -- and nothing else, no code, no scaffolding, not one file of the \
-work itself. It holds, under headings:
-
-- the idea as you were given it, word for word, unedited;
-- the direction you chose: what to build, by what mechanism, what it touches, the objective \
-evidence for it as a list of paths and prior art, the risks you know of, and how sure you are;
-- the ones you passed over, Alt-1 upward, one gist and its own evidence apiece, each saying in \
-one sentence why it is not the one;
-- what could be folded back in from them if the direction turns out to be wrong.
-
-It will be read by someone who did not watch you choose. Answer with the path you wrote and \
-nothing else: the draft will be read from the file.
-
-Idea:
-"""
-
-RELEVANT = f"""A coding agent has written the draft at {DRAFT} against this repository, from the \
-idea below. Read the repository, then read the draft, and say whether the two belong together at \
-all: a draft for another project, or for a repository that does not have what it says it will \
-extend, is one to say so about now rather than after a plan has been written for it.
-
-Then say whether its evidence holds -- a path it names that is not there, a pattern it says it \
-can extend that does not exist, a direction passed over for a reason this repository does not \
-support -- and whether the direction it chose is the one its own evidence points at.
-
-If the draft belongs to this repository and its evidence holds, answer with the single word \
-COMPLETE. {RELAYED}
-
-The idea it was written from:
-"""
-
-ANALYSE = f"""A coding agent has chosen what to build in this repository, in the draft at \
-{DRAFT}, and is about to plan it. Read the repository first -- what is there, how it is built, \
-how it is tested -- then read the draft, and answer under these headings and no others:
-
-CORE_RISKS: the assumptions this rests on that are most likely to be wrong, and how it fails \
-when they are.
-MISSING_REQUIREMENTS: what it will turn out to need that neither the idea nor the draft says.
-TECHNICAL_GAPS: where it is not feasible as described, or where the architecture will not take it.
-ALTERNATIVE_DIRECTIONS: the directions worth taking instead, with what each costs.
-QUESTIONS_FOR_USER: what only a person can decide, which the plan will otherwise decide by \
-guessing.
-CANDIDATE_CRITERIA: the acceptance criteria this ought to be held to, each one something a \
-command can check.
-
-You are not writing the plan and you are not choosing the direction again.
-
-What was asked for:
-"""
-
-STRUCTURE = """The plan states, under headings and in this order:
-
-- the goal, in a paragraph: what will be true when this is done.
-- the acceptance criteria, AC-1 upward. A criterion is deterministic or it is not a criterion: \
-each one carries the tests that must pass when it holds and the tests that must fail -- what the \
-work must refuse, not only what it must do. A number the idea stated is a requirement to be met, \
-not a direction to move in, unless it said otherwise.
-- the bounds of the path, at both ends: the most that would be worth doing, the least that would \
-still be the thing, and the choices left open along the way that either side may take either way.
-- how to approach it, and what in this repository to read first.
-- the order: what depends on what, and the milestones the work passes through.
-- the tasks that meet the criteria. Every task names the criterion it serves and carries one \
-tag -- `coding` for work to do, `analyze` for a question to settle. The work stays on the branch \
-it starts on, so no task moves it to another.
-- what the two of you settled and what you did not: what was agreed, what was disagreed and how \
-it was resolved, and anything still open.
-- what a person still has to decide, if anything is left that only a person can.
-"""
-
-WRITE_PLAN = f"""Write the plan now, to {PLAN}, taking the analysis below into account -- it \
-comes from a reviewer that read this repository and the draft without seeing your reasoning.
 
-{STRUCTURE}
-Write the plan and nothing else: no code, no scaffolding, not one file of the work itself.
-
-Answer with the path you wrote and nothing else: the plan will be read from the file.
-
-Analysis:
-"""
-
-CHALLENGE = f"""Review the plan at {PLAN}, which a coding agent wrote for this repository from \
-the draft at {DRAFT}. Read the repository and judge the plan against it, rather than against how \
-a plan usually looks. Answer under these headings and no others:
-
-AGREE: what is settled and should not be reopened.
-DISAGREE: what is unreasonable, and why.
-REQUIRED_CHANGES: what must change before this is worth executing at all -- a criterion that \
-cannot be checked, a task that names no criterion or carries no tag, a scope that has quietly \
-grown, a step that would move the work to another branch.
-OPTIONAL_IMPROVEMENTS: what would be better and does not block anything.
-UNRESOLVED: where you and it disagree and neither can settle it, which a person will have to.
-
-Judge it against what was asked for and the direction that was chosen, both below, and not only \
-against the goal the plan states -- that goal was written by the same agent, so a plan that has \
-drifted has drifted in both. The direction is allowed to be a departure from a literal reading of \
-the task; the plan is not allowed to be a departure from the direction.
-
-The plan is fixed once this is over, so anything you do not say now is not said. If nothing is \
-required and nothing under DISAGREE would change the work, answer with the single word COMPLETE \
-instead of the headings, and mean it: a plan is not improved by being asked for one more thing. \
-{RELAYED} Tell it too that where it thinks you are wrong it should say so in the plan, and say \
-why, since nobody will arbitrate it later.
-
-What was asked for:
-"""
-
-REVISE = f"""Revise the plan at {PLAN} against the review below, and answer with the path you \
-wrote and nothing else.
-
-Everything under REQUIRED_CHANGES is to be met or argued with in the plan itself, saying why. \
-What is under OPTIONAL_IMPROVEMENTS is yours to take or leave. What is under UNRESOLVED goes into \
-the plan as still open, in the words both of you used, since nobody will arbitrate it later. Keep \
-the plan the shape it already has, and do not start the work.
-
-Review:
-"""
-
-SETTLED = f"""The plan at {PLAN} has been through {CONVERGING} rounds of review without both \
-sides settling, which is as many as it gets: what is still open is open, and the plan says so.
-
-Write the last version now. Everything still disagreed goes in under what was not settled, in \
-the words both of you used, so that whoever reads it can see it was not agreed rather than \
-finding out later. Change nothing else, and do not start the work.
-
-Answer with the path you wrote and nothing else.
-
-The last review:
-"""
-
-COMMIT = f"""Commit {PLAN} and {DRAFT} together now, saying in the message that they are the \
-plan -- if this repository has no commit yet, this is its first. The work starts there and every \
-review reads what came after, so the plan is fixed by being in the history rather than by anyone \
-promising not to touch it.
-
-Their directory is one a project may well have told git to ignore, so add them with `git add -f` \
-and then check with `git ls-files --error-unmatch` that git really took them. A plan git never \
-took is a plan nothing can tell has changed.
-
-Answer with that commit's hash and nothing else.
-"""
-
-BUILD = f"""Build the plan in {PLAN} -- all of it. A round is not a task, a milestone or a stage: \
-work until you believe every acceptance criterion holds, and only then answer. If the plan has \
-stages, they are all done inside one round.
-
-Commit as you go: the reviews read the change since the plan's own commit, and work left \
-uncommitted is work they cannot tell from someone else's.
-
-The plan is the contract you are judged against, and it is now fixed -- do not edit it. Keep \
-{TRACKER} instead, starting it fresh from this plan, in two parts. The part that does not change: \
-the goal and the acceptance criteria, copied over, and never touched again. The part that does: \
-what is done, what is left, what you deferred and why, and every place the plan turned out to be \
-wrong along with what you did instead. Deferring is not finishing: a criterion you have set aside \
-is a criterion that does not hold, and the round is not over. Every review you are given goes in \
-too, with what you did about it and where you disagreed: the reviewer after it will not have seen \
-it, and that record is the only way it can know. Your summary covers one round; this covers all \
-of them, and it is read by someone who was at none.
-
-A task the plan tagged `analyze` is a question rather than work: settle it if the repository \
-settles it, and otherwise put it in the round summary as a question. The reviewer reads the \
-repository without having seen your reasoning, which is what makes its answer worth having.
-
-A reviewer will read what you write and answer, and what it answers is what you will be told \
-next. It reads the repository and not your reasoning, so it can be wrong: where you think it is, \
-say so and say why, and say what you did instead. Doing what a review asked while believing it \
-wrong is how two rounds become forty.
-
-Then answer with a summary of the round: what you built, which criteria it meets, which files \
-changed, what you tested and what it said -- every claim in it is a claim that reviewer will check.
-"""
-
-REVIEW = f"""A coding agent has been building the plan in {PLAN} in this repository and says it \
-is finished.
-
-The plan was committed, on its own, before the work began, and neither of you may change it now. \
-Check that first: `git diff <the commit below> -- {PLAN}` should be empty, and a plan edited \
-since is the whole of your answer: everything after it was judged against the wrong contract.
-
-Then check the claim against the repository: read {PLAN}, read the code, run the tests, read the \
-diff since that commit. Read {TRACKER} too, for what it says it has done -- as a claim to check, \
-not as evidence. Be skeptical in one direction in particular: work stubbed out, tests weakened or \
-special-cased to pass, criteria declared met by narrowing what they meant.
-
-If its summary put a question to you, answer it: it is a task the plan left to be settled, and \
-you are the one reading the repository without having watched the work.
-
-If every acceptance criterion genuinely holds, answer with the single word COMPLETE. {RELAYED}
-
-The commit the work starts from:
-"""
-
-ALIGN = f"""A coding agent has been building the plan in {PLAN} in this repository for several \
-rounds. This is not a review of the round: it is a check that the work is still the work.
-
-Read {PLAN} and {TRACKER}, then the diff since the commit below, and answer three questions. \
-Is every acceptance criterion still accounted for -- is there one nothing has touched, or one \
-quietly narrowed until it was met? Has anything been built that no criterion asked for? And of \
-what has been deferred, how much would have to hold before this could be called done at all?
-
-The plan is fixed. Where the work has departed from it, the departure is what has to be justified \
-or undone -- not the plan.
-
-If the work is still the plan's, answer with the single word COMPLETE. {RELAYED}
-
-The commit the work starts from:
-"""
-
-CODE_REVIEW = f"""A coding agent has finished the work for the plan in {PLAN}. The question here \
-is not whether it does what was asked, but whether what is now in the repository is any good.
-
-Review the change as a whole -- everything since the commit below, which is the one that added \
-the plan. The plan and its criteria are fixed, so do not ask for a change that would leave one of \
-them unmet. The criteria were checked before this loop began and are not reopened -- but they \
-still have to hold, so run the tests each one names, and a criterion that no longer holds is the \
-whole of your answer. Then correctness, then the things a diff hides: an error path nothing \
-takes, a case the tests do not reach, something duplicated rather than shared, a name that now \
-lies.
-
-Mark each thing you find with how much it matters, [P0] through [P9]: P0 is what must not ship, \
-and P9 is what you would mention and not insist on. A finding with no marker reads as P0.
-
-Read {TRACKER} for the reviews before yours and what the agent said back: a review already argued \
-and reversed is not one to ask for again, and two reviewers who each remember nothing can undo \
-one another for as long as they are both asked.
-
-If there is nothing that should be fixed before this ships, answer with the single word COMPLETE: \
-a review that finds something every time is not a review. {RELAYED}
-
-The commit the work starts from:
-"""
-
-
-def spoken(agent: AgentBase | SessionBase, prompt: str) -> str:
-    """What a turn answered, taking it again for as long as taking it keeps failing.
-
-    A turn that failed is a turn to take again, and only that turn: a round here is hours of work
-    and a review is one question about it, so letting a failed review send the round back would
-    pay for the expensive half twice to recover from the cheap half.
+#: Where a draft goes when nobody said, as `validate-gen-idea-io.sh` resolves it.
+IDEAS = ".humanize/ideas"
+
+#: What the plan is called when nobody said, which is what the plugin's own examples use.
+PLAN = "docs/plan.md"
+
+#: Which part of the setup sheet each setting is under, which is one part per command: a flag
+#: only means anything against the phase it is a flag of, and twenty-three of them in one list
+#: is a list nobody reads.
+_IDEA_SECTION: JsonDict = {"section": "gen-idea  ·  open the idea into a draft"}
+_PLAN_SECTION: JsonDict = {"section": "gen-plan  ·  turn the draft into a plan"}
+_LOOP_SECTION: JsonDict = {"section": "rlcr  ·  build the plan under review"}
+
+
+class Config(BaseModel):
+    """Every flag PolyArch/humanize takes, under the name the plugin gives it.
+
+    Three sections, one per command, which is how the sheet that asks about them is drawn:
+    each field says which one it is under. What the plugin reads from `.humanize/config.json`
+    is here too, since a config file and a flag are the same setting arrived at two ways --
+    and this is the one way.
+
+    What the plugin says with a model name is said here by choosing an agent: `codex_model`,
+    `codex_effort`, `bitlesson_model` and `provider_mode` are all "which model does this
+    half", which is `/agents` -- and this flow has five halves to answer for rather than one.
+    `--allow-empty-bitlesson-none` and `--require-bitlesson-entry-for-none` are one switch
+    written twice, and so are `--input`, `--output` and `--plan-file`: the draft and the plan
+    are each one path, named once here and handed from phase to phase.
+    """
+
+    model_config = {"frozen": True}
+
+    # -- gen-idea --------------------------------------------------------------------
+    gen_idea: bool = Field(
+        default=True,
+        description="open the idea into a repo-grounded draft",
+        json_schema_extra=_IDEA_SECTION,
+    )
+    n: int = Field(
+        default=6,
+        ge=2,
+        le=10,
+        description="--n: how many directions explore the idea",
+        json_schema_extra=_IDEA_SECTION,
+    )
+    idea_output: str = Field(
+        default="",
+        description="--output: where the draft goes, blank for .humanize/ideas",
+        json_schema_extra=_IDEA_SECTION,
+    )
+
+    # -- gen-plan --------------------------------------------------------------------
+    gen_plan: bool = Field(
+        default=True,
+        description="turn the draft into a plan, against review",
+        json_schema_extra=_PLAN_SECTION,
+    )
+    plan_output: str = Field(
+        default="",
+        description="--output: where the plan goes, blank for docs/plan.md",
+        json_schema_extra=_PLAN_SECTION,
+    )
+    gen_plan_mode: Literal["discussion", "direct"] = Field(
+        default="discussion",
+        description="--discussion or --direct: converge, or write it once",
+        json_schema_extra=_PLAN_SECTION,
+    )
+    auto_start_rlcr_if_converged: bool = Field(
+        default=False,
+        description="--auto-start-rlcr-if-converged: no review gate once converged",
+        json_schema_extra=_PLAN_SECTION,
+    )
+    alternative_plan_language: str = Field(
+        default="",
+        description="a translated plan too: zh, ko, ja, es, fr, de, pt, ru, ar",
+        json_schema_extra=_PLAN_SECTION,
+    )
+
+    # -- start-rlcr-loop -------------------------------------------------------------
+    rlcr: bool = Field(
+        default=True,
+        description="build the plan under review",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    plan_file: str = Field(
+        default="",
+        description="--plan-file: the plan to build, blank for the one just made",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    max: int = Field(
+        default=42,
+        ge=0,
+        description="--max: rounds before the loop stops",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    codex_timeout: int = Field(
+        default=5400,
+        ge=0,
+        description="--codex-timeout: seconds one review may take",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    full_review_round: int = Field(
+        default=5,
+        ge=2,
+        description="--full-review-round: rounds between alignment checks",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    base_branch: str = Field(
+        default="",
+        description="--base-branch: what the code review reads against",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    track_plan_file: bool = Field(
+        default=False,
+        description="--track-plan-file: the plan is in git and stays clean",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    push_every_round: bool = Field(
+        default=False,
+        description="--push-every-round: push after every round",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    skip_impl: bool = Field(
+        default=False,
+        description="--skip-impl: no building, straight to the code review",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    claude_answer_codex: bool = Field(
+        default=False,
+        description="--claude-answer-codex: the builder answers open questions",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    agent_teams: bool = Field(
+        default=False,
+        description="--agent-teams: the builder leads a team instead of coding",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    skip_quiz: bool = Field(
+        default=False,
+        description="--skip-quiz: do not check you have read the plan",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    yolo: bool = Field(
+        default=False,
+        description="--yolo: --skip-quiz and --claude-answer-codex together",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    privacy: bool = Field(
+        default=False,
+        description="--privacy: no methodology analysis when the loop exits",
+        json_schema_extra=_LOOP_SECTION,
+    )
+    require_bitlesson_entry_for_none: bool = Field(
+        default=False,
+        description="--require-bitlesson-entry-for-none: a round records a lesson",
+        json_schema_extra=_LOOP_SECTION,
+    )
+
+    @model_validator(mode="after")
+    def _settles(self) -> Config:
+        """Turns the aliases into what they alias, and refuses what cannot be run.
+
+        Returns:
+          The config, with `--yolo` spelled out as the two flags it is a name for.
+
+        Raises:
+          ValueError: If no phase is on, or if the phases that are on cannot hand to each
+            other -- an idea opened for a loop that will build somebody else's plan is the
+            drafting thrown away, and is a run nobody meant to ask for.
+        """
+        if self.yolo:
+            object.__setattr__(self, "skip_quiz", True)
+            object.__setattr__(self, "claude_answer_codex", True)
+        if not (self.gen_idea or self.gen_plan or self.rlcr):
+            raise ValueError("nothing to run: turn on gen_idea, gen_plan or rlcr")
+        if self.gen_idea and self.rlcr and not self.gen_plan:
+            raise ValueError(
+                "gen_idea with rlcr and no gen_plan: the draft this would write is not a "
+                "plan, so the loop would build whatever plan_file already says instead -- "
+                "turn gen_plan on, or turn one of the other two off"
+            )
+        if self.skip_impl and not self.rlcr:
+            raise ValueError("skip_impl is about the loop: turn rlcr on, or it off")
+        if self.gen_plan and not self.gen_idea and not self.idea_output:
+            raise ValueError(
+                "gen_plan without gen_idea needs a draft to plan from: set idea_output to "
+                "the draft you already have"
+            )
+        if (
+            self.rlcr
+            and not self.gen_plan
+            and not self.plan_file
+            and not self.skip_impl
+        ):
+            raise ValueError(
+                "rlcr without gen_plan needs a plan to build: set plan_file, or turn on "
+                "skip_impl, which reviews the branch without one"
+            )
+        return self
+
+
+def _language(said: str) -> tuple[str, str]:
+    """The language a translated plan would be written in, and its code.
 
     Args:
-      agent: Whose turn it is -- a session, when the turns are to remember each other, and the
-        agent itself for a review, which is a session that has just started.
-      prompt: What to say to it.
+      said: What the config asked for, by name or by code, in any case.
 
     Returns:
-      What it answered.
+      The language and its code, or two empty strings -- for nothing asked for, for English,
+      and for anything the plugin's table does not hold, which it warns about and disables.
     """
-    while True:
-        said = agent(prompt, suppress=True)
-        # A turn that exits clean having said nothing has not answered either, and passing that
-        # on would spend a round asking the other side to reply to silence.
-        if said:
-            return said
-        time.sleep(5)
+    wanted = said.strip().lower()
+    if not wanted or wanted in ("english", "en"):
+        return "", ""
+    for named, code in LANGUAGES.items():
+        if wanted in (named, code):
+            return named.capitalize(), code
+    print(
+        f'Warning: unsupported alternative_plan_language "{said}". Supported values: '
+        + ", ".join(f"{one.capitalize()} ({code})" for one, code in LANGUAGES.items())
+        + ". Translation variant will not be generated."
+    )
+    return "", ""
 
 
-@dataclass
-class Loop:
-    """The RLCR loop, as the thing the builder runs into every time it tries to stop.
+def _slug(task: str) -> str:
+    """A short name for an idea, as `validate-gen-idea-io.sh` makes one.
 
-    A round is the builder believing the whole plan is done, which is the moment it stops -- so
-    that is where the review goes, and what the review says is what the builder hears instead of
-    stopping. Two phases: the work is reviewed against the plan until nothing is left to require,
-    and then what was built is reviewed as code until nothing is left to fix.
+    Args:
+      task: The idea.
 
-    Attributes:
-      reviewer: Who reads each round, in a session that has just started every time.
-      base: The commit the plan was fixed in, which every review reads the work since.
-      rounds: How many rounds have been reviewed, counted here rather than taken from the turn:
-        a turn that failed is taken again, and the round it was taking is the same round.
-      building: Whether the work is still being built rather than read as code.
-      told: Every review given, oldest first, which is what the run has to show for itself.
+    Returns:
+      Its first few words, lowercased, joined with dashes.
     """
+    words = re.findall(r"[a-z0-9]+", task.lower())[:6]
+    return "-".join(words) or "idea"
 
-    reviewer: AgentBase
-    base: str
-    rounds: int = 0
-    building: bool = True
-    told: list[str] = field(default_factory=list[str])
 
-    def __call__(self, occasion: Occasion) -> Verdict | None:
-        """Reviews the round the builder has just finished, and says whether it may stop.
+def _stamp() -> str:
+    """Now, as the plugin stamps a file name."""
+    import datetime
 
-        Args:
-          occasion: The turn stopping, whose `said` is the summary of the round.
+    return datetime.datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
 
-        Returns:
-          What to send the builder on with, or None to let the round be the last one.
-        """
-        self.rounds += 1
-        if self.rounds >= ROUNDS:
-            return None  # as many rounds as the loop gets: what is not done is not done
-        if self.building:
-            # Every fifth round is a check that the work is still the work rather than a review
-            # of the round: a loop that only ever reads the last round drifts one round at a time.
-            asked = ALIGN if (self.rounds + 1) % ALIGNING == 0 else REVIEW
-            said = self.review(
-                f"{asked}{self.base}\n\nIts summary of the round:\n{occasion.said}"
-            )
-            if said is not None:
-                return said
-            # The claim is settled and is not asked again: a code review that sent the work back
-            # to be judged against the plan would put it to a reviewer that was not there for
-            # the answer, and two reviewers that each remember nothing can go on undoing one
-            # another for as long as they are both asked.
-            self.building = False
-        return self.review(
-            f"{CODE_REVIEW}{self.base}\n\nWhat it says it has done:\n{occasion.said}"
+
+def _head(root: Path) -> str:
+    """The branch the work is on, or "" outside a git repository.
+
+    Args:
+      root: The workspace.
+
+    Returns:
+      The branch.
+    """
+    status, branch = git("rev-parse", "--abbrev-ref", "HEAD", at=root)
+    return "" if status else branch
+
+
+def _base(root: Path, asked: str) -> str:
+    """What the code review reads the work against, as the setup script resolves it.
+
+    Args:
+      root: The workspace.
+      asked: What the config said, or "" to work it out.
+
+    Returns:
+      The branch: what was asked for, else the remote's default, else `main`, else `master`,
+      and "" where this repository has none of them -- which is a run without a code review.
+    """
+    if asked:
+        return asked
+    status, said = git("symbolic-ref", "refs/remotes/origin/HEAD", at=root)
+    if not status and said:
+        remote = said.rsplit("/", 1)[-1]
+        if not git("show-ref", "--verify", "--quiet", f"refs/heads/{remote}", at=root)[
+            0
+        ]:
+            return remote
+    for named in ("main", "master"):
+        if not git("show-ref", "--verify", "--quiet", f"refs/heads/{named}", at=root)[
+            0
+        ]:
+            return named
+    return ""
+
+
+def _section(held: str, *headings: str) -> str:
+    """One section of a plan, by any of the headings it might be under.
+
+    Args:
+      held: The plan.
+      headings: The words the heading might start with, lowercased.
+
+    Returns:
+      What is under the first one that is there, or "" if none of them is.
+    """
+    lines = held.splitlines()
+    for at, line in enumerate(lines):
+        if not line.startswith("## "):
+            continue
+        named = line[3:].strip().lower()
+        if not any(named.startswith(one) for one in headings):
+            continue
+        found: list[str] = []
+        for under in lines[at + 1 :]:
+            if under.startswith("## "):
+                break
+            found.append(under)
+        return "\n".join(found).strip()
+    return ""
+
+
+def _quiz(said: str) -> dict[str, str]:
+    """The quiz an agent wrote, read back field by field.
+
+    Args:
+      said: What it answered.
+
+    Returns:
+      Every field it stated, or nothing at all where one is missing or an answer is not one
+      of the four letters -- which the plugin warns about and carries on from.
+    """
+    found = {
+        name: value.strip()
+        for name, value in re.findall(
+            r"^(QUESTION_[12]|OPTION_[12][A-D]|ANSWER_[12]|PLAN_SUMMARY):\s*(.*)$",
+            said,
+            re.MULTILINE,
+        )
+    }
+    wanted = ["QUESTION_1", "QUESTION_2", "ANSWER_1", "ANSWER_2", "PLAN_SUMMARY"] + [
+        f"OPTION_{n}{letter}" for n in "12" for letter in "ABCD"
+    ]
+    if any(name not in found for name in wanted):
+        return {}
+    if any(found[f"ANSWER_{n}"].upper() not in ("A", "B", "C", "D") for n in "12"):
+        return {}
+    return found
+
+
+def _asked(human: HumanAgent, question: str, options: list[str]) -> str:
+    """Puts one multiple-choice question to whoever is at the prompt.
+
+    Args:
+      human: The person, driven as an agent.
+      question: What to ask.
+      options: What they may answer, in order.
+
+    Returns:
+      The letter they picked, uppercased, or "" where nobody was there to pick one -- which
+      is a command line, where the quiz is advisory and the run carries on.
+    """
+    listed = "\n".join(
+        f"  {letter}. {one}" for letter, one in zip("ABCD", options, strict=False)
+    )
+    said = human(f"{question}\n{listed}\n\nAnswer with A, B, C or D.")
+    return said.strip()[:1].upper() if said else ""
+
+
+def _idea(drafting: SessionBase, task: str, config: Config, root: Path) -> Path:
+    """`gen-idea`: opens the idea from N directions at once and closes it to one.
+
+    Args:
+      drafting: The session the drafter opens the idea in.
+      task: The idea, as it was given.
+      config: How this run was set up.
+      root: The workspace.
+
+    Returns:
+      The draft the builder wrote.
+
+    Raises:
+      ValueError: If the draft cannot be written where it was asked for, which is what the
+        plugin's IO validation exits on before anything runs.
+    """
+    where = Path(config.idea_output or f"{IDEAS}/{_slug(task)}-{_stamp()}.md")
+    if not where.is_absolute():
+        where = root / where
+    if where.exists():
+        raise ValueError(
+            f"{where}: output file already exists - choose a different path"
+        )
+    where.parent.mkdir(parents=True, exist_ok=True)
+    if not os.access(where.parent, os.W_OK):
+        raise ValueError(f"{where.parent}: no write permission to output directory")
+    spoken(
+        drafting,
+        render(
+            planning.GEN_IDEA,
+            N=config.n,
+            OUTPUT_FILE=where,
+            TEMPLATE=planning.GEN_IDEA_TEMPLATE,
+            IDEA_BODY=task,
+        ),
+    )
+    return where
+
+
+def _plan(
+    agents: Agents,
+    writing: SessionBase,
+    task: str,
+    config: Config,
+    root: Path,
+    draft: Path,
+) -> Path:
+    """`gen-plan`: the reviewer reads first, the builder writes, and the two converge.
+
+    Args:
+      agents: The agents the flow drives.
+      writing: The session the planner holds for the whole of the planning.
+      task: What was asked for.
+      config: How this run was set up.
+      root: The workspace.
+      draft: What the plan is written from.
+
+    Returns:
+      The plan.
+
+    Raises:
+      ValueError: If the draft is not there, is empty, does not belong to this repository, or
+        the plan cannot be written where it was asked for.
+    """
+    if not draft.is_file():
+        raise ValueError(f"{draft}: input file not found")
+    held = draft.read_text(encoding="utf-8")
+    if not held.strip():
+        raise ValueError(f"{draft}: input file is empty")
+    where = Path(config.plan_output or PLAN)
+    if not where.is_absolute():
+        where = root / where
+    if where.exists():
+        raise ValueError(
+            f"{where}: output file already exists - please choose another path"
+        )
+    if not where.parent.is_dir():
+        raise ValueError(f"{where.parent}: output directory does not exist")
+
+    said = spoken(
+        agents.analyst,
+        render(planning.RELEVANCE, INPUT_FILE=draft, DRAFT_CONTENT=held),
+    )[0]
+    if said.strip().upper().startswith("NOT_RELEVANT"):
+        raise ValueError(
+            f"the draft does not appear to be related to this repository: {said}"
         )
 
-    def review(self, asked: str) -> Verdict | None:
-        """Puts one round to the reviewer, and reads its answer as a verdict.
+    # The plan file starts as the template with the draft under it, which is what the plugin
+    # copies into place before the builder writes a word: the draft is the human input, and
+    # it stays in the file rather than being read once and paraphrased away.
+    where.write_text(
+        planning.GEN_PLAN_TEMPLATE
+        + "\n--- Original Design Draft Start ---\n\n"
+        + held
+        + "\n--- Original Design Draft End ---\n",
+        encoding="utf-8",
+    )
 
-        Args:
-          asked: What to ask about the round.
+    analysis = spoken(
+        agents.analyst,
+        render(planning.GEN_PLAN_ANALYSIS, INPUT_FILE=draft, DRAFT_CONTENT=held),
+    )[0]
+    spoken(
+        writing,
+        render(planning.GEN_PLAN_CANDIDATE, OUTPUT_FILE=where, ANALYSIS=analysis),
+    )
 
-        Returns:
-          What the builder is to hear instead of stopping, or None for a reviewer that had
-          nothing to require.
-        """
-        said = spoken(self.reviewer, asked)
-        if ACCEPTED.fullmatch(said):
-            return None
-        self.told.append(said)
-        return Verdict(refused=True, because=said)
+    converged = False
+    prior = ""
+    if config.gen_plan_mode == "discussion":
+        for _ in range(CONVERGING):
+            review = spoken(
+                agents.analyst,
+                render(
+                    planning.GEN_PLAN_CONVERGENCE,
+                    OUTPUT_FILE=where,
+                    TASK=task,
+                    PRIOR=prior,
+                ),
+            )[0]
+            if review.strip() == loop.COMPLETE:
+                converged = True
+                break
+            prior = f"What was still open after the last round:\n\n{review}\n"
+            spoken(
+                writing,
+                render(planning.GEN_PLAN_REVISION, OUTPUT_FILE=where, REVIEW=review),
+            )
+
+    # `--auto-start-rlcr-if-converged` is the one thing that skips the person: it is only
+    # ever satisfied in discussion mode, with the plan converged and nothing left to decide.
+    reviewing = not (
+        config.auto_start_rlcr_if_converged
+        and converged
+        and config.gen_plan_mode == "discussion"
+    )
+    spoken(
+        writing,
+        render(
+            planning.GEN_PLAN_FINAL,
+            OUTPUT_FILE=where,
+            CONVERGENCE_STATUS="converged" if converged else "partially_converged",
+            DECISIONS=(
+                "\nPut every remaining `PENDING` decision to the person at the prompt with "
+                "`AskUserQuestion` before writing the final plan, and record what they "
+                "decide in place of the `PENDING` status. Confirm every quantitative metric "
+                "the draft states with them too: whether it is a hard requirement or a "
+                "direction to move in, which changes how the acceptance criteria are "
+                "written.\n"
+                if reviewing
+                else ""
+            ),
+        ),
+    )
+    language, code = _language(config.alternative_plan_language)
+    if language:
+        spoken(
+            writing,
+            render(
+                planning.GEN_PLAN_TRANSLATE,
+                OUTPUT_FILE=where,
+                LANGUAGE=language,
+                VARIANT_FILE=where.with_name(f"{where.stem}_{code}{where.suffix}"),
+            ),
+        )
+    return where
 
 
-def run(agents: Agents, task: str) -> None:
-    builder, reviewer = agents
-    building = builder.new()  # one session for the whole run: the builder remembers
+def _rlcr(
+    agents: Agents,
+    building: SessionBase,
+    config: Config,
+    root: Path,
+    plan: Path | None,
+) -> None:
+    """`start-rlcr-loop`: the plan is built under review until nothing is left to say.
 
-    # gen-idea: the idea is opened from every direction at once and closed to one, and what
-    # comes out is a file rather than a turn -- everything after this reads the draft.
-    told = IDEA + task
-    for _ in range(CONVERGING):
-        spoken(building, told)
-        told = spoken(reviewer, RELEVANT + task)
-        if ACCEPTED.fullmatch(told):
-            break
-    # A draft still being argued with after three rounds goes to the planning anyway: the
-    # reviewer reads this repository again before the plan is written and again after, so a
-    # draft that does not belong to it is caught there rather than spun on here.
+    Args:
+      agents: The agents the flow drives.
+      building: The session the builder holds for the whole of the loop.
+      config: How this run was set up.
+      root: The workspace.
+      plan: The plan to build, or None for a `--skip-impl` run that has none.
 
-    # gen-plan: the reviewer reads the repository before the plan exists, the builder writes the
-    # plan against that, and the two go round until neither has anything left to require.
-    told = WRITE_PLAN + spoken(reviewer, ANALYSE + task)
-    for _ in range(CONVERGING):
-        spoken(building, told)
-        told = spoken(reviewer, CHALLENGE + task)
-        if ACCEPTED.fullmatch(told):
-            break
-        told = REVISE + told
+    Raises:
+      ValueError: If the loop cannot start: not a git repository, no plan where one is
+        needed, a plan that is not this repository's, or one that would move the branch.
+    """
+    if _head(root) == "":
+        raise ValueError(
+            "rlcr runs in a git repository: every review reads the work since the commit "
+            "the plan was fixed in"
+        )
+    if (
+        config.agent_teams
+        and os.environ.get("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS") != "1"
+    ):
+        raise ValueError(
+            "agent_teams requires the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS environment "
+            "variable to be set:\n\n  export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1"
+        )
+    if config.push_every_round and not git("remote", at=root)[1]:
+        raise ValueError(
+            "push_every_round needs a remote to push to, and this repository has none"
+        )
+    held = ""
+    if plan is not None:
+        if not plan.is_file():
+            raise ValueError(f"{plan}: no plan file to build")
+        held = plan.read_text(encoding="utf-8")
+        if len(held.splitlines()) < _ENOUGH:
+            raise ValueError(f"{plan}: the plan file has almost nothing in it")
+
+    # The plan is checked before anything is set up: a plan for another repository, or one
+    # that would move the work to another branch, is one to say so about now.
+    if plan is not None and not config.skip_impl:
+        verdict = spoken(
+            agents.reviewer,
+            render(prompts.PLAN_COMPLIANCE, PLAN_FILE=plan, PLAN_CONTENT=held),
+        )[0]
+        if "FAIL_RELEVANCE" in verdict:
+            raise ValueError(f"the plan is not related to this repository: {verdict}")
+        if "FAIL_BRANCH_SWITCH" in verdict:
+            raise ValueError(
+                "the plan contains branch-switching instructions, which are incompatible "
+                f"with RLCR: {verdict}"
+            )
+
+    if plan is not None and not (config.skip_quiz or config.skip_impl):
+        _understood(agents, plan, held)
+
+    stamp = loop.started()
+    where = loop.directory(root, stamp)
+    if plan is None:
+        (where / "plan.md").write_text(
+            "# Skip Implementation Mode\n\nThis RLCR loop was started with `skip_impl`, "
+            "which skips the implementation phase and goes directly to code review.\n\n"
+            "No implementation plan was provided - this is expected for skip-impl mode.\n",
+            encoding="utf-8",
+        )
+        named = str((where / "plan.md").relative_to(root))
     else:
-        # Three rounds and still not settled: what is open is written down as open rather than
-        # argued for a fourth time, and the plan goes to the work saying so.
-        spoken(building, SETTLED + told.removeprefix(REVISE))
+        shutil.copyfile(plan, where / "plan.md")
+        named = str(plan.relative_to(root) if plan.is_relative_to(root) else plan)
 
-    # The one fact the run owns. Asked of the builder, because an agent working on another machine
-    # is the only one that can see the repository the work happens in -- and held here, because a
-    # plan that recorded its own commit could not match it, having grown the line that records it.
-    base = spoken(building, COMMIT)
+    base = _base(root, config.base_branch)
+    commit = git("rev-parse", base, at=root)[1] if base else ""
+    state = State(
+        current_round=0,
+        max_iterations=config.max,
+        codex_model=agents.reviewer.config.model,
+        codex_effort=agents.reviewer.config.effort,
+        codex_timeout=config.codex_timeout,
+        push_every_round=config.push_every_round,
+        full_review_round=config.full_review_round,
+        plan_file=named,
+        plan_tracked=config.track_plan_file,
+        start_branch=_head(root),
+        base_branch=base,
+        base_commit=commit,
+        review_started=config.skip_impl,
+        ask_codex_question=not config.claude_answer_codex,
+        agent_teams=config.agent_teams,
+        privacy_mode=config.privacy,
+        # Skip-impl does not use the BitLesson-aware summary template, so enforcing it
+        # would block a review-only run on a section nothing asked it to write.
+        bitlesson_required=not config.skip_impl,
+        bitlesson_allow_empty_none=not config.require_bitlesson_entry_for_none,
+        mainline_stall_count=0,
+        started_at=_utc(),
+    )
+    running = Loop(agents.reviewer, where, root, state)
+    _set_up(running, config, plan, held)
+    if config.skip_impl:
+        (where / loop.REVIEW_STARTED).write_text(
+            "build_finish_round=0\n", encoding="utf-8"
+        )
 
-    # start-rlcr-loop: the loop is a hook, so a round ends where the builder would have.
-    with builder.hooks.on(Moment.STOP, Loop(reviewer, base)):
-        spoken(building, BUILD)
+    told = _round_zero(running, config, held)
+    running.prompt.write_text(told, encoding="utf-8")
+    with (
+        agents.builder.hooks.on(Moment.STOP, running),
+        agents.builder.hooks.on(Moment.PERMISSION_REQUEST, guards.Guard(running, root)),
+        agents.builder.hooks.on(
+            Moment.USER_PROMPT_SUBMIT, guards.Prompted(running, root)
+        ),
+    ):
+        spoken(building, told)
+
+
+#: How few lines a plan may have before it is not a plan, as the setup script counts them.
+_ENOUGH = 5
+
+
+def _utc() -> str:
+    """Now, as the state file records it."""
+    import datetime
+
+    return datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _understood(agents: Agents, plan: Path, held: str) -> None:
+    """The plan understanding quiz, which is advisory and never a gate.
+
+    Two questions about how the plan will be built, put to whoever is at the prompt. Getting
+    one wrong is not refused: what it earns is the summary of what the plan actually does,
+    and the choice to go on or to stop and read it. Nobody at the prompt is nobody to quiz,
+    so a command line runs straight through.
+
+    Args:
+      agents: The agents the flow drives.
+      plan: The plan.
+      held: What it says.
+
+    Raises:
+      ValueError: If the person read the summary and chose to stop and review the plan.
+    """
+    said = spoken(
+        agents.reviewer,
+        render(prompts.PLAN_UNDERSTANDING_QUIZ, PLAN_FILE=plan, PLAN_CONTENT=held),
+    )[0]
+    quiz = _quiz(said)
+    if not quiz:
+        print("Plan understanding quiz unavailable, continuing without it.")
+        return
+    answered = 0
+    asked = 0
+    for n in "12":
+        options = [quiz[f"OPTION_{n}{letter}"] for letter in "ABCD"]
+        picked = _asked(agents.human, quiz[f"QUESTION_{n}"], options)
+        if not picked:
+            return  # nobody is at the prompt, so there is nobody to quiz
+        asked += 1
+        answered += picked == quiz[f"ANSWER_{n}"].upper()
+    if asked and answered == asked:
+        print("Your understanding of the plan looks solid. Proceeding with setup.")
+        return
+    going = agents.human(
+        f"{quiz['PLAN_SUMMARY']}\n\nThe answers were "
+        + ", ".join(f"Q{n}: {quiz[f'ANSWER_{n}'].upper()}" for n in "12")
+        + ".\n\nWould you like to proceed with the RLCR loop anyway, or stop and review "
+        "the plan more carefully first?\n  A. Proceed with RLCR loop\n"
+        "  B. Stop and review the plan first\n\nAnswer with A or B."
+    )
+    if going.strip()[:1].upper() == "B":
+        raise ValueError(
+            "stopping. Please review the plan file and run the flow again when ready"
+        )
+
+
+def _set_up(running: Loop, config: Config, plan: Path | None, held: str) -> None:
+    """Writes everything a loop starts with: the tracker, the contract, the lessons, the state.
+
+    Args:
+      running: The loop.
+      config: How this run was set up.
+      plan: The plan, or None for a review-only run.
+      held: What the plan says.
+    """
+    where = running.where
+    lessons = running.root / running.state.bitlesson_file
+    if not lessons.exists():
+        lessons.parent.mkdir(parents=True, exist_ok=True)
+        lessons.write_text(prompts.BITLESSON, encoding="utf-8")
+    goal = _section(held, "goal", "objective", "overview")
+    criteria = _section(held, "acceptance", "criteria", "requirements")
+    if config.skip_impl and plan is not None:
+        tracker = render(
+            prompts.GOAL_TRACKER_SKIP_IMPL_ANCHORED,
+            PLAN_GOAL_CONTENT=goal
+            or f"Preserve the original plan scope from {running.state.plan_file} while "
+            "resolving code review findings on the current branch.",
+            PLAN_AC_CONTENT=criteria
+            or f"- The current branch remains aligned with the original plan at "
+            f"{running.state.plan_file}.\n- All blocking `[P0-9]` code review findings are "
+            "resolved without widening scope beyond the original plan.\n- Non-blocking "
+            "follow-up items are explicitly queued and do not block completion.",
+            PLAN_FILE=running.state.plan_file,
+        )
+    elif config.skip_impl:
+        tracker = prompts.GOAL_TRACKER_SKIP_IMPL
+    else:
+        tracker = render(
+            prompts.GOAL_TRACKER,
+            GOAL_SECTION=goal
+            or "[To be extracted from plan by the builder in Round 0]\n\nSource plan: "
+            + running.state.plan_file,
+            AC_SECTION=criteria
+            or "[To be defined by the builder in Round 0 based on the plan]",
+        )
+    running.tracker.write_text(tracker, encoding="utf-8")
+    running.summary.write_text(
+        render(prompts.SUMMARY_TEMPLATE, ROUND=0), encoding="utf-8"
+    )
+    if config.skip_impl:
+        running.contract.write_text(
+            render(
+                prompts.ROUND_CONTRACT_SKIP_IMPL_ANCHORED,
+                PLAN_FILE=running.state.plan_file,
+            )
+            if plan is not None
+            else prompts.ROUND_CONTRACT_SKIP_IMPL,
+            encoding="utf-8",
+        )
+    (where / "state.md").write_text(running.state.written(), encoding="utf-8")
+
+
+def _round_zero(running: Loop, config: Config, held: str) -> str:
+    """The prompt the builder starts on, as the setup script writes it.
+
+    Args:
+      running: The loop.
+      config: How this run was set up.
+      held: What the plan says, which round 0 is given in full.
+
+    Returns:
+      The prompt.
+    """
+    if config.skip_impl:
+        return render(
+            prompts.ROUND_0_SKIP_IMPL,
+            BASE_BRANCH=running.state.base_branch,
+            START_BRANCH=running.state.start_branch,
+            PLAN_FILE=running.state.plan_file,
+            GOAL_TRACKER_FILE=running.tracker,
+            ROUND_CONTRACT_FILE=running.contract,
+            SUMMARY_FILE=running.summary,
+            ANCHOR=render(
+                prompts.ROUND_0_SKIP_IMPL_ANCHORED, PLAN_FILE=running.state.plan_file
+            )
+            if held
+            else prompts.ROUND_0_SKIP_IMPL_UNANCHORED,
+        )
+    teams = ""
+    if config.agent_teams:
+        teams = (
+            "\n" + prompts.AGENT_TEAMS_INSTRUCTIONS + "\n" + prompts.AGENT_TEAMS_CORE
+        )
+    told = render(
+        prompts.ROUND_0,
+        GOAL_TRACKER_FILE=running.tracker,
+        ROUND_CONTRACT_FILE=running.contract,
+        SUMMARY_FILE=running.summary,
+        TASK_LANES=prompts.TASK_LANES,
+        PLAN_CONTENT=held,
+        BITLESSON_SELECTION=render(
+            prompts.BITLESSON_SELECTION,
+            BITLESSON_FILE=running.root / running.state.bitlesson_file,
+        ),
+        AGENT_TEAMS=teams,
+    )
+    if config.push_every_round:
+        told += prompts.PUSH_EVERY_ROUND_NOTE
+    return told
+
+
+def run(agents: Agents, task: str, config: Config | None = None) -> None:
+    """Runs whichever of the three phases this was set up to run, in order.
+
+    Args:
+      agents: The drafter, the planner and its analyst, the builder and its reviewer, and
+        whoever is at the prompt.
+      task: The idea, as it was given.
+      config: How the run was set up, or None for the plugin's own defaults -- which is all
+        three phases, and every flag as the plugin ships it.
+
+    Raises:
+      ValueError: If a phase that is on cannot start: a draft that is not there, a plan that
+        is not this repository's, a loop outside a git repository. Said before the first turn
+        rather than found hours into one.
+    """
+    setting = config or Config()
+    root = Path.cwd()
+    if setting.gen_idea and not task.strip():
+        raise ValueError("gen_idea opens an idea, and this run was given none")
+
+    # One session per phase, held for the whole of it: the side that writes remembers how it
+    # got there, and the next phase starts from the file rather than from the conversation --
+    # which is what makes the three of them three commands rather than one long turn.
+    draft = Path(setting.idea_output) if setting.idea_output else None
+    if draft is not None and not draft.is_absolute():
+        draft = root / draft
+    if setting.gen_idea:
+        draft = _idea(agents.drafter.new(), task, setting, root)
+
+    plan = Path(setting.plan_file) if setting.plan_file else None
+    if plan is not None and not plan.is_absolute():
+        plan = root / plan
+    if setting.gen_plan:
+        if draft is None:
+            raise ValueError(
+                "gen_plan needs a draft: set idea_output, or turn gen_idea on"
+            )
+        plan = _plan(agents, agents.planner.new(), task, setting, root, draft)
+
+    if setting.rlcr:
+        _rlcr(
+            agents,
+            agents.builder.new(),
+            setting,
+            root,
+            None if setting.skip_impl and plan is None else plan,
+        )

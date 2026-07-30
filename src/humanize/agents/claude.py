@@ -100,20 +100,32 @@ class ClaudeCodeSession(StreamSessionBase):
             self._agent.config.effort,
         ]
 
-    def _write(self, text: str) -> str:
-        """Renders one thing to say as the user message Claude reads it as."""
-        return (
-            json.dumps(
-                {
-                    "type": "user",
-                    "message": {
-                        "role": "user",
-                        "content": [{"type": "text", "text": text}],
-                    },
-                }
-            )
-            + "\n"
-        )
+    def _write(self, text: str, ticket: str = "") -> str:
+        """Renders one thing to say as the user message Claude reads it as.
+
+        A word put into a turn carries a `uuid`, which is what Claude names it by in the
+        `command_lifecycle` lines it answers with -- so a turn told three things says which
+        of them it has taken in, one at a time. Without one it says nothing at all, and a
+        word put in would only ever be as good as the write that sent it.
+
+        Args:
+          text: What to say.
+          ticket: The uuid to name it by, or "" for a turn's own prompt: the turn beginning
+            is what says that one landed.
+
+        Returns:
+          The line, newline included.
+        """
+        said: dict[str, Any] = {
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{"type": "text", "text": text}],
+            },
+        }
+        if ticket:
+            said["uuid"] = ticket
+        return json.dumps(said) + "\n"
 
     def _restarted(self) -> None:
         """Forgets what the last process had spent, which the new one has not counted."""
@@ -169,6 +181,15 @@ class ClaudeCodeSession(StreamSessionBase):
         if said.get("type") == "control_request":
             # Claude waits on the answer, so one left unanswered is a turn that never ends.
             self._answer(said)
+        elif said.get("type") == "command_lifecycle":
+            # What Claude answers a word put into a turn with, under the uuid it was sent
+            # with: `queued` the moment it has been read off stdin, `started` once it is in
+            # front of the model, `completed` when its answer is done. Only `started` is the
+            # agent having heard -- the other two are the pipe and the answer.
+            if said.get("state") == "started":
+                words = self.took(str(said.get("command_uuid") or ""))
+                if words is not None:
+                    yield Event(kind="took", text=words)
         elif said.get("type") == "system" and said.get("session_id"):
             # Noted, not taken: this is the first line out, said before anything can go
             # wrong, and a session is only opened by a turn that lands in it.

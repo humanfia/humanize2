@@ -818,7 +818,10 @@ async def test_every_line_typed_between_turns_is_a_turn_of_one_conversation(
         agent, person = app._agents
         assert person.backend == "human"
         assert agent.opened == [agent.opened[0]]
-        assert "held for the next turn" not in _transcript(app)
+        # And nothing is left pinned above the prompt: a flow waiting to be told something
+        # takes what was typed at once, so it was said rather than held.
+        assert not app.query_one("#queued", Static).has_class("waiting")
+        assert app._queued == []
 
         await driver.press("escape")
         await until(lambda: not app._agents, driver)

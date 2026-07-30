@@ -92,6 +92,12 @@ class SessionBase(ABC):
         #: the two moments that bracket a conversation are each said once.
         self._started = False
         self._ended = False
+        #: Every word put into a turn that the agent has not yet said it has, under whatever
+        #: the backend will name it by when it does. Written by whoever is talking to the
+        #: agent and read by whoever is reading it back, which are two threads, so it is held
+        #: under a lock of its own rather than under the one that serializes turns.
+        self._steered: dict[str, str] = {}
+        self._steering = threading.Lock()
         # A session drops itself from its agent when it is collected, so the agent neither holds
         # a flow's discarded sessions nor has to prune them while someone is reading them.
         agent._sessions.append(weakref.ref(self, agent._forget))
@@ -288,16 +294,60 @@ class SessionBase(ABC):
         """Puts a word in while a turn is running, as typing at the agent would.
 
         The agent reads it when it next looks, so a turn already under way takes it into
-        account rather than being restarted with it.
+        account rather than being restarted with it. Landing it is not the agent having it:
+        every backend here answers a word put in twice over -- once to say it has been taken
+        from us, and again, later, to say it is in front of the model -- and only the second
+        is the agent having heard. That second one is a `took` event.
 
         Args:
           text: What to say to the agent.
 
         Raises:
-          NotImplementedError: If this backend takes a turn's whole prompt up front and has
+            NotImplementedError: If this backend takes a turn's whole prompt up front and has
             nowhere to put a later word.
         """
         raise NotImplementedError(f"{type(self).__name__} cannot be talked to mid-turn")
+
+    def steering(self, text: str, ticket: str = "") -> str:
+        """Writes down a word being put into a turn, against the name it will come back under.
+
+        Args:
+          text: The word itself.
+          ticket: What the backend will name it by when it says it has it, or "" for a name
+            of our own -- which is what a backend takes when it will carry one back.
+
+        Returns:
+          The ticket, to be sent with the word.
+        """
+        said = ticket or uuid.uuid4().hex
+        with self._steering:
+            self._steered[said] = text
+        return said
+
+    def took(self, ticket: str) -> str | None:
+        """Takes a word off the book, the agent having said it has it.
+
+        Args:
+          ticket: What the backend named it by.
+
+        Returns:
+          The word, or None for one this session never put in -- a turn's own prompt comes
+          back the same way, and is not a word put into anything.
+        """
+        with self._steering:
+            return self._steered.pop(ticket, None)
+
+    def unsteered(self, text: str) -> None:
+        """Takes a word off the book because it never landed at all.
+
+        Args:
+          text: The word, which is what a backend that mints its own name knows it by.
+        """
+        with self._steering:
+            for ticket, said in list(self._steered.items()):
+                if said == text:
+                    del self._steered[ticket]
+                    return
 
     def close(self) -> None:
         """Ends the conversation, so that a turn under way stops waiting.
@@ -641,13 +691,23 @@ class StreamSessionBase(SessionBase):
     def interject(self, text: str) -> None:
         """Says something to the agent now, whether or not a turn is running.
 
+        Named as it goes, so that the agent saying it has it says which one: several words
+        put into one turn come back one at a time, and a name apiece is what tells them
+        apart. A word that could not be written is taken off the book again -- there is
+        nothing coming back for it.
+
         Args:
           text: What to say to the agent.
 
         Raises:
           RuntimeError: If no process is up to hear it, which is a session no turn has opened.
         """
-        self._say(text)
+        ticket = self.steering(text)
+        try:
+            self._say(text, ticket)
+        except BaseException:
+            self.took(ticket)
+            raise
 
     def _shut(self) -> None:
         """Ends the process, which is what was holding the conversation open."""
@@ -675,7 +735,7 @@ class StreamSessionBase(SessionBase):
             if proc.stdout is not None:
                 proc.stdout.close()
 
-    def _say(self, text: str) -> None:
+    def _say(self, text: str, ticket: str = "") -> None:
         """Writes one line of JSON to the agent, whole, whoever else is writing.
 
         Counted once it has landed: the agent owes an answer for each thing said, and a turn
@@ -684,6 +744,8 @@ class StreamSessionBase(SessionBase):
 
         Args:
           text: What to say.
+          ticket: What the agent is to name it by when it says it has it, or "" for a turn's
+            own prompt, which needs no name: the turn beginning is the whole of that answer.
 
         Raises:
           RuntimeError: If there is no process listening, or it stopped while being told.
@@ -693,7 +755,7 @@ class StreamSessionBase(SessionBase):
             if proc is None or proc.stdin is None:
                 raise RuntimeError("no turn is running to be talked to")
             try:
-                proc.stdin.write(self._write(text))
+                proc.stdin.write(self._write(text, ticket))
                 proc.stdin.flush()
             except (OSError, ValueError) as gone:
                 # A stdin closed under us raises ValueError rather than BrokenPipeError.
@@ -776,11 +838,13 @@ class StreamSessionBase(SessionBase):
         """
 
     @abstractmethod
-    def _write(self, text: str) -> str:
+    def _write(self, text: str, ticket: str = "") -> str:
         """Renders something to say to the agent as the line to write.
 
         Args:
           text: What to say.
+          ticket: What the agent is to name it by when it says it has it, or "" to ask for
+            no such name.
 
         Returns:
           The line, newline included.

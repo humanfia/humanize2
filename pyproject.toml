@@ -11,6 +11,10 @@ license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = [
     "dateparser>=1.4.1",
+    # A flow says what it can be configured with by declaring a model, and the menu that
+    # asks is read off that model: the types, the bounds and the combinations a flow
+    # refuses are all written once, where the flow declares them.
+    "pydantic>=2.9",
     "pyfiglet>=1.0",
     "pyyaml>=6.0.3",
     # Named because the interface imports it directly. It arrives with textual either
@@ -120,7 +124,9 @@ ignore = [
 "src/humanize/flows/__init__.py" = ["PTH"]
 # A flow is a module with one `run` in it, and the module docstring is about that
 # `run` -- how the flow loops, what each agent is for, and the line that starts it.
-"src/humanize/flows/*.py" = ["D103"]
+# What a flow prints is what it says: the interface captures everything printed
+# under it into the transcript, so a warning a flow has to give is a `print`.
+"src/humanize/flows/*.py" = ["D103", "T201"]
 # What a command line writes, it prints.
 "src/humanize/cli/**" = ["T201"]
 "tests/**" = [

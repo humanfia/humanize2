@@ -73,6 +73,7 @@ def test_the_status_a_command_exits_with_is_the_one_that_is_returned() -> None:
 def test_a_line_that_names_something_that_is_not_a_command_is_a_usage_error(
     argv: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """A name no command answers to, and a flag the interface does not take."""
     with pytest.raises(SystemExit) as stopped:
         cli.main(argv)
 
@@ -89,10 +90,28 @@ def test_a_line_naming_no_command_opens_the_interface() -> None:
     assert "tui" not in cli.COMMANDS
 
 
-def test_the_help_lists_every_command(capsys: pytest.CaptureFixture[str]) -> None:
+def test_a_line_of_flags_and_no_command_opens_the_interface_set_up() -> None:
+    """`hmz -f <flow>`: a run that is always the same run is one line rather than three walks."""
+    with unittest.mock.patch("humanize.tui.Humanize.run") as opened:
+        assert cli.main(["-f", "chat"]) == 0
+
+    assert opened.called
+
+
+@pytest.mark.parametrize("argv", [["--help"], ["-h"]])
+def test_the_help_lists_every_command(
+    argv: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Asked for on its own, which is what somebody typing it wants: what there is to run.
+
+    Rather than what the interface takes, which is what the same flags after `-f` are about.
+    """
     with pytest.raises(SystemExit) as stopped:
-        cli.main(["--help"])
+        cli.main(argv)
 
     assert stopped.value.code == 0
     shown = capsys.readouterr().out
     assert all(command in shown for command, _ in COMMANDS)
+    # And what `hmz` itself takes, which is the other half of the same line: one help says
+    # both what may be opened and what may be run, because both of them are `hmz`.
+    assert all(flag in shown for flag in ("--flow", "--agent", "--config"))

@@ -145,7 +145,7 @@ class _AppServer:
         )
         try:
             with urllib.request.urlopen(request, timeout=_CALL_SECONDS) as response:  # noqa: S310
-                return json.load(response)["data"]
+                said: dict[str, Any] = json.load(response)
         except urllib.error.HTTPError as refused:
             raise subprocess.CalledProcessError(
                 refused.code, self._argv, "", refused.read().decode(errors="replace")
@@ -154,6 +154,14 @@ class _AppServer:
             raise subprocess.CalledProcessError(
                 1, self._argv, "", str(unreachable)
             ) from unreachable
+        # A refusal arrives inside a 200: a word steered into a turn that has already ended
+        # comes back as `{"code": 40402, "msg": ...}` with the status still OK. Read as an
+        # answer, that is a word which never landed reading as one that did.
+        if said.get("code"):
+            raise subprocess.CalledProcessError(
+                1, self._argv, "", f"{path}: {said.get('msg') or said['code']}"
+            )
+        return said.get("data")
 
     def stop(self) -> None:
         """Takes the daemon down, leaving the sessions it held on disk."""
@@ -219,17 +227,24 @@ class KimiCodeCLISession(SessionBase):
         running = self._running
         if running.session is None:
             raise RuntimeError("no turn is running to be talked to")
+        # Named by its own words: Kimi mints a fresh id for a steered prompt, so the id it
+        # answers with is not the one it took, and the words are what both ends have.
+        self.steering(text, ticket=text)
         server = self._agent.server
         queued = server.call(
             "POST",
             f"/sessions/{running.session}/prompts",
             {"content": [{"type": "text", "text": text}], **running.config},
         )
-        server.call(
-            "POST",
-            f"/sessions/{running.session}/prompts:steer",
-            {"prompt_ids": [queued["prompt_id"]]},
-        )
+        try:
+            server.call(
+                "POST",
+                f"/sessions/{running.session}/prompts:steer",
+                {"prompt_ids": [queued["prompt_id"]]},
+            )
+        except BaseException:
+            self.unsteered(text)  # nothing is coming back for a word that never went in
+            raise
 
     def _stream(self, prompt: str) -> Iterator[Event]:
         """Sends one turn, opening the session on the first call and resuming it after.
@@ -404,6 +419,21 @@ class KimiCodeCLISession(SessionBase):
                     # first, and a turn reads forwards; what has been passed on is not passed on
                     # twice.
                     for message in reversed(said):
+                        if message["role"] != "assistant":
+                            # A word put into the turn, spliced into the conversation at the
+                            # step that takes it in: that splice is the agent saying it has
+                            # it, and is the only thing here that is not the agent talking.
+                            # Read as one, it would show your own words back as the agent's.
+                            if message["id"] not in shown:
+                                shown[message["id"]] = len(message["content"])
+                                words = "".join(
+                                    block.get("text") or ""
+                                    for block in message["content"]
+                                    if block.get("type") == "text"
+                                )
+                                if self.took(words) is not None:
+                                    yield Event(kind="took", text=words)
+                            continue
                         for block in message["content"][shown.get(message["id"], 0) :]:
                             kind = _BLOCKS.get(str(block.get("type")))
                             # A tool is named by what it is; everything else is what it says,

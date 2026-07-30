@@ -36,7 +36,11 @@ ALLOWED: dict[str, set[str]] = {
     "humanize.coganchor": set(),
     "humanize.coganchor.serve": {"humanize.coganchor", "humanize.coganchor.proto"},
     "humanize.cycle": {"humanize.agents"},
-    "humanize.flows": {"humanize.agents"},
+    # A flow drives agents, and one that has to know where its own agent keeps its tasks
+    # is reading a fact rather than a log: `backends` is the leaf that exists so a fact of
+    # that kind is written once, and it names nothing, so this widens the DAG without
+    # bending it.
+    "humanize.flows": {"humanize.agents", "humanize.backends"},
     "humanize.machines": {"humanize.coganchor"},
     "humanize.runner": {
         "humanize.agents",

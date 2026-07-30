@@ -37,8 +37,10 @@ class Event:
       kind: What was said. `text` is the agent talking, `reasoning` is it thinking aloud,
         `tool` is it using one, and `result` is the answer the turn ends on -- exactly one
         of which closes a turn. `failed` closes it the other way, carrying what went wrong
-        in place of an answer. A watcher sees three more: `begins` and `ends`, which bracket
-        the turn itself, and `asks`, which is the agent stopping to ask its user something.
+        in place of an answer. A watcher sees four more: `begins` and `ends`, which bracket
+        the turn itself, `asks`, which is the agent stopping to ask its user something, and
+        `took`, which is the agent saying that a word put into the turn is now in front of
+        it -- carrying that word, so that whoever said it knows which one landed.
       text: The words themselves, ready to be shown.
       tokens: What the turn cost, as tokens spent per model. Only a `result` carries it, and
         only from a backend that says.

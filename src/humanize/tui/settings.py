@@ -78,8 +78,32 @@ class Settings:
             said.append(Runs(f"{cli}/{model}:{effort}", str(agent.get("anchor") or "")))
         return said
 
+    def config(self, flow: str) -> dict[str, Any]:
+        """How one flow was last set up here, for a flow that can be set up at all.
+
+        Kept beside what its agents run and for the same reason: a flow of forty settings is
+        not one to answer again every morning. Read back through the flow's own model rather
+        than trusted, so a setting the flow has since dropped or renamed is one the model
+        refuses rather than one that quietly comes back.
+
+        Args:
+          flow: The flow it was set up for.
+
+        Returns:
+          What was set, field by field, and nothing at all for a flow this workspace has
+          never set up.
+        """
+        flows: dict[str, Any] = self._mine().get("flows") or {}
+        kept: dict[str, Any] = flows.get(flow) or {}
+        held = kept.get("config")
+        return cast("dict[str, Any]", held) if isinstance(held, dict) else {}
+
     def remember(
-        self, flow: str, names: tuple[str, ...], models: Sequence[Runs]
+        self,
+        flow: str,
+        names: tuple[str, ...],
+        models: Sequence[Runs],
+        config: dict[str, Any] | None = None,
     ) -> None:
         """Writes down what this workspace is set up to run, so that it opens that way.
 
@@ -88,6 +112,9 @@ class Settings:
           names: What that flow calls each agent it drives, which is "" apiece for a flow
             that said how many it drives and nothing more.
           models: What each of them runs and where, in the order the flow takes them.
+          config: What the flow itself was set up with, or None to leave whatever was kept
+            for it as it was -- choosing the agents again is not a way of forgetting how the
+            flow was set up.
         """
         agents: dict[str, dict[str, str]] = {}
         for at, runs in enumerate(models):
@@ -104,7 +131,11 @@ class Settings:
                 agents[named]["anchor"] = runs.anchor
         mine = self._mine()
         mine["flow"] = flow
-        mine.setdefault("flows", {})[flow] = {"agents": agents}
+        kept: dict[str, Any] = {"agents": agents}
+        held = config if config is not None else self.config(flow)
+        if held:
+            kept["config"] = held
+        mine.setdefault("flows", {})[flow] = kept
         self._write()
 
     def _mine(self) -> dict[str, Any]:

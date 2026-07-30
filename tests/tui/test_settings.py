@@ -138,3 +138,53 @@ def test_where_an_agent_works_is_kept_with_what_it_runs(tmp_path: Path) -> None:
         Runs("claude/m:high", "ssh://box"),
         Runs("codex/n:low"),
     ]
+
+
+def test_how_a_flow_was_set_up_is_kept_beside_what_its_agents_run(
+    tmp_path: Path,
+) -> None:
+    """A flow of twenty settings is not one to answer again every morning."""
+    Settings(tmp_path).remember(
+        "humanize1", ("builder",), [Runs("claude/m:high")], {"max": 12, "rlcr": True}
+    )
+
+    again = Settings(tmp_path)
+    assert again.config("humanize1") == {"max": 12, "rlcr": True}
+    held = yaml.safe_load((home() / "settings.yaml").read_text())
+    flows = held["workspaces"][str(tmp_path.resolve())]["flows"]
+    assert flows["humanize1"]["config"] == {"max": 12, "rlcr": True}
+
+
+def test_choosing_the_agents_again_is_not_a_way_of_forgetting_the_settings(
+    tmp_path: Path,
+) -> None:
+    """`/agents` says nothing about how the flow itself was set up, so it changes nothing."""
+    Settings(tmp_path).remember(
+        "humanize1", ("builder",), [Runs("claude/m:high")], {"max": 12}
+    )
+
+    Settings(tmp_path).remember("humanize1", ("builder",), [Runs("codex/n:low")])
+
+    assert Settings(tmp_path).config("humanize1") == {"max": 12}
+
+
+def test_a_flow_that_takes_no_setting_up_keeps_nothing(tmp_path: Path) -> None:
+    """Which is most of them, and is what a settings file written before this also says."""
+    Settings(tmp_path).remember("chat", ("",), [Runs("claude/m:high")])
+
+    assert Settings(tmp_path).config("chat") == {}
+
+
+def test_two_flows_of_one_name_are_two_entries(tmp_path: Path) -> None:
+    """A flow of yours is called by its path, so it cannot inherit a built-in's setup."""
+    Settings(tmp_path).remember(
+        "rlar", ("actor",), [Runs("claude/m:high")], {"deep": True}
+    )
+    Settings(tmp_path).remember(
+        ".humanize/flows/rlar.py", ("actor",), [Runs("codex/n:low")], {"deep": False}
+    )
+
+    kept = Settings(tmp_path)
+    assert kept.config("rlar") == {"deep": True}
+    assert kept.config(".humanize/flows/rlar.py") == {"deep": False}
+    assert kept.agents("rlar") == [Runs("claude/m:high")]

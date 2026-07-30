@@ -11,10 +11,13 @@ from __future__ import annotations
 import inspect
 import os
 import runpy
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Annotated,
+    Any,
     NamedTuple,
+    cast,
     get_args,
     get_origin,
     get_type_hints,
@@ -25,7 +28,14 @@ from humanize import backends
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
+    from pydantic import BaseModel
+
     from .agents import AgentBase, Moment
+
+
+#: How many arguments a flow's entry point takes when it says it can be set up with
+#: something: the agents, the task, and the model that says what there is to set.
+_WITH_A_CONFIG = 3
 
 
 class NotAFlow(ValueError):  # noqa: N818  -- the name SPEC.md gives it
@@ -74,6 +84,27 @@ def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
     return tuple(place.name for place in wanted(flow))
 
 
+def configures(flow: str | os.PathLike[str]) -> type[BaseModel] | None:
+    """What a flow can be set up with before it is run, if it takes anything at all.
+
+    A flow says so by taking a third argument annotated with a pydantic model or None: the
+    model is the whole of what may be asked, since the fields, their types, what each one is
+    for and the combinations the flow refuses are already written down in it. So whatever is
+    starting a flow can put the questions to somebody without knowing what any of them mean.
+
+    Args:
+      flow: The Python file the flow is written in. It is run to be read.
+
+    Returns:
+      The model to ask with, or None for a flow that takes the agents and the task and
+      nothing else -- which is most of them, and is what every flow was before this.
+
+    Raises:
+      NotAFlow: If the file is not there, or is not a flow.
+    """
+    return _read(flow)[3]
+
+
 def wanted(flow: str | os.PathLike[str]) -> tuple[Place, ...]:
     """Every agent a flow needs chosen for it, and what each of them has to be able to do.
 
@@ -99,6 +130,7 @@ def _read(
     Callable[..., None],
     tuple[Place, ...],
     Callable[..., tuple[AgentBase, ...]],
+    type[BaseModel] | None,
 ]:
     """Loads a flow and reads what it says about the agents it drives.
 
@@ -106,8 +138,9 @@ def _read(
       flow: The flow: one that came with humanize, by name, or a file of your own.
 
     Returns:
-      Its entry point, one place per agent it drives, and what to hand those agents over as
-      -- the named tuple the flow declared, or a plain one where it declared that.
+      Its entry point, one place per agent it drives, what to hand those agents over as --
+      the named tuple the flow declared, or a plain one where it declared that -- and the
+      model it can be set up with, or None where it takes no setting up.
 
     Raises:
       NotAFlow: If the file is not there, is not a flow -- nothing called `run`, or one whose
@@ -127,11 +160,10 @@ def _read(
         # A function, so that what is read below is what the entry point will be called
         # with: a class or a partial answers with annotations that are somebody else's.
         # Extras and all: what a flow wrote beside the type is what it asks of the agent.
-        declared = (
-            get_type_hints(run, include_extras=True).get("agents")
-            if inspect.isfunction(run)
-            else None
+        hinted = (
+            get_type_hints(run, include_extras=True) if inspect.isfunction(run) else {}
         )
+        declared = hinted.get("agents")
     except NameError as unresolved:
         # A flow whose agents are imported under TYPE_CHECKING states how many it drives
         # where nothing can read it back, which is the one thing a flow is asked to say.
@@ -152,6 +184,7 @@ def _read(
             run,
             tuple(_place(at, kinds.get(at)) for at in fields),
             declared._make,
+            _setting(run, hinted),
         )
     # `tuple[AgentBase, ...]` is any number of them, which is no answer to the question.
     declares = get_args(declared)
@@ -161,7 +194,85 @@ def _read(
             "tuple of a fixed length -- how many agents the flow drives -- or with a "
             "NamedTuple of them, which also says what each one is for"
         )
-    return run, tuple(_place("", kind) for kind in declares), tuple
+    return (
+        run,
+        tuple(_place("", kind) for kind in declares),
+        tuple,
+        _setting(run, hinted),
+    )
+
+
+def _set_up(
+    flow: str | os.PathLike[str],
+    setting: type[BaseModel] | None,
+    config: BaseModel | dict[str, Any],
+) -> BaseModel:
+    """Reads a config back into the model the flow has just declared.
+
+    Read back rather than taken as it comes, because a flow is loaded by running its file:
+    the class it declared last time is not the class it declares this time, so what was set
+    up against one is a stranger to the other. What survives that is the fields, which is
+    what a config is -- and reading them back is also what puts them through the flow's own
+    validators one last time, at the moment the flow is about to run. A mapping of the same
+    fields, which is what a YAML file of them reads as, is read back the same way.
+
+    Args:
+      flow: The flow, for what a refusal says.
+      setting: What it says it can be set up with, or None where it said nothing.
+      config: What it is being set up with.
+
+    Returns:
+      The same settings, as an instance of the model this loading of the flow declared.
+
+    Raises:
+      NotAFlow: If the flow takes no config, or takes another one, or will not accept these
+        settings -- each of which is a caller to correct before anything runs.
+    """
+    from pydantic import ValidationError
+
+    if setting is None:
+        raise NotAFlow(f"{flow}: run() takes no config, and one was given")
+    if not isinstance(config, dict) and type(config).__name__ != setting.__name__:
+        raise NotAFlow(
+            f"{flow}: run() takes a {setting.__name__} to be set up with, not a "
+            f"{type(config).__name__}"
+        )
+    fields = config if isinstance(config, dict) else config.model_dump()
+    try:
+        return setting.model_validate(fields)
+    except ValidationError as refused:
+        raise NotAFlow(f"{flow}: {refused}") from refused
+
+
+def _setting(
+    run: Callable[..., None], hinted: dict[str, object]
+) -> type[BaseModel] | None:
+    """The model a flow says it can be set up with, read off its third argument.
+
+    Third rather than named, because that is where it is: `run(agents, task, config)` is the
+    entry point, and a flow which takes nothing more has two arguments and is left alone.
+
+    Args:
+      run: The flow's entry point.
+      hinted: Its annotations, resolved.
+
+    Returns:
+      The model, or None where the flow takes no third argument or annotated it with
+      something that is not one -- a flow is not refused for the shape of an argument
+      nothing has to fill.
+    """
+    from pydantic import BaseModel
+
+    taken = list(inspect.signature(run).parameters)
+    if len(taken) < _WITH_A_CONFIG:
+        return None
+    kind = hinted.get(taken[_WITH_A_CONFIG - 1])
+    # `Model | None` is the annotation a flow writes, and is two arguments to a union; one
+    # written as the model alone is the same question with no way to answer it as unasked.
+    for said in (*get_args(kind), kind):
+        if isinstance(said, type) and issubclass(said, BaseModel):
+            return said
+    return None
 
 
 def _kinds(declared: type, run: Callable[..., None]) -> dict[str, object]:
@@ -255,7 +366,10 @@ class Runner:
     """
 
     def __init__(
-        self, flow: str | os.PathLike[str], agents: Sequence[AgentBase]
+        self,
+        flow: str | os.PathLike[str],
+        agents: Sequence[AgentBase],
+        config: BaseModel | dict[str, Any] | None = None,
     ) -> None:
         """Loads the flow and holds the agents to drive it with.
 
@@ -263,16 +377,23 @@ class Runner:
           flow: The Python file the flow is written in. It is run to be read, so whatever it
             does as it is imported happens here, and fails here as it would anywhere.
           agents: The agents to hand it, as many as it declares.
+          config: What it was set up with, for a flow that says it can be -- an instance of
+            the model :func:`configures` answers with, or the fields to build one from, which
+            is what a YAML file of them reads as. None is a flow left as it comes, and is
+            what a flow that takes no setting up is given either way.
 
         Raises:
           NotAFlow: If the file is not there, is not a flow -- nothing called ``run``, or one
             whose ``agents`` cannot be read or says nothing about how many it takes -- or is a
             flow that drives a different number of agents than were given, or one of them
-            cannot run a moment the flow said that place has to.
+            cannot run a moment the flow said that place has to, or was set up with something
+            that is not what it asked for.
         """
         from .agents import HumanAgent
 
-        run, places, make = _read(flow)
+        run, places, make, setting = _read(flow)
+        if config is not None:
+            config = _set_up(flow, setting, config)
         asked = [place for place in places if not place.person]
         if len(asked) != len(agents):
             raise NotAFlow(
@@ -294,7 +415,11 @@ class Runner:
         for agent, place in zip(driven, places, strict=True):
             if place.name:
                 agent.rename(place.name)
-        self._run: Callable[[tuple[AgentBase, ...], str], None] = run
+        self._run: Callable[..., None] = run
+        # Only for a flow that said it takes one, so that every flow written before there
+        # was such a thing is still called with the two arguments it declares.
+        self._config: BaseModel | None = config if setting is not None else None
+        self._setting = setting
         # As the flow declared them: a flow whose agents are a NamedTuple reaches them by
         # name, and one that unpacks a plain tuple sees no difference.
         self._agents = make(driven)
@@ -328,11 +453,18 @@ class Runner:
         with Cycle(self._flow, self._agents, task) as cycle:
             for agent in self._agents:
                 agent.cycle = cycle
-            self._run(self._agents, task)
+            if self._setting is None:
+                self._run(self._agents, task)
+            else:
+                # As it was set up, or as it comes: a flow that takes a config takes None for
+                # the run nobody set up, which is the default the flow itself declared.
+                self._run(self._agents, task, self._config)
 
 
-def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
-    """Reads an `hmz exec` line into a flow, the agents to drive it, and the task.
+def flow_and_agents(
+    argv: list[str],
+) -> tuple[str, list[AgentBase], str, dict[str, Any] | None]:
+    """Reads an `hmz exec` line into a flow, the agents to drive it, the task, and its setup.
 
     A flow says how many agents it drives, and this is where they come from: one for each, in
     the order the flow takes them, at the model and effort each is to run at.
@@ -341,10 +473,13 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
       argv: What followed the command name.
 
     Returns:
-      The flow's path, the agents to drive it with, and the task.
+      The flow's path, the agents to drive it with, the task, and what to set the flow up
+      with -- the YAML file `-c` named, read but not yet checked against the flow's own
+      model, or None where the line named none.
 
     Raises:
-      SystemExit: If the line does not name a flow and an agent apiece, as argparse rejects it.
+      SystemExit: If the line does not name a flow and an agent apiece, or names a config
+        that cannot be read, as argparse rejects it.
     """
     import argparse
 
@@ -370,10 +505,23 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
         f"{', '.join(sorted(one.name for one in backends.PROFILES))}",
     )
     parser.add_argument(
+        "-c",
+        "--config",
+        metavar="PATH",
+        help="a YAML file of what to set the flow up with, one field per line, as the flow "
+        "declares them; only for a flow that says it can be set up",
+    )
+    parser.add_argument(
         "task",
         help="what the flow is to have the agents do, after -- if it starts with a dash",
     )
     args = parser.parse_args(argv)
+    held = None
+    if args.config is not None:
+        try:
+            held = set_up_from(args.config)
+        except ValueError as why:
+            parser.error(str(why))
 
     # Only now that the line is known to name agents: `--help` has already exited, and it
     # should not have paid for three backends to say what it takes.
@@ -387,4 +535,35 @@ def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
             parser.error(f"bad agent {spec!r}: {bad}")
         agent, config = DRIVEN[profile.name]
         agents.append(agent(config(model=model, effort=effort)))
-    return args.flow, agents, args.task
+    return args.flow, agents, args.task, held
+
+
+def set_up_from(said: str | os.PathLike[str]) -> dict[str, Any]:
+    """Reads what a flow is to be set up with out of a file of it.
+
+    The file is what `/config` would have been walked through, written down: one field per
+    line, under the names the flow declared. It is not checked here -- the flow's own model
+    is what checks it, and the model is not there until the flow is loaded.
+
+    Args:
+      said: The path to the YAML.
+
+    Returns:
+      What it holds, field by field, and nothing at all for a file that is empty.
+
+    Raises:
+      ValueError: If the file cannot be read, or holds something that is not a mapping.
+    """
+    import yaml
+
+    try:
+        held = yaml.safe_load(Path(said).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as why:
+        raise ValueError(f"cannot read {said}: {why}") from why
+    if held is None:
+        return {}
+    if not isinstance(held, dict):
+        raise ValueError(  # noqa: TRY004 -- a file to correct, not a caller's type error
+            f"{said}: a flow is set up from a mapping, not a {type(held).__name__}"
+        )
+    return cast("dict[str, Any]", held)

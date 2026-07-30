@@ -19,10 +19,12 @@ nothing is imposed on it.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import functools
 import os
 import shlex
+import subprocess
 import sys
 import threading
 import time
@@ -53,12 +55,14 @@ from .complete import about, hinted, offered, takes
 from .discover import installed
 from .history import History
 from .monitor import Monitor, short, thousands
-from .pick import Flows, Models, Runs, Status, reads
+from .pick import Configures, Flows, Models, Runs, Status, reads
 from .settings import Settings
 from .tally import Tally
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
+
+    from pydantic import BaseModel
 
     from humanize.agents import AgentBase, Event, Question
     from humanize.backends import Model
@@ -72,6 +76,7 @@ if TYPE_CHECKING:
 #: own.
 _OWN = (
     "flow",
+    "config",
     "agents",
     "status",
     "clear",
@@ -94,6 +99,16 @@ _REFRESH = 0.5
 
 #: How long a second ctrl+c still counts as the same one, in seconds.
 _AGAIN = 2.0
+
+#: How many lines of what is waiting to be said are pinned above the prompt before the rest
+#: is counted instead. A pin that grew without limit would push the transcript off the screen
+#: to say that a lot is queued, which one line says. The stylesheet holds it to one row more
+#: than this, for the line that does the counting.
+_PINNED = 5
+
+#: How narrow a terminal a pinned line is still given room in, so that the arithmetic below
+#: cannot ask for a negative number of columns.
+_NARROW = 20
 
 #: The flow the interface opens on, which is the one that is only talking to one agent.
 _STARTS_ON = "chat"
@@ -120,6 +135,19 @@ def _where() -> str:
     except RuntimeError:
         return str(here)  # nobody's home directory, so nothing to shorten it against
     return str("~" / here.relative_to(home)) if here.is_relative_to(home) else str(here)
+
+
+def _clipped(said: str, room: int) -> str:
+    """One line of what is waiting, cut to a row rather than wrapped over several.
+
+    Args:
+      said: The line.
+      room: How many columns there are for it.
+
+    Returns:
+      It, or as much of it as fits with an ellipsis where the rest was.
+    """
+    return said if len(said) <= room else said[: room - 1] + "…"
 
 
 def _starts_at(models: tuple[Model, ...]) -> str:
@@ -347,6 +375,19 @@ class Humanize(App[None]):
     ModalScreen { background: $background; }
     #transcript { width: 1fr; height: 1fr; padding: 0; }
 
+    /* What was said to a flow and has not been taken yet, pinned above the prompt rather
+       than written into the transcript: it has not happened, and a transcript is what has.
+       Claude Code holds a queued message here too, and for the same reason -- it is still
+       yours to see go, rather than something to scroll back for.
+
+       On the left of the block that sits on the editor, beside what the run is running as:
+       one thing above the prompt rather than two, so that neither pushes the other up the
+       screen. As wide as what is in it, the right-hand side taking the rest. */
+    #pinned { height: auto; }
+    #queued { display: none; width: auto; height: auto; max-height: 6; padding: 0 2;
+              color: $text-muted; }
+    #queued.waiting { display: block; }
+
     /* Above the prompt and unbordered, at most ten rows: what Claude Code offers a
        half-typed command in. The row under the cursor is coloured, not filled. */
     #offers { display: none; max-height: 10; padding: 0 2; background: $background;
@@ -357,7 +398,8 @@ class Humanize(App[None]):
 
     /* The prompt: a rule across, what you are typing behind a `❯`, a rule across. Which is
        how Claude Code draws its own -- no box, no bar, no shadow. */
-    #above { height: auto; padding: 0 1; color: $text-muted; text-align: right; }
+    #above { width: 1fr; height: auto; padding: 0 1; color: $text-muted;
+             text-align: right; }
     .rule { height: 1; color: $text-muted; }
     #prompt { height: auto; background: $background; }
     #caret { width: 2; color: $text-muted; }
@@ -407,8 +449,23 @@ class Humanize(App[None]):
             return
         self.show("[dim]press ctrl+c again to exit[/dim]")
 
-    def __init__(self) -> None:
-        """Initializes an interface holding no agents, because nothing is running yet."""
+    def __init__(
+        self,
+        flow: str = "",
+        agents: Sequence[Runs] = (),
+        config: BaseModel | None = None,
+    ) -> None:
+        """Initializes an interface holding no agents, because nothing is running yet.
+
+        Args:
+          flow: The flow to open on, which is what `hmz -f` names -- or "" to open on what
+            this workspace was last set up to run, and on the one that only talks to one
+            agent where it has run nothing.
+          agents: What each of that flow's agents runs, in the order it takes them, or
+            nothing to open on what was remembered.
+          config: What that flow is set up with, or None to open on what was remembered.
+            Checked by whatever read the line: an interface is opened set up, not corrected.
+        """
         # `ansi_color` up front rather than left to the theme: Textual picks the filter it
         # runs every colour through inside `App.__init__`, before a theme set below could
         # have said anything, and under `NO_COLOR` the wrong one there turns the whole
@@ -451,17 +508,25 @@ class Humanize(App[None]):
         #: What this workspace was last set up to run, so that opening it again finds it
         #: that way rather than back at the default.
         self.settings = Settings()
-        self._flow_named = self.settings.flow or _STARTS_ON
-        self._models = self.settings.agents(self._flow_named) or [
-            Runs(f"{backend}/{_starts_at(models)}:high")
-            for backend, models in list(installed().items())[:1]
-        ]
+        self._flow_named = flow or self.settings.flow or _STARTS_ON
+        self._models = (
+            list(agents)
+            or self.settings.agents(self._flow_named)
+            or [
+                Runs(f"{backend}/{_starts_at(models)}:high")
+                for backend, models in list(installed().items())[:1]
+            ]
+        )
         #: One place per agent the flow drives: what the flow calls it, which is "" apiece
         #: for a flow that said how many it drives and nothing more, and the moments it needs
         #: that one to run. Kept beside the models rather than read off the flow each time the
         #: line above the prompt is drawn: that means loading and running a Python file, and
         #: this is drawn twice a second.
         self._wanted = self._places_of(self._flow_named)
+        #: What the flow itself is set up with, for a flow that says it can be set up at
+        #: all: an instance of the model it declared, or None. Read back from what this
+        #: workspace last ran, so a flow of many settings opens the way it was left.
+        self._config = config or self._config_of(self._flow_named)
         #: What has been typed here before, which the arrows walk. Read now rather than each
         #: time it is asked for: a run started here writes this project's own history into
         #: being, and what is being walked must not change under whoever is walking it.
@@ -474,7 +539,15 @@ class Humanize(App[None]):
         #: the event loop and drained from whichever thread a flow runs on, so it is held
         #: under a lock: `a running flow never drops a line` is only true if nothing races.
         self._queued: list[str] = []
+        #: Said into a turn that was running, and not yet answered for: what a backend takes
+        #: from us is not what the agent has heard, and every one of them says the second
+        #: thing separately, as a `took`. Held under the same lock as `(agent, words)`, at
+        #: most one per agent -- the next goes only once this one is answered for.
+        self._given: list[tuple[str, str]] = []
         self._saying = threading.Lock()
+        #: Whether the person has just been asked what to say next and answered out of the
+        #: queue, in which case the turn that answer starts has its line already.
+        self._handed = False
         #: Set when something is said, so a flow waiting to be told hears it at once rather
         #: than at the next tick, and whether a flow is waiting to be told at all.
         self._spoke = threading.Event()
@@ -501,6 +574,48 @@ class Humanize(App[None]):
                 Place(name="", person=False, moments=frozenset()) for _ in self._models
             )
 
+    @staticmethod
+    def _model_of(flow: str) -> type[BaseModel] | None:
+        """What a flow says it can be set up with, if it says anything.
+
+        Args:
+          flow: The flow, by name or as a path.
+
+        Returns:
+          The model to ask with, or None for a flow that takes no setting up -- and for one
+          that will not load, which is a flow to report where it is run rather than here.
+        """
+        from humanize.flows import find
+        from humanize.runner import configures
+
+        try:
+            return configures(find(flow))
+        except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
+            return None
+
+    def _config_of(self, flow: str) -> BaseModel | None:
+        """How this workspace last set a flow up, read back through the flow's own model.
+
+        Args:
+          flow: The flow.
+
+        Returns:
+          What it was set up with, or None for a flow that takes no setting up, has not been
+          set up here, or has since changed enough that what was kept no longer reads -- a
+          setting file is a convenience, and one that no longer fits is one to start over
+          from rather than to refuse to open on.
+        """
+        model = self._model_of(flow)
+        if model is None:
+            return None
+        kept = self.settings.config(flow)
+        if not kept:
+            return None
+        try:
+            return model.model_validate(kept)
+        except Exception:  # noqa: BLE001 -- what was kept no longer fits the flow
+            return None
+
     @property
     def _named_by(self) -> tuple[str, ...]:
         """What the flow calls each agent it drives, which is what a line about one says."""
@@ -515,7 +630,12 @@ class Humanize(App[None]):
         """
         yield RichLog(id="transcript", wrap=True, markup=True)
         yield OptionList(id="offers")
-        yield Static(id="above")
+        # Both sides of the same block, right on top of the editor: what is waiting to go on
+        # the left, what it would be going to on the right. Read from the bottom up -- the
+        # last thing typed and the running total sit on the row above the rule.
+        with Horizontal(id="pinned"):
+            yield Static(id="queued")
+            yield Static(id="above")
         yield Static(id="rule-above", classes="rule")
         with Horizontal(id="prompt"):
             yield Static(_YOURS, id="caret")
@@ -733,9 +853,25 @@ class Humanize(App[None]):
         lines = reads(self._named_by, self._models) or ["no agent installed"]
         if spent:
             lines.append(f"{thousands(spent)} tokens{_DOT}{rate:.0f}/s")
+        # Beside it, and cut to what it leaves: the two are one block, and a pinned line
+        # the width of the screen would push what the run is running as off the side of it.
+        waiting = self._waiting_lines(max(len(line) for line in lines) + 2)
+        if waiting:
+            # Bottom up, both sides ending on the row above the rule: the last thing typed
+            # and the running total are the two halves of where the run has got to, and one
+            # of them hanging a row above the other reads as two things rather than one.
+            rows = max(len(waiting), len(lines))
+            lines = [""] * (rows - len(lines)) + lines
+            waiting = [""] * (rows - len(waiting)) + waiting
         self.query_one("#above", Static).update(
             "[$text-muted]" + "\n".join(lines) + "[/]"
         )
+        pinned = self.query_one("#queued", Static)
+        pinned.set_class(bool(waiting), "waiting")
+        # As content rather than as markup: this is what somebody typed, and a `[TODO]` in it
+        # is a word rather than a tag. Neither escaper is safe here -- both only escape a
+        # bracket that already looks like a tag to them, and the two disagree about which do.
+        pinned.update(Content("\n".join(waiting)))
         for ruled in self.query(".rule").results(Static):
             ruled.update(_RULE * self.size.width)
         right = f"[$text-muted]{_DOT.join(self._keys())}[/]"
@@ -749,6 +885,65 @@ class Humanize(App[None]):
         self.query_one("#status", Static).update(
             left + " " * max(2, gap) + right, layout=False
         )
+
+    def _waiting_lines(self, beside: int = 0) -> list[str]:
+        """What has been said to the flow and not taken yet, as the pin above the prompt.
+
+        Behind the same `❯` the transcript marks what you said with, and dim: it is yours,
+        and it has not gone anywhere yet. Held to a few lines, with the rest counted -- a pin
+        that grew without limit would push the transcript off the screen to say that a lot
+        was queued, which the count says in one line.
+
+        Args:
+          beside: How many columns the block to the right of it takes, which are not the
+            pin's to draw in.
+
+        Returns:
+          The lines to draw, oldest first, as text rather than as markup -- a bracket
+          somebody typed is a bracket, and nothing here is drawn in a colour of its own.
+          Nothing at all with nothing waiting.
+        """
+        with self._saying:
+            # What has gone to an agent went before anything still queued, the queue being
+            # drained from the front, so it reads oldest first the same way the transcript does.
+            held = list(self._given) + [("", said) for said in self._queued]
+        if not held:
+            return []
+        # One line of the pin is one row of the screen: what is over is cut with an ellipsis
+        # rather than wrapped, or a pasted paragraph would be five lines and fifty rows, and
+        # the transcript, the editor and the status line would all go off the bottom.
+        room = max(_NARROW, self.size.width - beside - len(_YOURS) - 5)
+        lines: list[str] = []
+        for at, (who, said) in enumerate(held):
+            first, *rest = said.splitlines() or [""]
+            # Who has it, for a word already put to somebody: a flow drives several agents,
+            # and which of them is holding your line is the half of this worth knowing.
+            with_it = f"{_DOT}with {short(who)}" if who else ""
+            # As the transcript sets one: the first line behind the marker, the rest lined
+            # up under it.
+            shown = [
+                f"{_YOURS} {_clipped(first, room - len(with_it))}{with_it}",
+                *(f"  {_clipped(line, room)}" for line in rest),
+            ]
+            if lines and len(lines) + len(shown) > _PINNED:
+                # This one will not fit whole, so it is counted with the ones after it
+                # rather than shown in half.
+                lines.append(f"  … {len(held) - at} more waiting")
+                return lines
+            if len(shown) > _PINNED:
+                # The first, and longer on its own than there is room for: what is left of
+                # it is counted too, so that half a message never reads as the whole of one.
+                lines.extend(shown[: _PINNED - 1])
+                left = f"… {len(shown) - _PINNED + 1} more lines"
+                if at + 1 < len(held):
+                    left += f" and {len(held) - at - 1} more waiting"
+                lines.append(f"  {left}")
+                return lines
+            lines.extend(shown)
+            if len(lines) >= _PINNED and at + 1 < len(held):
+                lines.append(f"  … {len(held) - at - 1} more waiting")
+                return lines
+        return lines
 
     def _switched(self, argv: list[str], *, now: bool) -> bool | None:
         """What a switch becomes: what was asked for, or the other of what it is.
@@ -829,7 +1024,13 @@ class Humanize(App[None]):
         is nothing for it to conflict with.
         """
         self.push_screen(
-            Status(self._flow_named, self._named_by, self._models, self._monitor)
+            Status(
+                self._flow_named,
+                self._named_by,
+                self._models,
+                self._monitor,
+                self._config,
+            )
         )
 
     def action_cycle_flow(self) -> None:
@@ -864,6 +1065,9 @@ class Humanize(App[None]):
             places
         )
         self._wanted = places
+        # However this workspace last set that flow up, which for one it has never run is
+        # the flow's own defaults: a step is a step, and not a form to fill in.
+        self._config = self._config_of(switching)
         self.settings.remember(switching, self._named_by, self._models)
         self._draw()
 
@@ -892,6 +1096,8 @@ class Humanize(App[None]):
             self.action_clear()
         elif name == "flow":
             self.action_flow(argv[0] if argv else "")
+        elif name == "config":
+            self.action_config()
         elif name == "agents":
             self.action_agents()
         elif name == "status":
@@ -944,6 +1150,7 @@ class Humanize(App[None]):
             self.show("[dim]— stopping the flow —[/dim]")
         self._agents = []
         self._spoke.set()  # and a flow waiting to be told hears that it is over
+        self._never_sent("the flow stopped first")
 
     def on_unmount(self) -> None:
         """Stops whatever is running as the interface goes, however it goes.
@@ -957,6 +1164,36 @@ class Humanize(App[None]):
             agent.stop()
         self._agents = []
         self._spoke.set()
+
+    def _never_sent(self, because: str) -> None:
+        """Puts whatever was still waiting into the transcript, nothing being left to take it.
+
+        A flow ends two ways -- stopped by hand, or of its own accord -- and both leave the
+        pin holding lines that are not on their way anywhere. They come off it and into the
+        transcript as what they turned out to be: a line typed at a flow that is gone has to
+        be somewhere, or the next thing typed would quietly take its place.
+
+        Args:
+          because: What to say about why it never went.
+        """
+        with self._saying:
+            held, self._queued = self._queued, []
+            given, self._given = [text for _, text in self._given], []
+        if not (held or given):
+            return
+        for (
+            said
+        ) in given:  # oldest first: what went to an agent went before what is queued
+            self._said_by_you(said)
+        if given:
+            # Put to an agent, which never said it had it: it may well have reached the
+            # model, and saying it never went would be as wrong as saying it landed.
+            self.show(f"[dim]   put to the agent, never taken back: {because}[/dim]")
+        for said in held:
+            self._said_by_you(said)
+        if held:
+            self.show(f"[dim]   never sent: {because}[/dim]")
+        self._draw()
 
     def _export(self) -> None:
         """Writes the transcript beside the trace files, as opencode writes its markdown."""
@@ -973,18 +1210,22 @@ class Humanize(App[None]):
         self.show(f"[dim]{where}[/dim]")
 
     @work
-    async def action_flow(self, named: str = "") -> None:
-        """Switches which flow runs, and then what each of its agents runs.
+    async def action_flow(self, named: str = "", *, setting: bool = True) -> None:
+        """Switches which flow runs, how it is set up, and what each of its agents runs.
 
-        The two are asked as one walk rather than as two dialogs: what each agent runs is
-        asked next because a flow says for itself how many it drives, and esc off the first
-        thing that asks is a step back to the flows -- since a flow chosen by mistake is what
-        you would be walking back from.
+        The three are asked as one walk rather than as three dialogs: how the flow is set up
+        is asked next because only the flow that was just chosen says what there is to set,
+        and what each agent runs after that because a flow says for itself how many it
+        drives. Esc off any of them is a step back to the one before, since what you would
+        be walking back from is the choice that led there.
 
         Args:
           named: A flow of your own, as a path. Left out, the ones humanize came with are
             listed instead -- a path is typed, since guessing which files below here are
             flows means reading all of them.
+          setting: Whether to ask how the flow is set up on the way past. `/agents` is the
+            one that does not: it is the other half of `/config`, and a question it did not
+            ask is one it must not put up.
         """
         from humanize.flows import find
         from humanize.runner import wanted
@@ -1011,36 +1252,120 @@ class Humanize(App[None]):
             except Exception as why:  # noqa: BLE001 -- a flow that will not load
                 self.show(f"hmz: {why}", "red")
                 return
+            # How the flow itself runs, for a flow that says it can be set up: asked of the
+            # flow being switched to rather than of the one in force, since the settings
+            # belong to the model that flow declared and to no other.
+            model = self._model_of(switching) if setting else None
+            held = (
+                self._config
+                if switching == self._flow_named
+                else self._config_of(switching)
+            )
+            if model is not None:
+                held = await self.push_screen_wait(
+                    Configures(
+                        switching, model, held if isinstance(held, model) else None
+                    )
+                )
+                if held is None:
+                    if named:
+                        return  # nothing to step back into: this walk began here
+                    continue  # back to the flows, which is where this walk came from
             chosen = await self.push_screen_wait(Models(switching, places, agents))
             if chosen is not None:
                 # A flow is chosen in order to be run, so whatever is running stops: the
                 # interface opens on one already, and a choice that quietly went to the back
                 # of the queue behind it would read as no choice at all. Answering the same
                 # way twice is not a choice, though, and must not end the conversation.
-                if (switching, list(chosen)) != (self._flow_named, self._models):
+                if (switching, list(chosen), held) != (
+                    self._flow_named,
+                    self._models,
+                    self._config,
+                ):
                     self.action_stop_flow()
                 self._flow_named, self._models = switching, list(chosen)
-                self._wanted = places
-                self.settings.remember(switching, self._named_by, self._models)
+                self._wanted, self._config = places, held
+                self.settings.remember(
+                    switching,
+                    self._named_by,
+                    self._models,
+                    held.model_dump(mode="json") if held is not None else None,
+                )
                 self.show("[dim]say what to do, and the flow starts on it[/dim]")
                 self._draw()
                 return
+            if named and model is None:
+                return  # a flow of your own, and nothing before this to step back into
             if named:
-                return  # a flow of your own: there is no list to step back into
+                # Back to how it is set up, which is the step this walk came through.
+                continue
             # And otherwise round again, which is the step back off the leftmost column.
 
     def action_agents(self) -> None:
         """Sets what each of the flow's agents runs, which is what `/agents` is for.
 
-        The flow itself is not asked for again, so esc is a way out rather than a step back
-        into a list this did not come through.
+        Neither the flow nor how it is set up is asked for again: `/config` is the other
+        half, and this one is about what the flow runs on. So esc is a way out rather than a
+        step back into a question this did not come through.
         """
         if self._mid_run("no setting agents"):
             return
-        self.action_flow(self._flow_named)
+        self.action_flow(self._flow_named, setting=False)
+
+    @work
+    async def action_config(self) -> None:
+        """Sets up the flow itself, which is what `/config` is for.
+
+        Only what the flow says it takes, and nothing about the agents: `/agents` is the
+        other half, and a flow that says it takes no setting up says so here.
+        """
+        if self._mid_run("no setting up a flow"):
+            return
+        model = self._model_of(self._flow_named)
+        if model is None:
+            self.show(f"hmz: {self._flow_named} takes no setting up", "red")
+            return
+        held = await self.push_screen_wait(
+            Configures(
+                self._flow_named,
+                model,
+                self._config if isinstance(self._config, model) else None,
+            )
+        )
+        if held is None:
+            return
+        self._config = held
+        self.settings.remember(
+            self._flow_named,
+            self._named_by,
+            self._models,
+            held.model_dump(mode="json"),
+        )
+        self._draw()
+
+    def _at_turn_start(self) -> list[str]:
+        """What a turn starting folds into its prompt, which is one waiting line, or none.
+
+        None when the person has just handed the flow the line it is starting this turn on:
+        that line is this turn's, and taking the one behind it as well would put the two in
+        front of the agent together and have them answered once -- which is the same thing
+        going wrong from the other side.
+
+        Returns:
+          The one line to fold in, or nothing at all.
+        """
+        with self._saying:
+            if self._handed:
+                self._handed = False
+                return []
+        return self._take()
 
     def _take(self) -> list[str]:
-        """Takes everything said while nobody was working, and leaves nothing behind.
+        """Takes the oldest thing said while nobody was working, and leaves the rest.
+
+        One line, not the queue: five lines typed in a row are five things said, and folding
+        them into one prompt would have them answered once. The one behind this goes into
+        the turn after, or into this one the moment it is running.
 
         The queue is the interface's rather than any one agent's: a line is typed at the flow
         and reaches whichever agent asks for it first, which is what "a typed line reaches
@@ -1048,11 +1373,48 @@ class Humanize(App[None]):
         a line is delivered once however it is asked for.
 
         Returns:
-          What was said, oldest first, which is nothing when nothing was.
+          The oldest thing said, as the one-line list a turn folds into its prompt, which is
+          nothing at all when nothing is waiting.
         """
         with self._saying:
-            held, self._queued = self._queued, []
+            if not self._queued:
+                return []
+            held = [self._queued.pop(0)]
+        self._on_screen(self._went, held)
         return held
+
+    def _on_screen(
+        self, doing: Callable[..., None], *said: object, **and_so: object
+    ) -> None:
+        """Draws something from whichever thread is asking, which is not always the same one.
+
+        A turn asks for what is waiting from its own thread; a flow between turns asks from
+        the flow's; and a test drives the interface from the event loop itself. Only the
+        first two can go through `call_from_thread`; the loop itself may just draw.
+
+        Args:
+          doing: What to draw with.
+          said: What to draw.
+          and_so: The rest of what to draw with.
+        """
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:  # no loop here, so this is a thread of somebody's own
+            with contextlib.suppress(RuntimeError):  # or the interface has gone
+                self.call_from_thread(lambda: doing(*said, **and_so))
+            return
+        if self.is_running:  # and one that has gone has nothing left to draw on
+            doing(*said, **and_so)
+
+    def _went(self, held: list[str]) -> None:
+        """Puts what was waiting into the transcript, now that it has gone.
+
+        Args:
+          held: What was taken, oldest first.
+        """
+        for said in held:
+            self._said_by_you(said)
+        self._draw()
 
     def _listen(self, agent: AgentBase) -> str | None:
         """Waits at the prompt for a flow that has nothing to do until it is told something.
@@ -1084,6 +1446,10 @@ class Humanize(App[None]):
                 if agent.stopped or agent not in self._agents:
                     return None
                 if held := self._take():
+                    # Whatever turn this answer starts is that line's turn, and takes
+                    # nothing else out of the queue on the way in.
+                    with self._saying:
+                        self._handed = True
                     return "\n\n".join(held)
                 self._spoke.wait(_REFRESH)
         finally:
@@ -1132,7 +1498,7 @@ class Humanize(App[None]):
             self.show("hmz: a flow is already running", "red")
             return
         try:
-            path, chosen, task = flow_and_agents(argv)
+            path, chosen, task, _ = flow_and_agents(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
         try:
@@ -1144,8 +1510,10 @@ class Humanize(App[None]):
             # Loaded here rather than on the thread it will run on, so that the agents it
             # drives are in hand before anything is hooked up to them: a flow that says it
             # talks to the person drives one more than was chosen, and the person is reached
-            # through this interface like everything else.
-            runner = Runner(path, chosen)
+            # through this interface like everything else. How the flow itself is set up
+            # goes with them: it is a setting of the flow rather than of any agent, so it
+            # is not on the line that says what each of them runs.
+            runner = Runner(path, chosen, self._config)
         except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
             self.show(f"hmz: {why}", "red")
             return
@@ -1157,11 +1525,12 @@ class Humanize(App[None]):
         self._tally = Tally(agents, self._monitor)
         self._tally.watch()
         with self._saying:
-            self._queued = []
+            self._queued, self._given, self._handed = [], [], False
 
         for agent in agents:
             agent.watch(self._heard)
-            agent.waiting = self._take  # whichever turn starts next takes what was held
+            # Whichever turn starts next takes the oldest line that was held.
+            agent.waiting = self._at_turn_start
             # Bound to the agent, so that each of these answers about the flow that is
             # asking rather than about whichever flow is running by the time it is asked.
             agent.ask = functools.partial(self._ask, agent)
@@ -1188,6 +1557,10 @@ class Humanize(App[None]):
                         self.call_from_thread(
                             self.show, "[dim]— the flow is done —[/dim]"
                         )
+                    # And whatever it never got round to taking, which is now on its way
+                    # nowhere: a flow that ends of its own accord strands the pin exactly as
+                    # one that is stopped does.
+                    self._on_screen(self._never_sent, "the flow ended first")
             return 0
 
         self._background(drive)
@@ -1195,7 +1568,8 @@ class Humanize(App[None]):
     def _heard(self, agent: AgentBase, event: Event) -> None:
         """Shows what a turn said, and takes it into what the right-hand column shows.
 
-        Called from whichever thread the turn is running on.
+        Called from whichever thread the turn is running on, which is why everything drawn
+        from here goes through `_on_screen`.
 
         Args:
           agent: Whose turn said it.
@@ -1205,16 +1579,24 @@ class Humanize(App[None]):
         # what a watcher raises is swallowed, so accounting after it would be lost.
         for model, tokens in event.tokens.items():
             self._monitor.spend(agent.id, tokens, model=model)
+        if event.kind == "took":
+            # The agent saying a word put into its turn is now in front of it, which is the
+            # one thing that makes a word said rather than posted.
+            self._on_screen(self._took, agent.id, event.text)
+            return
         if event.kind == "begins":
             self._monitor.begins(agent.id, agent.config.model)
             self._began[agent.id] = time.monotonic()
         elif event.kind == "ends":
             self._monitor.ends(agent.id)
+            # Whatever it was holding is not on its way anywhere now: the turn it was put
+            # into is over, and it never said it had it.
+            self._on_screen(self._ended_holding, agent.id)
             # The line opencode closes a message with: a filled square, two spaces, then the
             # parts separated by a middle dot.
             took = time.monotonic() - self._began.pop(agent.id, time.monotonic())
             # The line Claude Code closes a turn with, which says how long it worked.
-            self.call_from_thread(
+            self._on_screen(
                 self._part,
                 f"[dim]{_WORKED} Worked for {took:.0f}s"
                 f"{_DOT}{escape(short(agent.id))}[/]",
@@ -1223,13 +1605,13 @@ class Humanize(App[None]):
         elif event.kind == "tool" and self._details:
             # The tool on the bullet, what it came back with under it -- Claude Code's shape.
             named, _, about = escape(event.text).partition(" ")
-            self.call_from_thread(
+            self._on_screen(
                 self._part,
                 f"[green]{_SAID}[/] {named}[dim]({about})[/]",
                 packs=True,
             )
         elif event.kind == "reasoning" and self._details:
-            self.call_from_thread(
+            self._on_screen(
                 self._part,
                 "\n".join(
                     f"[dim italic]{line}[/]" for line in escape(event.text).splitlines()
@@ -1237,7 +1619,7 @@ class Humanize(App[None]):
                 packs=False,
             )
         elif event.kind == "asks":
-            self.call_from_thread(
+            self._on_screen(
                 self._part,
                 f"[yellow]{_SAID}[/] {escape(event.text)}",
                 packs=False,
@@ -1246,7 +1628,7 @@ class Humanize(App[None]):
             # The bullet on the first line, two spaces under it for the rest, which is how
             # Claude Code sets a message it has just written.
             said = escape(event.text).splitlines() or [""]
-            self.call_from_thread(
+            self._on_screen(
                 self._part,
                 "\n".join(
                     [
@@ -1385,39 +1767,132 @@ class Humanize(App[None]):
         return bool(self._models)
 
     def _interject(self, text: str) -> None:
-        """Says something to the agent working right now.
+        """Puts something in the queue for the flow, and sends it if nothing is in the way.
+
+        Everything typed joins one queue, whether or not a turn is running: a line is a
+        thing said, and things said go one at a time and in order. It is pinned above the
+        prompt rather than written into the transcript until it goes -- it has not been said
+        to anybody yet, and a transcript is what happened, which is what Claude Code does
+        with a queued line too.
 
         Args:
           text: What to say.
         """
+        with self._saying:
+            self._queued.append(text)
+        self._spoke.set()  # a flow between turns is waiting to be told something
+        self._draw()  # rather than at the next tick: it was just typed
+        self._hand_over()
+
+    def _hand_over(self) -> None:
+        """Puts the oldest waiting line into the turn that is running, one line at a time.
+
+        One at a time and never two: a backend given a second word while it is still
+        swallowing the first runs the two together and answers once, so five lines typed in
+        a row would come back as one reply. The next goes only once the turn has said it has
+        this one, which is also the only point at which the two could not be run together.
+
+        Nothing is sent between turns. A line has nowhere to go but the queue then -- writing
+        it to a session that is not working would have it answered on its own, outside the
+        flow -- so it waits for whichever turn starts next, and a running flow never drops
+        one.
+        """
         working = set(self._monitor.now_working())
-        sessions = [
-            session
+        # The agent alongside its session: a word put in is pinned against whoever has it,
+        # and it is that agent's own stream that will say it has been taken in.
+        talking = [
+            (agent, session)
             for agent in self._agents
             if agent.id in working
             for session in agent.sessions
         ]
-        self._said_by_you(text)
-        if not sessions:
-            # Between two turns, or inside a flow's own sleep. It is held rather than
-            # written to a session, which between turns would answer it on its own, and it
-            # goes into whichever turn starts next -- so a running flow never drops a line.
-            with self._saying:
-                self._queued.append(text)
-            self._spoke.set()
-            if not self._awaiting:
-                # A flow waiting at the prompt is about to take this as the whole of its next
-                # turn, so saying it was held would be saying so of every line ever typed.
-                self.show("[dim]   held for the next turn[/dim]")
+        if not talking:
             return
+        agent, session = talking[-1]
+        with self._saying:
+            if any(who == agent.id for who, _ in self._given):
+                return  # it is holding one already, and holds one at a time
+            if not self._queued:
+                return
+            text = self._queued.pop(0)
+            self._given.append((agent.id, text))
+        self._draw()
 
         def put_in() -> int:
             # Off the event loop: this writes to the agent, and a large paste into a pipe the
             # interface itself is draining would otherwise deadlock the two.
             try:
-                sessions[-1].interject(text)
-            except (NotImplementedError, RuntimeError) as error:
-                self.call_from_thread(self.show, f"hmz: {error}", "red")
+                session.interject(text)
+            except (NotImplementedError, RuntimeError, OSError) as error:
+                self._on_screen(self._unreached, agent.id, text, str(error))
+            except subprocess.CalledProcessError as refused:
+                # A backend that refused it: codex drops a steer that named a turn already
+                # over, and kimi answers one inside a 200. Either way it never went.
+                self._on_screen(
+                    self._unreached,
+                    agent.id,
+                    text,
+                    refused.stderr or "the agent refused it",
+                )
             return 0
 
         self._background(put_in)
+
+    def _unreached(self, who: str, text: str, because: str) -> None:
+        """Puts a word back at the head of the queue, the agent never having taken it.
+
+        At the head rather than the end, and without trying the next one behind it: it was
+        said before everything still waiting, and sending that one now would be sending it
+        to the agent that just refused this.
+
+        Args:
+          who: The agent it was put to.
+          text: The word.
+          because: What the backend said about it.
+        """
+        with self._saying:
+            if (who, text) in self._given:
+                self._given.remove((who, text))
+                self._queued.insert(0, text)
+        self.show(f"hmz: {because}", "red")
+        self._spoke.set()  # and whichever turn starts next takes it instead
+        self._draw()
+
+    def _took(self, who: str, text: str) -> None:
+        """Takes a word off the pin, the agent having said it now has it.
+
+        Args:
+          who: The agent that said so.
+          text: The word it said it has.
+        """
+        with self._saying:
+            if (who, text) not in self._given:
+                return  # somebody else's word, or one already written down
+            self._given.remove((who, text))
+        self._said_by_you(text)
+        self._draw()
+        self._hand_over()  # and the next one behind it goes now that this is through
+
+    def _ended_holding(self, who: str) -> None:
+        """Says what became of the words an agent was holding when its turn ended.
+
+        The turn is over and it never said it had them, so they are neither waiting nor
+        taken: they were put to it, and what it did with them is between it and the backend.
+        Every backend but codex runs such a word as a turn of its own afterwards, and codex
+        drops it -- which is more than this can tell from here, so it says what it knows.
+
+        Args:
+          who: The agent whose turn ended.
+        """
+        with self._saying:
+            held = [text for agent, text in self._given if agent == who]
+            self._given = [pair for pair in self._given if pair[0] != who]
+        if not held:
+            return
+        for text in held:
+            self._said_by_you(text)
+        self.show(
+            f"[dim]   put to {escape(short(who))}, which ended its turn without saying "
+            f"it had {'them' if len(held) > 1 else 'it'}[/dim]"
+        )
+        self._draw()

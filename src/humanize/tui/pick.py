@@ -1,4 +1,4 @@
-"""The sheets: which flow, what each of its agents runs, and how the run is going.
+"""The sheets: which flow, how it is set up, what each of its agents runs, and how it goes.
 
 Drawn as Claude Code draws its own `/model`, which is the same question one step along: a rule
 of `▔` across the top, the question and a line about it indented three, the choices numbered
@@ -18,7 +18,16 @@ is a rule across, fields down the left and their values lined up beside them.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, ClassVar, NamedTuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+    NamedTuple,
+    cast,
+    get_args,
+    get_origin,
+)
 
 from rich.markup import escape
 from textual import events, on, work
@@ -34,6 +43,8 @@ from .discover import machines
 from .monitor import short, thousands
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel
+    from pydantic.fields import FieldInfo
     from textual.app import App, ComposeResult
 
     from humanize.backends import Model
@@ -41,7 +52,17 @@ if TYPE_CHECKING:
 
     from .monitor import Monitor
 
-__all__ = ["Anchors", "Flows", "Models", "Runs", "Sheet", "Status", "reads"]
+__all__ = [
+    "Anchors",
+    "Configures",
+    "Flows",
+    "Models",
+    "Runs",
+    "Sheet",
+    "Status",
+    "reads",
+    "setting",
+]
 
 
 class Runs(NamedTuple):
@@ -109,7 +130,8 @@ def reads(named: tuple[str, ...], runs: list[Runs]) -> list[str]:
 
 
 _SHEET = """
-Anchors, Flows, Models, Status { align: center middle; background: $background; }
+Anchors, Configures, Flows, Models, Status {
+    align: center middle; background: $background; }
 #sheet { width: 100%; height: auto; padding: 0; }
 #rule { height: 1; color: $primary; }
 #asked { padding: 0 0 0 3; text-style: bold; color: $primary; }
@@ -627,6 +649,371 @@ class Anchors(Sheet[str]):
         self.dismiss(str(event.option.id).removeprefix("="))
 
 
+#: How wide the column of setting names is, and the column of their values, so that a sheet
+#: of settings reads down three columns: what it is called, what it is, and what it is for.
+#: Wide enough for the longest name any flow here has, since a column that a name overruns
+#: is one the three of them stop lining up in.
+_SETTING = 34
+_VALUE = 13
+
+#: What a switch reads as. Both are words pydantic takes back as a boolean, so what is shown
+#: is also what is validated -- there is no second spelling of `on` for this to get wrong.
+_ON = "on"
+_OFF = "off"
+
+
+def _shown(value: object) -> str:
+    """One setting's value, as a line about it says it.
+
+    Args:
+      value: What it is set to.
+
+    Returns:
+      A switch as `on` or `off`, anything else as it is written, and something unset as the
+      empty string rather than as `None` -- a setting nobody has given a value is blank.
+    """
+    if isinstance(value, bool):
+        return _ON if value else _OFF
+    return "" if value is None else str(value)
+
+
+def _grouped(field: FieldInfo) -> str:
+    """Which part of the sheet a setting belongs under, if the flow said.
+
+    A flow groups its settings by writing `json_schema_extra={"section": "..."}` where it
+    declares them: twenty settings in one list is a list nobody reads, and the flow is the
+    only thing that knows which of them belong together.
+
+    Args:
+      field: The field, as the model declared it.
+
+    Returns:
+      The heading to draw above it, or "" for a flow that grouped nothing.
+    """
+    extra = field.json_schema_extra
+    if not isinstance(extra, dict):
+        return ""
+    said = cast("dict[str, Any]", extra).get("section")
+    return str(said) if said else ""
+
+
+def setting(config: BaseModel | None) -> list[str]:
+    """What a flow was set up with, one line per setting that is not at its default.
+
+    Read in two places -- `/status` and the box a run opens with -- and only the settings
+    that were changed: a flow with forty of them says nothing by listing the thirty-nine
+    nobody touched, and the one that was touched is the thing worth reading.
+
+    Args:
+      config: What the flow was set up with, or None for a flow that takes no setting up or
+        was left as it comes.
+
+    Returns:
+      One `name value` apiece, in the order the model declares them, and nothing at all for
+      a flow left entirely at its defaults.
+    """
+    if config is None:
+        return []
+    return [
+        f"{name:<{_SETTING}}{_shown(getattr(config, name))}"
+        for name, field in type(config).model_fields.items()
+        if getattr(config, name) != field.get_default(call_default_factory=True)
+    ]
+
+
+class Configures(Sheet["BaseModel"]):
+    """How the flow is set up, asked once between choosing it and choosing its agents.
+
+    A flow says what it can be set up with by declaring a model, and this is that model with
+    a cursor on it: one row per field, the name, what it is set to, and the line the field
+    was declared with. Nothing here knows what any of the settings mean -- the types say how
+    a value is moved, and the model itself says which combinations it will not take, so a
+    flow that refuses `gen_idea` without `gen_plan` refuses it here rather than an hour in.
+
+    Every value is held as it is typed and handed to the model to read back, so a field is
+    only ever wrong in one place: pydantic coerces `on`, `42` and `discussion` into the bool,
+    the int and the literal the flow declared, and says what is wrong with anything else.
+    """
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        ("left", "prev", "previous value"),
+        ("right", "next", "next value"),
+        # Enter is the whole sheet rather than the row under the cursor: a setting is
+        # adjusted where it stands, so there is nothing here to pick. Priority, or the
+        # list under the cursor would take it as choosing a row.
+        Binding("enter", "done", "done", priority=True),
+    ]
+
+    def __init__(
+        self, flow: str, model: type[BaseModel], now: BaseModel | None
+    ) -> None:
+        """Initializes the setting up.
+
+        Args:
+          flow: The flow these settings are for.
+          model: What it says it can be set up with.
+          now: How it is set up already, or None to start from the model's own defaults.
+        """
+        super().__init__()
+        self._flow = flow
+        self._model = model
+        self._fields = list(model.model_fields.items())
+        self._counting = len(str(len(self._fields)))
+        #: Every value as text, which is what is shown and what is read back: one spelling
+        #: of a setting, so that what is on screen is what the model is given.
+        self._typed_in: dict[str, str] = {
+            name: _shown(
+                getattr(now, name)
+                if now is not None
+                else field.get_default(call_default_factory=True)
+            )
+            for name, field in self._fields
+        }
+        #: What the model said was wrong with them, if it has been asked yet.
+        self._wrong = ""
+        #: Which setting the cursor was last on, counting settings rather than rows: the
+        #: headings between them are rows nothing can land on, so a row number is not one.
+        self._was = 0
+
+    def _ask(self) -> None:
+        """Says what is being set up, and what the keys do while it is."""
+        self.query_one("#asked", Label).update(f"Set up {self._flow}")
+        self.query_one("#about", Label).update(
+            "How this flow runs, which it says for itself. Left and right move a setting "
+            "along, typing writes one, and enter takes the lot. What is refused here is "
+            "refused by the flow rather than by this list."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _fill(self) -> None:
+        """Puts the settings up, grouped, with the marker beside the one under the cursor."""
+        listing = self.query_one("#choices", OptionList)
+        at = self._at(listing.highlighted)
+        rows: list[Option] = []
+        group = ""
+        for seen, (name, field) in enumerate(self._fields):
+            under = _grouped(field)
+            if under != group:
+                group = under
+                # A heading, and a blank line above it once there is something above it. It
+                # cannot be landed on, so the arrows walk the settings and step over these.
+                # A flow that grouped nothing gets neither, and reads as one list.
+                if group:
+                    if rows:
+                        rows.append(Option("", disabled=True))
+                    rows.append(
+                        Option(f"{_INDENT}[$primary]{escape(group)}[/]", disabled=True)
+                    )
+            rows.append(Option(self._line(seen, name, here=seen == at), id=name))
+        listing.set_options(rows)
+        listing.highlighted = self._row_of(at) if self._fields else None
+        self._drawn = listing.highlighted
+        self.query_one("#tuning", Label).update(
+            f"[$error]{escape(self._wrong)}[/]" if self._wrong else ""
+        )
+        # What the keys do on the setting under the cursor, and not what they do elsewhere:
+        # typing at a switch does nothing, and offering it is worse than not saying so.
+        written = bool(self._fields) and not self._steps(self._fields[at][0])
+        self.query_one("#keys", Label).update(
+            "Type to set · Backspace to rub out · Enter to accept · Esc to go back"
+            if written
+            else "←/→ to change · Enter to accept · Esc to go back"
+        )
+
+    def _row_of(self, at: int) -> int:
+        """Which row of the list one setting is on, once the headings are counted.
+
+        Args:
+          at: Which setting it is, counting from zero.
+
+        Returns:
+          The row.
+        """
+        rows = 0
+        group = ""
+        for seen, (_, field) in enumerate(self._fields):
+            under = _grouped(field)
+            if under != group:
+                group = under
+                if group:
+                    rows += 2 if rows else 1
+            if seen == at:
+                return rows
+            rows += 1
+        return rows
+
+    def _at(self, row: int | None) -> int:
+        """Which setting a row of the list is, which is what the cursor is really on.
+
+        Args:
+          row: Where the cursor is, or None for a list nothing is highlighted in.
+
+        Returns:
+          The setting, counting from zero, and the nearest one where the cursor is on a
+          heading -- which is where it lands when the list is first put up.
+        """
+        listing = self.query_one("#choices", OptionList)
+        if row is not None and 0 <= row < listing.option_count:
+            named = listing.get_option_at_index(row).id
+            if named is not None:
+                return next(
+                    (
+                        seen
+                        for seen, (one, _) in enumerate(self._fields)
+                        if one == named
+                    ),
+                    0,
+                )
+        return self._was
+
+    def _line(self, at: int, name: str, *, here: bool) -> str:
+        """One setting: what it is called, what it is set to, and what it is for.
+
+        A setting that is written carries a caret under the cursor, where the next letter
+        would land. Without it a blank one reads as a setting nothing can be typed into --
+        which is the one thing about this list that has to be visible, since a switch and a
+        word look the same until you try to type at one.
+
+        Args:
+          at: Which one it is, counting from zero.
+          name: The field.
+          here: Whether the cursor is on it.
+
+        Returns:
+          The row, as markup.
+        """
+        mark = f"{_INDENT}[$primary]{_HERE}[/] " if here else f"{_INDENT}  "
+        number = f"{at + 1:>{self._counting}}."
+        value = self._typed_in[name]
+        about = dict(self._fields)[name].description or ""
+        # A block where the next letter goes, drawn by reversing what is already there --
+        # the one thing a list in the terminal's own colours can show without naming one.
+        caret = "[reverse] [/reverse]" if here and not self._steps(name) else ""
+        # Padded on what is shown rather than on what is written: markup is not columns,
+        # and the caret is one of them.
+        named = escape(name) + " " * max(1, _SETTING - len(name))
+        room = _VALUE - len(value) - (1 if caret else 0)
+        return (
+            f"{mark}[$text-muted]{number}[/] {named}"
+            f"[$secondary]{escape(value)}[/]{caret}{' ' * max(1, room)}"
+            f"[$text-muted]{escape(about)}[/]"
+        )
+
+    @property
+    def _under(self) -> str:
+        """The setting the cursor is on, or "" for a model that declares none."""
+        if not self._fields:
+            return ""
+        listing = self.query_one("#choices", OptionList)
+        self._was = self._at(listing.highlighted)
+        return self._fields[self._was][0]
+
+    def _steps(self, name: str) -> tuple[str, ...]:
+        """What a setting steps through, where it is one of a fixed few.
+
+        Args:
+          name: The field.
+
+        Returns:
+          Every value it takes, in the order the flow wrote them -- the two words of a
+          switch, or the words of a literal -- and nothing at all for one that is written
+          rather than stepped.
+        """
+        kind = dict(self._fields)[name].annotation
+        # `Literal["a", "b"] | None` and `Literal["a", "b"]` are the same few words to step
+        # through, so the union is unwrapped before the literal is read off it.
+        for said in (kind, *get_args(kind)):
+            if get_origin(said) is Literal:
+                return tuple(str(one) for one in get_args(said))
+        if kind is bool:
+            return (_OFF, _ON)
+        return ()
+
+    def _move(self, by: int) -> None:
+        """Moves the setting under the cursor along, however that setting moves.
+
+        Args:
+          by: One step forward or back.
+        """
+        name = self._under
+        if not name:
+            return
+        if steps := self._steps(name):
+            at = (
+                steps.index(self._typed_in[name])
+                if self._typed_in[name] in steps
+                else 0
+            )
+            self._typed_in[name] = steps[(at + by) % len(steps)]
+        elif dict(self._fields)[name].annotation in (int, float):
+            try:
+                now = float(self._typed_in[name] or 0)
+            except ValueError:
+                now = 0
+            moved = now + by
+            self._typed_in[name] = str(
+                int(moved) if dict(self._fields)[name].annotation is int else moved
+            )
+        else:
+            return  # a setting that is written is not one an arrow has a step for
+        self._wrong = ""
+        self._fill()
+
+    def action_next(self) -> None:
+        """Moves the setting under the cursor one value on."""
+        self._move(1)
+
+    def action_prev(self) -> None:
+        """Moves the setting under the cursor one value back."""
+        self._move(-1)
+
+    def action_back(self) -> None:
+        """Leaves without setting anything, which leaves the flow as it was."""
+        self.dismiss(None)
+
+    def action_done(self) -> None:
+        """Reads every setting back into the model, and answers with it if it takes them.
+
+        What the model refuses is shown where it was typed rather than raised at the flow:
+        a combination the flow will not run is a combination to correct before it starts,
+        and this is the moment it is being said.
+        """
+        from pydantic import ValidationError
+
+        try:
+            self.dismiss(self._model.model_validate(self._typed_in))
+        except ValidationError as refused:
+            first = refused.errors()[0]
+            where = ".".join(str(part) for part in first.get("loc") or ())
+            self._wrong = f"{where}: {first['msg']}" if where else str(first["msg"])
+            self._fill()
+
+    def on_key(self, event: events.Key) -> None:
+        """Takes a letter as writing the setting under the cursor.
+
+        There is nothing to search here -- every setting is on screen at once -- so the keys
+        that narrow a list elsewhere are the ones that write a value.
+
+        Args:
+          event: The key.
+        """
+        name = self._under
+        if not name or self._steps(name):
+            return  # a switch and a literal are stepped rather than written
+        if event.key == "backspace":
+            self._typed_in[name] = self._typed_in[name][:-1]
+        elif event.is_printable and event.character:
+            self._typed_in[name] += event.character
+        else:
+            return
+        event.prevent_default()
+        event.stop()
+        self._wrong = ""
+        self._fill()
+
+
 class Status(ModalScreen[None]):
     """How the run is going: who is working, who handed to whom, and what it has cost.
 
@@ -641,7 +1028,12 @@ class Status(ModalScreen[None]):
     BINDINGS: ClassVar = [("escape", "back", "back")]
 
     def __init__(
-        self, flow: str, named: tuple[str, ...], models: list[Runs], monitor: Monitor
+        self,
+        flow: str,
+        named: tuple[str, ...],
+        models: list[Runs],
+        monitor: Monitor,
+        config: BaseModel | None = None,
     ) -> None:
         """Reads one run.
 
@@ -650,12 +1042,14 @@ class Status(ModalScreen[None]):
           named: What that flow calls each agent it drives, "" apiece where it names none.
           models: What each of its agents runs, and where its turns land.
           monitor: The run itself, read again each time this is redrawn.
+          config: What the flow was set up with, for a flow that takes any setting up.
         """
         super().__init__()
         self._flow = flow
         self._named = named
         self._models = models
         self._monitor = monitor
+        self._config = config
 
     def compose(self) -> ComposeResult:
         """The rule, what this is, the fields, and the way out."""
@@ -687,6 +1081,9 @@ class Status(ModalScreen[None]):
             [
                 ("Flow", [escape(self._flow)]),
                 ("Agents", reads(self._named, self._models) or ["none installed"]),
+                # Only what was changed: a flow of forty settings says nothing by listing
+                # the ones nobody touched, and this is read to see what this run is.
+                ("Set", [escape(one) for one in setting(self._config)]),
             ],
             [
                 (
