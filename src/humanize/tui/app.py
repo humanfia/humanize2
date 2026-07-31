@@ -416,6 +416,31 @@ class Humanize(App[None]):
         Binding("shift+tab", "cycle_flow", "flow", priority=True),
     ]
 
+    def check_action(
+        self,
+        action: str,
+        parameters: tuple[object, ...],  # noqa: ARG002  -- the same key, whatever it carries
+    ) -> bool | None:
+        """Whether one of the interface's own keys is live, with a sheet up over it.
+
+        Stepping to the next flow is not: a sheet is open in order to be answered, and the
+        one that asks what each agent runs is asking about the flow this would step off. The
+        key is the sheet's while the sheet is there -- shift+tab turns its tabs back -- and a
+        binding that is refused here is one the sheet is then offered rather than one that is
+        swallowed, since the interface's own is a priority binding and would otherwise be
+        matched first wherever the sheet's cursor was.
+
+        Args:
+          action: What the key would do.
+          parameters: What it would do it with.
+
+        Returns:
+          Whether to run it.
+        """
+        # Every other one of ours is either the editor's, which a sheet has taken the focus
+        # from, or means the same thing wherever it is pressed.
+        return not (action == "cycle_flow" and len(self.screen_stack) > 1)
+
     def action_quit(self) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Leaves, having first stopped whatever was running.
 

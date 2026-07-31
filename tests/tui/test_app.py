@@ -1000,13 +1000,14 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
         "codex": (Model("gpt-5.6-sol", ("xhigh",)),),
     },
 )
-async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
+async def test_what_an_agent_runs_is_one_cli_at_a_time_and_an_effort_the_arrows_move(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """As Claude Code's `/model` is: the models numbered, the effort on its own line.
 
-    A CLI and a model are one choice rather than two, because they are one choice in fact --
-    a model belongs to the CLI that runs it.
+    A CLI and a model are still one choice, because they are one choice in fact -- a model
+    belongs to the CLI that runs it -- but the CLI is a tab and its models are the list, so
+    what is read at once is one CLI's worth rather than every model there is.
     """
     from textual.widgets import OptionList
 
@@ -1022,15 +1023,20 @@ async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
 
-        # One row per CLI-and-model pair, numbered, with the cursor marked by `❯`.
+        # A tab per CLI installed here, with the one being read marked and the others not.
+        tabs = str(sheet.query_one("#tabs", Label).content)
+        assert "claude" in tabs
+        assert "codex" in tabs
+        assert "kimi" not in tabs  # not installed, so not a tab
+        assert "tab/shift+tab to switch" in tabs
+
+        # One row per model of that CLI alone, numbered, cursor marked by `❯`.
         rows = [str(option.prompt) for option in listing.options]
         assert [str(option.id) for option in listing.options] == [
-            "claude/claude-opus-5",
-            "codex/gpt-5.6-sol",
+            "claude/claude-opus-5"
         ]
         assert "❯" in rows[0]
         assert "1." in rows[0]
-        assert "❯" not in rows[1]
 
         # The effort is adjusted rather than chosen, and starts on the hardest.
         tuning = sheet.query_one("#tuning", Label)
@@ -1046,6 +1052,135 @@ async def test_what_an_agent_runs_is_one_list_and_an_effort_the_arrows_move(
         await until(lambda: not isinstance(app.screen, Models), driver)
 
     assert cast("Models", sheet)._chosen == [Runs("claude/claude-opus-5:max")]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={
+        "claude": (Model("claude-opus-5", ("max", "high")),),
+        "codex": (Model("gpt-5.6-sol", ("xhigh",)), Model("gpt-5.5", ("high",))),
+    },
+)
+async def test_tab_and_shift_tab_turn_to_the_next_cli_and_the_one_before(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """Which is the point of the tabs: a list of one CLI's models rather than of all of them.
+
+    They wrap, so the last tab is one press from the first however many CLIs are installed --
+    and shift+tab here is the tab before rather than the interface's own next flow, which is
+    not a thing to do from inside the sheet that is choosing what this flow runs on.
+    """
+    from textual.widgets import OptionList
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        sheet = app.screen
+        listing = sheet.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        flow = app._flow_named
+
+        await driver.press("tab")
+        await driver.pause()
+        assert [str(option.id) for option in listing.options] == [
+            "codex/gpt-5.6-sol",
+            "codex/gpt-5.5",
+        ]
+        assert "1." in str(listing.get_option_at_index(0).prompt)  # numbered afresh
+
+        await driver.press("tab")  # round the end, back to the first
+        await driver.pause()
+        assert [str(option.id) for option in listing.options] == [
+            "claude/claude-opus-5"
+        ]
+
+        await driver.press("shift+tab")  # and back the other way
+        await driver.pause()
+        assert [str(option.id) for option in listing.options] == [
+            "codex/gpt-5.6-sol",
+            "codex/gpt-5.5",
+        ]
+        # The interface's own shift+tab did not fire under the sheet.
+        assert app._flow_named == flow
+
+        await driver.press("down")  # the second of that CLI's models
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    assert cast("Models", sheet)._chosen == [Runs("codex/gpt-5.5:high")]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={
+        "claude": (Model("claude-opus-5", ("max",)), Model("claude-sonnet-5", ("max",)))
+    },
+)
+async def test_one_cli_is_a_heading_rather_than_a_row_of_tabs(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """There is nowhere to switch to, so nothing says there is."""
+    from textual.widgets import OptionList
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        sheet = app.screen
+        listing = sheet.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+
+        tabs = str(sheet.query_one("#tabs", Label).content)
+        assert "claude" in tabs
+        assert "to switch" not in tabs
+
+        await driver.press("tab")  # nowhere to go, and nothing moves
+        await driver.pause()
+        assert [str(option.id) for option in listing.options] == [
+            "claude/claude-opus-5",
+            "claude/claude-sonnet-5",
+        ]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={
+        "claude": (Model("claude-opus-5", ("max", "high")),),
+        "codex": (Model("gpt-5.6-sol", ("xhigh",)),),
+    },
+)
+async def test_what_was_typed_belongs_to_the_tab_it_was_typed_into(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """A search that narrowed one CLI to one model would narrow the next one to none."""
+    from textual.widgets import OptionList
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        sheet = app.screen
+        listing = sheet.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+
+        await driver.press(*"opus")
+        await driver.pause()
+        assert [str(option.id) for option in listing.options] == [
+            "claude/claude-opus-5"
+        ]
+
+        await driver.press("tab")
+        await driver.pause()
+        # The next CLI is read from its whole list rather than through the last search.
+        assert [str(option.id) for option in listing.options] == ["codex/gpt-5.6-sol"]
+        assert cast("Models", sheet)._typed == ""
 
 
 @pytest.mark.timeout(60)
@@ -1082,15 +1217,15 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
         # Claude opens on ultracode, which is the hardest thing it takes, and has no swarm.
         assert "ultracode effort" in str(tuning.content)
         assert "swarm" not in str(tuning.content)
-        await driver.press("tab")  # nothing to toggle, so nothing happens
+        await driver.press("ctrl+w")  # nothing to toggle, so nothing happens
         await driver.pause()
         assert "swarm" not in str(tuning.content)
 
-        # Kimi has one, and tab is what turns it on.
-        await driver.press("down")
+        # Kimi has one, a tab along, and ctrl+w is what turns it on.
+        await driver.press("tab")
         await driver.pause()
         assert "swarm mode off" in str(tuning.content)
-        await driver.press("tab")
+        await driver.press("ctrl+w")
         await driver.pause()
         assert "swarm mode on" in str(tuning.content)
         await driver.press("left")  # and it is still on at another effort

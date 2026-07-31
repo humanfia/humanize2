@@ -7,7 +7,12 @@
 ├── __init__.py
 ├── app.py
 ├── complete.py
-└── monitor.py
+├── discover.py
+├── history.py
+├── monitor.py
+├── pick.py
+├── settings.py
+└── tally.py
 ```
 
 ## `__init__.py`
@@ -66,6 +71,49 @@ line, with what the flow is doing beside the transcript.
   two presses and never one.
 - A line that cannot be carried out MUST be shown and MUST leave the interface up. Only
   `/exit` and two `ctrl+c` close it.
+- A key of the interface's own MUST NOT fire while a sheet is up over it: a sheet is open in
+  order to be answered, and the one that asks what each agent runs is asking about the flow
+  that stepping to the next flow would step off. The key MUST reach the sheet instead, rather
+  than being swallowed by the interface and doing nothing.
+
+## `pick.py`
+
+The sheets: which flow, how it is set up, what each of its agents runs and where, and how the
+run is going. Each MUST be drawn the way Claude Code draws its own `/model` -- a rule across the
+top, the question and a line about it, the choices numbered with a marker against the one under
+the cursor, and under them whatever is adjusted rather than chosen.
+
+- Nothing MUST be typed in that could be found: the CLIs offered MUST be the ones installed
+  here, and the efforts offered MUST be the ones that model takes. Nothing MUST be asked of a
+  CLI to find out -- starting one costs seconds a prompt has not got.
+- What an agent runs MUST be one choice rather than two, a model belonging to the CLI that runs
+  it; and the CLIs MUST be read one at a time, a tab apiece, since every model of every CLI in
+  one list is a list that grows each time any of them ships a model. Tab and shift+tab MUST
+  turn between them and MUST wrap. One CLI MUST be a heading rather than a row of tabs: there
+  is nowhere to switch to, so nothing MUST say there is.
+- Typing MUST narrow the list being read and MUST belong to the tab it was typed into: a search
+  that narrowed one CLI to one model would narrow the next to none, which reads as a CLI with
+  nothing in it. Esc MUST clear what was typed before it leaves, on every sheet that is
+  searched.
+- Where an agent works is a second question about that agent rather than a way of running the
+  model, so it MUST be a key on the same sheet rather than a row in it, and MUST open a sheet
+  of its own. Walking out of that one without answering MUST leave the agent as it was.
+
+## `settings.py`
+
+What one workspace was last set up to run, kept under humanize's own home as `settings.yaml`
+so that opening the interface again in the same project finds it that way.
+
+- MUST be kept per flow as well as per workspace, by the name humanize's own flows have and by
+  the path yours have: what an agent runs is only meaningful against the flow driving it, and a
+  flow of yours MUST NOT inherit the agents of the one it shares a name with. Each agent MUST
+  be keyed by the name the flow calls it, so that a flow which grows an agent in the middle does
+  not silently hand the reviewer's model to the builder.
+- A setting that was never chosen MUST be left out rather than written down as a default: a
+  file written before there was such a setting and a workspace nobody has been asked MUST read
+  the same way. What is read back MUST be checked before it is used -- a flow's own model
+  refuses a config it no longer takes -- and a file that is missing, unreadable or not what
+  this writes MUST be a workspace with nothing remembered rather than a reason not to open.
 
 ## `monitor.py`
 
@@ -124,3 +172,36 @@ What the editor offers to finish, which is the only way anything is chosen.
   typed rather than being appended to it.
 - Finding the flows MUST NOT cost the interface its responsiveness: it reads every Python
   file below this directory, which is far too slow to repeat between keystrokes.
+
+## `discover.py`
+
+Which agents are installed here, what each one runs, and where their turns could land.
+
+- Nothing MUST be asked of a backend: starting one costs what it costs, and this is read at a
+  prompt. What each runs MUST be read out of `humanize.backends`, and what only this machine
+  knows -- which models an account may run, which containers are up, which hosts are in an ssh
+  config -- MUST be read off the disk it is written on.
+- A backend that is not installed here MUST NOT be offered, and neither MUST an effort a model
+  does not take.
+
+## `history.py`
+
+What has been typed here before, so that it can be had back by walking to it.
+
+- Everything said MUST go down: the task that starts a flow and the words put into one already
+  running alike. One file MUST hold them all, under humanize' own home, each line saying which
+  directory it was typed in.
+- What is walked MUST be what was typed in this directory, and everything ever typed anywhere
+  where nothing has been typed here yet. Which of the two it is MUST be settled when the
+  interface starts: a history that changed under you mid-session would be one nobody could find
+  their way back through.
+
+## `tally.py`
+
+What a run has cost, read from the logs the agents keep for themselves.
+
+- A backend says what a turn cost only once the turn has ended, and a turn is minutes long, so
+  what is shown MUST be read from the CLIs' own usage logs as they are written instead.
+- What is read MUST be reported as a total rather than as an addition, so that a log read twice
+  cannot count a token twice -- and so that the backends' own reports may stand beside it,
+  whichever has seen more being what has been spent.

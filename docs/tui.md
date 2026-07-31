@@ -15,6 +15,7 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 - [Questions, and being away](#questions-and-being-away)
 - [Completion](#completion)
 - [History](#history)
+- [What each agent runs](#what-each-agent-runs)
 - [Where each agent works](#where-each-agent-works)
 - [Setting a flow up](#setting-a-flow-up)
 - [What it remembers](#what-it-remembers)
@@ -65,7 +66,7 @@ nowhere else to look them up.
 | --- | --- |
 | **enter** | Sends what is typed. Over an open [offers list](#completion), takes what is highlighted instead. |
 | **ctrl+j** | Breaks the line, which is what enter would do anywhere else. |
-| **shift+tab** | Steps to the next flow, carrying over what each agent runs. Refused while a flow is running. |
+| **shift+tab** | Steps to the next flow, carrying over what each agent runs. Refused while a flow is running, and not the interface's while a sheet is open — there it turns the sheet's [tabs](#what-each-agent-runs) back. |
 | **esc** | Stops the flow — the whole flow, not just the turn. Dismisses the offers list first, if one is open. Silent when nothing is running. |
 | **ctrl+c** | Takes back the nearest thing there is to take back: what is half-typed if anything is, the flow if not. Twice in a row leaves. |
 | **↑ / ↓** | Walks what was typed here before — but only off the first and last line, so a prompt of several lines is still moved around in. Over an open offers list, moves within the list. |
@@ -203,6 +204,37 @@ running alike. Both are things you wrote, and either may be worth writing again.
 been typed here yet, everything ever typed anywhere, so a fresh project still has something to
 walk back through. Which of the two it is is settled when the interface starts, so a history
 cannot change under you mid-session.
+
+## What each agent runs
+
+`/agents` asks it one agent at a time, by the name the flow calls each. A CLI and a model are
+one choice — a model belongs to the CLI that runs it — so picking a row picks the pair. They
+are read one CLI at a time all the same:
+
+```
+   claude · codex · kimi   tab/shift+tab to switch
+
+     1. claude-opus-5           claude
+   ❯ 2. claude-sonnet-5         claude
+
+   ◉ max effort  ←/→ to adjust · ◉ on this machine  ctrl+a to move
+```
+
+A tab per CLI **that is actually installed here**, and its models under it. **tab** turns to
+the next, **shift+tab** to the one before, and they wrap. One CLI on its own is a heading
+rather than a row of tabs: there is nowhere to switch to, so nothing says there is.
+
+Every model of every CLI in one list is a list that grows each time any of them ships a model,
+and one you scroll to the end of to find one thing is one you read rather than use.
+
+Typing narrows the list you are looking at — `cop` finds `claude-opus-5`, since nobody types a
+model id out — and belongs to the tab it was typed into: switching starts the next CLI's list
+fresh rather than showing it through the last search.
+
+Under the models, the things that are adjusted rather than chosen: **←/→** the effort,
+**ctrl+w** [swarm mode](agents.md#efforts) for a model that has one, and **ctrl+a**
+[where it works](#where-each-agent-works). Enter takes the row under the cursor and asks about
+the next agent the flow drives.
 
 ## Where each agent works
 

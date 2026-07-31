@@ -6,10 +6,13 @@ with `❯` against the one under the cursor and a `✔` against the one already 
 under them the one setting that is adjusted rather than chosen -- the effort -- on a line the
 left and right arrows move along. The keys are said at the bottom and nowhere else.
 
-What one agent runs is a CLI, a model and an effort. The first two are one choice here rather
-than two, because they are one choice in fact: a model belongs to the CLI that runs it, and a
-list of the pairs is shorter than a walk through two columns. The effort is the line with the
-arrows on it, exactly as Claude Code's is.
+What one agent runs is a CLI, a model and an effort. The first two are still one choice --
+picking a row picks the pair, because a model belongs to the CLI that runs it -- but they are
+read one CLI at a time: a tab apiece, only for the CLIs that are actually installed, and the
+models of that one under it. Every model of every CLI in one list is a list that grows each
+time any of them ships a model, and a list you scroll to the end of to find one thing is one
+you read rather than use. The effort is the line with the arrows on it, exactly as Claude
+Code's is.
 
 `/status` is the third of them, and is read rather than answered -- Claude Code's own, which
 is a rule across, fields down the left and their values lined up beside them.
@@ -131,11 +134,15 @@ def reads(named: tuple[str, ...], runs: list[Runs]) -> list[str]:
 
 _SHEET = """
 Anchors, Configures, Flows, Models, Status {
+
     align: center middle; background: $background; }
 #sheet { width: 100%; height: auto; padding: 0; }
 #rule { height: 1; color: $primary; }
 #asked { padding: 0 0 0 3; text-style: bold; color: $primary; }
 #about { padding: 0 3 1 3; color: $text-muted; width: 1fr; }
+/* The tabs, for the one sheet that has any. A sheet with none says nothing here, and a
+   label with nothing in it is a row nobody paid for. */
+#tabs { padding: 0 0 1 3; }
 OptionList { border: none; background: $background; max-height: 14; scrollbar-size: 0 0;
              padding: 0; }
 /* The marker says where the cursor is, so the row is not filled as well. */
@@ -224,11 +231,17 @@ class Sheet[T](ModalScreen[T | None]):
         self._fill()
 
     def compose(self) -> ComposeResult:
-        """The rule, the question, what there is to choose, what is tuned, and the keys."""
+        """The rule, the question, the tabs, what there is to choose, what is tuned, the keys.
+
+        Every sheet is made of the same parts whether or not it uses them. The tabs are the
+        one part that is taken away again where a sheet has none -- see :meth:`tabbed` -- so
+        that a sheet which is one list is drawn as one list and nothing moved down a row.
+        """
         with Vertical(id="sheet"):
             yield Label(id="rule")
             yield Label(id="asked")
             yield Label(id="about")
+            yield Label(id="tabs")
             yield OptionList(id="choices")
             yield Label(id="tuning")
             yield Label(id="keys")
@@ -236,7 +249,21 @@ class Sheet[T](ModalScreen[T | None]):
     def on_mount(self) -> None:
         """Rules the top of the sheet across, and asks."""
         self.query_one("#rule", Label).update(_RULE * self.size.width)
+        # Nothing until a sheet says otherwise, and gone rather than blank: a label with
+        # nothing in it still takes the row it is padded to, and a sheet that has no tabs
+        # must be drawn exactly as it was before there were any.
+        self.tabbed("")
         self._ask()
+
+    def tabbed(self, said: str) -> None:
+        """Puts a row of tabs above the choices, or takes the row back where there are none.
+
+        Args:
+          said: The tabs, as markup, or "" for a sheet that is one list.
+        """
+        showing = self.query_one("#tabs", Label)
+        showing.display = bool(said)
+        showing.update(said)
 
     def action_back(self) -> None:
         """Clears what was typed, or leaves once there is nothing left to clear.
@@ -364,10 +391,17 @@ class Models(Sheet[list[Runs]]):
         ("escape", "back", "back"),
         ("left", "easier", "less effort"),
         ("right", "harder", "more effort"),
+        # The tabs: one CLI at a time, forwards and back. Priority, or the list under the
+        # cursor would take tab as moving the focus and the interface below would take
+        # shift+tab as switching the flow -- which is not a thing to do from inside a sheet
+        # that is choosing what the flow runs on.
+        Binding("tab", "next_cli", "next CLI", priority=True),
+        Binding("shift+tab", "prev_cli", "previous CLI", priority=True),
         # Not an arrow, because swarm mode is not a step along the efforts: it is a second
         # thing to say about a turn -- how wide it runs, rather than how hard -- and a turn
-        # that is both is written down as both.
-        Binding("tab", "swarm", "swarm mode", priority=True),
+        # that is both is written down as both. A chord, because tab is the tabs and the
+        # letters are searching.
+        Binding("ctrl+w", "swarm", "swarm mode", priority=True),
         # Nor is where the work lands a way of running the model, so it is neither an arrow
         # nor a row: it is a second question about this agent, and it opens a sheet of its
         # own. A chord rather than a letter, because the letters are searching.
@@ -389,10 +423,8 @@ class Models(Sheet[list[Runs]]):
         super().__init__()
         self._flow = flow
         self._wanted = wanted
-        # One choice rather than two: a model belongs to the CLI that runs it.
-        self._runs = [
-            (backend, model) for backend in sorted(agents) for model in agents[backend]
-        ]
+        #: What each CLI installed here runs, which is a tab apiece and its models under it.
+        self._agents = dict(agents)
         self._chosen: list[Runs] = []
         self._effort = 0
         #: Whether the turn runs as a fleet rather than as one agent, for a model that takes
@@ -400,9 +432,10 @@ class Models(Sheet[list[Runs]]):
         self._swarm = False
         #: Where this one's turns land, which is this machine until it is said otherwise.
         self._anchor = ""
-        self._counting = len(str(len(self._runs)))
-        #: The ones the letters typed so far have left, which is what the cursor is walking.
-        self._shown = list(self._runs)
+        #: Which tab is open, counting the CLIs this agent could be.
+        self._at = 0
+        #: The models the letters typed so far have left, which is what the cursor is walking.
+        self._shown: list[Model] = []
 
     def _ask(self) -> None:
         """Asks for one more agent, from the models down."""
@@ -415,7 +448,7 @@ class Models(Sheet[list[Runs]]):
             "runs at. Two agents at one model are still two agents."
             + (
                 f" This one has to run {', '.join(sorted(needs))}, so only the CLIs that do "
-                "are listed."
+                "are here."
                 if needs
                 else ""
             )
@@ -423,48 +456,74 @@ class Models(Sheet[list[Runs]]):
         self._effort = 0
         self._swarm = False
         self._anchor = ""
-        self._typed = ""  # each agent is asked about from the whole list again
+        self._at = 0
+        self._typed = ""  # each agent is asked about from the first tab again
         self._fill()
         self.query_one("#choices", OptionList).focus()
 
-    def _able(self) -> list[tuple[str, Model]]:
-        """The models that could take this agent's turns, which is not always all of them.
+    def _able(self) -> list[str]:
+        """The CLIs that could take this agent's turns, which is not always all of them.
 
+        Which is what the tabs are: the ones installed here, less any the flow has ruled out.
         A flow that hangs a hook on a moment only some backends run said so where it declared
         the place; a CLI that does not run that moment is not one to offer for it, since
         choosing it is a flow that would refuse to start.
 
         Returns:
-          One `(cli, model)` pair per model still worth showing.
+          One CLI per tab, in the order the tabs go.
         """
         # The last one again once every place is answered: putting the rows up moves the
         # cursor, and that asks for them again -- after the last choice has been taken.
         at = min(len(self._chosen), len(self._wanted) - 1)
         needs = self._wanted[at].moments if self._wanted else frozenset[Moment]()
         return [
-            (backend, model)
-            for backend, model in self._runs
+            backend
+            for backend in sorted(self._agents)
             if not needs or (backend in DRIVEN and needs <= DRIVEN[backend][0].moments)
         ]
 
+    def _tabs(self) -> str:
+        """The CLIs as a row of tabs, with the one being read marked and the rest waiting.
+
+        Returns:
+          The line, as markup, or "" where there is no CLI to show a tab for at all.
+        """
+        able = self._able()
+        if not able:
+            return ""
+        here = self._backend()
+        said = _DOT.join(
+            f"[b $primary]{escape(one)}[/]"
+            if one == here
+            else f"[$text-muted]{escape(one)}[/]"
+            for one in able
+        )
+        # Only where there is somewhere to switch to: one CLI is a heading rather than tabs.
+        if len(able) > 1:
+            said += "   [$text-muted]tab/shift+tab to switch[/]"
+        return said
+
     def _fill(self) -> None:
-        """Puts the models up, and under them the effort the arrows move along."""
+        """Puts the tab's models up, and under them the effort the arrows move along."""
         listing = self.query_one("#choices", OptionList)
+        backend = self._backend()
         self._shown = [
-            (backend, model)
-            for backend, model in self._able()
+            model
+            for model in self._agents.get(backend, ())
             if self.fits(model.name, backend)
         ]
+        self._counting = len(str(len(self._shown)))
         at = min(listing.highlighted or 0, max(len(self._shown) - 1, 0))
         listing.set_options(
             Option(
                 self._row(seen, model.name, backend, here=seen == at, inforce=False),
                 id=f"{backend}/{model.name}",
             )
-            for seen, (backend, model) in enumerate(self._shown)
+            for seen, model in enumerate(self._shown)
         )
         listing.highlighted = at if self._shown else None
         self._drawn = at
+        self.tabbed(self._tabs())
         efforts = self._efforts()
         self._effort = min(self._effort, len(efforts) - 1) if efforts else 0
         tuned = (
@@ -477,7 +536,7 @@ class Models(Sheet[list[Runs]]):
             said = "on" if self._swarm else "off"
             tuned += (
                 f"{_DOT}[$secondary]◉[/] swarm mode {said}  "
-                f"[$text-muted]tab to toggle[/]"
+                f"[$text-muted]ctrl+w to toggle[/]"
             )
         if tuned:
             tuned += (
@@ -513,6 +572,11 @@ class Models(Sheet[list[Runs]]):
             self._anchor = where
             self._fill()
 
+    def _backend(self) -> str:
+        """The CLI whose tab is open, or "" where there is no tab to be on."""
+        able = self._able()
+        return able[self._at % len(able)] if able else ""
+
     def _efforts(self) -> tuple[str, ...]:
         """What the model under the cursor takes, hardest first, or none where none is."""
         under = self._under()
@@ -528,7 +592,34 @@ class Models(Sheet[list[Runs]]):
         if not self._shown:
             return None
         listing = self.query_one("#choices", OptionList)
-        return self._shown[min(listing.highlighted or 0, len(self._shown) - 1)][1]
+        return self._shown[min(listing.highlighted or 0, len(self._shown) - 1)]
+
+    def _turn_to(self, by: int) -> None:
+        """Opens the tab that many along, wrapping round at either end.
+
+        What is typed goes with the tab it was typed into: a search that narrowed one CLI's
+        models to one would narrow the next one's to none, which reads as a CLI with nothing
+        in it rather than as a search still running.
+
+        Args:
+          by: One tab forward or back.
+        """
+        able = self._able()
+        if len(able) < 2:  # noqa: PLR2004  -- one tab is nowhere to switch to
+            return
+        self._at = (self._at + by) % len(able)
+        self._typed = ""
+        self.query_one("#choices", OptionList).highlighted = 0
+        self._drawn = 0
+        self._fill()
+
+    def action_next_cli(self) -> None:
+        """Opens the next CLI's tab."""
+        self._turn_to(1)
+
+    def action_prev_cli(self) -> None:
+        """Opens the one before it."""
+        self._turn_to(-1)
 
     def action_swarm(self) -> None:
         """Turns swarm mode on or off, for a model that has one to turn on."""
