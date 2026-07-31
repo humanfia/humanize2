@@ -11,6 +11,8 @@ Everything here is importable from `humanize.agents`.
 - [Making one](#making-one)
 - [Turns](#turns)
 - [Sessions](#sessions)
+- [Awaiting a turn](#awaiting-a-turn)
+- [Many at once](#many-at-once)
 - [Watching a turn as it happens](#watching-a-turn-as-it-happens)
 - [Talking to a turn already running](#talking-to-a-turn-already-running)
 - [Goals](#goals)
@@ -116,6 +118,68 @@ than interleaving two.
 
 Discarding a session is how a flow forgets. They are held weakly by the agent, so a Ralph loop
 running for days does not grow one by a session a turn.
+
+## Awaiting a turn
+
+Every call that runs a turn has a twin that is awaited, for a flow written as
+[`async def run`](flows.md#a-flow-that-waits-for-more-than-one-thing):
+
+```python
+await agent.aturn(task)                  # agent(task), in a session of its own
+await session.aturn("continue")          # session("continue")
+await agent.apursue(objective)           # agent.pursue(objective)
+```
+
+Same arguments, same answers, same `suppress` and `schema`. The difference is where the waiting
+happens: the turn runs on a thread of its own and the loop is handed straight back, so a flow
+can have as many turns going as it likes and none of them holds up the rest.
+
+```python
+acted, reviewed = await asyncio.gather(
+    agents.actor.aturn(task),
+    agents.reviewer.aturn(REVIEW + task),
+)
+```
+
+A session is still a sequence: two turns awaited on one session are one after the other, as two
+called on it are. Two turns on two sessions are two turns at once.
+
+## Many at once
+
+`batch` is calling the agent, as many times over as there are prompts, all of them going at the
+same time — one session apiece, none of them kept, and the answers in the order they were asked
+for:
+
+```python
+answers = agent.batch([f"Review {path}" for path in paths])       # blocking
+answers = await agent.abatch([...])                               # awaited
+reviews = agent.batch(prompts, schema=Review, suppress=True)      # shaped, and || true
+```
+
+`batch_new` opens sessions rather than running turns, however many are wanted. A session costs
+nothing until a turn lands in one, so ten thousand of them is a list of ten thousand
+conversations that have not started:
+
+```python
+sessions = agent.batch_new(10_000)
+await asyncio.gather(*(one(f"shard {at}") for at, one in enumerate(sessions)))
+```
+
+How wide to go is a question about the machine, not about this library, so nothing here caps it:
+what a batch is given is what it runs at once. `at_once` is where a flow says otherwise, and
+every prompt lands either way — the rest queue behind the ones running:
+
+```python
+agent.batch(prompts, at_once=32)         # thirty-two turns going, however many prompts
+```
+
+A batch that is not suppressing raises the first failure **once every turn of it has landed**: a
+turn already running cannot be taken back, and a batch that let the failure out from under the
+others would leave them running with nobody waiting for them. `suppress=True` answers with `""`
+(or `None`, with a schema) in that prompt's place and lets the rest through.
+
+An agent [stopped](#stopping) mid-batch raises `Stopped`, which `suppress` deliberately does not
+catch.
 
 ## Watching a turn as it happens
 
@@ -671,6 +735,14 @@ class AgentBase:
     def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
     def pursue(objective: str, *, suppress: bool = False) -> str
     def new() -> SessionBase
+
+    async def aturn(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
+    async def apursue(objective: str, *, suppress: bool = False) -> str
+
+    def batch_new(count: int) -> list[SessionBase]
+    def batch(prompts, *, suppress: bool = False, schema: type[T] = …, at_once: int = 0) -> list[...]
+    async def abatch(prompts, *, suppress: bool = False, schema: type[T] = …, at_once: int = 0) -> list[...]
+
     def rename(name: str) -> None
     def stop() -> None
     def watch(listener: Callable[[AgentBase, Event], None]) -> None
@@ -691,6 +763,10 @@ class SessionBase:
     def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
     def stream(prompt: str, *, schema: type[BaseModel] | None = None) -> Iterator[Event]
     def pursue(objective: str, *, suppress: bool = False) -> str
+
+    async def aturn(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
+    async def apursue(objective: str, *, suppress: bool = False) -> str
+
     def interject(text: str) -> None
     def close() -> None
 

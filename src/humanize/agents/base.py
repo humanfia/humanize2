@@ -20,13 +20,15 @@ import uuid
 import weakref
 from abc import ABC, abstractmethod
 from collections import Counter, deque
+from concurrent.futures import ThreadPoolExecutor
 from typing import IO, TYPE_CHECKING, Any, ClassVar, Protocol, overload
 
 from .event import Event, Question, Stopped, Usage, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator, Mapping
+    import asyncio
+    from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 
     from pydantic import BaseModel
 
@@ -138,6 +140,86 @@ def _shaped[T: BaseModel](said: str, schema: type[T]) -> T:
     raise ValueError(f"the turn did not answer as a {schema.__name__}: {said[:200]}")
 
 
+def _lands[T](landed: asyncio.Future[T], answered: T) -> None:
+    """Hands a thread's answer to whoever awaited it, unless nobody is waiting any more."""
+    if not landed.done():  # a task that was cancelled is not one to answer
+        landed.set_result(answered)
+
+
+def _failed(landed: asyncio.Future[Any], why: BaseException) -> None:
+    """Raises a thread's failure where it was awaited, unless nobody is waiting any more."""
+    if not landed.done():
+        landed.set_exception(why)
+
+
+def _posted(
+    loop: asyncio.AbstractEventLoop, what: Callable[..., None], *said: Any
+) -> None:
+    """Says something back to a loop from the thread that was working for it.
+
+    A loop that has gone takes nothing more: the flow that was awaiting this went with it,
+    and a thread that raised on its way to a closed loop would only put a traceback on the
+    terminal a run is watched from.
+
+    Args:
+      loop: The loop to say it to.
+      what: What to call there.
+      said: What to call it with.
+    """
+    with contextlib.suppress(RuntimeError):
+        loop.call_soon_threadsafe(what, *said)
+
+
+async def _awaited[T](call: Callable[[], T], named: str) -> T:
+    """Runs one blocking call on a thread of its own, so the loop is free while it takes.
+
+    A turn is minutes of waiting on a process, and a flow that ran one on its own event loop
+    would hold up every other turn it has going for as long as that one took. So a turn takes
+    a thread and gives the loop back: ten thousand of them at once are ten thousand coroutines
+    over as many threads as are actually running, which is what waiting on a process costs.
+
+    A thread cannot be taken back, so a task cancelled while it waits here stops waiting and
+    leaves the turn to finish -- which is what stopping the agent is for.
+
+    Args:
+      call: What to run, which is the turn as the flow asked for it.
+      named: What to call the thread, so that a wide run says whose turn each of them is.
+
+    Returns:
+      Whatever the call answered.
+    """
+    import asyncio
+
+    loop = asyncio.get_running_loop()
+    landed: asyncio.Future[T] = loop.create_future()
+
+    def carry() -> None:
+        try:
+            answered = call()
+        except BaseException as why:  # noqa: BLE001 -- carried across, not handled
+            _posted(loop, _failed, landed, why)
+        else:
+            _posted(loop, _lands, landed, answered)
+
+    threading.Thread(target=carry, name=named, daemon=True).start()
+    return await landed
+
+
+def _at_once(asked: int, of: int) -> int:
+    """How many of a batch run at once: what it asked for, or all of them where it said none.
+
+    Args:
+      asked: What the caller said, or 0 for as many as there are -- a flow that asks for a
+        thousand answers has asked for a thousand turns, and pacing them behind a number
+        nobody chose would be this library deciding how wide a fan-out may be.
+      of: How many there are.
+
+    Returns:
+      A count of at least one, since a pool of no threads runs nothing.
+    """
+    return max(min(asked, of) if asked > 0 else of, 1)
+
+
 #: How far back a rate is measured unless something asks for another window. Five minutes is
 #: long enough to carry across the gaps a flow leaves -- a turn that thinks, a round it sleeps
 #: off, a commit it makes -- and short enough that a run which has gone quiet reads as quiet.
@@ -180,9 +262,16 @@ class Meter:
         """
         if not usage.total:
             return
+        moment = time.monotonic() if now is None else now
         with self._lock:
             self._total.update(usage)
-            self._recent.append((time.monotonic() if now is None else now, usage, turn))
+            self._recent.append((moment, usage, turn))
+            # Cut down as it is written rather than only when somebody reads a rate: an
+            # agent driving ten thousand sessions is told what every request of every one of
+            # them cost, and a run nobody is watching would otherwise keep all of it for as
+            # long as it ran. What is kept is the window, which is what this deque is.
+            while self._recent and self._recent[0][0] < moment - WINDOW:
+                self._recent.popleft()
 
     def spent(self) -> Usage:
         """Everything spent so far, by kind.
@@ -276,9 +365,12 @@ class SessionBase(ABC):
         #: each request came to rather than once the turn is over: a turn is minutes long,
         #: and a rate that stood still for all of them would be a rate of nothing.
         self._meter = Meter()
-        self._lock = (
-            threading.Lock()
-        )  # a conversation is a sequence: one turn at a time
+        #: A conversation is a sequence: one turn at a time, whoever asked for them. Held
+        #: for the whole of a turn -- the moments it fires and the events it says as well as
+        #: what the backend is told -- so that two threads on one session are two turns one
+        #: after the other rather than two halves of a turn each. Re-entrant because a
+        #: backend takes it again where it drives its own process, which is the same turn.
+        self._lock = threading.RLock()
         #: Whether a turn has been started in this session, and whether it has been closed:
         #: the two moments that bracket a conversation are each said once.
         self._started = False
@@ -296,7 +388,7 @@ class SessionBase(ABC):
         self._shaping: type[BaseModel] | None = None
         # A session drops itself from its agent when it is collected, so the agent neither holds
         # a flow's discarded sessions nor has to prune them while someone is reading them.
-        agent._sessions.append(weakref.ref(self, agent._forget))
+        agent._hold(self)
 
     @property
     def id(self) -> str:
@@ -457,6 +549,55 @@ class SessionBase(ABC):
                 raise
             return None
 
+    @overload
+    async def aturn(self, prompt: str, *, suppress: bool = False) -> str: ...
+
+    @overload
+    async def aturn[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T]
+    ) -> T | None: ...
+
+    async def aturn[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None:
+        """The same turn as :meth:`__call__`, awaited: `await session.aturn(prompt)`.
+
+        For a flow written as `async def run`, which is how one drives many conversations at
+        once: the turn runs on a thread of its own and the loop is handed back, so the other
+        conversations keep going while this one thinks. The session is still a sequence -- two
+        turns awaited on one session are one after the other, as two called on it are.
+
+        Args:
+          prompt: The input prompt for this turn.
+          suppress: Whether a turn that fails answers with nothing, as for :meth:`__call__`.
+          schema: The shape to answer in, as for :meth:`__call__`.
+
+        Returns:
+          What :meth:`__call__` would have answered with.
+        """
+        if schema is None:
+            return await _awaited(
+                lambda: self(prompt, suppress=suppress), f"{self._agent.id}-turn"
+            )
+        return await _awaited(
+            lambda: self(prompt, suppress=suppress, schema=schema),
+            f"{self._agent.id}-turn",
+        )
+
+    async def apursue(self, objective: str, *, suppress: bool = False) -> str:
+        """The same goal as :meth:`pursue`, awaited: `await session.apursue(objective)`.
+
+        Args:
+          objective: What the agent is to have achieved before it stops.
+          suppress: Whether a goal that fails answers with nothing, as for :meth:`pursue`.
+
+        Returns:
+          What :meth:`pursue` would have answered with.
+        """
+        return await _awaited(
+            lambda: self.pursue(objective, suppress=suppress), f"{self._agent.id}-goal"
+        )
+
     def stream(
         self, prompt: str, *, schema: type[BaseModel] | None = None
     ) -> Iterator[Event]:
@@ -487,6 +628,25 @@ class SessionBase(ABC):
 
         Raises:
           subprocess.CalledProcessError: If the turn fails, as for :meth:`__call__`.
+        """
+        # The whole turn under the session's own lock, rather than only the part where the
+        # backend is spoken to: the moments a turn fires and the events it says are the turn
+        # as much as the process is, and two threads calling one session are two turns one
+        # after the other. A conversation is a sequence, however many are driving it.
+        with self._lock:
+            yield from self._turning(prompt, schema=schema)
+
+    def _turning(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """One turn, from the moments it opens on to the answer it ends with.
+
+        Args:
+          prompt: The input prompt for this turn.
+          schema: The shape to answer in, or None to take what the agent says.
+
+        Yields:
+          What the agent said, in the order it said it.
         """
         if self._agent._stopped:
             raise Stopped(f"{self._agent.id} was stopped")
@@ -737,7 +897,7 @@ class SessionBase(ABC):
         """
         if self._id is None:  # an id is fixed for the life of the session it names
             self._id = session_id
-            self._agent._opened.append(session_id)
+            self._agent._opens(session_id)
             if self._agent.cycle is not None:
                 # The run is the only thing that knows this session was one of its own: the
                 # backend logs it under this id and never says whose it was.
@@ -1347,7 +1507,19 @@ class AgentBase(ABC):
         #: Whether that name is the agent's own, rather than one to be told by whatever ends
         #: up driving it: a flow that names the agents it takes names the ones that are not.
         self._named = name is not None
-        self._sessions: list[weakref.ref[SessionBase]] = []
+        #: What this agent has opened, is watched by, and still holds. Every one of them is
+        #: written from whichever thread a turn is running on and read from whichever thread
+        #: is asking, and a flow may have ten thousand of both, so each is touched under this
+        #: one lock. Re-entrant because dropping the last reference to a session runs the
+        #: bookkeeping that forgets it, and that can happen under any line that lets go of one
+        #: -- including a line already holding this.
+        self._holding = threading.RLock()
+        #: Every session this agent has opened and somebody still holds, oldest first, each
+        #: under a number of its own. A mapping rather than a list: an agent that has opened
+        #: ten thousand drops them one at a time and in no particular order, and a list would
+        #: search itself for each of them.
+        self._sessions: dict[int, weakref.ref[SessionBase]] = {}
+        self._holds = 0  # what the next session is filed under
         self._opened: list[str] = []
         self._watchers: list[Callable[[AgentBase, Event], None]] = []
         #: What is hung on this agent's moments, which a flow adds to and takes from while
@@ -1440,7 +1612,8 @@ class AgentBase(ABC):
         them, but the backend logged them all, and a trace of the run has to know whose they
         were. Ids rather than sessions, so remembering a day of turns costs a list of strings.
         """
-        return list(self._opened)
+        with self._holding:
+            return list(self._opened)
 
     @property
     def config(self) -> AgentConfig:
@@ -1539,7 +1712,9 @@ class AgentBase(ABC):
         Held weakly, so a flow that opens a session per turn -- a Ralph loop runs for days --
         does not grow an agent by one session a turn for as long as it runs.
         """
-        return [session for ref in self._sessions if (session := ref()) is not None]
+        with self._holding:
+            held = list(self._sessions.values())
+        return [session for ref in held if (session := ref()) is not None]
 
     def stop(self) -> None:
         """Has this agent take no further turn, and ends the one it is taking.
@@ -1558,32 +1733,64 @@ class AgentBase(ABC):
         Args:
           listener: What to tell, as this agent and the thing said.
         """
-        self._watchers.append(listener)
+        with self._holding:
+            self._watchers.append(listener)
 
-    def _forget(self, gone: weakref.ref[SessionBase]) -> None:
+    def _hold(self, session: SessionBase) -> None:
+        """Files a session as this agent's, weakly, as the session opens.
+
+        Weakly, so that a flow which drops a session per turn does not grow the agent by one
+        a turn; filed under a number of its own, so that dropping one of ten thousand costs
+        the same as dropping one of two.
+
+        Args:
+          session: The session, which has just been made for this agent.
+        """
+        with self._holding:
+            self._holds += 1
+            at = self._holds
+            self._sessions[at] = weakref.ref(session, lambda _gone: self._forget(at))
+
+    def _forget(self, at: int) -> None:
         """Drops a session that has been collected, whoever else has dropped it already.
 
         Called from wherever the collector happens to be -- a turn's own thread as a flow
-        lets a session go, or the interpreter on its way out. A list that no longer holds it
-        is a list with nothing to do here, and raising out of a finalizer only puts an
-        `Exception ignored in:` on the terminal a flow is being watched from.
+        lets a session go, or the interpreter on its way out, or a line of this class that
+        was itself holding the lock, which is why the lock is re-entrant. A place that no
+        longer holds it is a place with nothing to do here, and raising out of a finalizer
+        only puts an `Exception ignored in:` on the terminal a flow is being watched from.
 
         Args:
-          gone: The reference to the session that has been collected.
+          at: What the session was filed under.
         """
-        with contextlib.suppress(ValueError):
-            self._sessions.remove(gone)
+        with self._holding:
+            self._sessions.pop(at, None)
+
+    def _opens(self, session: str) -> None:
+        """Writes down a session this agent has just opened, from the turn that opened it.
+
+        Args:
+          session: The backend's id for it.
+        """
+        with self._holding:
+            self._opened.append(session)
 
     def _heard(self, event: Event) -> None:
         """Tells everyone watching what a turn of this agent just said.
 
         A watcher that raises is a watcher's own problem: a flow must not fail because
-        something looking at it did.
+        something looking at it did. Told from a copy of the list rather than from the list,
+        since a turn saying something is a turn on some other thread than the one hanging a
+        watcher on the agent.
 
         Args:
           event: What was said.
         """
-        for listener in self._watchers:
+        if not self._watchers:
+            return
+        with self._holding:
+            watching = tuple(self._watchers)
+        for listener in watching:
             with contextlib.suppress(Exception):
                 listener(self, event)
 
@@ -1685,6 +1892,191 @@ class AgentBase(ABC):
           What the agent answered once it stopped, stripped.
         """
         return self.new().pursue(objective, suppress=suppress)
+
+    @overload
+    async def aturn(self, prompt: str, *, suppress: bool = False) -> str: ...
+
+    @overload
+    async def aturn[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T]
+    ) -> T | None: ...
+
+    async def aturn[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None:
+        """The same turn as :meth:`__call__`, awaited: `await agent.aturn(prompt)`.
+
+        A session of its own and nothing kept, as calling the agent is -- run on a thread of
+        its own, so that a flow written as `async def run` can have as many of these going as
+        it likes without any one of them holding up the rest.
+
+        Args:
+          prompt: The input prompt for the turn.
+          suppress: Whether a turn that fails answers with nothing, as for :meth:`__call__`.
+          schema: The shape to answer in, as for :meth:`__call__`.
+
+        Returns:
+          What :meth:`__call__` would have answered with.
+        """
+        if schema is None:
+            return await self.new().aturn(prompt, suppress=suppress)
+        return await self.new().aturn(prompt, suppress=suppress, schema=schema)
+
+    async def apursue(self, objective: str, *, suppress: bool = False) -> str:
+        """The same goal as :meth:`pursue`, awaited: `await agent.apursue(objective)`.
+
+        Args:
+          objective: What the agent is to have achieved before it stops.
+          suppress: Whether a goal that fails answers with nothing, as for :meth:`pursue`.
+
+        Returns:
+          What :meth:`pursue` would have answered with.
+        """
+        return await self.new().apursue(objective, suppress=suppress)
+
+    def batch_new(self, count: int) -> list[SessionBase]:
+        """Opens as many sessions as it is asked for, at once.
+
+        Sessions cost nothing until a turn lands in one -- a session is a conversation that
+        has not started, and the backend has not been told it exists -- so this is a list to
+        hand to whatever runs the turns, however long a list it is. Which is the shape a
+        fan-out has: ten thousand conversations, each of which will remember its own.
+
+        Args:
+          count: How many to open. None at all for a count of nothing or less.
+
+        Returns:
+          The sessions, in the order they were opened, which is the order the agent has them.
+        """
+        return [self.new() for _ in range(max(count, 0))]
+
+    @overload
+    def batch(
+        self, prompts: Sequence[str], *, suppress: bool = False, at_once: int = 0
+    ) -> list[str]: ...
+
+    @overload
+    def batch[T: BaseModel](
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        schema: type[T],
+        at_once: int = 0,
+    ) -> list[T | None]: ...
+
+    def batch[T: BaseModel](
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        schema: type[T] | None = None,
+        at_once: int = 0,
+    ) -> list[Any]:
+        """Runs many turns at once, each in a session of its own, and keeps none of them.
+
+        :meth:`__call__` as many times over as there are prompts, all of them going at the
+        same time: a fan-out where each turn starts from the task and the repository with none
+        of the others in context. What comes back is in the order it was asked for, whichever
+        turn landed first.
+
+        A turn is a coding agent and everything it starts, so how many to have going at once
+        is a question about the machine rather than about this library: `at_once` is where a
+        flow says, and a flow that says nothing gets the fan-out it asked for.
+
+        Args:
+          prompts: What to ask, one turn apiece.
+          suppress: Whether a turn that fails answers with nothing, as for :meth:`__call__`.
+            A batch that does not suppress raises the first failure once every turn of it has
+            landed: a turn already running cannot be taken back.
+          schema: The shape to answer in, as for :meth:`__call__`.
+          at_once: How many turns to have running at a time, or 0 for all of them.
+
+        Returns:
+          One answer per prompt, in the order the prompts were given.
+
+        Raises:
+          subprocess.CalledProcessError: If a turn failed and `suppress` is not set.
+          Stopped: If the agent has been told to take no further turn.
+        """
+        asked = list(prompts)
+        if not asked:
+            return []
+
+        def one(prompt: str) -> Any:
+            if schema is None:
+                return self(prompt, suppress=suppress)
+            return self(prompt, suppress=suppress, schema=schema)
+
+        # Sized to the batch rather than kept between them: a fan-out is over when its
+        # answers are in, and the threads it took go with it.
+        with ThreadPoolExecutor(
+            max_workers=_at_once(at_once, len(asked)),
+            thread_name_prefix=f"{self.id}-at",
+        ) as crowd:
+            return list(crowd.map(one, asked))
+
+    @overload
+    async def abatch(
+        self, prompts: Sequence[str], *, suppress: bool = False, at_once: int = 0
+    ) -> list[str]: ...
+
+    @overload
+    async def abatch[T: BaseModel](
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        schema: type[T],
+        at_once: int = 0,
+    ) -> list[T | None]: ...
+
+    async def abatch[T: BaseModel](
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        schema: type[T] | None = None,
+        at_once: int = 0,
+    ) -> list[Any]:
+        """The same batch as :meth:`batch`, awaited: `await agent.abatch(prompts)`.
+
+        Args:
+          prompts: What to ask, one turn apiece.
+          suppress: Whether a turn that fails answers with nothing, as for :meth:`batch`.
+          schema: The shape to answer in, as for :meth:`__call__`.
+          at_once: How many turns to have running at a time, or 0 for all of them.
+
+        Returns:
+          One answer per prompt, in the order the prompts were given.
+
+        Raises:
+          subprocess.CalledProcessError: If a turn failed and `suppress` is not set, once
+            every turn of the batch has landed, as for :meth:`batch`.
+        """
+        import asyncio
+
+        asked = list(prompts)
+        if not asked:
+            return []
+        gate = asyncio.Semaphore(_at_once(at_once, len(asked)))
+
+        async def one(prompt: str) -> Any:
+            async with gate:
+                if schema is None:
+                    return await self.aturn(prompt, suppress=suppress)
+                return await self.aturn(prompt, suppress=suppress, schema=schema)
+
+        # Gathered whatever any of them did, and only then raised: a batch that let the first
+        # failure out from under the others would leave those others running with nobody
+        # waiting for them, which is a turn nothing will ever read and a thread nothing joins.
+        answered = await asyncio.gather(
+            *(one(prompt) for prompt in asked), return_exceptions=True
+        )
+        for said in answered:
+            if isinstance(said, BaseException):
+                raise said
+        return list(answered)
 
     @abstractmethod
     def new(self) -> SessionBase:
