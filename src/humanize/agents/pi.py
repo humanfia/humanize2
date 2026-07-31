@@ -46,7 +46,7 @@ _KINDS = {
 
 #: The tools of pi's own that change something rather than look at something, which is the
 #: whole of what an agent that may change nothing is refused. pi has no permission gate and no
-#: sandbox -- what it takes is which tools to load -- so `reading` is the only rung it can be
+#: sandbox -- what it takes is which tools to load -- so `read-only` is the only rung it can be
 #: held to, and the three above it are one and the same agent.
 _CHANGING = ("bash", "edit", "write")
 
@@ -139,7 +139,7 @@ class PiSession(StreamSessionBase):
             "--session-id",
             pinned,
         ]
-        if self._agent.config.permission == "reading":
+        if self._agent.config.permission == "read-only":
             # Not a mode it is put in but tools it is not given: an agent without the three
             # that change anything is one that can only look, which is the rung asked for.
             argv += ["--exclude-tools", ",".join(_CHANGING)]

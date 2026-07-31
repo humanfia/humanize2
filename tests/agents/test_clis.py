@@ -404,14 +404,14 @@ def test_pi_is_given_no_tools_that_change_anything_when_it_may_change_nothing(
 ) -> None:
     """Pi has no permission gate and no sandbox: what it takes is which tools to load."""
     reading = PiAgent(
-        PiAgentConfig(model="m", effort="high", permission="reading")
+        PiAgentConfig(model="m", effort="high", permission="read-only")
     ).new()
     assert reading("hi") == "hi"
     (launch, _) = stubs.calls()
     assert launch.argv[launch.argv.index("--exclude-tools") + 1] == "bash,edit,write"
 
 
-@pytest.mark.parametrize("permission", ["working", "granted", "unchecked"])
+@pytest.mark.parametrize("permission", ["workspace-write", "auto", "bypass"])
 def test_pi_above_that_rung_is_the_same_agent(stubs: _Stubs, permission: str) -> None:
     """Nothing here can tell the three apart, and it says so rather than pretending."""
     session = PiAgent(
@@ -425,10 +425,10 @@ def test_pi_above_that_rung_is_the_same_agent(stubs: _Stubs, permission: str) ->
 @pytest.mark.parametrize(
     ("permission", "edit", "bash", "webfetch"),
     [
-        ("reading", "deny", "deny", "allow"),
-        ("working", "allow", "allow", "deny"),
-        ("granted", "allow", "allow", "allow"),
-        ("unchecked", "allow", "allow", "allow"),
+        ("read-only", "deny", "deny", "allow"),
+        ("workspace-write", "allow", "allow", "deny"),
+        ("auto", "allow", "allow", "allow"),
+        ("bypass", "allow", "allow", "allow"),
     ],
 )
 def test_opencode_is_told_what_the_agent_may_do_in_its_own_variable(
@@ -454,7 +454,7 @@ def test_opencode_is_told_what_the_agent_may_do_in_its_own_variable(
 
 def test_mimo_is_told_the_same_thing_under_its_own_name(stubs: _Stubs) -> None:
     session = MimoCodeAgent(
-        MimoCodeAgentConfig(model="m", effort="low", permission="reading")
+        MimoCodeAgentConfig(model="m", effort="low", permission="read-only")
     ).new()
     assert session("hi") == "hi"
 

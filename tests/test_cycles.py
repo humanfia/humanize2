@@ -63,14 +63,14 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
             "backend": "shell",
             "model": "m",
             "effort": "high",
-            "permission": "unchecked",
+            "permission": "bypass",
         },
         {
             "agent": "reviewer",
             "backend": "shell",
             "model": "m",
             "effort": "high",
-            "permission": "unchecked",
+            "permission": "bypass",
         },
     ]
     assert [(said["agent"], said["session"]) for said in held] == [

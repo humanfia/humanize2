@@ -83,13 +83,13 @@ _BLOCKS = {"text": "text", "thinking": "reasoning", "tool_use": "tool"}
 #: `manual` and `auto`, and plan mode beside it. `manual` is the one that is never used: it
 #: asks, and a flow running unattended has nobody to answer -- so an agent that is to change
 #: nothing is put in plan mode instead, which is Kimi's own way of saying work it out and do
-#: none of it. There is no sandbox here, so `working` and `granted` are the same setting: it
+#: none of it. There is no sandbox here, so `workspace-write` and `auto` are the same setting: it
 #: is told to answer its own approvals, and nothing confines where it answers them.
 _PERMITTED = {
-    "reading": {"permission_mode": "auto", "plan_mode": True},
-    "working": {"permission_mode": "auto", "plan_mode": False},
-    "granted": {"permission_mode": "auto", "plan_mode": False},
-    "unchecked": {"permission_mode": "yolo", "plan_mode": False},
+    "read-only": {"permission_mode": "auto", "plan_mode": True},
+    "workspace-write": {"permission_mode": "auto", "plan_mode": False},
+    "auto": {"permission_mode": "auto", "plan_mode": False},
+    "bypass": {"permission_mode": "yolo", "plan_mode": False},
 }
 
 
@@ -431,7 +431,7 @@ class KimiCodeCLISession(SessionBase):
             "swarm_mode": effort.startswith(SWARM),
             # What it may do without being asked, which for an unattended flow is everything:
             # a flow watches its agent rather than answering it, as humanize' own flows do.
-            **_PERMITTED.get(self._agent.config.permission, _PERMITTED["unchecked"]),
+            **_PERMITTED.get(self._agent.config.permission, _PERMITTED["bypass"]),
         }
         with self._lock:  # a conversation is a sequence: one turn at a time
             # A turn that failed is as over as one that landed: neither leaves

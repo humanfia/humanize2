@@ -22,16 +22,16 @@ if TYPE_CHECKING:
 #: what the permission prompt of an interactive Claude fills in.
 _ASKS = "AskUserQuestion"
 
-#: What Claude calls each rung of the ladder. Its own four modes line up with them: `plan` is
-#: an agent that works everything out and changes nothing, `acceptEdits` is one that may change
-#: what it is working on without asking, `auto` is one whose requests are answered for it, and
-#: `bypassPermissions` is the permission system switched off -- which is what
-#: `--dangerously-skip-permissions` has always meant here, and is spelled that way still
-#: because that flag is the one Claude documents for it.
+#: What Claude calls each rung of the ladder. Its own four modes line up with them, and one of
+#: them is even called the same thing: `plan` is an agent that works everything out and changes
+#: nothing, `acceptEdits` is one that may change what it is working on without asking, Claude's
+#: own `auto` is one whose requests are answered for it, and `bypassPermissions` is the
+#: permission system switched off -- which is what `--dangerously-skip-permissions` has always
+#: meant here, and is spelled that way still because that flag is the one Claude documents.
 _PERMITTED = {
-    "reading": "plan",
-    "working": "acceptEdits",
-    "granted": "auto",
+    "read-only": "plan",
+    "workspace-write": "acceptEdits",
+    "auto": "auto",
 }
 
 #: What each kind of token is called on the total Claude states at the end of a turn, and what
@@ -381,7 +381,7 @@ class ClaudeCodeSession(StreamSessionBase):
         been declined and carries on from, rather than waiting on a reply that is not coming.
 
         An agent that may change nothing is the exception: a permission is a request to do
-        something, and granting one under `reading` would be handing back the rung the flow
+        something, and granting one under `read-only` would be handing back the rung the flow
         asked for. Claude in plan mode asks rather than acts, and the answer here is no.
 
         Args:
@@ -398,7 +398,7 @@ class ClaudeCodeSession(StreamSessionBase):
                 about=_about(called),
                 called=called,
             )
-            if self._agent.config.permission == "reading":
+            if self._agent.config.permission == "read-only":
                 self._reply(
                     said,
                     {"behavior": "deny", "message": f"{tool} would change something"},

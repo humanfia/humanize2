@@ -200,14 +200,14 @@ def test_what_an_agent_may_do_is_kept_and_read_back(tmp_path: Path) -> None:
     kept.remember(
         "rlar",
         ("actor", "reviewer"),
-        [Runs("claude/m:high", "", None, "reading"), Runs("codex/n:low")],
+        [Runs("claude/m:high", "", None, "read-only"), Runs("codex/n:low")],
     )
 
     assert Settings(tmp_path).agents("rlar") == [
-        Runs("claude/m:high", "", None, "reading"),
+        Runs("claude/m:high", "", None, "read-only"),
         Runs("codex/n:low"),
     ]
     held = yaml.safe_load((home() / "settings.yaml").read_text())
     written = held["workspaces"][str(tmp_path.resolve())]["flows"]["rlar"]["agents"]
-    assert written["actor"]["permission"] == "reading"
+    assert written["actor"]["permission"] == "read-only"
     assert "permission" not in written["reviewer"]

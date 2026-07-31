@@ -1744,19 +1744,19 @@ async def test_what_an_agent_may_do_is_stepped_through_beside_what_it_runs(
         tuning = sheet.query_one("#tuning", Label)
 
         # It opens at what an agent nobody has been asked about has always run at.
-        assert "unchecked" in str(tuning.content)
+        assert "bypass" in str(tuning.content)
         await driver.press("ctrl+p")
         await driver.pause()
-        assert "reading" in str(tuning.content)
+        assert "read-only" in str(tuning.content)
         await driver.press("ctrl+p")
         await driver.pause()
-        assert "working" in str(tuning.content)
+        assert "workspace-write" in str(tuning.content)
 
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
 
     # It rides along with what the agent runs, and is kept with it.
-    chosen = Runs("claude/claude-opus-5:max", "", None, "working")
+    chosen = Runs("claude/claude-opus-5:max", "", None, "workspace-write")
     assert app._models == [chosen]
     assert app.settings.agents(app._flow_named) == [chosen]
 

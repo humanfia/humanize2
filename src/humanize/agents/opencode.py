@@ -36,15 +36,15 @@ _CACHED = ("read", "write")
 
 #: What each rung of the ladder is, said the way opencode takes it: a permission apiece for
 #: editing a file, running a command and fetching a page, each `allow`, `ask` or `deny`. A
-#: `deny` here is the tool not being offered at all, which is what makes `reading` real; there
-#: is no sandbox, so `working` is the same agent with nothing outside the workspace to reach
-#: for, and `granted` and `unchecked` are that agent with the reaching allowed. `ask` is never
+#: `deny` here is the tool not being offered at all, which is what makes `read-only` real; there
+#: is no sandbox, so `workspace-write` is the same agent with nothing outside the workspace to reach
+#: for, and `auto` and `bypass` are that agent with the reaching allowed. `ask` is never
 #: used: a run per turn has nobody to answer it.
 _PERMITTED = {
-    "reading": {"edit": "deny", "bash": "deny", "webfetch": "allow"},
-    "working": {"edit": "allow", "bash": "allow", "webfetch": "deny"},
-    "granted": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
-    "unchecked": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
+    "read-only": {"edit": "deny", "bash": "deny", "webfetch": "allow"},
+    "workspace-write": {"edit": "allow", "bash": "allow", "webfetch": "deny"},
+    "auto": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
+    "bypass": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
 }
 
 
@@ -132,7 +132,7 @@ class OpencodeSession(CommandSessionBase):
         """
         return {
             type(self).permits: json.dumps(
-                _PERMITTED.get(self._agent.config.permission, _PERMITTED["unchecked"])
+                _PERMITTED.get(self._agent.config.permission, _PERMITTED["bypass"])
             )
         }
 

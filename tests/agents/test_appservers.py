@@ -225,7 +225,7 @@ for line in sys.stdin:
             send({"method": "thread/status/changed",
                   "params": {"status": {"type": "idle"}}})
             continue
-        send({"method": "item/agentMessage/delta", "params": {"delta": "working"}})
+        send({"method": "item/agentMessage/delta", "params": {"delta": "workspace-write"}})
         send({"method": "item/completed",
               "params": {"item": {"type": "agentMessage", "text": " halfway "}}})
         if not STUCK:
@@ -893,7 +893,7 @@ def test_codex_grants_what_a_turn_asks_to_be_allowed_to_do(codex: _FakeServer) -
     doing something -- which is why it is the one a hook can reach.
     """
     agent = CodexAgent(
-        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="granted")
+        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="auto")
     )
 
     assert agent("approving") == json.dumps({"decision": "accept"})
@@ -905,7 +905,7 @@ def test_a_hook_may_refuse_what_codex_asked_to_be_allowed_to_do(
     from humanize.agents import Moment, Verdict
 
     agent = CodexAgent(
-        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="granted")
+        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="auto")
     )
     with agent.hooks.on(Moment.PERMISSION_REQUEST, lambda _: Verdict(refused=True)):
         assert agent("approving") == json.dumps({"decision": "decline"})
@@ -916,7 +916,7 @@ def test_codex_is_widened_by_handing_back_the_permissions_it_asked_for(
 ) -> None:
     """That request takes the permissions as its answer rather than a yes or a no."""
     agent = CodexAgent(
-        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="granted")
+        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="auto")
     )
 
     assert agent("widening") == json.dumps(
@@ -928,7 +928,7 @@ def test_a_widening_a_hook_refuses_is_granted_nothing(codex: _FakeServer) -> Non
     from humanize.agents import Moment, Verdict
 
     agent = CodexAgent(
-        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="granted")
+        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="auto")
     )
     with agent.hooks.on(Moment.PERMISSION_REQUEST, lambda _: Verdict(refused=True)):
         assert agent("widening") == json.dumps({"permissions": {}})
@@ -937,9 +937,9 @@ def test_a_widening_a_hook_refuses_is_granted_nothing(codex: _FakeServer) -> Non
 @pytest.mark.parametrize(
     ("permission", "sandbox"),
     [
-        ("reading", "read-only"),
-        ("working", "workspace-write"),
-        ("unchecked", "danger-full-access"),
+        ("read-only", "read-only"),
+        ("workspace-write", "workspace-write"),
+        ("bypass", "danger-full-access"),
     ],
 )
 def test_a_codex_turn_carries_the_rung_it_runs_at(
@@ -958,7 +958,7 @@ def test_a_codex_turn_carries_the_rung_it_runs_at(
 
 @pytest.mark.parametrize(
     ("permission", "mode", "planning"),
-    [("reading", "auto", True), ("unchecked", "yolo", False)],
+    [("read-only", "auto", True), ("bypass", "yolo", False)],
 )
 def test_a_kimi_turn_carries_the_rung_it_runs_at(
     kimi: _FakeServer, permission: str, mode: str, planning: bool

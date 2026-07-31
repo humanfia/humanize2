@@ -220,7 +220,7 @@ are read one CLI at a time all the same:
      1. claude-opus-5           claude
    ❯ 2. claude-sonnet-5         claude
 
-   ◉ max effort  ←/→ to adjust · ◉ on this machine  ctrl+a to move · ◉ every skill  ctrl+s to choose · ◉ unchecked  ctrl+p to change
+   ◉ max effort  ←/→ to adjust · ◉ on this machine  ctrl+a to move · ◉ every skill  ctrl+s to choose · ◉ bypass  ctrl+p to change
 ```
 
 A tab per CLI **that is actually installed here**, and its models under it. **tab** turns to

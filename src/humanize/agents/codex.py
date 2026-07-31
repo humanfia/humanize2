@@ -73,14 +73,14 @@ _APPROVALS = (
 #: What Codex is run under at each rung of the ladder, sent with every turn: a thread picked
 #: back up does not carry the settings it was started with. Codex is the one backend here with
 #: a sandbox of its own, so its rungs are the real thing rather than an approximation of one --
-#: and the only rung that lets it ask for more is `granted`, which is the rung that means the
+#: and the only rung that lets it ask for more is `auto`, which is the rung that means the
 #: asking is granted. Everywhere else it is never asked, because a turn waiting on an approval
 #: nobody is there to give is a flow that has stopped.
 _PERMITTED = {
-    "reading": {"approvalPolicy": "never", "sandbox": "read-only"},
-    "working": {"approvalPolicy": "never", "sandbox": "workspace-write"},
-    "granted": {"approvalPolicy": "on-request", "sandbox": "workspace-write"},
-    "unchecked": {"approvalPolicy": "never", "sandbox": "danger-full-access"},
+    "read-only": {"approvalPolicy": "never", "sandbox": "read-only"},
+    "workspace-write": {"approvalPolicy": "never", "sandbox": "workspace-write"},
+    "auto": {"approvalPolicy": "on-request", "sandbox": "workspace-write"},
+    "bypass": {"approvalPolicy": "never", "sandbox": "danger-full-access"},
 }
 
 #: What every turn is run under whatever it is allowed to do.
@@ -101,7 +101,7 @@ def unattended(permission: str) -> dict[str, Any]:
     Returns:
       The settings to send with the turn, and with the thread it runs on.
     """
-    return _SERVICE | _PERMITTED.get(permission, _PERMITTED["unchecked"])
+    return _SERVICE | _PERMITTED.get(permission, _PERMITTED["bypass"])
 
 
 #: How long a server being taken down is given to go before it is left to the operating system,

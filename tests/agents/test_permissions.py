@@ -79,17 +79,17 @@ def _noted(log: Path) -> list[dict[str, Any]]:
 
 def test_the_ladder_is_four_rungs_loosest_last() -> None:
     """Which is what the interface steps through, and what a config is checked against."""
-    assert PERMISSIONS == ("reading", "working", "granted", "unchecked")
+    assert PERMISSIONS == ("read-only", "workspace-write", "auto", "bypass")
 
 
 def test_an_agent_nobody_was_asked_about_is_allowed_everything() -> None:
     """A flow watches its agent rather than gating it, and always has."""
-    assert ClaudeCodeAgentConfig(model="m", effort="high").permission == "unchecked"
+    assert ClaudeCodeAgentConfig(model="m", effort="high").permission == "bypass"
 
 
 @pytest.mark.parametrize(
     ("permission", "mode"),
-    [("reading", "plan"), ("working", "acceptEdits"), ("granted", "auto")],
+    [("read-only", "plan"), ("workspace-write", "acceptEdits"), ("auto", "auto")],
 )
 def test_claude_runs_at_the_permission_mode_the_rung_means(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, permission: str, mode: str
@@ -132,7 +132,7 @@ def test_an_agent_that_may_change_nothing_is_refused_what_would_change_something
     """Granting one under `reading` would be handing back the rung the flow asked for."""
     log = _claude(tmp_path, monkeypatch)
     agent = ClaudeCodeAgent(
-        ClaudeCodeAgentConfig(model="m", effort="high", permission="reading")
+        ClaudeCodeAgentConfig(model="m", effort="high", permission="read-only")
     )
     assert agent.new()("hi") == "hi"
     assert _noted(log)[1]["answered"]["behavior"] == "deny"
@@ -156,10 +156,10 @@ def test_a_hook_may_refuse_a_permission_at_any_rung_that_asks(
 @pytest.mark.parametrize(
     ("permission", "sandbox", "policy"),
     [
-        ("reading", "read-only", "never"),
-        ("working", "workspace-write", "never"),
-        ("granted", "workspace-write", "on-request"),
-        ("unchecked", "danger-full-access", "never"),
+        ("read-only", "read-only", "never"),
+        ("workspace-write", "workspace-write", "never"),
+        ("auto", "workspace-write", "on-request"),
+        ("bypass", "danger-full-access", "never"),
     ],
 )
 def test_codex_is_the_one_backend_with_a_sandbox_of_its_own(
@@ -179,21 +179,21 @@ def test_codex_is_only_ever_asked_at_the_rung_that_means_the_asking_is_granted()
     asked = [
         rung for rung in PERMISSIONS if unattended(rung)["approvalPolicy"] != "never"
     ]
-    assert asked == ["granted"]
+    assert asked == ["auto"]
 
 
 def test_a_rung_nobody_wrote_down_is_the_one_an_agent_comes_at() -> None:
     """A config read back out of a file older than this setting is such an agent."""
-    assert unattended("") == unattended("unchecked")
+    assert unattended("") == unattended("bypass")
 
 
 @pytest.mark.parametrize(
     ("permission", "mode", "planning"),
     [
-        ("reading", "auto", True),
-        ("working", "auto", False),
-        ("granted", "auto", False),
-        ("unchecked", "yolo", False),
+        ("read-only", "auto", True),
+        ("workspace-write", "auto", False),
+        ("auto", "auto", False),
+        ("bypass", "yolo", False),
     ],
 )
 def test_kimi_is_told_the_rung_as_a_mode_and_a_plan(
@@ -223,9 +223,9 @@ def test_an_agent_allowed_less_is_another_agent_at_the_same_model() -> None:
     from dataclasses import replace
 
     config = CodexAgentConfig(model="m", effort="high")
-    tighter = replace(config, permission="reading")
-    assert config.permission == "unchecked"
-    assert tighter.permission == "reading"
+    tighter = replace(config, permission="read-only")
+    assert config.permission == "bypass"
+    assert tighter.permission == "read-only"
     assert tighter.model == config.model
 
 
@@ -259,5 +259,5 @@ def test_a_failed_turn_is_still_a_failed_turn_at_every_rung(
 
     with pytest.raises(subprocess.CalledProcessError):
         ClaudeCodeAgent(
-            ClaudeCodeAgentConfig(model="m", effort="high", permission="reading")
+            ClaudeCodeAgentConfig(model="m", effort="high", permission="read-only")
         ).new()("hi")

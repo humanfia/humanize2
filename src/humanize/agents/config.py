@@ -13,22 +13,24 @@ if TYPE_CHECKING:
 
 __all__ = ["PERMISSIONS", "AgentConfig", "anchored"]
 
-#: What an agent may do without being asked, one word per rung and the loosest last. Every
-#: backend has a ladder of its own and none of them has the same four rungs, so these are the
-#: question rather than any one CLI's answer, and each driver says which of its own settings
-#: it reaches for:
+#: What an agent may do without being asked, loosest last. Named the way these CLIs name them
+#: rather than in a vocabulary of humanize's own, so that a rung reads as the thing it is
+#: wherever it is shown. Every backend has a ladder of its own and none of them has the same
+#: four rungs, so these are the question rather than any one CLI's answer, and each driver
+#: says which of its own settings it reaches for:
 #:
-#: - `reading`: it may look at anything and change nothing -- no edits, no commands.
-#: - `working`: it may change the workspace it was given, and is stopped at the edge of it.
-#: - `granted`: it may reach for anything, and what it asks for is granted -- which is where a
+#: - `read-only`: it may look at anything and change nothing -- no edits, no commands.
+#: - `workspace-write`: it may change the workspace it was given, and is stopped at the edge
+#:   of it.
+#: - `auto`: it may reach for anything, and what it asks for is granted -- which is where a
 #:   hook hung on `PERMISSION_REQUEST` gets a say, since that is the one moment a backend
 #:   actually waits on.
-#: - `unchecked`: nothing is asked and nothing is checked, which is what an unattended flow has
+#: - `bypass`: nothing is asked and nothing is checked, which is what an unattended flow has
 #:   always run its agents at.
 #:
-#: A backend with no sandbox of its own cannot tell `working` from `granted`, and says so where
-#: it maps them rather than pretending to a rung it has not got.
-PERMISSIONS = ("reading", "working", "granted", "unchecked")
+#: A backend with no sandbox of its own cannot tell `workspace-write` from `auto`, and says so
+#: where it maps them rather than pretending to a rung it has not got.
+PERMISSIONS = ("read-only", "workspace-write", "auto", "bypass")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -64,7 +66,7 @@ class AgentConfig:
     effort: str
     machine: MachineConfig | None = None
     skills: tuple[str, ...] | None = None
-    permission: str = "unchecked"
+    permission: str = "bypass"
 
 
 def anchored(target: str) -> MachineConfig | None:

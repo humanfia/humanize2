@@ -550,20 +550,21 @@ The conversation is not restarted with it.
 
 ## What an agent may do
 
-A config's `permission` is one rung of a four-rung ladder, loosest last:
+A config's `permission` is one rung of a four-rung ladder, loosest last — named the way these
+CLIs name them rather than in a vocabulary of humanize's own:
 
 | Rung | What it means |
 | --- | --- |
-| `reading` | It may look at anything and change nothing — no edits, no commands. |
-| `working` | It may change the workspace it was given, and is stopped at the edge of it. |
-| `granted` | It may reach for anything, and what it asks for is granted. |
-| `unchecked` | Nothing is asked and nothing is checked. |
+| `read-only` | It may look at anything and change nothing — no edits, no commands. |
+| `workspace-write` | It may change the workspace it was given, and is stopped at the edge of it. |
+| `auto` | It may reach for anything, and what it asks for is granted. |
+| `bypass` | Nothing is asked and nothing is checked. |
 
 ```python
-ClaudeCodeAgentConfig(model="claude-opus-5", effort="high", permission="reading")
+ClaudeCodeAgentConfig(model="claude-opus-5", effort="high", permission="read-only")
 ```
 
-`unchecked` is the default, because that is what a flow driving an agent unattended has always
+`bypass` is the default, because that is what a flow driving an agent unattended has always
 run it at: a flow watches its agent rather than gating it, and a turn waiting on an approval
 nobody is there to give is a flow that has stopped. Anything tighter is a choice, and in the
 interface it is made on `/agents` with `ctrl+p`.
@@ -573,16 +574,16 @@ reaches for whichever of its own settings says the same thing:
 
 | Rung | Claude Code | Codex | Kimi Code | pi | opencode, mimocode |
 | --- | --- | --- | --- | --- | --- |
-| `reading` | `plan` mode | `read-only` sandbox | plan mode | without `bash`, `edit`, `write` | `edit` and `bash` denied |
-| `working` | `acceptEdits` mode | `workspace-write` sandbox | — | — | `webfetch` denied |
-| `granted` | `auto` mode | `workspace-write`, approvals on request | — | — | — |
-| `unchecked` | `bypassPermissions` | `danger-full-access` | `yolo` mode | — | — |
+| `read-only` | `plan` mode | `read-only` sandbox | plan mode | without `bash`, `edit`, `write` | `edit` and `bash` denied |
+| `workspace-write` | `acceptEdits` mode | `workspace-write` sandbox | — | — | `webfetch` denied |
+| `auto` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | — |
+| `bypass` | `bypassPermissions` | `danger-full-access` | `yolo` mode | — | — |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one. Where a backend cannot tell two rungs apart it says so
 here rather than pretending: a dash is the rung above it, run again.
 
-**`granted` is the rung where a hook gets a say.** It is the one setting under which a backend
+**`auto` is the rung where a hook gets a say.** It is the one setting under which a backend
 actually asks before it acts and waits for the answer, so it is the one where a hook hung on
 [`PERMISSION_REQUEST`](#hooks) can refuse something and have the agent hear it. Claude Code
 and Codex both run that moment; the rest have nothing to hang it on.
