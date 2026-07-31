@@ -65,9 +65,9 @@ from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple
 from pydantic import BaseModel, Field, model_validator
 
 from humanize.agents import AgentBase, HumanAgent, Moment, SessionBase
-from humanize.flows._rlcr import guards, loop, planning, prompts
-from humanize.flows._rlcr.loop import Loop, State, git, spoken
-from humanize.flows._rlcr.prompts import render
+from humanize.flows._humanize1 import guards, loop, planning, prompts
+from humanize.flows._humanize1.loop import Loop, State, git, spoken
+from humanize.flows._humanize1.prompts import render
 
 if TYPE_CHECKING:
     from pydantic.config import JsonDict

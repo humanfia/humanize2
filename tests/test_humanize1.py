@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from humanize.agents import Moment, Occasion
-from humanize.flows._rlcr import guards, loop, prompts
+from humanize.flows._humanize1 import guards, loop, prompts
 from humanize.flows.humanize1 import Config
 from humanize.runner import configures, drives, wanted
 

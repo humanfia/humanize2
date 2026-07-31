@@ -23,7 +23,7 @@ from humanize.agents import (
     SessionBase,
 )
 from humanize.flows import humanize1
-from humanize.flows._rlcr import loop
+from humanize.flows._humanize1 import loop
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -609,7 +609,7 @@ def test_a_plan_git_is_holding_is_refused_unless_the_run_said_so(
         loop.State(plan_file="docs/plan.md", plan_tracked=False, start_branch="main"),
     )
 
-    from humanize.flows._rlcr.guards import Prompted
+    from humanize.flows._humanize1.guards import Prompted
 
     refused = Prompted(running, workspace)(
         Occasion(moment=Moment.USER_PROMPT_SUBMIT, agent="builder")
@@ -633,7 +633,7 @@ def test_a_plan_that_leaves_git_mid_loop_is_refused_too(
     )
     _git("rm", "--cached", "docs/plan.md", at=workspace)
 
-    from humanize.flows._rlcr.guards import Prompted
+    from humanize.flows._humanize1.guards import Prompted
 
     refused = Prompted(running, workspace)(
         Occasion(moment=Moment.USER_PROMPT_SUBMIT, agent="builder")
