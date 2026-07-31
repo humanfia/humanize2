@@ -129,6 +129,10 @@ The backends' own home directories, which humanize only reads:
 | Claude Code | `CLAUDE_CONFIG_DIR` | `~/.claude` |
 | Codex | `CODEX_HOME` | `~/.codex` |
 | Kimi Code | `KIMI_CODE_HOME` | `~/.kimi-code` |
+| pi | `PI_CODING_AGENT_DIR` | `~/.pi/agent` |
+
+opencode and mimocode keep a session in a database rather than in a log file, so there is
+nothing here to gather: a run of theirs is watched as it happens rather than collected after.
 
 A home that does not exist is skipped rather than being an error, so collecting on a machine
 with only one backend installed works.

@@ -42,6 +42,31 @@ PROFILES: tuple[AgentProfile, ...] = (
         name="kimi",
         state_paths=("~/.kimi-code", "~/.kimi"),
     ),
+    AgentProfile(
+        name="pi",
+        state_paths=("~/.pi",),
+    ),
+    # opencode and mimocode are one program under two names, and each keeps its install, its
+    # settings, its cached model catalogue and the database its sessions are rows of in four
+    # directories of its own.
+    AgentProfile(
+        name="opencode",
+        state_paths=(
+            "~/.opencode",
+            "~/.config/opencode",
+            "~/.local/share/opencode",
+            "~/.cache/opencode",
+        ),
+    ),
+    AgentProfile(
+        name="mimo",
+        state_paths=(
+            "~/.mimocode",
+            "~/.config/mimocode",
+            "~/.local/share/mimocode",
+            "~/.cache/mimocode",
+        ),
+    ),
 )
 
 _BY_NAME = {profile.name: profile for profile in PROFILES}

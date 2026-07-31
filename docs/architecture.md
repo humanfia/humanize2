@@ -40,7 +40,7 @@ a target and could be lifted out whole, so it has a name of its own.
 
 | Layer | Is | Entry points |
 | --- | --- | --- |
-| `backends.py` | Names, aliases, models, efforts, home directories and log globs for `claude`, `codex` and `kimi`. Facts, not code — standard library only. | `PROFILES`, `named()`, `read()` |
+| `backends.py` | Names, aliases, models, efforts, home directories and log globs for `claude`, `codex`, `kimi`, `pi`, `opencode` and `mimo`. Facts, not code — standard library only. | `PROFILES`, `named()`, `read()` |
 | `agents/` | What a flow is written against (`AgentBase`, `SessionBase`, `Event`, `Question`, `Moment`) and one driver per backend. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
 | `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |
@@ -59,7 +59,7 @@ agents/
 ├── hooks.py      Moment, Occasion, Verdict, Hooks — the same, for what a turn stops at
 ├── base.py       AgentBase and SessionBase: two halves of one object, declared in one file
 ├── config.py     AgentConfig, anchored
-└── claude.py codex.py kimi.py human.py
+└── claude.py codex.py kimi.py pi.py opencode.py mimo.py human.py
 
 coganchor/
 ├── anchor.py     AnchorConfig, connect, check — the front door
@@ -196,7 +196,7 @@ uv run pre-commit install     # then every commit is checked before it is made
 
 uv run pre-commit run --all-files   # format, lint, types
 uv run pytest                       # the tests
-uv run pytest --run-agents          # also drives claude, codex and kimi for real
+uv run pytest --run-agents          # also drives the real coding agent CLIs
 ```
 
 Run them through `uv run`, not `uvx`: the lockfile pins the versions the hooks and CI enforce.

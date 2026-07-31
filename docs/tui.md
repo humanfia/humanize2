@@ -158,6 +158,8 @@ How far "into the turn" it gets depends on the backend:
 | **Claude Code** | Answered within the same turn. The turn is over once the agent has answered everything it was told, not when it first stops. |
 | **Codex** | A steer on the turn its app server is running. |
 | **Kimi Code** | Queued, then steered into the turn already running. |
+| **pi** | A steer on the run it is making, taken into it rather than answered after it. |
+| **opencode**, **mimocode** | Nothing: a run per turn has ended by the time there is anything to say to it. |
 
 An [anchored](remote-execution.md) Claude ends its process with each turn so that its work
 reaches the target before the turn says it landed — so it hears you between turns rather than
@@ -213,7 +215,7 @@ one choice — a model belongs to the CLI that runs it — so picking a row pick
 are read one CLI at a time all the same:
 
 ```
-   claude · codex · kimi   tab/shift+tab to switch
+   claude · codex · kimi · mimo · opencode · pi   tab/shift+tab to switch
 
      1. claude-opus-5           claude
    ❯ 2. claude-sonnet-5         claude

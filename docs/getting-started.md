@@ -29,7 +29,7 @@ properly.
 Check what you have:
 
 ```sh
-command -v claude codex kimi
+command -v claude codex kimi pi opencode mimo
 ```
 
 Nothing else is required. [Isolation](machines.md#a-container-of-the-agents-own) wants
@@ -72,7 +72,7 @@ an editor under it, and a status line under that.
 
 The line above the editor says what you are about to talk to, as `cli/model:effort` — the CLI
 that will run the turn, the model it will ask for, and how hard it should think. The first time, it opens on
-the first of `claude`, `codex` and `kimi` you have installed, at that backend's newest model, at
+the first backend you have installed, at that backend's newest model, at
 `high` — deliberately not the hardest setting, which is the one to reach for rather than the one
 to spend before anybody has asked for anything. After that it opens on whatever this project was
 last set up to run.

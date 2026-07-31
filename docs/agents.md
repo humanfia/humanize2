@@ -41,7 +41,14 @@ agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="h
 | Claude Code | `ClaudeCodeAgent` | `ClaudeCodeAgentConfig` | `ClaudeCodeSession` |
 | Codex | `CodexAgent` | `CodexAgentConfig` | `CodexSession` |
 | Kimi Code | `KimiCodeCLIAgent` | `KimiCodeCLIAgentConfig` | `KimiCodeCLISession` |
+| pi | `PiAgent` | `PiAgentConfig` | `PiSession` |
+| opencode | `OpencodeAgent` | `OpencodeAgentConfig` | `OpencodeSession` |
+| mimocode | `MimoCodeAgent` | `MimoCodeAgentConfig` | `MimoCodeSession` |
 | you | `HumanAgent` | — (takes only `name=`) | `HumanSession` |
+
+pi, opencode and mimocode name a model as `provider/id` — `openai-codex/gpt-5.5`,
+`opencode/big-pickle`, `xiaomi/mimo-v2.5` — because a model there belongs to the provider that
+serves it, and the CLI is asked for the pair.
 
 A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land), the
 [skills it is loaded with](#which-skills-an-agent-is-loaded-with), and nothing else. It is
@@ -314,7 +321,7 @@ sessions under:
 
 ```python
 agent.id       # the name you gave it, the name the flow calls it, or one nothing else answers to
-agent.backend  # "claude", "codex" or "kimi"
+agent.backend  # "claude", "codex", "kimi", "pi", "opencode" or "mimo"
 agent.opened   # the backend's id for every session this agent ever opened, oldest first
 agent.sessions # the ones somebody still holds
 agent.config   # what it runs at
@@ -396,6 +403,8 @@ against a list, so a value your account has and this page does not still works.
 | Claude Code | `low`, `medium`, `high`, `xhigh`, `max`, and `ultracode` |
 | Codex | `low`, `medium`, `high`, `xhigh`, and `max`/`ultra` on the models that take them |
 | Kimi Code | `low`, `medium`, `high`, `max`, each also as `swarm…` |
+| pi | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
+| opencode, mimocode | the model variant: `minimal`, `low`, `medium`, `high`, `xhigh` |
 
 **`ultracode`** is Claude Code's `xhigh` thinking with the turn opted into orchestrating a fleet
 of its own. It is more work than any single-agent effort, which is why it sits above `max`.
@@ -409,13 +418,17 @@ the interface offers each model only the efforts it takes.
 
 ## What each backend can do
 
-| | Claude Code | Codex | Kimi Code |
-| --- | --- | --- | --- |
-| Driven through | its command line, held open | its app server | its app server |
-| [`interject`](#talking-to-a-turn-already-running) | yes — answered within the same turn | yes — a steer on the running turn | yes — queued, then steered in |
-| [`pursue`](#goals) | yes | yes | yes |
-| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | yes | no | no |
-| Sub-agents in a trace | yes | yes | yes |
+| | Claude Code | Codex | Kimi Code | pi | opencode, mimocode |
+| --- | --- | --- | --- | --- | --- |
+| Driven through | its command line, held open | its app server | its app server | its command line, held open | its command line, one run per turn |
+| [`interject`](#talking-to-a-turn-already-running) | yes — answered within the same turn | yes — a steer on the running turn | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended |
+| [`pursue`](#goals) | yes | yes | yes | no | no |
+| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | yes | no | no | no | no |
+| Sub-agents in a trace | yes | yes | yes | no | no |
+
+opencode and mimocode keep a session in a database rather than in a log file, so there is
+nothing for `hmz collect` to gather and nothing for the interface to read a running cost out
+of. What their turns cost still reaches a flow: each backend says it as the turn lands.
 
 A backend is driven through its command line where that can express what an agent is configured
 with, and through the app server it serves its own client from where it cannot. A model, an
@@ -494,6 +507,8 @@ leaving("claude", ("code-review",))    # what to switch off so that only that on
 | `claude` | `--disallowedTools "Skill(<name>)"` | the agent is refused the skill. Claude still lists it — no flag takes one off that list |
 | `codex` | `-c skills.config=[{name="<name>", enabled=false}]` on its app server | the skill is not loaded for that server, and the user's own `config.toml` is untouched |
 | `kimi` | — | `kimi web` takes no `--skills-dir`, so a skill it finds is one it loads |
+| `pi` | — | it is told which skills to load by path, and finds none of its own to choose between |
+| `opencode`, `mimo` | — | neither offers a way of switching one off for a single run |
 
 Where each CLI keeps them is written down in `humanize.backends`; nothing is asked of the CLI
 itself, for the reason nothing else is either. The interface asks which to have on the
@@ -520,7 +535,7 @@ class AgentBase:
     moments: ClassVar[frozenset[Moment]]   # the ones a hook may be hung on here
 
     id: str                 # what this agent is called
-    backend: str            # "claude", "codex", "kimi"
+    backend: str            # "claude", "codex", "kimi", "pi", …
     config: AgentConfig     # model, effort, machine, skills
     opened: list[str]       # the backend's id for every session it ever opened
     sessions: list[SessionBase]

@@ -26,7 +26,8 @@ a session is made of **turns**; one run of a flow is a **cycle**; an agent's tur
 ## Backend
 
 A coding agent CLI that is installed on this machine and that humanize knows how to drive.
-There are three: `claude` (Claude Code), `codex`, and `kimi` (Kimi Code).
+There are six: `claude` (Claude Code), `codex`, `kimi` (Kimi Code), `pi`, `opencode`, and
+`mimo` (mimocode).
 
 humanize does not talk to a model provider. It drives the CLI you already have, logged in the
 way you already log in, so your credentials never pass through it. A backend that is not on
@@ -63,7 +64,8 @@ Two consequences that surprise people:
 **Effort** is the backend's own word, not humanize's, so the values differ: Claude Code takes
 `low`/`medium`/`high`/`xhigh`/`max` and also `ultracode`; Codex's models each take their own
 subset; Kimi Code's effort also says how *wide* to run, where `swarmmax` is `max` thinking at
-the width of a fleet. See [Agents](agents.md#efforts).
+the width of a fleet; pi's is a thinking level down to `off`; opencode's and mimocode's is the
+variant of the model. See [Agents](agents.md#efforts).
 
 ## Session
 

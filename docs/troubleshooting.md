@@ -98,7 +98,7 @@ None of `claude`, `codex` or `kimi` is on your `PATH`. humanize drives the CLI y
 — it holds no API key and talks to no model provider itself.
 
 ```sh
-command -v claude codex kimi
+command -v claude codex kimi pi opencode mimo
 ```
 
 ### `no choosing a flow while a flow is running: esc stops it first`

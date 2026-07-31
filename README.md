@@ -34,7 +34,8 @@ uv sync
 
 ### Dependencies
 
-Python ≥ 3.12, and the coding agent CLIs you intend to drive (`claude`, `codex`, `kimi`) on your
+Python ≥ 3.12, and the coding agent CLIs you intend to drive (`claude`, `codex`, `kimi`, `pi`,
+`opencode`, `mimo`) on your
 PATH. A [container of the agent's own](docs/machines.md) and
 [remote execution](docs/remote-execution.md) ask for more.
 
@@ -139,7 +140,7 @@ and the tests on each Python the package claims. To run any of it by hand:
 ```sh
 uv run pre-commit run --all-files   # format, lint, types
 uv run pytest                       # the tests
-uv run pytest --run-agents          # also drives claude, codex and kimi for real
+uv run pytest --run-agents          # also drives the real coding agent CLIs
 ```
 
 If you edit this README, please conform to the

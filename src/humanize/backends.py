@@ -47,6 +47,11 @@ class Profile:
         where both spellings are what people call it, and neither is ambiguous.
       home_var: The environment variable that moves its home directory.
       home_dir: Where that home is by default, under this user's own.
+      home_in: What to look under inside the directory that variable names, for a backend
+        whose variable is the one every program shares -- `XDG_DATA_HOME` says where all of
+        them keep their data, and this one's is a directory of its own under it. Empty for a
+        backend whose variable names its home outright, which is what a variable of its own
+        does.
       logs: The files one session is logged to under that home, as globs taking `{ident}`.
         Claude gets two -- a sub-agent it starts writes its own transcript, and the tokens it
         spends are the run's.
@@ -73,6 +78,7 @@ class Profile:
     home_dir: str
     logs: tuple[str, ...]
     models: tuple[Model, ...]
+    home_in: str = ""
     skills: tuple[str, ...] = ()
     shared: tuple[str, ...] = ()
     works: tuple[str, ...] = ()
@@ -83,7 +89,8 @@ class Profile:
         Returns:
           The home directory. It may not exist: a backend that has never run has none.
         """
-        return Path(os.environ.get(self.home_var) or Path.home() / self.home_dir)
+        moved = os.environ.get(self.home_var)
+        return Path(moved) / self.home_in if moved else Path.home() / self.home_dir
 
 
 #: What Claude Code documents on its own command line, for every model it runs, and above them
@@ -92,6 +99,16 @@ class Profile:
 #: the top of this list. Hardest first, as every effort here is: the one to reach for is the
 #: one at the top.
 _CLAUDE = ("ultracode", "max", "xhigh", "high", "medium", "low")
+
+#: What pi calls its thinking levels, hardest first. `off` is the model asked not to think at
+#: all, which is an effort like any other here: it is the least of them, not the absence of a
+#: setting.
+_PI = ("max", "xhigh", "high", "medium", "low", "minimal", "off")
+
+#: What opencode and mimocode call a reasoning effort: a variant of the model, given as
+#: `--variant`, and provider-specific. These are the ones the models they front take; a
+#: provider with no variants of its own takes the flag and ignores it.
+_VARIANTS = ("xhigh", "high", "medium", "low", "minimal")
 
 #: Every backend humanize drives, as each of them reported itself. Codex says which efforts
 #: each of its models takes and they differ, so they are written down as it gave them.
@@ -156,6 +173,69 @@ PROFILES = (
                 ("max", "high", "medium", "low"),
                 swarms=True,
             ),
+        ),
+    ),
+    Profile(
+        name="pi",
+        aliases=("pi",),
+        home_var="PI_CODING_AGENT_DIR",
+        home_dir=".pi/agent",
+        # One file per session, named for the moment it opened and the id it was given, under
+        # a directory per workspace. The id is the tail of the name, so a glob on it finds the
+        # session whichever workspace it was opened in.
+        logs=("sessions/*/*{ident}.jsonl",),
+        # None named: pi is told which skills to load rather than which to leave, by the path
+        # of each, and it finds none of its own to be left out of that -- there is no
+        # directory it reads them from, so there is nothing here to offer a choice about.
+        models=(
+            Model("openai-codex/gpt-5.6-sol", _PI),
+            Model("openai-codex/gpt-5.6-terra", _PI),
+            Model("openai-codex/gpt-5.6-luna", _PI),
+            Model("openai-codex/gpt-5.5", _PI),
+            Model("openai-codex/gpt-5.4", _PI),
+            Model("openai-codex/gpt-5.4-mini", _PI),
+            Model("openai-codex/gpt-5.3-codex-spark", _PI),
+        ),
+    ),
+    Profile(
+        name="opencode",
+        aliases=("opencode",),
+        # No home variable of its own: it keeps its data where every other program does, in a
+        # directory of its own under the one `XDG_DATA_HOME` names.
+        home_var="XDG_DATA_HOME",
+        home_in="opencode",
+        home_dir=".local/share/opencode",
+        # None: a session here is rows of a database rather than a file, so there is no log to
+        # read a run's cost out of as it is spent, and none to gather afterwards.
+        logs=(),
+        models=(
+            Model("opencode/big-pickle", _VARIANTS),
+            Model("opencode/nemotron-3-ultra-free", _VARIANTS),
+            Model("opencode/deepseek-v4-flash-free", _VARIANTS),
+            Model("opencode/laguna-s-2.1-free", _VARIANTS),
+            Model("opencode/longcat-2.0-free", _VARIANTS),
+            Model("opencode/mimo-v2.5-free", _VARIANTS),
+            Model("opencode/north-mini-code-free", _VARIANTS),
+            Model("opencode/ling-3.0-tiny-free", _VARIANTS),
+        ),
+    ),
+    Profile(
+        name="mimo",
+        aliases=("mimo", "mimocode", "mimo-code"),
+        home_var="XDG_DATA_HOME",
+        home_in="mimocode",
+        home_dir=".local/share/mimocode",
+        logs=(),
+        models=(
+            Model("mimo/mimo-auto", _VARIANTS),
+            Model("xiaomi/mimo-v2.5-pro", _VARIANTS),
+            Model("xiaomi/mimo-v2.5-pro-ultraspeed", _VARIANTS),
+            Model("xiaomi/mimo-v2.5", _VARIANTS),
+            Model("openai/gpt-5.6-sol", _VARIANTS),
+            Model("openai/gpt-5.6-terra", _VARIANTS),
+            Model("openai/gpt-5.6-luna", _VARIANTS),
+            Model("openai/gpt-5.5", _VARIANTS),
+            Model("openai/gpt-5.4", _VARIANTS),
         ),
     ),
 )

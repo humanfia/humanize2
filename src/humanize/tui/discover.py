@@ -23,6 +23,8 @@ from typing import TYPE_CHECKING, Any, cast
 from humanize.backends import PROFILES, Model
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from humanize.backends import Profile
 
 __all__ = ["installed", "machines"]
@@ -33,6 +35,11 @@ _LOOKING_SECONDS = 2.0
 
 #: Where Claude Code keeps the models this account may run.
 _CLAUDE_CACHE = Path.home() / ".claude.json"
+
+#: Where pi keeps the models of each provider it has been given credentials for, under its own
+#: home. Which is the whole of what pi runs: it is a client of whatever provider you have,
+#: rather than a backend with models of its own, so this file is the answer here.
+_PI_CACHE = "models-store.json"
 
 #: What a context window is written as on the end of a model Claude Code offers. It is a way
 #: of running the model rather than a model, and a backend asked for one answers that there is
@@ -49,7 +56,9 @@ def installed() -> dict[str, tuple[Model, ...]]:
       One entry per backend that is on this machine, as its models.
     """
     return {
-        profile.name: _claude(profile) if profile.name == "claude" else profile.models
+        profile.name: _reading[profile.name](profile)
+        if profile.name in _reading
+        else profile.models
         for profile in PROFILES
         if shutil.which(profile.name) is not None
     }
@@ -144,3 +153,45 @@ def _claude(profile: Profile) -> tuple[Model, ...]:
     )
     named = known + [name for name in account if name not in known]
     return tuple(Model(name, efforts) for name in named)
+
+
+def _pi(profile: Profile) -> tuple[Model, ...]:
+    """Pi's models: the ones written down, plus the ones this install has credentials for.
+
+    pi is a client of whichever providers you have signed in to rather than a backend with
+    models of its own, so the list that matters is the one it keeps under its own home. Read
+    off the disk rather than asked for: `pi --list-models` is a process, and a prompt cannot
+    wait on one.
+
+    Args:
+      profile: pi's own, whose models are the written-down ones.
+
+    Returns:
+      Every model pi could be asked for here, as `provider/id`, the written-down ones first
+      and this install's own after them, each at every thinking level pi takes.
+    """
+    known = [model.name for model in profile.models]
+    efforts = profile.models[0].efforts
+    try:
+        held: Any = json.loads((profile.directory() / _PI_CACHE).read_text())
+    except (OSError, ValueError):
+        held = {}
+    account: list[str] = []
+    for whose, listed in cast("dict[str, Any]", held).items():
+        for model in cast(
+            "list[Any]", cast("dict[str, Any]", listed).get("models") or []
+        ):
+            named = cast("dict[str, Any]", model).get("id")
+            if named:
+                account.append(f"{whose}/{named}")
+    named = known + [name for name in sorted(set(account)) if name not in known]
+    return tuple(Model(name, efforts) for name in named)
+
+
+#: The backends whose models are not the same for everyone, and what reads each one's. What
+#: only this machine knows -- which models an account may run -- is read off the disk it is
+#: written on, since asking the backend means starting it.
+_reading: dict[str, Callable[[Profile], tuple[Model, ...]]] = {
+    "claude": _claude,
+    "pi": _pi,
+}

@@ -10,6 +10,9 @@ from .event import Event, Question, Stopped
 from .hooks import EVERYWHERE, Hook, Hooks, Hung, Moment, Occasion, Unhooked, Verdict
 from .human import HumanAgent, HumanSession
 from .kimi import SWARM, KimiCodeCLIAgent, KimiCodeCLIAgentConfig, KimiCodeCLISession
+from .mimo import MimoCodeAgent, MimoCodeAgentConfig, MimoCodeSession
+from .opencode import OpencodeAgent, OpencodeAgentConfig, OpencodeSession
+from .pi import PiAgent, PiAgentConfig, PiSession
 
 #: What each coding agent CLI is driven by here, under the name a command line calls it.
 #: One table rather than one apiece: whoever reads an `-a` builds an agent from it, and
@@ -19,6 +22,9 @@ DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
     "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
     "codex": (CodexAgent, CodexAgentConfig),
     "kimi": (KimiCodeCLIAgent, KimiCodeCLIAgentConfig),
+    "mimo": (MimoCodeAgent, MimoCodeAgentConfig),
+    "opencode": (OpencodeAgent, OpencodeAgentConfig),
+    "pi": (PiAgent, PiAgentConfig),
 }
 
 __all__ = [
@@ -43,8 +49,17 @@ __all__ = [
     "KimiCodeCLIAgent",
     "KimiCodeCLIAgentConfig",
     "KimiCodeCLISession",
+    "MimoCodeAgent",
+    "MimoCodeAgentConfig",
+    "MimoCodeSession",
     "Moment",
     "Occasion",
+    "OpencodeAgent",
+    "OpencodeAgentConfig",
+    "OpencodeSession",
+    "PiAgent",
+    "PiAgentConfig",
+    "PiSession",
     "Question",
     "SessionBase",
     "Stopped",

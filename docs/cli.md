@@ -84,12 +84,13 @@ cli=claude,model=claude-opus-4-8,effort=high
 Both spellings mean the same thing. The written-out form exists because a model or an effort may
 hold the punctuation the short form separates on.
 
-- `<cli>` is `claude`, `codex` or `kimi`. Each also answers to the longer name it is installed
-  under: `claude-code` and `kimi-code`.
+- `<cli>` is `claude`, `codex`, `kimi`, `pi`, `opencode` or `mimo`. Each also answers to the
+  longer name it is installed under: `claude-code`, `kimi-code`, `mimocode` and `mimo-code`.
 - `<model>` and `<effort>` are whatever that CLI is asked for — humanize does not check them
   against a list, so a model your account has and this documentation does not still works.
-- A model may hold slashes of its own — Kimi Code's are `kimi-code/k3` — so the CLI is read from
-  the front and the effort from after the last colon.
+- A model may hold slashes of its own — Kimi Code's are `kimi-code/k3`, and pi, opencode and
+  mimocode name every model as `provider/id` — so the CLI is read from the front and the effort
+  from after the last colon.
 
 **One `-a` is one agent.** A list inside a single `-a` is not split into several. Two agents of
 one spelling are two agents, which is what makes a flow of an actor and a reviewer at one
@@ -115,6 +116,8 @@ hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 hmz exec -f flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "fix the build"
 hmz exec -f rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 hmz exec -f ./flows/mine.py -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
+hmz exec -f ralph_loop -a pi/openai-codex/gpt-5.5:high "$(cat TASK.md)"
+hmz exec -f ralph_loop -a opencode/opencode/big-pickle:high "$(cat TASK.md)"
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high -- "--force is not a flag here"
 hmz exec -f humanize1 -c setup.yaml -a claude/claude-opus-5:max -a claude/claude-opus-5:max \
     -a codex/gpt-5.6-sol:xhigh -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:xhigh "add undo"
@@ -236,6 +239,8 @@ hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 | `CLAUDE_CONFIG_DIR` | `hmz collect`, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
 | `CODEX_HOME` | same | Codex's home. Defaults to `~/.codex`. |
 | `KIMI_CODE_HOME` | same | Kimi Code's home. Defaults to `~/.kimi-code`. |
+| `PI_CODING_AGENT_DIR` | same | pi's home. Defaults to `~/.pi/agent`. |
+| `XDG_DATA_HOME` | the model list | Where opencode and mimocode keep their data. Defaults to `~/.local/share`. |
 | `NO_COLOR` | the TUI | Honoured. |
 
 A backend home that does not exist is skipped rather than being an error.

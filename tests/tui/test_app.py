@@ -740,6 +740,37 @@ def test_only_model_ids_are_offered(
     assert all(name.startswith("claude-") for name in named)
 
 
+def test_pi_offers_the_models_this_install_has_credentials_for(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Pi runs whatever provider you have signed in to, so its list is not the same twice.
+
+    Read off the disk it is written on rather than asked for: `pi --list-models` is a process,
+    and this is read at a prompt.
+    """
+    from humanize.tui import discover
+
+    home = tmp_path / "pi-home"
+    home.mkdir()
+    (home / "models-store.json").write_text(
+        json.dumps({"acme": {"models": [{"id": "a-1"}, {"id": "a-2"}]}})
+    )
+    monkeypatch.setenv("PI_CODING_AGENT_DIR", str(home))
+
+    def which(name: str) -> str:
+        return f"/usr/bin/{name}"
+
+    monkeypatch.setattr(discover.shutil, "which", which)
+
+    named = [model.name for model in discover.installed()["pi"]]
+
+    # As pi is asked for a model: the provider and the id together.
+    assert "acme/a-1" in named
+    assert "acme/a-2" in named
+    assert "openai-codex/gpt-5.5" in named  # and the written-down ones are still there
+    assert all(model.efforts for model in discover.installed()["pi"])
+
+
 #: A `claude` that answers each thing it is told with one result and nothing else, which is
 #: what makes a conversation countable: one turn in, one turn out.
 ANSWERING = """

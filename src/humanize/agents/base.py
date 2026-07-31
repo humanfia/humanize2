@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 import json
 import os
 import queue
@@ -48,25 +49,29 @@ class Journal(Protocol):
 
 def _tee(
     source: IO[str],
-    sink: IO[str],
+    sink: IO[str] | None,
     captured: list[str],
     said: queue.Queue[Event | None] | None = None,
-    kind: str = "text",
+    reads: Callable[[str], Iterable[Event]] | None = None,
 ) -> None:
     """Copies `source` into `sink` line by line, keeping every line and announcing it.
 
     A sink that has gone away stops the copying but not the reading: a pipe nobody drains
     blocks the agent writing to it, and the turn would then be waiting on an agent that is
-    itself waiting. The None at the end is how a turn reading `said` knows this stream is
-    spent; a stream nobody is reading events from is drained and kept all the same.
+    itself waiting. A sink of None is a stream that is not to be copied anywhere at all --
+    one carrying a protocol rather than the agent talking -- and is read and kept just the
+    same. The None at the end is how a turn reading `said` knows this stream is spent; a
+    stream nobody is reading events from is drained and kept all the same.
     """
     with contextlib.suppress(OSError, ValueError):
         # A source closed under us is a process that has ended, which is not a failure here.
         for line in source:
             captured.append(line)
-            if said is not None:
-                said.put(Event(kind=kind, text=line.rstrip("\n")))
-            say(line, sink, end="")
+            if said is not None and reads is not None:
+                for event in reads(line):
+                    said.put(event)
+            if sink is not None:
+                say(line, sink, end="")
     with contextlib.suppress(OSError, ValueError):
         source.close()  # the reader closes what it read, whoever else has finished with it
     if said is not None:
@@ -586,6 +591,44 @@ class SessionBase(ABC):
 class CommandSessionBase(SessionBase):
     """A session whose turns are one run of a coding agent's command line each."""
 
+    #: Whether what the command writes on stdout is a protocol rather than the agent talking.
+    #: A backend that answers in JSON is read into events and watched as those, so its lines
+    #: are not put on the terminal as they arrive and its answer is put there at the end --
+    #: which is what every backend driven over a protocol does.
+    protocol: ClassVar[bool] = False
+
+    def _reads(self, line: str, *, error: bool) -> Iterable[Event]:
+        """Reads one line the command wrote into what it says the agent did.
+
+        The whole line, either way round, for a backend that writes what it is doing where a
+        person would read it: the agent talks on stdout and puts its progress on stderr. One
+        that answers in a protocol reads its own lines instead.
+
+        Args:
+          line: The line, as written.
+          error: Whether it came from stderr rather than stdout.
+
+        Returns:
+          Everything it said, which is nothing at all for a line saying nothing worth showing.
+        """
+        yield Event(kind="tool" if error else "text", text=line.rstrip("\n"))
+
+    def _result(self, transcript: str) -> Event:
+        """The answer the turn ends on, out of everything the command wrote on stdout.
+
+        Args:
+          transcript: The whole of stdout.
+
+        Returns:
+          The `result` event, carrying what the agent answered and what the turn cost.
+
+        Raises:
+          subprocess.CalledProcessError: If what the command wrote says the turn failed. A
+            backend that leaves nonzero for the times it could not start says so here instead,
+            and a turn that failed must not answer as if it had landed.
+        """
+        return Event(kind="result", text=transcript.strip())
+
     def _stream(
         self, prompt: str, *, schema: type[BaseModel] | None = None
     ) -> Iterator[Event]:
@@ -642,10 +685,24 @@ class CommandSessionBase(SessionBase):
                 # buffer would deadlock against an agent that prints before reading all of it.
                 pumps = [
                     threading.Thread(
-                        target=_tee, args=(proc.stdout, sys.stdout, out, said, "text")
+                        target=_tee,
+                        args=(
+                            proc.stdout,
+                            None if type(self).protocol else sys.stdout,
+                            out,
+                            said,
+                            functools.partial(self._reads, error=False),
+                        ),
                     ),
                     threading.Thread(
-                        target=_tee, args=(proc.stderr, sys.stderr, err, said, "tool")
+                        target=_tee,
+                        args=(
+                            proc.stderr,
+                            sys.stderr,
+                            err,
+                            said,
+                            functools.partial(self._reads, error=True),
+                        ),
                     ),
                 ]
                 for pump in pumps:
@@ -663,6 +720,11 @@ class CommandSessionBase(SessionBase):
                 # ended -- one None apiece, which is the only thing that ends this turn.
                 for _ in pumps:
                     while (event := said.get()) is not None:
+                        if type(self).protocol and not self._agent._watchers:
+                            # On stderr, where a backend that writes for a person puts its
+                            # progress: its own stdout is the protocol here, and a turn nobody
+                            # can watch is a flow that reads as hung for as long as it takes.
+                            say(event.text, sys.stderr)
                         yield event
                 for pump in pumps:
                     pump.join()
@@ -671,11 +733,16 @@ class CommandSessionBase(SessionBase):
             stdout = "".join(out)
             if status != 0:
                 raise subprocess.CalledProcessError(status, argv, stdout, "".join(err))
+            answered = self._result(stdout)
             if self._id is None:
                 # Separated, so that a stdout without a trailing newline cannot glue the first
                 # line of stderr onto the last of stdout and hide a line the id is read from.
                 self._adopt(self._read_session_id(stdout + "\n" + "".join(err)))
-            yield Event(kind="result", text=stdout.strip())
+            if type(self).protocol and not self._agent._watchers:
+                # Where a backend writing for a person would have put its answer. Something
+                # watching the agent has had it already, as the turn said it.
+                say(answered.text, sys.stdout)
+            yield answered
 
     @abstractmethod
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
