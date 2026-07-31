@@ -188,3 +188,26 @@ def test_two_flows_of_one_name_are_two_entries(tmp_path: Path) -> None:
     assert kept.config("rlar") == {"deep": True}
     assert kept.config(".humanize/flows/rlar.py") == {"deep": False}
     assert kept.agents("rlar") == [Runs("claude/m:high")]
+
+
+def test_what_an_agent_may_do_is_kept_and_read_back(tmp_path: Path) -> None:
+    """As the anchor and the skills are: written only where it narrows anything.
+
+    A file written before there was such a setting and one for an agent nobody was asked
+    about read the same way, which is what leaving it out means.
+    """
+    kept = Settings(tmp_path)
+    kept.remember(
+        "rlar",
+        ("actor", "reviewer"),
+        [Runs("claude/m:high", "", None, "reading"), Runs("codex/n:low")],
+    )
+
+    assert Settings(tmp_path).agents("rlar") == [
+        Runs("claude/m:high", "", None, "reading"),
+        Runs("codex/n:low"),
+    ]
+    held = yaml.safe_load((home() / "settings.yaml").read_text())
+    written = held["workspaces"][str(tmp_path.resolve())]["flows"]["rlar"]["agents"]
+    assert written["actor"]["permission"] == "reading"
+    assert "permission" not in written["reviewer"]

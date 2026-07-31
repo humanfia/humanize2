@@ -171,9 +171,12 @@ for line in sys.stdin:
         stream.write("\\n")
     if "method" not in call:
         # An answer to something the server asked of us. The turn was waiting on it, and what
-        # it answers with is what the turn goes on to say.
+        # it answers with is what the turn goes on to say -- the answers to a question, or the
+        # decision on something it asked to be allowed to do.
+        result = call.get("result") or {}
+        said = json.dumps(result["answers"] if "answers" in result else result)
         send({"method": "item/completed", "params": {"item": {
-            "type": "agentMessage", "text": json.dumps(call["result"]["answers"])}}})
+            "type": "agentMessage", "text": said}}})
         send({"method": "turn/completed", "params": {}})
         send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
         continue
@@ -201,6 +204,20 @@ for line in sys.stdin:
                 "itemId": "item_0", "threadId": "thread_fake", "turnId": "turn_fake",
                 "questions": [{"id": "which", "header": "Way", "question": "Which way?",
                                "options": [{"label": "left"}, {"label": "right"}]}]}})
+        if call["params"]["input"][0]["text"] == "approving":
+            # A turn asking to be allowed to run something, which the server puts to the
+            # client as a request of its own and waits on.
+            send({"id": "ok_1", "method": "item/commandExecution/requestApproval",
+                  "params": {"itemId": "item_0", "threadId": "thread_fake",
+                             "turnId": "turn_fake", "startedAtMs": 0,
+                             "command": "rm -rf /"}})
+        if call["params"]["input"][0]["text"] == "widening":
+            # And one asking for the sandbox itself to be widened, whose answer is the
+            # permissions rather than a decision about them.
+            send({"id": "ok_2", "method": "item/permissions/requestApproval",
+                  "params": {"itemId": "item_0", "threadId": "thread_fake",
+                             "turnId": "turn_fake", "startedAtMs": 0, "cwd": "/w",
+                             "permissions": {"network": {"enabled": True}}}})
         if call["params"]["input"][0]["text"] == "doomed":
             send({"method": "turn/completed",
                   "params": {"turn": {"id": "turn_fake", "status": "failed",
@@ -237,8 +254,9 @@ for line in sys.stdin:
 #: `tokenUsage.total`. The item nobody has heard of is there on purpose: the server grows kinds,
 #: and a turn must not go quiet over one.
 _CODEX_WORKING = """
-import json, sys
+import json, pathlib, sys
 
+LOG = pathlib.Path(sys.argv[0] + ".log")
 SPENT = [1000, 1500]
 
 
@@ -248,6 +266,9 @@ def send(message):
 
 
 for line in sys.stdin:
+    with LOG.open("a") as stream:
+        json.dump(json.loads(line), stream)
+        stream.write("\\n")
     call = json.loads(line)
     if "id" not in call:
         continue
@@ -860,3 +881,92 @@ def test_a_codex_server_is_told_which_skills_its_agent_is_not_to_load(
             ),
         ]
     ]
+
+
+def test_codex_grants_what_a_turn_asks_to_be_allowed_to_do(codex: _FakeServer) -> None:
+    """At the rung that means the asking is granted, the answer is yes.
+
+    The server waits on it, so this is the one moment a refusal here actually stops the agent
+    doing something -- which is why it is the one a hook can reach.
+    """
+    agent = CodexAgent(
+        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="granted")
+    )
+
+    assert agent("approving") == json.dumps({"decision": "accept"})
+
+
+def test_a_hook_may_refuse_what_codex_asked_to_be_allowed_to_do(
+    codex: _FakeServer,
+) -> None:
+    from humanize.agents import Moment, Verdict
+
+    agent = CodexAgent(
+        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="granted")
+    )
+    with agent.hooks.on(Moment.PERMISSION_REQUEST, lambda _: Verdict(refused=True)):
+        assert agent("approving") == json.dumps({"decision": "decline"})
+
+
+def test_codex_is_widened_by_handing_back_the_permissions_it_asked_for(
+    codex: _FakeServer,
+) -> None:
+    """That request takes the permissions as its answer rather than a yes or a no."""
+    agent = CodexAgent(
+        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="granted")
+    )
+
+    assert agent("widening") == json.dumps(
+        {"permissions": {"network": {"enabled": True}}, "scope": "turn"}
+    )
+
+
+def test_a_widening_a_hook_refuses_is_granted_nothing(codex: _FakeServer) -> None:
+    from humanize.agents import Moment, Verdict
+
+    agent = CodexAgent(
+        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="granted")
+    )
+    with agent.hooks.on(Moment.PERMISSION_REQUEST, lambda _: Verdict(refused=True)):
+        assert agent("widening") == json.dumps({"permissions": {}})
+
+
+@pytest.mark.parametrize(
+    ("permission", "sandbox"),
+    [
+        ("reading", "read-only"),
+        ("working", "workspace-write"),
+        ("unchecked", "danger-full-access"),
+    ],
+)
+def test_a_codex_turn_carries_the_rung_it_runs_at(
+    working: _FakeServer, permission: str, sandbox: str
+) -> None:
+    """A thread picked back up does not carry the settings it was started with."""
+    agent = CodexAgent(
+        CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission=permission)
+    )
+    agent("hi")
+
+    started = [call for call in working.calls() if call.get("method") == "turn/start"]
+    assert [call["params"]["sandbox"] for call in started] == [sandbox]
+    assert [call["params"]["approvalPolicy"] for call in started] == ["never"]
+
+
+@pytest.mark.parametrize(
+    ("permission", "mode", "planning"),
+    [("reading", "auto", True), ("unchecked", "yolo", False)],
+)
+def test_a_kimi_turn_carries_the_rung_it_runs_at(
+    kimi: _FakeServer, permission: str, mode: str, planning: bool
+) -> None:
+    agent = KimiCodeCLIAgent(
+        KimiCodeCLIAgentConfig(
+            model="kimi-code/k3", effort="high", permission=permission
+        )
+    )
+    agent("hi")
+
+    (profile,) = _bodies(kimi, "/profile")
+    assert profile["agent_config"]["permission_mode"] == mode
+    assert profile["agent_config"]["plan_mode"] is planning

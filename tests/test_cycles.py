@@ -58,8 +58,20 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
     assert began["task"] == "go"
     assert began["workspace"] == str(tmp_path.resolve())
     assert began["agents"] == [
-        {"agent": "actor", "backend": "shell", "model": "m", "effort": "high"},
-        {"agent": "reviewer", "backend": "shell", "model": "m", "effort": "high"},
+        {
+            "agent": "actor",
+            "backend": "shell",
+            "model": "m",
+            "effort": "high",
+            "permission": "unchecked",
+        },
+        {
+            "agent": "reviewer",
+            "backend": "shell",
+            "model": "m",
+            "effort": "high",
+            "permission": "unchecked",
+        },
     ]
     assert [(said["agent"], said["session"]) for said in held] == [
         ("actor", "session-0"),

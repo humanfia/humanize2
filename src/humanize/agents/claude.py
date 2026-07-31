@@ -21,6 +21,18 @@ if TYPE_CHECKING:
 #: what the permission prompt of an interactive Claude fills in.
 _ASKS = "AskUserQuestion"
 
+#: What Claude calls each rung of the ladder. Its own four modes line up with them: `plan` is
+#: an agent that works everything out and changes nothing, `acceptEdits` is one that may change
+#: what it is working on without asking, `auto` is one whose requests are answered for it, and
+#: `bypassPermissions` is the permission system switched off -- which is what
+#: `--dangerously-skip-permissions` has always meant here, and is spelled that way still
+#: because that flag is the one Claude documents for it.
+_PERMITTED = {
+    "reading": "plan",
+    "working": "acceptEdits",
+    "granted": "auto",
+}
+
 
 def _about(called: dict[str, Any]) -> str:
     """What a tool was called with, as the one line a row of a transcript has room for.
@@ -98,7 +110,11 @@ class ClaudeCodeSession(StreamSessionBase):
             "--verbose",
             "--resume" if self._id else "--session-id",
             pinned,
-            "--dangerously-skip-permissions",
+            *(
+                ["--permission-mode", mode]
+                if (mode := _PERMITTED.get(self._agent.config.permission))
+                else ["--dangerously-skip-permissions"]
+            ),
             "--model",
             self._agent.config.model,
             "--effort",
@@ -259,6 +275,10 @@ class ClaudeCodeSession(StreamSessionBase):
         question nobody is there to answer is refused, which Claude reads as the tool having
         been declined and carries on from, rather than waiting on a reply that is not coming.
 
+        An agent that may change nothing is the exception: a permission is a request to do
+        something, and granting one under `reading` would be handing back the rung the flow
+        asked for. Claude in plan mode asks rather than acts, and the answer here is no.
+
         Args:
           said: The `control_request`, as read.
         """
@@ -273,6 +293,12 @@ class ClaudeCodeSession(StreamSessionBase):
                 about=_about(called),
                 called=called,
             )
+            if self._agent.config.permission == "reading":
+                self._reply(
+                    said,
+                    {"behavior": "deny", "message": f"{tool} would change something"},
+                )
+                return
             if asking.refused:
                 self._reply(
                     said,

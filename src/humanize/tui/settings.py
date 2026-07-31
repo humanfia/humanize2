@@ -54,9 +54,9 @@ class Settings:
           flow: The flow they were driving.
 
         Returns:
-          One `cli/model:effort` apiece with the machine it was anchored to and the skills it
-          is loaded with, in the order the flow takes them, and nothing at all for a flow this
-          workspace has not run.
+          One `cli/model:effort` apiece with the machine it was anchored to, the skills it is
+          loaded with and what it may do without being asked, in the order the flow takes
+          them, and nothing at all for a flow this workspace has not run.
         """
         flows: dict[str, Any] = self._mine().get("flows") or {}
         kept: dict[str, Any] = flows.get(flow) or {}
@@ -76,7 +76,9 @@ class Settings:
             # An anchor is what a workspace that has one has: an entry written before there
             # were any is a workspace whose agents work here, which is what leaving it out
             # already meant. An entry that says nothing about skills is an agent nobody has
-            # been asked about, which is its CLI as it comes rather than an agent with none.
+            # been asked about, which is its CLI as it comes rather than an agent with none,
+            # and one that says nothing about what it may do runs at what such an agent has
+            # always run at.
             held = agent.get("skills")
             having = (
                 tuple(str(one) for one in cast("list[Any]", held))
@@ -88,6 +90,7 @@ class Settings:
                     f"{cli}/{model}:{effort}",
                     str(agent.get("anchor") or ""),
                     having,
+                    str(agent.get("permission") or ""),
                 )
             )
         return said
@@ -147,6 +150,10 @@ class Settings:
                 # And only for one that was asked: an agent loaded as its CLI comes says
                 # nothing, which is what every entry written before this said too.
                 agents[named]["skills"] = list(runs.skills)
+            if runs.permission:
+                # The same again: an entry that says nothing is an agent nobody was asked
+                # about, which is the rung one written before there were any ran at.
+                agents[named]["permission"] = runs.permission
         mine = self._mine()
         mine["flow"] = flow
         kept: dict[str, Any] = {"agents": agents}

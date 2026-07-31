@@ -408,6 +408,11 @@ class Humanize(App[None]):
     #status { height: 1; padding: 0 2; color: $text-muted; }
     """
 
+    #: Off, and its key given back. Nothing here is chosen from a dialog -- a `/` offers the
+    #: commands and a flag offers whatever it is for -- so a palette of them over the top is a
+    #: second way to say the same things, and one nothing else in this interface leads to.
+    ENABLE_COMMAND_PALETTE = False
+
     BINDINGS: ClassVar = [
         Binding("ctrl+c", "interrupt", "interrupt", priority=True),
         # What the status line says while a flow runs, and what opencode's esc does there.
@@ -1504,18 +1509,19 @@ class Humanize(App[None]):
         moved: list[AgentBase] = []
         for at, agent in enumerate(chosen):
             runs = self._models[at] if at < len(self._models) else Runs("")
-            if not runs.anchor and runs.skills is None:
+            if not runs.anchor and runs.skills is None and not runs.permission:
                 moved.append(agent)
                 continue
-            # The config is frozen, so an agent that works elsewhere, or without a skill its
-            # CLI would have loaded, is another agent at the same model and effort -- which
-            # is what it is.
+            # The config is frozen, so an agent that works elsewhere, without a skill its CLI
+            # would have loaded, or allowed less than an agent nobody asked about, is another
+            # agent at the same model and effort -- which is what it is.
             moved.append(
                 type(agent)(
                     replace(
                         agent.config,
                         machine=anchored(runs.anchor),
                         skills=runs.skills,
+                        **({"permission": runs.permission} if runs.permission else {}),
                     )
                 )
             )

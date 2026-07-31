@@ -220,7 +220,7 @@ are read one CLI at a time all the same:
      1. claude-opus-5           claude
    ❯ 2. claude-sonnet-5         claude
 
-   ◉ max effort  ←/→ to adjust · ◉ on this machine  ctrl+a to move · ◉ every skill  ctrl+s to choose
+   ◉ max effort  ←/→ to adjust · ◉ on this machine  ctrl+a to move · ◉ every skill  ctrl+s to choose · ◉ unchecked  ctrl+p to change
 ```
 
 A tab per CLI **that is actually installed here**, and its models under it. **tab** turns to
@@ -237,7 +237,8 @@ fresh rather than showing it through the last search.
 Under the models, the things that are adjusted rather than chosen: **←/→** the effort,
 **ctrl+w** [swarm mode](agents.md#efforts) for a model that has one, **ctrl+a**
 [where it works](#where-each-agent-works), **ctrl+s**
-[what it is loaded with](#what-each-agent-is-loaded-with). Enter takes the row under the
+[what it is loaded with](#what-each-agent-is-loaded-with), **ctrl+p**
+[what it may do](agents.md#what-an-agent-may-do). Enter takes the row under the
 cursor and asks about the next agent the flow drives.
 
 ## Where each agent works

@@ -132,12 +132,14 @@ while True:
 #: prompt of `boom` comes back as an error event with the exit status still zero, which is how
 #: this backend reports a turn it could not finish; one of `quiet` says nothing at all.
 _OPENCODE = """
-import json, pathlib, sys
+import json, os, pathlib, sys
 
 log = pathlib.Path(LOG)
 said = sys.stdin.read()
+allowed = os.environ.get("OPENCODE_PERMISSION") or os.environ.get("MIMOCODE_PERMISSION")
 with log.open("a") as stream:
-    json.dump({"argv": sys.argv[1:], "stdin": said}, stream)
+    json.dump({"argv": sys.argv[1:], "stdin": said, "allowed": allowed,
+               "inherited": os.environ.get("A_THING_THE_FLOW_HAS")}, stream)
     stream.write("\\n")
 
 flags = dict(zip(sys.argv, sys.argv[1:]))
@@ -175,6 +177,10 @@ class _Call:
 
     argv: list[str]
     stdin: str
+    #: What its environment said the agent may do, for the backend that is told there.
+    allowed: str | None = None
+    #: Something the flow itself had in its environment, which a turn is run with too.
+    inherited: str | None = None
 
 
 @dataclass(frozen=True)
@@ -391,3 +397,79 @@ def test_neither_opencode_nor_mimo_has_a_goal_feature(stubs: _Stubs) -> None:
         OpencodeAgent(OPENCODE).new().pursue("the suite passes")
     with pytest.raises(NotImplementedError):
         PiAgent(PI).new().pursue("the suite passes")
+
+
+def test_pi_is_given_no_tools_that_change_anything_when_it_may_change_nothing(
+    stubs: _Stubs,
+) -> None:
+    """Pi has no permission gate and no sandbox: what it takes is which tools to load."""
+    reading = PiAgent(
+        PiAgentConfig(model="m", effort="high", permission="reading")
+    ).new()
+    assert reading("hi") == "hi"
+    (launch, _) = stubs.calls()
+    assert launch.argv[launch.argv.index("--exclude-tools") + 1] == "bash,edit,write"
+
+
+@pytest.mark.parametrize("permission", ["working", "granted", "unchecked"])
+def test_pi_above_that_rung_is_the_same_agent(stubs: _Stubs, permission: str) -> None:
+    """Nothing here can tell the three apart, and it says so rather than pretending."""
+    session = PiAgent(
+        PiAgentConfig(model="m", effort="high", permission=permission)
+    ).new()
+    assert session("hi") == "hi"
+    (launch, _) = stubs.calls()
+    assert "--exclude-tools" not in launch.argv
+
+
+@pytest.mark.parametrize(
+    ("permission", "edit", "bash", "webfetch"),
+    [
+        ("reading", "deny", "deny", "allow"),
+        ("working", "allow", "allow", "deny"),
+        ("granted", "allow", "allow", "allow"),
+        ("unchecked", "allow", "allow", "allow"),
+    ],
+)
+def test_opencode_is_told_what_the_agent_may_do_in_its_own_variable(
+    stubs: _Stubs, permission: str, edit: str, bash: str, webfetch: str
+) -> None:
+    """Set for the turn and for nothing else: the user's own settings are left alone."""
+    session = OpencodeAgent(
+        OpencodeAgentConfig(model="m", effort="high", permission=permission)
+    ).new()
+    assert session("hi") == "hi"
+
+    (call,) = stubs.calls()
+    assert call.allowed is not None
+    assert json.loads(call.allowed) == {
+        "edit": edit,
+        "bash": bash,
+        "webfetch": webfetch,
+    }
+    # And the flag that answers everything not refused outright is still on: what the rung
+    # narrows is said as refusals, and the flag is what carries the rest.
+    assert "--auto" in call.argv
+
+
+def test_mimo_is_told_the_same_thing_under_its_own_name(stubs: _Stubs) -> None:
+    session = MimoCodeAgent(
+        MimoCodeAgentConfig(model="m", effort="low", permission="reading")
+    ).new()
+    assert session("hi") == "hi"
+
+    (call,) = stubs.calls()
+    assert call.allowed is not None
+    assert json.loads(call.allowed)["bash"] == "deny"
+
+
+def test_a_turn_runs_in_the_flows_own_environment_and_what_it_is_told(
+    stubs: _Stubs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Adding a variable must not take away the rest: an agent logs in as it already does."""
+    monkeypatch.setenv("A_THING_THE_FLOW_HAS", "kept")
+    assert OpencodeAgent(OPENCODE).new()("hi") == "hi"
+
+    (call,) = stubs.calls()
+    assert call.inherited == "kept"
+    assert call.allowed is not None

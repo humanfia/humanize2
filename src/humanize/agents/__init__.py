@@ -5,7 +5,7 @@ from __future__ import annotations
 from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
 from .claude import ClaudeCodeAgent, ClaudeCodeAgentConfig, ClaudeCodeSession
 from .codex import CodexAgent, CodexAgentConfig, CodexSession
-from .config import AgentConfig, anchored
+from .config import PERMISSIONS, AgentConfig, anchored
 from .event import Event, Question, Stopped
 from .hooks import EVERYWHERE, Hook, Hooks, Hung, Moment, Occasion, Unhooked, Verdict
 from .human import HumanAgent, HumanSession
@@ -30,6 +30,7 @@ DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
 __all__ = [
     "DRIVEN",
     "EVERYWHERE",
+    "PERMISSIONS",
     "SWARM",
     "AgentBase",
     "AgentConfig",

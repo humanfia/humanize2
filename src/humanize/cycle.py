@@ -89,6 +89,7 @@ class Cycle:
                     "backend": agent.backend,
                     "model": agent.config.model,
                     "effort": agent.config.effort,
+                    "permission": agent.config.permission,
                 }
                 for agent in agents
             ],

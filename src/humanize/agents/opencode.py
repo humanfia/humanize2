@@ -34,6 +34,19 @@ _SAYS = {"text": "text", "reasoning": "reasoning"}
 _COUNTED = ("input", "output", "reasoning")
 _CACHED = ("read", "write")
 
+#: What each rung of the ladder is, said the way opencode takes it: a permission apiece for
+#: editing a file, running a command and fetching a page, each `allow`, `ask` or `deny`. A
+#: `deny` here is the tool not being offered at all, which is what makes `reading` real; there
+#: is no sandbox, so `working` is the same agent with nothing outside the workspace to reach
+#: for, and `granted` and `unchecked` are that agent with the reaching allowed. `ask` is never
+#: used: a run per turn has nobody to answer it.
+_PERMITTED = {
+    "reading": {"edit": "deny", "bash": "deny", "webfetch": "allow"},
+    "working": {"edit": "allow", "bash": "allow", "webfetch": "deny"},
+    "granted": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
+    "unchecked": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
+}
+
 
 class OpencodeSession(CommandSessionBase):
     """An opencode conversation, resumed by the id the first turn's events name it with.
@@ -46,9 +59,10 @@ class OpencodeSession(CommandSessionBase):
     #: What it writes on stdout is the turn as events rather than the agent talking.
     protocol: ClassVar[bool] = True
 
-    #: The command this backend is installed as, which is the only thing mimocode differs by
-    #: on the way in.
+    #: The command this backend is installed as, and the variable it is told what the agent
+    #: may do in -- the two things mimocode differs by on the way in.
     command: ClassVar[str] = "opencode"
+    permits: ClassVar[str] = "OPENCODE_PERMISSION"
 
     def __init__(self, agent: AgentBase) -> None:
         """Initializes a session that has run no turn yet.
@@ -101,9 +115,24 @@ class OpencodeSession(CommandSessionBase):
         """What tells this backend that nobody is there to answer it.
 
         A flow watches its agent rather than gating it, as humanize' own flows do, and a turn
-        waiting on an approval nobody is there to give is a flow that has stopped.
+        waiting on an approval nobody is there to give is a flow that has stopped. It answers
+        yes to everything that is not refused outright, which is why the rung below is said as
+        refusals: what the agent may not do is denied, and the flag is what carries the rest.
         """
         return ["--auto"]
+
+    def _environment(self) -> dict[str, str]:
+        """What the agent may do, which this backend takes as a variable rather than a flag.
+
+        Set for this turn and for nothing else, rather than written into the settings file:
+        two agents of one flow may be allowed different things, and neither is a reason to
+        change what the person who started the flow has configured.
+        """
+        return {
+            type(self).permits: json.dumps(
+                _PERMITTED.get(self._agent.config.permission, _PERMITTED["unchecked"])
+            )
+        }
 
     def _reads(self, line: str, *, error: bool) -> Iterator[Event]:
         """Reads one event opencode wrote, as the things it says the agent did.

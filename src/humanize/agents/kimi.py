@@ -77,6 +77,19 @@ _COUNTED = (
 #: is not shown: an image is not a line of a transcript.
 _BLOCKS = {"text": "text", "thinking": "reasoning", "tool_use": "tool"}
 
+#: How each rung of the ladder is set on a Kimi session. The daemon takes one of `yolo`,
+#: `manual` and `auto`, and plan mode beside it. `manual` is the one that is never used: it
+#: asks, and a flow running unattended has nobody to answer -- so an agent that is to change
+#: nothing is put in plan mode instead, which is Kimi's own way of saying work it out and do
+#: none of it. There is no sandbox here, so `working` and `granted` are the same setting: it
+#: is told to answer its own approvals, and nothing confines where it answers them.
+_PERMITTED = {
+    "reading": {"permission_mode": "auto", "plan_mode": True},
+    "working": {"permission_mode": "auto", "plan_mode": False},
+    "granted": {"permission_mode": "auto", "plan_mode": False},
+    "unchecked": {"permission_mode": "yolo", "plan_mode": False},
+}
+
 
 class _AppServer:
     """A `kimi web` daemon of our own, and the calls one turn of a session is made of."""
@@ -370,10 +383,10 @@ class KimiCodeCLISession(SessionBase):
         turn: dict[str, Any] = {
             "model": self._agent.config.model,
             "thinking": effort.removeprefix(SWARM),
-            # A flow watches its agent rather than answering it, as humanize' own flows do.
-            "permission_mode": "auto",
-            "plan_mode": False,
             "swarm_mode": effort.startswith(SWARM),
+            # What it may do without being asked, which for an unattended flow is everything:
+            # a flow watches its agent rather than answering it, as humanize' own flows do.
+            **_PERMITTED.get(self._agent.config.permission, _PERMITTED["unchecked"]),
         }
         with self._lock:  # a conversation is a sequence: one turn at a time
             # A turn that failed is as over as one that landed: neither leaves

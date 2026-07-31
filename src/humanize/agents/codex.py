@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
 from .event import Event, Question, say
+from .hooks import EVERYWHERE, Moment, Occasion
 from .skills import leaving
 
 if TYPE_CHECKING:
@@ -56,14 +57,43 @@ class _Running:
     took: Callable[[str], str | None] | None = None
 
 
-#: What a turn is run under, sent with every one of them: a thread picked back up does not
-#: carry the settings it was started with, and a turn waiting on an approval nobody is there to
-#: give is a flow that has stopped. A flow watches its agent rather than answering it.
-_UNATTENDED = {
-    "approvalPolicy": "never",
-    "sandbox": "danger-full-access",
-    "serviceTier": "default",
+#: What the server calls each of the ways it asks a client to approve something. All three are
+#: answered where the agent is allowed to ask at all, and none of them ever arrives otherwise:
+#: an approval policy of `never` is the server not asking.
+_APPROVALS = (
+    "item/commandExecution/requestApproval",
+    "item/fileChange/requestApproval",
+    "item/permissions/requestApproval",
+)
+
+#: What Codex is run under at each rung of the ladder, sent with every turn: a thread picked
+#: back up does not carry the settings it was started with. Codex is the one backend here with
+#: a sandbox of its own, so its rungs are the real thing rather than an approximation of one --
+#: and the only rung that lets it ask for more is `granted`, which is the rung that means the
+#: asking is granted. Everywhere else it is never asked, because a turn waiting on an approval
+#: nobody is there to give is a flow that has stopped.
+_PERMITTED = {
+    "reading": {"approvalPolicy": "never", "sandbox": "read-only"},
+    "working": {"approvalPolicy": "never", "sandbox": "workspace-write"},
+    "granted": {"approvalPolicy": "on-request", "sandbox": "workspace-write"},
+    "unchecked": {"approvalPolicy": "never", "sandbox": "danger-full-access"},
 }
+
+#: What every turn is run under whatever it is allowed to do.
+_SERVICE = {"serviceTier": "default"}
+
+
+def unattended(permission: str) -> dict[str, Any]:
+    """What a turn is started with, at the rung the agent was configured for.
+
+    Args:
+      permission: One of :data:`humanize.agents.config.PERMISSIONS`.
+
+    Returns:
+      The settings to send with the turn, and with the thread it runs on.
+    """
+    return _SERVICE | _PERMITTED.get(permission, _PERMITTED["unchecked"])
+
 
 #: How long a server being taken down is given to go before it is left to the operating system,
 #: and how long an idle thread is given to carry a goal on by itself before the goal is over.
@@ -472,6 +502,13 @@ class _AppServer:
                         target=self._ask, args=(message,), daemon=True
                     ).start()
                     continue
+                if message["method"] in _APPROVALS:
+                    # On a thread of its own too: a hook is the flow's own code, and one that
+                    # takes its time must not stop the stream every session is read from.
+                    threading.Thread(
+                        target=self._approve, args=(message,), daemon=True
+                    ).start()
+                    continue
                 self._write(
                     {
                         "jsonrpc": "2.0",
@@ -488,6 +525,56 @@ class _AppServer:
                 say(message["params"]["delta"], sys.stderr, end="")
             self._messages.put(message)
         self._messages.put(None)  # it has stopped, and nothing more is coming
+
+    def _approve(self, message: dict[str, Any]) -> None:
+        """Grants something the agent asked to be allowed to do, unless a hook refuses.
+
+        The server only asks at all at the rung that means the asking is granted, so this
+        answers yes -- and the one place a refusal actually stops an agent doing something is
+        the moment the backend waits on, which is this one. A hook hung on
+        `PERMISSION_REQUEST` gets it first and may say no.
+
+        The three requests take two shapes of answer: a decision for a command and for a file
+        change, and the permissions themselves for a request to widen the sandbox -- where
+        granting is handing back the profile it asked for, and refusing is handing back none.
+
+        Args:
+          message: The request, as read.
+        """
+        told: dict[str, Any] = message.get("params") or {}
+        wanted: dict[str, Any] = told.get("permissions") or {}
+        about = next(
+            (
+                str(value)
+                for name, value in told.items()
+                if name not in _NAMING and isinstance(value, str) and value.strip()
+            ),
+            "",
+        )
+        asking = (
+            self._agents[0].hooks.fire(
+                Occasion(
+                    moment=Moment.PERMISSION_REQUEST,
+                    agent=self._agents[0].id,
+                    session=str(told.get("threadId") or ""),
+                    tool=str(message["method"]).rsplit("/", 2)[-2],
+                    about=about,
+                    input=told,
+                )
+            )
+            if self._agents
+            else None
+        )
+        refused = asking is not None and asking.refused
+        if message["method"] == _APPROVALS[2]:
+            answer: dict[str, Any] = (
+                {"permissions": {}}
+                if refused
+                else {"permissions": wanted, "scope": "turn"}
+            )
+        else:
+            answer = {"decision": "decline" if refused else "accept"}
+        self._write({"jsonrpc": "2.0", "id": message["id"], "result": answer})
 
     def _ask(self, message: dict[str, Any]) -> None:
         """Puts the questions a turn stopped on to whoever is driving the agent.
@@ -660,7 +747,7 @@ class CodexSession(SessionBase):
                         if schema is not None
                         else {}
                     ),
-                    **_UNATTENDED,
+                    **unattended(self._agent.config.permission),
                 },
                 self._running,
             ):
@@ -718,7 +805,7 @@ class CodexSession(SessionBase):
                     {
                         "cwd": self._workspace(),
                         "model": self._agent.config.model,
-                        **_UNATTENDED,
+                        **unattended(self._agent.config.permission),
                     },
                 )["thread"]["id"]
             )
@@ -756,7 +843,15 @@ class CodexSession(SessionBase):
 
 
 class CodexAgent(AgentBase):
-    """Codex, driven over the app server so that a turn can be steered while it runs."""
+    """Codex, driven over the app server so that a turn can be steered while it runs.
+
+    Every moment a turn passes through, and one more: at the rung where the agent may ask for
+    more than it has, the server asks and waits for the answer -- so that is the one place a
+    hook here can say no to something and have the agent hear it. At every other rung it is
+    never asked, and a hook hung on that moment never fires.
+    """
+
+    moments: ClassVar[frozenset[Moment]] = EVERYWHERE | {Moment.PERMISSION_REQUEST}
 
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent whose app server is not running yet.

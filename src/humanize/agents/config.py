@@ -11,7 +11,24 @@ if TYPE_CHECKING:
     # client behind a container.
     from humanize.machines import MachineConfig
 
-__all__ = ["AgentConfig", "anchored"]
+__all__ = ["PERMISSIONS", "AgentConfig", "anchored"]
+
+#: What an agent may do without being asked, one word per rung and the loosest last. Every
+#: backend has a ladder of its own and none of them has the same four rungs, so these are the
+#: question rather than any one CLI's answer, and each driver says which of its own settings
+#: it reaches for:
+#:
+#: - `reading`: it may look at anything and change nothing -- no edits, no commands.
+#: - `working`: it may change the workspace it was given, and is stopped at the edge of it.
+#: - `granted`: it may reach for anything, and what it asks for is granted -- which is where a
+#:   hook hung on `PERMISSION_REQUEST` gets a say, since that is the one moment a backend
+#:   actually waits on.
+#: - `unchecked`: nothing is asked and nothing is checked, which is what an unattended flow has
+#:   always run its agents at.
+#:
+#: A backend with no sandbox of its own cannot tell `working` from `granted`, and says so where
+#: it maps them rather than pretending to a rung it has not got.
+PERMISSIONS = ("reading", "working", "granted", "unchecked")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -36,12 +53,18 @@ class AgentConfig:
         backend here is told the other way round -- a CLI comes with its skills loaded and
         has to be talked out of one -- which :func:`humanize.agents.skills.leaving` works out
         by looking at what is installed.
+      permission: What this agent may do without being asked, as one of :data:`PERMISSIONS`.
+        `unchecked` because that is what a flow driving an agent unattended has always run it
+        at: a flow watches its agent rather than gating it, and a turn waiting on an approval
+        nobody is there to give is a flow that has stopped. Anything tighter is a choice, and
+        is made where the agents are chosen.
     """
 
     model: str
     effort: str
     machine: MachineConfig | None = None
     skills: tuple[str, ...] | None = None
+    permission: str = "unchecked"
 
 
 def anchored(target: str) -> MachineConfig | None:

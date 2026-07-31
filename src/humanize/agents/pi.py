@@ -35,6 +35,12 @@ _ASKS = ("select", "confirm", "input", "editor")
 #: wherever it is shown rather than as one with nothing to answer it with.
 _YES_NO = ("yes", "no")
 
+#: The tools of pi's own that change something rather than look at something, which is the
+#: whole of what an agent that may change nothing is refused. pi has no permission gate and no
+#: sandbox -- what it takes is which tools to load -- so `reading` is the only rung it can be
+#: held to, and the three above it are one and the same agent.
+_CHANGING = ("bash", "edit", "write")
+
 
 def _about(called: dict[str, Any]) -> str:
     """What a tool was called with, as the one line a row of a transcript has room for.
@@ -108,7 +114,7 @@ class PiSession(StreamSessionBase):
         # happened.
         pinned = self._id or str(uuid.uuid4())
         self._named = pinned
-        return [
+        argv = [
             "pi",
             "--mode",
             "rpc",
@@ -119,6 +125,11 @@ class PiSession(StreamSessionBase):
             "--session-id",
             pinned,
         ]
+        if self._agent.config.permission == "reading":
+            # Not a mode it is put in but tools it is not given: an agent without the three
+            # that change anything is one that can only look, which is the rung asked for.
+            argv += ["--exclude-tools", ",".join(_CHANGING)]
+        return argv
 
     def _write(self, text: str, ticket: str = "") -> str:
         """Renders one thing to say as the `prompt` command pi reads it as.

@@ -327,22 +327,22 @@ def test_an_agent_that_cannot_do_what_its_place_asks_is_refused_before_the_run(
     flow = _flow(tmp_path, DEMANDING)
 
     with pytest.raises(SystemExit):
-        main(["exec", "-f", flow, "-a", "codex/m:high", "-a", "codex/m:high", "task"])
+        main(["exec", "-f", flow, "-a", "kimi/m:high", "-a", "kimi/m:high", "task"])
 
     assert not (tmp_path / "flow.json").exists()  # nothing ran
 
-    # And the one backend that does ask before it uses a tool is taken.
-    main(["exec", "-f", flow, "-a", "claude/m:high", "-a", "codex/m:high", "task"])
+    # And a backend that does ask before it uses a tool is taken.
+    main(["exec", "-f", flow, "-a", "claude/m:high", "-a", "kimi/m:high", "task"])
     assert _seen(tmp_path)["agents"] == [["builder"], ["reviewer"]]
 
 
 def test_what_a_place_asks_for_is_said_where_it_is_refused(tmp_path: Path) -> None:
-    from humanize.agents import CodexAgent, CodexAgentConfig
+    from humanize.agents import KimiCodeCLIAgent, KimiCodeCLIAgentConfig
 
     flow = _flow(tmp_path, DEMANDING)
     agents = [
-        CodexAgent(CodexAgentConfig(model="m", effort="high")),
-        CodexAgent(CodexAgentConfig(model="m", effort="high")),
+        KimiCodeCLIAgent(KimiCodeCLIAgentConfig(model="m", effort="high")),
+        KimiCodeCLIAgent(KimiCodeCLIAgentConfig(model="m", effort="high")),
     ]
 
     with pytest.raises(NotAFlow, match="builder has to run PermissionRequest"):

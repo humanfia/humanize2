@@ -613,6 +613,18 @@ class CommandSessionBase(SessionBase):
         """
         yield Event(kind="tool" if error else "text", text=line.rstrip("\n"))
 
+    def _environment(self) -> Mapping[str, str]:
+        """What to set in the command's environment on top of this process's own.
+
+        For a backend that takes a setting there rather than on its command line. Nothing by
+        default: a turn inherits the environment the flow is running in, which is what lets
+        the agent log in the way it already logs in.
+
+        Returns:
+          The variables to add, which are set for the turn and for nothing else.
+        """
+        return {}
+
     def _result(self, transcript: str) -> Event:
         """The answer the turn ends on, out of everything the command wrote on stdout.
 
@@ -677,6 +689,9 @@ class CommandSessionBase(SessionBase):
                 # The agents draw progress bars and check marks: their bytes must never fail a
                 # turn, whatever encoding the machine running the flow happens to be set to.
                 errors="replace",
+                # This process's own, plus whatever the backend is told there. None rather than
+                # a copy where it is told nothing, so that a turn inherits it as it always did.
+                env={**os.environ, **added} if (added := self._environment()) else None,
             ) as proc:
                 assert proc.stdout is not None  # noqa: S101
                 assert proc.stderr is not None  # noqa: S101

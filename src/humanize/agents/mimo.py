@@ -20,6 +20,7 @@ class MimoCodeSession(OpencodeSession):
     """A mimocode conversation, held and resumed exactly as an opencode one is."""
 
     command: ClassVar[str] = "mimo"
+    permits: ClassVar[str] = "MIMOCODE_PERMISSION"
 
     def _unattended(self) -> list[str]:
         """What tells mimocode that nobody is there to answer it.

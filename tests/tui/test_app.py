@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from textual.widgets import Label, Static
 
+from humanize.agents import PERMISSIONS
 from humanize.backends import Model
 from humanize.cycle import cycles
 from humanize.tui import Humanize
@@ -1718,3 +1719,74 @@ async def test_the_person_asked_for_a_shape_is_asked_a_question_at_a_time(
         "tests": True,
         "rounds": 3,
     }
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
+)
+async def test_what_an_agent_may_do_is_stepped_through_beside_what_it_runs(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """A second question about the agent, adjusted rather than chosen from a list of four."""
+    from textual.widgets import OptionList
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        sheet = app.screen
+        await until(
+            lambda: bool(sheet.query_one("#choices", OptionList).options), driver
+        )
+        tuning = sheet.query_one("#tuning", Label)
+
+        # It opens at what an agent nobody has been asked about has always run at.
+        assert "unchecked" in str(tuning.content)
+        await driver.press("ctrl+p")
+        await driver.pause()
+        assert "reading" in str(tuning.content)
+        await driver.press("ctrl+p")
+        await driver.pause()
+        assert "working" in str(tuning.content)
+
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    # It rides along with what the agent runs, and is kept with it.
+    chosen = Runs("claude/claude-opus-5:max", "", None, "working")
+    assert app._models == [chosen]
+    assert app.settings.agents(app._flow_named) == [chosen]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
+)
+async def test_the_loosest_rung_is_written_down_as_nothing_at_all(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """A file written before there was such a setting reads the same way as one that has it."""
+    from textual.widgets import OptionList
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        sheet = app.screen
+        await until(
+            lambda: bool(sheet.query_one("#choices", OptionList).options), driver
+        )
+        # All the way round, back to the one it opened on.
+        for _ in range(len(PERMISSIONS)):
+            await driver.press("ctrl+p")
+        await driver.pause()
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    assert app._models == [Runs("claude/claude-opus-5:max")]
+    assert app.settings.agents(app._flow_named) == [Runs("claude/claude-opus-5:max")]

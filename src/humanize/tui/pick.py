@@ -40,7 +40,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-from humanize.agents import DRIVEN, SWARM, Moment, anchored
+from humanize.agents import DRIVEN, PERMISSIONS, SWARM, Moment, anchored
 from humanize.agents.skills import Skill, skills
 from humanize.backends import named
 
@@ -79,11 +79,14 @@ class Runs(NamedTuple):
       anchor: The machine its work lands on, as a target, or "" to work on this one.
       skills: The skills of its CLI it is to have, by name, or None for the CLI as it comes
         -- which is every skill it finds.
+      permission: What it may do without being asked, as one of `humanize.agents.PERMISSIONS`,
+        or "" for the one an agent nobody has been asked about runs at.
     """
 
     spec: str
     anchor: str = ""
     skills: tuple[str, ...] | None = None
+    permission: str = ""
 
 
 #: What Claude Code rules the top of a sheet with, and how far in everything under it sits.
@@ -137,6 +140,9 @@ def reads(named: tuple[str, ...], runs: list[Runs]) -> list[str]:
                 named[at] if at < len(named) else "",
                 one.spec,
                 one.anchor,
+                # Only where there is one: an agent nobody has narrowed says nothing here,
+                # which is what every agent a flow has ever driven would have said.
+                one.permission,
             )
             if part
         )
@@ -430,6 +436,11 @@ class Models(Sheet[list[Runs]]):
         # that is both is written down as both. A chord, because tab is the tabs and the
         # letters are searching.
         Binding("ctrl+w", "swarm", "swarm mode", priority=True),
+        # Nor is what the agent may do while it works: it is one of four words rather than a
+        # step along the efforts, so it is stepped through by a chord of its own. Adjusted
+        # here rather than chosen from a sheet, because four words fit on the line the effort
+        # is on and a list of four is a list nobody would want to walk to.
+        Binding("ctrl+p", "permit", "permission", priority=True),
         # Nor is where the work lands a way of running the model, so it is neither an arrow
         # nor a row: it is a second question about this agent, and it opens a sheet of its
         # own. A chord rather than a letter, because the letters are searching.
@@ -462,6 +473,10 @@ class Models(Sheet[list[Runs]]):
         self._swarm = False
         #: Where this one's turns land, which is this machine until it is said otherwise.
         self._anchor = ""
+        #: What it may do without being asked, counting the rungs: the loosest until it is
+        #: said otherwise, which is what an agent nobody has been asked about has always run
+        #: at.
+        self._permission = len(PERMISSIONS) - 1
         #: Which of a CLI's skills this one is to have, per CLI, for a CLI that has been
         #: asked about at all: the answer belongs to the CLI it was given about, and the tab
         #: may yet be turned to another one.
@@ -490,6 +505,7 @@ class Models(Sheet[list[Runs]]):
         self._effort = 0
         self._swarm = False
         self._anchor = ""
+        self._permission = len(PERMISSIONS) - 1
         self._skills = {}
         self._at = 0
         self._typed = ""  # each agent is asked about from the first tab again
@@ -583,6 +599,10 @@ class Models(Sheet[list[Runs]]):
                 f"{_DOT}[$secondary]◉[/] "
                 f"{'every skill' if having is None else f'{len(having)} skills'}  "
                 f"[$text-muted]ctrl+s to choose[/]"
+            )
+            tuned += (
+                f"{_DOT}[$secondary]◉[/] {PERMISSIONS[self._permission]}  "
+                f"[$text-muted]ctrl+p to change[/]"
             )
         self.query_one("#tuning", Label).update(tuned)
         self.query_one("#keys", Label).update(
@@ -690,6 +710,15 @@ class Models(Sheet[list[Runs]]):
             self._swarm = not self._swarm
             self._fill()
 
+    def action_permit(self) -> None:
+        """Steps to the next rung of what this agent may do without being asked.
+
+        Round rather than along: the rungs are four and the way back to the one before is the
+        way on past the last, which is one key rather than two.
+        """
+        self._permission = (self._permission + 1) % len(PERMISSIONS)
+        self._fill()
+
     def action_harder(self) -> None:
         """Moves one along the efforts, towards the one that thinks hardest."""
         self._effort = max(self._effort - 1, 0)
@@ -719,6 +748,13 @@ class Models(Sheet[list[Runs]]):
                 # Nothing said at all is the CLI as it comes, which is None rather than a
                 # list of every skill it happens to have installed today.
                 skills=self._skills.get(self._backend()),
+                # Only where it is a narrowing: the loosest rung is what an agent nobody has
+                # been asked about runs at, and saying so is saying nothing.
+                permission=(
+                    PERMISSIONS[self._permission]
+                    if self._permission < len(PERMISSIONS) - 1
+                    else ""
+                ),
             )
         )
         if len(self._chosen) < len(self._wanted):
