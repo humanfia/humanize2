@@ -1762,9 +1762,12 @@ class Humanize(App[None]):
         """Whether there is something for each of the flow's agents to run on.
 
         There is always a flow -- the interface opens on one -- so this is only ever short of
-        an agent, which is a machine with no coding agent installed on it.
+        an agent, which is a machine with no coding agent installed on it. A flow that asks
+        for none is not short of anything: the person at this prompt is an agent it is handed
+        rather than one anybody chooses, so a flow that talks only to them has everything it
+        needs the moment it is chosen.
         """
-        return bool(self._models)
+        return bool(self._models) or not self._wanted
 
     def _interject(self, text: str) -> None:
         """Puts something in the queue for the flow, and sends it if nothing is in the way.

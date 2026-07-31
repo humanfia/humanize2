@@ -71,7 +71,7 @@ hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] <task>
 | --- | --- |
 | `-f`, `--flow <flow>` | **Required.** The flow to drive: the name of one humanize came with, or the path to a file — which is what a flow of your own is called. See [where flows live](flows.md#where-flows-live). |
 | `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](flows.md#settings-of-the-flows-own). The flow's own model checks it before the first turn. |
-| `-a`, `--agent <spec>` | **Required, and repeated once for each agent the flow drives**, in the order it takes them. |
+| `-a`, `--agent <spec>` | **Repeated once for each agent the flow drives**, in the order it takes them — so none at all for a flow whose only side is you, since nobody chooses what the person runs. |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
 
 ### Writing an agent

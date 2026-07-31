@@ -230,6 +230,59 @@ def test_the_person_at_the_prompt_is_an_agent_nobody_is_asked_to_configure(
     assert seen["said"] == ["and then this", ""]
 
 
+#: A flow whose only side is the person at the prompt: it drives no coding agent at all, so
+#: there is nothing on its line to name.
+ALONE = """
+import json
+from pathlib import Path
+from typing import NamedTuple
+
+from humanize.agents import HumanAgent
+
+
+class Agents(NamedTuple):
+    human: HumanAgent
+
+
+def run(agents: Agents, task: str) -> None:
+    agents.human.prompting = lambda: "answered"
+    Path(__file__).with_suffix(".json").write_text(
+        json.dumps({"agents": [a.id for a in agents], "said": agents.human(task)})
+    )
+"""
+
+
+def test_a_flow_whose_only_side_is_the_person_names_no_agent_at_all(
+    tmp_path: Path,
+) -> None:
+    """A line that named an agent would be naming what nobody picks.
+
+    Nobody chooses what the person runs, so a flow whose only side is them has everything it
+    needs the moment it is named -- and a line that named no agent is not short of anything.
+    """
+    from humanize.runner import drives
+
+    flow = _flow(tmp_path, ALONE)
+    assert drives(flow) == ()
+
+    main(["exec", "-f", flow, "task"])
+
+    seen = _seen(tmp_path)
+    assert seen == {"agents": ["human"], "said": "answered"}
+
+
+def test_a_flow_that_does_drive_agents_still_has_to_be_given_them(
+    tmp_path: Path,
+) -> None:
+    """Which is caught against what the flow declares, as every other miscount is."""
+    flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
+
+    with pytest.raises(SystemExit) as exit_code:
+        main(["exec", "-f", flow, "task"])
+
+    assert exit_code.value.code == 2
+
+
 #: A flow that says one of its agents has to be one a hook can say no to, which is what
 #: writing the moment beside the type in the annotation means.
 DEMANDING = """

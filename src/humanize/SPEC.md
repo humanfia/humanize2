@@ -127,8 +127,11 @@ Runs a flow in the current directory, on the agents it is given.
 Args:
 
 - `-f`, `--flow <flow>`: The Python file the flow is written in. Required.
-- `-a`, `--agent <cli>/<model>:<effort>`: One agent to drive the flow with. Required, and
-  repeated once for each agent the flow drives, in the order it takes them. It MUST also be
+- `-a`, `--agent <cli>/<model>:<effort>`: One agent to drive the flow with. Repeated once for
+  each agent the flow drives, in the order it takes them -- which for a flow that drives none,
+  because the only side it talks to is the person at the prompt, is not at all: the person is
+  handed over rather than chosen. A line short of an agent the flow does drive is caught as
+  every other miscount is, against what the flow declares. It MUST also be
   accepted written out as `cli=<cli>,model=<model>,effort=<effort>`, in any order, since a
   model or an effort that holds the punctuation the short form separates on has nowhere else
   to go. One `-a` MUST be one agent: a list in a single `-a` MUST NOT be split into several.

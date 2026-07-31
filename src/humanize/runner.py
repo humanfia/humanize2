@@ -497,7 +497,11 @@ def flow_and_agents(
         "-a",
         "--agent",
         action="append",
-        required=True,
+        # Once for each agent the flow drives, which for a flow that talks only to the person
+        # at the prompt is none: the person is handed over rather than chosen, so a line that
+        # named one would be naming what nobody picks. A line short of an agent the flow does
+        # need is caught where every other miscount is, by the flow's own declaration.
+        default=[],
         dest="agents",
         metavar="CLI/MODEL:EFFORT",
         help="one agent, repeated once for each the flow drives, in the order it takes "

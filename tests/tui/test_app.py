@@ -1469,3 +1469,86 @@ async def test_the_box_at_the_top_says_what_this_is_and_not_what_is_set_up(
         status = str(app.query_one("#status", Static).content)
         assert app._flow_named in status
         assert _where() in status
+
+
+#: A flow that settles what only a person can settle, in the model it is going to run on.
+QUESTIONNAIRE = '''
+"""Ask the person, in a shape."""
+
+import json
+from pathlib import Path
+from typing import Literal, NamedTuple
+
+from pydantic import BaseModel, Field
+
+from humanize.agents import HumanAgent
+
+
+class Agents(NamedTuple):
+    """Nobody but the person."""
+
+    human: HumanAgent
+
+
+class Settled(BaseModel):
+    """What has to be settled before anything runs."""
+
+    model_config = {"extra": "forbid"}
+
+    approach: Literal["fast", "careful"] = Field(description="Which way should this be built?")
+    tests: bool = Field(description="Write tests for it?")
+    rounds: int = Field(default=3, description="How many rounds may it take?")
+
+
+def run(agents: Agents, task: str) -> None:
+    settled = agents.human(task, schema=Settled, suppress=True)
+    Path("settled.json").write_text(settled.model_dump_json() if settled else "nothing")
+'''
+
+
+@pytest.mark.timeout(90)
+async def test_the_person_asked_for_a_shape_is_asked_a_question_at_a_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A flow settles what only a person can settle, in the model it is going to run on.
+
+    The same road an agent's own question takes, so the interface shows each field as a
+    question with what it will take under it, and the next line typed is the answer.
+    """
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "flow.py").write_text(QUESTIONNAIRE)
+    app = Humanize()
+    async with app.run_test() as driver:
+        # As `/flow` sets it: the flow, what each of its agents runs -- which is nothing,
+        # since the only one it drives is the person -- and the places it asks for.
+        app._flow_named, app._models = "flow.py", []
+        app._wanted = app._places_of("flow.py")
+        await driver.press(*"how should I do this")
+        await driver.press("enter")
+
+        # The flow's own words above the first field, and the answers it will take under it.
+        await until(
+            lambda: "Which way should this be built?" in _transcript(app), driver
+        )
+        assert "how should I do this" in _transcript(app)
+        assert "careful" in _transcript(app)
+        await driver.press(*"careful")
+        await driver.press("enter")
+
+        await until(lambda: "Write tests for it?" in _transcript(app), driver)
+        await driver.press(*"yes")
+        await driver.press("enter")
+
+        # The one with a default says what to type to leave it, and what that will take.
+        await until(lambda: "How many rounds" in _transcript(app), driver)
+        assert "`-` for 3" in _transcript(app)
+        await driver.press("-")
+        await driver.press("enter")
+
+        await until((tmp_path / "settled.json").exists, driver)
+
+    assert json.loads((tmp_path / "settled.json").read_text()) == {
+        "approach": "careful",
+        "tests": True,
+        "rounds": 3,
+    }
