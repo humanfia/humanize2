@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = [
-    "dateparser>=1.4.1",
+    "dateparser>=1.4.2",
     # A flow says what it can be configured with by declaring a model, and the menu that
     # asks is read off that model: the types, the bounds and the combinations a flow
     # refuses are all written once, where the flow declares them.
@@ -32,7 +32,7 @@ Issues = "https://github.com/humanfia/humanize/issues"
 hmz = "humanize.cli:main"
 
 [build-system]
-requires = ["uv_build>=0.11.28,<0.12.0"]
+requires = ["uv_build>=0.12.2,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
