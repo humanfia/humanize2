@@ -90,7 +90,7 @@ Everything is under [docs/](docs/README.md), which indexes it by what you came f
 **Guides**
 
 - [Flows](docs/flows.md) — writing a flow and running it (`hmz exec`)
-- [Agents](docs/agents.md) — sessions, turns, goals, questions, efforts, names
+- [Agents](docs/agents.md) — sessions, turns, shapes, skills, goals, questions, efforts
 - [Machines](docs/machines.md) — where an agent's turns land
 - [Remote execution](docs/remote-execution.md) — acting on another machine (`hmz anchor`)
 - [Tracing](docs/tracing.md) — trajectories into a trace (`hmz collect`)
