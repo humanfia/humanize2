@@ -26,7 +26,7 @@ from typing import (
 from humanize import backends
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Awaitable, Callable, Sequence
 
     from pydantic import BaseModel
 
@@ -36,6 +36,11 @@ if TYPE_CHECKING:
 #: How many arguments a flow's entry point takes when it says it can be set up with
 #: something: the agents, the task, and the model that says what there is to set.
 _WITH_A_CONFIG = 3
+
+#: A flow's entry point: called with the agents and the task, and done when it returns --
+#: or, for one written as `async def run`, when what it returns has been awaited. Which of
+#: the two a flow is, is the flow's own business: `Runner.run` waits for it either way.
+type Flow = Callable[..., Awaitable[None] | None]
 
 
 class NotAFlow(ValueError):  # noqa: N818  -- the name SPEC.md gives it
@@ -127,7 +132,7 @@ def wanted(flow: str | os.PathLike[str]) -> tuple[Place, ...]:
 def _read(
     flow: str | os.PathLike[str],
 ) -> tuple[
-    Callable[..., None],
+    Flow,
     tuple[Place, ...],
     Callable[..., tuple[AgentBase, ...]],
     type[BaseModel] | None,
@@ -244,9 +249,7 @@ def _set_up(
         raise NotAFlow(f"{flow}: {refused}") from refused
 
 
-def _setting(
-    run: Callable[..., None], hinted: dict[str, object]
-) -> type[BaseModel] | None:
+def _setting(run: Flow, hinted: dict[str, object]) -> type[BaseModel] | None:
     """The model a flow says it can be set up with, read off its third argument.
 
     Third rather than named, because that is where it is: `run(agents, task, config)` is the
@@ -275,7 +278,7 @@ def _setting(
     return None
 
 
-def _kinds(declared: type, run: Callable[..., None]) -> dict[str, object]:
+def _kinds(declared: type, run: Flow) -> dict[str, object]:
     """What a flow annotated each place of its agents with, resolved where it can be.
 
     Against the flow's own globals, which are where its names are: a flow loaded by running
@@ -354,6 +357,38 @@ def _is_person(kind: object) -> bool:
     return kind is HumanAgent
 
 
+def _finished(running: Awaitable[None]) -> None:
+    """Runs a flow that is a coroutine, until it returns.
+
+    A flow may be written as ``async def run``, which is how one drives many agents at once:
+    the loop is the flow's own, started here and closed when the flow returns, so that a flow
+    which awaits nothing and one which awaits ten thousand turns are both just run. Starting
+    the flow is the same call either way -- whatever is driving one is driving a flow, not an
+    event loop, and none of them has to know which kind it took.
+
+    Args:
+      running: The flow, as the coroutine calling it made.
+    """
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    async def flowing() -> None:
+        # A coroutine of our own around it: `asyncio.run` takes one of those, and what a
+        # flow answered with is whatever awaiting it is spelled as where the flow was written.
+        await running
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(flowing())  # nothing is turning here, which is the ordinary way in
+        return
+    # Started from a thread that is already running a loop of its own -- an interface, a test.
+    # A flow cannot be run on that one: it would be the flow waiting for turns that are
+    # waiting for the loop the flow is holding, which is a run that never takes its first.
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="humanize-flow") as apart:
+        apart.submit(asyncio.run, flowing()).result()
+
+
 class Runner:
     """A flow, loaded from a file and handed the agents it was written for.
 
@@ -415,7 +450,7 @@ class Runner:
         for agent, place in zip(driven, places, strict=True):
             if place.name:
                 agent.rename(place.name)
-        self._run: Callable[..., None] = run
+        self._run: Flow = run
         # Only for a flow that said it takes one, so that every flow written before there
         # was such a thing is still called with the two arguments it declares.
         self._config: BaseModel | None = config if setting is not None else None
@@ -445,20 +480,31 @@ class Runner:
         backends log them one by one, under ids of their own -- and the run is over the moment
         this returns, however it returns.
 
+        A flow written as ``async def run`` is run to its return here too, on a loop of its
+        own: this waits for the flow either way, so that whatever started one is holding a
+        run rather than a coroutine somebody has to remember to await.
+
         Args:
           task: What the flow is to have its agents do.
         """
+        import inspect
+
         from .cycle import Cycle
 
         with Cycle(self._flow, self._agents, task) as cycle:
             for agent in self._agents:
                 agent.cycle = cycle
             if self._setting is None:
-                self._run(self._agents, task)
+                running = self._run(self._agents, task)
             else:
                 # As it was set up, or as it comes: a flow that takes a config takes None for
                 # the run nobody set up, which is the default the flow itself declared.
-                self._run(self._agents, task, self._config)
+                running = self._run(self._agents, task, self._config)
+            # Read off what the call answered rather than off the function: a flow is what it
+            # does when it is called, and one wrapped in something of its own -- a decorator
+            # that times its rounds -- is the same flow.
+            if inspect.isawaitable(running):
+                _finished(running)
 
 
 def flow_and_agents(

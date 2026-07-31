@@ -42,6 +42,19 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     Path("said.txt").write_text(session(task) + "\\n")
 """
 
+#: The same flow written as a coroutine, which the interface runs exactly as it runs the
+#: other kind: on a thread of its own, with the agents it was handed reaching back here.
+AWAITED = """
+from pathlib import Path
+
+from humanize.agents import AgentBase
+
+
+async def run(agents: tuple[AgentBase], task: str) -> None:
+    session = agents[0].new()
+    Path("said.txt").write_text(await session.aturn(task) + "\\n")
+"""
+
 #: A `claude` that answers each thing it is told with a turn of its own, as the real one
 #: does, but withholds the first answer until a second thing arrives -- which is what makes
 #: the interjection observable: the turn cannot end before the typed line lands.
@@ -134,6 +147,28 @@ async def test_a_line_typed_while_a_flow_runs_reaches_the_agent(
         await driver.press(*"start")
         await driver.press("enter")
         # The turn will not end until it has been told something else, so this cannot race.
+        await until(
+            lambda: bool(app._agents and any(agent.sessions for agent in app._agents)),
+            driver,
+        )
+        await driver.press(*"and this")
+        await driver.press("enter")
+        await until(lambda: bool((workspace / "said.txt").exists()), driver)
+
+    assert (workspace / "said.txt").read_text().strip() == "start then and this"
+
+
+@pytest.mark.timeout(60)
+async def test_a_flow_that_is_a_coroutine_runs_here_as_any_other_does(
+    workspace: Path,
+) -> None:
+    """A flow written as `async def run` is a flow: started, typed at, and done with here."""
+    (workspace / "flow.py").write_text(AWAITED)
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
+        await driver.press(*"start")
+        await driver.press("enter")
         await until(
             lambda: bool(app._agents and any(agent.sessions for agent in app._agents)),
             driver,

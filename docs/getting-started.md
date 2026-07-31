@@ -185,7 +185,9 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 ```
 
 The `tuple[AgentBase]` is not decoration: its length is how many agents the flow drives, and it
-is the one thing a command line starting the flow cannot otherwise know. Run it by name:
+is the one thing a command line starting the flow cannot otherwise know. Write `async def run`
+instead, and the flow can [wait for several turns at
+once](flows.md#a-flow-that-waits-for-more-than-one-thing). Run it by name:
 
 ```sh
 hmz exec -f twice -a claude/claude-opus-4-8:high "add a --dry-run flag"

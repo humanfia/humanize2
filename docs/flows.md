@@ -9,6 +9,7 @@ branch, sleep, read files, shell out, and give up, because it is just a function
 ## Table of Contents
 
 - [The contract](#the-contract)
+- [A flow that waits for more than one thing](#a-flow-that-waits-for-more-than-one-thing)
 - [How many agents, and what they are for](#how-many-agents-and-what-they-are-for)
 - [Settings of the flow's own](#settings-of-the-flows-own)
 - [Asking for an agent that can do something](#asking-for-an-agent-that-can-do-something)
@@ -56,6 +57,51 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 Anything else the file does as it is imported is the flow's own business and fails as it would
 anywhere — a flow that reads a prompt file beside it and does not find it is not reported as a
 command line to correct.
+
+`run` may also be `async def`. Everything else on this page is the same either way.
+
+## A flow that waits for more than one thing
+
+A loop that has more than one turn going at a time has to be able to wait for several things at
+once, so a flow may be written as a coroutine:
+
+```python
+import asyncio
+
+from humanize.agents import AgentBase
+
+
+async def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+    while True:
+        acted, reviewed = await asyncio.gather(
+            agents[0].aturn(task, suppress=True),
+            agents[1].aturn(f"Read the repository and say what is wrong: {task}", suppress=True),
+        )
+```
+
+Nothing about starting it changes: `hmz exec -f …` and the interface run a coroutine flow the
+same way they run any other, on a loop of the flow's own, and the run is over when `run`
+returns. The count of its agents, the settings it declares, the [cycle](tracing.md#cycles) it is
+written down as and the way it is [stopped](#stopping) are all exactly as they are for a flow
+that is a plain function.
+
+Every call that runs a turn has an awaited twin — `agent.aturn`, `session.aturn`,
+`agent.apursue` — and `agent.abatch` runs a whole fan-out of them. See
+[Agents › Awaiting a turn](agents.md#awaiting-a-turn).
+
+```python
+async def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+    # One session per shard, all of them at once, answers in the order they were asked for.
+    said = await agent.abatch([f"{task}\n\nShard {at} of 200." for at in range(200)])
+```
+
+Two rules of thumb: turns of *one* session are still a sequence, whoever awaits them — a
+conversation is a conversation — and a flow that awaits nothing is a flow that runs one turn at
+a time, which is what most of them want.
+
+Write the flow as a plain `def run` unless it has something to wait for. Both are flows; neither
+is the newer one.
 
 ## How many agents, and what they are for
 
@@ -369,6 +415,16 @@ while True:
 ```
 
 Same agent, opposite behaviour. The flow decides, not the agent.
+
+### Fanning out: one agent, many turns at once
+
+```python
+answers = agent.batch([f"Fix the tests in {path}" for path in paths], at_once=8)
+```
+
+A session apiece, all of them going, answers in the order they were asked for. `at_once` is how
+many run at a time — leave it out and they all do. In a coroutine flow it is `await
+agent.abatch(...)`, which is the same fan-out with the loop left free.
 
 ### Actor and reviewer
 

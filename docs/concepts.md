@@ -121,7 +121,9 @@ is *for* as well as how many there are, and an `Annotated[AgentBase, Moment.…]
 one has to be able to do, which is checked at the same moment.
 
 A flow is ordinary Python and may branch any way it likes. Nothing asks it what it is doing;
-what a run looks like is read off the turns going past.
+what a run looks like is read off the turns going past. `run` may be `async def`, which is how
+a flow drives [many turns at once](flows.md#a-flow-that-waits-for-more-than-one-thing);
+starting one is the same either way.
 
 See [Flows](flows.md).
 
