@@ -138,3 +138,16 @@ def test_asked_for_nothing_in_particular_they_answer_with_what_they_typed() -> N
     agent.prompting = lambda: "just do it"
 
     assert agent("What now?") == "just do it"
+
+
+def test_a_dash_means_the_same_thing_the_second_time_a_field_is_asked() -> None:
+    """What was typed at a field put back means what it means anywhere else."""
+    agent, asked = _answers(["careful", "yes", "later", "-", "-"])
+
+    settled = agent("How should I do this?", schema=Settled)
+
+    # `later` is not a number, so the field comes back -- and a dash there takes the default
+    # rather than being read as the value it is not.
+    assert settled == Settled(approach="careful", tests=True, rounds=3, files=[])
+    assert len(asked) == 5
+    assert "How many rounds may it take?" in asked[4].text

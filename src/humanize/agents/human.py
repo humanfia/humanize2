@@ -226,10 +226,7 @@ class HumanSession(SessionBase):
                     ""  # nobody there, or they have gone: there is no answer to build
                 )
             about = ""
-            # A dash at a field that has a default is that default: the field is left out,
-            # and the model fills it in as it would for anything that did not ask.
-            if said.strip() != _LEAVE or field.is_required():
-                answers[name] = said.strip()
+            self._answered(schema, answers, name, said)
         for _ in range(_TRIES):
             try:
                 return schema.model_validate(_read(schema, answers)).model_dump_json()
@@ -246,8 +243,30 @@ class HumanSession(SessionBase):
                     )
                     if said is None:
                         return ""
-                    answers[named] = said.strip()
+                    self._answered(schema, answers, named, said)
         return ""
+
+    @staticmethod
+    def _answered(
+        schema: type[BaseModel], answers: dict[str, str], name: str, said: str
+    ) -> None:
+        """Writes one answer down, or leaves the field to the model's own default.
+
+        A dash at a field that has a default is that default: the field is left out, and the
+        model fills it in as it would for anything nobody was asked about. Which holds on a
+        field put back as much as on one first asked -- what a person types means the same
+        thing the second time they are asked it.
+
+        Args:
+          schema: The shape being filled in.
+          answers: What has been typed so far, written into.
+          name: The field.
+          said: What they typed at it.
+        """
+        if said.strip() == _LEAVE and not schema.model_fields[name].is_required():
+            answers.pop(name, None)
+            return
+        answers[name] = said.strip()
 
     def _stream(
         self, prompt: str, *, schema: type[BaseModel] | None = None
