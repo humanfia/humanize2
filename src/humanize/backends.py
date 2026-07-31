@@ -50,6 +50,16 @@ class Profile:
       logs: The files one session is logged to under that home, as globs taking `{ident}`.
         Claude gets two -- a sub-agent it starts writes its own transcript, and the tokens it
         spends are the run's.
+      skills: The skill files under that home, as globs, each naming the `SKILL.md` of one
+        skill -- which is where the CLI itself looks for the skills a user has installed.
+        Empty for a backend that can be given no skills, and for one that offers no way of
+        being told which of them to load: a list to choose from that nothing acts on is a
+        list that lies.
+      shared: The same, under the user's own home rather than under the backend's: `.agents`
+        is the directory more than one of these has agreed to read, and a backend that reads
+        it goes on reading it wherever `home_var` has moved its own home to.
+      works: The same, under the workspace rather than under either home: a skill kept beside
+        the project it is for. A backend may read more than one such directory.
       models: What it runs, in the order they are offered: by tier and then newest first.
         Nothing sorts them, because nothing can -- a tier is not in the name and a version is
         not a number. Model ids only, never the aliases a backend also answers to: `opus` is
@@ -63,6 +73,9 @@ class Profile:
     home_dir: str
     logs: tuple[str, ...]
     models: tuple[Model, ...]
+    skills: tuple[str, ...] = ()
+    shared: tuple[str, ...] = ()
+    works: tuple[str, ...] = ()
 
     def directory(self) -> Path:
         """Where this backend keeps its state and its logs, wherever it has been moved to.
@@ -89,6 +102,13 @@ PROFILES = (
         home_var="CLAUDE_CONFIG_DIR",
         home_dir=".claude",
         logs=("projects/*/{ident}.jsonl", "projects/*/{ident}/subagents/**/*.jsonl"),
+        # The skills a person installs, which is what there is to choose between: the ones
+        # Claude ships with and the ones a plugin brought are the plugin's to say. Its own
+        # two directories and no more -- it does not read the shared one, which is why a
+        # skill kept there is symlinked into this. A turn is told which of these it may not
+        # reach for, as `Skill(<name>)`.
+        skills=("skills/*/SKILL.md",),
+        works=(".claude/skills/*/SKILL.md",),
         models=(
             Model("claude-fable-5", _CLAUDE),
             Model("claude-opus-5", _CLAUDE),
@@ -106,6 +126,12 @@ PROFILES = (
         home_var="CODEX_HOME",
         home_dir=".codex",
         logs=("sessions/**/rollout-*{ident}.jsonl",),
+        # Four places, which is what `skills/list` answers with: its own home, the shared
+        # one under yours, and both of the directories a project may keep them in. A turn is
+        # given the ones left on, as `skills.config` says which are off.
+        skills=("skills/*/SKILL.md",),
+        shared=(".agents/skills/*/SKILL.md",),
+        works=(".agents/skills/*/SKILL.md", ".codex/skills/*/SKILL.md"),
         models=(
             Model("gpt-5.6-sol", ("ultra", "max", "xhigh", "high", "medium", "low")),
             Model("gpt-5.6-terra", ("ultra", "max", "xhigh", "high", "medium", "low")),
@@ -119,6 +145,9 @@ PROFILES = (
         home_var="KIMI_CODE_HOME",
         home_dir=".kimi-code",
         logs=("server/events/{ident}.jsonl",),
+        # None named: `--skills-dir` is a flag of the command line, and a session here is a
+        # thread on `kimi web`, which takes none. A skill Kimi finds is a skill it loads, so
+        # there is nothing here to be offered a choice about.
         models=(
             Model("kimi-code/k3", ("max", "high", "medium", "low"), swarms=True),
             Model("kimi-code/k3-256k", ("max", "high", "medium", "low"), swarms=True),

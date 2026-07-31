@@ -84,8 +84,9 @@ top, the question and a line about it, the choices numbered with a marker agains
 the cursor, and under them whatever is adjusted rather than chosen.
 
 - Nothing MUST be typed in that could be found: the CLIs offered MUST be the ones installed
-  here, and the efforts offered MUST be the ones that model takes. Nothing MUST be asked of a
-  CLI to find out -- starting one costs seconds a prompt has not got.
+  here, the efforts offered MUST be the ones that model takes, and the skills offered MUST be
+  the ones that CLI would load. Nothing MUST be asked of a CLI to find out -- starting one
+  costs seconds a prompt has not got.
 - What an agent runs MUST be one choice rather than two, a model belonging to the CLI that runs
   it; and the CLIs MUST be read one at a time, a tab apiece, since every model of every CLI in
   one list is a list that grows each time any of them ships a model. Tab and shift+tab MUST
@@ -95,9 +96,14 @@ the cursor, and under them whatever is adjusted rather than chosen.
   that narrowed one CLI to one model would narrow the next to none, which reads as a CLI with
   nothing in it. Esc MUST clear what was typed before it leaves, on every sheet that is
   searched.
-- Where an agent works is a second question about that agent rather than a way of running the
-  model, so it MUST be a key on the same sheet rather than a row in it, and MUST open a sheet
-  of its own. Walking out of that one without answering MUST leave the agent as it was.
+- Where an agent works and which of its CLI's skills it is loaded with are each a second
+  question about that agent rather than a way of running the model, so each MUST be a key on
+  the same sheet rather than a row in it, and each MUST open a sheet of its own. Walking out of
+  one of those without answering MUST leave that agent as it was.
+- The skills sheet MUST be a checklist: every skill starts on, which is how a CLI comes, and
+  space MUST switch the one under the cursor. What it answers with MUST be the skills the agent
+  is to have. A CLI that offers no way of being told which to load MUST say that, rather than
+  that none are installed.
 
 ## `settings.py`
 

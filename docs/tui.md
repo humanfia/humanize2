@@ -17,6 +17,7 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 - [History](#history)
 - [What each agent runs](#what-each-agent-runs)
 - [Where each agent works](#where-each-agent-works)
+- [What each agent is loaded with](#what-each-agent-is-loaded-with)
 - [Setting a flow up](#setting-a-flow-up)
 - [What it remembers](#what-it-remembers)
 - [Colours](#colours)
@@ -86,7 +87,7 @@ list appears under the editor with a line about each.
 | --- | --- | --- |
 | `/flow` | `[path]` | Switches which flow runs, then [how it is set up](#setting-a-flow-up) if it takes any setting up, then what each of its agents runs. With a path, takes that file. Stops whatever was running — a flow is chosen in order to be run. Looking and leaving without choosing changes nothing. |
 | `/config` | | Sets up the flow itself, for a flow that says it can be. See [below](#setting-a-flow-up). |
-| `/agents` | | Sets what each agent of the current flow runs, one at a time, by the name the flow calls it — and, on **ctrl+a**, [where its turns land](#where-each-agent-works). It does not ask how the flow itself is set up; `/config` is that half. |
+| `/agents` | | Sets what each agent of the current flow runs, one at a time, by the name the flow calls it — and, on **ctrl+a**, [where its turns land](#where-each-agent-works), and on **ctrl+s**, [which of its CLI's skills it is loaded with](#what-each-agent-is-loaded-with). It does not ask how the flow itself is set up; `/config` is that half. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
@@ -217,7 +218,7 @@ are read one CLI at a time all the same:
      1. claude-opus-5           claude
    ❯ 2. claude-sonnet-5         claude
 
-   ◉ max effort  ←/→ to adjust · ◉ on this machine  ctrl+a to move
+   ◉ max effort  ←/→ to adjust · ◉ on this machine  ctrl+a to move · ◉ every skill  ctrl+s to choose
 ```
 
 A tab per CLI **that is actually installed here**, and its models under it. **tab** turns to
@@ -232,9 +233,10 @@ model id out — and belongs to the tab it was typed into: switching starts the 
 fresh rather than showing it through the last search.
 
 Under the models, the things that are adjusted rather than chosen: **←/→** the effort,
-**ctrl+w** [swarm mode](agents.md#efforts) for a model that has one, and **ctrl+a**
-[where it works](#where-each-agent-works). Enter takes the row under the cursor and asks about
-the next agent the flow drives.
+**ctrl+w** [swarm mode](agents.md#efforts) for a model that has one, **ctrl+a**
+[where it works](#where-each-agent-works), **ctrl+s**
+[what it is loaded with](#what-each-agent-is-loaded-with). Enter takes the row under the
+cursor and asks about the next agent the flow drives.
 
 ## Where each agent works
 
@@ -258,6 +260,29 @@ runs. See [Remote execution](remote-execution.md).
 
 Two agents of one flow may work on two machines, since it is a setting of the agent. A target
 that cannot be read is said so when the flow is started, before any turn has run.
+
+## What each agent is loaded with
+
+On the same sheet, **ctrl+s** asks which of that CLI's skills this agent is to have. Another
+second question about the agent, so another key rather than a row: the tuning line says
+`◉ every skill · ctrl+s to choose`.
+
+```
+   ❯ 1. [✔] code-review    Review the current diff… (yours)
+     2. [ ] dataviz        Use this skill whenever you… (yours)
+     3. [✔] housekeeping   Tidies the tree (this project)
+```
+
+The skills are found where the CLI itself looks — yours and this project's, read for the name
+and the line each describes itself with — and nothing is asked of the CLI, which would mean
+starting it. Every box starts ticked, which is how a CLI comes. **Space** switches the one
+under the cursor, enter takes the lot, and esc leaves the agent loaded as it was.
+
+What it answers with is the skills the agent **has**, so an agent that has been asked has
+exactly those from then on. It is a setting of the agent, so the reviewer reading a change
+need not be carrying what the builder writing it was. What each backend does with it, and what
+a CLI with no way of being told anything does, is in
+[Agents](agents.md#which-skills-an-agent-is-loaded-with).
 
 ## Setting a flow up
 
@@ -307,7 +332,8 @@ and the flow's own model says which combinations it will not take — so a flow 
 
 Opening the interface again in the same project finds it set up the way you left it: the flow
 that was last run there, for each flow that workspace has run, what each of its agents was
-running and where its turns landed — and how the flow itself was set up.
+running, where its turns landed and which skills it was loaded with — and how the flow
+itself was set up.
 
 Kept per flow — by the name humanize's own flows have, and by the path yours have, so a flow of
 yours cannot inherit the agents or the settings of the one it shares a name with. Per flow

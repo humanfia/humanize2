@@ -12,8 +12,8 @@
 ├── event.py
 ├── hooks.py
 ├── human.py
-└── kimi.py
-
+├── kimi.py
+└── skills.py
 ```
 
 ## `__init__.py`
@@ -37,11 +37,17 @@ class AgentConfig:
     model: str
     effort: str
     machine: MachineConfig | None = None
+    skills: tuple[str, ...] | None = None
 ```
 
 - `machine` MUST be the `humanize.machines.MachineConfig` the agent's turns land on, or `None`
   to run them on this machine. It is one setting because it is one question: a machine that is
   already running and a machine started for the agent are both answers to it.
+- `skills` MUST be the skills of its CLI the agent is to have, and MUST say what it has rather
+  than what it has not: an agent told which skills to have has exactly those, whatever is
+  installed afterwards. `None` MUST be the CLI as it comes, which is every skill it finds, and
+  MUST be what an agent nobody has been asked about is left as -- an empty tuple is a choice
+  and says none of them.
 - An anchored turn MUST be run by spawning `AnchorConfig.command(argv)`, never by calling
   coganchor in this process: a turn is pumped from threads of its own, which a supervisor that
   forks the agent and takes the process's signal handling cannot be given.
@@ -59,6 +65,35 @@ may be hung on, what it is told when one arrives, and what it may say back.
 - A hook that raises MUST have said nothing, as a watcher that raises has: a flow MUST NOT fail
   because something hung off it did. `Stopped` is the one thing it MUST raise out of the turn,
   since a run ended by hand has to read as ended by hand.
+
+## `skills.py`
+
+```python
+@dataclass(frozen=True, slots=True)
+class Skill:
+    name: str
+    about: str
+    whose: str
+
+
+def skills(backend: str, where: Path | str | None = None) -> list[Skill]:
+    """The skills one backend would load here, the way that backend finds them."""
+
+
+def leaving(
+    backend: str, wanted: Iterable[str] | None, where: Path | str | None = None
+) -> list[str]:
+    """The skills to switch off, for an agent that is to have the ones it was given."""
+```
+
+- Nothing MUST be asked of the CLI: starting one costs seconds a prompt does not have, so the
+  skills MUST be found where that CLI looks for them -- which is written down in
+  `humanize.backends` and read from here. A skill MUST be named as the CLI names it: what its
+  front matter says, or the directory it is in where it says nothing.
+- Here rather than beside whatever offers them, because both halves need the same list: an
+  interface asking which skills an agent is to have, and the driver that then has to tell the
+  backend. `leaving` MUST be that second half -- an agent says what it has and every backend is
+  told what it has not, and only looking says which those are.
 
 ## `base.py`
 
@@ -378,3 +413,9 @@ class DummySession(CommandSessionBase): ...
 - A backend told where to work MUST be told the directory the anchor puts it in, which is the
   workspace itself unless the mirror was put somewhere else, and this one when it is not
   anchored at all.
+- An agent told which skills to have MUST have the rest of them switched off through whatever
+  the backend takes for it -- a flag of the command line, an override of the server it is
+  driven through -- and MUST NOT be given them by writing the CLI's own settings: two agents of
+  one flow may be loaded differently, and neither is a reason to change what the person who
+  started the flow has installed. A backend with no way of being told MUST offer none, rather
+  than a list nothing acts on.

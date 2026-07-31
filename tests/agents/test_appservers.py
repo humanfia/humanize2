@@ -809,3 +809,54 @@ def test_a_codex_turn_is_held_to_the_shape_it_was_asked_for(codex: _FakeServer) 
     # What was asked is the schema itself, and the prompt is the prompt.
     assert called["turn/start"]["outputSchema"] == _Verdict.model_json_schema()
     assert called["turn/start"]["input"] == [{"type": "text", "text": "do the task"}]
+
+
+def test_a_codex_server_is_told_which_skills_its_agent_is_not_to_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The override Codex writes itself when a skill is switched off, given per server.
+
+    Per server rather than written down, which is what keeps it this agent's: the user's own
+    settings are left as they are, and two agents of one flow may load different sets. What
+    the agent says is which skills it has, so what the server is told is the rest of them.
+    """
+    for named in ("hello-there", "second-one"):
+        where = tmp_path / ".agents" / "skills" / named
+        where.mkdir(parents=True)
+        (where / "SKILL.md").write_text(f"---\nname: {named}\ndescription: one\n---\n")
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    # And the shared directory under the user's own home, which Codex reads whatever its own
+    # home has been moved to -- so a suite that only moved `CODEX_HOME` would be reading the
+    # skills of whoever is running it.
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path)
+    started: list[list[str]] = []
+
+    class _Recording:
+        def __init__(self, argv: list[str]) -> None:
+            started.append(argv)
+            self._agents: list[Any] = []
+
+        def stop(self) -> None:
+            """Nothing was started, so there is nothing to take down."""
+
+    monkeypatch.setattr(appservers, "_AppServer", _Recording)
+    plain = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high"))
+    assert plain.server is not None
+    assert started == [["codex", "app-server", "--stdio"]]
+
+    started.clear()
+    picky = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high", skills=()))
+    assert picky.server is not None
+    assert started == [
+        [
+            "codex",
+            "app-server",
+            "--stdio",
+            "-c",
+            (
+                'skills.config=[{name="hello-there", enabled=false}, '
+                '{name="second-one", enabled=false}]'
+            ),
+        ]
+    ]

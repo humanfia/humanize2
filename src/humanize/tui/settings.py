@@ -54,8 +54,9 @@ class Settings:
           flow: The flow they were driving.
 
         Returns:
-          One `cli/model:effort` apiece with the machine it was anchored to, in the order the
-          flow takes them, and nothing at all for a flow this workspace has not run.
+          One `cli/model:effort` apiece with the machine it was anchored to and the skills it
+          is loaded with, in the order the flow takes them, and nothing at all for a flow this
+          workspace has not run.
         """
         flows: dict[str, Any] = self._mine().get("flows") or {}
         kept: dict[str, Any] = flows.get(flow) or {}
@@ -74,8 +75,21 @@ class Settings:
                 return []
             # An anchor is what a workspace that has one has: an entry written before there
             # were any is a workspace whose agents work here, which is what leaving it out
-            # already meant.
-            said.append(Runs(f"{cli}/{model}:{effort}", str(agent.get("anchor") or "")))
+            # already meant. An entry that says nothing about skills is an agent nobody has
+            # been asked about, which is its CLI as it comes rather than an agent with none.
+            held = agent.get("skills")
+            having = (
+                tuple(str(one) for one in cast("list[Any]", held))
+                if isinstance(held, list)
+                else None
+            )
+            said.append(
+                Runs(
+                    f"{cli}/{model}:{effort}",
+                    str(agent.get("anchor") or ""),
+                    having,
+                )
+            )
         return said
 
     def config(self, flow: str) -> dict[str, Any]:
@@ -116,7 +130,7 @@ class Settings:
             for it as it was -- choosing the agents again is not a way of forgetting how the
             flow was set up.
         """
-        agents: dict[str, dict[str, str]] = {}
+        agents: dict[str, dict[str, Any]] = {}
         for at, runs in enumerate(models):
             # Read from both ends, as a command line reads one: a model may hold slashes of
             # its own, while a CLI and an effort never do.
@@ -129,6 +143,10 @@ class Settings:
                 # Only where there is one: an agent that works here says nothing about a
                 # machine, which is what a file written before there were any also says.
                 agents[named]["anchor"] = runs.anchor
+            if runs.skills is not None:
+                # And only for one that was asked: an agent loaded as its CLI comes says
+                # nothing, which is what every entry written before this said too.
+                agents[named]["skills"] = list(runs.skills)
         mine = self._mine()
         mine["flow"] = flow
         kept: dict[str, Any] = {"agents": agents}

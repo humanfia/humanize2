@@ -11,6 +11,7 @@ from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Question
 from .hooks import EVERYWHERE, Moment
+from .skills import leaving
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -107,6 +108,14 @@ class ClaudeCodeSession(StreamSessionBase):
             # Claude validates the answer against this itself, so a turn that lands has
             # answered in the shape: what comes back is the object, and nothing else.
             argv += ["--json-schema", json.dumps(self._shaping.model_json_schema())]
+        if off := leaving(
+            self._agent.backend, self._agent.config.skills, self._workspace()
+        ):
+            # A skill is a tool call, and `Skill(<name>)` is that call written as a rule: the
+            # agent is refused every skill it was not given. It is still told they exist --
+            # Claude lists what is installed, and no flag takes one off that list -- so this
+            # is a skill it cannot use rather than one it never hears of.
+            argv += ["--disallowedTools", ",".join(f"Skill({one})" for one in off)]
         return argv
 
     def _write(self, text: str, ticket: str = "") -> str:

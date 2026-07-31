@@ -29,11 +29,19 @@ class AgentConfig:
         the first turn and says where it is itself. The agent runs here either way, so its
         credentials and its trajectory stay where a flow can reach them; what moves is the
         project it reads and the commands it runs.
+      skills: The skills of its CLI this agent is to have, by the name the CLI knows each one
+        under, or None for the CLI as it comes -- which is every skill it finds. Said as what
+        the agent has rather than as what it has not, because that is what it is: an agent
+        told which skills to have has exactly those, whatever is installed afterwards. Every
+        backend here is told the other way round -- a CLI comes with its skills loaded and
+        has to be talked out of one -- which :func:`humanize.agents.skills.leaving` works out
+        by looking at what is installed.
     """
 
     model: str
     effort: str
     machine: MachineConfig | None = None
+    skills: tuple[str, ...] | None = None
 
 
 def anchored(target: str) -> MachineConfig | None:

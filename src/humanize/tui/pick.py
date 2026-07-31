@@ -41,6 +41,8 @@ from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
 from humanize.agents import DRIVEN, SWARM, Moment, anchored
+from humanize.agents.skills import Skill, skills
+from humanize.backends import named
 
 from .discover import machines
 from .monitor import short, thousands
@@ -62,6 +64,7 @@ __all__ = [
     "Models",
     "Runs",
     "Sheet",
+    "Skills",
     "Status",
     "reads",
     "setting",
@@ -74,10 +77,13 @@ class Runs(NamedTuple):
     Attributes:
       spec: The agent itself, as `cli/model:effort` -- the same word a command line takes.
       anchor: The machine its work lands on, as a target, or "" to work on this one.
+      skills: The skills of its CLI it is to have, by name, or None for the CLI as it comes
+        -- which is every skill it finds.
     """
 
     spec: str
     anchor: str = ""
+    skills: tuple[str, ...] | None = None
 
 
 #: What Claude Code rules the top of a sheet with, and how far in everything under it sits.
@@ -90,6 +96,12 @@ _DOT = " · "
 #: The marker against the choice under the cursor, and against the one already in force.
 _HERE = "❯"
 _INFORCE = "✔"
+
+#: The switch in front of a row that is turned on and off rather than picked: a box with a
+#: tick in it, and the same box empty. Which of the two it is is the whole of what such a row
+#: says about itself, so it is drawn as the thing everything else in a terminal draws it as.
+_TICKED = "[✔]"
+_EMPTY = "[ ]"
 
 #: How wide the column of names is before the line about each one starts. A model id
 #: may hold slashes of its own -- Kimi Code's are `kimi-code/k3` -- and is shown as the
@@ -133,8 +145,7 @@ def reads(named: tuple[str, ...], runs: list[Runs]) -> list[str]:
 
 
 _SHEET = """
-Anchors, Configures, Flows, Models, Status {
-
+Anchors, Configures, Flows, Models, Skills, Status {
     align: center middle; background: $background; }
 #sheet { width: 100%; height: auto; padding: 0; }
 #rule { height: 1; color: $primary; }
@@ -279,7 +290,14 @@ class Sheet[T](ModalScreen[T | None]):
         self.dismiss(None)
 
     def _row(
-        self, at: int, label: str, about: str, *, here: bool, inforce: bool
+        self,
+        at: int,
+        label: str,
+        about: str,
+        *,
+        here: bool,
+        inforce: bool,
+        box: str = "",
     ) -> str:
         """One numbered choice, laid out as Claude Code lays one out.
 
@@ -289,6 +307,8 @@ class Sheet[T](ModalScreen[T | None]):
           about: The line about it, which is said quietly.
           here: Whether the cursor is on it.
           inforce: Whether it is the one already in force.
+          box: The switch in front of the name, for a list whose rows are switched on and off
+            rather than picked between, or "" for a list that is picked from.
 
         Returns:
           The row, as markup.
@@ -296,10 +316,18 @@ class Sheet[T](ModalScreen[T | None]):
         mark = f"{_INDENT}[$primary]{_HERE}[/] " if here else f"{_INDENT}  "
         # Right-aligned, so that the tenth row starts where the ninth does.
         number = f"{at + 1:>{self._counting}}."
+        # In `$success` either way: an empty box has no ink in it to colour.
+        switch = f"[$success]{escape(box)}[/] " if box else ""
         named = escape(label) + (f" [$success]{_INFORCE}[/]" if inforce else "")
         # Padded on what is shown rather than on what is written: markup is not columns.
-        pad = " " * max(1, _LABEL - len(label) - (2 if inforce else 0))
-        return f"{mark}[$text-muted]{number}[/] {named}{pad}[$text-muted]{escape(about)}[/]"
+        pad = " " * max(
+            1,
+            _LABEL - len(label) - (2 if inforce else 0) - (len(box) + 1 if box else 0),
+        )
+        return (
+            f"{mark}[$text-muted]{number}[/] {switch}{named}{pad}"
+            f"[$text-muted]{escape(about)}[/]"
+        )
 
     @on(OptionList.OptionHighlighted)
     def _moved(self, event: OptionList.OptionHighlighted) -> None:
@@ -406,6 +434,8 @@ class Models(Sheet[list[Runs]]):
         # nor a row: it is a second question about this agent, and it opens a sheet of its
         # own. A chord rather than a letter, because the letters are searching.
         Binding("ctrl+a", "anchor", "anchor", priority=True),
+        # And what it is loaded with is a third, for the same reason and in the same way.
+        Binding("ctrl+s", "skills", "skills", priority=True),
     ]
 
     def __init__(
@@ -432,6 +462,10 @@ class Models(Sheet[list[Runs]]):
         self._swarm = False
         #: Where this one's turns land, which is this machine until it is said otherwise.
         self._anchor = ""
+        #: Which of a CLI's skills this one is to have, per CLI, for a CLI that has been
+        #: asked about at all: the answer belongs to the CLI it was given about, and the tab
+        #: may yet be turned to another one.
+        self._skills: dict[str, tuple[str, ...]] = {}
         #: Which tab is open, counting the CLIs this agent could be.
         self._at = 0
         #: The models the letters typed so far have left, which is what the cursor is walking.
@@ -456,6 +490,7 @@ class Models(Sheet[list[Runs]]):
         self._effort = 0
         self._swarm = False
         self._anchor = ""
+        self._skills = {}
         self._at = 0
         self._typed = ""  # each agent is asked about from the first tab again
         self._fill()
@@ -543,6 +578,12 @@ class Models(Sheet[list[Runs]]):
                 f"{_DOT}[$secondary]◉[/] on {escape(self._anchor or 'this machine')}  "
                 f"[$text-muted]ctrl+a to move[/]"
             )
+            having = self._skills.get(self._backend())
+            tuned += (
+                f"{_DOT}[$secondary]◉[/] "
+                f"{'every skill' if having is None else f'{len(having)} skills'}  "
+                f"[$text-muted]ctrl+s to choose[/]"
+            )
         self.query_one("#tuning", Label).update(tuned)
         self.query_one("#keys", Label).update(
             f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
@@ -570,6 +611,28 @@ class Models(Sheet[list[Runs]]):
         where = await showing.push_screen_wait(Anchors(self._anchor))
         if where is not None:
             self._anchor = where
+            self._fill()
+
+    @work
+    async def action_skills(self) -> None:
+        """Asks which of its CLI's skills this agent is to be without, and comes back here.
+
+        A walk out without answering leaves this one loaded as it was: what the agent runs is
+        the question this sheet asks, and declining to answer a second one is not declining
+        that.
+        """
+        backend = self._backend()
+        if not backend:
+            return
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        chosen = await showing.push_screen_wait(
+            Skills(backend, self._skills.get(backend))
+        )
+        if chosen is not None:
+            self._skills[backend] = chosen
             self._fill()
 
     def _backend(self) -> str:
@@ -651,12 +714,154 @@ class Models(Sheet[list[Runs]]):
             Runs(
                 spec=f"{event.option.id}:{wide}{self._efforts()[self._effort]}",
                 anchor=self._anchor,
+                # Only what was said about the CLI actually chosen: a walk through the
+                # skills of one and then a turn to another tab is a choice about the other.
+                # Nothing said at all is the CLI as it comes, which is None rather than a
+                # list of every skill it happens to have installed today.
+                skills=self._skills.get(self._backend()),
             )
         )
         if len(self._chosen) < len(self._wanted):
             self._ask()
             return
         self.dismiss(self._chosen)
+
+
+class Skills(Sheet[tuple[str, ...]]):
+    """Which of a CLI's skills one agent is loaded with, switched on and off one at a time.
+
+    A second question about the agent, like the machine it works on: what it runs is one
+    choice, and what it is loaded with is another. Found the way the CLI itself finds them --
+    the skills you have installed and the ones this project keeps -- so the list is the list
+    the agent would have had, and what is left marked is what it will have.
+
+    Every skill starts on, which is how a CLI comes: a sheet that had to be walked through
+    before an agent could have any of them would be a setting nobody asked for. What it
+    answers with is the ones it is to have, since that is what an agent is then loaded with
+    -- a skill installed afterwards is not one anybody chose for this agent.
+    """
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        # Space is what a checklist is switched with, so it is what this one is switched
+        # with. Priority, or it would go into the search like any other character -- which
+        # costs nothing here, a skill being named after the directory it is in and so never
+        # having a space in its name.
+        Binding("space", "switch", "switch this one", priority=True),
+        # Enter is the whole sheet rather than the row under the cursor, as it is where a
+        # sheet is adjusted rather than picked from: the rows are switched where they stand.
+        Binding("enter", "done", "done", priority=True),
+    ]
+
+    def __init__(self, backend: str, having: tuple[str, ...] | None) -> None:
+        """Initializes the switching.
+
+        Args:
+          backend: The CLI whose skills these are.
+          having: The ones this agent has already, or None for one that has never been asked
+            -- which is the CLI as it comes, and so all of them.
+        """
+        super().__init__()
+        self._backend = backend
+        self._having = having
+        self._found: list[Skill] | None = None
+        #: The ones marked now, which start as the ones it has. Read once the list is in
+        #: hand, since "all of them" is only a list of names after the looking.
+        self._on: set[str] | None = None
+
+    def _ask(self) -> None:
+        """Says whose skills these are, and what switching one off does."""
+        self.query_one("#asked", Label).update(f"Select what {self._backend} loads")
+        self.query_one("#about", Label).update(
+            "The skills this one agent is to have. They are found where the CLI itself "
+            "looks -- yours, and this project's -- and every one of them starts on. Another "
+            "agent of the same flow may be loaded with a different set."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _skills(self) -> list[Skill]:
+        """The skills there are to choose between, read once: this is redrawn per keystroke."""
+        if self._found is None:
+            self._found = skills(self._backend)
+            self._counting = len(str(len(self._found)))
+            self._on = (
+                {one.name for one in self._found}
+                if self._having is None
+                else {one.name for one in self._found if one.name in self._having}
+            )
+        return self._found
+
+    def _fill(self) -> None:
+        """Puts the skills up, with a mark against the ones this agent will have."""
+        listing = self.query_one("#choices", OptionList)
+        shown = [
+            skill
+            for skill in self._skills()
+            if self.fits(skill.name, skill.about, skill.whose)
+        ]
+        on = self._on or set()
+        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
+        listing.set_options(
+            Option(
+                self._row(
+                    seen,
+                    skill.name,
+                    f"{skill.about}  ({skill.whose})" if skill.about else skill.whose,
+                    here=seen == at,
+                    inforce=False,
+                    box=_TICKED if skill.name in on else _EMPTY,
+                ),
+                id=skill.name,
+            )
+            for seen, skill in enumerate(shown)
+        )
+        listing.highlighted = at if shown else None
+        self._drawn = at
+        self.query_one("#tuning", Label).update(
+            "" if self._skills() else f"[$text-muted]{self._nothing()}[/]"
+        )
+        self.query_one("#keys", Label).update(
+            "Type to search · Space to switch on and off · Enter to accept · Esc to go back"
+            f"{self.searching()}"
+        )
+
+    def _nothing(self) -> str:
+        """Why there is nothing to choose between, which is not always the same reason.
+
+        Returns:
+          That a CLI which keeps skills has none installed here, or that one which offers no
+          way of being told which to load cannot be told -- a sheet that said the second was
+          the first would be blaming the machine for what the backend cannot do.
+        """
+        profile = named(self._backend)
+        if profile is None or not (profile.skills or profile.shared or profile.works):
+            return f"{escape(self._backend)} cannot be told which skills to load"
+        return f"{escape(self._backend)} has no skills installed here"
+
+    @property
+    def _under(self) -> str:
+        """The skill the cursor is on, or "" where the letters typed have left none."""
+        listing = self.query_one("#choices", OptionList)
+        at = listing.highlighted
+        if at is None or not 0 <= at < listing.option_count:
+            return ""
+        return str(listing.get_option_at_index(at).id or "")
+
+    def action_switch(self) -> None:
+        """Switches the skill under the cursor on, or off again."""
+        if not (named := self._under) or self._on is None:
+            return
+        if named in self._on:
+            self._on.discard(named)
+        else:
+            self._on.add(named)
+        self._fill()
+
+    def action_done(self) -> None:
+        """Answers with the skills this agent is to have, in the order they are listed."""
+        on = self._on or set()
+        self.dismiss(tuple(skill.name for skill in self._skills() if skill.name in on))
 
 
 class Anchors(Sheet[str]):

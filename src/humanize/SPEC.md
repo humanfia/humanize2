@@ -37,8 +37,8 @@ Expose `home`, and nothing else. A caller names the layer it wants.
 ## `backends.py`
 
 Every fact about a coding agent CLI that is not code: what it is called, what a command line
-may call it, what it runs, where it keeps its home and which files under it a session is
-logged to.
+may call it, what it runs, where it keeps its home, which files under it a session is logged
+to, and which files under it and under a workspace are the skills it would load.
 
 - It MUST be the only place any of those is written down, and MUST import nothing but the
   standard library, so that reading a fact costs nothing of the layer the fact is about.

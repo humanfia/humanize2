@@ -1480,21 +1480,22 @@ class Humanize(App[None]):
         finally:
             self._awaiting = False
 
-    def _on_their_machines(self, chosen: list[AgentBase]) -> list[AgentBase]:
-        """Puts each agent on the machine it was anchored to, where one was chosen.
+    def _as_they_were_set_up(self, chosen: list[AgentBase]) -> list[AgentBase]:
+        """Sets each agent up as it was chosen: where it works, and what it is loaded with.
 
-        Done to the agents rather than said on the line that made them: where an agent works
-        is a setting of the agent, and `hmz exec` reads a line that says what each one runs
-        and nothing about where. An agent that works here is left exactly as it was.
+        Done to the agents rather than said on the line that made them: both are settings of
+        the agent, and `hmz exec` reads a line that says what each one runs and nothing else.
+        An agent that works here and was never asked about skills is left exactly as it was.
 
         Args:
           chosen: The agents the line named, in the order the flow takes them.
 
         Returns:
-          The same agents, or one anchored in place of any that was given a machine.
+          The same agents, or one set up in place of any that was given a machine or told
+          which of its CLI's skills to have.
 
         Raises:
-          ValueError: If a target cannot be read, before any of them has run.
+            ValueError: If a target cannot be read, before any of them has run.
         """
         from dataclasses import replace
 
@@ -1502,13 +1503,22 @@ class Humanize(App[None]):
 
         moved: list[AgentBase] = []
         for at, agent in enumerate(chosen):
-            where = self._models[at].anchor if at < len(self._models) else ""
-            if not where:
+            runs = self._models[at] if at < len(self._models) else Runs("")
+            if not runs.anchor and runs.skills is None:
                 moved.append(agent)
                 continue
-            # The config is frozen, so an agent that works elsewhere is another agent at the
-            # same model and effort -- which is what it is.
-            moved.append(type(agent)(replace(agent.config, machine=anchored(where))))
+            # The config is frozen, so an agent that works elsewhere, or without a skill its
+            # CLI would have loaded, is another agent at the same model and effort -- which
+            # is what it is.
+            moved.append(
+                type(agent)(
+                    replace(
+                        agent.config,
+                        machine=anchored(runs.anchor),
+                        skills=runs.skills,
+                    )
+                )
+            )
         return moved
 
     def _flow(self, argv: list[str]) -> None:
@@ -1527,7 +1537,7 @@ class Humanize(App[None]):
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
         try:
-            chosen = self._on_their_machines(chosen)
+            chosen = self._as_they_were_set_up(chosen)
         except ValueError as why:  # a target that cannot be read is a line to correct
             self.show(f"hmz: {why}", "red")
             return

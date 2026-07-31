@@ -22,6 +22,7 @@ Everything here is importable from `humanize.agents`.
 - [Efforts](#efforts)
 - [What each backend can do](#what-each-backend-can-do)
 - [Answering in a shape](#answering-in-a-shape)
+- [Which skills an agent is loaded with](#which-skills-an-agent-is-loaded-with)
 - [Where the turns land](#where-the-turns-land)
 - [API summary](#api-summary)
 
@@ -42,8 +43,9 @@ agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="h
 | Kimi Code | `KimiCodeCLIAgent` | `KimiCodeCLIAgentConfig` | `KimiCodeCLISession` |
 | you | `HumanAgent` | — (takes only `name=`) | `HumanSession` |
 
-A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land), and nothing
-else. It is frozen,
+A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land), the
+[skills it is loaded with](#which-skills-an-agent-is-loaded-with), and nothing else. It is
+frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
 would silently split one conversation across two models.
 
@@ -463,6 +465,40 @@ Claude's is an argument of the process rather than of the turn, so asking one se
 shape it was not started with ends that process and starts one that resumes the conversation.
 The conversation is not restarted with it.
 
+## Which skills an agent is loaded with
+
+A config's `skills` names the skills of its CLI this agent is to **have**:
+
+```python
+ClaudeCodeAgentConfig(model=…, effort=…, skills=("code-review", "run"))
+```
+
+`None` — the default — is the CLI as it comes, which is every skill it finds. A tuple is
+exactly those and nothing else, whatever is installed afterwards. It is a setting of the
+agent, so two agents of one flow may be loaded differently, and neither touches the settings
+of the CLI itself.
+
+Every backend is told the other way round — a CLI comes with its skills loaded and has to be
+talked out of one — so what actually goes on the wire is the rest of them, worked out by
+looking at what is installed:
+
+```python
+from humanize.agents.skills import leaving, skills
+
+skills("claude")                       # what it would load here: yours, and this project's
+leaving("claude", ("code-review",))    # what to switch off so that only that one is left
+```
+
+| Backend | How it is told | What it comes to |
+| --- | --- | --- |
+| `claude` | `--disallowedTools "Skill(<name>)"` | the agent is refused the skill. Claude still lists it — no flag takes one off that list |
+| `codex` | `-c skills.config=[{name="<name>", enabled=false}]` on its app server | the skill is not loaded for that server, and the user's own `config.toml` is untouched |
+| `kimi` | — | `kimi web` takes no `--skills-dir`, so a skill it finds is one it loads |
+
+Where each CLI keeps them is written down in `humanize.backends`; nothing is asked of the CLI
+itself, for the reason nothing else is either. The interface asks which to have on the
+[`/agents` sheet](tui.md#what-each-agent-is-loaded-with).
+
 ## Where the turns land
 
 A config's `machine` says where an agent's work goes. `None` — the default — is this machine.
@@ -485,8 +521,7 @@ class AgentBase:
 
     id: str                 # what this agent is called
     backend: str            # "claude", "codex", "kimi"
-    config: AgentConfig     # model, effort, machine
-
+    config: AgentConfig     # model, effort, machine, skills
     opened: list[str]       # the backend's id for every session it ever opened
     sessions: list[SessionBase]
     stopped: bool

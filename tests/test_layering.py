@@ -31,7 +31,15 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 #: What each layer may import besides its own subtree and :mod:`humanize` itself. Longest
 #: matching layer wins, and a layer it may name covers the modules inside that layer.
 ALLOWED: dict[str, set[str]] = {
-    "humanize.agents": {"humanize.coganchor", "humanize.machines"},
+    # Driving a backend is acting on the facts about it -- where it keeps the skills it
+    # would load, so that an agent given some can be told about the rest -- and `backends`
+    # is the leaf those are written down in. It names nothing itself, so this widens the DAG
+    # without bending it, exactly as it does for a flow below.
+    "humanize.agents": {
+        "humanize.backends",
+        "humanize.coganchor",
+        "humanize.machines",
+    },
     "humanize.backends": set(),
     "humanize.coganchor": set(),
     "humanize.coganchor.serve": {"humanize.coganchor", "humanize.coganchor.proto"},
