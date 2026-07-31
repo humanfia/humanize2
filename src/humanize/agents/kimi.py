@@ -33,7 +33,7 @@ from .config import AgentConfig
 from .event import Event, Question, Usage, say
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Mapping
 
     from pydantic import BaseModel
 
@@ -96,11 +96,14 @@ _PERMITTED = {
 class _AppServer:
     """A `kimi web` daemon of our own, and the calls one turn of a session is made of."""
 
-    def __init__(self, argv: list[str]) -> None:
+    def __init__(self, argv: list[str], env: Mapping[str, str] | None = None) -> None:
         """Starts the daemon and waits for it to say where it is listening.
 
         Args:
           argv: The command that starts it, already wrapped for wherever its work is to land.
+          env: The whole environment to start it in, which is this process's own less what the
+            agent's provider hushes and plus what it sets, or None to inherit this one. The
+            daemon is the agent's, so its account is the agent's too.
 
         Raises:
           subprocess.CalledProcessError: If it stops without ever saying, which would leave a
@@ -116,6 +119,7 @@ class _AppServer:
             stderr=subprocess.STDOUT,
             encoding="utf-8",
             errors="replace",
+            env=dict(env) if env else None,
         )
         assert self._proc.stdout is not None  # noqa: S101
         for line in self._proc.stdout:
@@ -618,9 +622,7 @@ class KimiCodeCLIAgent(AgentBase):
                     "--log-level",
                     "error",
                 ]
-                if (anchor := self.anchor) is not None:
-                    argv = anchor.command(argv)
-                self._server = _AppServer(argv)
+                self._server = _AppServer(self.spawned(argv), self._environ())
                 # Held by the finalizer alone, which is what takes the daemon down: when the
                 # agent is collected, and at exit for one held to the end.
                 weakref.finalize(self, self._server.stop)

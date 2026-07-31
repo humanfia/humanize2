@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from humanize.coganchor import AnchorConfig
+    from humanize.providers import Provider
 
     from .config import AgentConfig
 
@@ -885,6 +886,34 @@ class SessionBase(ABC):
         # given, and one reached through a symlink is not a request for what it points at.
         return os.path.abspath(mirror or os.getcwd())  # noqa: PTH100, PTH109
 
+    def _environment(self) -> Mapping[str, str]:
+        """What to set in the command's environment on top of this process's own.
+
+        Whatever the agent's provider says, which is how a key, an endpoint or an account on
+        somebody's cloud reaches the CLI, and nothing besides for an agent that has none: a
+        turn then inherits the environment the flow is running in, which is what lets the
+        agent log in the way it already logs in. A backend that takes a setting of its own
+        there adds it to these.
+
+        Returns:
+          The variables to add, which are set for the turn and for nothing else.
+        """
+        return self._agent.environment()
+
+    def _environ(self) -> dict[str, str] | None:
+        """The whole environment this session's processes are started with.
+
+        Returns:
+          This process's own, less what a provider hushes and plus what this session and that
+          provider set, or None where there is nothing to change.
+        """
+        added, hushed = self._environment(), self._agent.hushed()
+        if not added and not hushed:
+            return None
+        return {
+            name: value for name, value in os.environ.items() if name not in hushed
+        } | dict(added)
+
     def _adopt(self, session_id: str) -> None:
         """Takes the name the backend gave this session, the first time a turn lands in it.
 
@@ -969,18 +998,6 @@ class CommandSessionBase(SessionBase):
         """
         yield Event(kind="tool" if error else "text", text=line.rstrip("\n"))
 
-    def _environment(self) -> Mapping[str, str]:
-        """What to set in the command's environment on top of this process's own.
-
-        For a backend that takes a setting there rather than on its command line. Nothing by
-        default: a turn inherits the environment the flow is running in, which is what lets
-        the agent log in the way it already logs in.
-
-        Returns:
-          The variables to add, which are set for the turn and for nothing else.
-        """
-        return {}
-
     def _result(self, transcript: str) -> Event:
         """The answer the turn ends on, out of everything the command wrote on stdout.
 
@@ -1026,11 +1043,11 @@ class CommandSessionBase(SessionBase):
         with self._lock:
             self._shaping = schema
             argv, stdin = self._turn(prompt)
-            if (anchor := self._agent.anchor) is not None:
-                # Spawned rather than called: coganchor's supervisor forks the agent and takes
-                # the process's signal handling with it, which a flow pumping turns from
-                # threads of its own has no way to lend it.
-                argv = anchor.command(argv)
+            # Spawned rather than called: a supervisor forks the agent and takes the process's
+            # signal handling with it, which a flow pumping turns from threads of its own has
+            # no way to lend it. Whether there is one to spawn -- an anchor, a provider's own
+            # paths, both -- is the agent's to say.
+            argv = self._agent.spawned(argv)
             out: list[str] = []
             err: list[str] = []
             said: queue.Queue[Event | None] = queue.Queue()
@@ -1045,9 +1062,10 @@ class CommandSessionBase(SessionBase):
                 # The agents draw progress bars and check marks: their bytes must never fail a
                 # turn, whatever encoding the machine running the flow happens to be set to.
                 errors="replace",
-                # This process's own, plus whatever the backend is told there. None rather than
-                # a copy where it is told nothing, so that a turn inherits it as it always did.
-                env={**os.environ, **added} if (added := self._environment()) else None,
+                # This process's own, less what the agent's provider hushes and plus what it
+                # and the backend set. None rather than a copy where there is nothing to say,
+                # so that a turn inherits the environment as it always did.
+                env=self._environ(),
             ) as proc:
                 assert proc.stdout is not None  # noqa: S101
                 assert proc.stderr is not None  # noqa: S101
@@ -1385,8 +1403,7 @@ class StreamSessionBase(SessionBase):
         """
         if self._proc is not None and self._proc.poll() is None:
             return self._proc
-        if (anchor := self._agent.anchor) is not None:
-            argv = anchor.command(argv)
+        argv = self._agent.spawned(argv)
         started = subprocess.Popen(
             argv,
             stdin=subprocess.PIPE,
@@ -1395,6 +1412,9 @@ class StreamSessionBase(SessionBase):
             encoding="utf-8",
             errors="replace",
             bufsize=1,  # a line at a time, which is what the protocol is made of
+            # This process's own, less what the agent's provider hushes and plus what it and
+            # the backend set, as for a session that is one command per turn.
+            env=self._environ(),
         )
         assert started.stderr is not None  # noqa: S101
         with self._writing:
@@ -1546,6 +1566,8 @@ class AgentBase(ABC):
         self.cycle: Journal | None = None
         # The machine this agent's turns land on, once the first of them has brought it up.
         self._anchor: AnchorConfig | None = None
+        # The account its turns run as, once the first of them has looked it up.
+        self._provider: Provider | None = None
         self._starting = threading.Lock()
 
     @property
@@ -1704,6 +1726,118 @@ class AgentBase(ABC):
                 # agent is collected, and at exit for one held to the end.
                 weakref.finalize(self, machine.stop)
             return self._anchor
+
+    @property
+    def provider(self) -> Provider | None:
+        """Which account this agent's turns run as, or None while they run as the CLI does.
+
+        Read once and kept: what it holds is what the agent was configured with, and a
+        provider taken away while a flow is running is not a reason for the next turn of that
+        flow to sign in as somebody else.
+
+        Raises:
+          ValueError: If this agent was configured with a provider there is no such thing as.
+            Said the first time a turn needs one rather than swallowed: an agent that cannot
+            find the account it was told to run as must not quietly run as the one whoever
+            started it happens to be signed in as.
+        """
+        if not self._config.provider:
+            return None
+        with self._starting:
+            if self._provider is None:
+                from humanize import providers
+
+                found = providers.find(self.backend, self._config.provider)
+                if found is None:
+                    raise ValueError(
+                        f"{self._id}: no {self.backend} provider called "
+                        f"{self._config.provider!r}"
+                    )
+                self._provider = found
+            return self._provider
+
+    def environment(self) -> Mapping[str, str]:
+        """What this agent's turns are run with, on top of the environment they inherit.
+
+        Which is what a provider that is a key, an endpoint or an account on somebody's cloud
+        comes to: every one of these CLIs reads such a thing out of a variable of its own.
+
+        Returns:
+          The variables to add, which is nothing at all for an agent running as its CLI does.
+        """
+        from humanize import providers
+
+        return providers.environ(self.provider)
+
+    def hushed(self) -> frozenset[str]:
+        """The variables a turn of this agent is run without, whoever left them lying about.
+
+        A provider is which account the agent is, and these CLIs will take an account from an
+        environment variable in preference to the credentials they were signed in with: an
+        `ANTHROPIC_API_KEY` exported in somebody's shell profile outranks the file a provider
+        holds, and the turn would run -- and bill -- as that key with nothing about it looking
+        wrong. So a turn under a provider is run without every variable its backend would read
+        an account from, except the ones that provider set itself.
+
+        Returns:
+          The variables to take away, which is nothing at all for an agent running as its CLI
+          already runs: an agent with no provider is left exactly as it was found.
+        """
+        from humanize.backends import named
+
+        provider = self.provider
+        profile = named(self.backend)
+        if provider is None or profile is None:
+            return frozenset()
+        return profile.accounts() - set(provider.env)
+
+    def _environ(self) -> dict[str, str] | None:
+        """The whole environment one of this agent's processes is started with.
+
+        Args:
+          None.
+
+        Returns:
+          This process's own, less what a provider hushes and plus what it sets, or None
+          where there is nothing to change -- which is inheritance, as it always was.
+        """
+        added, hushed = self.environment(), self.hushed()
+        if not added and not hushed:
+            return None
+        return {
+            name: value for name, value in os.environ.items() if name not in hushed
+        } | dict(added)
+
+    def spawned(self, argv: list[str]) -> list[str]:
+        """One turn of this agent, as the command to actually spawn.
+
+        Every backend renders its own call and then comes here, so that what a turn is wrapped
+        in is decided once: the provider's own arguments are added to the CLI's command line,
+        and the whole of it is put under whatever has to supervise it.
+
+        A turn that is both anchored and run under a provider is supervised once, not twice: a
+        process has one tracer, so the anchor is told which paths to answer rather than being
+        wrapped in something that would answer them for it.
+
+        Args:
+          argv: The backend's own command for this turn.
+
+        Returns:
+          The command to spawn, which is `argv` itself for an agent that is neither anchored
+          nor run under a provider -- which is most of them.
+        """
+        provider = self.provider
+        if provider is not None and provider.args:
+            argv = [*argv, *provider.args]
+        swaps = provider.swaps() if provider is not None else ()
+        # What the provider hands the agent as variables is the agent's own, and the target
+        # is not to be given it: everything the agent exports is inherited by every command
+        # it runs there, and a key crossing to another machine is a key on that machine.
+        private = tuple(provider.env) if provider is not None else ()
+        anchor = self.anchor
+        if anchor is not None:
+            return anchor.command(argv, swaps=swaps, private=private)
+        return provider.command(argv) if provider is not None else argv
 
     @property
     def sessions(self) -> list[SessionBase]:

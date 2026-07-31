@@ -30,6 +30,7 @@ FULL = AnchorConfig(
     shadow="/tmp/mirror",
     local_paths=("/home/me/.secrets", "/home/me/.cache"),
     local_execs=("/usr/local/bin/here",),
+    redirects=(("/home/me/.claude/.credentials.json", "/srv/a provider/creds.json"),),
     net="remote",
     net_allow=("api.anthropic.com:443",),
     token="-Vx9nQs3cret",

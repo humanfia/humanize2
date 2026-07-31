@@ -22,6 +22,8 @@ arguments.
 - [`hmz collect`](#hmz-collect)
 - [`hmz anchor`](#hmz-anchor)
 - [`hmz anchor serve`](#hmz-anchor-serve)
+- [`hmz providers`](#hmz-providers)
+- [`hmz cred`](#hmz-cred)
 - [Environment variables](#environment-variables)
 - [Files](#files)
 - [Exit statuses](#exit-statuses)
@@ -79,6 +81,8 @@ hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] <task>
 ```
 claude/claude-opus-4-8:high
 cli=claude,model=claude-opus-4-8,effort=high
+claude@deepseek/claude-opus-4-8:high
+cli=claude,model=claude-opus-4-8,effort=high,provider=deepseek
 ```
 
 Both spellings mean the same thing. The written-out form exists because a model or an effort may
@@ -91,6 +95,10 @@ hold the punctuation the short form separates on.
 - A model may hold slashes of its own — Kimi Code's are `kimi-code/k3`, and pi, opencode and
   mimocode name every model as `provider/id` — so the CLI is read from the front and the effort
   from after the last colon.
+- An `@` after the CLI names the [provider](providers.md) that agent's turns run as — the
+  account, not the model: `claude@deepseek`. Written out, it is `provider=`. A CLI is never
+  spelled with an `@` in it, so the two are told apart wherever an agent is written. An agent
+  that names none runs its CLI as you already run it.
 
 **One `-a` is one agent.** A list inside a single `-a` is not split into several. Two agents of
 one spelling are two agents, which is what makes a flow of an actor and a reviewer at one
@@ -115,6 +123,7 @@ Whatever else a flow does as it is imported is the flow's own, and fails as it w
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 hmz exec -f flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "fix the build"
 hmz exec -f rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
+hmz exec -f flame_chase -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
 hmz exec -f ./flows/mine.py -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
 hmz exec -f ralph_loop -a pi/openai-codex/gpt-5.5:high "$(cat TASK.md)"
 hmz exec -f ralph_loop -a opencode/opencode/big-pickle:high "$(cat TASK.md)"
@@ -228,6 +237,71 @@ to a shell on that machine — read [Security](../README.md#security).
 hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 ```
 
+## `hmz providers`
+
+The accounts an agent may be run as: one named set of credentials per provider, kept apart from
+the CLI's own. See [Providers](providers.md).
+
+```
+hmz providers list [<cli>]
+hmz providers ways <cli>
+hmz providers add <cli>/<name> [-w|--way <way>] [-s|--set VAR=VALUE]... [--no-login]
+hmz providers login <cli>/<name> [-s|--set VAR=VALUE]...
+hmz providers show <cli>/<name>
+hmz providers remove <cli>/<name>
+```
+
+A provider is named `<cli>/<name>` — `claude/deepseek` — wherever one is asked for. Naming no
+command at all lists them.
+
+| Command | |
+| --- | --- |
+| `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, and the variables it sets. |
+| `ways <cli>` | How that backend can be signed into: each way, what it asks for, and what it runs. |
+| `add <cli>/<name>` | Makes one and signs it in. `-w` chooses the way and defaults to the backend's first, which is `login`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in. |
+| `login <cli>/<name>` | Signs an existing one in again, by the way it was made with. Takes the same `-s`. |
+| `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, the names of the variables it sets, and which paths a turn under it is given instead of which. |
+| `remove <cli>/<name>` | Takes it away, credentials and all. |
+
+Whatever a way asks that the line did not answer is asked at the terminal, and a secret is not
+echoed. A line with nobody at a terminal has to answer everything itself.
+
+**Values are never printed** — `show` and `list` say which variables a provider sets and not
+what they are.
+
+```sh
+hmz providers add claude/anthropic -w login
+hmz providers add claude/deepseek -w gateway -s ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+hmz providers ways codex
+hmz providers show claude/deepseek
+hmz providers remove claude/deepseek
+```
+
+## `hmz cred`
+
+Runs a program with some of its paths answered by others. This is what a turn under a provider
+is spawned as, and it is a command of its own for the reason `hmz anchor` is: the supervisor
+forks the program and takes the process's signal handling with it.
+
+```
+hmz cred --map FROM=TO [--map FROM=TO]... -- COMMAND [ARGS...]
+```
+
+| Flag | |
+| --- | --- |
+| `--map FROM=TO` | **Required, repeatable.** Answer `FROM` with `TO` for everything below, as two absolute paths. A directory names everything inside it. |
+| `COMMAND` | The program to run and its arguments, after `--`. |
+
+Exits with the program's own status. A run that could not be supervised is **not** run
+unsupervised — the program would read the credentials of whoever is at this machine, which is a
+turn taken as the wrong account rather than a turn that failed.
+
+Needs Linux on x86-64, as running an agent under an anchor does.
+
+```sh
+hmz cred --map /home/you/.claude/.credentials.json=/home/you/.humanize/providers/claude/deepseek/home/.credentials.json -- claude
+```
+
 ## Environment variables
 
 | Variable | Read by | |
@@ -258,6 +332,8 @@ A backend home that does not exist is skipped rather than being an error.
 | Path | Written by | |
 | --- | --- | --- |
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened, how it ended. See [Cycles](tracing.md#cycles). |
+| `~/.humanize/providers/<cli>/<name>/provider.json` | `hmz providers add` | What a [provider](providers.md) was made by, and what a turn under it runs with. `0600`, in a directory at `0700`. |
+| `~/.humanize/providers/<cli>/<name>/{home,user}/...` | the CLI's own login | That provider's credentials, at the names the CLI keeps its own under. |
 | `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run. |
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
 | `.humanize/<datetime>.trace.json` | `hmz collect` | The trace. Relative to the current directory, not to the workspace named. |
@@ -273,10 +349,10 @@ into them.
 | | |
 | --- | --- |
 | `0` | It did what it was asked. |
-| `1` | It could not: the target could not be reached, the listener could not be started. |
+| `1` | It could not: the target could not be reached, the listener could not be started, there is no such provider, a turn could not be supervised. |
 | `2` | The command line was wrong — argparse's own rejections, a flow that is not there or takes other agents, a malformed listen address, a non-loopback listener with no token. |
 | `130` | Interrupted. |
-| *the agent's own* | `hmz anchor` exits with the status of the agent it ran. |
+| *the agent's own* | `hmz anchor` and `hmz cred` exit with the status of the program they ran, and `hmz providers add` with that of the login it ran. |
 
 ## Python entry points
 
@@ -288,8 +364,11 @@ from humanize.runner import Runner          # hmz exec
 from humanize.tracing import collect        # hmz collect
 from humanize.coganchor import connect      # hmz anchor
 from humanize.coganchor import check        # hmz anchor --check
+from humanize import providers              # hmz providers
 ```
 
 - `Runner(flow, agents).run(task)` — [Flows](flows.md)
 - `collect(workspace, *, sessions=…, agents=…, output=…, start=…, end=…)` — [Tracing](tracing.md)
 - `connect(command, config)` / `check(config)` — [Remote execution](remote-execution.md)
+- `providers.providers(cli)` / `providers.find(cli, name)` / `providers.remove(cli, name)` —
+  [Providers](providers.md)

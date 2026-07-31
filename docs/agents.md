@@ -29,6 +29,7 @@ Everything here is importable from `humanize.agents`.
 - [What an agent may do](#what-an-agent-may-do)
 - [Which skills an agent is loaded with](#which-skills-an-agent-is-loaded-with)
 - [Where the turns land](#where-the-turns-land)
+- [Which account it runs as](#which-account-it-runs-as)
 - [API summary](#api-summary)
 
 ## Making one
@@ -56,8 +57,9 @@ pi, opencode and mimocode name a model as `provider/id` — `openai-codex/gpt-5.
 serves it, and the CLI is asked for the pair.
 
 A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land), the
-[skills it is loaded with](#which-skills-an-agent-is-loaded-with), and nothing else. It is
-frozen,
+[skills it is loaded with](#which-skills-an-agent-is-loaded-with),
+[what it may do](#what-an-agent-may-do), [which account it runs as](#which-account-it-runs-as),
+and nothing else. It is frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
 would silently split one conversation across two models.
 
@@ -717,6 +719,29 @@ ClaudeCodeAgentConfig(model=…, effort=…, machine=DockerConfig(image="python:
 for — which is the first turn. Constructing an agent pulls no image and starts no container.
 See [Machines](machines.md).
 
+## Which account it runs as
+
+A config's `provider` names one of the [providers](providers.md) made for its CLI. `""` — the
+default — is the CLI as you already run it, signed in the way you already signed in.
+
+```python
+ClaudeCodeAgentConfig(model="claude-opus-5", effort="max", provider="deepseek")
+```
+
+A turn of such an agent is given that provider's variables, and reads its credentials out of
+that provider's own directory rather than the CLI's — so two agents of one backend can be two
+accounts at the same time, one on a subscription and one on somebody's gateway. Only the
+credential files move: the sessions, the settings and the skills are the CLI's own.
+
+```python
+agent.provider       # Provider | None -- the account, read once and kept
+agent.environment()  # what its turns are run with, on top of what they inherit
+```
+
+`agent.provider` raises `ValueError` the first time a turn needs an account that is not there,
+naming the agent and what it was called. An agent that cannot find the account it was told to
+run as does not quietly run as yours.
+
 ## API summary
 
 ```python
@@ -725,11 +750,12 @@ class AgentBase:
 
     id: str                 # what this agent is called
     backend: str            # "claude", "codex", "kimi", "pi", …
-    config: AgentConfig     # model, effort, machine, skills
+    config: AgentConfig     # model, effort, machine, skills, permission, provider
     opened: list[str]       # the backend's id for every session it ever opened
     sessions: list[SessionBase]
     stopped: bool
     anchor: AnchorConfig | None
+    provider: Provider | None
     hooks: Hooks            # what is hung on its moments
 
     def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None

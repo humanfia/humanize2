@@ -131,9 +131,10 @@ class OpencodeSession(CommandSessionBase):
         change what the person who started the flow has configured.
         """
         return {
+            **super()._environment(),
             type(self).permits: json.dumps(
                 _PERMITTED.get(self._agent.config.permission, _PERMITTED["bypass"])
-            )
+            ),
         }
 
     def _reads(self, line: str, *, error: bool) -> Iterator[Event]:

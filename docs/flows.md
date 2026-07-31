@@ -507,8 +507,11 @@ if head() == before:
 
 ## Building the agents yourself
 
-A name, and [where the work lands](machines.md), are settings of the *agent* rather than of the
-flow, so `-a` does not reach them. A flow that needs one is handed agents built in Python:
+`-a` reaches four of an agent's settings: the CLI, the model, the effort, and — after an `@` —
+the [provider](providers.md) whose account it runs as. A name, [where the work
+lands](machines.md), [which skills it has](agents.md#which-skills-an-agent-is-loaded-with) and
+[what it may do](agents.md#what-an-agent-may-do) are settings of the *agent* that no `-a` spells,
+so a flow that needs one is handed agents built in Python:
 
 ```python
 from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig

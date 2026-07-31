@@ -19,6 +19,7 @@ _ABOUT = {
     "flow": "Switch flow",
     "config": "Set up how the flow runs",
     "agents": "Set what each agent runs",
+    "providers": "Manage the accounts agents run as",
     "status": "Show how the run is going",
     "clear": "Clear the screen",
     "details": "Toggle tool calls and thinking",

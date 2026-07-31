@@ -580,11 +580,13 @@ def flow_and_agents(
     agents: list[AgentBase] = []
     for spec in args.agents:
         try:
-            profile, model, effort = backends.read(spec)
+            profile, model, effort, provider = backends.read(spec)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
         agent, config = DRIVEN[profile.name]
-        agents.append(agent(config(model=model, effort=effort)))
+        # Named rather than looked up: an account that is not there is caught by the agent
+        # the first time it needs one, which says whose it was and what it was called.
+        agents.append(agent(config(model=model, effort=effort, provider=provider)))
     return args.flow, agents, args.task, held
 
 

@@ -1,6 +1,6 @@
 """Deciding what belongs to the target.
 
-Two independent questions, answered here:
+Three independent questions, answered here:
 
 * **Paths.** A :class:`Layout` maps a directory on this machine (the mirror)
   onto the path it occupies on the target.  By default the two are identical,
@@ -8,6 +8,10 @@ Two independent questions, answered here:
 * **Programs.** Everything the agent spawns runs on the target, except the
   agent's own runtime -- its binary and its re-execs, which stay here and are
   listed in ``local_programs``.
+* **Redirects.** A path the agent names may be answered with another one --
+  the credentials of the provider a turn runs as, rather than whichever
+  account this machine is signed into.  What it is answered with is local
+  state, so it is listed in ``local_paths`` too and never reaches the target.
 """
 
 from __future__ import annotations
@@ -53,11 +57,26 @@ class Router:
     local_paths: tuple[str, ...] = ()
     #: Program paths (prefix match) that must run on this machine.
     local_programs: tuple[str, ...] = ()
+    #: Paths answered with others, as ``(what the agent names, what it gets)``.
+    #: A directory stands for everything inside it, because a credential is
+    #: often one file of several kept together.
+    redirects: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         # Longest root first, so nested layouts win over their parents.
         self.layouts = tuple(
             sorted(self.layouts, key=lambda item: -len(item.local_root))
+        )
+        # And longest named path first, so a path under two redirects takes the
+        # one that says most about it.
+        self.redirects = tuple(
+            sorted(
+                (
+                    (_normalise(named), _normalise(instead))
+                    for named, instead in self.redirects
+                ),
+                key=lambda pair: -len(pair[0]),
+            )
         )
 
     def layout_for(self, local_path: str) -> Layout | None:
@@ -100,6 +119,27 @@ class Router:
     def runs_locally(self, program: str) -> bool:
         """True when a program belongs to this machine rather than the target."""
         return any(_within(program, prefix) for prefix in self.local_programs)
+
+    def swap(self, path: str) -> str | None:
+        """Return the path this session answers ``path`` with, or ``None``.
+
+        ``None`` for nearly every path there is.  Three shapes are answered:
+        what a redirect names, what lies under a directory one names, and what
+        lies beside one under the same name and another suffix -- which is how
+        a credential is rotated, ``.tmp`` written and renamed over the real
+        one, and leaving that unanswered would write the new token into the
+        store being redirected away from.  The same rule as
+        :meth:`humanize.providers.redirect.Swaps.swap`, which the two halves of
+        a redirected run keep in step by saying it the same way.
+        """
+        for named, instead in self.redirects:
+            if path == named:
+                return instead
+            if _within(path, named):
+                return posixpath.join(instead, path[len(named) :].lstrip("/"))
+            if path.startswith(named + "."):
+                return instead + path[len(named) :]
+        return None
 
 
 def _normalise(path: str) -> str:

@@ -38,17 +38,40 @@ def test_a_home_shared_with_every_program_keeps_its_own_directory_under_it(
 
 
 def test_an_agent_is_read_off_a_command_line_however_it_is_spelled() -> None:
-    profile, model, effort = backends.read("pi/openai-codex/gpt-5.5:high")
+    profile, model, effort, provider = backends.read("pi/openai-codex/gpt-5.5:high")
     assert (profile.name, model, effort) == ("pi", "openai-codex/gpt-5.5", "high")
-    profile, model, effort = backends.read("mimocode/xiaomi/mimo-v2.5:low")
+    assert provider == ""  # as whoever is at this machine already runs it
+    profile, model, effort, _ = backends.read("mimocode/xiaomi/mimo-v2.5:low")
     assert (profile.name, model, effort) == ("mimo", "xiaomi/mimo-v2.5", "low")
-    profile, model, effort = backends.read(
+    profile, model, effort, _ = backends.read(
         "cli=opencode,model=opencode/big-pickle,effort=xhigh"
     )
     assert (profile.name, model, effort) == ("opencode", "opencode/big-pickle", "xhigh")
 
 
+def test_an_agent_may_name_the_account_it_runs_as() -> None:
+    """Two agents of one CLI are two accounts when the line says so, either way it is written."""
+    profile, model, effort, provider = backends.read(
+        "claude@deepseek/claude-opus-5:high"
+    )
+    assert (profile.name, model, effort, provider) == (
+        "claude",
+        "claude-opus-5",
+        "high",
+        "deepseek",
+    )
+    _, _, _, provider = backends.read(
+        "cli=claude,model=claude-opus-5,effort=high,provider=work"
+    )
+    assert provider == "work"
+    # A CLI is never spelled with an `@` in it, so the model keeps whatever it holds.
+    profile, model, _, provider = backends.read("kimi@mine/kimi-code/k3:max")
+    assert (profile.name, model, provider) == ("kimi", "kimi-code/k3", "mine")
+
+
 def test_a_backend_nobody_has_heard_of_is_a_line_to_correct() -> None:
     assert backends.named("nope") is None
-    with pytest.raises(ValueError, match="expected CLI/MODEL:EFFORT"):
+    with pytest.raises(ValueError, match="expected CLI"):
         backends.read("nope/model:high")
+    with pytest.raises(ValueError, match="not cli, model, effort or provider"):
+        backends.read("cli=claude,model=m,effort=high,machine=elsewhere")

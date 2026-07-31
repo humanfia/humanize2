@@ -156,11 +156,14 @@ _CALLED = {
 class _AppServer:
     """A `codex app-server` of our own, spoken to in JSON-RPC over its stdio."""
 
-    def __init__(self, argv: list[str]) -> None:
+    def __init__(self, argv: list[str], env: Mapping[str, str] | None = None) -> None:
         """Starts the server and introduces this flow to it.
 
         Args:
           argv: The command that starts it, already wrapped for wherever its work is to land.
+          env: The whole environment to start it in, which is this process's own less what the
+            agent's provider hushes and plus what it sets, or None to inherit this one. The
+            server is the agent's, so its account is the agent's too.
 
         Raises:
           subprocess.CalledProcessError: If it will not be introduced to, which is every turn
@@ -177,6 +180,7 @@ class _AppServer:
             stderr=subprocess.DEVNULL,
             encoding="utf-8",
             errors="replace",
+            env=dict(env) if env else None,
         )
         self._pending = itertools.count(1)
         self._writing = threading.Lock()  # a line is written whole or not at all
@@ -929,9 +933,7 @@ class CodexAgent(AgentBase):
                     # off for this agent and for nobody else -- and the user's own settings
                     # are left exactly as they were.
                     argv += ["-c", f"skills.config={_toml(off)}"]
-                if anchor is not None:
-                    argv = anchor.command(argv)
-                self._server = _AppServer(argv)
+                self._server = _AppServer(self.spawned(argv), self._environ())
                 self._server._agents.append(self)
                 # Held by the finalizer alone, which is what takes the server down: when the
                 # agent is collected, and at exit for one held to the end.

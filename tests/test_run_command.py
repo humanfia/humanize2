@@ -47,6 +47,21 @@ def run(agents: tuple[AGENTS], task: str) -> None:
     )
 """
 
+#: A flow that writes down which account each of its agents was configured to run as, which
+#: is what an `-a` naming a provider has to reach.
+ACCOUNTS = """
+import json
+from pathlib import Path
+
+from humanize.agents import AgentBase
+
+
+def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+    Path(__file__).with_suffix(".json").write_text(
+        json.dumps([agent.config.provider for agent in agents])
+    )
+"""
+
 #: The same flow, declaring its agents as a named tuple: as many as there are places, and what
 #: each of them is for. It reaches them by name to prove it was handed the type it asked for.
 NAMED = """
@@ -160,6 +175,35 @@ def test_one_option_is_one_agent_however_it_is_written(tmp_path: Path) -> None:
         "CodexAgent",
         "KimiCodeCLIAgent",
     ]
+
+
+def test_an_agent_may_be_told_which_account_to_run_as(tmp_path: Path) -> None:
+    """One flow, one CLI, two accounts: which is the whole reason a provider has a name."""
+    flow = _flow(tmp_path, ACCOUNTS)
+    main(
+        [
+            "exec",
+            "-f",
+            flow,
+            "-a",
+            "claude@subscription/claude-opus-5:high",
+            "-a",
+            "cli=claude,model=claude-opus-5,effort=high,provider=deepseek",
+            "task",
+        ]
+    )
+    assert json.loads((tmp_path / "flow.json").read_text()) == [
+        "subscription",
+        "deepseek",
+    ]
+
+
+def test_an_agent_that_names_no_account_runs_as_this_machine_does(
+    tmp_path: Path,
+) -> None:
+    flow = _flow(tmp_path, ACCOUNTS)
+    main(["exec", "-f", flow, "-a", "claude/m:high", "-a", "codex/m:high", "task"])
+    assert json.loads((tmp_path / "flow.json").read_text()) == ["", ""]
 
 
 def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(

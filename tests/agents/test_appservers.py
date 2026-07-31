@@ -16,7 +16,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import BaseModel
@@ -29,6 +29,9 @@ from humanize.agents import (
     KimiCodeCLIAgentConfig,
 )
 from humanize.agents import codex as appservers
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 class _Verdict(BaseModel):
@@ -855,10 +858,14 @@ def test_a_codex_server_is_told_which_skills_its_agent_is_not_to_load(
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
     monkeypatch.chdir(tmp_path)
     started: list[list[str]] = []
+    environments: list[dict[str, str]] = []
 
     class _Recording:
-        def __init__(self, argv: list[str]) -> None:
+        def __init__(
+            self, argv: list[str], env: Mapping[str, str] | None = None
+        ) -> None:
             started.append(argv)
+            environments.append(dict(env or {}))
             self._agents: list[Any] = []
 
         def stop(self) -> None:
@@ -868,6 +875,8 @@ def test_a_codex_server_is_told_which_skills_its_agent_is_not_to_load(
     plain = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high"))
     assert plain.server is not None
     assert started == [["codex", "app-server", "--stdio"]]
+    # And nothing on top of what it inherits: an agent under no provider is run as it was.
+    assert environments == [{}]
 
     started.clear()
     picky = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high", skills=()))

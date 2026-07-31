@@ -52,20 +52,29 @@ if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
     from textual.app import App, ComposeResult
 
-    from humanize.backends import Model
+    from humanize.backends import Model, Way
+    from humanize.providers import Provider
     from humanize.runner import Place
 
     from .monitor import Monitor
 
 __all__ = [
     "Anchors",
+    "Backends",
     "Configures",
+    "Doing",
     "Flows",
     "Models",
+    "Picks",
+    "Providers",
     "Runs",
+    "RunsAs",
     "Sheet",
+    "Signing",
+    "Signs",
     "Skills",
     "Status",
+    "Ways",
     "reads",
     "setting",
 ]
@@ -81,12 +90,15 @@ class Runs(NamedTuple):
         -- which is every skill it finds.
       permission: What it may do without being asked, as one of `humanize.agents.PERMISSIONS`,
         or "" for the one an agent nobody has been asked about runs at.
+      provider: The account its turns run as, by the name a provider of its CLI was made
+        under, or "" to run as this machine is already signed in.
     """
 
     spec: str
     anchor: str = ""
     skills: tuple[str, ...] | None = None
     permission: str = ""
+    provider: str = ""
 
 
 #: What Claude Code rules the top of a sheet with, and how far in everything under it sits.
@@ -141,8 +153,11 @@ def reads(named: tuple[str, ...], runs: list[Runs]) -> list[str]:
                 one.spec,
                 one.anchor,
                 # Only where there is one: an agent nobody has narrowed says nothing here,
-                # which is what every agent a flow has ever driven would have said.
+                # which is what every agent a flow has ever driven would have said. The
+                # account it runs as reads the same way -- one that says nothing is the one
+                # this machine is signed in as.
                 one.permission,
+                one.provider,
             )
             if part
         )
@@ -151,7 +166,7 @@ def reads(named: tuple[str, ...], runs: list[Runs]) -> list[str]:
 
 
 _SHEET = """
-Anchors, Configures, Flows, Models, Skills, Status {
+Anchors, Backends, Configures, Flows, Models, Providers, RunsAs, Signing, Skills, Status, Ways {
     align: center middle; background: $background; }
 #sheet { width: 100%; height: auto; padding: 0; }
 #rule { height: 1; color: $primary; }
@@ -165,7 +180,10 @@ OptionList { border: none; background: $background; max-height: 14; scrollbar-si
 /* The marker says where the cursor is, so the row is not filled as well. */
 #choices > .option-list--option-highlighted {
     background: $background; color: $foreground; text-style: none; }
-#tuning { padding: 1 0 1 3; }
+/* As wide as the sheet, so that the settings adjusted under the models wrap onto a second
+   row rather than running off the side of a narrow terminal: a key nobody can see is a key
+   nobody has. */
+#tuning { padding: 1 0 1 3; width: 1fr; }
 #keys { padding: 0 0 0 3; color: $text-muted; }
 /* The fields carry their own indent, as the numbered rows above them do. */
 #said { padding: 0 0 1 0; }
@@ -447,6 +465,9 @@ class Models(Sheet[list[Runs]]):
         Binding("ctrl+a", "anchor", "anchor", priority=True),
         # And what it is loaded with is a third, for the same reason and in the same way.
         Binding("ctrl+s", "skills", "skills", priority=True),
+        # And which account it signs in as is a fourth. Not a row either: a provider belongs
+        # to the CLI rather than to the model, so two models of one CLI are the same account.
+        Binding("ctrl+r", "runs_as", "runs as", priority=True),
     ]
 
     def __init__(
@@ -481,6 +502,9 @@ class Models(Sheet[list[Runs]]):
         #: asked about at all: the answer belongs to the CLI it was given about, and the tab
         #: may yet be turned to another one.
         self._skills: dict[str, tuple[str, ...]] = {}
+        #: Which account it signs in as, per CLI and for the same reason: a provider is one
+        #: backend's, and the one chosen under this tab means nothing under the next.
+        self._providers: dict[str, str] = {}
         #: Which tab is open, counting the CLIs this agent could be.
         self._at = 0
         #: The models the letters typed so far have left, which is what the cursor is walking.
@@ -507,6 +531,7 @@ class Models(Sheet[list[Runs]]):
         self._anchor = ""
         self._permission = len(PERMISSIONS) - 1
         self._skills = {}
+        self._providers = {}
         self._at = 0
         self._typed = ""  # each agent is asked about from the first tab again
         self._fill()
@@ -604,6 +629,12 @@ class Models(Sheet[list[Runs]]):
                 f"{_DOT}[$secondary]◉[/] {PERMISSIONS[self._permission]}  "
                 f"[$text-muted]ctrl+p to change[/]"
             )
+            as_who = self._providers.get(self._backend())
+            tuned += (
+                f"{_DOT}[$secondary]◉[/] as "
+                f"{escape(as_who) if as_who else 'this machine is signed in'}  "
+                f"[$text-muted]ctrl+r to change[/]"
+            )
         self.query_one("#tuning", Label).update(tuned)
         self.query_one("#keys", Label).update(
             f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
@@ -653,6 +684,27 @@ class Models(Sheet[list[Runs]]):
         )
         if chosen is not None:
             self._skills[backend] = chosen
+            self._fill()
+
+    @work
+    async def action_runs_as(self) -> None:
+        """Asks which account this agent's turns run as, and comes back here either way.
+
+        A walk out without answering leaves it running as this machine is signed in, which
+        is what every agent ran as before there were providers to choose between.
+        """
+        backend = self._backend()
+        if not backend:
+            return
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        chosen = await showing.push_screen_wait(
+            RunsAs(backend, self._providers.get(backend, ""))
+        )
+        if chosen is not None:
+            self._providers[backend] = chosen
             self._fill()
 
     def _backend(self) -> str:
@@ -755,6 +807,10 @@ class Models(Sheet[list[Runs]]):
                     if self._permission < len(PERMISSIONS) - 1
                     else ""
                 ),
+                # And only the account chosen for the CLI actually taken, for the reason the
+                # skills are: a provider is one backend's, and the tab may have been turned
+                # since it was picked.
+                provider=self._providers.get(self._backend(), ""),
             )
         )
         if len(self._chosen) < len(self._wanted):
@@ -1344,6 +1400,573 @@ class Configures(Sheet["BaseModel"]):
         event.stop()
         self._wrong = ""
         self._fill()
+
+
+class Picks(Sheet[str]):
+    """A question that is only a list of named things, answered by picking one of them.
+
+    Three of the sheets here are that and nothing else -- which account an agent runs as,
+    which CLI a new one is for, and how to sign into it -- and three lists drawn three ways
+    would read as three different kinds of question. So the drawing is here, and each of them
+    says only what it asks and what there is to choose between.
+    """
+
+    #: The question at the top of the sheet, and the line under it saying what choosing one
+    #: does. Every sheet of this shape says both for itself.
+    asked = ""
+    about = ""
+
+    def __init__(self, current: str = "") -> None:
+        """Initializes the choosing.
+
+        Args:
+          current: What is in force already, which is the row the tick goes against.
+        """
+        super().__init__()
+        self._current = current
+        self._rows: list[tuple[str, str, str]] | None = None
+
+    def rows(self) -> list[tuple[str, str, str]]:
+        """What there is to choose between, which each sheet says for itself.
+
+        Returns:
+          One `(what picking it answers with, what it is called, the line about it)` apiece,
+          in the order to show them.
+        """
+        raise NotImplementedError
+
+    def nothing(self) -> str:
+        """What to say under the list where the list alone does not say it.
+
+        Returns:
+          The line, already escaped, or "" for a list that speaks for itself.
+        """
+        return ""
+
+    def _ask(self) -> None:
+        """Says what is being chosen, and puts the choices up."""
+        self.query_one("#asked", Label).update(self.asked)
+        self.query_one("#about", Label).update(self.about)
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _fill(self) -> None:
+        """Puts the rows up, with the marker beside the one the cursor is on."""
+        listing = self.query_one("#choices", OptionList)
+        if self._rows is None:
+            # Once: looking means reading a directory, and this is redrawn per keystroke.
+            self._rows = self.rows()
+        shown = [row for row in self._rows if self.fits(row[1], row[2])]
+        self._counting = len(str(len(shown)))
+        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
+        listing.set_options(
+            Option(
+                self._row(
+                    seen, label, about, here=seen == at, inforce=answer == self._current
+                ),
+                # Every row answers with a string and "" is one of the answers, which an id
+                # of its own keeps tellable from a row that was never chosen.
+                id=f"={answer}",
+            )
+            for seen, (answer, label, about) in enumerate(shown)
+        )
+        listing.highlighted = at if shown else None
+        self._drawn = at
+        said = self.nothing()
+        self.query_one("#tuning", Label).update(
+            f"[$text-muted]{said}[/]" if said else ""
+        )
+        self.query_one("#keys", Label).update(
+            f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
+        )
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Answers with what was picked.
+
+        Args:
+          event: What was chosen.
+        """
+        self.dismiss(str(event.option.id).removeprefix("="))
+
+
+def _sets(provider: Provider) -> str:
+    """What one account says about itself on a row: the way it was made by, and what it sets.
+
+    Args:
+      provider: The account.
+
+    Returns:
+      The line, with the variables named and never a value in it -- this is drawn where
+      somebody can read it, and a key on a screen is a key in a photograph.
+    """
+    variables = ", ".join(sorted(provider.env))
+    return f"{provider.way}{_DOT}{variables}" if variables else provider.way
+
+
+class RunsAs(Picks):
+    """Which account one agent's turns run as: one of its CLI's, or this machine's own.
+
+    A question about the agent like the machine it works on and the skills it is loaded with,
+    and asked in the same place for the same reason: two agents of one CLI may be two
+    accounts -- one on a subscription and one on somebody's gateway, each refreshing its own
+    token -- which is the whole of what a provider is for.
+    """
+
+    asked = "Select which account this agent runs as"
+    about = (
+        "The credentials its turns are run under. Its sessions, its settings and its skills "
+        "are the CLI's own either way; only the account moves. /providers is where they are "
+        "made."
+    )
+
+    def __init__(self, backend: str, current: str) -> None:
+        """Initializes the choosing.
+
+        Args:
+          backend: The CLI whose accounts these are.
+          current: The one this agent runs as now, or "" for this machine's own.
+        """
+        super().__init__(current)
+        self._backend = backend
+
+    def rows(self) -> list[tuple[str, str, str]]:
+        """This machine's own first, and then every account that CLI has here."""
+        from humanize import providers
+
+        return [
+            ("", "as this machine is signed in", "nothing is redirected"),
+            *(
+                (one.name, one.name, _sets(one))
+                for one in providers.providers(self._backend)
+            ),
+        ]
+
+    def nothing(self) -> str:
+        """Says where the accounts would come from, for a CLI that has none of them yet."""
+        if len(self._rows or []) > 1:
+            return ""
+        return f"{escape(self._backend)} has no providers yet; /providers makes one"
+
+
+class Backends(Picks):
+    """Which coding agent a new account is for.
+
+    Every backend humanize drives rather than the ones installed here: an account is
+    credentials, and credentials are worth writing down before the CLI that will use them is
+    on this machine.
+    """
+
+    asked = "Select which coding agent this account is for"
+    about = (
+        "The CLI whose credentials these are. An account is one backend's -- what signs in "
+        "to Claude Code is not what signs in to codex -- and the ways in are its own."
+    )
+
+    def rows(self) -> list[tuple[str, str, str]]:
+        """Every backend there is, saying how each of them can be signed into."""
+        from humanize.backends import PROFILES
+        from humanize.providers import ways
+
+        return [
+            (
+                profile.name,
+                profile.name,
+                ", ".join(way.name for way in ways(profile.name)),
+            )
+            for profile in PROFILES
+        ]
+
+
+class Ways(Picks):
+    """How to sign into one backend: its subscription, a key, a gateway, somebody's cloud.
+
+    What a backend offers rather than what could be written: each of these lands somewhere
+    different -- a login writes the CLI's own store, a key is a variable -- and an account is
+    one of them, answered.
+    """
+
+    asked = "Select how to sign in"
+    about = (
+        "What this account is. A way with a command of its own is handed the terminal once "
+        "the questions are answered, so its own browser or device code owns the screen; one "
+        "that is only answers is written down as they are given."
+    )
+
+    def __init__(self, backend: str) -> None:
+        """Initializes the choosing.
+
+        Args:
+          backend: The CLI these are the ways into.
+        """
+        super().__init__()
+        self._backend = backend
+
+    def rows(self) -> list[tuple[str, str, str]]:
+        """Every way that backend offers, and the one every backend has."""
+        from humanize.providers import ways
+
+        return [(way.name, way.name, way.about) for way in ways(self._backend)]
+
+    def nothing(self) -> str:
+        """Says so for a name no backend answers to, which is the only way this is empty."""
+        if self._rows:
+            return ""
+        return f"{escape(self._backend)} is not a coding agent humanize drives"
+
+
+class Signs(NamedTuple):
+    """What an account is to be made out of: what to call it, and what its way was told.
+
+    Attributes:
+      name: What the account is called, which is what an agent is configured with.
+      answers: What each question was answered with, by the variable that answer becomes.
+    """
+
+    name: str
+    answers: dict[str, str]
+
+
+#: What the row asking what to call an account is held under. Not a variable anything is
+#: given: a name is what an agent is configured with rather than something a CLI reads.
+_CALLED = ""
+
+#: The row a way that asks nothing in particular is answered in, and the question on it. Its
+#: own name rather than a variable's, since what is typed here is the variables themselves.
+_TYPED = " "
+_TYPED_ABOUT = "the variables, as NAME=VALUE, one per line -- ctrl+j breaks the line"
+
+
+class Signing(Sheet[Signs]):
+    """What a way in has to be told before an account can be made out of it.
+
+    A form rather than a list, so it is drawn as `/config` is: one row per question, the
+    variable the answer becomes, what has been typed into it, and the question said quietly
+    beside it. What the backend called a secret is drawn as bullets and never shown back --
+    it is on its way into a credential store, and a screen is somewhere it can be read off.
+    """
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        # Enter is the whole form rather than the row under the cursor: there is nothing here
+        # to pick, every row being written where it stands.
+        Binding("enter", "done", "done", priority=True),
+    ]
+
+    def __init__(self, cli: str, way: Way, name: str = "") -> None:
+        """Initializes the answering.
+
+        Args:
+          cli: The backend this account is for.
+          way: The way in it is being made by, whose questions these are.
+          name: What it is called already, for one being signed in again -- a name it has is
+            not a name to ask for twice -- or "" to ask for one.
+        """
+        super().__init__()
+        self._cli = cli
+        self._way = way
+        self._name = name
+        #: One row per thing to be told: what the answer is kept under, the question, and
+        #: whether it is a secret. What to call it comes first where it is not known already,
+        #: since nothing can be written down without a name.
+        self._fields: list[tuple[str, str, bool]] = [
+            *([] if name else [(_CALLED, "what to call this account", False)]),
+            *((one.env, one.about, one.secret) for one in way.asks),
+            # A way that asks nothing in particular is asked for everything at once: the way
+            # every backend has is variables of its own, and which ones they are is the
+            # answer rather than the question.
+            *([] if way.asks else [(_TYPED, _TYPED_ABOUT, True)]),
+        ]
+        self._counting = len(str(len(self._fields)))
+        #: What has been typed into each, starting from the answer a question has when nobody
+        #: is asked: a region that is usually right is an answer rather than a blank.
+        self._typed_in: dict[str, str] = {_CALLED: name} | {
+            one.env: one.fixed for one in way.asks
+        }
+        #: What was still missing, once the form has been offered.
+        self._wrong = ""
+
+    def _ask(self) -> None:
+        """Says what is being signed into, and what the keys do while it is."""
+        self.query_one("#asked", Label).update(
+            f"Sign in to {escape(self._cli)} by {escape(self._way.name)}"
+        )
+        self.query_one("#about", Label).update(
+            "What this way in has to be told. Typing answers the row under the cursor and "
+            "enter takes the lot. A secret is drawn as bullets and never shown back."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _fill(self) -> None:
+        """Puts the questions up, with the caret in the one under the cursor."""
+        listing = self.query_one("#choices", OptionList)
+        at = self._at
+        listing.set_options(
+            Option(
+                self._line(seen, held, about, secret=secret, here=seen == at),
+                id=f"={held}",
+            )
+            for seen, (held, about, secret) in enumerate(self._fields)
+        )
+        listing.highlighted = at if self._fields else None
+        self._drawn = listing.highlighted
+        self.query_one("#tuning", Label).update(
+            f"[$error]{escape(self._wrong)}[/]" if self._wrong else ""
+        )
+        self.query_one("#keys", Label).update(
+            "Type to answer · Backspace to rub out · Enter to accept · Esc to go back"
+        )
+
+    @property
+    def _at(self) -> int:
+        """Which question the cursor is on, counting from zero."""
+        listing = self.query_one("#choices", OptionList)
+        return min(listing.highlighted or 0, max(len(self._fields) - 1, 0))
+
+    def _line(self, at: int, held: str, about: str, *, secret: bool, here: bool) -> str:
+        """One question: what the answer becomes, what has been typed, and what is being asked.
+
+        Args:
+          at: Which one it is, counting from zero.
+          held: The variable the answer is kept under, or "" for the name.
+          about: The question, as the backend puts it.
+          secret: Whether what is typed is a secret.
+          here: Whether the cursor is on it.
+
+        Returns:
+          The row, as markup.
+        """
+        mark = f"{_INDENT}[$primary]{_HERE}[/] " if here else f"{_INDENT}  "
+        number = f"{at + 1:>{self._counting}}."
+        # A bullet per character for a secret: how much has been typed is worth seeing, and
+        # what it was is worth seeing once, on the way in, by the one typing it.
+        value = self._typed_in.get(held, "")
+        shown = "•" * len(value) if secret else value
+        named = held or "name"
+        # A block where the next letter goes, as `/config` draws one: every row here is
+        # written into, so every one of them has somewhere the next letter lands.
+        caret = "[reverse] [/reverse]" if here else ""
+        # Padded on what is shown rather than on what is written: markup is not columns.
+        label = escape(named) + " " * max(1, _SETTING - len(named))
+        room = _VALUE - len(shown) - 1
+        return (
+            f"{mark}[$text-muted]{number}[/] {label}"
+            f"[$secondary]{escape(shown)}[/]{caret}{' ' * max(1, room)}"
+            f"[$text-muted]{escape(about)}[/]"
+        )
+
+    def on_key(self, event: events.Key) -> None:
+        """Takes a letter as answering the question under the cursor.
+
+        There is nothing to search here -- every question is on screen at once -- so the keys
+        that narrow a list elsewhere are the ones that answer.
+
+        Args:
+          event: The key.
+        """
+        if not self._fields:
+            return
+        held = self._fields[self._at][0]
+        if event.key == "backspace":
+            self._typed_in[held] = self._typed_in.get(held, "")[:-1]
+        elif event.is_printable and event.character:
+            self._typed_in[held] = self._typed_in.get(held, "") + event.character
+        else:
+            return
+        event.prevent_default()
+        event.stop()
+        self._wrong = ""
+        self._fill()
+
+    def action_done(self) -> None:
+        """Answers with what it is to be called and what its way was told, once that is all.
+
+        What is missing is said where it was typed rather than raised at whoever opened the
+        sheet: a question left blank is a question to answer, and this is where answering it
+        happens.
+        """
+        from humanize.providers import env_of, where
+        from humanize.providers.login import asked
+
+        name = (self._name or self._typed_in.get(_CALLED, "")).strip()
+        answers = {
+            held: value
+            for held, value in self._typed_in.items()
+            if held.strip() and value
+        }
+        try:
+            where(self._cli, name)
+            if said := self._typed_in.get(_TYPED, "").strip():
+                # Read here rather than where the account is made, so that a line that is not
+                # a variable is said on the row it was typed on.
+                answers |= env_of(said.replace("\r", "\n"))
+        except ValueError as why:
+            self._wrong = str(why)
+            self._fill()
+            return
+        if still := asked(self._way, answers):
+            self._wrong = f"{still[0]} is still to be answered"
+            self._fill()
+            return
+        if not answers and not self._way.argv:
+            self._wrong = "an account that says nothing signs nothing in"
+            self._fill()
+            return
+        self.dismiss(Signs(name, answers))
+
+
+class Doing(NamedTuple):
+    """What the accounts sheet was asked for, for the interface to go and do.
+
+    Named as `hmz providers` names the same three things, because they are the same three
+    things: what can happen to an account is one list whether it is asked for at a sheet or
+    on a command line.
+
+    Attributes:
+      what: `add`, `login` or `remove`.
+      cli: The backend the account is for, or "" for one that is not made yet.
+      name: What it is called, or "" for the same reason.
+    """
+
+    what: str
+    cli: str = ""
+    name: str = ""
+
+
+#: The three things that can happen to an account, spelled as `hmz providers` spells them.
+_ADD = "add"
+_LOGIN = "login"
+_REMOVE = "remove"
+
+
+class Providers(Sheet[Doing]):
+    """Every account there is to run an agent as, a CLI at a time.
+
+    Read rather than chosen from: which account an agent runs as is asked where that agent is
+    chosen, so nothing here is being picked for anything. What it is for is the three things
+    that can happen to one -- made, signed in again, taken away -- so those are the keys, and
+    enter is the one of them that needs nothing under the cursor.
+
+    Each row is the name, the way it was made by and the variables it sets. Their names and
+    never a value: this is drawn where somebody can read it.
+    """
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        # Letters rather than chords, and priority so they are the keys rather than a search:
+        # a list of your own accounts is short enough to read, and every one of these is
+        # something to do to it. Enter alongside `a`, since a sheet nothing is picked from
+        # has nothing else for the key that picks.
+        Binding("enter", "add", "make one", priority=True),
+        Binding("a", "add", "make one", priority=True),
+        Binding("l", "again", "sign in again", priority=True),
+        Binding("r", "drop", "take away", priority=True),
+    ]
+
+    def __init__(self) -> None:
+        """Initializes the reading."""
+        super().__init__()
+        self._found: list[Provider] | None = None
+        #: Which account the cursor is on, as `cli/name`: the headings between them are rows
+        #: nothing can land on, so a row number is not an account.
+        self._was = ""
+
+    def on_key(self, event: events.Key) -> None:  # noqa: ARG002  -- every key here is a key
+        """Takes no letter as searching, each of the letters here being a key of its own."""
+        return
+
+    def _ask(self) -> None:
+        """Says what these are, and puts them up."""
+        self.query_one("#asked", Label).update("Accounts an agent may run as")
+        self.query_one("#about", Label).update(
+            "One named set of credentials per account, kept apart from the CLI's own and "
+            "from each other's. An agent is given one where the agents are chosen, on "
+            "ctrl+r, and runs its turns as that account."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _providers(self) -> list[Provider]:
+        """Every account there is, read once: this is redrawn each time the cursor moves."""
+        if self._found is None:
+            from humanize import providers
+
+            self._found = providers.providers()
+            self._counting = len(str(len(self._found)))
+        return self._found
+
+    def _fill(self) -> None:
+        """Puts the accounts up under a heading apiece, marked where the cursor is."""
+        listing = self.query_one("#choices", OptionList)
+        found = self._providers()
+        at = listing.highlighted
+        if at is not None and 0 <= at < listing.option_count:
+            self._was = str(listing.get_option_at_index(at).id or "") or self._was
+        if all(f"{one.cli}/{one.name}" != self._was for one in found):
+            # Gone, or never there: the cursor starts on the first of them, and a list with
+            # nothing in it has nothing for it to be on.
+            self._was = f"{found[0].cli}/{found[0].name}" if found else ""
+        rows: list[Option] = []
+        group, landing = "", 0
+        for seen, one in enumerate(found):
+            named = f"{one.cli}/{one.name}"
+            if one.cli != group:
+                group = one.cli
+                # A heading, and a blank line above it once there is something above it.
+                # Neither can be landed on, so the arrows walk the accounts and step over.
+                if rows:
+                    rows.append(Option("", disabled=True))
+                rows.append(
+                    Option(f"{_INDENT}[$primary]{escape(group)}[/]", disabled=True)
+                )
+            if named == self._was:
+                landing = len(rows)
+            rows.append(
+                Option(
+                    self._row(
+                        seen,
+                        one.name,
+                        _sets(one),
+                        here=named == self._was,
+                        inforce=False,
+                    ),
+                    id=named,
+                )
+            )
+        listing.set_options(rows)
+        listing.highlighted = landing if found else None
+        self._drawn = listing.highlighted
+        self.query_one("#tuning", Label).update(
+            "" if found else "[$text-muted]no accounts yet; enter makes one[/]"
+        )
+        self.query_one("#keys", Label).update(
+            "Enter or a to make one · l to sign one in again · r to take one away · "
+            "Esc to close"
+        )
+
+    def action_add(self) -> None:
+        """Answers that another one is to be made, which the interface walks through."""
+        self.dismiss(Doing(_ADD))
+
+    def action_again(self) -> None:
+        """Answers that the one under the cursor is to be signed in again."""
+        self._doing(_LOGIN)
+
+    def action_drop(self) -> None:
+        """Answers that the one under the cursor is to be taken away."""
+        self._doing(_REMOVE)
+
+    def _doing(self, what: str) -> None:
+        """Answers with something to do to the account under the cursor, if there is one.
+
+        Args:
+          what: What is to happen to it.
+        """
+        cli, _, name = self._was.partition("/")
+        if not name:
+            return  # nothing in the list, so nothing for a key to be about
+        self.dismiss(Doing(what, cli, name))
 
 
 class Status(ModalScreen[None]):

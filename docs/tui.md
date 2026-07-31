@@ -18,6 +18,8 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 - [What each agent runs](#what-each-agent-runs)
 - [Where each agent works](#where-each-agent-works)
 - [What each agent is loaded with](#what-each-agent-is-loaded-with)
+- [Which account each agent runs as](#which-account-each-agent-runs-as)
+- [The accounts themselves](#the-accounts-themselves)
 - [Setting a flow up](#setting-a-flow-up)
 - [What it remembers](#what-it-remembers)
 - [Colours](#colours)
@@ -45,7 +47,8 @@ transcript is a record, so a copy of either up there could only ever be the copy
 when you opened it. Both are on the lines round the editor, which are redrawn.
 
 **Above the editor**, one line per agent the flow drives: the name the flow calls it, then what
-it runs as `cli/model:effort`, then the machine its turns land on where that is not this one.
+it runs as `cli/model:effort`, then the machine its turns land on where that is not this one, and
+the [account](#which-account-each-agent-runs-as) it runs as where that is not this machine's own.
 Under them, what the run has cost so far and the rate it is
 costing it at — per model, since two agents at one model are one bill, and over a recent window
 only, so a flow that has stopped reads as stopped.
@@ -87,7 +90,8 @@ list appears under the editor with a line about each.
 | --- | --- | --- |
 | `/flow` | `[path]` | Switches which flow runs, then [how it is set up](#setting-a-flow-up) if it takes any setting up, then what each of its agents runs. With a path, takes that file. Stops whatever was running — a flow is chosen in order to be run. Looking and leaving without choosing changes nothing. |
 | `/config` | | Sets up the flow itself, for a flow that says it can be. See [below](#setting-a-flow-up). |
-| `/agents` | | Sets what each agent of the current flow runs, one at a time, by the name the flow calls it — and, on **ctrl+a**, [where its turns land](#where-each-agent-works), and on **ctrl+s**, [which of its CLI's skills it is loaded with](#what-each-agent-is-loaded-with). It does not ask how the flow itself is set up; `/config` is that half. |
+| `/agents` | | Sets what each agent of the current flow runs, one at a time, by the name the flow calls it — and, on **ctrl+a**, [where its turns land](#where-each-agent-works), on **ctrl+s**, [which of its CLI's skills it is loaded with](#what-each-agent-is-loaded-with), and on **ctrl+r**, [which account it runs as](#which-account-each-agent-runs-as). It does not ask how the flow itself is set up; `/config` is that half. |
+| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and the three things that can happen to one — made, signed in again, taken away. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
@@ -220,7 +224,7 @@ are read one CLI at a time all the same:
      1. claude-opus-5           claude
    ❯ 2. claude-sonnet-5         claude
 
-   ◉ max effort  ←/→ to adjust · ◉ on this machine  ctrl+a to move · ◉ every skill  ctrl+s to choose · ◉ bypass  ctrl+p to change
+   ◉ max effort  ←/→ to adjust · ◉ on this machine  ctrl+a to move · ◉ every skill  ctrl+s to choose · ◉ bypass  ctrl+p to change · ◉ as this machine is signed in  ctrl+r to change
 ```
 
 A tab per CLI **that is actually installed here**, and its models under it. **tab** turns to
@@ -238,7 +242,8 @@ Under the models, the things that are adjusted rather than chosen: **←/→** t
 **ctrl+w** [swarm mode](agents.md#efforts) for a model that has one, **ctrl+a**
 [where it works](#where-each-agent-works), **ctrl+s**
 [what it is loaded with](#what-each-agent-is-loaded-with), **ctrl+p**
-[what it may do](agents.md#what-an-agent-may-do). Enter takes the row under the
+[what it may do](agents.md#what-an-agent-may-do), **ctrl+r**
+[which account it runs as](#which-account-each-agent-runs-as). Enter takes the row under the
 cursor and asks about the next agent the flow drives.
 
 ## Where each agent works
@@ -286,6 +291,65 @@ exactly those from then on. It is a setting of the agent, so the reviewer readin
 need not be carrying what the builder writing it was. What each backend does with it, and what
 a CLI with no way of being told anything does, is in
 [Agents](agents.md#which-skills-an-agent-is-loaded-with).
+
+## Which account each agent runs as
+
+On the same sheet, **ctrl+r** asks which account that agent's turns run as. Another second
+question about the agent, so another key rather than a row — a [provider](providers.md) belongs
+to the CLI, so two models of one CLI are the same account. The tuning line says
+`◉ as this machine is signed in · ctrl+r to change`.
+
+```
+   ❯ 1. as this machine is signed in ✔ nothing is redirected
+     2. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
+     3. work                      login
+```
+
+The accounts offered are that CLI's own, since an account is one backend's, and the first row is
+what every agent ran as before there were any: whatever this machine is already signed in as. A
+CLI with no accounts yet says so, and says where they are made.
+
+It is a setting of the agent because it is the agent that signs in: two agents of one CLI, one on
+a subscription and one on somebody's gateway, are two accounts running at once, each refreshing
+its own token and neither able to read the other's. Esc leaves the agent running as it was.
+
+An agent given an account that has since been taken away is a red line when the flow is started,
+before any turn has run — never a traceback half an hour in.
+
+## The accounts themselves
+
+`/providers` is all of them, grouped by the CLI each belongs to, with the way it was made by and
+the variables it sets. Their names, never a value: this is drawn where somebody can read it.
+
+```
+   claude
+   ❯ 1. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
+     2. work                      login
+
+   codex
+     3. personal                  key
+```
+
+| Key | What it does |
+| --- | --- |
+| **enter** or **a** | Makes one: which CLI, then how to sign in, then what that way asks |
+| **l** | Signs the one under the cursor in again, by the way it was made with |
+| **r** | Takes it away, credentials and all |
+| **esc** | Closes the sheet; off any sheet it opens, a step back to the one before |
+
+Making one is three questions rather than one form, because each is only answerable once the one
+before it has been: a backend's [ways in](providers.md#the-ways-in) are its own, and what a way
+asks is the way's. A secret is drawn as bullets and never shown back — it is on its way into a
+credential store.
+
+A way with a login command of its own is **handed the terminal**: its browser or its device code
+owns the screen until it is done, and what it writes lands in that account's own directory rather
+than in the CLI's. What came of it is a line in the transcript.
+
+Nothing here is refused while a flow is running. An agent reads the account it was configured
+with once, so one made or taken away now is one the next run sees.
+
+The same accounts are on the command line as [`hmz providers`](providers.md#hmz-providers).
 
 ## Setting a flow up
 
@@ -335,8 +399,8 @@ and the flow's own model says which combinations it will not take — so a flow 
 
 Opening the interface again in the same project finds it set up the way you left it: the flow
 that was last run there, for each flow that workspace has run, what each of its agents was
-running, where its turns landed and which skills it was loaded with — and how the flow
-itself was set up.
+running, where its turns landed, which skills it was loaded with and which account it ran as —
+and how the flow itself was set up.
 
 Kept per flow — by the name humanize's own flows have, and by the path yours have, so a flow of
 yours cannot inherit the agents or the settings of the one it shares a name with. Per flow

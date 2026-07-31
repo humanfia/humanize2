@@ -400,16 +400,17 @@ async def test_nothing_is_offered_for_what_is_not_a_command() -> None:
 async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None:
     """A command this interface grows must be offered without being listed twice.
 
-    And nothing the command line has: `exec` is what the first thing you say already does,
-    and `collect` and `anchor` are not things to do to a flow that is running.
+    And none of the three the command line has that are not things to do to a flow that is
+    running: `exec` is what the first thing you say already does, and `collect`, `anchor` and
+    the wrapper a turn is spawned as are each about a run rather than inside one. What both
+    sides do have is the store of accounts, which is one thing said in two places.
     """
-    from humanize.cli import COMMANDS
     from humanize.tui.complete import about, offered
 
     offers = offered("/", _OWN)
 
     assert {f"/{name}" for name in _OWN if about(name)} == set(offers)
-    assert not {f"/{name}" for name in COMMANDS} & set(offers)
+    assert not {"/exec", "/collect", "/anchor", "/cred"} & set(offers)
     # And a command typed in full has nothing left to be finished with, so enter sends it.
     assert offered("/exit", _OWN) == []
 

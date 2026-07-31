@@ -80,6 +80,34 @@ def _anchor(argv: list[str]) -> int:
     return anchor(argv)
 
 
+def _cred(argv: list[str]) -> int:
+    """Runs a program whose credentials are kept somewhere other than where it looks.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      The program's exit status, or one of our own if it never ran.
+    """
+    from .cred import cred
+
+    return cred(argv)
+
+
+def _providers(argv: list[str]) -> int:
+    """Lists, makes and takes away the accounts an agent may be run as.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      Zero, or two for a line to correct.
+    """
+    from .providers import providers
+
+    return providers(argv)
+
+
 def _line() -> ArgumentParser:
     """The line `hmz` itself takes, which is how the interface is opened set up.
 
@@ -191,6 +219,8 @@ COMMANDS = {
         "aggregate the trajectories agents left behind into a Chrome trace",
     ),
     "anchor": (_anchor, "run an agent here that acts on another machine"),
+    "providers": (_providers, "the accounts an agent may be run as"),
+    "cred": (_cred, "run an agent whose credentials are kept somewhere else"),
 }
 
 

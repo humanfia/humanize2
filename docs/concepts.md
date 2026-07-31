@@ -1,6 +1,6 @@
 # Concepts
 
-Eight words carry the whole of humanize. This page defines them once, in the order they build
+Nine words carry the whole of humanize. This page defines them once, in the order they build
 on each other, so the rest of the documentation can use them without redefining them.
 
 ## Table of Contents
@@ -13,6 +13,7 @@ on each other, so the rest of the documentation can use them without redefining 
 - [Flow](#flow)
 - [Cycle](#cycle)
 - [Machine](#machine)
+- [Provider](#provider)
 - [Trace](#trace)
 - [How they fit](#how-they-fit)
 - [Two distinctions worth getting right](#two-distinctions-worth-getting-right)
@@ -21,7 +22,8 @@ on each other, so the rest of the documentation can use them without redefining 
 
 A **flow** drives **agents**, each of which holds **sessions** with a coding-agent **backend**;
 a session is made of **turns**; one run of a flow is a **cycle**; an agent's turns land on a
-**machine**; and what the whole thing did is read back as a **trace**.
+**machine** and may run as a **provider**; and what the whole thing did is read back as a
+**trace**.
 
 ## Backend
 
@@ -153,6 +155,20 @@ Cycles live under `~/.humanize/cycles/`. See [Tracing](tracing.md#cycles).
 | **One started for the agent** | a container of an image you name, brought up on the first turn and removed with the agent. |
 
 It is one setting because it is one question. See [Machines](machines.md).
+
+## Provider
+
+**One named set of credentials for one backend** — a subscription signed into, a key, an
+endpoint of somebody else's — kept apart from the CLI's own under
+`~/.humanize/providers/<cli>/<name>/`.
+
+An agent configured with one runs its turns as that account: with the provider's variables, and
+reading its credentials out of the provider's directory rather than the CLI's. Only the
+credential files move; the sessions, the settings and the skills are the CLI's own.
+
+It is a setting of the agent because it is the agent that signs in. Which is what lets one flow
+drive two agents of one CLI as two different accounts at once — each refreshing its own token,
+neither able to read the other's. See [Providers](providers.md).
 
 ## Trace
 

@@ -55,8 +55,9 @@ class Settings:
 
         Returns:
           One `cli/model:effort` apiece with the machine it was anchored to, the skills it is
-          loaded with and what it may do without being asked, in the order the flow takes
-          them, and nothing at all for a flow this workspace has not run.
+          loaded with, what it may do without being asked and the account it ran as, in the
+          order the flow takes them, and nothing at all for a flow this workspace has not
+          run.
         """
         flows: dict[str, Any] = self._mine().get("flows") or {}
         kept: dict[str, Any] = flows.get(flow) or {}
@@ -78,7 +79,8 @@ class Settings:
             # already meant. An entry that says nothing about skills is an agent nobody has
             # been asked about, which is its CLI as it comes rather than an agent with none,
             # and one that says nothing about what it may do runs at what such an agent has
-            # always run at.
+            # always run at. One that names no account runs as this machine is signed in,
+            # which is what every agent written down before there were any did.
             held = agent.get("skills")
             having = (
                 tuple(str(one) for one in cast("list[Any]", held))
@@ -91,6 +93,7 @@ class Settings:
                     str(agent.get("anchor") or ""),
                     having,
                     str(agent.get("permission") or ""),
+                    str(agent.get("provider") or ""),
                 )
             )
         return said
@@ -154,6 +157,10 @@ class Settings:
                 # The same again: an entry that says nothing is an agent nobody was asked
                 # about, which is the rung one written before there were any ran at.
                 agents[named]["permission"] = runs.permission
+            if runs.provider:
+                # And once more: an agent that names no account runs as this machine is
+                # signed in, which is what every entry written before this one says.
+                agents[named]["provider"] = runs.provider
         mine = self._mine()
         mine["flow"] = flow
         kept: dict[str, Any] = {"agents": agents}

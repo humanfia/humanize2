@@ -65,6 +65,15 @@ hmz exec -f ralph_loop -a cli=claude,model=claude-opus-4-8,effort=high "fix the 
 `-f` takes the name of a flow humanize came with, one of your own under `.humanize/flows` here or
 in your home directory, or the path to a file anywhere else.
 
+An agent may also name the account it runs as, so that one flow drives one CLI as two
+[providers](docs/providers.md) at once — a subscription and somebody else's endpoint:
+
+```sh
+hmz providers add claude/deepseek -w gateway
+hmz exec -f flame_chase \
+    -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
+```
+
 Every run is one cycle, written down under `~/.humanize/cycles` as it happens: the flow, the
 agents, and every session they opened. Collect what it left behind, and open the file in
 [ui.perfetto.dev](https://ui.perfetto.dev):
@@ -93,6 +102,7 @@ Everything is under [docs/](docs/README.md), which indexes it by what you came f
 - [Flows](docs/flows.md) — writing a flow and running it (`hmz exec`)
 - [Agents](docs/agents.md) — sessions, turns, shapes, skills, goals, questions, efforts
 - [Machines](docs/machines.md) — where an agent's turns land
+- [Providers](docs/providers.md) — which account an agent runs as (`hmz providers`)
 - [Remote execution](docs/remote-execution.md) — acting on another machine (`hmz anchor`)
 - [Tracing](docs/tracing.md) — trajectories into a trace (`hmz collect`)
 - [Troubleshooting](docs/troubleshooting.md) — what went wrong, and what to do

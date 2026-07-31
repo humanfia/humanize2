@@ -1,0 +1,420 @@
+"""Which account an agent's turns run as: made here, given to one agent, and kept.
+
+An account is credentials rather than a way of running a model, so it is asked about where
+the agent is chosen and not where the flow is -- two agents of one CLI may be two accounts.
+Nothing here signs anything in: a CLI's own login is the only thing that can perform that
+CLI's login, so it is patched out and what is tested is the walk up to it.
+"""
+
+from __future__ import annotations
+
+import unittest.mock
+from typing import TYPE_CHECKING
+
+import pytest
+from textual.widgets import Label, OptionList, Static
+
+from humanize import providers
+from humanize.backends import Model
+from humanize.tui import Humanize
+from humanize.tui.pick import (
+    Backends,
+    Models,
+    Providers,
+    Runs,
+    RunsAs,
+    Signing,
+    Ways,
+    reads,
+)
+from humanize.tui.settings import Settings
+
+from .test_app import _transcript, until
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+#: What one installed CLI looks like, for the tests that walk the agents sheet.
+CLAUDE = {"claude": (Model("claude-opus-5", ("max", "high")),)}
+
+
+def _account(name: str = "deepseek", cli: str = "claude") -> providers.Provider:
+    """Writes one account down, as `hmz providers add` does, signing nothing in."""
+    return providers.add(cli, name, way="key", env={"ANTHROPIC_API_KEY": "not-a-key"})
+
+
+@pytest.mark.timeout(60)
+async def test_the_command_opens_the_sheet_of_accounts() -> None:
+    """A command of its own, because an account outlives the flow that was set up with it."""
+    _account()
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        rows = [str(option.prompt) for option in listing.options]
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    # The CLI it is under as a heading, and under it the name, the way and the variables.
+    assert any("claude" in row for row in rows)
+    assert any("deepseek" in row and "key" in row for row in rows)
+    assert any("ANTHROPIC_API_KEY" in row for row in rows)
+    # Their names and never a value: this is drawn where somebody can read it.
+    assert all("not-a-key" not in row for row in rows)
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+async def test_an_account_made_on_the_sheet_lands_in_the_store(
+    signed_in: unittest.mock.MagicMock,
+) -> None:
+    """Three questions, because each is only answerable once the one before it has been."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+
+        await driver.press("a")
+        await until(lambda: isinstance(app.screen, Backends), driver)
+        backends = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(backends.options), driver)
+        assert str(backends.get_option_at_index(0).id) == "=claude"
+        await driver.press("enter")
+
+        await until(lambda: isinstance(app.screen, Ways), driver)
+        ways = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(ways.options), driver)
+        assert str(ways.get_option_at_index(0).id) == "=login"
+        await driver.press("enter")
+
+        # Only what to call it: the way that signs in to an account asks nothing else, the
+        # CLI's own login being what asks the rest.
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        await driver.press(*"mine")
+        await driver.press("enter")
+
+        # And the sheet comes back with the new one on it.
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+        said = _transcript(app)
+
+    made = providers.find("claude", "mine")
+    assert made is not None
+    assert made.way == "login"
+    # The CLI's own way in ran, under this account's own paths, and nothing else did.
+    assert signed_in.call_count == 1
+    assert "claude/mine is written down at" in said
+    assert "claude/mine is signed in" in said
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+async def test_a_secret_is_never_drawn_back(signed_in: unittest.mock.MagicMock) -> None:
+    """It is on its way into a credential store, and a screen is somewhere it is read off."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("a")
+        await until(lambda: isinstance(app.screen, Backends), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await driver.press("enter")
+
+        # `key`, which is a variable rather than a login: it asks, and nothing is run.
+        await until(lambda: isinstance(app.screen, Ways), driver)
+        ways = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(ways.options), driver)
+        await driver.press("down", "down")
+        await driver.pause()
+        assert str(ways.get_option_at_index(ways.highlighted or 0).id) == "=key"
+        await driver.press("enter")
+
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        form = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(form.options), driver)
+        await driver.press(*"mine")
+        await driver.press("down")
+        await driver.press(*"sk-secret")
+        await driver.pause()
+        rows = [str(option.prompt) for option in form.options]
+        assert all("sk-secret" not in row for row in rows)
+        assert any("•" * len("sk-secret") in row for row in rows)
+
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    made = providers.find("claude", "mine")
+    assert made is not None
+    assert made.env == {"ANTHROPIC_API_KEY": "sk-secret"}
+    # A way that is only answers has already happened, having been written down.
+    assert signed_in.call_count == 0
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+async def test_the_account_an_agent_runs_as_is_chosen_beside_what_it_runs(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """A fourth question about the agent, so it is a key on the same sheet and not a row."""
+    _account()
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        tuning = app.screen.query_one("#tuning", Label)
+        await until(lambda: "effort" in str(tuning.content), driver)
+        # Never asked, which is the account whoever is at this machine is signed in as.
+        assert "as this machine is signed in" in str(tuning.content)
+
+        await driver.press("ctrl+r")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        assert [str(option.id) for option in listing.options] == ["=", "=deepseek"]
+
+        await driver.press("down", "enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await until(lambda: "as deepseek" in str(tuning.content), driver)
+
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+        await driver.pause()
+        # And on the line above the prompt, beside what it runs.
+        assert "deepseek" in str(app.query_one("#above", Static).content)
+
+    chosen = Runs("claude/claude-opus-5:max", "", None, "", "deepseek")
+    assert app._models == [chosen]
+    assert app.settings.agents(app._flow_named) == [chosen]
+    assert reads(("builder",), [chosen]) == [
+        "builder · claude/claude-opus-5:max · deepseek"
+    ]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+async def test_a_cli_with_no_accounts_says_where_they_come_from(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """A sheet holding one row that changes nothing has to say why it is the only one."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await driver.press("ctrl+r")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        said = str(app.screen.query_one("#tuning", Label).content)
+
+        assert "claude has no providers yet" in said
+        assert "/providers" in said
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+async def test_walking_out_leaves_the_agent_running_as_this_machine(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """Declining to answer the fourth question is not declining to choose the agent."""
+    _account()
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await driver.press("ctrl+r")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        await driver.press("down")  # walked to and then walked away from
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    assert app._models == [Runs("claude/claude-opus-5:max")]
+
+
+@pytest.mark.timeout(60)
+async def test_walking_out_of_the_accounts_makes_nothing_and_loses_nothing() -> None:
+    """Esc is the step before, and the step before the first one is out."""
+    _account()
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+
+        await driver.press("a")
+        await until(lambda: isinstance(app.screen, Backends), driver)
+        await driver.press("escape")
+        # Back to the accounts, which is where making one was asked for.
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    assert [one.name for one in providers.providers()] == ["deepseek"]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+async def test_an_account_is_signed_in_again_by_the_way_it_was_made_with(
+    signed_in: unittest.mock.MagicMock,
+) -> None:
+    """A token expires and a subscription is signed out of, and neither remakes the account."""
+    providers.add("claude", "deepseek", way="login")
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        await driver.press("l")
+        await until(lambda: signed_in.call_count == 1, driver)
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+        said = _transcript(app)
+
+    assert "claude/deepseek is signed in" in said
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+async def test_signing_in_again_asks_only_what_is_not_written_down(
+    signed_in: unittest.mock.MagicMock,
+) -> None:
+    """A key the CLI keeps in its own store was never kept here, so it is asked for again."""
+    providers.add("codex", "work", way="key")
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        await driver.press("l")
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        form = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(form.options), driver)
+        # And only that: what to call an account that already has a name is not a question.
+        assert [str(option.id) for option in form.options] == ["=OPENAI_API_KEY"]
+
+        await driver.press(*"sk-1")
+        await driver.press("enter")
+        await until(lambda: signed_in.call_count == 1, driver)
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    assert signed_in.call_args.args[2] == {"OPENAI_API_KEY": "sk-1"}
+
+
+@pytest.mark.timeout(60)
+async def test_taking_an_account_away_says_what_went_with_it() -> None:
+    """Credentials are what is going, and a line that said less would be understating it."""
+    _account()
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        await driver.press("r")
+        await until(lambda: not providers.providers(), driver)
+        # The sheet comes back, with nothing on it now.
+        await until(
+            lambda: (
+                isinstance(app.screen, Providers)
+                and not app.screen.query_one("#choices", OptionList).options
+            ),
+            driver,
+        )
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+        said = _transcript(app)
+
+    assert "claude/deepseek is gone, credentials and all" in said
+    assert providers.find("claude", "deepseek") is None
+
+
+def test_an_agent_is_made_as_the_account_it_was_given() -> None:
+    """What the sheet answered is a setting of the agent, done to it before the flow starts."""
+    from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    _account()
+    app = Humanize()
+    app._models = [Runs("claude/m:high", "", None, "", "deepseek")]
+    made = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+
+    (agent,) = app._as_they_were_set_up([made])
+
+    assert agent.config.provider == "deepseek"
+    assert agent.config.machine is None  # it works here, as it did before
+
+    # And one nobody named an account for is the agent that was made, untouched.
+    app._models = [Runs("claude/m:high")]
+    again = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    assert app._as_they_were_set_up([again]) == [again]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+async def test_an_agent_told_to_run_as_nobody_is_a_line_to_correct(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """An agent that cannot find its account must not quietly run as whoever started it."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._models = [Runs("claude/claude-opus-5:max", "", None, "", "nonesuch")]
+        await driver.press(*"go")
+        await driver.press("enter")
+        await until(lambda: "nonesuch" in _transcript(app), driver)
+        said = _transcript(app)
+
+    assert "hmz: no claude provider called 'nonesuch'" in said
+    assert (
+        "Traceback" not in said
+    )  # said at the prompt, rather than raised out of a thread
+    assert not app._agents  # and nothing started
+
+
+def test_what_an_agent_runs_as_is_kept_and_read_back(tmp_path: Path) -> None:
+    """As the anchor and the skills are: written only where there is an account to write."""
+    kept = Settings(tmp_path)
+    kept.remember(
+        "rlar",
+        ("actor", "reviewer"),
+        [Runs("claude/m:high", "", None, "", "deepseek"), Runs("codex/n:low")],
+    )
+
+    assert Settings(tmp_path).agents("rlar") == [
+        Runs("claude/m:high", "", None, "", "deepseek"),
+        Runs("codex/n:low"),
+    ]
+    held = Settings(tmp_path)._read()
+    agents = held["workspaces"][str(tmp_path.resolve())]["flows"]["rlar"]["agents"]
+    assert agents["actor"]["provider"] == "deepseek"
+    # An agent nobody named one for says nothing, which is what a file written before there
+    # were any says too -- and reads back as this machine's own account.
+    assert "provider" not in agents["reviewer"]

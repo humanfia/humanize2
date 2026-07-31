@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -34,6 +34,14 @@ class AnchorConfig:
         agent sees are the target's own.
       local_paths: Paths to keep on this machine even when they are inside the workspace.
       local_execs: Paths whose programs run here rather than on the target.
+      private: Variables of the agent's own that must not cross to the target: a credential it
+        was given to reach its model provider is the agent's business and not the target's, and
+        everything else it exports reaches every command it runs there.
+      redirects: Paths this session answers with others, as `(what the agent names, what it
+        gets)`. A directory stands for everything inside it, and what a path is answered with
+        is kept on this machine like any other state of the agent's own. This is how a turn
+        runs as a provider's account: a process has one tracer, so an anchored session
+        answers for the credentials itself rather than nesting a supervisor inside this one.
       net: Where the agent's own connections go: `local`, so that its model provider stays
         reachable, or `remote`. What it spawns always uses the target's network.
       net_allow: Hosts to keep local anyway when `net` is remote, as `HOST[:PORT]`.
@@ -48,6 +56,8 @@ class AnchorConfig:
     shadow: str | None = None
     local_paths: tuple[str, ...] = ()
     local_execs: tuple[str, ...] = ()
+    private: tuple[str, ...] = ()
+    redirects: tuple[tuple[str, str], ...] = ()
     net: str = "local"
     net_allow: tuple[str, ...] = ()
     token: str | None = None
@@ -60,16 +70,30 @@ class AnchorConfig:
         hears about it as it configures its agents, not hours into the loop that drives them.
 
         Raises:
-          ValueError: If the target cannot be read, or the work's own connections are neither
-            kept local nor sent to the target.
+          ValueError: If the target cannot be read, the work's own connections are neither
+            kept local nor sent to the target, or a path is answered with something that is
+            not a path.
         """
         from humanize.coganchor.transport import Target
 
         Target.parse(self.target)
         if self.net not in ("local", "remote"):
             raise ValueError(f"unsupported net {self.net!r}; expected local or remote")
+        for pair in self.redirects:
+            # Absolute both ways: what the agent names is resolved before it is looked up,
+            # and a relative answer would be read against wherever the turn happens to be.
+            if not all(part.startswith("/") for part in pair):
+                raise ValueError(
+                    f"unsupported redirect {'='.join(pair)!r}; expected two absolute paths"
+                )
 
-    def command(self, argv: Sequence[str]) -> list[str]:
+    def command(
+        self,
+        argv: Sequence[str],
+        *,
+        swaps: Sequence[tuple[str, str]] = (),
+        private: Sequence[str] = (),
+    ) -> list[str]:
         """Renders the invocation that runs `argv` under this anchor in a process of its own.
 
         What :func:`connect` does in this one, for callers that cannot lend it theirs. A
@@ -78,13 +102,31 @@ class AnchorConfig:
 
         Args:
           argv: The agent to run and its own arguments.
+          swaps: Paths this one turn answers with others, on top of :attr:`redirects`. Where a
+            turn under a provider says which credentials it is taken with, rather than the
+            settings saying it for every turn.
+          private: Variables this one turn keeps to itself, on top of :attr:`private` -- the
+            same thing said for the credentials a provider hands the agent as variables
+            rather than as files.
 
         Returns:
           The command to spawn, which exits with the agent's own status.
+
+        Raises:
+          ValueError: If a swap is not between two absolute paths.
         """
         from humanize.coganchor.argv import render
 
-        return render(self, argv)
+        answering = (
+            replace(
+                self,
+                redirects=(*self.redirects, *swaps),
+                private=(*self.private, *private),
+            )
+            if swaps or private
+            else self
+        )
+        return render(answering, argv)
 
     def mount(self) -> tuple[Target, str, str]:
         """Reads the target, and works out where the workspace is on each side of it.
@@ -171,15 +213,24 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
     target, workspace, export = config.mount()
     agent = statepaths.resolve(list(command))
     shadow_root = os.path.abspath(config.shadow) if config.shadow else workspace
+    redirects = tuple(
+        (os.path.abspath(named), os.path.abspath(instead))
+        for named, instead in config.redirects
+    )
     router = Router(
         layouts=(Layout.create(shadow_root, workspace),),
         local_paths=tuple(
-            agent.local_paths + [os.path.abspath(path) for path in config.local_paths]
+            agent.local_paths
+            + [os.path.abspath(path) for path in config.local_paths]
+            # What a path is answered with is this machine's business: mirroring a
+            # provider's credentials onto the target would put them where the work lands.
+            + [instead for _, instead in redirects]
         ),
         local_programs=tuple(
             agent.local_programs
             + [os.path.abspath(path) for path in config.local_execs]
         ),
+        redirects=redirects,
     )
     prepare_shadow_root(shadow_root, force=config.force, target=target.describe())
 
@@ -205,6 +256,7 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
         ),
         netproxy=netproxy,
         token=config.token,
+        private=config.private,
     )
     log.info("running %s against %s", agent.profile.name, target.describe())
     try:

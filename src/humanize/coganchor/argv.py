@@ -76,6 +76,22 @@ def parser() -> ArgumentParser:
         help="run programs under this path locally instead of on the target",
     )
     built.add_argument(
+        "--redirect",
+        metavar="FROM=TO",
+        action="append",
+        default=[],
+        help="answer this path with that one -- the file it names, or everything "
+        "under the directory it names -- and keep what it is answered with local",
+    )
+    built.add_argument(
+        "--private",
+        metavar="NAME",
+        action="append",
+        default=[],
+        help="keep this variable out of what the agent's commands are run with on the "
+        "target: a credential it was given to reach its model provider is its own",
+    )
+    built.add_argument(
         "--net",
         choices=["local", "remote"],
         default="local",
@@ -142,6 +158,8 @@ def settings(args: Namespace) -> AnchorConfig:
         shadow=args.shadow,
         local_paths=tuple(args.local_path),
         local_execs=tuple(args.local_exec),
+        redirects=tuple(_pair(said) for said in args.redirect),
+        private=tuple(args.private),
         net=args.net,
         net_allow=tuple(args.net_allow),
         token=args.token,
@@ -179,6 +197,19 @@ def render(config: AnchorConfig, argv: Sequence[str]) -> list[str]:
         ("--net-allow", config.net_allow),
     ):
         options += [f"{flag}={value}" for value in values]
+    options += [f"--redirect={named}={instead}" for named, instead in config.redirects]
+    options += [f"--private={name}" for name in config.private]
     if config.force:
         options.append("--force")
     return [sys.executable, "-m", "humanize", "anchor", *options, *argv]
+
+
+def _pair(said: str) -> tuple[str, str]:
+    """Reads one `FROM=TO` as the two paths it names.
+
+    Whether they are paths a session could answer anything with is
+    :class:`~humanize.coganchor.anchor.AnchorConfig`'s to say, so one with no `=` in it comes
+    back as half a pair and is refused there along with everything else it refuses.
+    """
+    named, _, instead = said.partition("=")
+    return named, instead

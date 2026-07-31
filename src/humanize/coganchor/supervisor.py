@@ -31,6 +31,8 @@ from humanize.coganchor.linux import procfs, ptrace, seccomp
 from humanize.coganchor.linux.syscalls import NR, TRAPPED_SYSCALLS, syscall_name
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from humanize.coganchor.linux.ptrace import Registers
     from humanize.coganchor.netproxy import NetProxy
     from humanize.coganchor.policy import Router
@@ -104,11 +106,16 @@ class Supervisor:
         *,
         netproxy: NetProxy | None = None,
         token: str | None = None,
+        private: Iterable[str] = (),
     ) -> None:
         self.client = client
         self.router = router
         self.shadow = shadow
         self.netproxy = netproxy
+        #: What the agent was given that the target is not to be given: the credentials it
+        #: reaches its own model provider with. Everything else it exports is inherited by
+        #: every command it runs there, which is what makes these worth naming.
+        self.private = frozenset(private)
         self._launch = launch
         self._token = token
         self._dispatcher = SyscallDispatcher(self)
@@ -412,7 +419,11 @@ class Supervisor:
             else program
         )
         argv = [self.router.rewrite(item) for item in argv]
-        env = {name: self.router.rewrite(value) for name, value in env.items()}
+        env = {
+            name: self.router.rewrite(value)
+            for name, value in env.items()
+            if name not in self.private
+        }
         remote_program = self.router.rewrite(remote_program)
         log.debug(
             "pid %d: running %s on the target (cwd %s)", tracee.pid, argv[:1], cwd

@@ -112,6 +112,9 @@ ignore = [
 # The syscall layer's domain type is the string path: it reads them out of ptrace
 # registers and puts them on a wire, so `pathlib` would only convert them twice.
 "src/humanize/coganchor/**" = ["PTH"]
+# The same, for the half of a redirected run that reads paths out of a tracee: what
+# it holds is what the process itself named, byte for byte, and back again.
+"src/humanize/providers/_trace.py" = ["PTH"]
 # A handle and the client it came off, a session and its agent: each pair is two
 # halves of one object declared in one file, and the underscore keeps the halves
 # out of the package's public surface rather than out of each other's.

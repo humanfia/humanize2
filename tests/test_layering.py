@@ -39,6 +39,10 @@ ALLOWED: dict[str, set[str]] = {
         "humanize.backends",
         "humanize.coganchor",
         "humanize.machines",
+        # Which account a turn runs as is a setting of the agent, so driving one reads the
+        # providers. They name nothing above themselves, so this widens the DAG without
+        # bending it -- as `backends` does below.
+        "humanize.providers",
     },
     "humanize.backends": set(),
     "humanize.coganchor": set(),
@@ -56,11 +60,19 @@ ALLOWED: dict[str, set[str]] = {
         "humanize.cycle",
         "humanize.flows",
     },
+    # A provider is credentials for one backend, kept apart from that backend's own, and it
+    # is run under the same interception a session on another machine is: the facts about the
+    # CLI, and the ptrace layer that answers a path. Neither of those names it back.
+    "humanize.providers": {"humanize.backends", "humanize.coganchor"},
     "humanize.tracing": {"humanize.backends"},
     "humanize.tui": {
         "humanize.agents",
         "humanize.backends",
         "humanize.flows",
+        # `/providers` is where an account is made and `/agents` is where one is given to an
+        # agent, so the interface reads the same leaf the agents do. It names nothing above
+        # itself, so this widens the DAG without bending it.
+        "humanize.providers",
         "humanize.runner",
     },
 }

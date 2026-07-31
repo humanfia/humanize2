@@ -55,17 +55,29 @@ from .complete import about, hinted, offered, takes
 from .discover import installed
 from .history import History
 from .monitor import Monitor, short, thousands
-from .pick import Configures, Flows, Models, Runs, Status, reads
+from .pick import (
+    Backends,
+    Configures,
+    Flows,
+    Models,
+    Providers,
+    Runs,
+    Signing,
+    Status,
+    Ways,
+    reads,
+)
 from .settings import Settings
 from .tally import Tally
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Generator, Sequence
 
     from pydantic import BaseModel
 
     from humanize.agents import AgentBase, Event, Question
-    from humanize.backends import Model
+    from humanize.backends import Model, Way
+    from humanize.providers import Provider
     from humanize.runner import Place
 
 #: What the editor understands, named as opencode names them, one step along: what answers
@@ -78,6 +90,7 @@ _OWN = (
     "flow",
     "config",
     "agents",
+    "providers",
     "status",
     "clear",
     "details",
@@ -88,10 +101,11 @@ _OWN = (
 
 #: What the box this opens with says about how to begin. The model of the thing rather than
 #: the keys: what a key does right now is on the status line, and is only worth saying in one
-#: place -- so these are the two nouns instead, which are the ones a flow is written in.
+#: place -- so these are the nouns instead, which are the ones a flow is written in.
 _HELP = (
     "Say what to do, and the flow starts on it.",
     "/flow chooses the loop, /agents what it drives.",
+    "/providers holds the accounts they run as.",
 )
 
 #: How often the right-hand column and the status line are redrawn, in seconds.
@@ -1130,6 +1144,8 @@ class Humanize(App[None]):
             self.action_config()
         elif name == "agents":
             self.action_agents()
+        elif name == "providers":
+            self.action_providers()
         elif name == "status":
             self.action_status()
         elif name == "details":
@@ -1373,6 +1389,170 @@ class Humanize(App[None]):
         )
         self._draw()
 
+    @work
+    async def action_providers(self) -> None:
+        """Walks the accounts an agent may be run as, which is what `/providers` is for.
+
+        The sheet comes back after each thing done to one, since what it says is what there
+        is now: an account made or taken away is a list that has changed. Esc closes it, and
+        esc off any of the sheets it opens is a step back into the one before -- so a walk in
+        to look at them and out again changes nothing.
+
+        Not refused while a flow runs. What it holds is not what is running: an agent reads
+        the account it was configured with once, so one made or taken away now is one the
+        next run sees. A login that takes the terminal does hold the rest of the interface up
+        while it has it, which is what handing the terminal over means.
+        """
+        while True:
+            doing = await self.push_screen_wait(Providers())
+            if doing is None:
+                return
+            # The three words `hmz providers` uses for the same three things, which is where
+            # the sheet took them from: one vocabulary for one list of things to do.
+            if doing.what == "add":
+                await self._make_provider()
+            elif doing.what == "login":
+                await self._sign_provider_in(doing.cli, doing.name)
+            else:
+                self._drop_provider(doing.cli, doing.name)
+
+    async def _make_provider(self) -> None:
+        """Asks which CLI, which way in and what that way needs, and writes the account down.
+
+        Three questions rather than one form, because each is only answerable once the one
+        before it has been: a backend's ways in are its own, and what a way asks is the way's.
+        """
+        from humanize.providers import login as signing
+
+        cli = ""
+        way: Way | None = None
+        while True:
+            if not cli:
+                picked = await self.push_screen_wait(Backends())
+                if picked is None:
+                    return  # nothing before this to step back into
+                cli = picked
+            if way is None:
+                named = await self.push_screen_wait(Ways(cli))
+                if named is None:
+                    cli = ""  # back to the backends, which is where this walk came from
+                    continue
+                way = signing.way_of(cli, named)
+                if way is None:
+                    return  # the sheet lists that backend's own ways, so there are none else
+            signs = await self.push_screen_wait(Signing(cli, way))
+            if signs is None:
+                way = None  # and back to the ways, for the same reason
+                continue
+            break
+        try:
+            provider = signing.make(cli, signs.name, way, signs.answers)
+        except (ValueError, OSError) as why:  # a name or a directory that will not do
+            self.show(f"hmz: {why}", "red")
+            return
+        self.show(
+            f"[dim]{escape(provider.cli)}/{escape(provider.name)} is written down at "
+            f"{escape(str(provider.at))}[/dim]"
+        )
+        self._signed_in(provider, way, signs.answers)
+
+    async def _sign_provider_in(self, cli: str, name: str) -> None:
+        """Runs one account's own way in again, asking for whatever it still needs.
+
+        Args:
+          cli: The backend it is for.
+          name: What the account is called.
+        """
+        from humanize import providers as held
+        from humanize.providers import login as signing
+
+        provider = held.find(cli, name)
+        if provider is None:
+            self.show(f"hmz: no provider {cli}/{name}", "red")
+            return
+        way = signing.way_of(cli, provider.way)
+        if way is None or not way.argv:
+            self.show(
+                f"hmz: {cli}/{name} was made by {provider.way}, which has nothing to run; "
+                "make it again to change what it holds",
+                "red",
+            )
+            return
+        # What it already holds answers what it can. A key the CLI keeps in its own store is
+        # not among them -- it was never kept here -- so it is asked for again.
+        answers = dict(provider.env)
+        if signing.asked(way, answers):
+            signs = await self.push_screen_wait(Signing(cli, way, name=name))
+            if signs is None:
+                return  # walked out, which signs nothing in and changes nothing
+            answers |= signs.answers
+        self._signed_in(provider, way, answers)
+
+    def _signed_in(self, provider: Provider, way: Way, answers: dict[str, str]) -> None:
+        """Hands the terminal to a backend's own way in, and says what came of it.
+
+        A login is a browser opened, a code read out, a token exchanged: it owns the screen
+        while it runs, and there is nothing for this interface to draw over it. A way that is
+        only answers has already happened, having been written down.
+
+        Args:
+          provider: The account being signed in.
+          way: The way in, whose own command is what runs.
+          answers: What its questions were answered with.
+        """
+        from humanize.providers import login as signing
+
+        if not way.argv:
+            return
+        try:
+            with self._handing_over():
+                status = signing.sign_in(provider, way, answers)
+        except OSError as why:  # the backend's own command is not on this machine
+            self.show(f"hmz: {way.argv[0]}: {why}", "red")
+            return
+        if status:
+            self.show(f"hmz: {way.argv[0]} exited {status}", "red")
+            return
+        self.show(
+            f"[dim]{escape(provider.cli)}/{escape(provider.name)} is signed in[/dim]"
+        )
+
+    @contextlib.contextmanager
+    def _handing_over(self) -> Generator[None]:
+        """Gives the terminal away for as long as something else needs to own it.
+
+        Where there is one to give: a driver that cannot be suspended is one nobody is
+        watching -- a test, a web terminal -- and what was going to run still has to run.
+        """
+        from textual.app import SuspendNotSupported
+
+        try:
+            with self.suspend():
+                yield
+        except SuspendNotSupported:
+            yield
+
+    def _drop_provider(self, cli: str, name: str) -> None:
+        """Takes one account away, credentials and all, and says so.
+
+        Args:
+          cli: The backend it is for.
+          name: What it is called.
+        """
+        from humanize import providers as held
+
+        try:
+            gone = held.remove(cli, name)
+        except ValueError as why:  # a name nothing could ever have been kept under
+            self.show(f"hmz: {why}", "red")
+            return
+        if not gone:
+            self.show(f"hmz: no provider {cli}/{name}", "red")
+            return
+        self.show(
+            f"[dim]{escape(cli)}/{escape(name)} is gone, credentials and all[/dim]"
+        )
+
     def _at_turn_start(self) -> list[str]:
         """What a turn starting folds into its prompt, which is one waiting line, or none.
 
@@ -1486,41 +1666,59 @@ class Humanize(App[None]):
             self._awaiting = False
 
     def _as_they_were_set_up(self, chosen: list[AgentBase]) -> list[AgentBase]:
-        """Sets each agent up as it was chosen: where it works, and what it is loaded with.
+        """Sets each agent up as it was chosen: where it works, what it holds, who it is.
 
-        Done to the agents rather than said on the line that made them: both are settings of
-        the agent, and `hmz exec` reads a line that says what each one runs and nothing else.
-        An agent that works here and was never asked about skills is left exactly as it was.
+        Done to the agents rather than said on the line that made them: all of them are
+        settings of the agent, and `hmz exec` reads a line that says what each one runs and
+        nothing else. An agent that works here, was never asked about skills and runs as this
+        machine is signed in is left exactly as it was.
 
         Args:
           chosen: The agents the line named, in the order the flow takes them.
 
         Returns:
-          The same agents, or one set up in place of any that was given a machine or told
-          which of its CLI's skills to have.
+          The same agents, or one set up in place of any that was given a machine, told which
+          of its CLI's skills to have, or told which account to run as.
 
         Raises:
-            ValueError: If a target cannot be read, before any of them has run.
+            ValueError: If a target cannot be read, or an agent was given an account there is
+              no such thing as -- both before any of them has run, since either is a line to
+              correct at the prompt rather than a traceback out of a flow's own thread.
         """
         from dataclasses import replace
 
+        from humanize import providers
         from humanize.agents import anchored
 
         moved: list[AgentBase] = []
         for at, agent in enumerate(chosen):
             runs = self._models[at] if at < len(self._models) else Runs("")
-            if not runs.anchor and runs.skills is None and not runs.permission:
+            if (
+                not runs.anchor
+                and runs.skills is None
+                and not runs.permission
+                and not runs.provider
+            ):
                 moved.append(agent)
                 continue
+            if runs.provider and providers.find(agent.backend, runs.provider) is None:
+                # Asked now rather than when the first turn needs it: an agent that cannot
+                # find the account it was told to run as must not quietly run as whoever
+                # started it is signed in as, and must not do it half an hour in.
+                raise ValueError(
+                    f"no {agent.backend} provider called {runs.provider!r}"
+                )
             # The config is frozen, so an agent that works elsewhere, without a skill its CLI
-            # would have loaded, or allowed less than an agent nobody asked about, is another
-            # agent at the same model and effort -- which is what it is.
+            # would have loaded, allowed less than an agent nobody asked about, or signed in
+            # as somebody else, is another agent at the same model and effort -- which is
+            # what it is.
             moved.append(
                 type(agent)(
                     replace(
                         agent.config,
                         machine=anchored(runs.anchor),
                         skills=runs.skills,
+                        provider=runs.provider,
                         **({"permission": runs.permission} if runs.permission else {}),
                     )
                 )

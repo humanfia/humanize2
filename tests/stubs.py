@@ -22,13 +22,27 @@ class HereAnchor(AnchorConfig):
     """An anchor that runs the turn here after all, and keeps what it was handed.
 
     A real one would spawn coganchor, which needs a target and a machine to intercept on;
-    what an agent owes it is the whole call the backend built, which is what this records.
+    what an agent owes it is the whole call the backend built, which is what this records --
+    and, for an agent that is also run under a provider, the paths that session is to answer
+    with others, since a process has one tracer and the anchor is the one that has it.
     """
 
     seen: list[list[str]] = field(default_factory=list[list[str]])
+    answered: list[list[tuple[str, str]]] = field(
+        default_factory=list[list[tuple[str, str]]]
+    )
+    kept: list[list[str]] = field(default_factory=list[list[str]])
 
-    def command(self, argv: Sequence[str]) -> list[str]:
+    def command(
+        self,
+        argv: Sequence[str],
+        *,
+        swaps: Sequence[tuple[str, str]] = (),
+        private: Sequence[str] = (),
+    ) -> list[str]:
         self.seen.append(list(argv))
+        self.answered.append(list(swaps))
+        self.kept.append(list(private))
         return list(argv)
 
 

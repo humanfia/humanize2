@@ -60,6 +60,12 @@ class AgentConfig:
         at: a flow watches its agent rather than gating it, and a turn waiting on an approval
         nobody is there to give is a flow that has stopped. Anything tighter is a choice, and
         is made where the agents are chosen.
+      provider: Which account this agent's turns run as, by the name a provider of its CLI was
+        made under, or "" for the CLI as whoever is at this machine already runs it. It is a
+        setting of the agent rather than of the flow because it is the agent that signs in:
+        two agents of one CLI, one on a subscription and one on somebody's gateway, are two
+        accounts running at once, each refreshing its own token and neither able to read the
+        other's -- which is what a provider is for.
     """
 
     model: str
@@ -67,6 +73,7 @@ class AgentConfig:
     machine: MachineConfig | None = None
     skills: tuple[str, ...] | None = None
     permission: str = "bypass"
+    provider: str = ""
 
 
 def anchored(target: str) -> MachineConfig | None:

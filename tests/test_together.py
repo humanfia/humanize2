@@ -79,6 +79,21 @@ for line in sys.stdin:
 """
 
 
+#: The same fake, answering with whichever credentials it found rather than with "done": what
+#: an agent run under a provider must come back with is that provider's own account.
+WHOEVER = """
+import json, pathlib, sys
+
+flags = dict(zip(sys.argv, sys.argv[1:]))
+taken = flags.get("--session-id") or flags["--resume"]
+print(json.dumps({"type": "system", "session_id": taken}), flush=True)
+where = pathlib.Path.home() / ".claude" / ".credentials.json"
+for line in sys.stdin:
+    said = where.read_text().strip() if where.exists() else "nobody"
+    print(json.dumps({"type": "result", "result": said}), flush=True)
+"""
+
+
 @pytest.fixture
 def sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Puts a fake `claude` on PATH, hides the real agent homes, and returns the workspace."""
@@ -168,3 +183,67 @@ def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
     assert labels(document, "process_name") == {
         "actor · claude-opus-4-8 · high · 1 sessions"
     }
+
+
+@pytest.mark.timeout(180)
+def test_one_flow_runs_two_agents_of_one_cli_as_two_accounts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole errand of a provider, through every layer at once.
+
+    One flow, one CLI, two agents, two accounts: each turn reads the credentials of the
+    provider its agent was configured with, neither reads the other's, and neither reads the
+    ones this machine is signed in with -- which is what a flame chase between a subscription
+    and somebody's gateway comes down to.
+    """
+    import json as reading
+
+    from humanize import providers
+    from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from humanize.runner import Runner
+
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    fake = binaries / "claude"
+    fake.write_text(f"#!{sys.executable}\n{WHOEVER}")
+    fake.chmod(0o755)
+    house = tmp_path / "home"
+    (house / ".claude").mkdir(parents=True)
+    (house / ".claude" / ".credentials.json").write_text('"this machine"')
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("HOME", str(house))
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    monkeypatch.chdir(workspace)
+    for named in ("subscription", "gateway"):
+        provider = providers.add("claude", named, way="login")
+        (provider.at / "home" / ".credentials.json").write_text(f'"{named}"')
+
+    (workspace / "flow.py").write_text(
+        """
+import json
+from pathlib import Path
+
+from humanize.agents import AgentBase
+
+
+def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+    Path("said.json").write_text(json.dumps([agent(task) for agent in agents]))
+"""
+    )
+    agents = [
+        ClaudeCodeAgent(
+            ClaudeCodeAgentConfig(model="m", effort="high", provider=named), name=named
+        )
+        for named in ("subscription", "gateway")
+    ]
+
+    Runner(workspace / "flow.py", agents).run("who are you")
+
+    assert reading.loads((workspace / "said.json").read_text()) == [
+        '"subscription"',
+        '"gateway"',
+    ]
+    # And what this machine is signed in as was neither read nor written.
+    assert (house / ".claude" / ".credentials.json").read_text() == '"this machine"'

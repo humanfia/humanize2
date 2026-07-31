@@ -56,6 +56,65 @@ _CREAT_FLAGS = O_CREAT | O_WRONLY | O_TRUNC
 #: The flags field of ``struct open_how``, which is the first ``u64`` of it.
 _OPEN_HOW_FLAGS = 8
 
+#: Where the same structure keeps the resolution the call insists on, and the two
+#: settings of it an answered path cannot honour: one says the file must be under
+#: the descriptor given, the other that the descriptor is the root.  A call asking
+#: for either is failed rather than answered, since answering it would either break
+#: the promise or quietly re-root the path somewhere else.
+_OPEN_HOW_RESOLVE = 16
+_RESOLVE_CONFINED = 0x08 | 0x10
+
+#: What a redirected path is kept clear of: the red zone, which a leaf function of
+#: the tracee may be using this moment.  Only as many bytes as the paths themselves
+#: take are written below it -- a thread with a stack of its own may have very
+#: little left, and a fixed few kilobytes would be written past the end of it.
+_RED_ZONE = 128
+
+#: Where each syscall keeps the paths it names, as ``(descriptor argument, path
+#: argument)`` pairs -- the descriptor being ``None`` for a call that has none and
+#: resolves against the process's own directory.  Read off the manual pages, one
+#: line per call, and the same table :mod:`humanize.providers._trace` redirects
+#: against when a turn is run under a provider without being anchored.
+#:
+#: ``execve`` is deliberately absent: what a process becomes is the exec bridge's
+#: business, and a redirected path is a credential rather than a program.
+_REDIRECTABLE: dict[int, tuple[tuple[int | None, int], ...]] = {
+    NR.OPEN: ((None, 0),),
+    NR.CREAT: ((None, 0),),
+    NR.STAT: ((None, 0),),
+    NR.LSTAT: ((None, 0),),
+    NR.ACCESS: ((None, 0),),
+    NR.READLINK: ((None, 0),),
+    NR.CHDIR: ((None, 0),),
+    NR.MKDIR: ((None, 0),),
+    NR.RMDIR: ((None, 0),),
+    NR.UNLINK: ((None, 0),),
+    NR.CHMOD: ((None, 0),),
+    NR.TRUNCATE: ((None, 0),),
+    NR.UTIMES: ((None, 0),),
+    # The link itself, not what it says: what a symlink points at is text the
+    # kernel does not resolve here, and rewriting it would answer a question
+    # nobody asked.
+    NR.SYMLINK: ((None, 1),),
+    NR.LINK: ((None, 0), (None, 1)),
+    NR.RENAME: ((None, 0), (None, 1)),
+    NR.OPENAT: ((0, 1),),
+    NR.OPENAT2: ((0, 1),),
+    NR.NEWFSTATAT: ((0, 1),),
+    NR.STATX: ((0, 1),),
+    NR.FACCESSAT: ((0, 1),),
+    NR.FACCESSAT2: ((0, 1),),
+    NR.READLINKAT: ((0, 1),),
+    NR.MKDIRAT: ((0, 1),),
+    NR.UNLINKAT: ((0, 1),),
+    NR.FCHMODAT: ((0, 1),),
+    NR.UTIMENSAT: ((0, 1),),
+    NR.SYMLINKAT: ((1, 2),),
+    NR.RENAMEAT: ((0, 1), (2, 3)),
+    NR.RENAMEAT2: ((0, 1), (2, 3)),
+    NR.LINKAT: ((0, 1), (2, 3)),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class Action:
@@ -121,6 +180,9 @@ class SyscallDispatcher:
         if handler is None:
             return ALLOW
         try:
+            unanswerable = self._answer(tracee, registers)
+            if unanswerable is not None:
+                return unanswerable
             return handler(tracee, registers)
         except procfs.TraceeGoneError:
             return ALLOW
@@ -132,6 +194,52 @@ class SyscallDispatcher:
                 exc,
             )
             return fails(exc.errno or errno.EIO)
+
+    # ---------------------------------------------------------- answered paths
+
+    def _answer(self, tracee: Tracee, registers: Registers) -> Action | None:
+        """Point a syscall's paths at whatever this session answers them with.
+
+        Before the handler below reads them, so that everything after this sees
+        the file the syscall will really touch: what a path is answered with is
+        local state, kept out of the layouts, so the shadow tree never hears of
+        it and the target is never told.
+
+        Returns ``None`` when there was nothing to answer, which is the usual
+        case, and the failure to give the syscall when a path was answered but
+        the answer could not be planted.  Never the original path: an agent that
+        read the credentials of whoever is at this machine would be a turn taken
+        as the wrong account, which is worse than a turn that did not run.
+        """
+        router = self._sup.router
+        if not router.redirects:
+            # A session that answers nothing reads no path out of a tracee twice.
+            return None
+        taken = 0  # what the paths already planted used, so two do not overwrite one
+        for descriptor, argument in _REDIRECTABLE.get(registers.syscall_number, ()):
+            dirfd = AT_FDCWD if descriptor is None else registers.signed_arg(descriptor)
+            named = self._path(tracee.pid, dirfd, registers.arg(argument))
+            instead = router.swap(named) if named is not None else None
+            if instead is None:
+                continue
+            if _confined(tracee.pid, registers):
+                log.warning(
+                    "pid %d: openat2 insisted on a resolution %s cannot be given; failing it",
+                    tracee.pid,
+                    instead,
+                )
+                return fails(errno.EIO)
+            room = _plant(tracee.pid, registers, taken, argument, instead)
+            if room is None:
+                log.warning(
+                    "pid %d: %s could not be given %s; failing it",
+                    tracee.pid,
+                    syscall_name(registers.syscall_number),
+                    instead,
+                )
+                return fails(errno.EIO)
+            taken += room
+        return None
 
     # ------------------------------------------------------------------ opening
 
@@ -504,6 +612,46 @@ def _timespec_ns(seconds: int, nanoseconds: int) -> int | None:
     if nanoseconds == _UTIME_NOW:
         return time.time_ns()
     return seconds * 1_000_000_000 + nanoseconds
+
+
+def _confined(pid: int, registers: Registers) -> bool:
+    """Whether this call asked for a resolution an answered path cannot be given."""
+    if registers.syscall_number != NR.OPENAT2:
+        return False
+    try:
+        raw = procfs.read_bytes(pid, registers.arg(2), _OPEN_HOW_RESOLVE + 8)
+    except OSError:
+        return False
+    return bool(int.from_bytes(raw[_OPEN_HOW_RESOLVE:], "little") & _RESOLVE_CONFINED)
+
+
+def _plant(
+    pid: int, registers: Registers, taken: int, argument: int, path: str
+) -> int | None:
+    """Write a path into the tracee and point one of its arguments at it.
+
+    ``taken`` is how many bytes this syscall's earlier paths already used below
+    the pointer, so that a call naming two -- a credential written to one name
+    and renamed onto another, which is how most of these CLIs save one -- does
+    not overwrite the first with the second.
+
+    Returns how many bytes it took, confirmed by reading it back, or ``None``
+    where it could not be written.  An absolute path ignores whatever descriptor
+    the call was also given, so pointing the argument at it is the whole of the
+    rewrite.
+    """
+    # As the tracee named it: a path is bytes, and one that is not valid text
+    # came back through the surrogates ``read_cstring`` escapes it with.
+    blob = os.fsencode(path) + b"\0"
+    address = registers.stack_pointer - _RED_ZONE - taken - len(blob)
+    try:
+        procfs.write_bytes(pid, address, blob)
+        if procfs.read_bytes(pid, address, len(blob)) != blob:
+            return None
+    except (OSError, ValueError, UnicodeEncodeError):
+        return None
+    registers.set_arg(argument, address)
+    return len(blob)
 
 
 def _fd_path(pid: int, dirfd: int) -> str | None:
