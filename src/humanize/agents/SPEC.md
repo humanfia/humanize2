@@ -10,8 +10,10 @@
 ├── codex.py
 ├── config.py
 ├── event.py
+├── hooks.py
 ├── human.py
 └── kimi.py
+
 ```
 
 ## `__init__.py`
@@ -43,6 +45,20 @@ class AgentConfig:
 - An anchored turn MUST be run by spawning `AnchorConfig.command(argv)`, never by calling
   coganchor in this process: a turn is pumped from threads of its own, which a supervisor that
   forks the agent and takes the process's signal handling cannot be given.
+
+## `hooks.py`
+
+`Moment`, `Occasion`, `Verdict`, `Hook`, `Hooks` and `Unhooked`: the points of a turn something
+may be hung on, what it is told when one arrives, and what it may say back.
+
+- A hook MUST be a callable of the flow's own, hung on a live agent and taken down again while
+  it runs -- the same table these CLIs take as shell commands, held here instead so that it is
+  written in the language the flow is written in.
+- `Hooks.on` MUST refuse a moment the agent does not run, saying so where the hook is hung
+  rather than hours into a loop. Which moments those are MUST be `AgentBase.moments`.
+- A hook that raises MUST have said nothing, as a watcher that raises has: a flow MUST NOT fail
+  because something hung off it did. `Stopped` is the one thing it MUST raise out of the turn,
+  since a run ended by hand has to read as ended by hand.
 
 ## `base.py`
 
@@ -86,7 +102,9 @@ class AgentBase(ABC):
         """
         raise NotImplementedError
 
-    def __call__(self, prompt: str, *, suppress: bool = False) -> str:
+    def __call__[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None:
         """Runs one turn in a session of its own, and keeps nothing."""
 
     def pursue(self, objective: str, *, suppress: bool = False) -> str:
@@ -133,6 +151,9 @@ class AgentBase(ABC):
 
 ```python
 class SessionBase(ABC):
+    #: Whether the backend can be held to a shape rather than asked to keep to one.
+    shapes: ClassVar[bool] = False
+
     def __init__(self, agent: AgentBase): ...
 
     @property
@@ -140,23 +161,29 @@ class SessionBase(ABC):
     def id(self) -> str:
         raise NotImplementedError
 
-    def __call__(self, prompt: str, *, suppress: bool = False) -> str:
+    def __call__[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None:
         """Runs one turn in the session.
 
         Args:
             prompt: The prompt to send to the agent.
             suppress: Whether a turn that fails answers with nothing rather than raising.
+            schema: The shape to answer in, or None to take what the agent says.
 
         Returns:
-            The agent's response.
+            The agent's response, or the model it was asked for.
         """
 
     @abstractmethod
-    def stream(self, prompt: str) -> Iterator[Event]:
+    def stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
         """Runs one turn, saying what the agent says as it says it.
 
         Args:
             prompt: The prompt to send to the agent.
+            schema: The shape to answer in, or None to take what the agent says.
 
         Yields:
             What the agent said, in the order it said it.
@@ -193,7 +220,22 @@ class SessionBase(ABC):
 - `suppress` MUST catch a turn that failed and nothing else. A flow is a loop, and a loop that
   catches its own turns is `try` around every line of it -- so `|| true` is a word on the call
   rather than a block around it. It MUST NOT catch an agent that was stopped, which is not a
-  failed turn, nor a backend that has no goal feature, which is a flow to correct.
+  failed turn, nor a backend that has no goal feature, which is a flow to correct. A turn asked
+  for a shape that answered in some other one MUST be caught by it too, and MUST answer `None`
+  rather than `""`: an answer that is not what was asked for is a turn that did not do what it
+  was told, however cleanly the backend exited.
+- A turn given a `schema` MUST answer with that model or not at all, and the model MUST be the
+  whole of what the backend is asked: its fields, their types, which of them are required and
+  the line each was declared with are already in it, so nothing about the shape MUST be said
+  twice. A backend with a setting for this MUST be held to it there -- a flag of the command
+  line, a setting of the turn -- and one with none MUST be asked in the prompt instead, with
+  `shapes` saying which of the two a backend is. Either way the answer MUST be read back
+  through the model, so that a flow reads a field rather than a marker in a paragraph.
+- What is asked MUST be asked afresh for each turn of the model a call takes: a hook that
+  sends the agent on says what to say next, and a shape that was only on the first prompt is
+  one the last turn was never asked for. It MUST NOT be in what the hooks and the watchers are
+  shown, which is the flow's own words -- a schema in the transcript is the plumbing showing
+  through.
 - `interject` MUST reach the turn already under way rather than starting another, and MUST
   raise `NotImplementedError` on a backend that takes a turn's whole prompt up front. A
   backend that can be talked to MUST raise `RuntimeError` when nothing is running to hear it.
@@ -288,6 +330,26 @@ class CommandSessionBase(SessionBase):
   down with it, and MUST NOT stop the reading either: a pipe nobody drains blocks the agent.
 - Every session that is not one command per turn MUST derive from `SessionBase` instead, so
   that a backend driven another way inherits none of this.
+
+## `human.py`
+
+The person at the prompt, driven as an agent: `HumanAgent` and `HumanSession`.
+
+- They MUST be made by whatever drives the flow rather than by the flow, and MUST NOT be among
+  the agents a flow is configured with: nobody chooses what the person runs.
+- A turn of theirs MUST NOT be bracketed by the `begins` and `ends` that say whose turn it is.
+  The person takes no turn of a model, and counting it would put them in the graph of who
+  handed to whom and spin a clock at them while they thought.
+- Asked for a shape, they MUST be asked a question per field rather than shown the schema, and
+  the model MUST be built out of what they typed: the description the flow wrote where it
+  declared the field is the question, and a field that takes one of a fixed few MUST offer
+  those, so that the question reads as one wherever it is shown. Each MUST go the road a coding
+  agent's own question goes -- `AgentBase.asked` -- so that a flow gets the same thing from the
+  person as from an agent.
+- What the model refuses MUST be put back on the field it was refused for, in the model's own
+  words: the flow that declared the field is the only thing that knows what it will take. It
+  MUST be put back a bounded number of times, and a person who is not there or who walks away
+  MUST answer with nothing rather than leave the flow waiting.
 
 ## `claude.py` / `codex.py` / ... - Concrete Agent and Session Classes
 

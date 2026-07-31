@@ -34,6 +34,8 @@ from .event import Event, Question, say
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pydantic import BaseModel
+
 #: The one line `kimi web` prints once it is listening, and the only place the port it took --
 #: asked for as 0, so that two flows on one machine cannot collide -- and its token are said.
 _LISTENING = re.compile(r"^Kimi server: (\S+)/#token=(\S+)$")
@@ -246,11 +248,20 @@ class KimiCodeCLISession(SessionBase):
             self.unsteered(text)  # nothing is coming back for a word that never went in
             raise
 
-    def _stream(self, prompt: str) -> Iterator[Event]:
+    def _stream(
+        self,
+        prompt: str,
+        *,
+        schema: type[BaseModel] | None = None,  # noqa: ARG002
+    ) -> Iterator[Event]:
         """Sends one turn, opening the session on the first call and resuming it after.
 
         The daemon answers a turn whole, but it writes the turn down as it goes: what the
         agent said is read back as it is written, which is what makes the turn watchable.
+
+        A shape is not a setting of a turn here -- the daemon takes a prompt and nothing
+        else about the answer -- so a turn asked for one has already been asked in the
+        prompt, which is what :attr:`SessionBase.shapes` says of this backend.
         """
         yield from self._submit(prompt, goal=False)
 

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from humanize.agents import (
     CodexAgent,
@@ -28,6 +29,16 @@ from humanize.agents import (
     KimiCodeCLIAgentConfig,
 )
 from humanize.agents import codex as appservers
+
+
+class _Verdict(BaseModel):
+    """What a turn asked for a shape is to answer with."""
+
+    model_config = {"extra": "forbid"}
+
+    done: bool
+    notes: str
+
 
 #: A `kimi web` that says where it is listening and then serves the calls a turn is made of,
 #: recording each one. A prompt of `boom` is refused, which is how a failed turn is spelled.
@@ -778,3 +789,23 @@ def test_kimi_answers_a_question_the_turn_stopped_on(kimi: _FakeServer) -> None:
     assert _bodies(kimi, "/questions/q_0") == [
         {"answers": {"which": {"kind": "single", "option_id": "o_r"}}}
     ]
+
+
+def test_a_codex_turn_is_held_to_the_shape_it_was_asked_for(codex: _FakeServer) -> None:
+    """`outputSchema` is a setting of the turn, so the prompt says nothing about the shape."""
+    session = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high")).new()
+
+    def finish() -> None:
+        for _ in range(200):
+            if session._running.turn is not None:
+                session.interject("go on")
+                return
+            time.sleep(0.02)
+
+    threading.Thread(target=finish, daemon=True).start()
+    session("do the task", schema=_Verdict, suppress=True)
+
+    called = {call["method"]: call["params"] for call in codex.calls()}
+    # What was asked is the schema itself, and the prompt is the prompt.
+    assert called["turn/start"]["outputSchema"] == _Verdict.model_json_schema()
+    assert called["turn/start"]["input"] == [{"type": "text", "text": "do the task"}]

@@ -22,7 +22,7 @@ import sys
 import threading
 import weakref
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
@@ -30,6 +30,8 @@ from .event import Event, Question, say
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping
+
+    from pydantic import BaseModel
 
 #: What the server calls a turn stopping to ask its user something. Every other request it
 #: makes of a client is an approval, which an unattended flow does not stop for.
@@ -573,6 +575,7 @@ class _AppServer:
         return message.get("result")
 
 
+
 @dataclass(frozen=True, kw_only=True)
 class CodexAgentConfig(AgentConfig):
     """What Codex is configured with: the common model and effort, and nothing else."""
@@ -587,6 +590,10 @@ class CodexSession(SessionBase):
     """
 
     _agent: CodexAgent  # every turn is run on the app server this agent holds
+
+    #: `outputSchema` is the server's own: a turn started with one is constrained to answer
+    #: in it, so the shape is asked for where the turn is started rather than in the prompt.
+    shapes: ClassVar[bool] = True
 
     def __init__(self, agent: AgentBase) -> None:
         """Initializes a session holding no thread yet.
@@ -603,11 +610,15 @@ class CodexSession(SessionBase):
         """The thread this session is, which the server names before the turn starts."""
         return self._id or self._running.thread
 
-    def _stream(self, prompt: str) -> Iterator[Event]:
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
         """Sends one turn to the server, saying what the agent says as it says it.
 
         Args:
           prompt: The input prompt for this turn.
+          schema: The shape to answer in, which is a setting of the turn here: the server
+            takes it as `outputSchema` and holds the last message to it.
 
         Yields:
           What the agent said, in the order it said it.
@@ -630,6 +641,11 @@ class CodexSession(SessionBase):
                     "input": [{"type": "text", "text": prompt}],
                     "model": self._agent.config.model,
                     "effort": self._agent.config.effort,
+                    **(
+                        {"outputSchema": schema.model_json_schema()}
+                        if schema is not None
+                        else {}
+                    ),
                     **_UNATTENDED,
                 },
                 self._running,
@@ -755,6 +771,7 @@ class CodexAgent(AgentBase):
             if self._server is None:
                 argv = ["codex", "app-server", "--stdio"]
                 if (anchor := self.anchor) is not None:
+
                     argv = anchor.command(argv)
                 self._server = _AppServer(argv)
                 self._server._agents.append(self)

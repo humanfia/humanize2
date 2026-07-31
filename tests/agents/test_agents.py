@@ -355,6 +355,43 @@ def test_claude_holds_one_process_for_the_whole_session(clis: _FakeCLIs) -> None
     assert [first.stdin, second.stdin] == ["hi", "again"]
 
 
+def test_a_shape_is_asked_for_by_the_process_the_turn_runs_in(clis: _FakeCLIs) -> None:
+    """`--json-schema` is an argument of the process, so asking for one restarts it.
+
+    The conversation is not restarted with it: the new process resumes the session, which is
+    what an anchored session does between every pair of turns anyway.
+    """
+    from pydantic import BaseModel
+
+    class Greeting(BaseModel):
+        model_config = {"extra": "forbid"}
+
+        greeting: str
+
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+    ).new()
+    assert session("hi") == "hi"
+    # The stand-in answers with what it was told, so a prompt that is the object is a turn
+    # that answered in the shape.
+    assert session('{"greeting": "hello"}', schema=Greeting) == Greeting(
+        greeting="hello"
+    )
+    assert session("back to words") == "back to words"
+
+    launches = [call.argv for call in clis.calls() if call.argv]
+    assert (
+        len(launches) == 3
+    )  # one apiece: without the shape, with it, and without again
+    assert "--json-schema" not in launches[0]
+    assert "--json-schema" in launches[1]
+    assert "--json-schema" not in launches[2]
+    # Which is the same conversation throughout: every process after the first resumes it.
+    assert [argv[argv.index("--resume") + 1] for argv in launches[1:]] == [
+        session.id
+    ] * 2
+
+
 def test_claude_can_be_talked_to_while_a_turn_is_running(clis: _FakeCLIs) -> None:
     """The point of holding the process open: a word put in reaches the turn under way."""
     session = ClaudeCodeAgent(

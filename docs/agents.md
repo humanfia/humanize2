@@ -21,6 +21,7 @@ Everything here is importable from `humanize.agents`.
 - [The person as an agent](#the-person-as-an-agent)
 - [Efforts](#efforts)
 - [What each backend can do](#what-each-backend-can-do)
+- [Answering in a shape](#answering-in-a-shape)
 - [Where the turns land](#where-the-turns-land)
 - [API summary](#api-summary)
 
@@ -42,8 +43,9 @@ agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="h
 | you | `HumanAgent` | — (takes only `name=`) | `HumanSession` |
 
 A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land), and nothing
-else. It is frozen, because a session resumes under the settings it opened with — a config that
-changed mid-flow would silently split one conversation across two models.
+else. It is frozen,
+because a session resumes under the settings it opened with — a config that changed mid-flow
+would silently split one conversation across two models.
 
 An agent takes an optional `name=`:
 
@@ -349,6 +351,39 @@ In a flow, declare one among the agents and it is handed over like the rest — 
 [Flows](flows.md#the-person-at-the-prompt). Nobody is asked what it runs, so it is not one of
 the agents `-a` names.
 
+### Asking them for a shape, which is a questionnaire
+
+Given a [`schema`](#answering-in-a-shape), the person is not shown a JSON Schema — they are
+asked **a question per field**, and the model is built out of what they typed:
+
+```python
+class Settled(BaseModel):
+    approach: Literal["fast", "careful"] = Field(description="Which way should this be built?")
+    tests: bool = Field(description="Write tests for it?")
+    rounds: int = Field(default=3, description="How many rounds may it take?")
+
+settled = person("How should I do this?", schema=Settled, suppress=True)
+if settled is not None and settled.tests:
+    ...
+```
+
+| In the model | What they are asked |
+| --- | --- |
+| `description=` | the question itself, or the field's name where it has none |
+| `Literal[…]` | those words, as the answers it offers |
+| `bool` | `yes` and `no` |
+| a default | “or `-` for 3” — and a dash takes it |
+| `list[str]` | one line, separated by commas |
+
+Each question goes the road a coding agent's own question takes — `AgentBase.asked`, which the
+interface shows and answers — so it is a real question there, options and all, and `/afk` or a
+command line answers it the way it answers any other: nobody is there. What the model refuses is
+put back on the field it was refused for, in the model's own words, a bounded number of times;
+a questionnaire nobody filled in answers with `None` under `suppress`.
+
+This is the same thing a coding agent's `AskUserQuestion` is, reachable from a flow — and more,
+since the flow states the shape of the whole answer once, in the model it is going to use.
+
 ## Efforts
 
 `effort` is passed to the backend in the backend's own wording. humanize does not check it
@@ -388,6 +423,46 @@ for it in the prompt is not the same feature.
 A turn that must stay open to be talked to is such a case: a command line run per turn has ended
 by the time there is anything to say to it.
 
+## Answering in a shape
+
+A turn given a `schema` answers with that pydantic model instead of with text:
+
+```python
+from pydantic import BaseModel, Field
+
+
+class Review(BaseModel):
+    """What a review comes to."""
+
+    model_config = {"extra": "forbid"}
+
+    done: bool = Field(description="True only if there is nothing left to do or to fix.")
+    notes: str = Field(description="What to say to the agent, word for word.")
+
+
+review = agent(asked, schema=Review)   # a Review, not a str
+if review.done:
+    ...
+```
+
+The model *is* the question: its fields, their types, which are required and the line each was
+declared with are what the backend is given, so nothing has to be repeated in the prompt.
+
+Where the backend can be held to it, it is: Claude Code gets `--json-schema` and validates the
+answer itself, and Codex gets the turn's `outputSchema`. A backend that has no such setting is
+asked in the prompt instead, and what it says is read back — `SessionBase.shapes` is which of
+the two a backend is. The person is asked neither way: they get
+[a question per field](#asking-them-for-a-shape-which-is-a-questionnaire). Either way the
+answer arrives as the model or not at all.
+
+`suppress=True` answers `None` rather than `""`, and covers both a turn that failed and one
+whose answer is not the shape it was asked for — an answer that is not what was asked for is a
+turn that did not do what it was told. Without it, the second raises `ValueError`.
+
+Claude's is an argument of the process rather than of the turn, so asking one session for a
+shape it was not started with ends that process and starts one that resumes the conversation.
+The conversation is not restarted with it.
+
 ## Where the turns land
 
 A config's `machine` says where an agent's work goes. `None` — the default — is this machine.
@@ -411,13 +486,14 @@ class AgentBase:
     id: str                 # what this agent is called
     backend: str            # "claude", "codex", "kimi"
     config: AgentConfig     # model, effort, machine
+
     opened: list[str]       # the backend's id for every session it ever opened
     sessions: list[SessionBase]
     stopped: bool
     anchor: AnchorConfig | None
     hooks: Hooks            # what is hung on its moments
 
-    def __call__(prompt: str, *, suppress: bool = False) -> str
+    def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
     def pursue(objective: str, *, suppress: bool = False) -> str
     def new() -> SessionBase
     def rename(name: str) -> None
@@ -435,8 +511,10 @@ class SessionBase:
     id: str                 # raises until a turn has landed
     named: str | None       # the same, or None
 
-    def __call__(prompt: str, *, suppress: bool = False) -> str
-    def stream(prompt: str) -> Iterator[Event]
+    shapes: ClassVar[bool]  # whether the backend can be held to a schema
+
+    def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
+    def stream(prompt: str, *, schema: type[BaseModel] | None = None) -> Iterator[Event]
     def pursue(objective: str, *, suppress: bool = False) -> str
     def interject(text: str) -> None
     def close() -> None

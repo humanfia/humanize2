@@ -7,8 +7,10 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -16,13 +18,15 @@ import uuid
 import weakref
 from abc import ABC, abstractmethod
 from collections import Counter
-from typing import IO, TYPE_CHECKING, Any, ClassVar, Protocol
+from typing import IO, TYPE_CHECKING, Any, ClassVar, Protocol, overload
 
 from .event import Event, Question, Stopped, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping
+
+    from pydantic import BaseModel
 
     from humanize.coganchor import AnchorConfig
 
@@ -69,6 +73,65 @@ def _tee(
         said.put(None)
 
 
+#: What a turn is told when its backend has no way of being held to a shape. The schema is the
+#: whole of the instruction: it says the fields, their types and which of them are required,
+#: and a sentence restating any of that would be a second place for it to be wrong.
+_IN_SHAPE = """
+
+Answer with JSON and nothing else -- no prose around it, no code fence -- matching this JSON \
+Schema exactly:
+
+{schema}
+"""
+
+#: What a model wraps an answer in when it is talking as well as answering.
+_FENCED = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
+
+
+def _readings(said: str) -> Iterator[str]:
+    """Every part of an answer that might be the JSON it was asked for, likeliest first.
+
+    A backend held to a schema answers with the object and nothing else, and that is the first
+    of these. The rest are for one that was asked rather than held: a fenced block, and the
+    span from the first brace to the last, which is the object with the talking cut off.
+
+    Args:
+      said: The whole answer.
+
+    Yields:
+      What to try reading, in the order to try it.
+    """
+    held = said.strip()
+    yield held
+    for block in _FENCED.findall(held):
+        yield str(block).strip()
+    first, last = held.find("{"), held.rfind("}")
+    if 0 <= first < last:
+        yield held[first : last + 1]
+
+
+def _shaped[T: BaseModel](said: str, schema: type[T]) -> T:
+    """Reads what a turn answered as the model it was asked to answer with.
+
+    Args:
+      said: The whole answer.
+      schema: The shape it was asked for.
+
+    Returns:
+      The answer, as that model.
+
+    Raises:
+      ValueError: If none of the answer reads as one -- which is a turn that did not do what
+        it was asked, and is reported as such rather than passed on half-read.
+    """
+    from pydantic import ValidationError
+
+    for reading in _readings(said):
+        with contextlib.suppress(ValidationError, ValueError):
+            return schema.model_validate_json(reading)
+    raise ValueError(f"the turn did not answer as a {schema.__name__}: {said[:200]}")
+
+
 class SessionBase(ABC):
     """One conversation with one agent, kept alive across turns.
 
@@ -76,6 +139,12 @@ class SessionBase(ABC):
     still has the earlier turns in context. Discarding the session is how a flow forgets:
     a new instance starts from nothing.
     """
+
+    #: Whether this backend can be held to a shape, rather than asked to keep to one. A
+    #: session that can is handed the schema itself, and answers with the object or not at
+    #: all; one that cannot is told about it in the prompt, which is the same question put
+    #: where the model is still free to answer around it.
+    shapes: ClassVar[bool] = False
 
     def __init__(self, agent: AgentBase) -> None:
         """Initializes an unopened session and registers it with its agent.
@@ -98,6 +167,11 @@ class SessionBase(ABC):
         #: under a lock of its own rather than under the one that serializes turns.
         self._steered: dict[str, str] = {}
         self._steering = threading.Lock()
+        #: The shape the turn now running was asked to answer in, or None for one asked for
+        #: nothing in particular. Written under the lock that serializes the turns and read
+        #: by whatever builds the call, since a command line and a process's own arguments
+        #: are both built from a session that is already holding the turn.
+        self._shaping: type[BaseModel] | None = None
         # A session drops itself from its agent when it is collected, so the agent neither holds
         # a flow's discarded sessions nor has to prune them while someone is reading them.
         agent._sessions.append(weakref.ref(self, agent._forget))
@@ -126,7 +200,17 @@ class SessionBase(ABC):
         """
         return self._id
 
-    def __call__(self, prompt: str, *, suppress: bool = False) -> str:
+    @overload
+    def __call__(self, prompt: str, *, suppress: bool = False) -> str: ...
+
+    @overload
+    def __call__[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T]
+    ) -> T | None: ...
+
+    def __call__[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None:
         """Sends one turn, opening the session on the first call and resuming it after.
 
         Args:
@@ -134,29 +218,47 @@ class SessionBase(ABC):
           suppress: Whether a turn that fails answers with nothing instead of raising. A flow
             is a loop, and a loop that catches its own turns is `try` around every line of
             it; this is the `|| true` that flowbench writes beside each one.
+          schema: The shape to answer in, as the pydantic model a flow reads the answer as, or
+            None to take what the agent says as it says it. A turn asked for one answers with
+            that model rather than with text, so a flow that needs a decision reads a field
+            instead of a marker at the end of a paragraph.
 
         Returns:
-          The response generated by the agent, stripped, or "" for a turn that failed while
-          `suppress` was set.
+          The response generated by the agent, stripped -- or the model it was asked for,
+          where it was asked for one. Nothing at all for a turn that failed, or one whose
+          answer is not the shape it was asked for, while `suppress` was set: "" without a
+          schema, and None with one.
 
         Raises:
           subprocess.CalledProcessError: If the turn fails and `suppress` is not set, with
             whatever the backend said about it attached as a diagnostic.
+          ValueError: If a turn asked for a shape did not answer in it, and `suppress` is not
+            set. An answer that is not what was asked for is a turn that did not do what it
+            was told, which is a failed turn however cleanly the backend exited.
           Stopped: If the agent has been told to take no further turn -- which `suppress`
             does not cover, since a loop that carried on past it would never end.
         """
         said = ""
         try:
-            for event in self.stream(prompt):
+            for event in self.stream(prompt, schema=schema):
                 if event.kind == "result":
                     said = event.text
         except subprocess.CalledProcessError:
             if not suppress:
                 raise
-            return ""
-        return said.strip()
+            return None if schema is not None else ""
+        if schema is None:
+            return said.strip()
+        try:
+            return _shaped(said, schema)
+        except ValueError:
+            if not suppress:
+                raise
+            return None
 
-    def stream(self, prompt: str) -> Iterator[Event]:
+    def stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
         """Sends one turn, saying what the agent says as it says it.
 
         The turn is over when the iterator is, and its last `result` event is what
@@ -173,6 +275,11 @@ class SessionBase(ABC):
 
         Args:
           prompt: The input prompt for this turn.
+          schema: The shape to answer in, or None to take what the agent says. A backend that
+            can be held to one is handed it; one that cannot is asked for it in the prompt,
+            since a turn that has to be read as an object has to be asked somehow -- under
+            the flow's own words rather than in place of them, and not in what the hooks and
+            the transcript are shown, which is what the flow said.
 
         Yields:
           What the agent said, in the order it said it.
@@ -205,7 +312,15 @@ class SessionBase(ABC):
             again = 0
             while True:
                 answered = Event(kind="result", text="")
-                for event in self._stream(prompt):
+                # Asked for afresh each time round, because each time round is a turn: a
+                # hook that sends the agent on says what to say next, and a shape that was
+                # only on the first prompt would be a shape the last turn was never asked
+                # for. On the prompt as it is sent rather than on the one the hooks and the
+                # transcript see, which is the flow's own words: a schema in the transcript
+                # is the plumbing showing through.
+                for event in self._stream(
+                    self._shaped_ask(prompt, schema), schema=schema
+                ):
                     if event.kind == "result":
                         # Held back: a hook may yet send the agent on, and a turn that was
                         # sent on has not answered.
@@ -227,6 +342,24 @@ class SessionBase(ABC):
                 prompt, again = stopping.because, again + 1
         finally:
             self._agent._heard(Event(kind="ends", text=""))
+
+    def _shaped_ask(self, prompt: str, schema: type[BaseModel] | None) -> str:
+        """The prompt as the backend is to be given it, shape and all.
+
+        Args:
+          prompt: What the flow is asking.
+          schema: The shape it wants back, or None.
+
+        Returns:
+          The prompt itself for a backend that can be held to the shape -- it is told
+          separately, and telling it twice would be asking for the same thing two ways -- and
+          the prompt with the schema under it for one that can only be asked.
+        """
+        if schema is None or type(self).shapes:
+            return prompt
+        return prompt + _IN_SHAPE.format(
+            schema=json.dumps(schema.model_json_schema(), indent=2)
+        )
 
     def _heard(self, event: Event) -> Event:
         """Tells whoever is watching the agent what was said, and answers with it.
@@ -280,11 +413,15 @@ class SessionBase(ABC):
         )
 
     @abstractmethod
-    def _stream(self, prompt: str) -> Iterator[Event]:
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
         """Sends one turn, saying what the agent says as it says it.
 
         Args:
           prompt: The input prompt for this turn.
+          schema: The shape the turn is to answer in, for a backend that can be held to one,
+            and already asked for in the prompt for one that cannot.
 
         Yields:
           What the agent said, in the order it said it.
@@ -449,7 +586,9 @@ class SessionBase(ABC):
 class CommandSessionBase(SessionBase):
     """A session whose turns are one run of a coding agent's command line each."""
 
-    def _stream(self, prompt: str) -> Iterator[Event]:
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
         """Sends one turn, saying each line the agent writes as it is written.
 
         Turns of one session are serialized, so a session shared by two threads holds one
@@ -462,6 +601,9 @@ class CommandSessionBase(SessionBase):
 
         Args:
           prompt: The input prompt for this turn.
+          schema: The shape to answer in, which the command :meth:`_turn` builds reads off
+            the session -- it is set here, under the lock the turn is taken under, so that
+            what builds the command is looking at this turn's own.
 
         Yields:
           A line at a time as the agent writes it, and the whole of what it said last.
@@ -471,6 +613,7 @@ class CommandSessionBase(SessionBase):
             attached to it as diagnostics.
         """
         with self._lock:
+            self._shaping = schema
             argv, stdin = self._turn(prompt)
             if (anchor := self._agent.anchor) is not None:
                 # Spawned rather than called: coganchor's supervisor forks the agent and takes
@@ -586,7 +729,9 @@ class StreamSessionBase(SessionBase):
         #: Who is reading the process's complaints, so a failed turn can wait for the last.
         self._draining: threading.Thread | None = None
 
-    def _stream(self, prompt: str) -> Iterator[Event]:
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
         """Sends one turn as a line of JSON, and reads the agent's own back until it ends.
 
         A word put in while the turn runs is a thing said too, and the agent answers each
@@ -596,6 +741,11 @@ class StreamSessionBase(SessionBase):
 
         Args:
           prompt: The input prompt for this turn.
+          schema: The shape to answer in, which is an argument of the process rather than of
+            the turn: a session already holding one that was started for another shape ends
+            it, and the turn starts one that is asked for this one. The conversation is not
+            ended by that -- the new process resumes it, as an anchored session's does every
+            turn.
 
         Yields:
           What the agent said, in the order it said it.
@@ -604,6 +754,9 @@ class StreamSessionBase(SessionBase):
           subprocess.CalledProcessError: If the agent exits rather than answering.
         """
         with self._lock:
+            if schema is not self._shaping:
+                self._shut()
+            self._shaping = schema
             argv = self._command()
             proc = self._start(argv)
             assert proc.stdout is not None  # noqa: S101
@@ -1126,7 +1279,17 @@ class AgentBase(ABC):
             raise Stopped(f"{self._id} was stopped")
         return said
 
-    def __call__(self, prompt: str, *, suppress: bool = False) -> str:
+    @overload
+    def __call__(self, prompt: str, *, suppress: bool = False) -> str: ...
+
+    @overload
+    def __call__[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T]
+    ) -> T | None: ...
+
+    def __call__[T: BaseModel](
+        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+    ) -> str | T | None:
         """Runs one turn in a session of its own, and keeps nothing.
 
         Which is the shape a Ralph loop is made of: the agent starts from the task and the
@@ -1137,11 +1300,16 @@ class AgentBase(ABC):
           prompt: The input prompt for the turn.
           suppress: Whether a turn that fails answers with nothing, as for
             :meth:`SessionBase.__call__`.
+          schema: The shape to answer in, as for :meth:`SessionBase.__call__` -- which is
+            what a flow asking one agent a question rather than setting it to work wants:
+            `agents.reviewer(asked, schema=Review).done` is the review read as a decision.
 
         Returns:
-          What the agent answered, stripped.
+          What the agent answered, stripped, or the model it was asked for.
         """
-        return self.new()(prompt, suppress=suppress)
+        if schema is None:
+            return self.new()(prompt, suppress=suppress)
+        return self.new()(prompt, suppress=suppress, schema=schema)
 
     def pursue(self, objective: str, *, suppress: bool = False) -> str:
         """Runs a goal in a session of its own, and keeps nothing.

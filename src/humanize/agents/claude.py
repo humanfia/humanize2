@@ -56,6 +56,10 @@ class ClaudeCodeSession(StreamSessionBase):
     is already there, and so is anything said to it while a turn is running.
     """
 
+    #: `--json-schema` is Claude's own: it validates the answer against the schema before it
+    #: hands it back, so a turn asked for a shape answers in it or does not answer.
+    shapes: ClassVar[bool] = True
+
     def __init__(self, agent: AgentBase) -> None:
         """Initializes a session that has spent nothing yet.
 
@@ -83,7 +87,7 @@ class ClaudeCodeSession(StreamSessionBase):
         # A fresh id per attempt: an opening turn that failed may still have left Claude holding
         # the id it was given, and retrying under that one would collide forever.
         pinned = self._id or str(uuid.uuid4())
-        return [
+        argv = [
             "claude",
             "--print",
             "--input-format",
@@ -99,6 +103,11 @@ class ClaudeCodeSession(StreamSessionBase):
             "--effort",
             self._agent.config.effort,
         ]
+        if self._shaping is not None:
+            # Claude validates the answer against this itself, so a turn that lands has
+            # answered in the shape: what comes back is the object, and nothing else.
+            argv += ["--json-schema", json.dumps(self._shaping.model_json_schema())]
+        return argv
 
     def _write(self, text: str, ticket: str = "") -> str:
         """Renders one thing to say as the user message Claude reads it as.
