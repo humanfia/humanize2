@@ -120,7 +120,7 @@ each time with nothing of the last turn in context:
 Then say what you want done. It will keep going until you stop it with esc — that is what a
 Ralph loop *is*. `/status` shows who is working, who handed to whom, and what it has cost.
 
-humanize comes with nine: `chat`, `ralph_loop`, `stateful_ralph`, `fixed_tps_ralph`,
+humanize comes with nine: `chat`, `ralph_loop`, `stateful_ralph`, `fixed_juice_ralph`,
 `continue_loop`, `goal`, `flame_chase`, `rlar` and `humanize1`. Six of them are flowbench's
 loops written this way. Each is described in
 [Flows](flows.md#the-flows-humanize-comes-with).

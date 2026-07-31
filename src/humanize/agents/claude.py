@@ -291,7 +291,10 @@ class ClaudeCodeSession(StreamSessionBase):
             }
         )
         self._fed, self._seen = Counter(), {}
-        self._spends(owed)
+        # Not a turn of the model: the requests it is settling up for have each been counted
+        # already, and counting this as one more would put a turn in the average that never
+        # happened.
+        self._spends(owed, turn=False)
 
     def _read(self, line: str) -> Iterator[Event]:
         """Reads one event Claude wrote, as the things it says the agent did.

@@ -159,23 +159,30 @@ class Meter:
         """Initializes a meter that has seen nothing spent."""
         self._lock = threading.Lock()
         self._total: Counter[str] = Counter()
-        #: Recent spending as (when, what), bounded by the window rather than by the length
-        #: of the run: a flow going for days keeps five minutes of it.
-        self._recent: deque[tuple[float, Usage]] = deque()
+        #: Recent spending as (when, what, whether it was a turn of the model), bounded by
+        #: the window rather than by the length of the run: a flow going for days keeps five
+        #: minutes of it.
+        self._recent: deque[tuple[float, Usage, bool]] = deque()
         self._began = time.monotonic()
 
-    def spend(self, usage: Usage, now: float | None = None) -> None:
+    def spend(
+        self, usage: Usage, now: float | None = None, *, turn: bool = True
+    ) -> None:
         """Notes what one request to the model cost.
 
         Args:
           usage: What it cost, by kind.
           now: When, defaulting to this moment. Given only so a test can say.
+          turn: Whether this is a turn of the model rather than a correction to the ones
+            already counted. A backend that states a turn's whole cost after having said what
+            each request in it came to is settling up, not taking another turn -- and counting
+            it as one would put a turn in the average that never happened.
         """
         if not usage.total:
             return
         with self._lock:
             self._total.update(usage)
-            self._recent.append((time.monotonic() if now is None else now, usage))
+            self._recent.append((time.monotonic() if now is None else now, usage, turn))
 
     def spent(self) -> Usage:
         """Everything spent so far, by kind.
@@ -209,9 +216,35 @@ class Meter:
             while self._recent and self._recent[0][0] < moment - window:
                 self._recent.popleft()
             lately = Usage({"input": 0.0, "output": 0.0})
-            for _, usage in self._recent:
+            for _, usage, _ in self._recent:
                 lately = lately + usage
             return lately / min(window, max(moment - self._began, 0.0))
+
+    def juice(self, over: float = WINDOW, now: float | None = None) -> float:
+        """What an average turn of the model came out with, over the last stretch of the run.
+
+        A turn of the model rather than a turn of the flow: one request and the answer to it,
+        of which the work a flow asks for is many. How much of an answer that comes to is what
+        the effort a model runs at moves -- so it is the number to steer by when what is being
+        held is how hard the thing is thinking, rather than how fast a bill is running up.
+
+        Args:
+          over: How far back to measure, in seconds.
+          now: The moment to measure at, defaulting to this one. Given only so a test can say.
+
+        Returns:
+          Output tokens per turn, and nothing at all where no turn has landed in the window --
+          which reads as nothing to go on rather than as a turn that said nothing.
+        """
+        moment = time.monotonic() if now is None else now
+        window = max(over, 0.0)
+        with self._lock:
+            while self._recent and self._recent[0][0] < moment - window:
+                self._recent.popleft()
+            turns = sum(1 for _, _, taken in self._recent if taken)
+            if not turns:
+                return 0.0
+            return sum(usage.output for _, usage, _ in self._recent) / turns
 
 
 class SessionBase(ABC):
@@ -302,10 +335,9 @@ class SessionBase(ABC):
     def rate(self, over: float = WINDOW) -> Usage:
         """How fast this conversation is spending, by kind, over the last stretch of it.
 
-        Which is the number a flow steers by: `session.rate().output` is output tokens a
-        second, over seconds on the clock rather than seconds the agent was talking -- the
-        same reckoning the interface's own readout is, so that a flow and a person watching
-        it are reading the same thing.
+        `session.rate().output` is output tokens a second, over seconds on the clock rather
+        than seconds the agent was talking -- the same reckoning the interface's own readout
+        is, so that a flow and a person watching it are reading the same thing.
 
         Args:
           over: How far back to measure, in seconds. The whole run where it is younger than
@@ -316,7 +348,23 @@ class SessionBase(ABC):
         """
         return self._meter.rate(over)
 
-    def _spends(self, usage: Usage) -> None:
+    def juice(self, over: float = WINDOW) -> float:
+        """What an average turn of the model came out with, over the last stretch of it.
+
+        A turn of the model, not a turn of the flow: one request and the answer to it, of
+        which a turn a flow asks for is many. It is what an effort moves -- a model asked to
+        think harder writes more per answer, and takes longer over it -- so this is the number
+        to steer by when what is being held is how hard it is thinking.
+
+        Args:
+          over: How far back to measure, in seconds.
+
+        Returns:
+          Output tokens per turn, and 0.0 where no turn has landed in the window.
+        """
+        return self._meter.juice(over)
+
+    def _spends(self, usage: Usage, *, turn: bool = True) -> None:
         """Notes what one request of the turn now running cost, as its backend says.
 
         Told as the turn goes rather than once it is over: a turn is minutes long, and what a
@@ -325,9 +373,11 @@ class SessionBase(ABC):
 
         Args:
           usage: What that request cost, by kind.
+          turn: Whether it is a turn of the model rather than a settling up of the ones
+            already counted, as for :meth:`Meter.spend`.
         """
-        self._meter.spend(usage)
-        self._agent._meter.spend(usage)
+        self._meter.spend(usage, turn=turn)
+        self._agent._meter.spend(usage, turn=turn)
 
     @property
     def effort(self) -> str:
@@ -1423,6 +1473,20 @@ class AgentBase(ABC):
           Tokens a second, by kind.
         """
         return self._meter.rate(over)
+
+    def juice(self, over: float = WINDOW) -> float:
+        """What an average turn of this agent's model came out with, over the last stretch.
+
+        Every session it has opened, the ones nobody holds any more included, as for
+        :meth:`spent`.
+
+        Args:
+          over: How far back to measure, in seconds.
+
+        Returns:
+          Output tokens per turn, and 0.0 where no turn has landed in the window.
+        """
+        return self._meter.juice(over)
 
     @property
     def effort(self) -> str:

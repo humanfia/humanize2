@@ -343,3 +343,78 @@ def test_the_next_turn_is_counted_from_where_the_last_one_left_off(
 
     assert answered.spent.total == 624  # the rise across the second turn, not the whole
     assert session.spent().total == 1248  # which is what the two of them come to
+
+
+def test_a_meter_says_what_an_average_turn_of_the_model_came_out_with() -> None:
+    """A turn of the model -- one request and the answer to it -- not a turn of a flow."""
+    meter = Meter()
+    began = meter._began
+
+    meter.spend(Usage(input=100, output=20), now=began + 1)
+    meter.spend(Usage(input=100, output=40), now=began + 2)
+
+    assert meter.juice(over=10, now=began + 5) == pytest.approx(30.0)
+
+
+def test_settling_up_is_not_another_turn_of_the_model() -> None:
+    """A backend that states a turn's whole cost after saying what each request came to.
+
+    Counting that as a turn would put one in the average that never happened -- and would
+    halve the answer size of every backend that settles up.
+    """
+    meter = Meter()
+    began = meter._began
+
+    meter.spend(Usage(input=10, output=20), now=began + 1)
+    meter.spend(Usage(input=490), now=began + 2, turn=False)
+
+    assert meter.juice(over=10, now=began + 5) == pytest.approx(20.0)
+    assert meter.spent().input == 500  # but every token of it was still spent
+
+
+def test_an_average_over_a_window_with_no_turn_in_it_is_nothing_to_go_on() -> None:
+    """Which is not the same as a turn that came out with nothing, and does not read as one."""
+    meter = Meter()
+    began = meter._began
+
+    meter.spend(Usage(output=100), now=began + 1)
+
+    assert meter.juice(over=10, now=began + 5) == pytest.approx(100.0)
+    assert meter.juice(over=10, now=began + 60) == 0.0
+
+
+def test_a_session_says_what_an_average_turn_of_it_came_out_with(pi: None) -> None:
+    """The stand-in answers each prompt with two requests, five tokens out apiece."""
+    session = PiAgent(PI).new()
+    session("hi")
+
+    assert session.juice(over=60) == pytest.approx(5.0)
+    assert session.spent().output == 10  # which is the two of them together
+
+
+def test_a_message_told_twice_is_one_turn_in_the_average(claude: None) -> None:
+    """Claude says the same message twice and states the whole of its cost both times.
+
+    So the average is over the requests it made, not over the times it mentioned them -- and
+    the total it settles up with at the end is not one of them either.
+    """
+    session = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high")).new()
+    session("hi")
+
+    # One request, four tokens out, however many times it was told about and settled for.
+    assert session.juice(over=60) == pytest.approx(4.0)
+
+
+def test_an_agent_averages_over_every_session_of_it(pi: None) -> None:
+    agent = PiAgent(PI)
+    agent("one")
+    agent("two")
+
+    assert agent.juice(over=60) == pytest.approx(5.0)  # four turns, five out apiece
+
+
+def test_a_backend_that_answers_in_steps_is_averaged_over_them(opencode: None) -> None:
+    session = OpencodeAgent(OPENCODE).new()
+    session("hi")
+
+    assert session.juice(over=60) == pytest.approx(2.0)  # two steps, two out apiece

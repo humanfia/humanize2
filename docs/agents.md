@@ -454,8 +454,10 @@ Every session and every agent says what it has spent and how fast it is spending
 session.spent()          # Usage(input=41230, output=2180, cache_read=980100)
 session.rate()           # tokens a second, by kind, over the last five minutes
 session.rate(over=60)    # over the last minute instead
+session.juice(over=60)   # output tokens an average turn of the model came out with
 agent.spent()            # every session this agent has opened, dropped ones included
 agent.rate(over=60)
+agent.juice()
 ```
 
 A `Usage` is a **mapping of kind to tokens**. `input` and `output` are the two every backend
@@ -481,6 +483,19 @@ moved when one ended would stand still for all of them: every backend here is re
 what each request to the model cost — Claude Code and pi on the message it answered with,
 Codex on `thread/tokenUsage/updated`, opencode and mimocode on each step, Kimi Code from the
 session it is polling anyway.
+
+**`juice()` is the third reading, and it is not a clock at all.** It is what one turn of the
+*model* came out with — one request and the answer to it, of which a turn a flow asks for is
+many. That average is what an effort moves: a model asked to think harder writes more in each
+answer and takes longer over it. So it is the number to steer by when what is being held is
+how hard the thing is thinking rather than how fast a bill is running up, and it is what
+[`fixed_juice_ralph`](flows.md#the-flows-humanize-comes-with) governs on. A window with no
+turn in it reads as `0.0`: nothing to go on, which a flow tells apart from a turn that said
+nothing.
+
+A backend that states a whole turn's cost after having said what each request in it came to
+is settling up rather than taking another turn, and is not counted as one — or the average
+would be halved by the accounting.
 
 The `result` event a turn ends on carries the same reckoning as `spent`, beside the per-model
 `tokens` it already carried: the two are the same spending counted two ways, and

@@ -317,7 +317,7 @@ that starts it in its own docstring.
 | `chat` | 1 + you | One agent, one session, and every line typed between turns is a turn of it. Talking to a coding agent with no loop around it. This is what the interface opens on. |
 | `ralph_loop` | 1 | A fresh session every turn, so nothing carries over: the agent starts from the task and the repository each time. |
 | `stateful_ralph` | 1 | One session, held for the whole run, re-sent the task every turn. |
-| `fixed_tps_ralph` | 1 | Ralph with a governor on it: it [moves the effort](agents.md#moving-the-effort-while-it-runs) a rung a round and rests a turn off over the seconds its output is worth, to hold the agent to `tps` output tokens a second. |
+| `fixed_juice_ralph` | 1 | Ralph with a governor on it: it [moves the effort](agents.md#moving-the-effort-while-it-runs) a rung a round to hold the agent to `juice` output tokens per turn of the model. |
 | `continue_loop` | 1 | Sends the task once, then keeps nudging `continue`. Until a turn lands the task is sent again — `continue` on its own would open a session that never saw it. |
 | `goal` | 1 | Ralph, with the task set as the agent's [own goal](agents.md#goals). The loop only starts it over when it stopped without having met it. |
 | `flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. |
