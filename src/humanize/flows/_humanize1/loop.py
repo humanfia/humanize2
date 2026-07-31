@@ -356,9 +356,14 @@ class Loop:
         for name, kind in (("current_round", int), ("max_iterations", int)):
             found = re.search(rf"^{name}:\s*(\S+)\s*$", held, re.MULTILINE)
             if found is None:
+                # A field the setup script wrote and the file no longer has: whatever else
+                # was done to it, this is not a state file the loop can go on from.
                 self._ends("unexpected")
-            return None
+                return None
             with contextlib.suppress(ValueError):
+                # What is on disk wins, which is the whole point of reading it back. A value
+                # that no longer reads as a number is left as it was rather than taken as
+                # zero, and the round after it will write the file out again.
                 setattr(self.state, name, kind(found.group(1)))
         return None
 

@@ -21,6 +21,7 @@ from humanize.agents import (
     Moment,
     Occasion,
     SessionBase,
+    Verdict,
 )
 from humanize.flows import humanize1
 from humanize.flows._humanize1 import loop
@@ -641,3 +642,73 @@ def test_a_plan_that_leaves_git_mid_loop_is_refused_too(
 
     assert refused is not None
     assert "no longer tracked in git" in refused.because
+
+
+def _gated(workspace: Path, held: str) -> tuple[loop.Loop, Verdict | None]:
+    """Puts one state file in front of the gate that reads it back, and answers with both.
+
+    Args:
+      workspace: The repository the loop is anchored to.
+      held: What `state.md` says.
+
+    Returns:
+      The loop and whatever the gate said about it.
+    """
+    where = workspace / ".humanize" / "rlcr" / "now"
+    where.mkdir(parents=True)
+    (where / "state.md").write_text(held, encoding="utf-8")
+    running = loop.Loop(
+        None,  # pyright: ignore[reportArgumentType]
+        where,
+        workspace,
+        loop.State(current_round=1, max_iterations=42),
+    )
+    return running, running._schema(Occasion(moment=Moment.STOP, agent="builder"))
+
+
+def test_the_state_the_builder_may_not_write_is_read_back_each_round(
+    workspace: Path,
+) -> None:
+    """Which is what the refusal to let it write the file is worth having for.
+
+    The loop keeps the round in memory and writes it out, so on an ordinary round this reads
+    back what it just wrote. On a round where something else got at the file, what is on disk
+    is what the loop goes on from -- that is the whole point of looking.
+    """
+    running, said = _gated(
+        workspace, loop.State(current_round=7, max_iterations=9).written()
+    )
+
+    assert said is None  # nothing to refuse: the file reads
+    assert not running.over
+    assert (running.state.current_round, running.state.max_iterations) == (7, 9)
+
+
+def test_a_state_file_that_no_longer_says_which_round_it_is_ends_the_loop(
+    workspace: Path,
+) -> None:
+    """A round number nothing can trust is a loop that stops rather than one that guesses."""
+    written = loop.State(current_round=7).written()
+    without = "\n".join(
+        line for line in written.splitlines() if not line.startswith("current_round:")
+    )
+
+    running, said = _gated(workspace, without)
+
+    assert said is None
+    assert running.over == "unexpected"
+    assert (running.where / "unexpected-state.md").is_file()
+
+
+def test_a_round_number_that_is_not_a_number_is_left_as_it_was(workspace: Path) -> None:
+    """The field is there and says something else, which is not the same as being gone."""
+    written = loop.State(current_round=7, max_iterations=9).written()
+
+    running, said = _gated(
+        workspace, written.replace("current_round: 7", "current_round: x")
+    )
+
+    assert said is None
+    assert not running.over
+    assert running.state.current_round == 1  # as the loop had it, rather than zero
+    assert running.state.max_iterations == 9  # and the field beside it still read
