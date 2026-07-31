@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
-from .event import Event, Question
+from .event import Event, Question, Usage
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -34,6 +34,15 @@ _ASKS = ("select", "confirm", "input", "editor")
 #: What pi offers for a question that is a yes or a no, so that it reads as a question
 #: wherever it is shown rather than as one with nothing to answer it with.
 _YES_NO = ("yes", "no")
+
+#: What each kind of token is called in the usage pi reports on every message. Reasoning is
+#: counted inside the output rather than beside it, which is why it is not a kind of its own.
+_KINDS = {
+    "input": "input",
+    "output": "output",
+    "cache_read": "cacheRead",
+    "cache_write": "cacheWrite",
+}
 
 #: The tools of pi's own that change something rather than look at something, which is the
 #: whole of what an agent that may change nothing is refused. pi has no permission gate and no
@@ -93,8 +102,13 @@ class PiSession(StreamSessionBase):
         #: it if anything did. Both are cleared as the turn's answer is given.
         self._said = ""
         self._failed: str | None = None
-        #: What the turn now running has cost, added up as pi reports each request.
+        #: What the turn now running has cost, added up as pi reports each request: as one
+        #: number for the model it ran on, and by the kind each token went on.
         self._spent = 0
+        self._costing = Usage()
+        #: What the process now up was last told to think at, so that a flow moving the
+        #: effort mid-session is told to pi rather than left on the flag it was started with.
+        self._at: str | None = None
 
     @property
     def named(self) -> str | None:
@@ -121,7 +135,7 @@ class PiSession(StreamSessionBase):
             "--model",
             self._agent.config.model,
             "--thinking",
-            self._agent.config.effort,
+            self.effort,
             "--session-id",
             pinned,
         ]
@@ -146,7 +160,18 @@ class PiSession(StreamSessionBase):
         said: dict[str, Any] = {"type": "prompt", "message": text}
         if ticket:
             said["id"] = ticket
-        return json.dumps(said) + "\n"
+        line = json.dumps(said) + "\n"
+        if self._at is not None and self._at != self.effort:
+            # How hard to think is a command here rather than a flag to restart under: pi
+            # takes it on the session it is already holding, so a flow that moves the effort
+            # is answered by telling it, ahead of the prompt the new effort is for.
+            self._at = self.effort
+            line = (
+                json.dumps({"type": "set_thinking_level", "level": self._at})
+                + "\n"
+                + line
+            )
+        return line
 
     def interject(self, text: str) -> None:
         """Steers the turn under way, which pi takes into the turn it is running.
@@ -175,7 +200,8 @@ class PiSession(StreamSessionBase):
 
     def _restarted(self) -> None:
         """Forgets the turn the last process was in the middle of, which this one is not."""
-        self._said, self._failed, self._spent = "", None, 0
+        self._said, self._failed, self._spent, self._costing = "", None, 0, Usage()
+        self._at = self.effort
 
     def _read(self, line: str) -> Iterator[Event]:
         """Reads one event pi wrote, as the things it says the agent did.
@@ -275,12 +301,18 @@ class PiSession(StreamSessionBase):
             return
         usage: dict[str, Any] = message.get("usage") or {}
         # Every kind of token counts: what a rate is measuring is the traffic, and a cache
-        # read crosses the wire like anything else. Reasoning is counted inside the output,
-        # which is why it is not added again here.
-        self._spent += sum(
-            int(usage.get(kind) or 0)
-            for kind in ("input", "output", "cacheRead", "cacheWrite")
+        # read crosses the wire like anything else. Told as it lands rather than once the run
+        # is over, since that is what a rate read while the turn runs is made of.
+        counted = Usage(
+            {
+                kind: float(usage.get(named) or 0)
+                for kind, named in _KINDS.items()
+                if usage.get(named)
+            }
         )
+        self._spent += int(counted.total)
+        self._costing = self._costing + counted
+        self._spends(counted)
         self._failed = (
             str(message["errorMessage"]) if message.get("errorMessage") else None
         )
@@ -301,14 +333,14 @@ class PiSession(StreamSessionBase):
           whose last request came back as an error and left nothing to answer with did not
           land, and a loop fed that error would be running on it as the work of the turn.
         """
-        said, failed, spent = self._said, self._failed, self._spent
-        self._said, self._failed, self._spent = "", None, 0
+        said, failed, spent, turn = self._said, self._failed, self._spent, self._costing
+        self._said, self._failed, self._spent, self._costing = "", None, 0, Usage()
         tokens = {self._agent.config.model: spent} if spent > 0 else {}
         if failed is not None and not said:
-            return Event(kind="failed", text=failed, tokens=tokens)
+            return Event(kind="failed", text=failed, tokens=tokens, spent=turn)
         if self._named is not None:
             self._adopt(self._named)  # a turn has landed, so the session is open
-        return Event(kind="result", text=said.strip(), tokens=tokens)
+        return Event(kind="result", text=said.strip(), tokens=tokens, spent=turn)
 
     def _answer(self, said: dict[str, Any]) -> None:
         """Answers something an extension of pi's stopped the turn to ask.

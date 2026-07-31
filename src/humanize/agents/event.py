@@ -8,13 +8,93 @@ into `Event`s, and that is all it has to import to do it.
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import IO, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterator
 
-__all__ = ["Event", "Question", "Stopped", "say"]
+__all__ = ["Event", "Question", "Stopped", "Usage", "say"]
+
+#: The kinds every backend here counts, and which of them each also counts beside those. A
+#: kind is named the same thing wherever it is counted, so that one flow reading two backends
+#: reads one word for one thing.
+COMMON = ("input", "output")
+
+
+class Usage(Mapping[str, float]):
+    """Tokens, by the kind each of them went on.
+
+    A mapping, because what a backend counts is what a backend counts: `input` and `output`
+    are the two every one of them has, and the rest -- a cache read, a cache write, the
+    reasoning one counts beside the output rather than inside it -- differ from CLI to CLI. A
+    kind that is not in one of these is one this backend does not report, which is not the
+    same as one it reports as nothing, so `usage.get("cache_read", 0)` is how an optional kind
+    is asked for.
+
+    The same shape says what has been spent and how fast it is being spent: a rate is tokens a
+    second, kind by kind, which is the same reckoning divided by the seconds it happened over.
+    """
+
+    __slots__ = ("_kinds",)
+
+    def __init__(
+        self, kinds: Mapping[str, float] | None = None, /, **named: float
+    ) -> None:
+        """Initializes a reckoning of tokens.
+
+        Args:
+          kinds: What was spent, by kind.
+          named: The same, for the kinds that can be written as words.
+        """
+        self._kinds: dict[str, float] = {**(kinds or {}), **named}
+
+    @property
+    def input(self) -> float:
+        """What went in, which every backend counts."""
+        return self._kinds.get("input", 0.0)
+
+    @property
+    def output(self) -> float:
+        """What came out, which every backend counts."""
+        return self._kinds.get("output", 0.0)
+
+    @property
+    def total(self) -> float:
+        """Every kind together, which is the whole of what crossed the wire.
+
+        The kinds are counted so that adding them up says that: a backend that counts its
+        reasoning inside the output does not also carry it beside it, and one that counts a
+        cached read inside the input does not carry that twice either.
+        """
+        return sum(self._kinds.values())
+
+    def __getitem__(self, kind: str) -> float:
+        return self._kinds[kind]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._kinds)
+
+    def __len__(self) -> int:
+        return len(self._kinds)
+
+    def __add__(self, other: Mapping[str, float]) -> Usage:
+        """Two reckonings as one, kind by kind."""
+        added = dict(self._kinds)
+        for kind, tokens in other.items():
+            added[kind] = added.get(kind, 0.0) + tokens
+        return Usage(added)
+
+    def __truediv__(self, over: float) -> Usage:
+        """The same reckoning as a rate, which is what it came to over that many seconds."""
+        if over <= 0:
+            return Usage(dict.fromkeys(self._kinds, 0.0))
+        return Usage({kind: tokens / over for kind, tokens in self._kinds.items()})
+
+    def __repr__(self) -> str:
+        said = ", ".join(f"{kind}={tokens:g}" for kind, tokens in self._kinds.items())
+        return f"Usage({said})"
 
 
 class Stopped(Exception):  # noqa: N818  -- not an error: an agent asked to stop has stopped
@@ -44,11 +124,15 @@ class Event:
       text: The words themselves, ready to be shown.
       tokens: What the turn cost, as tokens spent per model. Only a `result` carries it, and
         only from a backend that says.
+      spent: The same cost, by the kind of token it went on rather than by model -- what a
+        rate is read off. Only a `result` carries it, and its `total` is what `tokens` comes
+        to: the two are the same spending counted two ways.
     """
 
     kind: str
     text: str
     tokens: Mapping[str, int] = field(default_factory=dict[str, int])
+    spent: Usage = field(default_factory=Usage)
 
 
 @dataclass(frozen=True, slots=True)

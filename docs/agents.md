@@ -20,6 +20,8 @@ Everything here is importable from `humanize.agents`.
 - [Names, and what a run left behind](#names-and-what-a-run-left-behind)
 - [The person as an agent](#the-person-as-an-agent)
 - [Efforts](#efforts)
+- [Moving the effort while it runs](#moving-the-effort-while-it-runs)
+- [What it has cost, and how fast](#what-it-has-cost-and-how-fast)
 - [What each backend can do](#what-each-backend-can-do)
 - [Answering in a shape](#answering-in-a-shape)
 - [What an agent may do](#what-an-agent-may-do)
@@ -416,6 +418,73 @@ of its own. It is more work than any single-agent effort, which is why it sits a
 
 Codex's models differ from each other — `gpt-5.6-sol` takes `ultra`, `gpt-5.5` does not — so
 the interface offers each model only the efforts it takes.
+
+## Moving the effort while it runs
+
+A config is frozen, because a session resumes under the settings it opened with. The effort is
+the one of them a flow may move as it goes:
+
+```python
+agents.builder.effort = "low"       # every session of this agent, from its next turn
+session.effort = "max"              # this conversation alone
+session.effort = ""                 # and back to whatever the agent runs at
+```
+
+Reading it back is the same property. `agent.config.effort` stays what the agent was
+*configured* with; `agent.effort` is what its turns actually run at.
+
+**It takes hold on the next turn.** The turn already under way keeps the effort it started at:
+a model does not think harder halfway through an answer, and a flow that changed it mid-turn
+would be describing a turn that never happened.
+
+Each backend carries it the way that backend takes it. Codex, Kimi Code, opencode and mimocode
+take the effort with each turn, so the next turn simply carries the new one. Claude Code takes
+it as an argument of the process it is held open as, so moving it ends that process and
+resumes the conversation in one started at the new effort — the same thing asking for a shape
+does. pi has a command for it, and is told.
+
+A `swarm` prefix moves with it on Kimi Code: `agent.effort = "swarmmax"` is `max` thinking at
+the width of a fleet, from the next turn on.
+
+## What it has cost, and how fast
+
+Every session and every agent says what it has spent and how fast it is spending it:
+
+```python
+session.spent()          # Usage(input=41230, output=2180, cache_read=980100)
+session.rate()           # tokens a second, by kind, over the last five minutes
+session.rate(over=60)    # over the last minute instead
+agent.spent()            # every session this agent has opened, dropped ones included
+agent.rate(over=60)
+```
+
+A `Usage` is a **mapping of kind to tokens**. `input` and `output` are the two every backend
+counts, and are on it as attributes; the rest — a cache read, a cache write, the reasoning a
+backend counts beside the output rather than inside it — differ from CLI to CLI, so a kind
+that is not there is one that backend does not report:
+
+```python
+spent = session.spent()
+spent.input, spent.output, spent.total       # always
+spent.get("cache_read", 0)                   # for a backend that counts one
+dict(spent)                                  # everything it does count
+```
+
+**A rate is tokens a second over seconds on the clock**, not seconds an agent was talking: a
+flow sleeps between rounds, commits, reads what the last turn wrote, and that time is time the
+tokens were spent over. The window defaults to five minutes — `humanize.agents.WINDOW`, the
+same one the interface's readout is over — and a run younger than the window is measured over
+the run, so a rate read a minute in is what that minute came to rather than a fifth of it.
+
+**It moves while the turn is still running.** A turn is minutes long, so a number that only
+moved when one ended would stand still for all of them: every backend here is read as it says
+what each request to the model cost — Claude Code and pi on the message it answered with,
+Codex on `thread/tokenUsage/updated`, opencode and mimocode on each step, Kimi Code from the
+session it is polling anyway.
+
+The `result` event a turn ends on carries the same reckoning as `spent`, beside the per-model
+`tokens` it already carried: the two are the same spending counted two ways, and
+`result.spent.total` is what `result.tokens` comes to.
 
 ## What each backend can do
 

@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, CommandSessionBase
 from .config import AgentConfig
-from .event import Event
+from .event import Event, Usage
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -79,6 +79,7 @@ class OpencodeSession(CommandSessionBase):
         #: which parts of it have already been shown -- a part is written once here, but a
         #: turn that saw it twice would show it twice.
         self._spent = 0
+        self._costing = Usage()
         self._shown: set[str] = set()
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
@@ -94,6 +95,7 @@ class OpencodeSession(CommandSessionBase):
           The command and the prompt to write to it.
         """
         self._said, self._failed, self._spent, self._shown = "", None, 0, set()
+        self._costing = Usage()
         argv = [
             type(self).command,
             "run",
@@ -104,7 +106,7 @@ class OpencodeSession(CommandSessionBase):
             "--model",
             self._agent.config.model,
             "--variant",
-            self._agent.config.effort,
+            self.effort,
         ]
         if self._id is not None:
             argv += ["--session", self._id]
@@ -157,7 +159,12 @@ class OpencodeSession(CommandSessionBase):
             failed: dict[str, Any] = said.get("error") or {}
             self._failed = json.dumps(failed) if failed else "the turn failed"
         elif kind == "step_finish":
-            self._spent += self._cost(cast("dict[str, Any]", part.get("tokens") or {}))
+            # Told as the step lands rather than once the run is over, which is what a rate
+            # read while the turn is still running is made of.
+            counted = self._cost(cast("dict[str, Any]", part.get("tokens") or {}))
+            self._spent += int(counted.total)
+            self._costing = self._costing + counted
+            self._spends(counted)
         elif kind == "tool_use":
             yield from self._tool(part)
         elif (says := _SAYS.get(kind)) is not None:
@@ -199,22 +206,31 @@ class OpencodeSession(CommandSessionBase):
             kind="tool", text=f"{part.get('tool') or 'tool'} {about}".strip()[:120]
         )
 
-    def _cost(self, counted: dict[str, Any]) -> int:
-        """What one step of a turn cost, all told.
+    def _cost(self, counted: dict[str, Any]) -> Usage:
+        """What one step of a turn cost, by the kind each token went on.
 
         Every kind of token counts: what a rate is measuring is the traffic, and a cache read
         crosses the wire like anything else. Reasoning is counted beside the output here
-        rather than inside it, which is why it is added rather than left out.
+        rather than inside it, which is why it is a kind of its own.
 
         Args:
           counted: The step's `tokens`, as read.
 
         Returns:
-          The tokens that step spent.
+          What that step spent.
         """
         cached: dict[str, Any] = counted.get("cache") or {}
-        return sum(int(counted.get(name) or 0) for name in _COUNTED) + sum(
-            int(cached.get(name) or 0) for name in _CACHED
+        return Usage(
+            {
+                name: float(counted.get(name) or 0)
+                for name in _COUNTED
+                if counted.get(name)
+            }
+            | {
+                f"cache_{name}": float(cached.get(name) or 0)
+                for name in _CACHED
+                if cached.get(name)
+            }
         )
 
     def _result(self, transcript: str) -> Event:
@@ -244,6 +260,7 @@ class OpencodeSession(CommandSessionBase):
             kind="result",
             text=said.strip(),
             tokens={self._agent.config.model: spent} if spent > 0 else {},
+            spent=self._costing,
         )
 
     def _read_session_id(self, transcript: str) -> str:

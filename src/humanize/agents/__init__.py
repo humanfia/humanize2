@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
+from .base import (
+    WINDOW,
+    AgentBase,
+    CommandSessionBase,
+    Meter,
+    SessionBase,
+    StreamSessionBase,
+)
 from .claude import ClaudeCodeAgent, ClaudeCodeAgentConfig, ClaudeCodeSession
 from .codex import CodexAgent, CodexAgentConfig, CodexSession
 from .config import PERMISSIONS, AgentConfig, anchored
-from .event import Event, Question, Stopped
+from .event import Event, Question, Stopped, Usage
 from .hooks import EVERYWHERE, Hook, Hooks, Hung, Moment, Occasion, Unhooked, Verdict
 from .human import HumanAgent, HumanSession
 from .kimi import SWARM, KimiCodeCLIAgent, KimiCodeCLIAgentConfig, KimiCodeCLISession
@@ -32,6 +39,7 @@ __all__ = [
     "EVERYWHERE",
     "PERMISSIONS",
     "SWARM",
+    "WINDOW",
     "AgentBase",
     "AgentConfig",
     "ClaudeCodeAgent",
@@ -50,6 +58,7 @@ __all__ = [
     "KimiCodeCLIAgent",
     "KimiCodeCLIAgentConfig",
     "KimiCodeCLISession",
+    "Meter",
     "MimoCodeAgent",
     "MimoCodeAgentConfig",
     "MimoCodeSession",
@@ -66,6 +75,7 @@ __all__ = [
     "Stopped",
     "StreamSessionBase",
     "Unhooked",
+    "Usage",
     "Verdict",
     "anchored",
 ]

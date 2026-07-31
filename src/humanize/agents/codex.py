@@ -21,12 +21,13 @@ import subprocess
 import sys
 import threading
 import weakref
+from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event, Question, say
+from .event import Event, Question, Usage, say
 from .hooks import EVERYWHERE, Moment, Occasion
 from .skills import leaving
 
@@ -55,6 +56,9 @@ class _Running:
     #: around: the server holds every session of the agent, so the turn loop has no other way
     #: to know whose word it is reading.
     took: Callable[[str], str | None] | None = None
+    #: Told what each request of this turn cost as the server says it, for the same reason:
+    #: the server counts every thread it holds, and only the session knows whose this is.
+    spends: Callable[[Usage], None] | None = None
 
 
 #: What the server calls each of the ways it asks a client to approve something. All three are
@@ -81,6 +85,11 @@ _PERMITTED = {
 
 #: What every turn is run under whatever it is allowed to do.
 _SERVICE = {"serviceTier": "default"}
+
+#: What each kind of token is called in the totals the server states. Cached input is counted
+#: inside the input rather than beside it, so it is not a kind of its own here: adding it would
+#: be counting the same tokens twice.
+_KINDS = {"input": "inputTokens", "output": "outputTokens"}
 
 
 def unattended(permission: str) -> dict[str, Any]:
@@ -171,9 +180,9 @@ class _AppServer:
         )
         self._pending = itertools.count(1)
         self._writing = threading.Lock()  # a line is written whole or not at all
-        #: What each thread has spent so far, as the server counts it: a running total, so
-        #: what one turn cost is the rise across it.
-        self._counted: dict[str, int] = {}
+        #: What each thread has spent so far, by kind, as the server counts it: a running
+        #: total, so what one turn cost is the rise across it.
+        self._counted: dict[str, Counter[str]] = {}
         self._messages: queue.Queue[dict[str, Any] | None] = queue.Queue()
         # Read from a thread of its own, so that a turn can wait on the server for a while
         # rather than only for as long as it takes.
@@ -304,7 +313,8 @@ class _AppServer:
             # stream when a turn starts reading. A turn has not ended until it has begun.
             begun = False
             failed: str | None = None
-            before = self._counted.get(thread, 0)
+            before = Counter(self._counted.get(thread) or Counter())
+            costing = Usage()
             started: set[Any] = set()  # the items this turn has already shown
             try:
                 while (message := self._read()) is not None:
@@ -391,15 +401,39 @@ class _AppServer:
                         case "thread/tokenUsage/updated":
                             # Sent as the turn spends it. `total` is the thread, every turn of
                             # it; `last` is the one request that just came back. Cached input
-                            # is counted inside the input rather than beside it, so the total
-                            # the server states is the whole of what crossed the wire.
+                            # is counted inside the input rather than beside it, so the input
+                            # the server states is the whole of what went in -- and the two
+                            # kinds together are the whole of what crossed the wire.
                             counted: dict[str, Any] = told.get("tokenUsage") or {}
                             usage: dict[str, Any] = counted.get("total") or {}
-                            if total := int(usage.get("totalTokens") or 0) or sum(
-                                int(usage.get(name) or 0)
-                                for name in ("inputTokens", "outputTokens")
-                            ):
-                                self._counted[thread] = total
+                            held = Counter(
+                                {
+                                    kind: int(usage.get(named) or 0)
+                                    for kind, named in _KINDS.items()
+                                    if usage.get(named)
+                                }
+                            )
+                            if sum(held.values()):
+                                risen = Usage(
+                                    {
+                                        kind: tokens
+                                        for kind in set(held) | set(before)
+                                        if (
+                                            tokens := held[kind]
+                                            - (self._counted.get(thread) or Counter())[
+                                                kind
+                                            ]
+                                        )
+                                        > 0
+                                    }
+                                )
+                                self._counted[thread] = held
+                                costing = costing + risen
+                                if running.spends is not None:
+                                    # As the turn spends it rather than once it is over: a
+                                    # turn is minutes long, and a rate that only moved at the
+                                    # end of one would stand still for all of them.
+                                    running.spends(risen)
                         case "error":
                             failed = json.dumps(told.get("error"))
                         case "turn/completed" if told.get("turn", {}).get(
@@ -424,13 +458,16 @@ class _AppServer:
                 raise subprocess.CalledProcessError(1, self._argv, said, failed)
             # What the turn cost is the rise across it, charged to the model it ran on: the
             # server counts the thread, and a thread is every turn this session has taken.
-            spent = self._counted.get(thread, 0) - before
+            spent = sum((self._counted.get(thread) or Counter()).values()) - sum(
+                before.values()
+            )
             yield Event(
                 kind="result",
                 text=said.strip(),
                 tokens={str(params.get("model") or "codex"): spent}
                 if spent > 0
                 else {},
+                spent=costing,
             )
 
     def steer(self, thread: str, turn: str, text: str, ticket: str) -> None:
@@ -734,14 +771,16 @@ class CodexSession(SessionBase):
             # server reads every session's stream, and only this one knows what it put in.
             self._running.thread = thread
             self._running.took = self.took
+            self._running.spends = self._spends
             said = ""
             spent: Mapping[str, int] = {}
+            costing = Usage()
             for event in self._agent.server.turn(
                 {
                     "threadId": thread,
                     "input": [{"type": "text", "text": prompt}],
                     "model": self._agent.config.model,
-                    "effort": self._agent.config.effort,
+                    "effort": self.effort,
                     **(
                         {"outputSchema": schema.model_json_schema()}
                         if schema is not None
@@ -752,7 +791,7 @@ class CodexSession(SessionBase):
                 self._running,
             ):
                 if event.kind == "result":
-                    said, spent = event.text, event.tokens
+                    said, spent, costing = event.text, event.tokens, event.spent
                     continue
                 if not self._agent._watchers:
                     # On stderr, where every other backend puts its progress: a turn nobody
@@ -766,7 +805,7 @@ class CodexSession(SessionBase):
                 # has had it already, as the turn said it.
                 say(said, sys.stdout)
             self._adopt(thread)  # a turn has landed, so the session is open
-            yield Event(kind="result", text=said, tokens=spent)
+            yield Event(kind="result", text=said, tokens=spent, spent=costing)
 
     def interject(self, text: str) -> None:
         """Steers the turn under way, which the server takes into the turn it is running.
@@ -835,7 +874,7 @@ class CodexSession(SessionBase):
                     "threadId": thread,
                     "input": [{"type": "text", "text": objective}],
                     "model": config.model,
-                    "effort": config.effort,
+                    "effort": self.effort,
                 }
             )
             self._adopt(thread)

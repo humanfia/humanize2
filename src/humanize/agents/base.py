@@ -15,13 +15,14 @@ import re
 import subprocess
 import sys
 import threading
+import time
 import uuid
 import weakref
 from abc import ABC, abstractmethod
-from collections import Counter
+from collections import Counter, deque
 from typing import IO, TYPE_CHECKING, Any, ClassVar, Protocol, overload
 
-from .event import Event, Question, Stopped, say
+from .event import Event, Question, Stopped, Usage, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
 
 if TYPE_CHECKING:
@@ -137,6 +138,82 @@ def _shaped[T: BaseModel](said: str, schema: type[T]) -> T:
     raise ValueError(f"the turn did not answer as a {schema.__name__}: {said[:200]}")
 
 
+#: How far back a rate is measured unless something asks for another window. Five minutes is
+#: long enough to carry across the gaps a flow leaves -- a turn that thinks, a round it sleeps
+#: off, a commit it makes -- and short enough that a run which has gone quiet reads as quiet.
+#: The same window the interface's own readout is over, so that a flow reading a rate and a
+#: person watching one are reading the same number.
+WINDOW = 300.0
+
+
+class Meter:
+    """What has been spent and when, so that a rate can be read off it.
+
+    Written from whichever thread a turn is running on and read from whichever thread is
+    asking, so every touch of it is under the lock. What goes in is what one request to the
+    model cost, as its backend reports it -- an addition rather than a total, since a total
+    read twice would count the first of it twice.
+    """
+
+    def __init__(self) -> None:
+        """Initializes a meter that has seen nothing spent."""
+        self._lock = threading.Lock()
+        self._total: Counter[str] = Counter()
+        #: Recent spending as (when, what), bounded by the window rather than by the length
+        #: of the run: a flow going for days keeps five minutes of it.
+        self._recent: deque[tuple[float, Usage]] = deque()
+        self._began = time.monotonic()
+
+    def spend(self, usage: Usage, now: float | None = None) -> None:
+        """Notes what one request to the model cost.
+
+        Args:
+          usage: What it cost, by kind.
+          now: When, defaulting to this moment. Given only so a test can say.
+        """
+        if not usage.total:
+            return
+        with self._lock:
+            self._total.update(usage)
+            self._recent.append((time.monotonic() if now is None else now, usage))
+
+    def spent(self) -> Usage:
+        """Everything spent so far, by kind.
+
+        Returns:
+          The whole of it, `input` and `output` always among the kinds even where nothing has
+          gone on them: those two are what every backend counts, so a reader of one of these
+          need not ask whether they are there.
+        """
+        with self._lock:
+            return Usage({"input": 0.0, "output": 0.0} | dict(self._total))
+
+    def rate(self, over: float = WINDOW, now: float | None = None) -> Usage:
+        """How fast it is being spent, by kind, over the last stretch of it.
+
+        Seconds on the clock rather than seconds an agent was talking: a flow sleeps between
+        rounds, commits, reads what the last turn wrote, and that time is time the tokens were
+        spent over. A window longer than the run itself is the run itself, so a rate read a
+        minute in is what that minute came to rather than a fifth of it.
+
+        Args:
+          over: How far back to measure, in seconds.
+          now: The moment to measure at, defaulting to this one. Given only so a test can say.
+
+        Returns:
+          Tokens a second, by kind, with `input` and `output` always among them.
+        """
+        moment = time.monotonic() if now is None else now
+        window = max(over, 0.0)
+        with self._lock:
+            while self._recent and self._recent[0][0] < moment - window:
+                self._recent.popleft()
+            lately = Usage({"input": 0.0, "output": 0.0})
+            for _, usage in self._recent:
+                lately = lately + usage
+            return lately / min(window, max(moment - self._began, 0.0))
+
+
 class SessionBase(ABC):
     """One conversation with one agent, kept alive across turns.
 
@@ -159,6 +236,13 @@ class SessionBase(ABC):
         """
         self._agent = agent
         self._id: str | None = None
+        #: What this conversation is to think at from its next turn on, where it has been
+        #: told something other than what its agent runs at, and None where it has not.
+        self._effort: str | None = None
+        #: What this conversation has cost and how fast, written as the backend says what
+        #: each request came to rather than once the turn is over: a turn is minutes long,
+        #: and a rate that stood still for all of them would be a rate of nothing.
+        self._meter = Meter()
         self._lock = (
             threading.Lock()
         )  # a conversation is a sequence: one turn at a time
@@ -204,6 +288,68 @@ class SessionBase(ABC):
           The backend's id, or None before the backend has said one.
         """
         return self._id
+
+    def spent(self) -> Usage:
+        """What this conversation has cost so far, by the kind of token it went on.
+
+        Returns:
+          Every kind its backend counts, `input` and `output` among them whatever it counts
+          besides. What it comes to is the whole of what has crossed the wire for this
+          session, which is what the backend has said each request cost added up.
+        """
+        return self._meter.spent()
+
+    def rate(self, over: float = WINDOW) -> Usage:
+        """How fast this conversation is spending, by kind, over the last stretch of it.
+
+        Which is the number a flow steers by: `session.rate().output` is output tokens a
+        second, over seconds on the clock rather than seconds the agent was talking -- the
+        same reckoning the interface's own readout is, so that a flow and a person watching
+        it are reading the same thing.
+
+        Args:
+          over: How far back to measure, in seconds. The whole run where it is younger than
+            that, so a rate read a minute in is what that minute came to.
+
+        Returns:
+          Tokens a second, by kind.
+        """
+        return self._meter.rate(over)
+
+    def _spends(self, usage: Usage) -> None:
+        """Notes what one request of the turn now running cost, as its backend says.
+
+        Told as the turn goes rather than once it is over: a turn is minutes long, and what a
+        flow steering by a rate needs is the rate while the turn is still running. Both meters
+        are told, so that an agent whose sessions a loop drops one a turn still has the run.
+
+        Args:
+          usage: What that request cost, by kind.
+        """
+        self._meter.spend(usage)
+        self._agent._meter.spend(usage)
+
+    @property
+    def effort(self) -> str:
+        """How hard the next turn of this conversation is to think.
+
+        What the agent runs at, unless this conversation has been told otherwise. A flow may
+        say so while the session is running -- an hour into a Ralph loop, watching what it is
+        costing -- and the backend is asked for it from the next turn on. The turn already
+        under way keeps the effort it started at: a model does not think harder halfway
+        through an answer, and a flow that changed it mid-turn would be describing a turn that
+        never happened.
+        """
+        return self._effort or self._agent.effort
+
+    @effort.setter
+    def effort(self, effort: str) -> None:
+        """Has this conversation think at something other than what its agent runs at.
+
+        Args:
+          effort: The backend's own word for it, or "" to go back to the agent's.
+        """
+        self._effort = effort or None
 
     @overload
     def __call__(self, prompt: str, *, suppress: bool = False) -> str: ...
@@ -836,7 +982,7 @@ class StreamSessionBase(SessionBase):
           subprocess.CalledProcessError: If the agent exits rather than answering.
         """
         with self._lock:
-            if schema is not self._shaping:
+            if schema is not self._shaping or self._stale():
                 self._shut()
             self._shaping = schema
             argv = self._command()
@@ -853,6 +999,7 @@ class StreamSessionBase(SessionBase):
                 ) from gone
             said = ""
             spent: Counter[str] = Counter()
+            costing = Usage()
             settled = False
             for line in proc.stdout:
                 for event in self._read(line):
@@ -873,8 +1020,10 @@ class StreamSessionBase(SessionBase):
                     if event.kind == "result":
                         said = event.text
                         # Every answer in the turn cost something, the ones to a word put in
-                        # mid-turn included, and the turn is what all of it is charged to.
+                        # mid-turn included, and the turn is what all of it is charged to --
+                        # counted by model and by kind, which are the same spending twice.
                         spent.update(event.tokens)
+                        costing = costing + event.spent
                         with self._writing:
                             self._owed -= 1
                             settled = self._owed <= 0
@@ -921,7 +1070,7 @@ class StreamSessionBase(SessionBase):
                 # on the terminal it was run from. Something watching the agent has had it
                 # already, as the turn said it, and would then be shown it twice.
                 say(said, sys.stdout)
-            yield Event(kind="result", text=said, tokens=spent)
+            yield Event(kind="result", text=said, tokens=spent, spent=costing)
 
     def interject(self, text: str) -> None:
         """Says something to the agent now, whether or not a turn is running.
@@ -1064,6 +1213,19 @@ class StreamSessionBase(SessionBase):
         Does nothing by default. A backend counting anything per process says so here.
         """
 
+    def _stale(self) -> bool:
+        """Whether the process now up was started for something this turn is no longer.
+
+        A setting that is an argument of the process rather than of the turn moves by
+        restarting it -- the conversation is not ended by that, since the new process resumes
+        it, which is what an anchored session does between every pair of turns anyway.
+
+        Returns:
+          Whether to end the process before this turn, which is never by default: a backend
+          with nothing on its command line that a flow can move has nothing to go stale.
+        """
+        return False
+
     @abstractmethod
     def _command(self) -> list[str]:
         """The command the session's one process is run as.
@@ -1124,6 +1286,13 @@ class AgentBase(ABC):
             twice -- an actor and the reviewer reading its work -- stays two.
         """
         self._config = config
+        #: What this agent's turns are to think at, where a flow has said something other
+        #: than what it was configured with, and None where it has not.
+        self._effort: str | None = None
+        #: What every session of this agent has cost and how fast, kept here as well as on
+        #: each of them: a Ralph loop drops a session a turn, and what the agent has spent
+        #: must outlive the conversations it spent it in.
+        self._meter = Meter()
         self._id = name or f"{type(self).__name__}#{uuid.uuid4().hex[:8]}"
         #: Whether that name is the agent's own, rather than one to be told by whatever ends
         #: up driving it: a flow that names the agents it takes names the ones that are not.
@@ -1225,8 +1394,55 @@ class AgentBase(ABC):
 
     @property
     def config(self) -> AgentConfig:
-        """The model and effort every session of this agent runs at."""
+        """The model and effort every session of this agent was configured with.
+
+        What it was configured with rather than what it is running at: the config is frozen,
+        because a session resumes under the settings it opened with, and :attr:`effort` is
+        the one of them a flow may move while the agent runs.
+        """
         return self._config
+
+    def spent(self) -> Usage:
+        """What this agent has cost so far, by the kind of token it went on.
+
+        Every session it has opened, the ones nobody holds any more included: a flow that
+        drops a session a turn has still spent what those turns spent.
+
+        Returns:
+          Every kind its backend counts, `input` and `output` among them.
+        """
+        return self._meter.spent()
+
+    def rate(self, over: float = WINDOW) -> Usage:
+        """How fast this agent is spending, by kind, over the last stretch of it.
+
+        Args:
+          over: How far back to measure, in seconds.
+
+        Returns:
+          Tokens a second, by kind.
+        """
+        return self._meter.rate(over)
+
+    @property
+    def effort(self) -> str:
+        """How hard this agent's turns are to think, from the next one on.
+
+        What it was configured with until a flow says otherwise. Setting it moves every
+        session of this agent that has not been told something of its own -- a flow watching
+        what a loop is costing turns the whole agent down, and one nursing a single
+        conversation through a hard patch turns that session up.
+        """
+        return self._effort or self._config.effort
+
+    @effort.setter
+    def effort(self, effort: str) -> None:
+        """Has this agent's turns think at something other than what it was configured with.
+
+        Args:
+          effort: The backend's own word for it, or "" to go back to the configured one.
+        """
+        self._effort = effort or None
 
     @property
     def anchor(self) -> AnchorConfig | None:

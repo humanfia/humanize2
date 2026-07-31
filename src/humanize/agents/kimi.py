@@ -24,12 +24,13 @@ import time
 import urllib.error
 import urllib.request
 import weakref
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event, Question, say
+from .event import Event, Question, Usage, say
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -64,14 +65,15 @@ _POLL_SECONDS = 1.0
 _CALL_SECONDS = 60.0
 _STOP_SECONDS = 5.0
 
-#: What the daemon counts a session's spending in. Every kind of token counts: what a rate is
-#: measuring is the traffic, and a cache read crosses the wire like anything else.
-_COUNTED = (
-    "input_tokens",
-    "output_tokens",
-    "cache_read_tokens",
-    "cache_creation_tokens",
-)
+#: What the daemon counts a session's spending in, and what each of those is here. Every kind
+#: of token counts: what a rate is measuring is the traffic, and a cache read crosses the wire
+#: like anything else.
+_KINDS = {
+    "input": "input_tokens",
+    "output": "output_tokens",
+    "cache_read": "cache_read_tokens",
+    "cache_write": "cache_creation_tokens",
+}
 
 #: What each kind of block a message is written in reads as. A block of a kind that is not here
 #: is not shown: an image is not a line of a transcript.
@@ -216,9 +218,9 @@ class KimiCodeCLISession(SessionBase):
         super().__init__(agent)
         #: The turn under way, which is what a word put in is steered into.
         self._running = _Running()
-        #: What this session has cost so far, as the daemon counts it: a running total for the
-        #: whole conversation, so what one turn cost is the rise across it.
-        self._counted = 0
+        #: What this session has cost so far, by kind, as the daemon counts it: a running
+        #: total for the whole conversation, so what one turn cost is the rise across it.
+        self._counted: Counter[str] = Counter()
 
     @property
     def named(self) -> str | None:
@@ -342,6 +344,49 @@ class KimiCodeCLISession(SessionBase):
                 {"answers": answers},
             )
 
+    def _counting(self, server: _AppServer, session: str) -> Usage:
+        """What this session has spent since the last time it was asked.
+
+        The daemon counts the whole conversation, so what has been spent since is the rise
+        across it. Told to the meters as it is read, which is what a rate taken while the turn
+        is still running is made of.
+
+        Args:
+          server: The daemon holding the session.
+          session: The session to ask about.
+
+        Returns:
+          The rise since the last reading, by kind, which is nothing at all where it has not
+          moved.
+
+        Raises:
+          subprocess.CalledProcessError: If the daemon will not say, which is not a failed
+            turn: what a run costs is worth nothing at the price of the run.
+        """
+        held = server.call("GET", f"/sessions/{session}")
+        usage: dict[str, Any] = (
+            cast("dict[str, Any]", held).get("usage") or {}
+            if isinstance(held, dict)
+            else {}
+        )
+        counted = Counter(
+            {
+                kind: int(usage.get(named) or 0)
+                for kind, named in _KINDS.items()
+                if usage.get(named)
+            }
+        )
+        risen = Usage(
+            {
+                kind: tokens
+                for kind in set(counted) | set(self._counted)
+                if (tokens := counted[kind] - self._counted[kind]) > 0
+            }
+        )
+        self._counted = counted
+        self._spends(risen)
+        return risen
+
     def _pursue(self, objective: str) -> str:
         """Runs the turn under a goal of Kimi's own, which its runtime steers until it is met.
 
@@ -379,7 +424,7 @@ class KimiCodeCLISession(SessionBase):
           subprocess.CalledProcessError: If the daemon refuses any of the calls a turn is made
             of, leaving the session unopened so that the next call retries the turn.
         """
-        effort = self._agent.config.effort
+        effort = self.effort
         turn: dict[str, Any] = {
             "model": self._agent.config.model,
             "thinking": effort.removeprefix(SWARM),
@@ -421,6 +466,7 @@ class KimiCodeCLISession(SessionBase):
                     str, int
                 ] = {}  # how much of each message has been passed on
                 settled = False
+                costing = Usage()  # what this turn has come to, added up as it goes
                 while True:
                     # First of all: a turn that has stopped to ask waits on the answer, so a
                     # poll that only read messages would be reading a session that has
@@ -428,6 +474,12 @@ class KimiCodeCLISession(SessionBase):
                     with contextlib.suppress(subprocess.CalledProcessError):
                         self._asked(session)
                     busy = server.call("GET", f"/sessions/{session}/status")["busy"]
+                    # What it has come to so far, asked for each time round rather than once
+                    # at the end: a turn is minutes long, and a rate that only moved when one
+                    # ended would stand still for all of them. A daemon that will not say is
+                    # not a failed turn.
+                    with contextlib.suppress(subprocess.CalledProcessError):
+                        costing = costing + self._counting(server, session)
                     if goal and not busy:
                         # A goal runs through the quiet between its turns: Kimi starts the next one
                         # itself once the session falls still, so a session that has stopped is a
@@ -502,22 +554,22 @@ class KimiCodeCLISession(SessionBase):
                             # the agent has had it already, as the turn said it.
                             say(answer, sys.stdout)
                         # What the turn cost: the daemon counts the whole session, so what
-                        # this turn spent is the rise across it. Asked for once the answer is
-                        # in hand and never at the cost of it -- a turn that landed has
-                        # landed, whatever the daemon then says about what it came to.
-                        spent: dict[str, int] = {}
+                        # this turn spent is the rise across it, added up as the turn went.
+                        # Asked once more here and never at the cost of the answer -- a turn
+                        # that landed has landed, whatever the daemon then says it came to.
                         with contextlib.suppress(subprocess.CalledProcessError):
-                            held = server.call("GET", f"/sessions/{session}")
-                            usage: dict[str, Any] = (
-                                cast("dict[str, Any]", held).get("usage") or {}
-                                if isinstance(held, dict)
-                                else {}
-                            )
-                            total = sum(int(usage.get(name) or 0) for name in _COUNTED)
-                            if (risen := total - self._counted) > 0:
-                                spent[self._agent.config.model] = risen
-                            self._counted = total
-                        yield Event(kind="result", text=answer.strip(), tokens=spent)
+                            costing = costing + self._counting(server, session)
+                        spent = (
+                            {self._agent.config.model: int(costing.total)}
+                            if costing.total > 0
+                            else {}
+                        )
+                        yield Event(
+                            kind="result",
+                            text=answer.strip(),
+                            tokens=spent,
+                            spent=costing,
+                        )
                         return
                     # A session says it has stopped before the last thing it said can be read
                     # back, so what it said is read once more after it stops rather than at the

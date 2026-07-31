@@ -257,7 +257,9 @@ _CODEX_WORKING = """
 import json, pathlib, sys
 
 LOG = pathlib.Path(sys.argv[0] + ".log")
-SPENT = [1000, 1500]
+# What the thread has cost all told, which is what the server states: the rise across a turn
+# is what that turn spent, and the input carries all of it but the hundred that came out.
+TOTAL = [1000]
 
 
 def send(message):
@@ -320,12 +322,13 @@ for line in sys.stdin:
                 "modelContextWindow": 258400,
                 "last": {"inputTokens": 900, "cachedInputTokens": 800, "outputTokens": 100,
                          "reasoningOutputTokens": 0, "totalTokens": 1000},
-                "total": {"inputTokens": 900, "cachedInputTokens": 800, "outputTokens": 100,
-                          "reasoningOutputTokens": 0,
-                          "totalTokens": SPENT.pop(0) if SPENT else 1500}}}})
+                "total": {"inputTokens": TOTAL[0] - 100, "cachedInputTokens": 800,
+                          "outputTokens": 100, "reasoningOutputTokens": 0,
+                          "totalTokens": TOTAL[0]}}}})
         send({"method": "item/completed", "params": {
             "threadId": "thread_fake", "turnId": "turn_fake", "completedAtMs": 1, "item": {
                 "id": "item_5", "type": "agentMessage", "text": "done"}}})
+        TOTAL[0] = 1500
         send({"method": "turn/completed", "params": {
             "threadId": "thread_fake", "turn": {"id": "turn_fake", "status": "completed",
                                                 "items": []}}})
@@ -970,3 +973,40 @@ def test_a_kimi_turn_carries_the_rung_it_runs_at(
     (profile,) = _bodies(kimi, "/profile")
     assert profile["agent_config"]["permission_mode"] == mode
     assert profile["agent_config"]["plan_mode"] is planning
+
+
+def test_a_codex_turn_runs_at_the_effort_the_flow_moved_it_to(
+    working: _FakeServer,
+) -> None:
+    """A setting of the turn here, so the next turn simply carries the new one."""
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high"))
+    session = agent.new()
+    session("one")
+    session.effort = "low"
+    session("two")
+
+    started = [call for call in working.calls() if call.get("method") == "turn/start"]
+    assert [call["params"]["effort"] for call in started] == ["high", "low"]
+
+
+def test_a_kimi_turn_runs_at_the_effort_the_flow_moved_it_to(kimi: _FakeServer) -> None:
+    """The profile is sent with every turn, so the next one carries the new one."""
+    agent = _agent()
+    agent.effort = "low"
+    agent("hi")
+
+    (profile,) = _bodies(kimi, "/profile")
+    assert profile["agent_config"]["thinking"] == "low"
+
+
+def test_a_kimi_turn_moved_to_a_swarm_runs_wide_from_the_next_turn(
+    kimi: _FakeServer,
+) -> None:
+    """Kimi's effort says how wide as well as how hard, so moving it moves both."""
+    agent = _agent()
+    agent.effort = "swarmmax"
+    agent("hi")
+
+    (profile,) = _bodies(kimi, "/profile")
+    assert profile["agent_config"]["thinking"] == "max"
+    assert profile["agent_config"]["swarm_mode"] is True

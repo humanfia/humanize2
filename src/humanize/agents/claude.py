@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
-from .event import Event, Question
+from .event import Event, Question, Usage
 from .hooks import EVERYWHERE, Moment
 from .skills import leaving
 
@@ -31,6 +32,22 @@ _PERMITTED = {
     "reading": "plan",
     "working": "acceptEdits",
     "granted": "auto",
+}
+
+#: What each kind of token is called on the total Claude states at the end of a turn, and what
+#: it is called on the message each request answered with. The same kinds either way, under
+#: the two spellings Claude uses for them.
+_KINDS = {
+    "input": "inputTokens",
+    "output": "outputTokens",
+    "cache_read": "cacheReadInputTokens",
+    "cache_write": "cacheCreationInputTokens",
+}
+_AS_IT_GOES = {
+    "input": "input_tokens",
+    "output": "output_tokens",
+    "cache_read": "cache_read_input_tokens",
+    "cache_write": "cache_creation_input_tokens",
 }
 
 
@@ -80,8 +97,17 @@ class ClaudeCodeSession(StreamSessionBase):
           agent: The agent whose config every turn of this session runs at.
         """
         super().__init__(agent)
-        #: What each model has cost so far, as Claude counts it: a running total per process.
-        self._counted: dict[str, int] = {}
+        #: What each model has cost so far, by kind, as Claude counts it: a running total per
+        #: process, so what a turn cost is the rise across it.
+        self._counted: dict[str, Counter[str]] = {}
+        #: What the turn now running has already been counted as spending, from the messages
+        #: it answered with -- so that the total it states at the end adds only the rest --
+        #: and what each of those messages last said it had cost.
+        self._fed: Counter[str] = Counter()
+        self._seen: dict[str, Counter[str]] = {}
+        #: What the process now up was started to think at, so that a flow moving the effort
+        #: mid-session is answered by starting one that thinks at the new one.
+        self._at: str | None = None
         #: The id Claude says this session has, taken only once a turn has landed in it.
         self._named: str | None = None
 
@@ -118,7 +144,7 @@ class ClaudeCodeSession(StreamSessionBase):
             "--model",
             self._agent.config.model,
             "--effort",
-            self._agent.config.effort,
+            self.effort,
         ]
         if self._shaping is not None:
             # Claude validates the answer against this itself, so a turn that lands has
@@ -163,10 +189,20 @@ class ClaudeCodeSession(StreamSessionBase):
 
     def _restarted(self) -> None:
         """Forgets what the last process had spent, which the new one has not counted."""
-        self._counted = {}
+        self._counted, self._fed, self._seen = {}, Counter(), {}
+        self._at = self.effort
 
-    def _spent(self, said: dict[str, Any]) -> dict[str, int]:
-        """What the turn just ending cost, as tokens per model.
+    def _stale(self) -> bool:
+        """Whether the process up was started to think at something this turn is not.
+
+        `--effort` is an argument of the process, so a flow that moves it mid-session is
+        answered by ending this one and resuming the conversation in a process started at the
+        new one -- exactly as asking for a shape is.
+        """
+        return self._at is not None and self._at != self.effort
+
+    def _spent(self, said: dict[str, Any]) -> tuple[dict[str, int], Usage]:
+        """What the turn just ending cost, per model and by the kind it went on.
 
         Claude reports each model's usage as a running total for the session, so what this
         turn cost is the rise since the last one. Every kind of token counts: what a rate is
@@ -176,24 +212,86 @@ class ClaudeCodeSession(StreamSessionBase):
           said: The `result` event, as read.
 
         Returns:
-          Tokens spent per model since the previous turn, models that did not move omitted.
+          Tokens spent per model since the previous turn, models that did not move omitted,
+          and the same spending by kind.
         """
         spent: dict[str, int] = {}
+        risen: Counter[str] = Counter()
         used: dict[str, Any] = said.get("modelUsage") or {}
         for model, usage in used.items():
-            total = sum(
-                int(usage.get(kind) or 0)
-                for kind in (
-                    "inputTokens",
-                    "outputTokens",
-                    "cacheReadInputTokens",
-                    "cacheCreationInputTokens",
-                )
+            counted = Counter(
+                {
+                    kind: int(usage.get(named) or 0)
+                    for kind, named in _KINDS.items()
+                    if usage.get(named)
+                }
             )
-            if (risen := total - self._counted.get(model, 0)) > 0:
-                spent[model] = risen
-            self._counted[model] = total
-        return spent
+            before = self._counted.get(model) or Counter()
+            moved = Counter(
+                {
+                    kind: tokens
+                    for kind in set(counted) | set(before)
+                    if (tokens := counted[kind] - before[kind]) > 0
+                }
+            )
+            if total := sum(moved.values()):
+                spent[model] = total
+            risen.update(moved)
+            self._counted[model] = counted
+        return spent, Usage(risen)
+
+    def _live(self, said: dict[str, Any]) -> None:
+        """Takes what one request to the model came to, as its answer arrives.
+
+        Claude says what each of them cost on the message it produced, which is where a rate
+        read while the turn is still running comes from -- the `result` at the end of the turn
+        is minutes away, and a rate that only moved there would stand still for all of them.
+        What the result then states is the whole of the turn, so only the shortfall is added.
+
+        Args:
+          said: The `assistant` event, as read.
+        """
+        message: dict[str, Any] = said.get("message") or {}
+        usage: dict[str, Any] = message.get("usage") or {}
+        # Claude says the same message twice -- once for the thinking in it and once for the
+        # words -- and states the whole of what that request cost both times. So what one of
+        # these adds is the rise on the message it names, not the figure on it.
+        named = str(message.get("id") or "")
+        counted: Counter[str] = Counter(
+            {
+                kind: int(usage.get(spelled) or 0)
+                for kind, spelled in _AS_IT_GOES.items()
+                if usage.get(spelled)
+            }
+        )
+        before = self._seen.get(named) or Counter()
+        risen = Usage(
+            {
+                kind: tokens
+                for kind in set(counted) | set(before)
+                if (tokens := counted[kind] - before[kind]) > 0
+            }
+        )
+        self._seen[named] = counted
+        if risen.total:
+            self._fed.update(risen)
+            self._spends(risen)
+
+    def _settle(self, risen: Usage) -> None:
+        """Adds whatever the turn's own total says was spent beyond what was counted live.
+
+        Args:
+          risen: What the turn cost, by kind, as the `result` states it.
+        """
+        owed = Usage(
+            {
+                kind: tokens
+                for kind in set(risen) | set(self._fed)
+                if (tokens := risen.get(kind, 0.0) - self._fed[kind]) > 0
+            }
+        )
+        self._fed, self._seen = Counter(), {}
+        self._spends(owed)
 
     def _read(self, line: str) -> Iterator[Event]:
         """Reads one event Claude wrote, as the things it says the agent did.
@@ -232,20 +330,27 @@ class ClaudeCodeSession(StreamSessionBase):
             if said.get("is_error"):
                 # `subtype` reads "success" even here, so this flag is the whole of it. The
                 # text is Claude explaining itself, which is a diagnostic and not an answer.
+                tokens, risen = self._spent(said)
+                self._settle(risen)
                 yield Event(
                     kind="failed",
                     text=str(said.get("result") or "the turn failed"),
-                    tokens=self._spent(said),
+                    tokens=tokens,
+                    spent=risen,
                 )
                 return
             if self._named is not None:
                 self._adopt(self._named)  # a turn has landed, so the session is open
+            tokens, risen = self._spent(said)
+            self._settle(risen)
             yield Event(
                 kind="result",
                 text=str(said.get("result") or ""),
-                tokens=self._spent(said),
+                tokens=tokens,
+                spent=risen,
             )
         elif said.get("type") == "assistant":
+            self._live(said)
             for part in said.get("message", {}).get("content", []):
                 if part.get("type") == "text" and part.get("text", "").strip():
                     yield Event(kind="text", text=part["text"])
