@@ -162,31 +162,10 @@ read the plan
 Write a 2-3 sentence summary explaining what the plan does and how, suitable for educating a \
 user who showed gaps in understanding. Focus on the technical approach, not just the goal.
 
-## Output Format
-
-You MUST output in this exact format, with each field on its own line:
-
-```
-QUESTION_1: <your first question>
-OPTION_1A: <option A text>
-OPTION_1B: <option B text>
-OPTION_1C: <option C text>
-OPTION_1D: <option D text>
-ANSWER_1: <A, B, C, or D>
-QUESTION_2: <your second question>
-OPTION_2A: <option A text>
-OPTION_2B: <option B text>
-OPTION_2C: <option C text>
-OPTION_2D: <option D text>
-ANSWER_2: <A, B, C, or D>
-PLAN_SUMMARY: <2-3 sentence technical summary>
-```
-
 ## Important Notes
 
-- Always output all 13 fields - never skip any
-- ANSWER must be exactly one letter: A, B, C, or D
-- Randomize the position of the correct answer (do not always put it in A or D)
+- Exactly two questions, each with exactly four options
+- Randomize the position of the correct answer (do not always put it first or last)
 - The plan may be written in any language - generate questions and options in the same language \
 as the plan
 - Focus on substance over format
@@ -242,20 +221,10 @@ main")
 3. **Why this matters**: RLCR requires the working branch to remain constant across all rounds \
 of the loop. Plans that mandate branch switching are incompatible with the RLCR workflow.
 
-## Return Your Verdict
-
-You MUST output exactly one of these three verdicts on its own line:
-
-- `PASS: <brief summary of what the plan is about>`
-- `FAIL_RELEVANCE: <reason why the plan is not related to this repository>`
-- `FAIL_BRANCH_SWITCH: <quote the specific instruction from the plan that requires branch \
-switching>`
-
 ## Important Notes
 
-- Always output exactly one verdict - never output zero or multiple verdicts
-- If in doubt on relevance, lean toward PASS (same lenient approach as other validators)
-- If in doubt on branch-switch detection, lean toward PASS (avoid false positives)
+- If in doubt on relevance, lean toward passing (same lenient approach as other validators)
+- If in doubt on branch-switch detection, lean toward passing (avoid false positives)
 - The plan may be written in any language - that is okay
 - Focus on the substance, not the format of the plan
 

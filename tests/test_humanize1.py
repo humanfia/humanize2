@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.agents import Moment, Occasion
+from humanize.agents import HumanAgent, Moment, Occasion, Question
+from humanize.flows import humanize1
 from humanize.flows._humanize1 import guards, loop, prompts
 from humanize.flows.humanize1 import Config
 from humanize.runner import configures, drives, wanted
@@ -533,3 +534,43 @@ def test_the_work_itself_is_not_guarded(tmp_path: Path) -> None:
     assert guard(_asked("Write", file_path=str(tmp_path / "src" / "a.py"))) is None
     assert guard(_asked("Read", file_path=str(tmp_path / "README.md"))) is None
     assert guard(_asked("Bash", command="pytest -q")) is None
+
+
+def _picks(said: str | None) -> tuple[HumanAgent, list[Question]]:
+    """Somebody at the prompt who answers every question with the one thing."""
+    human = HumanAgent()
+    asked: list[Question] = []
+
+    def answering(question: Question) -> str | None:
+        asked.append(question)
+        return said
+
+    human.ask = answering
+    return human, asked
+
+
+def test_a_quiz_question_is_put_as_a_question_with_its_options() -> None:
+    """The road a coding agent's own question takes, so whatever is driving shows it as one."""
+    human, asked = _picks("B. the second one")
+
+    picked = humanize1._asked(
+        human, "Which is it?", ["the first one", "the second one"]
+    )
+
+    assert picked == "B"
+    assert asked[0].text == "Which is it?"
+    assert asked[0].options == ("A. the first one", "B. the second one")
+
+
+def test_a_quiz_answered_by_the_letter_is_answered_all_the_same() -> None:
+    """Which is how the quiz is written down, and so how somebody reading it would answer."""
+    human, _ = _picks("b")
+
+    assert humanize1._asked(human, "Which is it?", ["one", "two"]) == "B"
+
+
+def test_nobody_at_the_prompt_is_a_quiz_that_is_not_put(tmp_path: Path) -> None:
+    """A command line has nobody to quiz, and the quiz is advisory: the run carries on."""
+    human = HumanAgent()  # nothing set `ask`, which is how a command line leaves it
+
+    assert humanize1._asked(human, "Which is it?", ["one", "two"]) == ""

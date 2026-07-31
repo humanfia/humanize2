@@ -32,6 +32,8 @@ from .prompts import render
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
+    from pydantic import BaseModel
+
     from humanize.agents import AgentBase, Occasion, SessionBase
     from humanize.backends import Profile
 
@@ -42,6 +44,7 @@ __all__ = [
     "STOP",
     "Loop",
     "State",
+    "answered",
     "git",
     "issues",
     "spoken",
@@ -142,6 +145,31 @@ def spoken(agent: AgentBase | SessionBase, prompt: str) -> tuple[str, float]:
         # that on would spend a round asking the other side to reply to silence.
         if said:
             return said, time.monotonic() - began
+        time.sleep(5)
+
+
+def answered[T: BaseModel](
+    agent: AgentBase | SessionBase, prompt: str, schema: type[T]
+) -> T:
+    """What a turn answered as the shape it was asked for, taking it again while it fails.
+
+    :func:`spoken` for a question rather than for work: the answer is a field to read instead
+    of a paragraph to look for a marker in, and the model is held to the shape rather than
+    asked for it. A turn that failed, or that answered in some other shape, is the same thing
+    here -- a question that has not been answered -- and is asked again.
+
+    Args:
+      agent: Whose turn it is.
+      prompt: What to ask it.
+      schema: The shape the answer is to be read as.
+
+    Returns:
+      The answer, as that shape.
+    """
+    while True:
+        said = agent(prompt, suppress=True, schema=schema)
+        if said is not None:
+            return said
         time.sleep(5)
 
 

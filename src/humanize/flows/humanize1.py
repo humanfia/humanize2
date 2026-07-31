@@ -64,9 +64,12 @@ from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple
 
 from pydantic import BaseModel, Field, model_validator
 
+# Under a name of its own: what a person is put is one of these, and the shape of the
+# quiz below has a `Question` of its own that is a field of the model the reviewer fills.
 from humanize.agents import AgentBase, HumanAgent, Moment, SessionBase
+from humanize.agents import Question as Asking
 from humanize.flows._humanize1 import guards, loop, planning, prompts
-from humanize.flows._humanize1.loop import Loop, State, git, spoken
+from humanize.flows._humanize1.loop import Loop, State, answered, git, spoken
 from humanize.flows._humanize1.prompts import render
 
 if TYPE_CHECKING:
@@ -115,6 +118,86 @@ IDEAS = ".humanize/ideas"
 
 #: What the plan is called when nobody said, which is what the plugin's own examples use.
 PLAN = "docs/plan.md"
+
+
+class Relevance(BaseModel):
+    """Whether a draft is about this repository at all, which `gen-plan` will not start without.
+
+    One of the four questions this flow puts to an agent rather than sets it to work on. Each
+    is a model like this one: the fields are the whole of what is being asked, the backend is
+    held to them, and the flow reads a field rather than looking for a word at the start of a
+    paragraph.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    relevant: bool = Field(
+        description="Whether the draft is related to this repository. Be lenient: false only "
+        "for a draft that is clearly about something else entirely."
+    )
+    why: str = Field(description="One or two sentences saying why.")
+
+
+class Convergence(BaseModel):
+    """One round of the planning conversation: the review, and whether it is settled."""
+
+    model_config = {"extra": "forbid"}
+
+    converged: bool = Field(
+        description="True only if nothing is required and nothing you disagree with would "
+        "change the work, so the plan is done being argued over."
+    )
+    review: str = Field(
+        description="The review itself, under the AGREE, DISAGREE, REQUIRED_CHANGES, "
+        "OPTIONAL_IMPROVEMENTS and UNRESOLVED headings and no others. The agent that wrote "
+        "the plan is given this word for word to revise against."
+    )
+
+
+class Compliance(BaseModel):
+    """The two things a plan is checked for before a loop is started to build it."""
+
+    model_config = {"extra": "forbid"}
+
+    relevant: bool = Field(
+        description="Whether the plan is about this repository. Lean towards true."
+    )
+    switches_branch: bool = Field(
+        description="Whether the plan tells the implementer to switch, check out or create a "
+        "git branch as part of the work. Lean towards false: `git checkout -- <file>` and "
+        "'stay on the current branch' are not branch switches."
+    )
+    why: str = Field(
+        description="What the plan is about, in a sentence -- or, where either check failed, "
+        "the reason, quoting the instruction that requires the branch switch."
+    )
+
+
+class Question(BaseModel):
+    """One of the plan understanding quiz's questions, with its four options."""
+
+    model_config = {"extra": "forbid"}
+
+    question: str = Field(description="The question itself.")
+    options: list[str] = Field(
+        description="Exactly four options, in order: A, B, C and D."
+    )
+    answer: Literal["A", "B", "C", "D"] = Field(description="Which one is correct.")
+
+
+class Quiz(BaseModel):
+    """The plan understanding quiz, which is advisory and never a gate."""
+
+    model_config = {"extra": "forbid"}
+
+    questions: list[Question] = Field(
+        description="Exactly two questions, in the order they are to be asked."
+    )
+    summary: str = Field(
+        description="Two or three sentences on what the plan does and how, for a reader who "
+        "showed gaps in understanding. The technical approach, not just the goal."
+    )
+
 
 #: Which part of the setup sheet each setting is under, which is one part per command: a flag
 #: only means anything against the phase it is a flag of, and twenty-three of them in one list
@@ -422,36 +505,13 @@ def _section(held: str, *headings: str) -> str:
     return ""
 
 
-def _quiz(said: str) -> dict[str, str]:
-    """The quiz an agent wrote, read back field by field.
-
-    Args:
-      said: What it answered.
-
-    Returns:
-      Every field it stated, or nothing at all where one is missing or an answer is not one
-      of the four letters -- which the plugin warns about and carries on from.
-    """
-    found = {
-        name: value.strip()
-        for name, value in re.findall(
-            r"^(QUESTION_[12]|OPTION_[12][A-D]|ANSWER_[12]|PLAN_SUMMARY):\s*(.*)$",
-            said,
-            re.MULTILINE,
-        )
-    }
-    wanted = ["QUESTION_1", "QUESTION_2", "ANSWER_1", "ANSWER_2", "PLAN_SUMMARY"] + [
-        f"OPTION_{n}{letter}" for n in "12" for letter in "ABCD"
-    ]
-    if any(name not in found for name in wanted):
-        return {}
-    if any(found[f"ANSWER_{n}"].upper() not in ("A", "B", "C", "D") for n in "12"):
-        return {}
-    return found
-
-
 def _asked(human: HumanAgent, question: str, options: list[str]) -> str:
     """Puts one multiple-choice question to whoever is at the prompt.
+
+    Asked as a question with options rather than as a paragraph with a list in it: it is the
+    road a coding agent's own question takes, so whatever is driving the flow shows it as one
+    -- and the options themselves are what the person picks between, the letters being how
+    the quiz was written down rather than something to make them read off a list.
 
     Args:
       human: The person, driven as an agent.
@@ -462,11 +522,21 @@ def _asked(human: HumanAgent, question: str, options: list[str]) -> str:
       The letter they picked, uppercased, or "" where nobody was there to pick one -- which
       is a command line, where the quiz is advisory and the run carries on.
     """
-    listed = "\n".join(
-        f"  {letter}. {one}" for letter, one in zip("ABCD", options, strict=False)
+    listed = list(zip("ABCD", options, strict=False))
+    said = human.asked(
+        Asking(
+            text=question,
+            options=tuple(f"{letter}. {one}" for letter, one in listed),
+        )
     )
-    said = human(f"{question}\n{listed}\n\nAnswer with A, B, C or D.")
-    return said.strip()[:1].upper() if said else ""
+    if not said:
+        return ""
+    # Whichever way they answered: the option itself, which is what an interface offers, or
+    # the letter, which is what somebody reading the quiz as it was written would type.
+    for letter, one in listed:
+        if said.strip() in (one, f"{letter}. {one}"):
+            return letter
+    return said.strip()[:1].upper()
 
 
 def _idea(drafting: SessionBase, task: str, config: Config, root: Path) -> Path:
@@ -548,13 +618,14 @@ def _plan(
     if not where.parent.is_dir():
         raise ValueError(f"{where.parent}: output directory does not exist")
 
-    said = spoken(
+    read = answered(
         agents.analyst,
         render(planning.RELEVANCE, INPUT_FILE=draft, DRAFT_CONTENT=held),
-    )[0]
-    if said.strip().upper().startswith("NOT_RELEVANT"):
+        Relevance,
+    )
+    if not read.relevant:
         raise ValueError(
-            f"the draft does not appear to be related to this repository: {said}"
+            f"the draft does not appear to be related to this repository: {read.why}"
         )
 
     # The plan file starts as the template with the draft under it, which is what the plugin
@@ -581,7 +652,7 @@ def _plan(
     prior = ""
     if config.gen_plan_mode == "discussion":
         for _ in range(CONVERGING):
-            review = spoken(
+            round_ = answered(
                 agents.analyst,
                 render(
                     planning.GEN_PLAN_CONVERGENCE,
@@ -589,14 +660,17 @@ def _plan(
                     TASK=task,
                     PRIOR=prior,
                 ),
-            )[0]
-            if review.strip() == loop.COMPLETE:
+                Convergence,
+            )
+            if round_.converged:
                 converged = True
                 break
-            prior = f"What was still open after the last round:\n\n{review}\n"
+            prior = f"What was still open after the last round:\n\n{round_.review}\n"
             spoken(
                 writing,
-                render(planning.GEN_PLAN_REVISION, OUTPUT_FILE=where, REVIEW=review),
+                render(
+                    planning.GEN_PLAN_REVISION, OUTPUT_FILE=where, REVIEW=round_.review
+                ),
             )
 
     # `--auto-start-rlcr-if-converged` is the one thing that skips the person: it is only
@@ -686,16 +760,17 @@ def _rlcr(
     # The plan is checked before anything is set up: a plan for another repository, or one
     # that would move the work to another branch, is one to say so about now.
     if plan is not None and not config.skip_impl:
-        verdict = spoken(
+        read = answered(
             agents.reviewer,
             render(prompts.PLAN_COMPLIANCE, PLAN_FILE=plan, PLAN_CONTENT=held),
-        )[0]
-        if "FAIL_RELEVANCE" in verdict:
-            raise ValueError(f"the plan is not related to this repository: {verdict}")
-        if "FAIL_BRANCH_SWITCH" in verdict:
+            Compliance,
+        )
+        if not read.relevant:
+            raise ValueError(f"the plan is not related to this repository: {read.why}")
+        if read.switches_branch:
             raise ValueError(
                 "the plan contains branch-switching instructions, which are incompatible "
-                f"with RLCR: {verdict}"
+                f"with RLCR: {read.why}"
             )
 
     if plan is not None and not (config.skip_quiz or config.skip_impl):
@@ -787,29 +862,33 @@ def _understood(agents: Agents, plan: Path, held: str) -> None:
     Raises:
       ValueError: If the person read the summary and chose to stop and review the plan.
     """
-    said = spoken(
-        agents.reviewer,
+    # Advisory, so a turn that failed or would not answer in the shape asked for is a quiz
+    # that is not run rather than one that is asked for again: the plugin warns and goes on.
+    quiz = agents.reviewer(
         render(prompts.PLAN_UNDERSTANDING_QUIZ, PLAN_FILE=plan, PLAN_CONTENT=held),
-    )[0]
-    quiz = _quiz(said)
-    if not quiz:
+        suppress=True,
+        schema=Quiz,
+    )
+    if quiz is None or not quiz.questions:
         print("Plan understanding quiz unavailable, continuing without it.")
         return
-    answered = 0
+    right = 0
     asked = 0
-    for n in "12":
-        options = [quiz[f"OPTION_{n}{letter}"] for letter in "ABCD"]
-        picked = _asked(agents.human, quiz[f"QUESTION_{n}"], options)
+    for question in quiz.questions:
+        picked = _asked(agents.human, question.question, question.options)
         if not picked:
             return  # nobody is at the prompt, so there is nobody to quiz
         asked += 1
-        answered += picked == quiz[f"ANSWER_{n}"].upper()
-    if asked and answered == asked:
+        right += picked == question.answer
+    if asked and right == asked:
         print("Your understanding of the plan looks solid. Proceeding with setup.")
         return
     going = agents.human(
-        f"{quiz['PLAN_SUMMARY']}\n\nThe answers were "
-        + ", ".join(f"Q{n}: {quiz[f'ANSWER_{n}'].upper()}" for n in "12")
+        f"{quiz.summary}\n\nThe answers were "
+        + ", ".join(
+            f"Q{at + 1}: {question.answer}"
+            for at, question in enumerate(quiz.questions)
+        )
         + ".\n\nWould you like to proceed with the RLCR loop anyway, or stop and review "
         "the plan more carefully first?\n  A. Proceed with RLCR loop\n"
         "  B. Stop and review the plan first\n\nAnswer with A or B."

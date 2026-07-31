@@ -408,10 +408,6 @@ relevant to the current repository.
    - Is the draft about learning from or understanding this codebase?
    - Does the draft reference file paths, functions, or features that exist here?
 
-3. **Return a clear verdict**:
-   - If relevant: Output `RELEVANT: <brief explanation>`
-   - If not relevant: Output `NOT_RELEVANT: <brief explanation>`
-
 ## Important Notes
 
 - Be lenient in your judgment - if the draft could reasonably be connected to this repository, \
@@ -521,7 +517,7 @@ GEN_PLAN_CONVERGENCE = """A coding agent has written the candidate plan at @{{OU
 for this repository. Review it for reasonability against the repository itself, rather than \
 against how a plan usually looks.
 
-Your output MUST follow this format, under these headings and no others:
+Your review MUST be written under these headings and no others:
 
 - `AGREE:` points accepted as reasonable
 - `DISAGREE:` points considered unreasonable and why
@@ -529,9 +525,8 @@ Your output MUST follow this format, under these headings and no others:
 - `OPTIONAL_IMPROVEMENTS:` non-blocking improvements
 - `UNRESOLVED:` opposite opinions needing user decisions
 
-If nothing is required and nothing under DISAGREE would change the work, answer with the \
-single word COMPLETE instead of the headings, and mean it: a plan is not improved by being \
-asked for one more thing.
+Say the plan has converged when nothing is required and nothing under DISAGREE would change \
+the work, and mean it: a plan is not improved by being asked for one more thing.
 
 What was asked for:
 

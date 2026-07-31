@@ -320,7 +320,7 @@ that starts it in its own docstring.
 | `continue_loop` | 1 | Sends the task once, then keeps nudging `continue`. Until a turn lands the task is sent again — `continue` on its own would open a session that never saw it. |
 | `goal` | 1 | Ralph, with the task set as the agent's [own goal](agents.md#goals). The loop only starts it over when it stopped without having met it. |
 | `flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. |
-| `rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. Nothing between them parses anything — the review *is* the actor's next prompt, word for word. |
+| `rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. The review *is* the actor's next prompt, word for word, and the reviewer is also the one that says the task is finished — which is what ends the run. |
 | `humanize1` | `drafter`, `planner`, `analyst`, `builder`, `reviewer` | RLCR: an idea is opened, planned against review, then built against it. [PolyArch/humanize](https://github.com/PolyArch/humanize) as one unattended run, with every flag it takes on `/config`. Run it in a git repository. |
 
 `humanize1` is [PolyArch/humanize](https://github.com/PolyArch/humanize) as one unattended run:
@@ -384,6 +384,37 @@ def run(agents: Agents, task: str) -> None:
 
 Give the two the same model and effort and they are still two agents — which is the point: a
 trace reads the actor's session and the reviewer's rounds as two.
+
+### Asking a question rather than setting an agent to work
+
+A loop that has to decide something — is this finished, does this plan belong to this
+repository — asks for the [shape of the answer](agents.md#answering-in-a-shape) and reads a
+field, rather than looking for a word at the end of a paragraph:
+
+```python
+class Review(BaseModel):
+    """What one round's review comes to."""
+
+    model_config = {"extra": "forbid"}
+
+    done: bool = Field(description="True only if there is nothing left to do or to fix.")
+    notes: str = Field(description="What to say to the agent, passed on word for word.")
+
+
+review = agents.reviewer(REVIEW_PROMPT + task, suppress=True, schema=Review)
+if review is not None and review.done:
+    return
+```
+
+`suppress=True` covers a review that never arrived and one that came back as something other
+than a `Review`: both are `None`, and both are a round to take again. This is what `rlar` ends
+on, and what `humanize1` asks its analyst and its reviewer before it starts anything.
+
+The same call to [the person](#the-person-at-the-prompt) is a questionnaire: they are asked a
+question per field rather than shown a schema, and the model is built out of what they typed.
+So a flow settles what only a person can settle in the model it is going to run on —
+`agents.human(asked, schema=Settled, suppress=True)`. See
+[Agents](agents.md#asking-them-for-a-shape-which-is-a-questionnaire).
 
 ### Catching turns without wrapping every line
 

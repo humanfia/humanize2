@@ -30,6 +30,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from pathlib import Path
 
+    from pydantic import BaseModel
+
 CONFIG = AgentConfig(model="m", effort="high")
 
 #: A plan with a goal and a criterion, which is what the loop is anchored to.
@@ -131,7 +133,12 @@ class Scripted(AgentBase):
 class ScriptedSession(SessionBase):
     """One conversation with a scripted agent."""
 
-    def _stream(self, prompt: str) -> Iterator[Event]:
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        # Nothing is done with the shape: this stands in for a backend that cannot be held to
+        # one, so the prompt it is given already asks for it and what it says is read back.
+        del schema
         agent = self._agent
         assert isinstance(agent, Scripted)
         agent.heard.append(prompt)
@@ -203,6 +210,11 @@ def _builder(where: Path, wrote: list[str]) -> Callable[[str], str]:
     return turn
 
 
+#: What a reviewer answers the plan compliance check with, which the flow asks for as a shape
+#: rather than as a verdict line: a scripted agent answers in it the way a real one is held to.
+_COMPLIES = '{{"relevant": true, "switches_branch": false, "why": "{why}."}}'
+
+
 def _reviewer(said: list[str]) -> Callable[[str], str]:
     """A reviewer that accepts the work and then finds nothing wrong with the code.
 
@@ -216,7 +228,9 @@ def _reviewer(said: list[str]) -> Callable[[str], str]:
     def turn(prompt: str) -> str:
         if prompt.startswith("You are a specialized agent that validates"):
             said.append("compliance")
-            return "PASS: the plan adds undo to the editor in this repository."
+            return _COMPLIES.format(
+                why="the plan adds undo to the editor in this repository"
+            )
         if prompt.startswith("# Code Review Phase"):
             said.append("code-review")
             return "Reviewed the whole change. Nothing to fix before this ships."
@@ -340,7 +354,7 @@ def test_findings_send_the_builder_back_before_the_loop_can_finish(
 
     def reviewing(prompt: str) -> str:
         if prompt.startswith("You are a specialized agent that validates"):
-            return "PASS: it is this repository's."
+            return _COMPLIES.format(why="it is this repository's")
         if prompt.startswith("# Code Review Phase"):
             reviews["at"] += 1
             if reviews["at"] == 1:
@@ -391,7 +405,7 @@ def test_a_review_with_no_verdict_is_sent_back_for_one(
 
     def reviewing(prompt: str) -> str:
         if prompt.startswith("You are a specialized agent that validates"):
-            return "PASS: it is this repository's."
+            return _COMPLIES.format(why="it is this repository's")
         if prompt.startswith("# Code Review Phase"):
             return "Nothing to raise."
         reviews["at"] += 1
@@ -443,7 +457,7 @@ def test_the_loop_stops_after_as_many_rounds_as_it_was_given(
             CONFIG,
             name="reviewer",
             doing=lambda said: (
-                "PASS: it is this repository's."
+                _COMPLIES.format(why="it is this repository's")
                 if said.startswith("You are a specialized agent that validates")
                 else "Still wrong.\n\nMainline Progress Verdict: ADVANCED\n"
             ),
@@ -487,7 +501,7 @@ def test_the_circuit_breaks_after_three_rounds_of_no_progress(
             CONFIG,
             name="reviewer",
             doing=lambda said: (
-                "PASS: it is this repository's."
+                _COMPLIES.format(why="it is this repository's")
                 if said.startswith("You are a specialized agent that validates")
                 else "Nothing moved.\n\nMainline Progress Verdict: STALLED\n"
             ),
