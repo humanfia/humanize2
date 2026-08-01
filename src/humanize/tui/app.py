@@ -64,14 +64,15 @@ from .pick import (
     Runs,
     Signing,
     Status,
-    Ways,
+    handed_over,
+    made,
     reads,
 )
 from .settings import Settings
 from .tally import Tally
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Sequence
+    from collections.abc import Callable, Sequence
 
     from pydantic import BaseModel
 
@@ -1417,44 +1418,37 @@ class Humanize(App[None]):
                 self._drop_provider(doing.cli, doing.name)
 
     async def _make_provider(self) -> None:
-        """Asks which CLI, which way in and what that way needs, and writes the account down.
+        """Asks which CLI, and then walks that backend's own way in.
 
-        Three questions rather than one form, because each is only answerable once the one
-        before it has been: a backend's ways in are its own, and what a way asks is the way's.
+        Two questions rather than one, because the second is only answerable once the first
+        has been: a backend's ways in are its own. The rest of the walk is the one the sheet
+        an agent's account is chosen on runs, so making one from either place is the same
+        thing done in the same order.
         """
-        from humanize.providers import login as signing
-
-        cli = ""
-        way: Way | None = None
         while True:
-            if not cli:
-                picked = await self.push_screen_wait(Backends())
-                if picked is None:
-                    return  # nothing before this to step back into
-                cli = picked
-            if way is None:
-                named = await self.push_screen_wait(Ways(cli))
-                if named is None:
-                    cli = ""  # back to the backends, which is where this walk came from
-                    continue
-                way = signing.way_of(cli, named)
-                if way is None:
-                    return  # the sheet lists that backend's own ways, so there are none else
-            signs = await self.push_screen_wait(Signing(cli, way))
-            if signs is None:
-                way = None  # and back to the ways, for the same reason
-                continue
-            break
-        try:
-            provider = signing.make(cli, signs.name, way, signs.answers)
-        except (ValueError, OSError) as why:  # a name or a directory that will not do
-            self.show(f"hmz: {why}", "red")
+            cli = await self.push_screen_wait(Backends())
+            if cli is None:
+                return  # nothing before this to step back into
+            outcome = await made(self, cli)
+            # Walking out of the first question the walk itself asks is a step back into the
+            # one asked here, since that is the step before it. Only here: the same walk from
+            # the sheet an agent's account is chosen on has nothing behind it but that sheet.
+            if outcome.provider is not None or outcome.why:
+                break
+        made_one = outcome.provider
+        if made_one is None:  # a name or a directory that will not do
+            self.show(f"hmz: {outcome.why}", "red")
             return
         self.show(
-            f"[dim]{escape(provider.cli)}/{escape(provider.name)} is written down at "
-            f"{escape(str(provider.at))}[/dim]"
+            f"[dim]{escape(made_one.cli)}/{escape(made_one.name)} is written down at "
+            f"{escape(str(made_one.at))}[/dim]"
         )
-        self._signed_in(provider, way, signs.answers)
+        if outcome.status:
+            self.show(f"hmz: signing it in exited {outcome.status}", "red")
+        elif outcome.way_runs:
+            self.show(
+                f"[dim]{escape(made_one.cli)}/{escape(made_one.name)} is signed in[/dim]"
+            )
 
     async def _sign_provider_in(self, cli: str, name: str) -> None:
         """Runs one account's own way in again, asking for whatever it still needs.
@@ -1505,7 +1499,7 @@ class Humanize(App[None]):
         if not way.argv:
             return
         try:
-            with self._handing_over():
+            with handed_over(self):
                 status = signing.sign_in(provider, way, answers)
         except OSError as why:  # the backend's own command is not on this machine
             self.show(f"hmz: {way.argv[0]}: {why}", "red")
@@ -1516,21 +1510,6 @@ class Humanize(App[None]):
         self.show(
             f"[dim]{escape(provider.cli)}/{escape(provider.name)} is signed in[/dim]"
         )
-
-    @contextlib.contextmanager
-    def _handing_over(self) -> Generator[None]:
-        """Gives the terminal away for as long as something else needs to own it.
-
-        Where there is one to give: a driver that cannot be suspended is one nobody is
-        watching -- a test, a web terminal -- and what was going to run still has to run.
-        """
-        from textual.app import SuspendNotSupported
-
-        try:
-            with self.suspend():
-                yield
-        except SuspendNotSupported:
-            yield
 
     def _drop_provider(self, cli: str, name: str) -> None:
         """Takes one account away, credentials and all, and says so.

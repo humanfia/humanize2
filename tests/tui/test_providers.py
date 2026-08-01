@@ -203,6 +203,103 @@ async def test_the_account_an_agent_runs_as_is_chosen_beside_what_it_runs(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """The moment somebody finds out they have no account is the moment to offer them one.
+
+    So making one is a key on the question rather than a walk out of it, and what comes back
+    is the account chosen: making one here is choosing it.
+    """
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        tuning = app.screen.query_one("#tuning", Label)
+        await until(lambda: "effort" in str(tuning.content), driver)
+
+        await driver.press("ctrl+r")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        # Nothing to choose but this machine's own, which is where somebody finds out.
+        assert [
+            str(option.id)
+            for option in app.screen.query_one("#choices", OptionList).options
+        ] == ["="]
+
+        await driver.press("ctrl+n")
+        # Straight to the ways in: the backend is what the sheet was already asking about.
+        await until(lambda: isinstance(app.screen, Ways), driver)
+        await driver.press("down", "down", "enter")  # `key`, which asks for one thing
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        await driver.press(*"mine")
+        await driver.press("down")
+        await driver.press(*"not-a-key")
+        await driver.press("enter")
+
+        # Back to the agents, with the account made and given to this one.
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await until(lambda: "as mine" in str(tuning.content), driver)
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+        await driver.pause()
+
+    made = providers.find("claude", "mine")
+    assert made is not None
+    assert dict(made.env) == {"ANTHROPIC_API_KEY": "not-a-key"}
+    assert app._models == [Runs("claude/claude-opus-5:max", "", None, "", "mine")]
+
+
+@pytest.mark.timeout(60)
+async def test_walking_out_of_the_ways_steps_back_into_the_backends() -> None:
+    """Esc is the step before, and the step before the ways is which CLI they are of."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("a")
+        await until(lambda: isinstance(app.screen, Backends), driver)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Ways), driver)
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Backends), driver)
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    assert providers.providers() == []
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+async def test_making_one_and_walking_out_of_it_changes_nothing(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """Esc off the making is the account question again, with nothing written down."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await driver.press("ctrl+r")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await driver.press("ctrl+n")
+        await until(lambda: isinstance(app.screen, Ways), driver)
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    assert providers.providers("claude") == []
+    assert app._models[0].provider == ""
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
 async def test_a_cli_with_no_accounts_says_where_they_come_from(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
@@ -216,8 +313,11 @@ async def test_a_cli_with_no_accounts_says_where_they_come_from(
         await until(lambda: isinstance(app.screen, RunsAs), driver)
         said = str(app.screen.query_one("#tuning", Label).content)
 
-        assert "claude has no providers yet" in said
-        assert "/providers" in said
+        assert "claude has no accounts here yet" in said
+        # And says where one comes from without sending anybody out of the question: the
+        # moment somebody finds out they have none is the moment to be offered one.
+        assert "ctrl+n makes one" in said
+        assert "ctrl+n to make one" in str(app.screen.query_one("#keys", Label).content)
 
 
 @pytest.mark.timeout(60)

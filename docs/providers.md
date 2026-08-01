@@ -246,6 +246,12 @@ a second question about the same agent rather than a way of running the model �
 belongs to the CLI, so two models of one CLI are the same account — which is why it is a key and
 not a row.
 
+**ctrl+n on that sheet makes one there and then**, so finding out you have no account for this
+CLI is not a reason to leave the question: it asks how to sign in and what that way needs, hands
+the terminal to the CLI's own login where the way has one, and comes back with the new account
+chosen for that agent. It is the same walk `/providers` runs without the question already
+answered — which backend.
+
 `""` — the default — is the CLI as you already run it. A name no provider of that backend
 answers to raises the first time that agent needs it, saying which agent and what it was called:
 an agent that cannot find the account it was told to run as must not quietly run as yours.

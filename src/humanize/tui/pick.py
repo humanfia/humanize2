@@ -20,6 +20,7 @@ is a rule across, fields down the left and their values lined up beside them.
 
 from __future__ import annotations
 
+import contextlib
 import time
 from typing import (
     TYPE_CHECKING,
@@ -48,6 +49,8 @@ from .discover import machines
 from .monitor import short, thousands
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from pydantic import BaseModel
     from pydantic.fields import FieldInfo
     from textual.app import App, ComposeResult
@@ -1416,6 +1419,10 @@ class Picks(Sheet[str]):
     asked = ""
     about = ""
 
+    #: What this sheet's own keys do, said on the keys line before the ones every sheet has.
+    #: Empty for a sheet that only picks, which is most of them.
+    keys = ""
+
     def __init__(self, current: str = "") -> None:
         """Initializes the choosing.
 
@@ -1477,7 +1484,7 @@ class Picks(Sheet[str]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
+            f"{self.keys}Type to search · Enter to choose · Esc to cancel{self.searching()}"
         )
 
     @on(OptionList.OptionSelected)
@@ -1513,12 +1520,20 @@ class RunsAs(Picks):
     token -- which is the whole of what a provider is for.
     """
 
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        # Making one is asked for here rather than somewhere else: this is the moment somebody
+        # finds out they have no account for this CLI, or that the one they want is not among
+        # these, and sending them out of the question to answer it would lose the question.
+        Binding("ctrl+n", "new", "new", priority=True),
+    ]
+
     asked = "Select which account this agent runs as"
     about = (
         "The credentials its turns are run under. Its sessions, its settings and its skills "
-        "are the CLI's own either way; only the account moves. /providers is where they are "
-        "made."
+        "are the CLI's own either way; only the account moves."
     )
+    keys = "ctrl+n to make one · "
 
     def __init__(self, backend: str, current: str) -> None:
         """Initializes the choosing.
@@ -1529,6 +1544,40 @@ class RunsAs(Picks):
         """
         super().__init__(current)
         self._backend = backend
+        #: What became of the last account made from here, said under the list: a login that
+        #: exited badly is worth knowing about where it was asked for.
+        self._said = ""
+
+    @work
+    async def action_new(self) -> None:
+        """Makes an account for this CLI without leaving the question it is chosen in.
+
+        The same walk `/providers` runs, minus the question this sheet has already answered:
+        which backend. What comes of it is what the sheet is now showing, so a new account is
+        chosen straight away -- making one here is choosing it -- unless its own way in failed,
+        which is said under the list and left for whoever is looking to decide about.
+        """
+        # textual types the property off the bare generic, as it does everywhere else here.
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        outcome = await made(showing, self._backend)
+        if outcome.why:
+            self._said = escape(outcome.why)
+        if outcome.provider is None:
+            self._rows = None  # it may have been made and then failed; look again
+            self._fill()
+            return
+        if outcome.status:
+            self._said = (
+                f"{escape(outcome.provider.name)} is written down, but signing it in "
+                f"exited {outcome.status}"
+            )
+            self._rows = None
+            self._fill()
+            return
+        self.dismiss(outcome.provider.name)
 
     def rows(self) -> list[tuple[str, str, str]]:
         """This machine's own first, and then every account that CLI has here."""
@@ -1543,10 +1592,98 @@ class RunsAs(Picks):
         ]
 
     def nothing(self) -> str:
-        """Says where the accounts would come from, for a CLI that has none of them yet."""
+        """Says what came of making one, or where they come from for a CLI that has none."""
+        if self._said:
+            return self._said
         if len(self._rows or []) > 1:
             return ""
-        return f"{escape(self._backend)} has no providers yet; /providers makes one"
+        return f"{escape(self._backend)} has no accounts here yet; ctrl+n makes one"
+
+
+class Made(NamedTuple):
+    """What making an account came to.
+
+    Attributes:
+      provider: The account written down, or None where the walk was left without making one.
+      status: What the way's own command exited with, or 0 for a way that runs nothing and
+        for one nobody got as far as running.
+      why: What went wrong before anything was written down, or "" where nothing did.
+      way_runs: Whether the way had a command of its own, which is what tells an account that
+        was signed in from one that was only written down.
+    """
+
+    provider: Provider | None = None
+    status: int = 0
+    why: str = ""
+    way_runs: bool = False
+
+
+async def made(host: App[None], cli: str, *, whose: str = "") -> Made:
+    """Walks one backend's way in, and writes down the account it makes.
+
+    Here rather than beside whatever asked for it, because both places that ask are here:
+    `/providers`, which asks which backend first, and the sheet an agent's own account is
+    chosen on, which knows the backend already and would otherwise have to send somebody out
+    of the question they are answering to answer it.
+
+    Args:
+      host: The interface, which is what the sheets are pushed onto and what hands the
+        terminal over while a login owns it.
+      cli: The backend the account is for.
+      whose: What to call it, for one already named, or "" to ask.
+
+    Returns:
+      What came of it: the account, whether its way in exited badly, and what stopped it
+      before anything was written down. All three empty for a walk that was left.
+    """
+    from humanize.providers import login as signing
+
+    way: Way | None = None
+    while True:
+        if way is None:
+            named_way = await host.push_screen_wait(Ways(cli))
+            if named_way is None:
+                return Made()  # walked out of the first question, which changes nothing
+            way = signing.way_of(cli, named_way)
+            if way is None:
+                return (
+                    Made()
+                )  # the sheet lists that backend's own, so there are none else
+        signs = await host.push_screen_wait(Signing(cli, way, name=whose))
+        if signs is None:
+            way = None  # back to the ways, which is the step before
+            continue
+        break
+    try:
+        provider = signing.make(cli, signs.name or whose, way, signs.answers)
+    except (ValueError, OSError) as why:  # a name or a directory that will not do
+        return Made(why=str(why))
+    if not way.argv:
+        return Made(provider=provider)
+    # A login is a browser opened, a code read out, a token exchanged: it owns the screen
+    # while it runs, and there is nothing for an interface to draw over it.
+    with handed_over(host):
+        status = signing.sign_in(provider, way, signs.answers)
+    return Made(provider=provider, status=status, way_runs=True)
+
+
+@contextlib.contextmanager
+def handed_over(host: App[None]) -> Generator[None]:
+    """Gives the terminal away for as long as something else needs to own it.
+
+    Where there is one to give: a driver that cannot be suspended is one nobody is watching --
+    a test, a web terminal -- and what was going to run still has to run.
+
+    Args:
+      host: The interface holding the terminal.
+    """
+    from textual.app import SuspendNotSupported
+
+    try:
+        with host.suspend():
+            yield
+    except SuspendNotSupported:
+        yield
 
 
 class Backends(Picks):

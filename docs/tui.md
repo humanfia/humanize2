@@ -90,7 +90,7 @@ list appears under the editor with a line about each.
 | --- | --- | --- |
 | `/flow` | `[path]` | Switches which flow runs, then [how it is set up](#setting-a-flow-up) if it takes any setting up, then what each of its agents runs. With a path, takes that file. Stops whatever was running — a flow is chosen in order to be run. Looking and leaving without choosing changes nothing. |
 | `/config` | | Sets up the flow itself, for a flow that says it can be. See [below](#setting-a-flow-up). |
-| `/agents` | | Sets what each agent of the current flow runs, one at a time, by the name the flow calls it — and, on **ctrl+a**, [where its turns land](#where-each-agent-works), on **ctrl+s**, [which of its CLI's skills it is loaded with](#what-each-agent-is-loaded-with), and on **ctrl+r**, [which account it runs as](#which-account-each-agent-runs-as). It does not ask how the flow itself is set up; `/config` is that half. |
+| `/agents` | | Sets what each agent of the current flow runs, one at a time, by the name the flow calls it — and, on **ctrl+a**, [where its turns land](#where-each-agent-works), on **ctrl+s**, [which of its CLI's skills it is loaded with](#what-each-agent-is-loaded-with), and on **ctrl+r**, [which account it runs as](#which-account-each-agent-runs-as) — where **ctrl+n** makes one on the spot. It does not ask how the flow itself is set up; `/config` is that half. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and the three things that can happen to one — made, signed in again, taken away. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
@@ -306,8 +306,15 @@ to the CLI, so two models of one CLI are the same account. The tuning line says
 ```
 
 The accounts offered are that CLI's own, since an account is one backend's, and the first row is
-what every agent ran as before there were any: whatever this machine is already signed in as. A
-CLI with no accounts yet says so, and says where they are made.
+what every agent ran as before there were any: whatever this machine is already signed in as.
+
+**ctrl+n makes one without leaving the question.** This is the moment you find out that the
+account you want is not there, so it is the moment to be offered it: ctrl+n asks how to sign in
+and what that way needs — the same walk [`/providers`](#the-accounts-themselves) runs, minus the
+question this sheet has already answered — hands the terminal to the CLI's own login where the
+way has one, and comes back with the new account chosen. A CLI with no accounts yet says
+`claude has no accounts here yet; ctrl+n makes one` under the list, and one whose login exited
+badly says that there instead, leaving the account written down for another try.
 
 It is a setting of the agent because it is the agent that signs in: two agents of one CLI, one on
 a subscription and one on somebody's gateway, are two accounts running at once, each refreshing
