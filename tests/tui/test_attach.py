@@ -61,8 +61,10 @@ HOLDING = """
 import asyncio
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     async def both() -> None:
         # A turn apiece, open at the same time and neither answering until the fake CLI is

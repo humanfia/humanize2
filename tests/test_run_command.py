@@ -30,8 +30,10 @@ import os
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AGENTS], task: str) -> None:
     Path(__file__).with_suffix(".json").write_text(
         json.dumps(
@@ -54,8 +56,10 @@ import json
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     Path(__file__).with_suffix(".json").write_text(
         json.dumps([agent.config.provider for agent in agents])
@@ -68,8 +72,10 @@ import json
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     Path(__file__).with_suffix(".json").write_text(
         json.dumps([agent.config.permission for agent in agents])
@@ -85,6 +91,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -92,6 +99,7 @@ class Agents(NamedTuple):
     reviewer: AgentBase
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     Path(__file__).with_suffix(".json").write_text(
         json.dumps(
@@ -112,10 +120,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from hmz.flows import flow
+
 if TYPE_CHECKING:
     from hmz.agents import AgentBase
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     pass
 """
@@ -268,6 +279,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from hmz.agents import AgentBase, HumanAgent
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -275,6 +287,7 @@ class Agents(NamedTuple):
     human: HumanAgent
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     agents.human.prompting = ["", "and then this"].pop
     Path(__file__).with_suffix(".json").write_text(
@@ -318,12 +331,14 @@ from pathlib import Path
 from typing import NamedTuple
 
 from hmz.agents import HumanAgent
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
     human: HumanAgent
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     agents.human.prompting = lambda: "answered"
     Path(__file__).with_suffix(".json").write_text(
@@ -371,6 +386,7 @@ from pathlib import Path
 from typing import Annotated, NamedTuple
 
 from hmz.agents import AgentBase, Moment, Verdict
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -378,6 +394,7 @@ class Agents(NamedTuple):
     reviewer: AgentBase
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     agents.builder.hooks.on(Moment.PERMISSION_REQUEST, lambda _: Verdict(refused=True))
     Path(__file__).with_suffix(".json").write_text(
@@ -463,8 +480,11 @@ def test_the_flow_runs_where_the_command_was_given(
 @pytest.mark.parametrize(
     ("source", "complaint"),
     [
-        ("flow = None\n", "run(agents, task)"),
-        ("def run(agents, task):\n    pass\n", "tuple"),
+        ("flow = None\n", "nothing in it is marked @flow()"),
+        (
+            "from hmz.flows import flow\n\n\n@flow\ndef run(agents, task):\n    pass\n",
+            "tuple",
+        ),
         (RECORD.replace("AGENTS", "AgentBase, ..."), "fixed length"),
         (RECORD.replace("AGENTS", "AgentBase, AgentBase"), "drives 2 agents, 1 given"),
         (UNREADABLE, "cannot be read here"),

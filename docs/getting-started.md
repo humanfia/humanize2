@@ -177,15 +177,18 @@ view of a long run that fits on a screen.
 
 ## Write a flow of your own
 
-A flow is a Python file with a `run(agents, task)` in it. Put this in
+A flow is a Python file with a function marked `@flow` in it, taking the agents and the task.
+Put this in
 `.humanize/flows/twice.py`:
 
 ```python
 """Two passes: do the work, then read it back and fix what is wrong."""
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     session = agent.new()

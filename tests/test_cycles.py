@@ -26,8 +26,10 @@ CONFIG = AgentConfig(model="m", effort="high")
 #: A flow that opens one session per agent, each of which names itself as it lands.
 FLOW = """
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     for at, agent in enumerate(agents):
         agent.new()(f"echo session-{at}")
@@ -101,7 +103,9 @@ def test_a_run_that_was_interrupted_says_so(
     """Esc ends a flow, and a cycle that ended that way is not one that finished."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "flow.py").write_text(
-        "from hmz.agents import AgentBase, Stopped\n\n\n"
+        "from hmz.agents import AgentBase, Stopped\n"
+        "from hmz.flows import flow\n\n\n"
+        "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
         '    raise Stopped("stopped")\n'
     )
@@ -119,7 +123,9 @@ def test_a_run_that_failed_says_so(
     """A turn that failed takes the flow with it, and the cycle says how it went."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "flow.py").write_text(
-        "from hmz.agents import AgentBase\n\n\n"
+        "from hmz.agents import AgentBase\n"
+        "from hmz.flows import flow\n\n\n"
+        "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
         '    agents[0].new()("exit 3")\n'
     )

@@ -226,8 +226,10 @@ import json
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     Path("said.json").write_text(json.dumps([agent(task) for agent in agents]))
 """

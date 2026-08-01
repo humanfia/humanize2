@@ -1,7 +1,7 @@
 # Flows
 
-A flow is a Python file with a `run(agents, task)` in it. It is the loop: which agent is asked
-what, in what order, and when to stop.
+A flow is a Python file with a function marked `@flow` in it, taking the agents and the task.
+It is the loop: which agent is asked what, in what order, and when to stop.
 
 It is ordinary Python. There is no DSL, no graph to declare, no state machine — a flow may
 branch, sleep, read files, shell out, and give up, because it is just a function.
@@ -31,9 +31,14 @@ branch, sleep, read files, shell out, and give up, because it is just a function
 
 Three rules, and that is the whole of it.
 
-**1. A function called `run`, taking the agents and the task.**
+**1. A function marked `@flow`, taking the agents and the task.** What it is called is up to
+you — the mark is what makes it a flow, not the name.
 
 ```python
+from hmz.flows import flow
+
+
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     ...
 ```
@@ -49,8 +54,10 @@ question, and is refused.
 """Two passes over the same task."""
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     session = agent.new()
@@ -62,10 +69,10 @@ Anything else the file does as it is imported is the flow's own business and fai
 anywhere — a flow that reads a prompt file beside it and does not find it is not reported as a
 command line to correct.
 
-`run` may also be `async def`. Everything else on this page is the same either way.
+A flow may also be `async def`. Everything else on this page is the same either way.
 
-One file may hold [several flows](#several-flows-in-one-file), each marked with `@flow` and each
-run as `<flow>:<name>`. `run` is the one the file holds under its own name.
+One file may hold [several flows](#several-flows-in-one-file): `@flow` is the one the file holds
+under its own name, and `@flow(name="…")` is one of the rest, run as `<flow>:<name>`.
 
 ## A flow that waits for more than one thing
 
@@ -76,8 +83,10 @@ once, so a flow may be written as a coroutine:
 import asyncio
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 async def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     while True:
         acted, reviewed = await asyncio.gather(
@@ -97,6 +106,7 @@ Every call that runs a turn has an awaited twin — `agent.aturn`, `session.atur
 [Agents › Awaiting a turn](agents.md#awaiting-a-turn).
 
 ```python
+@flow
 async def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     # One session per shard, all of them at once, answers in the order they were asked for.
@@ -137,6 +147,7 @@ class Agents(NamedTuple):
     reviewer: AgentBase
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     working = agents.actor.new()
     ...
@@ -174,6 +185,7 @@ class Config(BaseModel):
     mode: Literal["fast", "slow"] = Field(default="fast", description="which way")
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> None:
     setting = config or Config()
     ...
@@ -385,7 +397,7 @@ Picking one stops whatever was running — a flow is chosen in order to be run.
 
 ## Several flows in one file
 
-Three phases of one thing are one thing to write and three to run. Mark each entry point, and
+Three phases of one thing are one thing to write and three to run. Give each mark a name, and
 each is a flow of its own, called `<flow>:<name>`:
 
 ```python
@@ -394,13 +406,13 @@ each is a flow of its own, called `<flow>:<name>`:
 from hmz.flows import flow
 
 
-@flow
-def gen_idea(agents: Drafting, task: str, config: Idea | None = None) -> None:
+@flow(name="gen-idea")
+def first_pass(agents: Drafting, task: str, config: Idea | None = None) -> None:
     """Opens a loose idea into a repo-grounded draft."""
 
 
-@flow
-def gen_plan(agents: Planning, task: str, config: Plan | None = None) -> None:
+@flow(name="gen-plan")
+def then_plan(agents: Planning, task: str, config: Plan | None = None) -> None:
     """Turns that draft into a plan both sides have converged on."""
 ```
 
@@ -409,17 +421,16 @@ hmz exec -f official/humanize1:gen-idea -a claude/claude-opus-5:max "add undo to
 hmz exec -f official/humanize1:gen-plan -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max ""
 ```
 
-The name is the function's own with its underscores turned into dashes; `@flow(name="build")`
-says otherwise, and `@flow(about="…")` says what it does where flows are listed, which is
-otherwise the first line of its docstring.
+The name is what you write in the mark and nothing else — a name written down where a flow is
+run should not change under whoever renames the function. `@flow(about="…")` says what it does
+where flows are listed, which is otherwise the first line of its docstring.
 
 Each of them declares its own agents and its own settings, so `/agents` asks two questions
 rather than five and `/config` shows one phase's flags rather than three phases' at once. What
 passes between them is whatever they write — a file, usually.
 
-`@flow` marks; it does not wrap. The function is called exactly as it was, and a file with a
-plain `run` in it needs none of this: that is the flow the file holds under its own name, and is
-what every flow was.
+`@flow` marks; it does not wrap. The function is called exactly as it was. A file that marks
+one function with a bare `@flow` is one flow under the file's own name, which is most of them.
 
 ## Where flows live
 

@@ -40,6 +40,7 @@ HERE = '''
 from typing import NamedTuple
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -48,6 +49,7 @@ class Agents(NamedTuple):
     builder: AgentBase
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     pass
 '''
@@ -59,6 +61,7 @@ REMOTE = '''
 from typing import Annotated, NamedTuple
 
 from hmz.agents import AgentBase, Remote
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -67,6 +70,7 @@ class Agents(NamedTuple):
     builder: Annotated[AgentBase, Remote]
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     pass
 '''
@@ -78,6 +82,7 @@ BOXED = '''
 from typing import Annotated, NamedTuple
 
 from hmz.agents import AgentBase, Isolated
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -86,6 +91,7 @@ class Agents(NamedTuple):
     tester: Annotated[AgentBase, Isolated("python:3.12")]
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     pass
 '''
@@ -97,6 +103,7 @@ PAIR = '''
 from typing import Annotated, NamedTuple
 
 from hmz.agents import AgentBase, Remote
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -106,6 +113,7 @@ class Agents(NamedTuple):
     reviewer: Annotated[AgentBase, Remote]
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     pass
 '''

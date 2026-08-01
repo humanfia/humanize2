@@ -35,8 +35,10 @@ FLOW = """
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     session = agents[0].new()
     Path("said.txt").write_text(session(task) + "\\n")
@@ -48,8 +50,10 @@ AWAITED = """
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 async def run(agents: tuple[AgentBase], task: str) -> None:
     session = agents[0].new()
     Path("said.txt").write_text(await session.aturn(task) + "\\n")
@@ -1600,6 +1604,7 @@ from typing import Literal, NamedTuple
 from pydantic import BaseModel, Field
 
 from hmz.agents import HumanAgent
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -1618,6 +1623,7 @@ class Settled(BaseModel):
     rounds: int = Field(default=3, description="How many rounds may it take?")
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     settled = agents.human(task, schema=Settled, suppress=True)
     Path("settled.json").write_text(settled.model_dump_json() if settled else "nothing")

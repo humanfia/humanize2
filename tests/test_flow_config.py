@@ -37,6 +37,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Config(BaseModel):
@@ -47,6 +48,7 @@ class Config(BaseModel):
     mode: Literal["fast", "slow"] = Field(default="fast", description="which way")
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> None:
     Path(__file__).with_suffix(".json").write_text(
         json.dumps({"task": task, "config": None if config is None else config.model_dump()})
@@ -59,8 +61,10 @@ import json
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     Path(__file__).with_suffix(".json").write_text(json.dumps({"task": task}))
 """
@@ -68,8 +72,10 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 #: A flow whose third argument is not a model, which is a flow that takes no setting up.
 NOT_A_MODEL = """
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str, config: str = "") -> None:
     pass
 """
@@ -137,7 +143,7 @@ def test_being_set_up_with_something_else_is_refused_before_anything_runs(
 
     where = _flow(tmp_path, SETTABLE)
 
-    with pytest.raises(NotAFlow, match="run\\(\\) takes a Config"):
+    with pytest.raises(NotAFlow, match="the flow takes a Config"):
         Runner(where, [ShellAgent(CONFIG)], Other())
 
 
@@ -221,5 +227,5 @@ def test_a_flow_that_takes_nothing_refuses_being_set_up(tmp_path: Path) -> None:
 
     where = _flow(tmp_path, PLAIN)
 
-    with pytest.raises(NotAFlow, match="run\\(\\) takes no config"):
+    with pytest.raises(NotAFlow, match="the flow takes no config"):
         Runner(where, [ShellAgent(CONFIG)], Other())

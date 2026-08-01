@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -44,6 +45,7 @@ class Agents(NamedTuple):
     reviewer: AgentBase
 
 
+@flow
 async def run(agents: Agents, task: str) -> None:
     acted, reviewed = await asyncio.gather(
         agents.actor.aturn(f"echo acted-{task}"),
@@ -61,8 +63,10 @@ import json
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 async def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     said = await agent.abatch([f"echo {task}-{at}" for at in range(12)])
@@ -77,6 +81,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Config(BaseModel):
@@ -85,6 +90,7 @@ class Config(BaseModel):
     rounds: int = Field(default=3, ge=1, le=9, description="how many times round")
 
 
+@flow
 async def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> None:
     setting = config or Config()
     said = [await agents[0].aturn(f"echo round-{at}") for at in range(setting.rounds)]
@@ -96,8 +102,10 @@ async def run(agents: tuple[AgentBase], task: str, config: Config | None = None)
 #: A coroutine flow that fails partway, which is a flow that failed and not a flow to correct.
 FAILING = """
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 async def run(agents: tuple[AgentBase], task: str) -> None:
     agents[0]("echo one")
     raise ValueError("the flow itself went wrong")
@@ -107,8 +115,10 @@ async def run(agents: tuple[AgentBase], task: str) -> None:
 #: after that raises where the flow is waiting for it.
 STOPPED = """
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 async def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     await agent.aturn("echo one")
@@ -125,6 +135,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -134,6 +145,7 @@ class Agents(NamedTuple):
     reviewer: AgentBase
 
 
+@flow
 async def run(agents: Agents, task: str) -> None:
     await asyncio.sleep(0)  # a flow that is a coroutine, and awaits like one
     Path(__file__).with_suffix(".json").write_text(
@@ -150,8 +162,10 @@ async def run(agents: Agents, task: str) -> None:
 #: refused for a coroutine exactly as it is for a function.
 UNCOUNTED = """
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 async def run(agents: tuple[AgentBase, ...], task: str) -> None:
     pass
 """
@@ -353,8 +367,10 @@ import json
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     Path(__file__).with_suffix(".json").write_text(
         json.dumps(agents[0](f"echo {task}"))

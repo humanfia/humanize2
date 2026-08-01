@@ -154,8 +154,8 @@ def _read(
       model it can be set up with, or None where it takes no setting up.
 
     Raises:
-      NotAFlow: If the file is not there, is not a flow -- nothing called `run`, or one whose
-        `agents` cannot be read or says nothing about how many it takes.
+      NotAFlow: If the file is not there, is not a flow -- nothing in it marked `@flow()`, or
+        one whose `agents` cannot be read or says nothing about how many it takes.
     """
     from hmz.flows import find, inside, loaded
 
@@ -183,9 +183,13 @@ def _read(
             raise NotAFlow(missing)
         if holds:
             raise NotAFlow(
-                f"{flow}: nothing in it is called run, and it holds "
+                f"{flow}: nothing in it is marked @flow(), and it holds "
                 f"{', '.join(holds)} -- name the one to run"
             )
+        raise NotAFlow(
+            f"{flow}: nothing in it is marked @flow() -- a flow is a function marked with "
+            "it, which is how a file says which of the functions in it is one"
+        )
     try:
         # A function, so that what is read below is what the entry point will be called
         # with: a class or a partial answers with annotations that are somebody else's.
@@ -198,7 +202,7 @@ def _read(
         # A flow whose agents are imported under TYPE_CHECKING states how many it drives
         # where nothing can read it back, which is the one thing a flow is asked to say.
         raise NotAFlow(
-            f"{flow}: run()'s agents cannot be read here ({unresolved}) -- import what "
+            f"{flow}: the flow's agents cannot be read here ({unresolved}) -- import what "
             "the annotation names at runtime, so the count it states can be checked"
         ) from unresolved
     # A named tuple is a tuple that also says what each of its places is for, and `_fields`
@@ -220,9 +224,9 @@ def _read(
     declares = get_args(declared)
     if run is None or get_origin(declared) is not tuple or Ellipsis in declares:
         raise NotAFlow(
-            f"{flow}: a flow is a run(agents, task) whose agents are annotated with a "
-            "tuple of a fixed length -- how many agents the flow drives -- or with a "
-            "NamedTuple of them, which also says what each one is for"
+            f"{flow}: a flow is a function marked @flow() taking (agents, task), whose "
+            "agents are annotated with a tuple of a fixed length -- how many agents the "
+            "flow drives -- or with a NamedTuple of them, which also says what each is for"
         )
     return (
         run,
@@ -299,6 +303,10 @@ def _unfetched(named: str) -> str:
 def _entry(inside: dict[str, Any], wanted: str) -> Callable[..., Any] | None:
     """The flow a file was asked for, out of everything in it.
 
+    By what it was marked with and never by what it is called: a file is run to be read, and
+    the functions it leaves behind are its flows, whatever it imported and whatever it broke a
+    flow into. `@flow()` is the one the file holds under its own name.
+
     Args:
       inside: What running the file left behind.
       wanted: Which of its flows was asked for, or "" for the one it holds under its own name.
@@ -312,8 +320,7 @@ def _entry(inside: dict[str, Any], wanted: str) -> Callable[..., Any] | None:
         said = getattr(one, "__humanize_flow__", None)
         if isinstance(said, Flow) and said.name == wanted:
             return cast("Callable[..., Any]", one)
-    run = inside.get("run") if not wanted else None
-    return cast("Callable[..., Any]", run) if callable(run) else None
+    return None
 
 
 def _holds(inside: dict[str, Any]) -> list[str]:
@@ -361,10 +368,10 @@ def _set_up(
     from pydantic import ValidationError
 
     if setting is None:
-        raise NotAFlow(f"{flow}: run() takes no config, and one was given")
+        raise NotAFlow(f"{flow}: the flow takes no config, and one was given")
     if not isinstance(config, dict) and type(config).__name__ != setting.__name__:
         raise NotAFlow(
-            f"{flow}: run() takes a {setting.__name__} to be set up with, not a "
+            f"{flow}: the flow takes a {setting.__name__} to be set up with, not a "
             f"{type(config).__name__}"
         )
     fields = config if isinstance(config, dict) else config.model_dump()
@@ -564,8 +571,9 @@ class Runner:
             what a flow that takes no setting up is given either way.
 
         Raises:
-          NotAFlow: If the file is not there, is not a flow -- nothing called ``run``, or one
-            whose ``agents`` cannot be read or says nothing about how many it takes -- or is a
+          NotAFlow: If the file is not there, is not a flow -- nothing in it marked
+            ``@flow()``, or one whose ``agents`` cannot be read or says nothing about how many
+            it takes -- or is a
             flow that drives a different number of agents than were given, or one of them
             cannot run a moment the flow said that place has to, or was set up with something
             that is not what it asked for.
@@ -578,7 +586,7 @@ class Runner:
         asked = [place for place in places if not place.person]
         if len(asked) != len(agents):
             raise NotAFlow(
-                f"{flow}: run() drives {len(asked)} agents, {len(agents)} given"
+                f"{flow}: the flow drives {len(asked)} agents, {len(agents)} given"
             )
         # Before the first turn, for the reason the count is: a flow that hangs a hook on a
         # moment its agent does not run would otherwise find out hours into a loop, from a

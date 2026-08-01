@@ -63,8 +63,10 @@ import time
 from pathlib import Path
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     while not Path("go.txt").exists():
         time.sleep(0.02)

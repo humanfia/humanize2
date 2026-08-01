@@ -1,9 +1,10 @@
-"""One file, several flows: what each is called, and how one of them is asked for.
+"""What makes a function a flow, what it is called, and how one of them is asked for.
 
-A file with a `run` in it is one flow, which is what every flow was. A file that marks its
-entry points is one flow apiece, each called `<file>:<name>` -- so three phases of one thing
-are one thing to write and three to run, each asking only for the agents it drives and only
-for the settings it takes.
+A flow is a function marked with `@flow`, and nothing else is one -- not a function called
+`run`, which is a name a file is free to use for anything. `@flow` is the flow its file holds
+under the file's own name; `@flow(name=...)` is one of several, called `<file>:<name>`, so
+three phases of one thing are one thing to write and three to run, each asking only for the
+agents it drives and only for the settings it takes.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from hmz.agents import AgentConfig
 from hmz.flows import about, find, flow, found, held, inside
 from hmz.runner import NotAFlow, Runner, configures, drives, wanted
 from tests.stubs import ShellAgent
@@ -19,11 +21,9 @@ from tests.stubs import ShellAgent
 if TYPE_CHECKING:
     from pathlib import Path
 
-from hmz.agents import AgentConfig
-
 CONFIG = AgentConfig(model="m", effort="high")
 
-#: A file that is three flows: one agent apiece, one of them named for itself.
+#: A file that is two flows beside each other, neither of them the file's own.
 THREE = '''"""Three phases of one thing, which are three things to run."""
 
 from typing import NamedTuple
@@ -53,8 +53,8 @@ class Wide(BaseModel):
     n: int = 6
 
 
-@flow
-def gen_idea(agents: Drafting, task: str, config: Wide | None = None) -> None:
+@flow(name="gen-idea")
+def first_pass(agents: Drafting, task: str, config: Wide | None = None) -> None:
     """Opens a loose idea into a draft."""
     agents.drafter.new()(f"{task} {(config or Wide()).n}")
 
@@ -65,39 +65,53 @@ def start_it(agents: Building, task: str) -> None:
     agents.builder.new()(task)
 
 
-def _not_a_flow(agents: Drafting, task: str) -> None:
-    """Marked with nothing, so it is not one of them."""
+def run(agents: Drafting, task: str) -> None:
+    """Called run, marked with nothing, and so not a flow at all."""
 '''
 
-#: A file that is one flow, the way every flow was one before any of this.
+#: A file that is one flow, under a function name that says nothing about it.
 ONE = '''"""Just the one, and it says what it does here."""
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
-def run(agents: tuple[AgentBase], task: str) -> None:
+@flow
+def whatever_it_is_called(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     agent.new()(task)
 '''
 
-#: And one that is both: a `run` under the file's own name, and another beside it.
+#: And one that is both: the file's own flow, and another beside it.
 BOTH = '''"""One under its own name, and one beside it."""
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     """What the file itself is."""
     (agent,) = agents
     agent.new()(task)
 
 
-@flow
+@flow(name="twice")
 def twice(agents: tuple[AgentBase], task: str) -> None:
     """The other one."""
     (agent,) = agents
     agent.new()(task)
+    agent.new()(task)
+'''
+
+#: A file with a `run` in it and nothing marked, which is what a flow used to be and is not.
+UNMARKED = '''"""A file that says nothing about which of its functions is a flow."""
+
+from hmz.agents import AgentBase
+
+
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
     agent.new()(task)
 '''
 
@@ -121,22 +135,34 @@ def test_a_file_says_which_flows_it_holds_and_what_each_one_does(
     ]
 
 
-def test_the_name_is_the_function_s_own_with_dashes_for_underscores(
+def test_the_name_is_what_the_decorator_was_told_and_not_the_function_s(
     tmp_path: Path,
 ) -> None:
-    """Which is how these read on a command line, and `name=` is how to say otherwise."""
+    """A name written down where a flow is run must not change under whoever renames it."""
     named = {one.name for one in held(_written(tmp_path, THREE))}
 
-    assert named == {"gen-idea", "build"}  # `start_it` was told to be `build`
+    assert named == {"gen-idea", "build"}  # not `first_pass`, and not `start_it`
 
 
-def test_a_file_with_a_run_in_it_is_one_flow_under_its_own_name(tmp_path: Path) -> None:
-    """Which is what every flow was before a file could hold several."""
+def test_a_function_called_run_is_not_a_flow_for_being_called_that(
+    tmp_path: Path,
+) -> None:
+    """Which is the whole of the rule: a file says which of its functions is a flow."""
+    where = _written(tmp_path, UNMARKED, "unmarked")
+
+    assert held(where) == []
+    with pytest.raises(NotAFlow, match="nothing in it is marked @flow"):
+        drives(where)
+
+
+def test_a_file_marked_once_is_one_flow_under_its_own_name(tmp_path: Path) -> None:
+    """However the function it marked is spelled, which is nothing to do with the name."""
     (said,) = held(_written(tmp_path, ONE, "one"))
 
     assert said.name == ""
     # Nothing said its own line, so the file's own first line is what it says.
     assert said.about == "Just the one, and it says what it does here."
+    assert drives(_written(tmp_path, ONE, "one")) == ("",)
 
 
 def test_the_file_s_own_flow_is_listed_first(tmp_path: Path) -> None:
@@ -215,7 +241,7 @@ def test_a_name_no_flow_in_the_file_answers_to_says_so(tmp_path: Path) -> None:
 
 
 def test_a_file_that_holds_one_may_still_be_asked_for_by_name(tmp_path: Path) -> None:
-    """`run` is the file's own flow, so a colon on it is a name it does not have."""
+    """The file's own flow has no name of its own, so a colon on it names nothing."""
     where = _written(tmp_path, ONE, "one")
 
     assert drives(where) == ("",)

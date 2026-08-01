@@ -6,10 +6,11 @@ the ones humanize ships, the ones its own repository holds, whatever [flowverses
 have been added, and then this project's own directory and yours -- so a flow of your own may
 stand in for one of humanize's by taking its name.
 
-One file may hold several flows. A file with a `run` in it is one flow, which is what every
-flow was before this; a file that marks its entry points with :func:`flow` holds one apiece,
-each called `<file>:<name>`, so that three phases of one thing live in one file and are three
-things to run.
+A flow is a function marked with :func:`flow`, and nothing else is one. `@flow()` is the flow
+its file holds under the file's own name; `@flow(name="draft")` is one of several a file holds,
+called `<file>:draft` -- so that three phases of one thing live in one file and are three things
+to run. What the function is called is the file's own business: `run`, `main`, `draft_it`, all
+the same to a name that never mentions it.
 """
 
 from __future__ import annotations
@@ -72,9 +73,10 @@ class Flow:
 
     Attributes:
       name: What it is called inside its file, which is the half after the colon. "" for the
-        one a file holds under its own name, which is its `run`.
+        one a file holds under its own name, which is what `@flow()` marks.
       about: One line saying what it does, for whoever is choosing between them. Read off the
-        function's own docstring where the decorator was not told one.
+        function's own docstring where the decorator was not told one, and off the file's
+        where the file is one flow and its function says nothing.
     """
 
     name: str = ""
@@ -100,22 +102,29 @@ def flow[**P, T](
 def flow[**P, T](
     call: Callable[P, T] | None = None, /, *, name: str = "", about: str = ""
 ) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]:
-    """Marks a function as one of the flows its file holds.
+    """Marks a function as a flow. Nothing else is one.
 
-    A file with a `run` in it is one flow and needs none of this. This is for a file that
-    holds several -- three phases of one thing, which are one thing to write and three to run
-    -- and each of them is then called `<file>:<name>`::
+    Written with no name, it is the flow its file holds under the file's own name::
 
-        @flow(about="opens a loose idea into a repo-grounded draft")
-        def gen_idea(agents: Agents, task: str) -> None:
+        @flow
+        def run(agents: tuple[AgentBase], task: str) -> None:
             ...
 
-    is `humanize1:gen-idea`. The name is the function's own with its underscores turned into
-    dashes, which is how these read on a command line, and `name=` says otherwise.
+    is `ralph_loop`, in `ralph_loop.py`. Written with one, it is one of several that file
+    holds, and is called `<file>:<name>`::
+
+        @flow(name="gen-idea", about="opens a loose idea into a repo-grounded draft")
+        def first_pass(agents: Agents, task: str) -> None:
+            ...
+
+    is `humanize1:gen-idea`. What the function is called is the file's own business either
+    way: a name that is written down where a flow is run is a name to keep, and one taken
+    from the function would change under whoever renamed it.
 
     Args:
       call: The function, when the decorator is written with no arguments at all.
-      name: What to call this one, defaulting to the function's own.
+      name: What to call this one among the flows its file holds, or "" for the one the file
+        holds under its own name.
       about: One line saying what it does, defaulting to the first line of its docstring.
 
     Returns:
@@ -125,15 +134,7 @@ def flow[**P, T](
     """
 
     def marks(said: Callable[P, T]) -> Callable[P, T]:
-        called = name or said.__name__.replace("_", "-")
-        setattr(
-            said,
-            _SAID,
-            Flow(
-                name="" if said.__name__ == "run" else called,
-                about=about or _first(said.__doc__),
-            ),
-        )
+        setattr(said, _SAID, Flow(name=name, about=about or _first(said.__doc__)))
         return said
 
     return marks if call is None else marks(call)
@@ -170,10 +171,10 @@ def held(where_: str | os.PathLike[str]) -> list[Flow]:
         happens here.
 
     Returns:
-      One per flow: the file's own `run` first where it has one, and then whatever it marked
-      with :func:`flow`. Nothing at all for a file that is not a flow, or cannot be read --
-      this is asked while a list is being drawn, and a file that will not import is one line
-      of that list rather than the end of it.
+      One per function it marked with :func:`flow`, the one it marked with no name first --
+      which is the flow the file holds under its own name. Nothing at all for a file that
+      marks none, or cannot be read: this is asked while a list is being drawn, and a file
+      that will not import is one line of that list rather than the end of it.
     """
     try:
         inside = loaded(where_)
@@ -189,24 +190,27 @@ def _flows_of(inside: dict[str, Any]) -> list[Flow]:
       inside: What the file defined, by name.
 
     Returns:
-      One per flow: the file's own `run` first where it has one, then whatever it marked with
-      :func:`flow`, in the order it declared them -- which for three phases of one thing is
-      their order. Nothing at all for a file that holds no flow, which a directory of them may
-      well have in it: something the flows beside it import, or the file that sets their tests
-      up.
+      One per function the file marked with :func:`flow`, in the order it declared them --
+      which for three phases of one thing is their order -- and the one it marked with no name
+      first, since that is the one the file is named after and a list that put it third would
+      read as the third thing in the file. Nothing at all for a file that marks nothing, which
+      a directory of flows may well have in it: something the flows beside it import, or the
+      file that sets their tests up. A name declared twice is the first of them: a file that
+      holds two flows of one name is a file to correct, and picking one of them at random is
+      not the way to say so.
     """
     said: list[Flow] = []
-    for name, one in inside.items():
+    for one in inside.values():
         marked = getattr(one, _SAID, None)
-        if isinstance(marked, Flow):
-            said.append(marked)
-        elif name == "run" and callable(one):
-            # The file's own docstring where its `run` has none: a file that is one flow is
-            # documented as that flow, and its first line is what it does.
-            about = _first(getattr(one, "__doc__", "")) or _first(inside.get("__doc__"))
-            said.append(Flow(name="", about=about))
-    # The file's own first, wherever it was declared: it is the one the file is named after,
-    # and a list that put it third would read as the third thing in the file.
+        if not isinstance(marked, Flow) or any(
+            marked.name == already.name for already in said
+        ):
+            continue
+        # The file's own docstring where the flow it holds says nothing: a file that is one
+        # flow is documented as that flow, and its first line is what it does.
+        if not marked.name and not marked.about:
+            marked = Flow(name="", about=_first(inside.get("__doc__")))
+        said.append(marked)
     return [one for one in said if not one.name] + [one for one in said if one.name]
 
 

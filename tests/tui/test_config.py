@@ -37,6 +37,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 FIRST = {"section": "first  ·  how loudly"}
 SECOND = {"section": "second  ·  how far"}
@@ -65,6 +66,7 @@ class Config(BaseModel):
         return self
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> None:
     pass
 '''
@@ -74,6 +76,7 @@ UNGROUPED = '''
 from pydantic import BaseModel, Field
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Config(BaseModel):
@@ -83,6 +86,7 @@ class Config(BaseModel):
     rounds: int = Field(default=3, description="how many times round")
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> None:
     pass
 '''
@@ -90,8 +94,10 @@ def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> No
 #: A flow that takes no setting up at all, which is what most of them are.
 PLAIN = """
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     pass
 """

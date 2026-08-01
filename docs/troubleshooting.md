@@ -46,15 +46,29 @@ that is not a flowverse's, is taken as a path. See [where flows live](flows.md#w
 The name is right and the download has not happened. Open `/flow`, walk to it with the arrows,
 and press `ctrl+r`.
 
-### `nothing in it is called run, and it holds …`
+### `nothing in it is marked @flow(), and it holds …`
 
 The file holds [several flows](flows.md#several-flows-in-one-file) and none of them under its
 own name, so which one is a colon away: `-f official/humanize1:gen-plan`.
 
-### `a flow is a run(agents, task) whose agents are annotated with a tuple of a fixed length`
+### `nothing in it is marked @flow()`
 
-The file has no `run`, or its `agents` parameter is annotated with something that does not say
-how many. `tuple[AgentBase, ...]` is any number, which is no answer.
+Nothing in the file says which of its functions is a flow. A function called `run` is not one
+for being called that — mark it:
+
+```python
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    ...
+```
+
+### `a flow is a function marked @flow() taking (agents, task), whose agents are annotated …`
+
+The `agents` parameter is annotated with something that does not say how many.
+`tuple[AgentBase, ...]` is any number, which is no answer.
 
 ```python
 def run(agents: tuple[AgentBase], task: str) -> None:          # one agent
@@ -62,7 +76,9 @@ def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:  # two
 def run(agents: Agents, task: str) -> None:                     # a NamedTuple of them
 ```
 
-### `run()'s agents cannot be read here (…)`
+(each marked `@flow`, which is what makes it a flow at all.)
+
+### `the flow's agents cannot be read here (…)`
 
 The annotation names something that only exists for a type checker:
 

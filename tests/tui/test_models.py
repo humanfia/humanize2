@@ -40,6 +40,7 @@ HERE = '''
 from typing import NamedTuple
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -48,6 +49,7 @@ class Agents(NamedTuple):
     builder: AgentBase
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     pass
 '''

@@ -123,15 +123,18 @@ class Runner:
         """
 ```
 
-- A flow MUST be a Python file whose entry point is `run(agents: tuple[...], task: str)`, and
-  that tuple MUST be of a fixed length, which is how many agents the flow drives: it is the one
-  thing about a flow a command line running it cannot otherwise know. It MUST be readable where
-  the flow runs rather than only where a type checker looks, since a count nothing can read
-  back is not one a command line can be held to.
-- One file MAY hold several flows, each marked with `hmz.flows.flow` and each addressed as
-  `<flow>:<name>`. Which one was asked for MUST be read before the name is resolved to a file,
-  and a name no flow in the file answers to MUST be reported as a usage error saying which ones
-  it holds -- a file of three asked for by its own name is a colon away from what was meant.
+- A flow MUST be a Python file holding a function marked with `hmz.flows.flow` and taking
+  `(agents: tuple[...], task: str)`. Nothing else MUST be one: which of a file's functions is a
+  flow is the file's to say and not a name to guess at. That tuple MUST be of a fixed length,
+  which is how many agents the flow drives: it is the one thing about a flow a command line
+  running it cannot otherwise know. It MUST be readable where the flow runs rather than only
+  where a type checker looks, since a count nothing can read back is not one a command line can
+  be held to.
+- One file MAY hold several flows: the one marked `@flow` is the flow the file holds under its
+  own name, and each marked `@flow(name=...)` is addressed as `<flow>:<name>`. Which one was
+  asked for MUST be read before the name is resolved to a file, and a name no flow in the file
+  answers to MUST be reported as a usage error saying which ones it holds -- a file of three
+  asked for by its own name is a colon away from what was meant.
 - A `NamedTuple` of agents MUST be accepted in its place, and MUST additionally say what the
   flow calls each of them. `drives` MUST report those names, so that whatever asks for the
   agents asks for them by what they are for rather than by their place in a line; a plain

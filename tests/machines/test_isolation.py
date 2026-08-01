@@ -176,6 +176,7 @@ ISOLATING = f'''
 from typing import Annotated, NamedTuple
 
 from hmz.agents import AgentBase, Isolated
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -184,6 +185,7 @@ class Agents(NamedTuple):
     tester: Annotated[AgentBase, Isolated("{IMAGE}")]
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     agents.tester("hostname > stamp.txt; cat /etc/os-release > which.txt")
 '''

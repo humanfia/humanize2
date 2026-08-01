@@ -60,15 +60,19 @@ def inside(named_: str) -> str: ...
 def about(named_: str) -> str: ...
 ```
 
-- One file MAY hold several flows. A file with a `run` in it MUST be one flow under the file's
-  own name, which is what every flow was; a function marked with `flow` MUST be one of its own,
-  called `<file>:<name>`, so that three phases of one thing are one thing to write and three to
-  run -- each asking only for the agents it drives and only for the settings it takes.
+- A flow MUST be a function marked with `flow`, and nothing else MUST be one: a file is read by
+  running it, and which of the functions it leaves behind is a flow is the file's to say rather
+  than something to read off a name. One file MAY hold several: `flow` with no name MUST be the
+  flow that file holds under its own name, and `flow(name=...)` MUST be one of its own, called
+  `<file>:<name>` -- so that three phases of one thing are one thing to write and three to run,
+  each asking only for the agents it drives and only for the settings it takes.
 - `flow` MUST mark rather than wrap. A flow is called the way it always was, and a decorator
   between the flow and whatever reads its arguments would be a decorator that has to answer for
   them. What it marks with MUST travel on the function, since a file is read by running it.
-- A name MUST default to the function's own with its underscores turned into dashes, which is
-  how these read on a command line, and `name=` MUST say otherwise.
+- A name MUST be what the mark was told and nothing else: a name written down where a flow is
+  run -- a command line, a settings file, another flow asking for this one -- MUST NOT change
+  under whoever renames the function. A file that marks two flows with one name MUST answer
+  with the first of them, that being a file to correct rather than a choice to make at random.
 - What a flow says about itself MUST be the first line of its docstring where the decorator was
   not told one, and for a file that is one flow MUST fall back to the file's own docstring: a
   file that is one flow is documented as that flow.

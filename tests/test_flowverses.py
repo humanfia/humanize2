@@ -24,8 +24,10 @@ if TYPE_CHECKING:
 FLOW = '''"""A flow of somebody else's."""
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     agent.new()(task)

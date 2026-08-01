@@ -117,7 +117,7 @@ partway into a loop with a turn's work already behind it:
 
 ```console
 $ hmz exec -f official/rlar -a claude/claude-opus-4-8:high "fix the build"
-hmz exec: error: /.../rlar.py: run() drives 2 agents, 1 given
+hmz exec: error: /.../rlar.py: the flow drives 2 agents, 1 given
 ```
 
 Whatever else a flow does as it is imported is the flow's own, and fails as it would anywhere.

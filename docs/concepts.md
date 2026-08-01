@@ -113,10 +113,11 @@ A turn is the unit that:
 
 ## Flow
 
-**A Python file with a `run(agents, task)` in it.** It is the loop: what each agent is asked,
-in what order, and when to stop.
+**A Python file with a function marked `@flow` in it, taking the agents and the task.** It is
+the loop: what each agent is asked, in what order, and when to stop.
 
 ```python
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     while True:
@@ -131,12 +132,12 @@ has to be able to do, and an `Annotated[AgentBase, Remote]` or `Annotated[AgentB
 says where it may work. All of it is checked at the same moment.
 
 A flow is ordinary Python and may branch any way it likes. Nothing asks it what it is doing;
-what a run looks like is read off the turns going past. `run` may be `async def`, which is how
-a flow drives [many turns at once](flows.md#a-flow-that-waits-for-more-than-one-thing);
-starting one is the same either way.
+what a run looks like is read off the turns going past. It may be `async def`, which is how a
+flow drives [many turns at once](flows.md#a-flow-that-waits-for-more-than-one-thing); starting
+one is the same either way.
 
-One file may hold several: `run` is the flow it holds under its own name, and each function
-marked with `@flow` is another, run as `<flow>:<name>`. Three phases of one thing are then one
+One file may hold several: `@flow` is the flow it holds under its own name, and each
+`@flow(name="…")` is another, run as `<flow>:<name>`. Three phases of one thing are then one
 thing to write and three to run, each asking only for the agents it drives.
 
 See [Flows](flows.md).

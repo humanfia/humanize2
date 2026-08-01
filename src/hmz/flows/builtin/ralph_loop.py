@@ -6,8 +6,10 @@ hmz exec -f ralph_loop -a claude/MODEL:high "$(cat TASK.md)"
 import time
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     while True:

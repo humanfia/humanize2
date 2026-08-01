@@ -35,8 +35,10 @@ if TYPE_CHECKING:
 FLOW = '''"""Somebody else's loop, fetched from somewhere else."""
 
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     agent.new()(task)
@@ -335,12 +337,12 @@ class Wide(BaseModel):
     n: int = 6
 
 
-@flow
+@flow(name="gen-idea")
 def gen_idea(agents: Drafting, task: str, config: Wide | None = None) -> None:
     """Opens a loose idea into a draft."""
 
 
-@flow
+@flow(name="rlcr")
 def rlcr(agents: Building, task: str) -> None:
     """Builds it, under review."""
 '''

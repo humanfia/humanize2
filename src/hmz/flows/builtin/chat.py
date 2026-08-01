@@ -15,6 +15,7 @@ at a prompt, they answer with nothing and the flow does the one thing it was giv
 from typing import NamedTuple
 
 from hmz.agents import AgentBase, HumanAgent
+from hmz.flows import flow
 
 
 class Chat(NamedTuple):
@@ -24,6 +25,7 @@ class Chat(NamedTuple):
     human: HumanAgent
 
 
+@flow
 def run(agents: Chat, task: str) -> None:
     # One session, so the turns are a conversation rather than a series of first turns.
     conversation = agents.assistant.new()

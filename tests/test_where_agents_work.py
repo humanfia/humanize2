@@ -28,6 +28,7 @@ DECLARED = '''
 from typing import Annotated, NamedTuple
 
 from hmz.agents import AgentBase, Isolated, Remote
+from hmz.flows import flow
 
 
 class Agents(NamedTuple):
@@ -38,6 +39,7 @@ class Agents(NamedTuple):
     reviewer: AgentBase
 
 
+@flow
 def run(agents: Agents, task: str) -> None:
     pass
 '''
@@ -45,8 +47,10 @@ def run(agents: Agents, task: str) -> None:
 #: A flow that says nothing about where its one agent works, which is most flows.
 PLAIN = """
 from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
+@flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     pass
 """
