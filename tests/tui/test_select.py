@@ -301,6 +301,23 @@ async def test_a_spacer_between_two_groups_of_choices_takes_only_itself() -> Non
         assert taken[1:]  # and the row under it, which the drag ended on
 
 
+async def test_clicking_twice_on_a_row_of_a_list_takes_the_word_under_it() -> None:
+    """Under it: a list is drawn a couple of columns in, and a word is where it looks."""
+    app = Humanize()
+    async with app.run_test(size=(80, 24)) as driver:
+        offers = app.query_one("#offers", Choices)
+        offers.add_options([Option("alpha beta gamma"), Option("second choice")])
+        offers.add_class("offering")
+        await driver.pause()
+
+        # Column eight of the widget is column six of the row, which is `beta`.
+        await driver.click("#offers", offset=(8, 0), times=2)
+        await driver.pause()
+
+        assert app.screen.get_selected_text() == "beta"
+        assert app._clipboard == "beta"
+
+
 async def test_a_list_that_can_be_selected_is_still_a_list_that_is_picked_from() -> (
     None
 ):

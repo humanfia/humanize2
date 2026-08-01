@@ -231,7 +231,9 @@ class Transcript(ScrollView, can_focus=False):
             row.line,
             _wanted(
                 self._lines[row.line],
-                _under(row.strip, self.scroll_offset.x + event.x),
+                # Less the room drawn round it, since a click is where it landed on the
+                # widget and a row begins where the widget's own padding ends.
+                _under(row.strip, self.scroll_offset.x + event.x - self.gutter.left),
                 event.chain,
             ),
         )
@@ -411,9 +413,10 @@ class Choices(OptionList):
         if begins is None:
             return  # a row with nothing on it: a spacer between two groups of options
         line = begins[1]
-        _took(
-            self, line, _wanted(self._text[line], _under(strip, event.x), event.chain)
-        )
+        # Less the room drawn round it: a list is indented by its own padding, and a click is
+        # where it landed on the widget rather than where the row it landed on begins.
+        at = _under(strip, event.x - self.gutter.left)
+        _took(self, line, _wanted(self._text[line], at, event.chain))
 
     def render_lines(self, crop: Region) -> list[Strip]:
         """Counts the lines the options come to, then draws as the list itself draws.
