@@ -205,6 +205,10 @@ class AgentBase(ABC):
   it was given and returns. It MUST raise `Stopped` for an agent stopped while it waited: a
   run ended by hand is written down as ended by hand, and answering with nothing would write
   it down as one that finished.
+- Whatever is watching an agent MUST be told which of its conversations said a thing, and MUST
+  be told None only for something the agent said rather than one of them -- a question put by a
+  server that serves every session of it at once. An agent may be holding ten conversations, and
+  a watcher that cannot tell them apart is one reading ten interleaved with nowhere to answer.
 - `opened` MUST report the backend's id for every session this agent has opened, oldest first,
   including the sessions nobody holds any more. It is what a flow hands a trace to say which
   trajectories were this agent's.

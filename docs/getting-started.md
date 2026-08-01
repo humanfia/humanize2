@@ -109,7 +109,7 @@ highlighted. The full list is in the [TUI reference](tui.md).
 Talking to one agent is not the shape of most work. A **flow** is what you reach for once it
 is not: a Python file that drives one or more agents in a loop.
 
-Press **shift+tab** to step to the next flow, or type `/flow` to pick one by name. Try
+Type `/flow` to pick one by name. Try
 `ralph_loop` — a fresh session every turn, so the agent starts from the task and the repository
 each time with nothing of the last turn in context:
 

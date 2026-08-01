@@ -674,7 +674,7 @@ class SessionBase(ABC):
         submitted = self._fire(Moment.USER_PROMPT_SUBMIT, prompt=prompt)
         if submitted.adds:
             prompt = f"{prompt}\n\n{submitted.adds}"
-        self._agent._heard(Event(kind="begins", text=prompt))
+        self._heard(Event(kind="begins", text=prompt))
         try:
             if submitted.refused:
                 # The turn does not run, and what the hook said instead is what it answers
@@ -714,7 +714,7 @@ class SessionBase(ABC):
                     return
                 prompt, again = stopping.because, again + 1
         finally:
-            self._agent._heard(Event(kind="ends", text=""))
+            self._heard(Event(kind="ends", text=""))
 
     def _shaped_ask(self, prompt: str, schema: type[BaseModel] | None) -> str:
         """The prompt as the backend is to be given it, shape and all.
@@ -737,13 +737,18 @@ class SessionBase(ABC):
     def _heard(self, event: Event) -> Event:
         """Tells whoever is watching the agent what was said, and answers with it.
 
+        Said as this conversation's rather than as the agent's: an agent may be holding ten
+        at once, and whoever is watching has to be able to tell which of them said a thing --
+        to show one conversation rather than ten interleaved, and to say the next thing back
+        to the one it is reading.
+
         Args:
           event: What was said.
 
         Returns:
           The same event, so that saying it and passing it on is one line.
         """
-        self._agent._heard(event)
+        self._agent._heard(event, self)
         return event
 
     def _fire(
@@ -1598,7 +1603,9 @@ class AgentBase(ABC):
         self._sessions: dict[int, weakref.ref[SessionBase]] = {}
         self._holds = 0  # what the next session is filed under
         self._opened: list[str] = []
-        self._watchers: list[Callable[[AgentBase, Event], None]] = []
+        self._watchers: list[
+            Callable[[AgentBase, SessionBase | None, Event], None]
+        ] = []
         #: What is hung on this agent's moments, which a flow adds to and takes from while
         #: the agent is running: the hooks are the flow's own callables rather than a table
         #: the backend read out of a settings file before anything started.
@@ -1943,11 +1950,15 @@ class AgentBase(ABC):
         for session in self.sessions:
             session.close()
 
-    def watch(self, listener: Callable[[AgentBase, Event], None]) -> None:
+    def watch(
+        self, listener: Callable[[AgentBase, SessionBase | None, Event], None]
+    ) -> None:
         """Has everything this agent's turns say reach `listener` as they say it.
 
         Args:
-          listener: What to tell, as this agent and the thing said.
+          listener: What to tell, as this agent, the conversation that said it, and the thing
+            said. The conversation is None for something the agent said rather than one of
+            them -- a question put by a server that serves every session of it at once.
         """
         with self._holding:
             self._watchers.append(listener)
@@ -1991,7 +2002,7 @@ class AgentBase(ABC):
         with self._holding:
             self._opened.append(session)
 
-    def _heard(self, event: Event) -> None:
+    def _heard(self, event: Event, session: SessionBase | None = None) -> None:
         """Tells everyone watching what a turn of this agent just said.
 
         A watcher that raises is a watcher's own problem: a flow must not fail because
@@ -2001,6 +2012,8 @@ class AgentBase(ABC):
 
         Args:
           event: What was said.
+          session: Which conversation said it, or None for something the agent said rather
+            than one of them.
         """
         if not self._watchers:
             return
@@ -2008,7 +2021,7 @@ class AgentBase(ABC):
             watching = tuple(self._watchers)
         for listener in watching:
             with contextlib.suppress(Exception):
-                listener(self, event)
+                listener(self, session, event)
 
     def asked(self, question: Question) -> str | None:
         """Puts something a turn stopped to ask to whoever is driving this agent.

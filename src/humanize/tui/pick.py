@@ -51,7 +51,7 @@ from .discover import machines
 from .monitor import short, thousands
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Sequence
 
     from pydantic import BaseModel
     from pydantic.fields import FieldInfo
@@ -69,6 +69,7 @@ __all__ = [
     "Configures",
     "Doing",
     "Flows",
+    "Held",
     "Models",
     "Picks",
     "Providers",
@@ -207,15 +208,68 @@ _FIELD = 18
 _LIVE = 0.5
 
 
-def reads(named: tuple[str, ...], runs: list[Runs]) -> list[str]:
-    """One line per agent a flow drives: what it is called, what it runs, and where.
+class Held(NamedTuple):
+    """What one agent of a running flow is holding: its conversations, and which is read.
+
+    Attributes:
+      many: How many conversations it has open, which is none for an agent that has opened
+        none and for every agent of a flow that is not running.
+      at: Which of them is being read, counting from zero, or None for an agent none of
+        whose conversations is.
+      unread: Whether one it holds that is not being read has said something since it was
+        last looked at.
+      working: Whether any of its conversations has a turn open. Which is the first thing
+        somebody looks for with several agents going at once -- who is thinking and who has
+        stopped -- and the only one of these that changes by itself.
+    """
+
+    many: int = 0
+    at: int | None = None
+    unread: bool = False
+    working: bool = False
+
+
+#: What says an agent is working and what says it is not. A filled circle and a hollow one:
+#: the same two marks the sheets use for what is in force and what is not, and the one thing
+#: on this line that moves on its own.
+_WORKING, _IDLE = "●", "○"
+
+
+def _holds(held: Held) -> str:
+    """What one agent's conversations say about themselves beside what it runs.
+
+    Args:
+      held: What it is holding.
+
+    Returns:
+      Whether it is working, then `2 of 5` for the agent holding the one being read -- which
+      of them it is being the half worth knowing -- or the count alone for the others, and
+      `unread` after it where one of those has said something since it was last looked at.
+      Nothing at all for an agent holding none, which is every agent of a flow that is not
+      running.
+    """
+    if not held.many:
+        return ""
+    reading = f"{held.at + 1} of {held.many}" if held.at is not None else f"{held.many}"
+    said = f"{_WORKING} {reading}" if held.working else f"{_IDLE} {reading}"
+    return f"{said}{_DOT}unread" if held.unread else said
+
+
+def reads(
+    named: tuple[str, ...], runs: list[Runs], holding: Sequence[Held] = ()
+) -> list[str]:
+    """One line per agent a flow drives: what it runs, where, and what it is holding.
 
     In one place because it is read in two -- above the prompt while a flow runs, and on
-    `/status` -- and an agent that read as two different things in them would be two.
+    `/status` -- and an agent that read as two different things in them would be two. What it
+    is holding is only asked for above the prompt, that being where a conversation is read
+    and said to; `/status` asks for the same line without it, and it says nothing there.
 
     Args:
       named: What the flow calls each of them, "" apiece where it names none.
       runs: What each of them runs, and where its turns land.
+      holding: The conversations each of them has open, in the same order, or nothing at all
+        for a flow that is not running -- which holds none.
 
     Returns:
       One line apiece, in the order the flow takes them.
@@ -233,6 +287,7 @@ def reads(named: tuple[str, ...], runs: list[Runs]) -> list[str]:
                 # this machine is signed in as.
                 one.permission,
                 one.provider,
+                _holds(holding[at]) if at < len(holding) else "",
             )
             if part
         )

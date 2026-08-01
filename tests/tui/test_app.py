@@ -451,14 +451,13 @@ async def test_what_is_running_is_not_swapped_underneath_itself(
         )
 
         app.action_agents()
-        app.action_cycle_flow()
         await driver.press(*"/flow")
         await driver.press("enter")
         await driver.pause()
 
-        assert app._flow_named == "flow.py"  # none of the three got anywhere
+        assert app._flow_named == "flow.py"  # neither of the two got anywhere
         assert app._models == [Runs("claude/m:high")]
-        assert _transcript(app).count("while a flow is running") == 3
+        assert _transcript(app).count("while a flow is running") == 2
         # And `/status` is not one of them: it is read, so there is nothing to conflict with.
         app.action_status()
         await driver.pause()
@@ -586,7 +585,7 @@ async def test_a_turn_that_has_gone_quiet_still_reads_as_one_that_is_running() -
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"), name="one")
     app = Humanize()
     async with app.run_test() as driver:
-        app._heard(agent, Event(kind="begins", text="do it"))
+        app._heard(agent, agent.new(), Event(kind="begins", text="do it"))
         app._began["one"] = time.monotonic() - 42  # a turn that started a while ago
         app._draw()
         await driver.pause()
@@ -1053,15 +1052,17 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
     app = Humanize()
     async with app.run_test() as driver:
         agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+        app._agents = [agent]  # so the conversation it opens is one there is to read
+        session = agent.new()
         app._said_by_you("do the thing")
 
         # From a thread of its own, as a turn always says things: `_heard` hands them to the
         # event loop, which it may only do from somewhere that is not the event loop.
         def turn() -> None:
-            app._heard(agent, Event(kind="begins", text=""))
-            app._heard(agent, Event(kind="tool", text="Bash git status"))
-            app._heard(agent, Event(kind="text", text="one\ntwo"))
-            app._heard(agent, Event(kind="ends", text=""))
+            app._heard(agent, session, Event(kind="begins", text=""))
+            app._heard(agent, session, Event(kind="tool", text="Bash git status"))
+            app._heard(agent, session, Event(kind="text", text="one\ntwo"))
+            app._heard(agent, session, Event(kind="ends", text=""))
 
         await asyncio.to_thread(turn)
         await until(lambda: "Worked for" in _transcript(app), driver)
@@ -1181,10 +1182,12 @@ async def test_the_arrows_turn_to_the_next_cli_and_the_one_before(
         await driver.press("left")  # and back the other way
         await driver.pause()
         assert "[b $primary]codex" in str(sheet.query_one("#tabs", Label).content)
-        # And the interface's own shift+tab is still not a thing to do from under a sheet.
+        # And the interface's own tab and shift+tab are not things to do from under a sheet:
+        # a sheet is open in order to be answered, so both keys are its own while it is there.
         await driver.press("shift+tab")
         await driver.pause()
         assert app._flow_named == flow
+        assert isinstance(app.screen, RunsAs)
 
         await driver.press("enter")  # as this machine is signed in, on codex
         await until(lambda: isinstance(app.screen, Models), driver)
@@ -1416,32 +1419,6 @@ async def test_the_cursor_can_be_seen_in_the_lists_that_are_chosen_from() -> Non
 
 
 @pytest.mark.timeout(60)
-async def test_shift_tab_steps_through_the_flows_without_asking() -> None:
-    """A short list is stepped through, not opened: `/flow` is there for picking by name."""
-    from humanize.flows import found
-
-    named = [name for _, name in found()]
-    with unittest.mock.patch(
-        "humanize.tui.app.installed",
-        return_value={"claude": (Model("claude-opus-5", ("high",)),)},
-    ):
-        app = Humanize()
-        async with app.run_test() as driver:
-            await driver.pause()
-            assert app._flow_named == named[0]
-
-            await driver.press("shift+tab")
-            await until(lambda: app._flow_named == named[1], driver)
-            assert not isinstance(app.screen, Flows)  # nothing was opened to do it
-            assert app._models  # and it is still something you can say a thing to
-
-            for _ in range(len(named) - 1):
-                await driver.press("shift+tab")
-                await driver.pause()
-            assert app._flow_named == named[0]  # round again
-
-
-@pytest.mark.timeout(60)
 async def test_a_switch_takes_on_and_off_as_well_as_being_flipped() -> None:
     """A toggle is what you reach for; `on` is what you write down and replay."""
     app = Humanize()
@@ -1589,12 +1566,11 @@ async def test_the_box_at_the_top_says_what_this_is_and_not_what_is_set_up(
             _where() not in opened
         )  # where it works is on the status line, and only there
 
-        # And stepping to another flow leaves the box alone, there being nothing in it to
-        # correct. What is set up is on the two lines round the editor: the agents above it,
-        # the flow on the status line under it.
-        was = app._flow_named
-        await driver.press("shift+tab")
-        await until(lambda: app._flow_named != was, driver)
+        # And another flow leaves the box alone, there being nothing in it to correct. What
+        # is set up is on the two lines round the editor: the agents above it, the flow on
+        # the status line under it.
+        app._flow_named = "ralph_loop"
+        app._draw()
         await driver.pause()
 
         assert _transcript(app) == opened

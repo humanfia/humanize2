@@ -11,6 +11,7 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 - [The screen](#the-screen)
 - [Keys](#keys)
 - [Commands](#commands)
+- [Reading one conversation](#reading-one-conversation)
 - [Talking to a running flow](#talking-to-a-running-flow)
 - [Questions, and being away](#questions-and-being-away)
 - [Completion](#completion)
@@ -30,15 +31,15 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  the transcript: what each agent said, one turn after another        │
+│  the transcript: one conversation, a turn after another              │
 │                                                                      │
 ├──────────────────────────────────────────────────────────────────────┤
-│                       builder · claude/claude-opus-4-8:high          │  ← what each agent runs
-│                       reviewer · codex/gpt-5.6-sol:high              │
+│              builder · claude/claude-opus-4-8:high · 2 of 5          │  ← what each agent runs
+│              reviewer · codex/gpt-5.6-sol:high · 3 · unread          │
 │                       48.2k tokens · 91/s                            │
 │ ❯ type here                                                          │  ← the editor
 ├──────────────────────────────────────────────────────────────────────┤
-│ ⠋ builder… (73s · esc to interrupt)      enter say · / commands · …  │  ← the status line
+│ ⠋ builder… (73s · esc to interrupt)      enter say · tab agent · …  │  ← the status line
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -47,10 +48,15 @@ two lines on how to begin. Nothing about what is set up to run or where it would
 transcript is a record, so a copy of either up there could only ever be the copy that was true
 when you opened it. Both are on the lines round the editor, which are redrawn.
 
+**The transcript** is one conversation, not every agent's at once. Which one, and how to move
+between them, is [below](#reading-one-conversation).
+
 **Above the editor**, one line per agent the flow drives: the name the flow calls it, then what
-it runs as `cli/model:effort`, then the machine its turns land on where that is not this one, and
-the [account](#which-cli-and-which-account) it runs as where that is not this machine's own.
-Under them, what the run has cost so far and the rate it is
+it runs as `cli/model:effort`, then the machine its turns land on where that is not this one, the
+[account](#which-cli-and-which-account) it runs as where that is not this machine's own, and
+finally the conversations it has open — `2 of 5` on the agent holding the one you are reading,
+the count alone on the others, and `unread` against one holding a conversation that has said
+something since you last looked at it. Under them, what the run has cost so far and the rate it is
 costing it at — per model, since two agents at one model are one bill, and over a recent window
 only, so a flow that has stopped reads as stopped.
 
@@ -71,16 +77,18 @@ nowhere else to look them up.
 | --- | --- |
 | **enter** | Sends what is typed. Over an open [offers list](#completion), takes what is highlighted instead. |
 | **ctrl+j** | Breaks the line, which is what enter would do anywhere else. |
-| **shift+tab** | Steps to the next flow, carrying over what each agent runs. Refused while a flow is running, and not the interface's while a sheet is open — there it turns the sheet's [tabs](#which-cli-and-which-account) back. |
 | **esc** | Stops the flow — the whole flow, not just the turn. Dismisses the offers list first, if one is open. Silent when nothing is running. |
 | **ctrl+c** | Takes back the nearest thing there is to take back: what is half-typed if anything is, the flow if not. Twice in a row leaves. |
 | **↑ / ↓** | Walks what was typed here before — but only off the first and last line, so a prompt of several lines is still moved around in. Over an open offers list, moves within the list. |
-| **tab** | Takes the highlighted offer. The offers' alone; it does nothing when none are showing. |
+| **tab** | [Steps to the next agent that is working](#reading-one-conversation) and reads its conversation. Over an open offers list, takes the highlighted offer instead. |
+| **shift+tab** | Steps to the one before it. |
 
 Leaving is always two presses and never one, whatever was going on. The second ctrl+c has to
 land within two seconds of the first to count as the same one.
 
-Focus cannot leave the editor. There is nowhere else for it to go.
+Focus cannot leave the editor. There is nowhere else for it to go — which is why tab and
+shift+tab are free to read the conversations. While a sheet is up over the interface they are
+the sheet's, and while the offers list is open tab is its.
 
 ## Commands
 
@@ -96,8 +104,8 @@ list appears under the editor with a line about each.
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
-| `/clear` | | Clears the screen, and nothing else. What is running is left running. |
-| `/export` | | Writes the transcript to `.humanize/<datetime>.session.md`. |
+| `/clear` | | Clears the screen, and nothing else: the conversation being read, not the others, and nothing that is running. |
+| `/export` | | Writes what is on the screen — the conversation being read — to `.humanize/<datetime>.session.md`. |
 | `/exit` | | Leaves. |
 
 `/details` and `/afk` flip when given nothing, and take `on` or `off` when you want to say
@@ -105,6 +113,51 @@ which.
 
 **`hmz collect` and `hmz anchor` are deliberately not here.** Neither is a thing to do to a
 flow that is running, and a command that only ever means one thing is a command line.
+
+## Reading one conversation
+
+A flow drives several agents, and each of them holds as many conversations as it likes — a
+Ralph loop opens one a turn, a fan-out holds one per worktree. All of them written down the
+same screen is none of them readable, so **the transcript is one conversation**, and **tab**
+and **shift+tab** step to the next agent and the one before, wrapping at either end.
+
+**They step between the ones that are working.** With ten agents going, what you are stepping
+between is the ones thinking right now, not the ones that have stopped. A conversation between
+its turns is still read once you are on it — what you are reading is left where it is until you
+press one of these — but it is not stepped onto, and with nothing working at all both keys do
+nothing.
+
+The conversation you are reading is the one:
+
+- the transcript shows — moving to another draws it again from what it has said;
+- a line you type goes into;
+- the line above the prompt marks as `2 of 5`, against the agent holding it.
+
+That line also says **which agents are working**: `●` for one with a turn open, `○` for one
+that has stopped. It is the first thing to look for with several going at once, and the only
+thing on that line that changes by itself:
+
+```
+   builder · claude/claude-opus-5:max · ● 2 of 5
+   reviewer · codex/gpt-5.6-sol:high · ○ 1 · unread
+```
+
+An agent holding a conversation that has said something since you last looked at it is marked
+`unread` there, so a flow of ten conversations is not nine nobody knows to look at.
+
+You start out reading the first conversation the flow opens, so a flow that only drives one
+agent needs none of this. With no flow running there is nothing to read and both keys do
+nothing. A flow that talks to you is talking to you here, so the conversation with the person
+is not one of the ones these keys move between.
+
+**What is being read is held by the conversation itself**, not by where it comes in the list.
+The list churns — a Ralph loop drops one every turn — and when the one you were reading goes,
+the newest of that agent's is read instead, since a loop that dropped one has already opened
+the next. Where that agent has none left, whatever is nearest to where it was.
+
+What is kept is bounded, a flow being a thing that runs for days: the last eight conversations,
+and the last two thousand lines of each. Older lines and older conversations are gone from the
+screen, not from the [trace](tracing.md) — that is what a trace is for.
 
 ## Talking to a running flow
 
@@ -153,8 +206,11 @@ lines` for one message too long to show whole. Only what is drawn is cut; the wh
 you typed is what goes. A flow that ends, however it ends, drops whatever is still pinned into
 the transcript and says it was never sent.
 
-A line reaches the agent that has a turn open, not whichever was named last: an agent between turns
-may still be holding a session that would take it silently.
+A line reaches [the conversation you are reading](#reading-one-conversation), and only while a
+turn of it is open. Not whichever agent happens to be working: an agent may be holding one
+conversation you are reading and taking a turn in another, and a line said to the wrong one is
+a line said to somebody else. A conversation between turns would answer it on its own, outside
+the flow, so it waits for the turn that starts next instead.
 
 How far "into the turn" it gets depends on the backend:
 

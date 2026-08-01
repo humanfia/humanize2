@@ -262,12 +262,17 @@ A watcher sees three more that a stream does not: `begins` and `ends`, which bra
 and `asks`, which is the agent stopping to ask its user something.
 
 ```python
-def looking(agent, event):
+def looking(agent, session, event):
     if event.kind in ("begins", "ends"):
-        print(f"--- {agent.id} {event.kind}")
+        print(f"--- {agent.id} {session and session.named} {event.kind}")
 
 agent.watch(looking)
 ```
+
+The **session** is which of that agent's conversations said it — an agent may be holding ten at
+once, so a watcher that could not tell them apart would be reading ten interleaved and would
+have nowhere to say the next thing back to. It is `None` only for something the agent said
+rather than one of them: a question put by a server that serves every session of it at once.
 
 A watcher that raises is the watcher's own problem: a flow must not fail because something
 looking at it did.
@@ -844,7 +849,7 @@ class AgentBase:
 
     def rename(name: str) -> None
     def stop() -> None
-    def watch(listener: Callable[[AgentBase, Event], None]) -> None
+    def watch(listener: Callable[[AgentBase, SessionBase | None, Event], None]) -> None
     def asked(question: Question) -> str | None
     def prompted() -> str | None
 

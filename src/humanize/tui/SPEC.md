@@ -42,7 +42,7 @@ line, with what the flow is doing beside the transcript.
   colours the terminal already has a setting for, or a reversal of what is already there. A
   colour of its own would be a guess about the background it lands on.
 - The editor MUST mean both things at once: a line beginning with `/` is a command, and any
-  other line is said to the agent working right now, through `SessionBase.interject`, so that
+  other line is said to the conversation being read, through `SessionBase.interject`, so that
   a turn already under way takes it into account rather than being restarted with it.
 - Enter MUST send and `ctrl+j` MUST break the line, so that a long prompt can be written.
 - A half-typed line MUST be offered what it could be finished with, in a list under the
@@ -51,8 +51,32 @@ line, with what the flow is doing beside the transcript.
   still stand once the cursor is back in the middle of it.
 - Keys the offers are using MUST be theirs only while there are offers: a prompt of more than
   one line needs its arrows back, and focus MUST NOT be able to leave the editor.
-- A typed line MUST reach the agent that has a turn open, not whichever was named last: an
-  agent between turns may still be holding a session that would take it silently.
+- The transcript MUST be one conversation rather than every agent's at once: a flow drives
+  several agents and an agent holds several sessions, and all of them interleaved is none of
+  them readable. What each session says MUST be kept against that session, the transcript
+  MUST show the one being read, and attaching to another MUST draw it again from what was
+  kept. What is kept MUST be bounded -- a flow runs for days and a Ralph loop opens a session
+  a turn -- by keeping the last few sessions and the last few lines of each.
+- tab and shift+tab MUST step to the next and the previous session that is *working*,
+  wrapping, and MUST do nothing at all where none is. The ones working rather than every one
+  the flow holds: with ten agents going, what somebody is stepping between is the ones
+  thinking. A session read already MUST be left where it is when its turn ends -- it is being
+  read -- but MUST NOT be stepped onto again until it is working. What is read MUST be held by
+  identity rather than by where it comes among them, since a flow opens and drops them as it
+  runs: when the one being read goes, the newest of that agent's MUST be read instead, and
+  the nearest that is still there where that agent has none.
+- Which session is being read MUST be visible, beside how many that agent holds, and a
+  session that is not being read and has said something since it was last looked at MUST be
+  marked as having something unread. Otherwise a flow of ten conversations is nine nobody
+  knows to look at.
+- Whether each agent is working MUST be visible on that same line. It is the first thing
+  looked for with several going at once -- who is thinking and who has stopped -- and the one
+  thing there that changes without anybody touching it.
+- A typed line MUST reach the session being read, not whichever agent has a turn open: an
+  agent holding two sessions is working in one of them, and a line said to the other is a
+  line said to the wrong conversation. It MUST reach it only while a turn of that session is
+  open -- one between turns would answer it on its own, outside the flow -- and MUST wait for
+  the turn that starts next otherwise.
 - The accounts an agent may be run as MUST be reachable from here as well as from a command
   line: an account outlives the flow that was set up with it, and the one place a person is
   asked anything is the one place a credential can be typed. It is the one thing said in both
@@ -66,19 +90,21 @@ line, with what the flow is doing beside the transcript.
   -- how much of the working to show -- and were two switches for no reason.
 - An agent that stops to ask MUST be able to reach whoever is at the prompt: the question and
   what it offers MUST be shown, and the next line typed MUST be the answer rather than a word
-  put into the turn. `/afk` MUST toggle whether it may ask at all, and asking MUST start
-  allowed, so that an agent that really needs a person gets one unless it has been said that
-  none is there. A question still up when the flow ends or is stopped MUST end with it, so
-  that stopping a flow is never blocked on one.
+  put into the turn. It MUST be shown against whichever of that agent's sessions is working,
+  and against the one being read where none of them is: the server that puts a question speaks
+  for every session of its agent and so names none, and a question shown nowhere is a turn
+  waiting on an answer nobody was asked for. `/afk` MUST toggle whether it may ask at all, and
+  asking MUST start allowed, so that an agent that really needs a person gets one unless it has
+  been said that none is there. A question still up when the flow ends or is stopped MUST end
+  with it, so that stopping a flow is never blocked on one.
 - `ctrl+c` MUST take back the nearest thing there is to take back: what is half-typed if
   anything is, and the flow if not. Two of them in a row MUST leave, so that leaving is always
   two presses and never one.
 - A line that cannot be carried out MUST be shown and MUST leave the interface up. Only
   `/exit` and two `ctrl+c` close it.
 - A key of the interface's own MUST NOT fire while a sheet is up over it: a sheet is open in
-  order to be answered, and the one that asks what each agent runs is asking about the flow
-  that stepping to the next flow would step off. The key MUST reach the sheet instead, rather
-  than being swallowed by the interface and doing nothing.
+  order to be answered, and reading another conversation is not an answer to it. The key MUST
+  reach the sheet instead, rather than being swallowed by the interface and doing nothing.
 
 ## `pick.py`
 

@@ -24,6 +24,7 @@ from humanize.agents import (
     AgentConfig,
     Event,
     Meter,
+    Question,
     SessionBase,
     Stopped,
     Usage,
@@ -153,11 +154,15 @@ class _Landed:
             self.count += 1
 
 
-def _watched(said: list[Event]) -> Callable[[AgentBase, Event], None]:
+def _watched(
+    said: list[Event], whose: list[SessionBase | None] | None = None
+) -> Callable[[AgentBase, SessionBase | None, Event], None]:
     """A watcher that keeps everything a turn of the agent said, whichever thread said it."""
 
-    def heard(_agent: AgentBase, event: Event) -> None:
+    def heard(_agent: AgentBase, session: SessionBase | None, event: Event) -> None:
         said.append(event)
+        if whose is not None:
+            whose.append(session)
 
     return heard
 
@@ -565,6 +570,37 @@ def test_what_an_agent_opened_is_every_session_whichever_thread_opened_it() -> N
     # the agent lost one of them.
     assert sum(event.kind == "begins" for event in watching) == 2_000
     assert sum(event.kind == "ends" for event in watching) == 2_000
+
+
+def test_what_is_watching_is_told_which_conversation_said_it() -> None:
+    """An agent may be holding ten at once, and a watcher has to be able to tell them apart.
+
+    To show one conversation rather than ten interleaved, and to have somewhere to say the
+    next thing back to -- which is what attaching to one of them is.
+    """
+    agent = _InProcessAgent(answers=_answered)
+    said: list[Event] = []
+    whose: list[SessionBase | None] = []
+    agent.watch(_watched(said, whose))
+    one, two = agent.new(), agent.new()
+
+    one("first")
+
+    # Every event of a turn is that conversation's, the two that bracket it included.
+    assert [event.kind for event in said] == ["begins", "result", "ends"]
+    assert set(whose) == {one}
+
+    said.clear()
+    whose.clear()
+    two("second")
+    assert set(whose) == {two}
+
+    # And what the agent says rather than one of them says so, by naming none.
+    said.clear()
+    whose.clear()
+    agent.asked(Question(text="Which way?"))
+    assert [event.kind for event in said] == ["asks"]
+    assert whose == [None]
 
 
 def test_a_meter_keeps_the_window_rather_than_the_whole_run() -> None:

@@ -169,7 +169,9 @@ async def test_a_line_into_a_turn_that_is_open_is_pinned_until_the_agent_has_it(
         agent = SteerableAgent(CONFIG)
         app._agents = [agent]
         session = agent.new()
-        app._monitor.begins(agent.id, "m")  # a turn is open, so there is one to steer
+        # A turn is open on that conversation, so there is one to steer -- and the interface
+        # reads the only conversation there is, which is where a typed line goes.
+        app._heard(agent, session, Event(kind="begins", text=""))
 
         await driver.press(*"and this")
         await driver.press("enter")
@@ -182,7 +184,7 @@ async def test_a_line_into_a_turn_that_is_open_is_pinned_until_the_agent_has_it(
         assert f"with {short(agent.id)}" in _pinned(app)
 
         # And written down when that agent's own stream says the turn has taken it in.
-        app._heard(agent, Event(kind="took", text="and this"))
+        app._heard(agent, session, Event(kind="took", text="and this"))
         await until(lambda: "and this" in _transcript(app), driver)
 
         assert _pinned(app) == ""
@@ -203,13 +205,13 @@ async def test_a_turn_that_ended_without_saying_it_had_it_says_that_instead() ->
         agent = SteerableAgent(CONFIG)
         app._agents = [agent]
         session = agent.new()
-        app._monitor.begins(agent.id, "m")
+        app._heard(agent, session, Event(kind="begins", text=""))
 
         await driver.press(*"take this")
         await driver.press("enter")
         await until(lambda: bool(_pinned(app)), driver)
 
-        app._heard(agent, Event(kind="ends", text=""))
+        app._heard(agent, session, Event(kind="ends", text=""))
         await until(lambda: "take this" in _transcript(app), driver)
 
         assert _pinned(app) == ""
@@ -255,7 +257,7 @@ async def test_a_word_put_to_one_agent_is_not_taken_off_by_another() -> None:
 
         with app._saying:
             app._given.append((builder.id, "for the builder"))
-        app._heard(reviewer, Event(kind="took", text="for the builder"))
+        app._heard(reviewer, reviewer.new(), Event(kind="took", text="for the builder"))
         await driver.pause()
 
         assert app._given == [(builder.id, "for the builder")]
@@ -533,7 +535,7 @@ async def test_lines_typed_in_a_row_go_into_the_turn_one_at_a_time() -> None:
         agent = SteerableAgent(CONFIG)
         app._agents = [agent]
         session = agent.new()
-        app._monitor.begins(agent.id, "m")
+        app._heard(agent, session, Event(kind="begins", text=""))
 
         for said in ("hi", "hi again", "hi once more"):
             app._interject(said)
@@ -544,7 +546,7 @@ async def test_lines_typed_in_a_row_go_into_the_turn_one_at_a_time() -> None:
         assert app._given == [(agent.id, "hi")]
         assert app._queued == ["hi again", "hi once more"]
 
-        app._heard(agent, Event(kind="took", text="hi"))
+        app._heard(agent, session, Event(kind="took", text="hi"))
         await until(lambda: len(session.put_in) > 1, driver)
 
         assert session.put_in == ["hi", "hi again"]
@@ -585,7 +587,7 @@ async def test_what_went_to_an_agent_is_pinned_in_front_of_what_is_still_queued(
         agent = SteerableAgent(CONFIG)
         app._agents = [agent]
         session = agent.new()
-        app._monitor.begins(agent.id, "m")
+        app._heard(agent, session, Event(kind="begins", text=""))
 
         app._interject("gone to it")
         app._interject("behind that")

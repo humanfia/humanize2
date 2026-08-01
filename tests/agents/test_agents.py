@@ -607,7 +607,9 @@ def test_a_question_reaches_whoever_is_driving_the_agent_and_nobody_otherwise() 
     agent = ClaudeCodeAgent(CONFIG)
     heard: list[str] = []
     agent.watch(
-        lambda _, event: heard.append(event.kind) if event.kind == "asks" else None
+        lambda _agent, _session, event: (
+            heard.append(event.kind) if event.kind == "asks" else None
+        )
     )
     question = Question(text="Which way?", options=("left", "right"))
 

@@ -373,7 +373,8 @@ hmz exec -f <flow> -a <cli>/<model>:<effort> [-a ...] <task>
 One `-a` for each agent the flow drives, in the order it takes them. Full syntax in the
 [CLI reference](cli.md#hmz-exec).
 
-In the [interface](tui.md), shift+tab steps through the flows and `/flow` picks one by name.
+In the [interface](tui.md), `/flow` picks one by name — tab and shift+tab are for stepping
+between the agents of the flow that is running.
 Picking one stops whatever was running — a flow is chosen in order to be run.
 
 ## Where flows live
