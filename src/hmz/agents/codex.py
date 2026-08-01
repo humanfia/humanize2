@@ -900,6 +900,9 @@ class CodexAgent(AgentBase):
 
     moments: ClassVar[frozenset[Moment]] = EVERYWHERE | {Moment.PERMISSION_REQUEST}
 
+    #: codex keeps itself going toward an objective, which is what `pursue` reaches for.
+    pursues: ClassVar[bool] = True
+
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent whose app server is not running yet.
 

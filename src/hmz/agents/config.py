@@ -33,6 +33,21 @@ __all__ = ["PERMISSIONS", "AgentConfig", "Isolated", "Remote", "anchored", "isol
 PERMISSIONS = ("read-only", "workspace-write", "auto", "bypass")
 
 
+class Goal:
+    """What a flow writes beside an agent it runs under the backend's own goal feature.
+
+    `pursue` is the agent keeping itself going toward an objective it decides for itself is
+    met, and three backends have it. A flow built on that is not a flow any agent can drive,
+    so it says which of its agents has to have one, by writing this where it declares them::
+
+        class Agents(NamedTuple):
+            worker: Annotated[AgentBase, Goal]
+
+    and an agent whose backend has no goal feature is refused before the first turn rather
+    than raising in the middle of one, which is where a loop would otherwise find out.
+    """
+
+
 class Remote:
     """What a flow writes beside an agent that may be pointed at another machine.
 

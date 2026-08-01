@@ -255,11 +255,29 @@ class Agents(NamedTuple):
 exactly as it did, and what is written beside it is what the place asks of whoever fills it.
 Several moments are several arguments.
 
-It is checked before the first turn, for the same reason the count is:
+**A goal is asked for the same way.** `agent.pursue(objective)` is the backend's own goal
+feature — the agent decides for itself that the objective has been met, and until it does, a
+turn that would have ended starts another. Three backends have one (Claude Code, codex, Kimi),
+so a flow built on it says so:
+
+```python
+from hmz.agents import AgentBase, Goal
+
+
+class Agents(NamedTuple):
+    """The one it drives, which has to have a goal of its own."""
+
+    worker: Annotated[AgentBase, Goal]
+```
+
+Both are checked before the first turn, for the same reason the count is:
 
 ```console
 $ hmz exec -f gated -a codex/gpt-5.6-sol:high -a codex/gpt-5.6-sol:high "fix the build"
 hmz exec: error: /.../gated.py: builder has to run PermissionRequest, which codex does not
+
+$ hmz exec -f pursuing -a pi/gpt-5.4:high "fix the build"
+hmz exec: error: /.../pursuing.py: worker is run under a goal, which pi has no feature for
 ```
 
 and the interface's `/agents` offers only the CLIs that would work for that place, so it cannot

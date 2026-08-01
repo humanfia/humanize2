@@ -1567,6 +1567,13 @@ class AgentBase(ABC):
     #: more, and a flow that needs one of those says so where it declares the agents it drives.
     moments: ClassVar[frozenset[Moment]] = EVERYWHERE
 
+    #: Whether this backend has a goal feature of its own -- one where the agent decides for
+    #: itself that an objective has been met, and a turn that would have ended starts another
+    #: instead, which is what `pursue` reaches for. Three of them have; a flow that runs its
+    #: agent under a goal says so where it declares them, and is then refused an agent that
+    #: has not rather than raising on the first turn.
+    pursues: ClassVar[bool] = False
+
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent that has opened nothing yet.
 

@@ -129,6 +129,9 @@ class Place(NamedTuple):
       moments: The moments the agent filling it has to run, which the flow said by writing
         `Annotated[AgentBase, Moment.PERMISSION_REQUEST]` where it declared the place. Empty
         where it asked for nothing in particular, which is most places.
+      goal: Whether the flow runs this one under the backend's own goal feature, which it
+        said by writing `Annotated[AgentBase, Goal]` where it declared the place. Only three
+        backends have one, so a flow built on it is not a flow any agent can drive.
       where: Where the agent filling it may work, which the flow said the same way -- `Remote`
         for one that may be pointed at another machine, an `Isolated` for one that works in a
         container the flow itself names the image of. None for a place the flow said nothing
@@ -141,6 +144,7 @@ class Place(NamedTuple):
     person: bool
     moments: frozenset[Moment]
     where: type[Remote] | Remote | Isolated | None = None
+    goal: bool = False
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
@@ -682,9 +686,12 @@ def _place(name: str, kind: object) -> Place:
     """
     moments = frozenset(_moments(kind))
     where = _where(kind)
+    goal = _goal(kind)
     if get_origin(kind) is Annotated:
         kind = get_args(kind)[0]
-    return Place(name=name, person=_is_person(kind), moments=moments, where=where)
+    return Place(
+        name=name, person=_is_person(kind), moments=moments, where=where, goal=goal
+    )
 
 
 def _where(kind: object) -> type[Remote] | Remote | Isolated | None:
@@ -705,6 +712,23 @@ def _where(kind: object) -> type[Remote] | Remote | Isolated | None:
         if said is Remote or isinstance(said, (Remote, Isolated)):
             return said
     return None
+
+
+def _goal(kind: object) -> bool:
+    """Whether a flow said the agent filling a place is run under its backend's goal feature.
+
+    Args:
+      kind: What the flow annotated the place with.
+
+    Returns:
+      True if it wrote `Goal` beside the type, and False for a place annotated with the type
+      alone -- which is one driven by turns like every other.
+    """
+    from .agents import Goal
+
+    if get_origin(kind) is not Annotated:
+        return False
+    return any(said is Goal for said in get_args(kind)[1:])
 
 
 def _moments(kind: object) -> tuple[Moment, ...]:
@@ -830,6 +854,11 @@ class Runner:
                 raise NotAFlow(
                     f"{flow}: {place.name or 'the agent'} has to run "
                     f"{', '.join(sorted(short))}, which {agent.backend} does not"
+                )
+            if place.goal and not type(agent).pursues:
+                raise NotAFlow(
+                    f"{flow}: {place.name or 'the agent'} is run under a goal, which "
+                    f"{agent.backend} has no feature for"
                 )
             _lands(flow, agent, place)
         # The person at the prompt is made here rather than given: nobody chooses what they

@@ -135,6 +135,12 @@ class Runner:
   asked for MUST be read before the name is resolved to a file, and a name no flow in the file
   answers to MUST be reported as a usage error saying which ones it holds -- a file of three
   asked for by its own name is a colon away from what was meant.
+- A flow that runs one of its agents under the backend's own goal feature MUST say so where it
+  declares the place, by writing `Goal` beside the type, and an agent whose backend has none
+  MUST be refused before the first turn -- for the reason a moment it cannot run is: a loop
+  built on `pursue` finds out in the middle of a turn otherwise, hours in. What each backend
+  has MUST be said on the agent rather than asked of it, so that whoever is choosing one can
+  offer only the ones that would work.
 - A `NamedTuple` of agents MUST be accepted in its place, and MUST additionally say what the
   flow calls each of them. `drives` MUST report those names, so that whatever asks for the
   agents asks for them by what they are for rather than by their place in a line; a plain

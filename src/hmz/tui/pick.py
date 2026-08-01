@@ -2143,11 +2143,13 @@ class RunsAs(Sheet[Whose]):
         Returns:
           One CLI per tab, in the order the tabs go.
         """
-        needs = self._place.moments
+        needs, pursuing = self._place.moments, self._place.goal
         return [
             backend
             for backend in sorted(self._agents)
-            if not needs or (backend in DRIVEN and needs <= DRIVEN[backend][0].moments)
+            if backend in DRIVEN
+            and needs <= DRIVEN[backend][0].moments
+            and (not pursuing or DRIVEN[backend][0].pursues)
         ]
 
     def _backend(self) -> str:
@@ -2210,15 +2212,18 @@ class RunsAs(Sheet[Whose]):
         self.query_one("#asked", Label).update(
             f"Select what takes {self._named}'s turns, and the account they run as"
         )
-        needs = self._place.moments
+        # What the place asks of whoever fills it, in the order a person would say it: the
+        # moments a hook is hung on, and then the goal feature a flow built on one needs.
+        asked = [str(moment) for moment in sorted(self._place.moments)]
+        if self._place.goal:
+            asked.append("a goal of its own")
         self.query_one("#about", Label).update(
             f"Which coding agent takes this one's turns in {self._flow}, one per tab on the "
             "arrows, and under it that CLI's own accounts -- an account is one backend's. Its "
             "sessions, its settings and its skills are the CLI's own whichever it runs as."
             + (
-                f" This one has to run {', '.join(sorted(needs))}, so only the CLIs that do "
-                "are here."
-                if needs
+                f" This one has to run {', '.join(asked)}, so only the CLIs that do are here."
+                if asked
                 else ""
             )
         )

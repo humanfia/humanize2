@@ -15,6 +15,7 @@ from .codex import CodexAgent, CodexAgentConfig, CodexSession
 from .config import (
     PERMISSIONS,
     AgentConfig,
+    Goal,
     Isolated,
     Remote,
     anchored,
@@ -57,6 +58,7 @@ __all__ = [
     "CodexSession",
     "CommandSessionBase",
     "Event",
+    "Goal",
     "Hook",
     "Hooks",
     "HumanAgent",

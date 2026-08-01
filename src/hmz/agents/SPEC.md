@@ -35,6 +35,9 @@ with no behaviour on them.
 ## `config.py`
 
 ```python
+class Goal: ...
+
+
 class Remote: ...
 
 

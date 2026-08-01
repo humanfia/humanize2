@@ -26,7 +26,7 @@ import urllib.request
 import weakref
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
@@ -591,6 +591,9 @@ class KimiCodeCLISession(SessionBase):
 
 class KimiCodeCLIAgent(AgentBase):
     """Kimi Code, driven through an app server of its own so a whole session is settable."""
+
+    #: Kimi keeps itself going toward an objective, which is what `pursue` reaches for.
+    pursues: ClassVar[bool] = True
 
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent whose server is not running yet.

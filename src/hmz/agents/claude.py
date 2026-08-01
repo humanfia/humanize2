@@ -518,6 +518,9 @@ class ClaudeCodeAgent(AgentBase):
     #: one backend here where a hook can say no to something and have the agent hear it.
     moments: ClassVar[frozenset[Moment]] = EVERYWHERE | {Moment.PERMISSION_REQUEST}
 
+    #: Claude keeps itself going toward an objective, which is what `pursue` reaches for.
+    pursues: ClassVar[bool] = True
+
     def new(self, cwd: str | os.PathLike[str] | None = None) -> ClaudeCodeSession:
         """Opens a new Claude Code session, in the directory it is given or in this one."""
         return ClaudeCodeSession(self, cwd)
