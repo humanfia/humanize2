@@ -1,6 +1,6 @@
 """Stateful ralph (flowbench: stateful_ralph) -- one session, re-sent the task every turn.
 
-hmz exec -f stateful_ralph -a kimi/kimi-code/k3:high "$(cat TASK.md)"
+hmz exec -f stateful_ralph -a kimi/PROVIDER/MODEL:high "$(cat TASK.md)"
 """
 
 import time

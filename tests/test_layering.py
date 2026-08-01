@@ -54,6 +54,10 @@ ALLOWED: dict[str, set[str]] = {
     # bending it.
     "hmz.flows": {"hmz.agents", "hmz.backends"},
     "hmz.machines": {"hmz.coganchor"},
+    # What a backend runs is asked of that backend as the account whose it would be, so the
+    # asking reads the facts about the CLI and the providers it could be run as. Neither
+    # names it back, so this widens the DAG without bending it.
+    "hmz.models": {"hmz.backends", "hmz.providers"},
     "hmz.runner": {
         "hmz.agents",
         "hmz.backends",
@@ -69,6 +73,8 @@ ALLOWED: dict[str, set[str]] = {
         "hmz.agents",
         "hmz.backends",
         "hmz.flows",
+        # What each CLI runs, which the sheets offer and the key on them fills again.
+        "hmz.models",
         # `/providers` is where an account is made and `/agents` is where one is given to an
         # agent, so the interface reads the same leaf the agents do. It names nothing above
         # itself, so this widens the DAG without bending it.

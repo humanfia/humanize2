@@ -75,8 +75,8 @@ def _about(called: dict[str, Any]) -> str:
 class PiAgentConfig(AgentConfig):
     """What pi is configured with: the common model and effort, and nothing else.
 
-    The model is written as pi writes it, `provider/id` -- `openai-codex/gpt-5.5` -- since a
-    model here belongs to the provider that serves it and pi is asked for the pair.
+    The model is written as pi writes it, `provider/id`, since a model here belongs to the
+    provider that serves it and pi is asked for the pair.
     """
 
 

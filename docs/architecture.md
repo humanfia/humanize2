@@ -22,6 +22,7 @@ src/hmz/
 ├── __init__.py       home() — where humanize keeps what outlives one run
 ├── __main__.py       python -m hmz
 ├── backends.py       every fact about a coding agent CLI that is not code
+├── models.py         what each backend runs, asked of it and kept per account
 ├── cycle.py          what one run of one flow was, written down as it happens
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
 ├── cli/              the command line: one module per command that has a parser
@@ -40,7 +41,8 @@ a target and could be lifted out whole, so it has a name of its own.
 
 | Layer | Is | Entry points |
 | --- | --- | --- |
-| `backends.py` | Names, aliases, models, efforts, home directories and log globs for `claude`, `codex`, `kimi`, `pi`, `opencode` and `mimo`. Facts, not code — standard library only. | `PROFILES`, `named()`, `read()` |
+| `backends.py` | Names, aliases, efforts, home directories and log globs for `claude`, `codex`, `kimi`, `pi`, `opencode` and `mimo`. Facts, not code — standard library only, and no model id anywhere in it. | `PROFILES`, `named()`, `read()` |
+| `models.py` | What each backend runs, asked of that backend the way it offers being asked, and kept per account. Nothing here is a list: a CLI ships models without asking anybody. | `ask`, `offered`, `asked`, `where` |
 | `agents/` | What a flow is written against (`AgentBase`, `SessionBase`, `Event`, `Question`, `Moment`) and one driver per backend. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
 | `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |

@@ -8,6 +8,7 @@ CLI's login, so it is patched out and what is tested is the walk up to it.
 
 from __future__ import annotations
 
+import json
 import unittest.mock
 from typing import TYPE_CHECKING
 
@@ -38,9 +39,44 @@ if TYPE_CHECKING:
 CLAUDE = {"claude": (Model("claude-opus-5", ("max", "high")),)}
 
 
+def _kept(cli: str, name: str = "") -> tuple[Model, ...]:
+    """Writes down what one account's CLI said it runs, which is what asking it leaves.
+
+    Args:
+      cli: The backend.
+      name: The account, or "" for the CLI as this machine already runs it.
+
+    Returns:
+      What was written, which is the one model these walks choose between.
+    """
+    from hmz import models
+
+    at = models.where(cli, name)
+    at.parent.mkdir(parents=True, exist_ok=True)
+    at.write_text(
+        json.dumps(
+            {
+                "asked": "2026-08-12T00:00:00Z",
+                "models": [
+                    {"name": model.name, "efforts": list(model.efforts)}
+                    for model in CLAUDE[cli]
+                ],
+            }
+        )
+    )
+    return CLAUDE[cli]
+
+
 def _account(name: str = "deepseek", cli: str = "claude") -> providers.Provider:
-    """Writes one account down, as `hmz providers add` does, signing nothing in."""
-    return providers.add(cli, name, way="key", env={"ANTHROPIC_API_KEY": "not-a-key"})
+    """Writes one account down, as `hmz providers add` does, signing nothing in.
+
+    And with the models that account runs already asked for, which is what making one does:
+    a walk that has to press a key before there is anything to choose from is a walk nobody
+    takes, and this is about the account rather than about the asking.
+    """
+    made = providers.add(cli, name, way="key", env={"ANTHROPIC_API_KEY": "not-a-key"})
+    _kept(cli, name)
+    return made
 
 
 @pytest.mark.timeout(60)
@@ -239,10 +275,11 @@ async def test_the_account_an_agent_runs_as_is_the_first_thing_asked_about_it(
         await driver.press("down", "enter")
         await until(lambda: isinstance(app.screen, Models), driver)
         tuning = app.screen.query_one("#tuning", Label)
-        # Read on the models rather than adjusted there: a step of its own answered it.
-        await until(lambda: "as deepseek" in str(tuning.content), driver)
-        assert "ctrl+r" not in str(tuning.content)
-        assert "ctrl+r" not in str(app.screen.query_one("#keys", Label).content)
+        await until(lambda: "max effort" in str(tuning.content), driver)
+        # Not read back here and not adjustable here: a step of its own answered it, and a
+        # setting shown where it cannot be changed is a setting somebody tries to change.
+        assert "deepseek" not in str(tuning.content)
+        assert "deepseek" not in str(app.screen.query_one("#keys", Label).content)
 
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
@@ -262,12 +299,23 @@ async def test_the_account_an_agent_runs_as_is_the_first_thing_asked_about_it(
 @unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The moment somebody finds out they have no account is the moment to offer them one.
 
     So making one is a key on the question rather than a walk out of it, and what comes back
-    is the account chosen: making one here is choosing it.
+    is the account chosen: making one here is choosing it -- with the models that account
+    runs already asked for, which is what makes the step after it answerable.
     """
+    import hmz.models
+
+    asked: list[tuple[str, str]] = []
+
+    def note(cli: str, provider: str = "", seconds: float = 0.0) -> tuple[Model, ...]:
+        asked.append((cli, provider))
+        return _kept(cli, provider)
+
+    monkeypatch.setattr(hmz.models, "ask", note)
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
@@ -293,7 +341,7 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
         # choosing it, so the step it was asked in is answered.
         await until(lambda: isinstance(app.screen, Models), driver)
         tuning = app.screen.query_one("#tuning", Label)
-        await until(lambda: "as mine" in str(tuning.content), driver)
+        await until(lambda: "max effort" in str(tuning.content), driver)
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
         await driver.pause()
@@ -302,6 +350,10 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
     assert made is not None
     assert dict(made.env) == {"ANTHROPIC_API_KEY": "not-a-key"}
     assert app._models == [Runs("claude/claude-opus-5:max", "", None, "", "mine")]
+    # The backends installed here are asked as the interface opens, and an account as it
+    # lands: an account is made in order to run turns as, and which models those turns may
+    # name is the account's rather than this machine's.
+    assert asked == [("claude", ""), ("claude", "mine")]
 
 
 @pytest.mark.timeout(60)

@@ -387,8 +387,15 @@ that runs it, and the CLI was settled a step ago, so it is named above them as a
    ◉ max effort  ←/→ to adjust · ◉ swarm mode off  ctrl+w to toggle · ◉ every skill  ctrl+s to choose · ◉ bypass  ctrl+p to change
 ```
 
-Typing narrows the list — `cop` finds `claude-opus-5`, since nobody types a model id out — and
-esc clears what was typed before it steps back.
+Typing narrows the list — a few letters anywhere in a name find it, since nobody types a model
+id out — and esc clears what was typed before it steps back.
+
+**The list is what that CLI said it runs as the account chosen a step ago**, not a list written
+into humanize: a CLI ships a model without asking anybody, and which of them you may name
+depends on the account. It is asked the first time the interface opens, and again whenever an
+account is made. **ctrl+r** asks it again from here, which is where you find out that the model
+you came for is not in the list. A CLI that has never been asked says so where the list would
+be; one that will not answer says why, under the list, and leaves the sheet up.
 
 Under the models, the things that are adjusted rather than chosen: **←/→** the effort,
 **ctrl+w** [swarm mode](agents.md#efforts) for a model that has one, **ctrl+s**

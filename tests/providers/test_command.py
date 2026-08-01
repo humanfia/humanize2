@@ -300,3 +300,43 @@ def test_signing_in_again_runs_the_way_the_provider_was_made_by(
 
     assert (tmp_path / "ran").exists()
     assert (provider.at / "home" / ".credentials.json").exists()
+
+
+def test_an_account_is_asked_what_it_runs_as_soon_as_it_is_made(
+    asking: None,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An account is made to run turns as, and which models those may name is the account's."""
+    from hmz import models
+    from tests.test_models import CLAUDE, stands_in
+
+    stands_in(monkeypatch, tmp_path / "bin", "claude", CLAUDE)
+
+    assert run(*MINE) == 0
+
+    assert "claude says it runs 2 models as mine" in capsys.readouterr().out
+    assert [model.name for model in models.offered("claude", "mine")] == [
+        "claude-nine",
+        "claude-quick",
+    ]
+
+
+def test_an_account_whose_cli_will_not_say_what_it_runs_is_still_an_account(
+    asking: None,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The line was for making the account, and the account was made."""
+    from tests.test_models import stands_in
+
+    stands_in(
+        monkeypatch, tmp_path / "bin", "claude", "", code=1, says="not signed in\n"
+    )
+
+    assert run(*MINE) == 0
+
+    assert providers.find("claude", "mine") is not None
+    assert "did not say what it runs" in capsys.readouterr().err

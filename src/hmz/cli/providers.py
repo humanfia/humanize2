@@ -203,9 +203,41 @@ def _add(cli: str, name: str, way: str, given: list[str], *, login: bool) -> int
         print(f"hmz: {why}", file=sys.stderr)
         return 1
     print(f"{provider.cli}/{provider.name} is written down at {provider.at}")
-    if not login or not chosen.argv:
+    if not login:
+        # A line that says not to run the backend's own way in is a line that says not to
+        # start the backend: asking it what it runs would be starting it. What it runs is
+        # found out by whatever next wants a list of it.
         return 0
-    return _sign(provider, chosen, answers)
+    if not chosen.argv:
+        return _asks(provider.cli, provider.name)
+    return _sign(provider, chosen, answers) or _asks(provider.cli, provider.name)
+
+
+def _asks(cli: str, name: str) -> int:
+    """Asks a new account's CLI what it runs, so that there is a list before one is wanted.
+
+    An account is made in order to run turns as, and which models those turns may name is
+    that account's rather than the CLI's: this is where that is found out, once, and it is
+    kept until somebody asks for it again.
+
+    Args:
+      cli: The backend the account is for.
+      name: What the account is called.
+
+    Returns:
+      Zero either way. An account whose CLI would not say what it runs is still an account,
+      and exiting badly over it would be reporting the thing that worked as the thing that
+      did not.
+    """
+    from hmz import models
+
+    try:
+        found = models.ask(cli, name)
+    except Exception as why:  # noqa: BLE001 -- a CLI that will not say, however it will not
+        print(f"hmz: {cli} did not say what it runs as {name}: {why}", file=sys.stderr)
+        return 0
+    print(f"{cli} says it runs {len(found)} models as {name}")
+    return 0
 
 
 def _again(cli: str, name: str, given: list[str]) -> int:
@@ -234,7 +266,9 @@ def _again(cli: str, name: str, given: list[str]) -> int:
     except EOFError:
         print("hmz: nothing to read the answers from", file=sys.stderr)
         return 1
-    return _sign(provider, chosen, answers)
+    # Signed in again is possibly a different account, and certainly a fresh answer to what
+    # it runs: an account that has just changed hands is one to ask again.
+    return _sign(provider, chosen, answers) or _asks(cli, name)
 
 
 def _sign(provider: object, way: object, answers: dict[str, str]) -> int:

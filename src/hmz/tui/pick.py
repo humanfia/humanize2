@@ -196,8 +196,8 @@ _TICKED = "[✔]"
 _EMPTY = "[ ]"
 
 #: How wide the column of names is before the line about each one starts. A model id
-#: may hold slashes of its own -- Kimi Code's are `kimi-code/k3` -- and is shown as the
-#: CLI is given it, since a name shortened here is not the name of anything.
+#: may hold slashes of its own -- Kimi Code's and opencode's are `provider/id` -- and is
+#: shown as the CLI is given it, since a name shortened here is not the name of anything.
 _LABEL = 26
 
 #: How wide the column of field names on `/status` is, so their values line up beside them.
@@ -351,11 +351,11 @@ class Sheet[T](ModalScreen[T | None]):
             is called, and where it came from.
 
         Returns:
-          True if what has been typed is spread through one of them in order -- `cop` finds
-          `claude-opus-5`, since nobody types a model id out to narrow a list of them. One of
-          them rather than all of them run together, or a search would run off the end of the
-          name it was narrowing to and finish itself in the word beside it: `chat` would find
-          `flame_chase builtin`, which is a match nobody typed.
+          True if what has been typed is spread through one of them in order, so that a few
+          letters anywhere in a name find it -- nobody types a model id out to narrow a list
+          of them. One of them rather than all of them run together, or a search would run
+          off the end of the name it was narrowing to and finish itself in the word beside
+          it: `chat` would find `flame_chase builtin`, which is a match nobody typed.
         """
         if not self._typed:
             return True
@@ -977,6 +977,12 @@ class Models(Sheet[Runs]):
     three that really are side questions about the same agent: how wide the turn runs, what
     it may do without being asked, and which of its CLI's skills it is loaded with. What a
     step of its own answered is read there rather than adjusted.
+
+    The rows are what that CLI last said it runs as that account rather than a list written
+    down anywhere: a CLI ships a model without asking anybody, and which of them a turn may
+    name is the account's. `ctrl+r` asks it again, which is what somebody who came here for a
+    model that is not in the list wants -- and is the whole reason the key is on this sheet
+    rather than somewhere they would have to go to find it.
     """
 
     BINDINGS: ClassVar = [
@@ -995,6 +1001,11 @@ class Models(Sheet[Runs]):
         # And what it is loaded with is a third, for the same reason and in the same way: a
         # side question about this agent, which opens a sheet of its own and comes back here.
         Binding("ctrl+s", "skills", "skills", priority=True),
+        # What a CLI runs is what it last said it runs, and it ships a model without asking
+        # anybody: this is the key that asks it again, on the same chord the flowverses are
+        # fetched again on. Here rather than anywhere else, because here is where somebody
+        # finds out that the model they came for is not in the list.
+        Binding("ctrl+r", "refresh", "ask it what it runs", priority=True),
     ]
 
     def __init__(
@@ -1013,7 +1024,8 @@ class Models(Sheet[Runs]):
           named: What the flow calls it, which every step of configuring it says.
           whose: The CLI that takes its turns and the account they run as, as the step before
             answered.
-          models: What that CLI says it runs.
+          models: What that CLI last said it runs as that account, which is nothing at all
+            for one that has never been asked -- and is what `ctrl+r` here fills.
           place: What the flow declared about this one, which is where a container it settled
             is read from.
           now: What this step answered last time it was walked through, or None for one being
@@ -1043,13 +1055,20 @@ class Models(Sheet[Runs]):
         self._start = 0
         #: The models the letters typed so far have left, which is what the cursor is walking.
         self._shown: list[Model] = []
+        #: Whether the CLI is being asked what it runs, which is a process starting up and so
+        #: is said under the list rather than waited on.
+        self._asking = False
+        #: What came of asking it, said under the list: a CLI that is not signed in cannot say
+        #: what it runs, and that is worth knowing where the list looked short.
+        self._said = ""
 
     def _ask(self) -> None:
         """Asks what this one runs, from the models down."""
         self.query_one("#asked", Label).update(f"Select what {self._named} runs")
         self.query_one("#about", Label).update(
             f"Which model of {self._whose.cli} takes this one's turns in {self._flow}, and "
-            "how hard it thinks. Two agents at one model are still two agents."
+            "how hard it thinks. Two agents at one model are still two agents. These are "
+            f"what {self._whose.cli} last said it runs as this account; ctrl+r asks it again."
         )
         self._read_back()
         self._fill()
@@ -1109,9 +1128,16 @@ class Models(Sheet[Runs]):
         # The CLI these are the models of, as a heading rather than a row of tabs: it was
         # chosen a step ago, so there is nowhere to switch to and nothing says there is.
         self.tabbed(f"[b $primary]{escape(backend)}[/]" if backend else "")
-        self.query_one("#tuning", Label).update(self._tuned())
+        # The effort and the side questions where there is a model to ask them about, and
+        # otherwise what became of asking the CLI what it runs: one row either way, and the
+        # one that is worth reading is the one there is something to read.
+        said = self._tuned()
+        if not said and (nothing := self._nothing()):
+            said = f"[$text-muted]{nothing}[/]"
+        self.query_one("#tuning", Label).update(said)
         self.query_one("#keys", Label).update(
-            f"Type to search · Enter to choose · Esc to go back{self.searching()}"
+            "ctrl+r to ask again · Type to search · Enter to choose · Esc to go back"
+            f"{self.searching()}"
         )
 
     def _tuned(self) -> str:
@@ -1167,6 +1193,56 @@ class Models(Sheet[Runs]):
             return f"in a container of {escape(image)}"
         anchor = self._now.anchor if self._now is not None else ""
         return f"on {escape(anchor)}" if anchor else ""
+
+    def _nothing(self) -> str:
+        """What to say where there is no model to say anything else about.
+
+        Returns:
+          What is happening, what came of the last asking, or where the models come from for
+          an account that has never been asked -- and "" where the letters typed are the
+          reason the list is empty, which the letters themselves already say.
+        """
+        backend = self._whose.cli
+        if self._asking:
+            return f"asking {escape(backend)} what it runs…"
+        if self._said:
+            return self._said
+        if self._models:
+            return ""  # narrowed away by what was typed, which is not a list with nothing in it
+        whose = f" as {escape(self._whose.provider)}" if self._whose.provider else ""
+        return f"{escape(backend)} has not said what it runs{whose} yet; ctrl+r asks it"
+
+    @work
+    async def action_refresh(self) -> None:
+        """Asks this CLI what it runs as this account, and puts up what it answers.
+
+        Off the event loop, because asking means starting a coding agent and some of them take
+        the better part of a minute over it: an interface that stopped redrawing while it ran
+        would be one that looked as though it had gone away.
+        """
+        import asyncio
+
+        from hmz import models
+
+        backend, account = self._whose.cli, self._whose.provider
+        if not backend or self._asking:
+            return
+        self._asking, self._said = True, ""
+        self._fill()
+        try:
+            found = await asyncio.to_thread(models.ask, backend, account)
+        except Exception as why:  # noqa: BLE001 -- a CLI that would not answer, however
+            # Said under the list rather than raised at whoever opened the sheet: a CLI that
+            # is not signed in cannot say what it runs, and the question here still stands.
+            self._said = escape(str(why) or type(why).__name__)
+            self._asking = False
+            self._fill()
+            return
+        self._asking, self._models = False, found
+        self._said = "" if found else f"{escape(backend)} named no models it runs"
+        self.query_one("#choices", OptionList).highlighted = 0
+        self._drawn = 0
+        self._fill()
 
     @work
     async def action_skills(self) -> None:
@@ -2235,12 +2311,17 @@ class Made(NamedTuple):
       why: What went wrong before anything was written down, or "" where nothing did.
       way_runs: Whether the way had a command of its own, which is what tells an account that
         was signed in from one that was only written down.
+      runs: How many models its CLI said it runs as this account, asked as soon as the account
+        landed. Zero for one that was never got as far as asking, and for one whose CLI would
+        not say -- which is not an account that cannot be used, only one whose models have to
+        be asked for again before there are any to choose from.
     """
 
     provider: Provider | None = None
     status: int = 0
     why: str = ""
     way_runs: bool = False
+    runs: int = 0
 
 
 async def made(host: App[None], cli: str, *, whose: str = "") -> Made:
@@ -2284,12 +2365,46 @@ async def made(host: App[None], cli: str, *, whose: str = "") -> Made:
     except (ValueError, OSError) as why:  # a name or a directory that will not do
         return Made(why=str(why))
     if not way.argv:
-        return Made(provider=provider)
+        return Made(provider=provider, runs=await asks(cli, provider.name))
     # A login is a browser opened, a code read out, a token exchanged: it owns the screen
     # while it runs, and there is nothing for an interface to draw over it.
     with handed_over(host):
         status = signing.sign_in(provider, way, signs.answers)
-    return Made(provider=provider, status=status, way_runs=True)
+    return Made(
+        provider=provider,
+        status=status,
+        way_runs=True,
+        # An account whose way in exited badly has nothing to say about what it runs, and
+        # asking it would only be a second way of finding that out.
+        runs=0 if status else await asks(cli, provider.name),
+    )
+
+
+async def asks(cli: str, name: str) -> int:
+    """Asks a new account's CLI what it runs, so that there is a list when one is asked for.
+
+    Here rather than where an account is written down: what a backend runs is that account's
+    and is found by starting that backend, which is a thing to do once an account exists and
+    not a thing the store of them should be doing at all.
+
+    Off the event loop, because it is a coding agent starting up.
+
+    Args:
+      cli: The backend the account is for.
+      name: What the account is called.
+
+    Returns:
+      How many models it said it runs, and zero where it would not say -- which is a list to
+      ask for again rather than an account that will not work.
+    """
+    import asyncio
+
+    from hmz import models
+
+    try:
+        return len(await asyncio.to_thread(models.ask, cli, name))
+    except Exception:  # noqa: BLE001 -- a CLI that will not say is one to ask again later
+        return 0
 
 
 @contextlib.contextmanager

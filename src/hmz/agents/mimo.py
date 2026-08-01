@@ -40,8 +40,8 @@ class MimoCodeSession(OpencodeSession):
 class MimoCodeAgentConfig(AgentConfig):
     """What mimocode is configured with: the common model and effort, and nothing else.
 
-    The model is written as mimocode writes it, `provider/id` -- `xiaomi/mimo-v2.5` -- since a
-    model here belongs to the provider that serves it and mimocode is asked for the pair.
+    The model is written as mimocode writes it, `provider/id`, since a model here belongs to
+    the provider that serves it and mimocode is asked for the pair.
     """
 
 

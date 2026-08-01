@@ -297,9 +297,8 @@ class OpencodeSession(CommandSessionBase):
 class OpencodeAgentConfig(AgentConfig):
     """What opencode is configured with: the common model and effort, and nothing else.
 
-    The model is written as opencode writes it, `provider/id` -- `opencode/big-pickle` --
-    since a model here belongs to the provider that serves it and opencode is asked for the
-    pair.
+    The model is written as opencode writes it, `provider/id`, since a model here belongs to
+    the provider that serves it and opencode is asked for the pair.
     """
 
 

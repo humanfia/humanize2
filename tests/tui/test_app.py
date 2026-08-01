@@ -793,65 +793,40 @@ async def test_details_covers_the_thinking_as_well_as_the_tools() -> None:
         assert "thinking" in _transcript(app)  # said to be part of the same switch
 
 
-def test_only_model_ids_are_offered(
+def test_a_backend_offers_what_it_last_said_it_runs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """An alias is whichever model is newest today, and something else tomorrow.
+    """Read off the disk rather than asked for: asking is a coding agent starting up.
 
-    A window written on the end of one is a setting rather than a model -- a backend asked
-    for either answers that there is no such model, and a cycle that recorded one says
-    nothing.
+    What each backend runs is not written down anywhere -- `hmz.models` asks it and keeps the
+    answer -- so a prompt reads the answer and nothing else.
     """
+    from hmz import models
     from hmz.tui import discover
 
-    cache = tmp_path / ".claude.json"
-    cache.write_text(
-        json.dumps({"additionalModelOptionsCache": [{"value": "claude-fable-5[1m]"}]})
+    kept = models.where("claude")
+    kept.parent.mkdir(parents=True, exist_ok=True)
+    kept.write_text(
+        json.dumps(
+            {
+                "asked": "2026-08-12T00:00:00Z",
+                "models": [{"name": "claude-nine", "efforts": ["max", "high"]}],
+            }
+        )
     )
-    monkeypatch.setattr(discover, "_CLAUDE_CACHE", cache)
 
     def which(name: str) -> str:
         return f"/usr/bin/{name}"
 
     monkeypatch.setattr(discover.shutil, "which", which)
 
-    named = [model.name for model in discover.installed()["claude"]]
+    found = discover.installed()
 
-    assert "claude-fable-5" in named  # the account's own, without the window on the end
-    assert not [name for name in named if "[" in name]
-    assert not {"opus", "sonnet", "fable", "haiku"} & set(named)
-    assert all(name.startswith("claude-") for name in named)
-
-
-def test_pi_offers_the_models_this_install_has_credentials_for(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Pi runs whatever provider you have signed in to, so its list is not the same twice.
-
-    Read off the disk it is written on rather than asked for: `pi --list-models` is a process,
-    and this is read at a prompt.
-    """
-    from hmz.tui import discover
-
-    home = tmp_path / "pi-home"
-    home.mkdir()
-    (home / "models-store.json").write_text(
-        json.dumps({"acme": {"models": [{"id": "a-1"}, {"id": "a-2"}]}})
-    )
-    monkeypatch.setenv("PI_CODING_AGENT_DIR", str(home))
-
-    def which(name: str) -> str:
-        return f"/usr/bin/{name}"
-
-    monkeypatch.setattr(discover.shutil, "which", which)
-
-    named = [model.name for model in discover.installed()["pi"]]
-
-    # As pi is asked for a model: the provider and the id together.
-    assert "acme/a-1" in named
-    assert "acme/a-2" in named
-    assert "openai-codex/gpt-5.5" in named  # and the written-down ones are still there
-    assert all(model.efforts for model in discover.installed()["pi"])
+    assert [model.name for model in found["claude"]] == ["claude-nine"]
+    assert found["claude"][0].efforts == ("max", "high")
+    # And a backend nobody has asked yet is a catalogue to fill rather than one with nothing
+    # in it: the interface asks it as it opens, and the models sheet says which key asks it.
+    assert found["codex"] == ()
 
 
 #: A `claude` that answers each thing it is told with one result and nothing else, which is

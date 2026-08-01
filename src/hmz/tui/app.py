@@ -76,6 +76,7 @@ from .pick import (
     Signing,
     Status,
     Whose,
+    asks,
     called,
     handed_over,
     made,
@@ -158,11 +159,6 @@ _WHO, _WHAT, _WHERE = 0, 1, 2
 #: The flow the interface opens on, which is the one that is only talking to one agent.
 _STARTS_ON = "chat"
 
-#: What it opens talking to, where the CLI it opens on runs it. The menu leads with the most
-#: capable model a CLI has, which is the one to reach for rather than the one to spend before
-#: anybody has asked for anything -- so what it starts on is named here instead.
-_STARTS_AT = ("claude-opus-5", "gpt-5.6-sol", "kimi-code/k3")
-
 
 def _where() -> str:
     """The directory this is working in, as somebody reading a status line wants it.
@@ -195,17 +191,25 @@ def _clipped(said: str, room: int) -> str:
     return said if len(said) <= room else said[: room - 1] + "…"
 
 
-def _starts_at(models: tuple[Model, ...]) -> str:
-    """Which of a CLI's models the interface opens talking to.
+def _opens_on() -> list[Runs]:
+    """The one agent the interface opens talking to, where there is one to open on.
 
-    Args:
-      models: What that CLI runs, in the order it is offered in.
+    The first backend installed here that has said what it runs, at the first model it named
+    -- which is that CLI's own idea of what it runs by default, and the only idea of it worth
+    having. Nothing is written down here: a model to open on that was named in this file
+    would be a model this file was right about on the day it was written.
 
     Returns:
-      The one named as the one to start on, or the first it offers when none of them is.
+      The one agent, or nothing at all where no backend here has yet said what it runs --
+      which is a catalogue to fill rather than a model to guess at.
     """
-    named = {model.name for model in models}
-    return next((at for at in _STARTS_AT if at in named), models[0].name)
+    for backend, found in installed().items():
+        if found:
+            # Not the hardest effort, which is what the picker's cursor starts on: that is
+            # the one to reach for, and this is the one to spend before anyone has asked for
+            # anything. `high` is an effort every model of every backend here takes.
+            return [Runs(f"{backend}/{found[0].name}:high")]
+    return []
 
 
 #: How many cells the bar opencode spins in its status line is wide. Blocks, not braille --
@@ -631,20 +635,15 @@ class Humanize(App[None]):
         #: is what you reach for once talking to one agent is not the shape of the work, and
         #: nobody knows that before they have said anything.
         #:
-        #: Not the hardest effort, which is what the picker's cursor starts on: that is the
-        #: one to reach for, and this is the one to spend before anyone has asked for
-        #: anything. `high` is an effort every model of every backend here takes.
+        #: Nothing at all until some backend here has said what it runs, which is asked for in
+        #: the background as this opens: a model to open on is one of that CLI's own, and
+        #: there is no telling what those are without asking it.
         #: What this workspace was last set up to run, so that opening it again finds it
         #: that way rather than back at the default.
         self.settings = Settings()
         self._flow_named = flow or self.settings.flow or _STARTS_ON
         self._models = (
-            list(agents)
-            or self.settings.agents(self._flow_named)
-            or [
-                Runs(f"{backend}/{_starts_at(models)}:high")
-                for backend, models in list(installed().items())[:1]
-            ]
+            list(agents) or self.settings.agents(self._flow_named) or _opens_on()
         )
         #: One place per agent the flow drives: what the flow calls it, which is "" apiece
         #: for a flow that said how many it drives and nothing more, and the moments it needs
@@ -796,11 +795,44 @@ class Humanize(App[None]):
         self._welcome()
         self._draw()
         self.set_interval(_REFRESH, self._draw)
+        self._asks_what_runs()
         # The editor is the only thing to type at, so it is the only thing that takes focus:
         # a transcript or a list that could hold it would swallow the keystrokes meant for it.
         for elsewhere in self.query("#transcript, #offers"):
             elsewhere.can_focus = False
         self.query_one(Editor).focus()
+
+    @work
+    async def _asks_what_runs(self) -> None:
+        """Asks each backend here what it runs, the once, for the account nobody chose.
+
+        Only the ones that have never been asked: what a CLI runs is kept, and this is the
+        first filling of it -- the moment before that, there is nothing to offer at any of the
+        sheets and nothing to open talking to.
+
+        In the background and one at a time, because asking means starting a coding agent:
+        a prompt cannot wait on one, and six at once is six of them. A backend that will not
+        answer is left alone rather than retried -- ctrl+r on the models is what asks again.
+        """
+        import asyncio
+
+        from hmz import models
+
+        for backend in installed():
+            if models.asked(backend):
+                continue
+            try:
+                await asyncio.to_thread(models.ask, backend)
+            except Exception as why:  # noqa: BLE001 -- a CLI that will not say what it runs
+                # Not raised at whoever opened the interface: nobody asked for this, and a
+                # backend that will not answer is one to ask again from the models.
+                self.log(f"{backend} did not say what it runs: {why}")
+                continue
+            # Which may be the first model there is to open on, for an interface that opened
+            # with nothing installed to talk to.
+            if not self._models:
+                self._models = _opens_on()
+            self._draw()
 
     def _welcome(self) -> None:
         """The box this opens with: what this is, and how to begin.
@@ -1662,6 +1694,8 @@ class Humanize(App[None]):
           a flow that drives none, which is a flow that talks only to the person at this
           prompt. None where the walk was left.
         """
+        from hmz import models
+
         whose: dict[int, Whose] = {}
         runs: dict[int, Runs] = {}
         at, step = 0, _WHO
@@ -1686,7 +1720,13 @@ class Humanize(App[None]):
                         flow,
                         named,
                         held,
-                        agents.get(held.cli, ()),
+                        # What that account may name rather than what the CLI says as whoever
+                        # is at this machine: two accounts of one CLI are two catalogues, and
+                        # the step before this one settled which. The one nobody chose is
+                        # already in hand, having been read when the walk began.
+                        models.offered(held.cli, held.provider)
+                        if held.provider
+                        else agents.get(held.cli, ()),
                         places[at],
                         runs.get(at),
                     )
@@ -1807,10 +1847,19 @@ class Humanize(App[None]):
         )
         if outcome.status:
             self.show(f"hmz: signing it in exited {outcome.status}", "red")
-        elif outcome.way_runs:
+            return
+        if outcome.way_runs:
             self.show(
                 f"[dim]{escape(made_one.cli)}/{escape(made_one.name)} is signed in[/dim]"
             )
+        # What it runs is asked as soon as it lands, since that is what an account is for.
+        self.show(
+            f"[dim]{escape(made_one.cli)} says it runs {outcome.runs} models as "
+            f"{escape(made_one.name)}[/dim]"
+            if outcome.runs
+            else f"[dim]{escape(made_one.cli)} did not say what it runs as "
+            f"{escape(made_one.name)}; ctrl+r on its models asks again[/dim]"
+        )
 
     async def _sign_provider_in(self, cli: str, name: str) -> None:
         """Runs one account's own way in again, asking for whatever it still needs.
@@ -1842,9 +1891,19 @@ class Humanize(App[None]):
             if signs is None:
                 return  # walked out, which signs nothing in and changes nothing
             answers |= signs.answers
-        self._signed_in(provider, way, answers)
+        if not self._signed_in(provider, way, answers):
+            return
+        # Signed in again is possibly a different account, and certainly a fresh answer to
+        # what it runs: an account that has just changed hands is one to ask again.
+        runs = await asks(cli, name)
+        self.show(
+            f"[dim]{escape(cli)} says it runs {runs} models as {escape(name)}[/dim]"
+            if runs
+            else f"[dim]{escape(cli)} did not say what it runs as {escape(name)}; "
+            "ctrl+r on its models asks again[/dim]"
+        )
 
-    def _signed_in(self, provider: Provider, way: Way, answers: dict[str, str]) -> None:
+    def _signed_in(self, provider: Provider, way: Way, answers: dict[str, str]) -> bool:
         """Hands the terminal to a backend's own way in, and says what came of it.
 
         A login is a browser opened, a code read out, a token exchanged: it owns the screen
@@ -1855,23 +1914,27 @@ class Humanize(App[None]):
           provider: The account being signed in.
           way: The way in, whose own command is what runs.
           answers: What its questions were answered with.
+
+        Returns:
+          Whether it landed, so that what follows a login knows there was one.
         """
         from hmz.providers import login as signing
 
         if not way.argv:
-            return
+            return False
         try:
             with handed_over(self):
                 status = signing.sign_in(provider, way, answers)
         except OSError as why:  # the backend's own command is not on this machine
             self.show(f"hmz: {way.argv[0]}: {why}", "red")
-            return
+            return False
         if status:
             self.show(f"hmz: {way.argv[0]} exited {status}", "red")
-            return
+            return False
         self.show(
             f"[dim]{escape(provider.cli)}/{escape(provider.name)} is signed in[/dim]"
         )
+        return True
 
     def _drop_provider(self, cli: str, name: str) -> None:
         """Takes one account away, credentials and all, and says so.

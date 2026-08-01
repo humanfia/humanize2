@@ -1,6 +1,6 @@
 """Chat -- one agent, one session, and every line typed between turns is a turn of it.
 
-hmz exec -f chat -a claude/claude-opus-5:high "what does this repository do?"
+hmz exec -f chat -a claude/MODEL:high "what does this repository do?"
 
 Which is talking to a coding agent, with no loop around it: the flow does what it is told and
 then waits to be told again. It is the flow the terminal interface opens on, so that saying

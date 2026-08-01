@@ -13,6 +13,7 @@
 ├── cycle.py
 ├── flows
 ├── machines
+├── models.py
 ├── providers
 ├── runner.py
 ├── tracing
@@ -38,13 +39,55 @@ Expose `home`, and nothing else. A caller names the layer it wants.
 ## `backends.py`
 
 Every fact about a coding agent CLI that is not code: what it is called, what a command line
-may call it, what it runs, where it keeps its home, which files under it a session is logged
-to, and which files under it and under a workspace are the skills it would load.
+may call it, how hard it can be asked to think, where it keeps its home, which files under it
+a session is logged to, and which files under it and under a workspace are the skills it would
+load.
 
 - It MUST be the only place any of those is written down, and MUST import nothing but the
   standard library, so that reading a fact costs nothing of the layer the fact is about.
 - Code that acts on a fact MUST live where its purpose does: driving a backend in `agents`,
   reading its logs back in `tracing`.
+- A model id MUST NOT be written down here, nor anywhere else in this package. What a CLI
+  runs is not a fact that keeps: it ships models without asking anybody, and which of them an
+  account may name is that account's. `models.py` is what asks.
+- The efforts MUST be written down, being that backend's own vocabulary rather than a
+  catalogue of things that come and go. A rung the backend takes without documenting MUST be
+  written down as one, since no listing of the backend's own will ever name it.
+
+## `models.py`
+
+```python
+def where(cli: str, provider: str = "") -> Path: ...
+def offered(cli: str, provider: str = "") -> tuple[Model, ...]: ...
+def asked(cli: str, provider: str = "") -> str: ...
+def ask(
+    cli: str, provider: str = "", seconds: float = WAITING
+) -> tuple[Model, ...]: ...
+```
+
+What each backend runs, asked of that backend and kept until it is asked again.
+
+- What a backend runs MUST be got from that backend itself, by whatever mechanism that
+  backend offers for being asked -- its own control request, its own catalogue command, its
+  own dump of what it is configured with. It MUST NOT be a list written down here: a list is
+  wrong the day the CLI ships a model, and says nothing about which of them this account may
+  actually name.
+- It MUST be asked as the account whose it would be: under that provider's own credential
+  paths and variables, and without the ones its backend would take another account from --
+  which is how a turn of that account is run. What is kept MUST be kept per account, two
+  accounts of one CLI being two catalogues.
+- What is kept for a provider MUST be kept with that provider, so that taking the account
+  away takes its catalogue with it. The account nobody chose keeps its own under humanize's
+  home.
+- Asking MUST NOT happen at a prompt: it is a coding agent starting up. Reading what was kept
+  MUST cost one file read.
+- An account MUST be asked as soon as it is made, since that is the first moment there is
+  anything to ask. A backend that would not answer MUST leave the account made: an account
+  whose models are not known yet is one to ask again, not one that failed.
+- A model's efforts MUST be its backend's ladder narrowed to the rungs that backend said that
+  model takes, in the ladder's own order, and MUST be the whole ladder where it said nothing
+  of that model -- a model it says nothing about is one it will take any of them for.
+- A catalogue that has never been asked for MUST be empty rather than guessed at.
 
 ## `cycle.py`
 
@@ -146,8 +189,9 @@ Args:
 
 - `<cli>` MUST be one of `claude`, `codex` and `kimi`, each of which MUST also answer to the
   longer name it is installed under, and `<model>` and `<effort>` MUST be what that CLI is
-  asked for. A model MAY hold slashes of its own -- Kimi Code's are `kimi-code/k3` -- so the
-  CLI MUST be read from the front and the effort from after the last colon.
+  asked for. A model MAY hold slashes of its own -- Kimi Code's and opencode's are written
+  `provider/id` -- so the CLI MUST be read from the front and the effort from after the last
+  colon.
 - The CLI MAY be followed by `@<provider>`, which is the account that agent's turns run as: a
   CLI is never spelled with an `@` in it, so the two are told apart wherever an agent is
   written. `provider=` MUST say the same thing written out, and an `@` naming nothing MUST be
@@ -197,6 +241,10 @@ three things that can happen to one -- made, signed in again, taken away.
   a question with no answer and no default MUST be reported rather than waited on.
 - Nothing MUST print a secret. What one holds MUST be shown as the names of the variables it
   sets and never their values.
+- An account that has just been made or signed in again MUST have its CLI asked what it runs
+  as that account, and what it said MUST be reported. A CLI that would not answer MUST NOT
+  make the line fail: the account was made, which is what the line was for. `--no-login` MUST
+  ask nothing either -- a line that says not to run the backend does not run it.
 
 ## `hmz cred`
 

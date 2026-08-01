@@ -1,6 +1,6 @@
 """Ralph loop (flowbench: ralph_loop) -- a fresh session every turn, so nothing carries over.
 
-hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
+hmz exec -f ralph_loop -a claude/MODEL:high "$(cat TASK.md)"
 """
 
 import time

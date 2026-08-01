@@ -30,11 +30,17 @@ The terminal interface, which `hmz` with no command opens. It is a coding agent'
 terminal with a flow underneath: laid out as a transcript, a multi-line editor, and a status
 line, with what the flow is doing beside the transcript.
 
-- It MUST open on a flow that is only talking to one agent, at the first agent installed, so
-  that saying something is all it takes to start. A flow is what is reached for once talking
-  to one agent is not the shape of the work, and that is not known before anything has been
-  said. The agent it opens on MUST NOT be at the hardest effort the model takes: that is the
-  one to reach for, not the one to spend before it has been asked for.
+- It MUST open on a flow that is only talking to one agent, at the first agent installed that
+  has said what it runs, so that saying something is all it takes to start. A flow is what is
+  reached for once talking to one agent is not the shape of the work, and that is not known
+  before anything has been said. Which model MUST be the first that CLI named, which is that
+  CLI's own idea of what it runs; naming one here would be naming one that was right on the
+  day it was written. The agent it opens on MUST NOT be at the hardest effort the model
+  takes: that is the one to reach for, not the one to spend before it has been asked for.
+- Every backend installed here that has never said what it runs MUST be asked as the
+  interface opens, in the background and one at a time: before that there is nothing to
+  offer at any sheet and nothing to open talking to. It MUST NOT hold the prompt up, and a
+  backend that will not answer MUST NOT be asked again on its own.
 - Choosing a flow MUST stop whatever is running, since a flow is chosen in order to be run.
   Looking at the flows and leaving without choosing MUST change nothing at all.
 - It MUST be drawn in the terminal's own colours, and MUST NOT ask the terminal what they
@@ -117,9 +123,18 @@ top, the question and a line about it, the choices numbered with a marker agains
 the cursor, and under them whatever is adjusted rather than chosen.
 
 - Nothing MUST be typed in that could be found: the CLIs offered MUST be the ones installed
-  here, the efforts offered MUST be the ones that model takes, and the skills offered MUST be
-  the ones that CLI would load. Nothing MUST be asked of a CLI to find out -- starting one
-  costs seconds a prompt has not got.
+  here, the models offered MUST be the ones that CLI said it runs as the account chosen for
+  it, the efforts offered MUST be the ones that model takes, and the skills offered MUST be
+  the ones that CLI would load. Nothing MUST be asked of a CLI while a sheet is being drawn
+  -- starting one costs seconds a prompt has not got -- so what was kept is what is read.
+- The models MUST be askable again from the sheet they are chosen on, on `ctrl+r`, which is
+  the key a flowverse is fetched again on. This is where somebody finds out that the model
+  they came for is not in the list, and sending them elsewhere to fix it would lose the
+  question they came to answer. Asking MUST NOT stop the interface redrawing, and what came
+  of it MUST be said under the list rather than raised at whoever opened the sheet.
+- A CLI that has never said what it runs as the chosen account MUST say so where the list
+  would be, and MUST say which key asks it: an empty list that explains nothing reads as a
+  CLI with no models.
 - Which flow to run MUST be asked out of the places flows come from, a tab apiece: every
   flowverse there is, fetched or not, and then this project's flows and yours where there are
   any. The arrows the list itself is not using MUST turn between them, as they do between the
@@ -254,10 +269,10 @@ What the editor offers to finish, which is the only way anything is chosen.
 
 Which agents are installed here, what each one runs, and where their turns could land.
 
-- Nothing MUST be asked of a backend: starting one costs what it costs, and this is read at a
-  prompt. What each runs MUST be read out of `hmz.backends`, and what only this machine
-  knows -- which models an account may run, which containers are up, which hosts are in an ssh
-  config -- MUST be read off the disk it is written on.
+- Nothing MUST be asked of a backend here: starting one costs what it costs, and this is read
+  at a prompt. What each runs MUST be what `hmz.models` last kept for it, and what only this
+  machine knows -- which containers are up, which hosts are in an ssh config -- MUST be read
+  off the disk it is written on.
 - A backend that is not installed here MUST NOT be offered, and neither MUST an effort a model
   does not take.
 

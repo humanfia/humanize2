@@ -1,10 +1,15 @@
 """What is true of each coding agent CLI, written down once.
 
-Facts rather than code: what a backend is called, what it answers to on a command line, what
-it runs, where it keeps its home and which files under it a session is logged to. Four things
-need these and none of them needs the others -- driving a backend, reading a run's cost as it
-happens, gathering its trajectories afterwards, offering its models at a prompt -- so they are
-here rather than in whichever of those was written first.
+Facts rather than code: what a backend is called, what it answers to on a command line, how
+hard it thinks, where it keeps its home and which files under it a session is logged to. Four
+things need these and none of them needs the others -- driving a backend, reading a run's cost
+as it happens, gathering its trajectories afterwards, offering what it runs at a prompt -- so
+they are here rather than in whichever of those was written first.
+
+What it runs is not here, and cannot be: a model id is whatever that CLI shipped this week, on
+whatever account the turns run as. :mod:`hmz.models` asks the backend itself and keeps what it
+says. The efforts are, because they are the backend's own vocabulary rather than a catalogue --
+`xhigh` means the same thing next release -- and a model narrows them to the ones it takes.
 
 Nothing is imported to read this, which is what lets `hmz collect` and the prompt's model list
 have it without paying for the agents themselves. The code that acts on a fact lives where its
@@ -82,9 +87,15 @@ class Way:
 class Model:
     """One model a backend runs, and the efforts it runs at.
 
+    What a backend answered when it was asked what it runs, rather than anything written down
+    here: :mod:`hmz.models` is what asks and what keeps the answer.
+
     Attributes:
-      name: What to ask the backend for.
-      efforts: The efforts this model takes, which is not always all of them.
+      name: What to ask the backend for. The id it answers to, never an alias it also takes:
+        `opus` is whichever Opus is newest today and something else tomorrow, so a cycle that
+        recorded it says nothing about what actually ran.
+      efforts: The efforts this model takes, hardest first, which is not always all of the
+        ones its backend has.
       swarms: Whether it also runs a turn as a fleet of subagents rather than as one agent,
         which is a second thing to say about a turn and not a harder version of the first --
         so it is chosen alongside the effort rather than among them.
@@ -123,11 +134,15 @@ class Profile:
         it goes on reading it wherever `home_var` has moved its own home to.
       works: The same, under the workspace rather than under either home: a skill kept beside
         the project it is for. A backend may read more than one such directory.
-      models: What it runs, in the order they are offered: by tier and then newest first.
-        Nothing sorts them, because nothing can -- a tier is not in the name and a version is
-        not a number. Model ids only, never the aliases a backend also answers to: `opus` is
-        whichever Opus is newest today and something else tomorrow, so a cycle that recorded
-        it says nothing about what actually ran.
+      efforts: How hard this backend can be asked to think, hardest first, in its own wording.
+        The whole ladder it has words for; a model of it takes some of them, and which ones is
+        the backend's to say when it is asked what it runs.
+      beyond: The rungs of that ladder it takes but does not list -- a way of running a model
+        that is real and undocumented. Written here because no listing of the backend's own
+        will ever name one, so a model asked about would otherwise lose it.
+      swarms: Whether a turn of this backend also runs as a fleet of subagents rather than as
+        one agent. A property of the backend rather than of a model: it is a way of taking a
+        turn, and every model that takes turns here takes them that way too.
       creds: What a login to this backend leaves behind: the paths it reads its credentials
         back out of and writes its refreshed ones to. One under this backend's home per entry,
         or one under the user's own home where the entry starts with `~/` -- which is where
@@ -150,11 +165,13 @@ class Profile:
     home_var: str
     home_dir: str
     logs: tuple[str, ...]
-    models: tuple[Model, ...]
+    efforts: tuple[str, ...]
     home_in: str = ""
     skills: tuple[str, ...] = ()
     shared: tuple[str, ...] = ()
     works: tuple[str, ...] = ()
+    beyond: tuple[str, ...] = ()
+    swarms: bool = False
     creds: tuple[str, ...] = ()
     ways: tuple[Way, ...] = ()
     ambient: tuple[str, ...] = ()
@@ -214,6 +231,14 @@ class Profile:
 #: one at the top.
 _CLAUDE = ("ultracode", "max", "xhigh", "high", "medium", "low")
 
+#: What codex calls its reasoning levels. Which of them a model takes differs across its
+#: models, and codex says which where it says what it runs.
+_CODEX = ("ultra", "max", "xhigh", "high", "medium", "low")
+
+#: What Kimi Code calls its thinking levels. It says which its models take too, and they
+#: differ: this is the ladder, not a promise that every model has every rung.
+_KIMI = ("max", "high", "medium", "low")
+
 #: What pi calls its thinking levels, hardest first. `off` is the model asked not to think at
 #: all, which is an effort like any other here: it is the least of them, not the absence of a
 #: setting.
@@ -240,6 +265,10 @@ PROFILES = (
         home_var="CLAUDE_CONFIG_DIR",
         home_dir=".claude",
         logs=("projects/*/{ident}.jsonl", "projects/*/{ident}/subagents/**/*.jsonl"),
+        efforts=_CLAUDE,
+        # `ultracode` is real and undocumented, so the catalogue Claude Code answers with
+        # will never name it: a model asked about keeps it whatever that list says.
+        beyond=("ultracode",),
         # The skills a person installs, which is what there is to choose between: the ones
         # Claude ships with and the ones a plugin brought are the plugin's to say. Its own
         # two directories and no more -- it does not read the shared one, which is why a
@@ -330,16 +359,6 @@ PROFILES = (
                 ),
             ),
         ),
-        models=(
-            Model("claude-fable-5", _CLAUDE),
-            Model("claude-opus-5", _CLAUDE),
-            Model("claude-opus-4-8", _CLAUDE),
-            Model("claude-opus-4-7", _CLAUDE),
-            Model("claude-opus-4-6", _CLAUDE),
-            Model("claude-sonnet-5", _CLAUDE),
-            Model("claude-sonnet-4-6", _CLAUDE),
-            Model("claude-haiku-4-5", _CLAUDE),
-        ),
     ),
     Profile(
         name="codex",
@@ -347,6 +366,7 @@ PROFILES = (
         home_var="CODEX_HOME",
         home_dir=".codex",
         logs=("sessions/**/rollout-*{ident}.jsonl",),
+        efforts=_CODEX,
         # Four places, which is what `skills/list` answers with: its own home, the shared
         # one under yours, and both of the directories a project may keep them in. A turn is
         # given the ones left on, as `skills.config` says which are off.
@@ -428,12 +448,6 @@ PROFILES = (
                 ),
             ),
         ),
-        models=(
-            Model("gpt-5.6-sol", ("ultra", "max", "xhigh", "high", "medium", "low")),
-            Model("gpt-5.6-terra", ("ultra", "max", "xhigh", "high", "medium", "low")),
-            Model("gpt-5.6-luna", ("max", "xhigh", "high", "medium", "low")),
-            Model("gpt-5.5", ("xhigh", "high", "medium", "low")),
-        ),
     ),
     Profile(
         name="kimi",
@@ -441,6 +455,10 @@ PROFILES = (
         home_var="KIMI_CODE_HOME",
         home_dir=".kimi-code",
         logs=("server/events/{ident}.jsonl",),
+        efforts=_KIMI,
+        # Every model Kimi runs takes a turn as a fleet as well as as one agent: `swarmmax`
+        # and `max` are the same thinking at two widths.
+        swarms=True,
         # None named: `--skills-dir` is a flag of the command line, and a session here is a
         # thread on `kimi web`, which takes none. A skill Kimi finds is a skill it loads, so
         # there is nothing here to be offered a choice about.
@@ -484,15 +502,6 @@ PROFILES = (
                 ),
             ),
         ),
-        models=(
-            Model("kimi-code/k3", ("max", "high", "medium", "low"), swarms=True),
-            Model("kimi-code/k3-256k", ("max", "high", "medium", "low"), swarms=True),
-            Model(
-                "kimi-code/kimi-for-coding",
-                ("max", "high", "medium", "low"),
-                swarms=True,
-            ),
-        ),
     ),
     Profile(
         name="pi",
@@ -503,6 +512,7 @@ PROFILES = (
         # a directory per workspace. The id is the tail of the name, so a glob on it finds the
         # session whichever workspace it was opened in.
         logs=("sessions/*/*{ident}.jsonl",),
+        efforts=_PI,
         # None named: pi is told which skills to load rather than which to leave, by the path
         # of each, and it finds none of its own to be left out of that -- there is no
         # directory it reads them from, so there is nothing here to offer a choice about.
@@ -536,15 +546,6 @@ PROFILES = (
                 argv=("pi",),
             ),
         ),
-        models=(
-            Model("openai-codex/gpt-5.6-sol", _PI),
-            Model("openai-codex/gpt-5.6-terra", _PI),
-            Model("openai-codex/gpt-5.6-luna", _PI),
-            Model("openai-codex/gpt-5.5", _PI),
-            Model("openai-codex/gpt-5.4", _PI),
-            Model("openai-codex/gpt-5.4-mini", _PI),
-            Model("openai-codex/gpt-5.3-codex-spark", _PI),
-        ),
     ),
     Profile(
         name="opencode",
@@ -557,6 +558,7 @@ PROFILES = (
         # None: a session here is rows of a database rather than a file, so there is no log to
         # read a run's cost out of as it is spent, and none to gather afterwards.
         logs=(),
+        efforts=_VARIANTS,
         # One file per kind of thing signed into: the providers in one, the servers a session
         # reaches out to in the other.
         creds=("auth.json", "mcp-auth.json"),
@@ -598,16 +600,6 @@ PROFILES = (
                 asks=(Asked(env="OPENCODE_API_KEY", about="the key", secret=True),),
             ),
         ),
-        models=(
-            Model("opencode/big-pickle", _VARIANTS),
-            Model("opencode/nemotron-3-ultra-free", _VARIANTS),
-            Model("opencode/deepseek-v4-flash-free", _VARIANTS),
-            Model("opencode/laguna-s-2.1-free", _VARIANTS),
-            Model("opencode/longcat-2.0-free", _VARIANTS),
-            Model("opencode/mimo-v2.5-free", _VARIANTS),
-            Model("opencode/north-mini-code-free", _VARIANTS),
-            Model("opencode/ling-3.0-tiny-free", _VARIANTS),
-        ),
     ),
     Profile(
         name="mimo",
@@ -616,6 +608,7 @@ PROFILES = (
         home_in="mimocode",
         home_dir=".local/share/mimocode",
         logs=(),
+        efforts=_VARIANTS,
         creds=("auth.json", "mcp-auth.json"),
         ambient=(
             "ANTHROPIC_API_KEY",
@@ -636,17 +629,6 @@ PROFILES = (
                 about="a MiMo key, which its own models run on",
                 asks=(Asked(env="XIAOMI_API_KEY", about="the key", secret=True),),
             ),
-        ),
-        models=(
-            Model("mimo/mimo-auto", _VARIANTS),
-            Model("xiaomi/mimo-v2.5-pro", _VARIANTS),
-            Model("xiaomi/mimo-v2.5-pro-ultraspeed", _VARIANTS),
-            Model("xiaomi/mimo-v2.5", _VARIANTS),
-            Model("openai/gpt-5.6-sol", _VARIANTS),
-            Model("openai/gpt-5.6-terra", _VARIANTS),
-            Model("openai/gpt-5.6-luna", _VARIANTS),
-            Model("openai/gpt-5.5", _VARIANTS),
-            Model("openai/gpt-5.4", _VARIANTS),
         ),
     ),
 )
@@ -702,8 +684,8 @@ def read(spec: str) -> tuple[Profile, str, str, str, str | None]:
                 f"{', '.join(sorted(given))} is not cli, model, effort, provider or permission"
             )
     else:
-        # Read from both ends: a model may hold slashes of its own -- Kimi's are
-        # `kimi-code/k3` -- while a CLI and an effort never do.
+        # Read from both ends: a model may hold slashes of its own -- Kimi Code's and
+        # opencode's are `provider/id` -- while a CLI and an effort never do.
         backend, _, rest = spec.partition("/")
         model, _, effort = rest.rpartition(":")
     # The account, if one was named: a CLI is never spelled with an `@` in it, so the two are

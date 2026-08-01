@@ -267,13 +267,18 @@ command at all lists them.
 | --- | --- |
 | `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, and the variables it sets. |
 | `ways <cli>` | How that backend can be signed into: each way, what it asks for, and what it runs. |
-| `add <cli>/<name>` | Makes one and signs it in. `-w` chooses the way and defaults to the backend's first, which is `login`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in. |
-| `login <cli>/<name>` | Signs an existing one in again, by the way it was made with. Takes the same `-s`. |
+| `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first, which is `login`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. |
+| `login <cli>/<name>` | Signs an existing one in again, by the way it was made with, and asks it again what it runs. Takes the same `-s`. |
 | `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, the names of the variables it sets, and which paths a turn under it is given instead of which. |
 | `remove <cli>/<name>` | Takes it away, credentials and all. |
 
 Whatever a way asks that the line did not answer is asked at the terminal, and a secret is not
 echoed. A line with nobody at a terminal has to answer everything itself.
+
+**What an account runs is that account's**, so it is asked for as soon as one is made: which
+models a turn may name depends on which subscription, key or gateway it runs under. A CLI that
+will not say does not fail the line — the account was made — and **ctrl+r** on the models sheet
+asks it again.
 
 **Values are never printed** — `show` and `list` say which variables a provider sets and not
 what they are.
@@ -343,6 +348,8 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened, how it ended. See [Cycles](tracing.md#cycles). |
 | `~/.humanize/providers/<cli>/<name>/provider.json` | `hmz providers add` | What a [provider](providers.md) was made by, and what a turn under it runs with. `0600`, in a directory at `0700`. |
 | `~/.humanize/providers/<cli>/<name>/{home,user}/...` | the CLI's own login | That provider's credentials, at the names the CLI keeps its own under. |
+| `~/.humanize/providers/<cli>/<name>/models.json` | `hmz providers add`, **ctrl+r** | What that CLI said it runs as that account. Goes when the account does. |
+| `~/.humanize/models/<cli>.json` | the TUI, **ctrl+r** | The same, for the CLI as you already run it. |
 | `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run. |
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
 | `.humanize/<datetime>.trace.json` | `hmz collect` | The trace. Relative to the current directory, not to the workspace named. |

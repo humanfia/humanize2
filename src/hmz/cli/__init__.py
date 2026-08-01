@@ -1,8 +1,8 @@
 """``hmz`` -- the whole command line, over layers that have none of their own.
 
     hmz
-    hmz -f humanize1 -c setup.yaml -a claude/claude-opus-5:max ...
-    hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
+    hmz -f humanize1 -c setup.yaml -a claude/MODEL:max ...
+    hmz exec -f ralph_loop -a claude/MODEL:high "$(cat TASK.md)"
     hmz collect
     hmz anchor --target ssh://build-box claude
 
