@@ -149,6 +149,22 @@ class Runner:
   setup fails is not answered with a command line to correct.
 - `run` MUST call the entry point with the agents as the tuple the flow declared -- the named
   one where it named them -- in the order they were given, and the task.
+- `calls` MUST answer with one flow ready for another flow to run, found by the same name `-f`
+  takes: a flow is a loop over agents, and a loop worth having is one another loop can reach
+  for. A name nothing answers to MUST be refused where it is asked for rather than where the
+  answer is called, so that a flow which asks for another by the wrong name says so at once
+  rather than an hour into a loop. What it answers MUST be called the way the flow itself is --
+  the agents, the task, and the config for one that takes one -- and MUST answer with whatever
+  the flow answers with, so that a flow written as a coroutine is awaited by whoever called it.
+- A called flow MUST be handed the agents it declares, as the tuple it declared them as, and
+  MUST be handed one fewer where it talks to the person, whom nothing chooses. It MUST NOT
+  rename them: they belong to the run that was started, and a name changed under it would
+  change what has already been written down.
+- `running` MUST report every flow running now, the one that was started first and whatever it
+  called after it. Nothing else can say: a flow is a Python file that may branch any way it
+  likes, so what it is doing is only visible where it was started and where it asked for
+  another. A flow MUST leave that list however it ends, and a call MUST be written into the
+  cycle at both ends, a run being what it did as well as what it was started as.
 - `flow_and_agents` MUST read the same `hmz exec` line the command takes, and MUST be here
   rather than in `cli`: the terminal interface starts a flow from that line and then keeps the
   agents, and a reader that lived in the command line would be one the interface reached up

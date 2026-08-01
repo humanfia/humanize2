@@ -93,6 +93,11 @@ line, with what the flow is doing beside the transcript.
   line said to the wrong conversation. It MUST reach it only while a turn of that session is
   open -- one between turns would answer it on its own, outside the flow -- and MUST wait for
   the turn that starts next otherwise.
+- What is running MUST be what is running: a flow may reach for another by name and run it, so
+  the line that names one MUST name the flow that was started and whatever it called, innermost
+  last, and the sheet that says how the run is going MUST say the same. A flow that called
+  another and reads as the flow somebody chose is an interface that stopped being true the
+  moment the call was made.
 - The accounts an agent may be run as MUST be reachable from here as well as from a command
   line: an account outlives the flow that was set up with it, and the one place a person is
   asked anything is the one place a credential can be typed. It is the one thing said in both
@@ -136,6 +141,8 @@ line, with what the flow is doing beside the transcript.
 
 ```python
 class Transcript(ScrollView): ...
+
+
 class Choices(OptionList): ...
 ```
 

@@ -134,7 +134,8 @@ says where it may work. All of it is checked at the same moment.
 A flow is ordinary Python and may branch any way it likes. Nothing asks it what it is doing;
 what a run looks like is read off the turns going past. It may be `async def`, which is how a
 flow drives [many turns at once](flows.md#a-flow-that-waits-for-more-than-one-thing); starting
-one is the same either way.
+one is the same either way. It may also [call another flow](flows.md#a-flow-that-calls-another-flow)
+by name, and run it with the agents it already has.
 
 One file may hold several: `@flow` is the flow it holds under its own name, and each
 `@flow(name="…")` is another, run as `<flow>:<name>`. Three phases of one thing are then one

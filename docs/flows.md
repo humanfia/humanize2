@@ -18,6 +18,7 @@ branch, sleep, read files, shell out, and give up, because it is just a function
 - [The person at the prompt](#the-person-at-the-prompt)
 - [Running one](#running-one)
 - [Several flows in one file](#several-flows-in-one-file)
+- [A flow that calls another flow](#a-flow-that-calls-another-flow)
 - [Where flows live](#where-flows-live)
 - [Flowverses](#flowverses)
 - [The flows humanize ships](#the-flows-humanize-ships)
@@ -431,6 +432,63 @@ passes between them is whatever they write — a file, usually.
 
 `@flow` marks; it does not wrap. The function is called exactly as it was. A file that marks
 one function with a bare `@flow` is one flow under the file's own name, which is most of them.
+
+## A flow that calls another flow
+
+A flow is a loop over agents, and a loop worth having is one another loop can reach for. Ask
+for it by the same name `-f` takes, and you are handed the flow itself to run with the agents
+you already have:
+
+```python
+from hmz.agents import AgentBase
+from hmz.flows import flow
+from hmz.runner import calls
+
+
+@flow
+def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+    plan = calls("official/humanize1:gen-plan")
+    plan(agents, f"plan this first: {task}")
+    for _ in range(3):
+        agents[0].new()(task)
+```
+
+`calls` takes what `-f` takes — `ralph_loop`, `official/rlar`, `humanize1:gen-plan`, a path of
+your own — so a flowverse is a library as well as a menu. A name nothing answers to is refused
+where you ask for it rather than an hour into your loop.
+
+**Hand it the agents it declares.** A flow that drives one is called with one, in the tuple it
+declared them as — pass a list or a tuple and it arrives as that flow's own `NamedTuple`, named
+the way that flow names them. A flow that [talks to the person](#the-person-at-the-prompt) may
+be handed one fewer, since nobody chooses the person; hand over your own if you have one, so
+that what it asks reaches whoever is at the prompt.
+
+Nothing is renamed. The agents belong to the run that was started, and what has already been
+written down about them stays true.
+
+**A flow that takes [settings of its own](#settings-of-the-flows-own) takes them here too**,
+as a third argument — an instance of that flow's model, or the fields to build one from:
+
+```python
+calls("official/rlar")(agents, task, {"rounds": 9})
+```
+
+They are read back through the flow's own model at the moment it is called, so a flow that
+takes no settings, or takes different ones, says so rather than quietly ignoring them.
+
+**A called flow answers with whatever it answers with**, so one written as a coroutine is
+awaited by whoever called it:
+
+```python
+@flow
+async def run(agents: tuple[AgentBase], task: str) -> None:
+    await calls("official/rlar")(agents, task)
+```
+
+**What is running is both of them.** `hmz.runner.running()` reports the flow that was started
+and whatever it called, innermost last; the interface names them on its status line and on
+`/status`, and the [cycle](tracing.md) records each call and each return. A flow that called
+another does not read as the flow somebody chose.
 
 ## Where flows live
 

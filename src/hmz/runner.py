@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import inspect
 import os
+import threading
+import time
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -49,6 +51,67 @@ class NotAFlow(ValueError):  # noqa: N818  -- the name SPEC.md gives it
     file beside it and does not find it -- is left to fail as it would anywhere, rather than
     being reported as a command line to correct.
     """
+
+
+class Running(NamedTuple):
+    """One flow that is running now.
+
+    Attributes:
+      flow: What it was asked for as -- the name a command line gave, or the one a flow asked
+        another for, which is the name worth showing either way.
+      since: When it started, on the monotonic clock.
+    """
+
+    flow: str
+    since: float
+
+
+#: The flows running now, in the order they started: the one somebody ran, then whatever it
+#: called, then whatever that called. Kept here rather than asked of the flows, which is the
+#: one thing a flow cannot be asked -- it is a Python file and may branch any way it likes --
+#: and read by the interface to say what is running under what.
+#:
+#: A list rather than a stack, because a flow written as a coroutine may have two of them
+#: going at once, and both are running. Under a lock, since a flow runs on whichever thread
+#: took it and the interface reads while they run.
+_RUNNING: list[Running] = []
+_TELLING = threading.Lock()
+
+
+def running() -> tuple[Running, ...]:
+    """Every flow running now, the one that was started first and whatever it called after it.
+
+    Returns:
+      One apiece, in the order they started. Empty where nothing is running.
+    """
+    with _TELLING:
+        return tuple(_RUNNING)
+
+
+def _entered(flow: str) -> Running:
+    """Writes down that a flow has started, for whatever is watching the run.
+
+    Args:
+      flow: What it was asked for as.
+
+    Returns:
+      The record, to be handed back when it ends.
+    """
+    one = Running(flow, time.monotonic())
+    with _TELLING:
+        _RUNNING.append(one)
+    return one
+
+
+def _left(one: Running) -> None:
+    """Writes down that a flow has ended, however it ended.
+
+    Args:
+      one: What :func:`_entered` answered with.
+    """
+    with _TELLING:
+        if one in _RUNNING:
+            _RUNNING.remove(one)
 
 
 class Place(NamedTuple):
@@ -234,6 +297,171 @@ def _read(
         tuple,
         _setting(run, hinted),
     )
+
+
+def calls(flow: str | os.PathLike[str]) -> Flow:
+    """One flow, ready for another flow to run: what it marked, found by name.
+
+    A flow is a loop over agents, and a loop worth having is one another loop can reach for::
+
+        from hmz.flows import flow
+        from hmz.runner import calls
+
+        @flow
+        def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+            plan = calls("official/humanize1:gen-plan")
+            plan(agents, f"plan this first: {task}")
+            agents[0].new()(task)
+
+    The name is the one `-f` takes -- `ralph_loop`, `official/rlar`, `humanize1:gen-plan`, a
+    path of your own -- so a flow reaches another flow the way a person does, and a flowverse
+    is a library as well as a menu.
+
+    What comes back is the flow's own function, with the run written down around it: what is
+    running is what the interface shows, and a flow that called another must not read as the
+    flow that was started. It is called the way the flow itself is -- the agents, the task,
+    and the config for one that says it takes one -- and answers with whatever the flow
+    answers with, so a flow written as a coroutine is awaited by whoever called it::
+
+        await calls("official/rlar")(agents, task)
+
+    Args:
+      flow: The flow to call, by the name `-f` takes.
+
+    Returns:
+      Something to call with the agents and the task.
+
+    Raises:
+      NotAFlow: If there is no such flow, or it is not one. Raised here rather than at the
+        call, so that a flow which asks for another by a name that is wrong says so when it is
+        asked for rather than an hour into a loop.
+    """
+    run, places, make, setting = _read(flow)
+    named = str(flow)
+
+    def calling(
+        agents: Sequence[AgentBase],
+        task: str,
+        config: BaseModel | dict[str, Any] | None = None,
+    ) -> Awaitable[None] | None:
+        driven = _handed(named, places, make, agents)
+        # Read back through the flow's own model, which is what refuses a config a flow does
+        # not take and one it takes another of -- and what puts the settings through its own
+        # validators at the moment it is about to run, exactly as a run of it does.
+        given = None if config is None else _set_up(named, setting, config)
+        settings = () if setting is None else (given,)
+        started = _entered(named)
+        _wrote(driven, "called", flow=named, task=task)
+        try:
+            answered = run(driven, task, *settings)
+        except BaseException:
+            _left(started)
+            _wrote(driven, "returned", flow=named)
+            raise
+        if inspect.isawaitable(answered):
+            # A flow written as a coroutine has not run yet: it is running while whoever
+            # called it awaits it, so what says it is running has to last that long too.
+            return _awaited(answered, driven, started, named)
+        _left(started)
+        _wrote(driven, "returned", flow=named)
+        return None
+
+    return calling
+
+
+async def _awaited(
+    answered: Awaitable[None],
+    driven: tuple[AgentBase, ...],
+    started: Running,
+    named: str,
+) -> None:
+    """Waits for a called flow that is a coroutine, and writes down that it ended.
+
+    Args:
+      answered: What calling it gave back.
+      driven: The agents it was called with, for the cycle to write to.
+      started: What :func:`_entered` answered with.
+      named: The flow, as it was asked for.
+    """
+    try:
+        await answered
+    finally:
+        _left(started)
+        _wrote(driven, "returned", flow=named)
+
+
+def _handed(
+    flow: str,
+    places: tuple[Place, ...],
+    make: Callable[..., tuple[AgentBase, ...]],
+    agents: Sequence[AgentBase],
+) -> tuple[AgentBase, ...]:
+    """The agents a called flow is handed, as the tuple that flow declared.
+
+    A flow is called with what it drives, so a caller hands over as many agents as the flow
+    declares -- and may hand over one fewer where the flow talks to the person, since the
+    person is made rather than chosen. Nothing is renamed: the agents belong to the flow that
+    was started, and a name changed under it would change what the run has already been
+    written down as.
+
+    Args:
+      flow: The flow being called, for what a refusal says.
+      places: What it declared.
+      make: What to build its agents as -- the named tuple it declared, or a plain one.
+      agents: What the caller handed over.
+
+    Returns:
+      The agents, as the flow declared them.
+
+    Raises:
+      NotAFlow: If that is the wrong number of them, if one of them cannot run a moment the
+        flow says that place has to, or if one is somewhere the flow does not put it.
+    """
+    from .agents import HumanAgent
+
+    given = list(agents)
+    asked = [place for place in places if not place.person]
+    if len(given) == len(places):
+        driven = given
+    elif len(given) == len(asked):
+        # The person is made rather than chosen, exactly as a run of the flow makes one.
+        taking = iter(given)
+        driven = [HumanAgent() if place.person else next(taking) for place in places]
+    else:
+        raise NotAFlow(
+            f"{flow}: the flow drives {len(asked)} agents, {len(given)} given"
+        )
+    for agent, place in zip(driven, places, strict=True):
+        if short := place.moments - type(agent).moments:
+            raise NotAFlow(
+                f"{flow}: {place.name or 'the agent'} has to run "
+                f"{', '.join(sorted(short))}, which {agent.backend} does not"
+            )
+        _lands(flow, agent, place)
+    return make(driven)
+
+
+def _wrote(driven: tuple[AgentBase, ...], event: str, **said: Any) -> None:
+    """Writes one line about a called flow into the run's own record, where there is one.
+
+    Through the agents rather than through anything of ours: the cycle belongs to the run that
+    was started, the agents were handed it as it began, and a flow called from a `Runner` that
+    opened none -- a flow run from a test, a flow called from a flow called from nothing --
+    has nowhere to write and nothing to say.
+
+    Args:
+      driven: The agents the called flow was handed.
+      event: What happened.
+      said: What is worth saying about it.
+    """
+    # Asked what it is rather than taken as read: what an agent asks of a journal is that it
+    # can be told a session was opened, and this is asking it for something else.
+    from .cycle import Cycle
+
+    for agent in driven:
+        if isinstance(agent.cycle, Cycle):
+            agent.cycle.write(event, **said)
+            return
 
 
 def _lands(flow: str | os.PathLike[str], agent: AgentBase, place: Place) -> None:
@@ -646,20 +874,27 @@ class Runner:
 
         from .cycle import Cycle
 
-        with Cycle(self._flow, self._agents, task) as cycle:
-            for agent in self._agents:
-                agent.cycle = cycle
-            if self._setting is None:
-                running = self._run(self._agents, task)
-            else:
-                # As it was set up, or as it comes: a flow that takes a config takes None for
-                # the run nobody set up, which is the default the flow itself declared.
-                running = self._run(self._agents, task, self._config)
-            # Read off what the call answered rather than off the function: a flow is what it
-            # does when it is called, and one wrapped in something of its own -- a decorator
-            # that times its rounds -- is the same flow.
-            if inspect.isawaitable(running):
-                _finished(running)
+        # Written down as running before it is: what a flow calls is written down the same
+        # way, so that whatever is watching reads one list of what is running under what,
+        # rather than a flow it was told about and a flow it was not.
+        started = _entered(self._flow)
+        try:
+            with Cycle(self._flow, self._agents, task) as cycle:
+                for agent in self._agents:
+                    agent.cycle = cycle
+                if self._setting is None:
+                    running_now = self._run(self._agents, task)
+                else:
+                    # As it was set up, or as it comes: a flow that takes a config takes None
+                    # for the run nobody set up, which is the default the flow declared.
+                    running_now = self._run(self._agents, task, self._config)
+                # Read off what the call answered rather than off the function: a flow is what
+                # it does when it is called, and one wrapped in something of its own -- a
+                # decorator that times its rounds -- is the same flow.
+                if inspect.isawaitable(running_now):
+                    _finished(running_now)
+        finally:
+            _left(started)
 
 
 def read_agent(

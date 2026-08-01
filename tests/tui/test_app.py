@@ -611,6 +611,32 @@ async def test_a_flow_between_two_turns_is_a_flow_that_is_running() -> None:
 
 
 @pytest.mark.timeout(60)
+async def test_a_flow_that_called_another_names_both_of_them() -> None:
+    """A flow may reach for another and run it, and what is running is then both."""
+    from hmz.runner import _entered, _left
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._flow_named = "chat"
+        started = _entered("chat")
+        called = _entered("official/rlar")
+        try:
+            app._draw()
+            await driver.pause()
+            status = str(app.query_one("#status", Static).content)
+        finally:
+            _left(called)
+            _left(started)
+
+        assert "chat ▸ official/rlar" in status
+
+        # And back to the one that is set up to run, once nothing is.
+        app._draw()
+        await driver.pause()
+        assert "chat" in str(app.query_one("#status", Static).content)
+
+
+@pytest.mark.timeout(60)
 async def test_a_turn_that_has_gone_quiet_still_reads_as_one_that_is_running() -> None:
     """A model thinks for minutes without a word, and the clock is what says it is alive."""
     from hmz.agents import Event

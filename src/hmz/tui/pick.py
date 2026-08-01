@@ -1615,6 +1615,33 @@ def _grouped(field: FieldInfo) -> str:
     return str(said) if said else ""
 
 
+def _flowing(started: str) -> list[str]:
+    """Which flow is running, and inside which, for the row that names one.
+
+    A flow may reach for another by name and run it, so the flow a run is in is not always
+    the flow that was started -- and a sheet that named only the one somebody chose would be
+    a sheet that stopped being true the moment a flow called another.
+
+    Args:
+      started: The flow that was chosen, which is what this says with nothing running.
+
+    Returns:
+      One line apiece, the one that was started first and whatever it called under it, each
+      with how long it has been going; and just the one that is set up to run where nothing
+      is running.
+    """
+    from hmz.runner import running
+
+    now = running()
+    if not now:
+        return [escape(started)]
+    return [
+        f"{'  ' * at}{'▸ ' if at else ''}{escape(one.flow)}"
+        f"   [$text-muted]{time.monotonic() - one.since:.0f}s[/]"
+        for at, one in enumerate(now)
+    ]
+
+
 def setting(config: BaseModel | None) -> list[str]:
     """What a flow was set up with, one line per setting that is not at its default.
 
@@ -2910,7 +2937,7 @@ class Status(ModalScreen[None]):
         # has cost, with a blank line between one group and the next.
         groups: list[list[tuple[str, list[str]]]] = [
             [
-                ("Flow", [escape(self._flow)]),
+                ("Flow", _flowing(self._flow)),
                 ("Agents", reads(self._named, self._models) or ["none installed"]),
                 # Only what was changed: a flow of forty settings says nothing by listing
                 # the ones nobody touched, and this is read to see what this run is.

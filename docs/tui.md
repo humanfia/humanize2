@@ -65,6 +65,8 @@ only, so a flow that has stopped reads as stopped.
 **The status line, left:** what is running, if anything is — whose turn it is and how long it
 has been going. Between two turns it names the flow and how long the run has been going, since
 a flow that sleeps off a round, commits, and reads what the last turn wrote has not stopped. A
+flow that [called another flow](flows.md#a-flow-that-calls-another-flow) names both, innermost
+last: `chat ▸ official/rlar`. A
 flow that has run out of things to do until you say something says `waiting for you`. With
 nothing running at all, it names the flow that is set up to run and the directory it would run
 in, with your home written as `~`.

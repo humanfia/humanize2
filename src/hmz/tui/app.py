@@ -1347,7 +1347,7 @@ class Humanize(App[None]):
                 (self._began[who] for who in working if who in self._began),
                 default=self._monitor.began,
             )
-            named = ", ".join(short(who) for who in working) or self._flow_named
+            named = ", ".join(short(who) for who in working) or self._flowing()
             left = (
                 f"[$secondary]{bar}[/] {escape(named)}… "
                 f"[$text-muted]({time.monotonic() - since:.0f}s{_DOT}esc to interrupt)[/]"
@@ -1357,7 +1357,7 @@ class Humanize(App[None]):
             # nothing running: the two lines above are about a run once there is one, and
             # where it is working has not changed since it started.
             left = (
-                f"[$secondary]◉[/] {escape(self._flow_named)}"
+                f"[$secondary]◉[/] {escape(self._flowing())}"
                 f"[$text-muted]{_DOT}{escape(_where())}[/]"
             )
         # For a moment after it happens, beside whatever else the line says: writing to a
@@ -1407,6 +1407,22 @@ class Humanize(App[None]):
         self.query_one("#status", Static).update(
             left + " " * max(2, gap) + right, layout=False
         )
+
+    def _flowing(self) -> str:
+        """What is running now, flow inside flow, for the line that names one.
+
+        A flow may reach for another by name and run it, so what is running is a list rather
+        than a name: the one that was started, and whatever it called, innermost last. Read
+        from the runner rather than asked of the flow -- a flow is a Python file and may branch
+        any way it likes, so what it is doing is only ever visible where it was started.
+
+        Returns:
+          The flows, innermost last, and the one that is set up to run where none is running --
+          which is what this line says with nothing going on.
+        """
+        from hmz.runner import running
+
+        return " ▸ ".join(one.flow for one in running()) or self._flow_named
 
     def _waiting_lines(self, beside: int = 0) -> list[str]:
         """What has been said to the flow and not taken yet, as the pin above the prompt.
