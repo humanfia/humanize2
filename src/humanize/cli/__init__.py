@@ -169,7 +169,6 @@ def _tui(argv: list[str]) -> int:
     Returns:
       Zero, once the interface has been closed, or two for a line to correct.
     """
-    from humanize.flows import find
     from humanize.runner import configures, read_agent, set_up_from, wanted
     from humanize.tui import Humanize
     from humanize.tui.pick import Runs
@@ -190,7 +189,7 @@ def _tui(argv: list[str]) -> int:
     setting = None
     if args.config is not None:
         try:
-            model = configures(find(flow))
+            model = configures(flow)
         except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
             parser.error(str(why))
         if model is None:
@@ -203,7 +202,7 @@ def _tui(argv: list[str]) -> int:
             parser.error(f"{args.config}: {refused}")
     if args.agents:
         try:
-            places = wanted(find(flow))
+            places = wanted(flow)
         except Exception as why:  # noqa: BLE001
             parser.error(str(why))
         if len(places) != len(args.agents):

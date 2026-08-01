@@ -2396,7 +2396,14 @@ _CALLED = ""
 #: The row a way that asks nothing in particular is answered in, and the question on it. Its
 #: own name rather than a variable's, since what is typed here is the variables themselves.
 _TYPED = " "
-_TYPED_ABOUT = "the variables, as NAME=VALUE, one per line -- ctrl+j breaks the line"
+_TYPED_ABOUT = (
+    "the variables, as NAME=VALUE, one per line -- shift+enter breaks the line"
+)
+
+#: What breaks a line where enter means something else, which is everywhere here. Two of
+#: them: a terminal reports shift+enter as itself only where it speaks a keyboard protocol
+#: that has a way to say so, and `ctrl+j` is a line feed and arrives from anywhere.
+_BREAKS = ("shift+enter", "ctrl+j")
 
 
 class Signing(Sheet[Signs]):
@@ -2519,6 +2526,10 @@ class Signing(Sheet[Signs]):
         held = self._fields[self._at][0]
         if event.key == "backspace":
             self._typed_in[held] = self._typed_in.get(held, "")[:-1]
+        elif event.key in _BREAKS and held == _TYPED:
+            # The one row that takes a list rather than a value: several variables, a line
+            # each, which is why it is the one row a line can be broken in.
+            self._typed_in[held] = self._typed_in.get(held, "") + "\n"
         elif event.is_printable and event.character:
             self._typed_in[held] = self._typed_in.get(held, "") + event.character
         else:

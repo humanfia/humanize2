@@ -331,6 +331,11 @@ class Editor(TextArea):
 
     BINDINGS: ClassVar = [
         Binding("enter", "send", "send", priority=True),
+        # Both, because only one of them always arrives. A terminal reports shift+enter as
+        # itself only where it speaks the keyboard protocol that has a way to say so, and
+        # sends a bare carriage return where it does not -- which is enter, and would send
+        # the line. `ctrl+j` is a line feed, so it reaches here from any terminal there is.
+        Binding("shift+enter", "newline", "newline", priority=True),
         Binding("ctrl+j", "newline", "newline", priority=True),
     ]
 
@@ -703,11 +708,13 @@ class Humanize(App[None]):
           will not load, since a name is a label on something that runs and not a reason for
           anything to stop.
         """
-        from humanize.flows import find
         from humanize.runner import Place, wanted
 
         try:
-            return wanted(find(flow))
+            # By the name it was chosen under, not by the file that name resolves to: a file
+            # may hold several flows, and which of them was asked for is the half after the
+            # colon -- which resolving the name to a path throws away.
+            return wanted(flow)
         except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
             return tuple(
                 Place(name="", person=False, moments=frozenset()) for _ in self._models
@@ -724,11 +731,10 @@ class Humanize(App[None]):
           The model to ask with, or None for a flow that takes no setting up -- and for one
           that will not load, which is a flow to report where it is run rather than here.
         """
-        from humanize.flows import find
         from humanize.runner import configures
 
         try:
-            return configures(find(flow))
+            return configures(flow)
         except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
             return None
 
@@ -1346,7 +1352,7 @@ class Humanize(App[None]):
             # it, and with none it is a key that does nothing.
             keys.append("tab agent")
         keys.append("/ commands")
-        keys.append("ctrl+j newline")
+        keys.append("shift+enter newline")
         if self._agents:
             keys.append("esc stop")
         keys.append(
@@ -1551,7 +1557,6 @@ class Humanize(App[None]):
             one that does not: it is the other half of `/config`, and a question it did not
             ask is one it must not put up.
         """
-        from humanize.flows import find
         from humanize.runner import wanted
 
         if self._mid_run("no choosing a flow"):
@@ -1571,8 +1576,10 @@ class Humanize(App[None]):
             try:
                 # One place per agent the flow drives: what it calls each -- a name apiece
                 # where it declared them as a named tuple -- how many there are either way,
-                # and what it needs each of them to be able to do.
-                places = wanted(find(switching))
+                # and what it needs each of them to be able to do. Asked by the name it was
+                # chosen under: a file may hold several flows, and the half after the colon
+                # is which of them this is.
+                places = wanted(switching)
             except Exception as why:  # noqa: BLE001 -- a flow that will not load
                 self.show(f"hmz: {why}", "red")
                 return

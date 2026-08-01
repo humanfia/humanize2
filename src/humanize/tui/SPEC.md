@@ -44,7 +44,10 @@ line, with what the flow is doing beside the transcript.
 - The editor MUST mean both things at once: a line beginning with `/` is a command, and any
   other line is said to the conversation being read, through `SessionBase.interject`, so that
   a turn already under way takes it into account rather than being restarted with it.
-- Enter MUST send and `ctrl+j` MUST break the line, so that a long prompt can be written.
+- Enter MUST send and `shift+enter` MUST break the line, so that a long prompt can be written.
+  `ctrl+j` MUST break it too: a terminal reports shift+enter as itself only where it speaks a
+  keyboard protocol that can say so, and sends a bare carriage return where it does not --
+  which is enter, and would send the line. A line feed arrives from every terminal there is.
 - A half-typed line MUST be offered what it could be finished with, in a list under the
   editor, and tab MUST take what is highlighted. What is offered MUST be reconsidered when the
   cursor moves as well as when the text does: an offer made at the end of a line MUST NOT
@@ -165,6 +168,9 @@ the cursor, and under them whatever is adjusted rather than chosen.
 - An account MUST be makeable from the step that asks for one. That step is where somebody
   finds out they have none for that CLI, and sending them to another command to make one loses
   the question they were answering.
+- The row that takes variables of your own MUST take several, a line apiece, and MUST break
+  the line on the same keys the editor does: enter is what takes the form, so a list typed
+  into one row needs a key of its own to be a list at all.
 - The skills sheet MUST be a checklist: every skill starts on, which is how a CLI comes, and
   space MUST switch the one under the cursor. What it answers with MUST be the skills the agent
   is to have. A CLI that offers no way of being told which to load MUST say that, rather than

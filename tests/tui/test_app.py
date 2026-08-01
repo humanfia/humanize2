@@ -363,6 +363,36 @@ async def test_the_arrows_walk_what_was_typed_before_it() -> None:
 
 
 @pytest.mark.timeout(60)
+@pytest.mark.parametrize("key", ["shift+enter", "ctrl+j"])
+async def test_the_line_is_broken_rather_than_sent(key: str) -> None:
+    """Enter sends, so breaking the line is a key of its own -- and two of them.
+
+    A terminal reports shift+enter as itself only where it speaks a keyboard protocol that
+    has a way to say so, and sends a bare carriage return where it does not -- which is
+    enter, and would send the line. `ctrl+j` is a line feed, and arrives from anywhere.
+    """
+    app = Humanize()
+    async with app.run_test() as driver:
+        editor = app.query_one(Editor)
+        await driver.press(*"first")
+        await driver.press(key)
+        await driver.press(*"second")
+
+        assert editor.text == "first\nsecond"  # still in the editor, and in two lines
+        assert "first" not in _transcript(app)  # nothing was sent by breaking a line
+
+
+@pytest.mark.timeout(60)
+async def test_the_keys_under_the_prompt_say_how_to_break_a_line() -> None:
+    """The one somebody reaches for first, which is the one that reads as a newline."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.pause()
+
+        assert "shift+enter newline" in " ".join(app._keys())
+
+
+@pytest.mark.timeout(60)
 async def test_the_arrows_are_the_editor_s_own_inside_a_prompt_of_more_than_one_line() -> (
     None
 ):

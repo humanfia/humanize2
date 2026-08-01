@@ -12,15 +12,17 @@ lands rather than how it is drawn.
 from __future__ import annotations
 
 import subprocess
+import unittest.mock
 from typing import TYPE_CHECKING
 
 import pytest
 from textual.widgets import Label, OptionList
 
+from humanize.backends import Model
 from humanize.flows import OFFICIAL, flowverses
 from humanize.flows import verses as store
 from humanize.tui import Humanize
-from humanize.tui.pick import Fetches, Flows
+from humanize.tui.pick import Configures, Fetches, Flows, RunsAs
 
 from .test_app import until
 
@@ -301,3 +303,103 @@ async def test_the_flow_that_is_picked_is_the_one_that_was_chosen(theirs: Path) 
         assert not isinstance(
             app.screen, Flows
         )  # on to what it runs, which is the next step
+
+
+#: A file that is three flows and no `run`, which is what humanize1 is.
+THREE = '''"""Three phases of one thing, which are three things to run."""
+
+from typing import NamedTuple
+
+from pydantic import BaseModel
+
+from humanize.agents import AgentBase
+from humanize.flows import flow
+
+
+class Drafting(NamedTuple):
+    """The one that writes."""
+
+    drafter: AgentBase
+
+
+class Building(NamedTuple):
+    """The one that builds, and the one that reads it."""
+
+    builder: AgentBase
+    reviewer: AgentBase
+
+
+class Wide(BaseModel):
+    """What the first phase takes."""
+
+    n: int = 6
+
+
+@flow
+def gen_idea(agents: Drafting, task: str, config: Wide | None = None) -> None:
+    """Opens a loose idea into a draft."""
+
+
+@flow
+def rlcr(agents: Building, task: str) -> None:
+    """Builds it, under review."""
+'''
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
+)
+async def test_one_of_the_flows_a_file_holds_is_chosen_like_any_other(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    tmp_path: Path,
+) -> None:
+    """The walk on from it is that flow's own: its agents, and the settings it takes."""
+    where = tmp_path / ".humanize" / "flows"
+    where.mkdir(parents=True)
+    (where / "three.py").write_text(THREE)
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+        await driver.press("left")  # this project's own flows, which is the last tab
+        await until(
+            lambda: _rows(sheet) != ["chat", "ralph_loop", "stateful_ralph"], driver
+        )
+
+        assert _rows(sheet) == [
+            ".humanize/flows/three.py:gen-idea",
+            ".humanize/flows/three.py:rlcr",
+        ]
+
+        await driver.press("down")  # the second of them, which drives two agents
+        await driver.press("enter")
+
+        # On to what that flow drives, rather than a refusal that the file has no `run`.
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        assert "builder" in str(app.screen.query_one("#asked", Label).content)
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "humanize.tui.app.installed",
+    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
+)
+async def test_each_of_them_is_set_up_with_its_own_settings(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    tmp_path: Path,
+) -> None:
+    """`/config` asks the phase that was chosen, and the one beside it takes no settings."""
+    where = tmp_path / ".humanize" / "flows"
+    where.mkdir(parents=True)
+    (where / "three.py").write_text(THREE)
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+        await driver.press("left")
+        await until(lambda: bool(_rows(sheet)), driver)
+
+        await driver.press("enter")  # the first of them, which says it takes an `n`
+
+        await until(lambda: isinstance(app.screen, Configures), driver)
+        assert "n" in str(app.screen.query_one("#choices", OptionList).options[0].id)

@@ -77,12 +77,18 @@ nowhere else to look them up.
 | Key | What it does |
 | --- | --- |
 | **enter** | Sends what is typed. Over an open [offers list](#completion), takes what is highlighted instead. |
-| **ctrl+j** | Breaks the line, which is what enter would do anywhere else. |
+| **shift+enter** | Breaks the line, which is what enter would do anywhere else. |
+| **ctrl+j** | The same, for a terminal that cannot tell shift+enter from enter. |
 | **esc** | Stops the flow — the whole flow, not just the turn. Dismisses the offers list first, if one is open. Silent when nothing is running. |
 | **ctrl+c** | Takes back the nearest thing there is to take back: what is half-typed if anything is, the flow if not. Twice in a row leaves. |
 | **↑ / ↓** | Walks what was typed here before — but only off the first and last line, so a prompt of several lines is still moved around in. Over an open offers list, moves within the list. |
 | **tab** | [Steps to the next agent that is working](#reading-one-conversation) and reads its conversation. Over an open offers list, takes the highlighted offer instead. |
 | **shift+tab** | Steps to the one before it. |
+
+shift+enter reaches a program only from a terminal that speaks the keyboard protocol that has
+a way to say so — Ghostty, kitty, WezTerm, Alacritty, iTerm2 with it turned on. Anywhere else
+it is a plain carriage return, which is enter, and would send the line: ctrl+j is a line feed
+and arrives from every terminal there is.
 
 Leaving is always two presses and never one, whatever was going on. The second ctrl+c has to
 land within two seconds of the first to count as the same one.

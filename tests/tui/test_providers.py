@@ -161,6 +161,59 @@ async def test_a_secret_is_never_drawn_back(signed_in: unittest.mock.MagicMock) 
 
 
 @pytest.mark.timeout(60)
+@pytest.mark.parametrize("key", ["shift+enter", "ctrl+j"])
+@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+async def test_variables_of_your_own_are_given_a_line_apiece(
+    signed_in: unittest.mock.MagicMock,
+    key: str,
+) -> None:
+    """The row that takes a list rather than a value, so it is the row a line breaks in."""
+    del signed_in
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("a")
+        await until(lambda: isinstance(app.screen, Backends), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await driver.press("enter")
+        # `env`, the way every backend has: variables of its own, which is the last of them.
+        await until(lambda: isinstance(app.screen, Ways), driver)
+        ways = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(ways.options), driver)
+        await driver.press("up")  # round the end of the list, onto the last row
+        await driver.pause()
+        assert str(ways.get_option_at_index(ways.highlighted or 0).id) == "=env"
+        await driver.press("enter")
+
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await driver.press(*"mine")
+        await driver.press("down")  # onto the variables, which is where a list goes
+        await driver.press(*"ANTHROPIC_BASE_URL=https://example.test")
+        await driver.press(key)
+        await driver.press(*"ANTHROPIC_AUTH_TOKEN=sk-secret")
+        await driver.press("enter")
+
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    made = providers.find("claude", "mine")
+    assert made is not None
+    # Two of them, which is two lines: one line would have been one variable to correct.
+    assert made.env == {
+        "ANTHROPIC_BASE_URL": "https://example.test",
+        "ANTHROPIC_AUTH_TOKEN": "sk-secret",
+    }
+
+
+@pytest.mark.timeout(60)
 @unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
 async def test_the_account_an_agent_runs_as_is_the_first_thing_asked_about_it(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over

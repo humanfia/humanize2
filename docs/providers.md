@@ -154,7 +154,8 @@ input and kept in codex's own store, so it is not kept a second time as a variab
 
 The names are typed rather than chosen because there is no list worth keeping: pi has a variable
 for each provider it knows and opencode one for each of a hundred and eighty, across six vendors
-that move.
+that move. One variable a line, and shift+enter — or ctrl+j — is what breaks the line, enter
+being what takes the form.
 
 ## `hmz providers`
 
