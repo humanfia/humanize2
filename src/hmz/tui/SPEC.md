@@ -11,6 +11,7 @@
 ├── history.py
 ├── monitor.py
 ├── pick.py
+├── selecting.py
 ├── settings.py
 └── tally.py
 ```
@@ -114,6 +115,53 @@ line, with what the flow is doing beside the transcript.
 - A key of the interface's own MUST NOT fire while a sheet is up over it: a sheet is open in
   order to be answered, and reading another conversation is not an answer to it. The key MUST
   reach the sheet instead, rather than being swallowed by the interface and doing nothing.
+- Letting go of a selection MUST put what was selected on the clipboard, by the escape a
+  terminal takes for one -- which is the only way to reach the clipboard of the machine
+  somebody is sitting at while the interface runs on another. The interface has the mouse, so
+  the terminal never sees the drag and a selection nobody copied is one that goes nowhere. The
+  editor MUST be copied from the same way, holding a selection of its own so that the screen's
+  has nothing in it. That something was copied MUST be said for a moment, since a clipboard is
+  written to silently and a gesture that says nothing is one nobody knows worked.
+- What `/export` writes MUST be the text the transcript was written as rather than the rows it
+  was drawn as, for the reason a selection gives back that text: a file of lines broken where
+  the terminal ran out of room is one nothing reads back.
+
+## `selecting.py`
+
+```python
+class Transcript(ScrollView): ...
+class Choices(OptionList): ...
+```
+
+The two things on the screen that are read rather than answered: the transcript, and the list a
+sheet offers. A terminal that is being sent the drags as well as the clicks is a terminal that
+is no longer selecting anything itself, so the selection is the interface's to draw and the
+interface's to hand over.
+
+- What a selection gives back MUST be the text that was written rather than the screen it was
+  drawn on: a line too long for the terminal is drawn over four rows and MUST come back as the
+  one line it is, without the break the width put in it and without the spaces that padded each
+  row out to the edge. A break in what comes back MUST be a break that was really there.
+- Every row drawn MUST therefore say which line of the text it is a piece of and where in that
+  line it begins, including a row with nothing on it and the room below the last line: a row
+  that says nothing about itself is one Textual can only take to mean the whole widget, and a
+  drag that began on a blank line would copy the lot.
+- A thing Rich draws rather than says MUST be kept as the rows it drew, a line apiece. There is
+  no text behind a box to go back to.
+- A selection MUST be let go of rather than moved when what it was made against goes: the
+  transcript being emptied, or drawn again at another width -- a box is as many lines as it has
+  rows, and is a different number of rows in a narrower terminal. One that quietly comes to mean
+  the lines below the ones somebody dragged across is worse than one that is gone.
+- Two clicks MUST take the word under them and three MUST take the whole line, rather than
+  Textual's own answer to both, which is every line there is -- and which, since a selection is
+  copied as it is let go of, would put a day's transcript on the clipboard.
+- The lists MUST be selectable as the rows they offer, and MUST stay lists that are picked from:
+  a click is a choice and only a drag is a selection. Textual numbers the offsets it leaves on a
+  drawn row against the option that row came out of, so they MUST be said again against the
+  whole list, or every option in one reads as the first.
+- The transcript MUST NOT take focus, and MUST NOT jump to the end while something further up is
+  being read: the editor is the only thing on the screen that is typed at, and a transcript that
+  scrolled out from under a drag could not be copied from while a flow was running.
 
 ## `pick.py`
 

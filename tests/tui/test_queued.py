@@ -15,13 +15,14 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
-from textual.widgets import RichLog, Static
+from textual.widgets import Static
 
 from hmz.agents import AgentBase, AgentConfig, Event
 from hmz.tui import Humanize
 from hmz.tui.app import _PINNED
 from hmz.tui.monitor import short
 from hmz.tui.pick import Runs
+from hmz.tui.selecting import Transcript
 from tests.stubs import ShellAgent, ShellSession
 
 if TYPE_CHECKING:
@@ -81,7 +82,7 @@ async def until(ready: Callable[[], bool], driver: Pilot[None]) -> None:
 
 def _transcript(app: Humanize) -> str:
     """Everything the interface has shown, as one searchable string."""
-    return "\n".join(line.text for line in app.query_one("#transcript", RichLog).lines)
+    return app.query_one("#transcript", Transcript).text
 
 
 def _pinned(app: Humanize) -> str:

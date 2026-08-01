@@ -114,9 +114,9 @@ def _transcript(app: Humanize) -> str:
 
     Read while the interface is still up: its widgets go with it when it exits.
     """
-    from textual.widgets import RichLog
+    from hmz.tui.selecting import Transcript
 
-    return "\n".join(line.text for line in app.query_one("#transcript", RichLog).lines)
+    return app.query_one("#transcript", Transcript).text
 
 
 async def into_models(app: Humanize, driver: Pilot[None]) -> None:

@@ -10,6 +10,7 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 
 - [The screen](#the-screen)
 - [Keys](#keys)
+- [Selecting and copying](#selecting-and-copying)
 - [Commands](#commands)
 - [Reading one conversation](#reading-one-conversation)
 - [Talking to a running flow](#talking-to-a-running-flow)
@@ -97,6 +98,42 @@ Focus cannot leave the editor. There is nowhere else for it to go — which is w
 shift+tab are free to read the conversations. While a sheet is up over the interface they are
 the sheet's, and while the offers list is open tab is its.
 
+## Selecting and copying
+
+Drag across the screen with the mouse, and what you dragged across is on your clipboard when you
+let go. The status line says `copied` for a moment, which is the only sign there is: a clipboard
+is written to silently.
+
+| Gesture | What it takes |
+| --- | --- |
+| **drag** | Everything between where you pressed and where you let go, across as many lines as you like. |
+| **double click** | The word under it — everything up to the spaces on either side, so a path or an id comes whole. |
+| **triple click** | The whole line, however many rows of the screen it was drawn over. |
+
+**What comes back is what was written, not what was drawn.** A line too long for your terminal is
+drawn over four rows, and copying it gives you the line: no break where the terminal ran out of
+room, and none of the spaces that padded each row out to the edge. A break in what you copy is a
+break that was really there. The same goes for `/export`, which writes the same text to a file.
+
+The box the interface opens with is a picture rather than a line, so dragging across it gives you
+its rows as they are drawn, borders and all.
+
+The editor selects for itself — dragging in it copies what you dragged across, the same as
+anywhere else — and so do the lists a sheet offers you to choose from: a click on one of those
+is still a choice, and only a drag is a selection.
+
+Changing the width of your terminal lets go of whatever was selected. The lines are wrapped
+again at the width you gave them, so a selection made against the old wrapping is dropped rather
+than left pointing a line or two off what you dragged across.
+
+**How it reaches the clipboard.** The interface has the mouse, so your terminal never sees the
+drag and cannot copy anything itself. What is selected goes out as the escape a terminal takes
+for its clipboard (OSC 52), which is why it works over ssh: it reaches the clipboard of the
+machine you are sitting at rather than the one the flow is running on. Most terminals take it;
+some ask you to turn it on — `set-clipboard on` in tmux, `Allow reporting`/`clipboard write` in
+VTE-based ones. Holding **shift** while dragging is your terminal's own selection instead, which
+every terminal keeps for itself and which copies the screen as drawn, wrapping and all.
+
 ## Commands
 
 A line beginning with `/` is a command; any other line is said to the agent. Type `/` and the
@@ -112,7 +149,7 @@ list appears under the editor with a line about each.
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
 | `/clear` | | Clears the screen, and nothing else: the conversation being read, not the others, and nothing that is running. |
-| `/export` | | Writes what is on the screen — the conversation being read — to `.humanize/<datetime>.session.md`. |
+| `/export` | | Writes what is on the screen — the conversation being read — to `.humanize/<datetime>.session.md`, as it was written rather than as it was wrapped. |
 | `/exit` | | Leaves. |
 
 `/details` and `/afk` flip when given nothing, and take `on` or `off` when you want to say

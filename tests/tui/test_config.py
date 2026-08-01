@@ -12,12 +12,13 @@ import unittest.mock
 from typing import TYPE_CHECKING
 
 import pytest
-from textual.widgets import Label, OptionList, RichLog
+from textual.widgets import Label, OptionList
 
 from hmz.backends import Model
 from hmz.cli import main
 from hmz.tui import Humanize
 from hmz.tui.pick import Configures, Flows, Models, Runs, setting
+from hmz.tui.selecting import Transcript
 from hmz.tui.settings import Settings
 
 from .test_app import into_models
@@ -341,10 +342,7 @@ async def test_config_on_a_flow_that_takes_none_says_so(flows: Path) -> None:
         await driver.press("enter")
         await driver.pause()
 
-        assert any(
-            "takes no setting up" in line.text
-            for line in app.query_one("#transcript", RichLog).lines
-        )
+        assert "takes no setting up" in app.query_one("#transcript", Transcript).text
 
 
 def test_status_says_only_what_was_changed() -> None:

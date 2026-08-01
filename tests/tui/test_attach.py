@@ -17,12 +17,13 @@ import weakref
 from typing import TYPE_CHECKING
 
 import pytest
-from textual.widgets import RichLog, Static
+from textual.widgets import Static
 
 from hmz.agents import AgentConfig, Event
 from hmz.tui import Humanize
 from hmz.tui.app import _KEPT
 from hmz.tui.pick import Held, Runs, reads
+from hmz.tui.selecting import Transcript
 from tests.stubs import ShellAgent, ShellSession
 
 if TYPE_CHECKING:
@@ -113,7 +114,7 @@ async def until(ready: Callable[[], bool], driver: Pilot[None]) -> None:
 
 def _transcript(app: Humanize) -> str:
     """Everything the transcript is showing, as one searchable string."""
-    return "\n".join(line.text for line in app.query_one("#transcript", RichLog).lines)
+    return app.query_one("#transcript", Transcript).text
 
 
 def _above(app: Humanize) -> str:

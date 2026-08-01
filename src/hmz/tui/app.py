@@ -53,7 +53,7 @@ from textual.containers import Horizontal
 from textual.content import Content
 from textual.message import Message
 from textual.theme import Theme
-from textual.widgets import OptionList, RichLog, Static, TextArea
+from textual.widgets import OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
 from hmz.backends import Model
@@ -83,6 +83,7 @@ from .pick import (
     pointed,
     reads,
 )
+from .selecting import Choices, Transcript
 from .settings import Settings
 from .tally import Tally
 
@@ -129,6 +130,11 @@ _REFRESH = 0.5
 
 #: How long a second ctrl+c still counts as the same one, in seconds.
 _AGAIN = 2.0
+
+#: How long the status line says that something was copied, in seconds. Long enough to be
+#: read after a drag that ended somewhere else on the screen, and gone before it is mistaken
+#: for a thing about the run.
+_COPIED = 2.0
 
 #: How many lines of what is waiting to be said are pinned above the prompt before the rest
 #: is counted instead. A pin that grew without limit would push the transcript off the screen
@@ -279,8 +285,14 @@ _TERMINAL = Theme(
         "input-cursor-background": "ansi_blue",
         "input-cursor-foreground": "ansi_bright_white",
         "input-cursor-text-style": "none",
+        # What is selected, in the editor and anywhere on the screen: the same pair either
+        # way, since it is one gesture and means one thing. Both ends named, for the reason
+        # the cursor's are -- a selection drawn as a shade of the background is one nobody
+        # can see the edges of, and the edges are what somebody dragging is watching.
         "input-selection-background": "ansi_bright_black",
         "input-selection-foreground": "ansi_bright_white",
+        "screen-selection-background": "ansi_bright_black",
+        "screen-selection-foreground": "ansi_bright_white",
         "block-hover-background": "ansi_default",
         # Chrome and anything said quietly, at the one slot every scheme keeps a grey in.
         # Not the foreground at half strength: half of `ansi_default` is `ansi_default`,
@@ -437,6 +449,21 @@ class Editor(TextArea):
             event.stop()
             # Positional because textual's is: the class names follow it as *args.
             listing.set_class(False, "offering")  # noqa: FBT003
+
+    def on_mouse_up(self) -> None:
+        """Copies what was just dragged across in the editor, as everywhere else does.
+
+        The editor selects for itself rather than letting the screen do it -- it holds a
+        selection so that what is typed can be changed, not only read -- so the screen has
+        nothing to copy after a drag in here, and this is the only place that knows there was
+        one. A click rather than a drag leaves nothing selected, and copies nothing.
+        """
+        # textual types the property off the bare generic, so what it hands back is an
+        # `App` of nothing in particular.
+        cast(
+            "Humanize",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        ).copied(self.selected_text)
 
     def take(self, whole: str) -> None:
         """Replaces the part being finished with what was offered for it.
@@ -629,6 +656,10 @@ class Humanize(App[None]):
         self._answered = threading.Event()
         #: When ctrl+c was last pressed, so that two of them in a row read as two.
         self._interrupted = 0.0
+        #: When something was last copied off the screen, so that the status line can say so
+        #: for a moment: a clipboard is written to silently, and a gesture that says nothing
+        #: is one nobody knows worked.
+        self._copied = 0.0
         #: The flow to run and what each of its agents runs, which start out as the flow that
         #: is only talking to one agent and the first agent there is to talk to. So the first
         #: thing you say starts something rather than being told to pick a flow first: a flow
@@ -772,8 +803,8 @@ class Humanize(App[None]):
         it is wanted: a column saying so the whole time costs a fifth of every line of every
         transcript, to say something that has usually not changed since it was last looked at.
         """
-        yield RichLog(id="transcript", wrap=True, markup=True)
-        yield OptionList(id="offers")
+        yield Transcript(id="transcript")
+        yield Choices(id="offers")
         # Both sides of the same block, right on top of the editor: what is waiting to go on
         # the left, what it would be going to on the right. Read from the bottom up -- the
         # last thing typed and the running total sit on the row above the rule.
@@ -904,6 +935,38 @@ class Humanize(App[None]):
             for line in escape(event.text.rstrip("\n")).splitlines():
                 self.show(f"[dim]  {_CAME_BACK}  {line}[/]")
 
+    def on_text_selected(self) -> None:
+        """Puts what was just selected with the mouse on the clipboard.
+
+        Letting go of a selection is the whole gesture. The interface has the mouse -- it is
+        drawing the highlight itself, the terminal never having been told a drag was going on
+        -- so a selection nobody copied is one that goes nowhere.
+
+        What is copied is the text the transcript was written as rather than the screen: a
+        line that took four rows comes back as the line, without the breaks the width put in
+        it and without the spaces that padded each row out to the edge.
+        """
+        self.copied(self.screen.get_selected_text() or "")
+
+    def copied(self, text: str) -> None:
+        """Puts something on the clipboard, and says on the status line that it went.
+
+        By the escape a terminal takes for its clipboard, which is the only way to reach the
+        clipboard of the machine somebody is sitting at while the interface runs on another
+        one. Nothing else about it is ours: a terminal that will not take the escape is one to
+        turn it on in, and holding shift while dragging is what every terminal keeps for
+        itself.
+
+        Args:
+          text: What to copy, and "" for a gesture that came to nothing -- a click that
+            landed on no text, an empty selection -- which is not a thing to say happened.
+        """
+        if not text:
+            return
+        self.copy_to_clipboard(text)
+        self._copied = time.monotonic()
+        self._draw()
+
     def _said_by_you(self, text: str) -> None:
         """Puts something you said in the transcript, behind the `❯` Claude Code marks it with.
 
@@ -949,7 +1012,7 @@ class Humanize(App[None]):
         kept = self._keeping(where)
         kept.lines.append(_Shown(content, shrink))
         if where is reading:
-            self.query_one("#transcript", RichLog).write(content, shrink=shrink)
+            self.query_one("#transcript", Transcript).write(content, shrink=shrink)
         else:
             kept.unread = True  # and the line above the prompt says so until it is read
 
@@ -1042,7 +1105,7 @@ class Humanize(App[None]):
         if (before := self._kept.pop(None, None)) is not None:
             kept.lines = deque([*before.lines, *kept.lines], maxlen=_LINES)
         kept.unread = False
-        shown = self.query_one("#transcript", RichLog)
+        shown = self.query_one("#transcript", Transcript)
         shown.clear()
         for line in kept.lines:
             shown.write(line.content, shrink=line.shrink)
@@ -1235,6 +1298,11 @@ class Humanize(App[None]):
                 f"[$secondary]◉[/] {escape(self._flow_named)}"
                 f"[$text-muted]{_DOT}{escape(_where())}[/]"
             )
+        # For a moment after it happens, beside whatever else the line says: writing to a
+        # clipboard is silent, and a person who has just dragged across half a screen is
+        # owed the one word that says it went somewhere.
+        if time.monotonic() - self._copied < _COPIED:
+            left += f"[$text-muted]{_DOT}copied[/]"
         # Above the prompt on the right, where Claude Code says what it is running as. One
         # agent to a line rather than a row of them separated by commas: a flow drives several
         # and they are read one at a time, against the name the flow calls each one by -- and
@@ -1492,7 +1560,7 @@ class Humanize(App[None]):
         conversation would be `/clear` reaching into ones nobody was looking at.
         """
         self._keeping(self._reading()).lines.clear()
-        self.query_one("#transcript", RichLog).clear()
+        self.query_one("#transcript", Transcript).clear()
         self._welcome()  # a cleared screen is a screen just opened, and one opens with this
         self._draw()
 
@@ -1558,17 +1626,18 @@ class Humanize(App[None]):
         self._draw()
 
     def _export(self) -> None:
-        """Writes the transcript beside the trace files, as opencode writes its markdown."""
+        """Writes the transcript beside the trace files, as opencode writes its markdown.
+
+        What was written rather than what was drawn, which is the same thing a selection gives
+        back: a file of lines broken where the terminal happened to run out of room is a file
+        nothing can be read out of again.
+        """
         import datetime
 
         stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
         where = Path(".humanize") / f"{stamp}.session.md"
         where.parent.mkdir(parents=True, exist_ok=True)
-        where.write_text(
-            "\n".join(
-                line.text for line in self.query_one("#transcript", RichLog).lines
-            )
-        )
+        where.write_text(self.query_one("#transcript", Transcript).text)
         self.show(f"[dim]{where}[/dim]")
 
     @work

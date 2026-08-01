@@ -49,6 +49,7 @@ from hmz.backends import named
 
 from .discover import machines
 from .monitor import short, thousands
+from .selecting import Choices
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Sequence
@@ -408,7 +409,7 @@ class Sheet[T](ModalScreen[T | None]):
             yield Label(id="asked")
             yield Label(id="about")
             yield Label(id="tabs")
-            yield OptionList(id="choices")
+            yield Choices(id="choices")
             yield Label(id="tuning")
             yield Label(id="keys")
 
