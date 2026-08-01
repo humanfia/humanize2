@@ -23,7 +23,7 @@ For doing a particular thing, once you know what the words mean.
 
 | | |
 | --- | --- |
-| [Flows](flows.md) | Writing a flow: the entry point, how many agents it drives, what to call them, and the patterns that come with humanize. |
+| [Flows](flows.md) | Writing a flow: the mark that makes one, how many agents it drives, what to call them, calling one flow from another, and the patterns that come with humanize. |
 | [Agents](agents.md) | Driving a coding agent from Python: sessions, turns, streaming, goals, questions, interruption. |
 | [Machines](machines.md) | Where an agent's turns land — this machine, one that is already running, or a container started for the agent. |
 | [Providers](providers.md) | Which account an agent runs as, so that one flow can drive one CLI as two accounts at once. |
