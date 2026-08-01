@@ -67,25 +67,32 @@ class Running(NamedTuple):
 
 
 #: The flows running now, in the order they started: the one somebody ran, then whatever it
-#: called, then whatever that called. Kept here rather than asked of the flows, which is the
-#: one thing a flow cannot be asked -- it is a Python file and may branch any way it likes --
-#: and read by the interface to say what is running under what.
+#: called, then whatever that called, each beside the thread it is running on. Kept here
+#: rather than asked of the flows, which is the one thing a flow cannot be asked -- it is a
+#: Python file and may branch any way it likes -- and read by the interface to say what is
+#: running under what.
 #:
 #: A list rather than a stack, because a flow written as a coroutine may have two of them
 #: going at once, and both are running. Under a lock, since a flow runs on whichever thread
 #: took it and the interface reads while they run.
-_RUNNING: list[Running] = []
+_RUNNING: list[tuple[Running, threading.Thread]] = []
 _TELLING = threading.Lock()
 
 
 def running() -> tuple[Running, ...]:
     """Every flow running now, the one that was started first and whatever it called after it.
 
+    A flow says it has ended as it ends, however it ends -- but only a flow that got the
+    chance to. One whose thread has gone was abandoned where it stood rather than finished:
+    an interface taken down under it, a test that let go of it. So what is running is checked
+    against the threads running it, and a flow with no thread left is not one of them.
+
     Returns:
       One apiece, in the order they started. Empty where nothing is running.
     """
     with _TELLING:
-        return tuple(_RUNNING)
+        _RUNNING[:] = [one for one in _RUNNING if one[1].is_alive()]
+        return tuple(flow for flow, _ in _RUNNING)
 
 
 def _entered(flow: str) -> Running:
@@ -99,7 +106,7 @@ def _entered(flow: str) -> Running:
     """
     one = Running(flow, time.monotonic())
     with _TELLING:
-        _RUNNING.append(one)
+        _RUNNING.append((one, threading.current_thread()))
     return one
 
 
@@ -110,8 +117,7 @@ def _left(one: Running) -> None:
       one: What :func:`_entered` answered with.
     """
     with _TELLING:
-        if one in _RUNNING:
-            _RUNNING.remove(one)
+        _RUNNING[:] = [held for held in _RUNNING if held[0] is not one]
 
 
 class Place(NamedTuple):

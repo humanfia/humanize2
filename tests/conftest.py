@@ -14,6 +14,7 @@ import pytest
 import hmz.models
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from hmz.backends import Model
@@ -31,6 +32,22 @@ def _humanize_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     of the person who only asked for the suite to pass.
     """
     monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize-home"))
+
+
+@pytest.fixture(autouse=True)
+def _nothing_running_yet() -> Iterator[None]:
+    """Starts each test with no flow running, and leaves none behind.
+
+    What is running is one list for the process. Several tests here hold a flow open on
+    purpose -- two agents working at once is what half the interface is about -- and its
+    thread is still alive when the test lets go of it, so the next test would find that flow
+    running and say so on its own status line.
+    """
+    from hmz import runner
+
+    runner._RUNNING.clear()
+    yield
+    runner._RUNNING.clear()
 
 
 @pytest.fixture(autouse=True)

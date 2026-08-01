@@ -165,6 +165,10 @@ class Runner:
   likes, so what it is doing is only visible where it was started and where it asked for
   another. A flow MUST leave that list however it ends, and a call MUST be written into the
   cycle at both ends, a run being what it did as well as what it was started as.
+- What is running MUST be checked against the threads running it. A flow says it has ended as
+  it ends, but only one that got the chance to: a flow abandoned where it stood -- an interface
+  taken down under it -- would otherwise be reported as running for the life of the process,
+  and everything that reads this would name a flow that is no longer there.
 - `flow_and_agents` MUST read the same `hmz exec` line the command takes, and MUST be here
   rather than in `cli`: the terminal interface starts a flow from that line and then keeps the
   agents, and a reader that lived in the command line would be one the interface reached up
