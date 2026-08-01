@@ -38,12 +38,15 @@ def test_a_home_shared_with_every_program_keeps_its_own_directory_under_it(
 
 
 def test_an_agent_is_read_off_a_command_line_however_it_is_spelled() -> None:
-    profile, model, effort, provider = backends.read("pi/openai-codex/gpt-5.5:high")
+    profile, model, effort, provider, permission = backends.read(
+        "pi/openai-codex/gpt-5.5:high"
+    )
     assert (profile.name, model, effort) == ("pi", "openai-codex/gpt-5.5", "high")
     assert provider == ""  # as whoever is at this machine already runs it
-    profile, model, effort, _ = backends.read("mimocode/xiaomi/mimo-v2.5:low")
+    assert permission is None  # at the default rung
+    profile, model, effort, _, _ = backends.read("mimocode/xiaomi/mimo-v2.5:low")
     assert (profile.name, model, effort) == ("mimo", "xiaomi/mimo-v2.5", "low")
-    profile, model, effort, _ = backends.read(
+    profile, model, effort, _, _ = backends.read(
         "cli=opencode,model=opencode/big-pickle,effort=xhigh"
     )
     assert (profile.name, model, effort) == ("opencode", "opencode/big-pickle", "xhigh")
@@ -51,7 +54,7 @@ def test_an_agent_is_read_off_a_command_line_however_it_is_spelled() -> None:
 
 def test_an_agent_may_name_the_account_it_runs_as() -> None:
     """Two agents of one CLI are two accounts when the line says so, either way it is written."""
-    profile, model, effort, provider = backends.read(
+    profile, model, effort, provider, _ = backends.read(
         "claude@deepseek/claude-opus-5:high"
     )
     assert (profile.name, model, effort, provider) == (
@@ -60,18 +63,35 @@ def test_an_agent_may_name_the_account_it_runs_as() -> None:
         "high",
         "deepseek",
     )
-    _, _, _, provider = backends.read(
+    _, _, _, provider, _ = backends.read(
         "cli=claude,model=claude-opus-5,effort=high,provider=work"
     )
     assert provider == "work"
     # A CLI is never spelled with an `@` in it, so the model keeps whatever it holds.
-    profile, model, _, provider = backends.read("kimi@mine/kimi-code/k3:max")
+    profile, model, _, provider, _ = backends.read("kimi@mine/kimi-code/k3:max")
     assert (profile.name, model, provider) == ("kimi", "kimi-code/k3", "mine")
+
+
+def test_an_agent_may_name_its_permission_rung() -> None:
+    """Only the written-out form has somewhere unambiguous to put the fourth setting."""
+    profile, model, effort, provider, permission = backends.read(
+        "cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only"
+    )
+
+    assert (profile.name, model, effort, provider, permission) == (
+        "codex",
+        "gpt-5.6-sol",
+        "high",
+        "",
+        "read-only",
+    )
 
 
 def test_a_backend_nobody_has_heard_of_is_a_line_to_correct() -> None:
     assert backends.named("nope") is None
     with pytest.raises(ValueError, match="expected CLI"):
         backends.read("nope/model:high")
-    with pytest.raises(ValueError, match="not cli, model, effort or provider"):
+    with pytest.raises(
+        ValueError, match="not cli, model, effort, provider or permission"
+    ):
         backends.read("cli=claude,model=m,effort=high,machine=elsewhere")

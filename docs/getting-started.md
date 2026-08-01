@@ -138,6 +138,15 @@ hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "fix the failing tests"
   in the order the flow takes them — `rlar` drives two, so it takes two `-a`.
 - The last argument is the task.
 
+To narrow what one of those agents may do, use the written-out form and name one of the four
+[permission rungs](agents.md#what-an-agent-may-do):
+
+```sh
+hmz exec -f ralph_loop \
+    -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only \
+    "review this repository"
+```
+
 Nobody is at a prompt here, so an agent that stops to ask a question is told nobody answered
 and carries on rather than waiting forever.
 

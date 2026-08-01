@@ -142,7 +142,7 @@ def _line() -> ArgumentParser:
         dest="agents",
         metavar="CLI/MODEL:EFFORT",
         help="what one of that flow's agents runs, repeated once for each it drives, in the "
-        "order it takes them; needs -f",
+        "order it takes them; the written-out form may include permission=PERMISSION; needs -f",
     )
     parser.add_argument(
         "-c",
@@ -169,7 +169,7 @@ def _tui(argv: list[str]) -> int:
       Zero, once the interface has been closed, or two for a line to correct.
     """
     from humanize.flows import find
-    from humanize.runner import configures, set_up_from, wanted
+    from humanize.runner import configures, read_agent, set_up_from, wanted
     from humanize.tui import Humanize
     from humanize.tui.pick import Runs
 
@@ -181,6 +181,11 @@ def _tui(argv: list[str]) -> int:
         parser.error("-a says what runs the flow, so it needs -f")
     if args.config is not None and not flow:
         parser.error("-c says how the flow runs, so it needs -f")
+    for spec in args.agents:
+        try:
+            read_agent(spec)
+        except ValueError as bad:
+            parser.error(f"bad agent {spec!r}: {bad}")
     setting = None
     if args.config is not None:
         try:

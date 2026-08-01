@@ -645,6 +645,14 @@ CLIs name them rather than in a vocabulary of humanize's own:
 ClaudeCodeAgentConfig(model="claude-opus-5", effort="high", permission="read-only")
 ```
 
+The command line names the same setting in an agent's written-out form:
+
+```sh
+hmz exec -f ralph_loop \
+    -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only \
+    "review the current change"
+```
+
 `bypass` is the default, because that is what a flow driving an agent unattended has always
 run it at: a flow watches its agent rather than gating it, and a turn waiting on an approval
 nobody is there to give is a flow that has stopped. Anything tighter is a choice, and in the

@@ -17,7 +17,7 @@ from typing import Any, cast
 
 import pytest
 
-from humanize.agents import AgentConfig, SessionBase
+from humanize.agents import PERMISSIONS, AgentConfig, SessionBase
 from humanize.cli import main
 from humanize.runner import NotAFlow, Runner
 from tests.stubs import ShellAgent
@@ -59,6 +59,20 @@ from humanize.agents import AgentBase
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     Path(__file__).with_suffix(".json").write_text(
         json.dumps([agent.config.provider for agent in agents])
+    )
+"""
+
+#: A flow that writes down the permission rung each agent was configured to run at.
+ACCESS = """
+import json
+from pathlib import Path
+
+from humanize.agents import AgentBase
+
+
+def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+    Path(__file__).with_suffix(".json").write_text(
+        json.dumps([agent.config.permission for agent in agents])
     )
 """
 
@@ -204,6 +218,28 @@ def test_an_agent_that_names_no_account_runs_as_this_machine_does(
     flow = _flow(tmp_path, ACCOUNTS)
     main(["exec", "-f", flow, "-a", "claude/m:high", "-a", "codex/m:high", "task"])
     assert json.loads((tmp_path / "flow.json").read_text()) == ["", ""]
+
+
+@pytest.mark.parametrize("permission", PERMISSIONS)
+def test_an_agent_may_be_given_a_permission_rung(
+    tmp_path: Path, permission: str
+) -> None:
+    """Each `-a` carries its own rung, and omitting it keeps the existing default."""
+    flow = _flow(tmp_path, ACCESS)
+    main(
+        [
+            "exec",
+            "-f",
+            flow,
+            "-a",
+            f"cli=codex,model=m,effort=high,permission={permission}",
+            "-a",
+            "claude/m:high",
+            "task",
+        ]
+    )
+
+    assert json.loads((tmp_path / "flow.json").read_text()) == [permission, "bypass"]
 
 
 def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(
@@ -474,6 +510,25 @@ def test_an_agent_that_is_not_cli_model_and_effort_is_a_usage_error(
         main(["exec", "-f", flow, "-a", spec, "task"])
     assert stopped.value.code == 2
     assert f"bad agent {spec!r}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("permission", ["readonly", "read_only", ""])
+def test_an_unknown_permission_is_a_usage_error_before_any_agent_runs(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    permission: str,
+) -> None:
+    flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
+    spec = f"cli=codex,model=m,effort=high,permission={permission}"
+
+    with pytest.raises(SystemExit) as stopped:
+        main(["exec", "-f", flow, "-a", spec, "task"])
+
+    assert stopped.value.code == 2
+    error = capsys.readouterr().err
+    assert f"bad agent {spec!r}" in error
+    assert "permission must be one of read-only, workspace-write, auto, bypass" in error
+    assert not (tmp_path / "flow.json").exists()
 
 
 def test_a_flow_fails_as_it_would_anywhere_when_it_is_the_flow_that_failed(

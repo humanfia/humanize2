@@ -664,7 +664,7 @@ def named(backend: str) -> Profile | None:
     return next((one for one in PROFILES if backend in one.aliases), None)
 
 
-def read(spec: str) -> tuple[Profile, str, str, str]:
+def read(spec: str) -> tuple[Profile, str, str, str, str | None]:
     """Reads one `-a` into the backend to drive, what to drive it at, and as whom.
 
     Args:
@@ -672,30 +672,34 @@ def read(spec: str) -> tuple[Profile, str, str, str]:
         where a model or an effort holding the punctuation the short form separates on goes.
         The CLI may name a provider after an `@`, as `claude@deepseek/MODEL:EFFORT`, which is
         the account that agent's turns run as; `provider=` says the same thing written out.
+        The written-out form may also name the agent's permission rung as `permission=`.
 
     Returns:
-      The backend, the model, the effort, and the provider -- which is "" for an agent that
-      runs as whoever is at this machine already runs its CLI, and is most of them.
+      The backend, the model, the effort, the provider -- which is "" for an agent that runs
+      as whoever is at this machine already runs its CLI -- and the permission, which is None
+      for an agent that runs at the default rung.
 
     Raises:
       ValueError: If it is neither spelling, or names no backend there is. What it says is
         what a command line reports after the agent it could not read.
     """
     provider = ""
+    permission: str | None = None
     if "=" in spec:
         given = {
             key.strip(): value.strip()
             for key, _, value in (part.partition("=") for part in spec.split(","))
         }
-        backend, model, effort, provider = (
+        backend, model, effort, provider, permission = (
             given.pop("cli", ""),
             given.pop("model", ""),
             given.pop("effort", ""),
             given.pop("provider", ""),
+            given.pop("permission", None),
         )
         if given:
             raise ValueError(
-                f"{', '.join(sorted(given))} is not cli, model, effort or provider"
+                f"{', '.join(sorted(given))} is not cli, model, effort, provider or permission"
             )
     else:
         # Read from both ends: a model may hold slashes of its own -- Kimi's are
@@ -717,5 +721,6 @@ def read(spec: str) -> tuple[Profile, str, str, str]:
         raise ValueError(
             "expected CLI[@PROVIDER]/MODEL:EFFORT or "
             "cli=CLI,model=MODEL,effort=EFFORT[,provider=PROVIDER]"
+            "[,permission=PERMISSION]"
         )
-    return profile, model.strip(), effort.strip(), provider.strip()
+    return profile, model.strip(), effort.strip(), provider.strip(), permission

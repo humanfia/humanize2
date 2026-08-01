@@ -98,6 +98,23 @@ def test_a_line_of_flags_and_no_command_opens_the_interface_set_up() -> None:
     assert opened.called
 
 
+def test_a_bad_permission_does_not_open_the_interface(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    spec = "cli=codex,model=m,effort=high,permission=readonly"
+    with (
+        unittest.mock.patch("humanize.tui.Humanize.run") as opened,
+        pytest.raises(SystemExit) as stopped,
+    ):
+        cli.main(["-f", "chat", "-a", spec])
+
+    assert stopped.value.code == 2
+    assert not opened.called
+    error = capsys.readouterr().err
+    assert f"bad agent {spec!r}" in error
+    assert "permission must be one of read-only, workspace-write, auto, bypass" in error
+
+
 @pytest.mark.parametrize("argv", [["--help"], ["-h"]])
 def test_the_help_lists_every_command(
     argv: list[str], capsys: pytest.CaptureFixture[str]

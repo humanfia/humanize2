@@ -83,10 +83,12 @@ claude/claude-opus-4-8:high
 cli=claude,model=claude-opus-4-8,effort=high
 claude@deepseek/claude-opus-4-8:high
 cli=claude,model=claude-opus-4-8,effort=high,provider=deepseek
+cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only
 ```
 
-Both spellings mean the same thing. The written-out form exists because a model or an effort may
-hold the punctuation the short form separates on.
+The first two spellings mean the same thing. The written-out form exists because a model or an
+effort may hold the punctuation the short form separates on, and is also where settings with no
+unambiguous short spelling go.
 
 - `<cli>` is `claude`, `codex`, `kimi`, `pi`, `opencode` or `mimo`. Each also answers to the
   longer name it is installed under: `claude-code`, `kimi-code`, `mimocode` and `mimo-code`.
@@ -99,6 +101,9 @@ hold the punctuation the short form separates on.
   account, not the model: `claude@deepseek`. Written out, it is `provider=`. A CLI is never
   spelled with an `@` in it, so the two are told apart wherever an agent is written. An agent
   that names none runs its CLI as you already run it.
+- `permission=` names [what that agent may do](agents.md#what-an-agent-may-do): `read-only`,
+  `workspace-write`, `auto` or `bypass`. It is available in the written-out form only and
+  defaults to `bypass`. A misspelling is refused before any agent runs.
 
 **One `-a` is one agent.** A list inside a single `-a` is not split into several. Two agents of
 one spelling are two agents, which is what makes a flow of an actor and a reviewer at one
@@ -123,6 +128,7 @@ Whatever else a flow does as it is imported is the flow's own, and fails as it w
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 hmz exec -f flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "fix the build"
 hmz exec -f rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
+hmz exec -f rlar -a claude/claude-opus-4-8:high -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only "$(cat TASK.md)"
 hmz exec -f flame_chase -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
 hmz exec -f ./flows/mine.py -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
 hmz exec -f ralph_loop -a pi/openai-codex/gpt-5.5:high "$(cat TASK.md)"

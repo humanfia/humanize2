@@ -63,7 +63,7 @@ if TYPE_CHECKING:                     # ← this is the problem
 Import it at runtime instead. The count has to be readable where the flow runs, not only where
 pyright looks.
 
-### `bad agent 'claude:high': expected CLI/MODEL:EFFORT or cli=CLI,model=MODEL,effort=EFFORT`
+### `bad agent 'claude:high': expected CLI[@PROVIDER]/MODEL:EFFORT or cli=CLI,…`
 
 An `-a` that is missing a part. All three are required:
 
@@ -75,10 +75,19 @@ An `-a` that is missing a part. All three are required:
 The CLI is read from the front and the effort from after the **last** colon, so a model with
 slashes in it — `kimi/kimi-code/k3:high` — is fine.
 
-### `bad agent '…': foo is not cli, model or effort`
+### `bad agent '…': foo is not cli, model, effort, provider or permission`
 
-A key in the written-out form that is none of the three. Only `cli`, `model` and `effort` are
-taken.
+A key in the written-out form that is not one of the five it takes: `cli`, `model`, `effort`,
+`provider` and `permission`.
+
+### `permission must be one of read-only, workspace-write, auto, bypass`
+
+The `permission=` value is misspelled or empty. It is matched exactly and is refused rather than
+silently replaced with the default:
+
+```sh
+-a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only
+```
 
 ### The agent starts and immediately fails
 
