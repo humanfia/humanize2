@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.flows import BUILTIN, OFFICIAL, find, flowverses, found
-from humanize.flows import verses as store
+from hmz.flows import BUILTIN, OFFICIAL, find, flowverses, found
+from hmz.flows import verses as store
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 #: A flow, as short as one can be: the file is what is being fetched, not what it does.
 FLOW = '''"""A flow of somebody else's."""
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -235,7 +235,7 @@ def test_a_flow_of_your_own_still_wins_a_bare_name(
 
 def test_a_flow_from_a_flowverse_runs_by_that_name(theirs: Path) -> None:
     """Which is the whole point of fetching one: `-f theirs/loop` is a flow to run."""
-    from humanize.runner import drives
+    from hmz.runner import drives
 
     store.add(str(theirs))
 
@@ -246,7 +246,7 @@ def test_a_flowverse_that_has_not_been_fetched_says_so_rather_than_that_there_is
     None
 ):
     """The name is right and the download has not happened, which is a different thing."""
-    from humanize.runner import NotAFlow, drives
+    from hmz.runner import NotAFlow, drives
 
     with pytest.raises(NotAFlow, match="has not been fetched yet"):
         drives(f"{OFFICIAL}/rlar")

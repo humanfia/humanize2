@@ -6,7 +6,7 @@ way it likes -- so the order it ran its agents in is only ever recoverable from 
 
 from __future__ import annotations
 
-from humanize.tui.monitor import Monitor
+from hmz.tui.monitor import Monitor
 
 
 def test_who_is_working_is_whoever_has_a_turn_open() -> None:

@@ -114,7 +114,7 @@ An agent stopped by hand makes the run `stopped` rather than `failed`, whatever 
 way made of it — so a run you ended is written down as one you ended.
 
 ```python
-from humanize.cycle import cycles, opened
+from hmz.cycle import cycles, opened
 
 for cycle in cycles():                 # this workspace, oldest first
     print(cycle, opened(cycle))        # {"actor": ["0a1b…", "5f6e…"], "reviewer": [...]}
@@ -166,7 +166,7 @@ directory**, so its trajectories are found by `--session` rather than by workspa
 ## From Python
 
 ```python
-from humanize.tracing import collect
+from hmz.tracing import collect
 
 document = collect(
     "~/code/myproject",

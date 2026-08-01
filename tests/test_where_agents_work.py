@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.agents import AgentConfig, Isolated, Remote, anchored
-from humanize.machines import DockerConfig
-from humanize.runner import NotAFlow, Runner, wanted
+from hmz.agents import AgentConfig, Isolated, Remote, anchored
+from hmz.machines import DockerConfig
+from hmz.runner import NotAFlow, Runner, wanted
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
@@ -27,7 +27,7 @@ CONFIG = AgentConfig(model="m", effort="high")
 DECLARED = '''
 from typing import Annotated, NamedTuple
 
-from humanize.agents import AgentBase, Isolated, Remote
+from hmz.agents import AgentBase, Isolated, Remote
 
 
 class Agents(NamedTuple):
@@ -44,7 +44,7 @@ def run(agents: Agents, task: str) -> None:
 
 #: A flow that says nothing about where its one agent works, which is most flows.
 PLAIN = """
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:

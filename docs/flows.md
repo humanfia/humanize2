@@ -48,7 +48,7 @@ question, and is refused.
 ```python
 """Two passes over the same task."""
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -75,7 +75,7 @@ once, so a flow may be written as a coroutine:
 ```python
 import asyncio
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 async def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
@@ -127,7 +127,7 @@ A `NamedTuple` says what each agent is *for* as well as how many there are:
 ```python
 from typing import NamedTuple
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 class Agents(NamedTuple):
@@ -164,7 +164,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 class Config(BaseModel):
@@ -228,7 +228,7 @@ some of them run says so where it declares the place, by writing the moment besi
 ```python
 from typing import Annotated, NamedTuple
 
-from humanize.agents import AgentBase, Moment
+from hmz.agents import AgentBase, Moment
 
 
 class Agents(NamedTuple):
@@ -260,7 +260,7 @@ beside the type.
 ```python
 from typing import Annotated, NamedTuple
 
-from humanize.agents import AgentBase, Isolated, Remote
+from hmz.agents import AgentBase, Isolated, Remote
 
 
 class Agents(NamedTuple):
@@ -300,7 +300,7 @@ must run that moment *and* may be moved. Several arguments, read one by one, in 
 What the flow declared is readable without driving it:
 
 ```python
-from humanize.runner import wanted
+from hmz.runner import wanted
 
 wanted("official/rlar")   # one Place per agent somebody has to choose: .name, .moments, .where
 ```
@@ -318,7 +318,7 @@ is a Ralph loop that will not let a turn stop while the task file still says the
 ```python
 from pathlib import Path
 
-from humanize.agents import AgentBase, Moment, Occasion, Verdict
+from hmz.agents import AgentBase, Moment, Occasion, Verdict
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -347,7 +347,7 @@ A place annotated `HumanAgent` is you, driven as an agent — which is what you 
 ```python
 from typing import NamedTuple
 
-from humanize.agents import AgentBase, HumanAgent
+from hmz.agents import AgentBase, HumanAgent
 
 
 class Chat(NamedTuple):
@@ -391,7 +391,7 @@ each is a flow of its own, called `<flow>:<name>`:
 ```python
 """Three phases of one thing."""
 
-from humanize.flows import flow
+from hmz.flows import flow
 
 
 @flow
@@ -501,7 +501,7 @@ own docstring.
 | `ralph_loop` | 1 | A fresh session every turn, so nothing carries over: the agent starts from the task and the repository each time. |
 | `stateful_ralph` | 1 | One session, held for the whole run, re-sent the task every turn. |
 
-Their source is the best documentation of this API there is — `src/humanize/flows/builtin/` in
+Their source is the best documentation of this API there is — `src/hmz/flows/builtin/` in
 a checkout, or wherever `pip` put it.
 
 ## The official flowverse
@@ -659,8 +659,8 @@ so a flow that needs one is handed agents built in Python — and a machine only
 own place for that agent [said `Remote`](#where-each-agent-works):
 
 ```python
-from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
-from humanize.runner import Runner
+from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.runner import Runner
 
 config = ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 agents = [
@@ -700,7 +700,7 @@ A flow is a function, so drive it with something that is not a coding agent:
 ```python
 from collections.abc import Iterator
 
-from humanize.agents import AgentBase, AgentConfig, Event, SessionBase
+from hmz.agents import AgentBase, AgentConfig, Event, SessionBase
 
 
 class FakeSession(SessionBase):
@@ -722,7 +722,7 @@ as a shell script, so a test spells out exactly what the agent it stands in for 
 To check only that a flow *loads* and declares what it should:
 
 ```python
-from humanize.runner import drives
+from hmz.runner import drives
 
 assert drives("my_loop") == ("actor", "reviewer")
 ```

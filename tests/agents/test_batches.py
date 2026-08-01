@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, ClassVar
 import pytest
 from pydantic import BaseModel
 
-from humanize.agents import (
+from hmz.agents import (
     WINDOW,
     AgentBase,
     AgentConfig,

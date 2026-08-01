@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.agents import (
+from hmz.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,
@@ -23,8 +23,8 @@ from humanize.agents import (
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
 )
-from humanize.tui.monitor import Monitor
-from humanize.tui.tally import Tally
+from hmz.tui.monitor import Monitor
+from hmz.tui.tally import Tally
 
 if TYPE_CHECKING:
     from pathlib import Path

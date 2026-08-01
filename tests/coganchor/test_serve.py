@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.coganchor.proto import Frame, Kind, Op, RemoteOSError
-from humanize.coganchor.serve import fsops
-from humanize.coganchor.serve.exports import Export, ExportTable
-from humanize.coganchor.serve.sessions import compose_env
+from hmz.coganchor.proto import Frame, Kind, Op, RemoteOSError
+from hmz.coganchor.serve import fsops
+from hmz.coganchor.serve.exports import Export, ExportTable
+from hmz.coganchor.serve.sessions import compose_env
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

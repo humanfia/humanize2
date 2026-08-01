@@ -17,11 +17,11 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import RichLog, Static
 
-from humanize.agents import AgentBase, AgentConfig, Event
-from humanize.tui import Humanize
-from humanize.tui.app import _PINNED
-from humanize.tui.monitor import short
-from humanize.tui.pick import Runs
+from hmz.agents import AgentBase, AgentConfig, Event
+from hmz.tui import Humanize
+from hmz.tui.app import _PINNED
+from hmz.tui.monitor import short
+from hmz.tui.pick import Runs
 from tests.stubs import ShellAgent, ShellSession
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ FLOW = """
 import time
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:

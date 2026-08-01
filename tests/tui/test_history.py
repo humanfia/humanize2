@@ -12,8 +12,8 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from humanize import home
-from humanize.tui.history import History
+from hmz import home
+from hmz.tui.history import History
 
 if TYPE_CHECKING:
     import pytest

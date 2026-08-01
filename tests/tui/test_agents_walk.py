@@ -18,10 +18,10 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList
 
-from humanize.backends import Model
-from humanize.tui import Humanize
-from humanize.tui.pick import Anchors, Models, Runs, RunsAs
-from humanize.tui.settings import Settings
+from hmz.backends import Model
+from hmz.tui import Humanize
+from hmz.tui.pick import Anchors, Models, Runs, RunsAs
+from hmz.tui.settings import Settings
 
 from .test_app import _transcript, until
 
@@ -39,7 +39,7 @@ HERE = '''
 
 from typing import NamedTuple
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 class Agents(NamedTuple):
@@ -58,7 +58,7 @@ REMOTE = '''
 
 from typing import Annotated, NamedTuple
 
-from humanize.agents import AgentBase, Remote
+from hmz.agents import AgentBase, Remote
 
 
 class Agents(NamedTuple):
@@ -77,7 +77,7 @@ BOXED = '''
 
 from typing import Annotated, NamedTuple
 
-from humanize.agents import AgentBase, Isolated
+from hmz.agents import AgentBase, Isolated
 
 
 class Agents(NamedTuple):
@@ -96,7 +96,7 @@ PAIR = '''
 
 from typing import Annotated, NamedTuple
 
-from humanize.agents import AgentBase, Remote
+from hmz.agents import AgentBase, Remote
 
 
 class Agents(NamedTuple):
@@ -136,7 +136,7 @@ async def _walk_in(app: Humanize, driver: Pilot[None], flow: str) -> None:
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_one_agent_is_three_steps_in_this_order(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     flows: Path,
@@ -171,7 +171,7 @@ async def test_one_agent_is_three_steps_in_this_order(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_two_agents_are_six_sheets_one_agent_at_a_time(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     flows: Path,
@@ -207,7 +207,7 @@ async def test_two_agents_are_six_sheets_one_agent_at_a_time(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_esc_off_each_step_is_the_step_before_it(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     flows: Path,
@@ -244,7 +244,7 @@ async def test_esc_off_each_step_is_the_step_before_it(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value=CLAUDE | {"codex": (Model("gpt-5.6-sol", ("xhigh",)),)},
 )
 async def test_stepping_back_and_turning_to_another_cli_asks_about_that_one(
@@ -276,7 +276,7 @@ async def test_stepping_back_and_turning_to_another_cli_asks_about_that_one(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_esc_off_the_second_agent_is_the_last_step_of_the_first(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     flows: Path,
@@ -300,7 +300,7 @@ async def test_esc_off_the_second_agent_is_the_last_step_of_the_first(
 
 @pytest.mark.timeout(60)
 @pytest.mark.parametrize("flow", ["here", "boxed"])
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_where_it_works_is_asked_only_where_the_flow_says_it_moves(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     flows: Path,
@@ -324,7 +324,7 @@ async def test_where_it_works_is_asked_only_where_the_flow_says_it_moves(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_a_container_the_flow_settled_is_shown_rather_than_asked_about(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     flows: Path,
@@ -344,7 +344,7 @@ async def test_a_container_the_flow_settled_is_shown_rather_than_asked_about(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_an_agent_that_works_here_says_nothing_new(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     flows: Path,
@@ -366,9 +366,9 @@ async def test_an_agent_that_works_here_says_nothing_new(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.pick.machines", return_value=[("ssh://box", "ssh config")]
+    "hmz.tui.pick.machines", return_value=[("ssh://box", "ssh config")]
 )
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_where_an_agent_works_rides_along_with_what_it_runs(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     _machines: unittest.mock.MagicMock,  # noqa: PT019
@@ -403,8 +403,8 @@ async def test_where_an_agent_works_rides_along_with_what_it_runs(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.pick.machines", return_value=[])
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.pick.machines", return_value=[])
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_a_machine_nothing_here_can_see_is_a_target_that_is_typed(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     _machines: unittest.mock.MagicMock,  # noqa: PT019
@@ -435,7 +435,7 @@ async def test_a_machine_nothing_here_can_see_is_a_target_that_is_typed(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_a_flow_that_puts_its_agent_here_refuses_one_that_was_pointed_away(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     flows: Path,

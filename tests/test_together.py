@@ -18,10 +18,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize import tracing
-from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
-from humanize.coganchor import AnchorConfig
-from humanize.machines import AnchoredConfig
+from hmz import tracing
+from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.coganchor import AnchorConfig
+from hmz.machines import AnchoredConfig
 from tests.coganchor.conftest import VIRTUAL_WORKSPACE
 from tests.tracing.conftest import labels
 
@@ -198,9 +198,9 @@ def test_one_flow_runs_two_agents_of_one_cli_as_two_accounts(
     """
     import json as reading
 
-    from humanize import providers
-    from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
-    from humanize.runner import Runner
+    from hmz import providers
+    from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.runner import Runner
 
     binaries = tmp_path / "bin"
     binaries.mkdir()
@@ -225,7 +225,7 @@ def test_one_flow_runs_two_agents_of_one_cli_as_two_accounts(
 import json
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:

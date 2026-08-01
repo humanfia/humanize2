@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from humanize import backends
+from hmz import backends
 
 
 def test_every_backend_answers_to_its_own_name() -> None:

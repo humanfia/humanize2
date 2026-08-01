@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize import cli, tracing
+from hmz import cli, tracing
 from tests.tracing.conftest import loaded
 
 if TYPE_CHECKING:
@@ -69,7 +69,7 @@ def test_forwards_every_argument_to_collect(
     options: dict[str, object],
 ) -> None:
     collect = unittest.mock.Mock(return_value={"otherData": {}})
-    monkeypatch.setattr("humanize.tracing.collector.collect", collect)
+    monkeypatch.setattr("hmz.tracing.collector.collect", collect)
 
     run(*argv)
 
@@ -89,14 +89,14 @@ def test_the_run_says_whose_sessions_were_whose(
     Two agents at one configuration are one agent to a collector reading the logs alone, so
     the last run in this workspace is read for what it wrote down about itself.
     """
-    from humanize.cycle import Cycle
+    from hmz.cycle import Cycle
 
     monkeypatch.chdir(tmp_path)
     cycle = Cycle("rlar", [], "go")
     cycle.write("opened", agent="actor", backend="claude", session="one")
     cycle.write("opened", agent="reviewer", backend="claude", session="two")
     collect = unittest.mock.Mock(return_value={"otherData": {}})
-    monkeypatch.setattr("humanize.tracing.collector.collect", collect)
+    monkeypatch.setattr("hmz.tracing.collector.collect", collect)
 
     run()
 

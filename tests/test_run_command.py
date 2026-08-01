@@ -17,9 +17,9 @@ from typing import Any
 
 import pytest
 
-from humanize.agents import PERMISSIONS, AgentConfig
-from humanize.cli import main
-from humanize.runner import NotAFlow, Runner
+from hmz.agents import PERMISSIONS, AgentConfig
+from hmz.cli import main
+from hmz.runner import NotAFlow, Runner
 from tests.stubs import ShellAgent
 
 #: A flow that drives nothing and writes down what it was handed, next to its own file. AGENTS
@@ -29,7 +29,7 @@ import json
 import os
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AGENTS], task: str) -> None:
@@ -53,7 +53,7 @@ ACCOUNTS = """
 import json
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
@@ -67,7 +67,7 @@ ACCESS = """
 import json
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
@@ -84,7 +84,7 @@ import os
 from pathlib import Path
 from typing import NamedTuple
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 class Agents(NamedTuple):
@@ -113,7 +113,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from humanize.agents import AgentBase
+    from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -123,9 +123,9 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 #: The flows humanize ships, each of which shows the line that would start it.
 PREBUILT = sorted(
     path
-    for path in (
-        Path(__file__).resolve().parents[1] / "src/humanize/flows/builtin"
-    ).glob("*.py")
+    for path in (Path(__file__).resolve().parents[1] / "src/hmz/flows/builtin").glob(
+        "*.py"
+    )
     if not path.stem.startswith("_")
 )
 
@@ -246,7 +246,7 @@ def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(
     tmp_path: Path,
 ) -> None:
     """A flow that named its agents is handed the type it asked for, and they answer to it."""
-    from humanize.runner import drives
+    from hmz.runner import drives
 
     flow = _flow(tmp_path, NAMED)
     assert drives(flow) == ("builder", "reviewer")
@@ -267,7 +267,7 @@ import os
 from pathlib import Path
 from typing import NamedTuple
 
-from humanize.agents import AgentBase, HumanAgent
+from hmz.agents import AgentBase, HumanAgent
 
 
 class Agents(NamedTuple):
@@ -295,7 +295,7 @@ def test_the_person_at_the_prompt_is_an_agent_nobody_is_asked_to_configure(
     tmp_path: Path,
 ) -> None:
     """A flow says it talks to them; it is handed one, and what they answer with is typed."""
-    from humanize.runner import drives
+    from hmz.runner import drives
 
     flow = _flow(tmp_path, PEOPLED)
     # Two places, one of them the person -- so one agent is asked for and one is given.
@@ -317,7 +317,7 @@ import json
 from pathlib import Path
 from typing import NamedTuple
 
-from humanize.agents import HumanAgent
+from hmz.agents import HumanAgent
 
 
 class Agents(NamedTuple):
@@ -340,7 +340,7 @@ def test_a_flow_whose_only_side_is_the_person_names_no_agent_at_all(
     Nobody chooses what the person runs, so a flow whose only side is them has everything it
     needs the moment it is named -- and a line that named no agent is not short of anything.
     """
-    from humanize.runner import drives
+    from hmz.runner import drives
 
     flow = _flow(tmp_path, ALONE)
     assert drives(flow) == ()
@@ -370,7 +370,7 @@ import json
 from pathlib import Path
 from typing import Annotated, NamedTuple
 
-from humanize.agents import AgentBase, Moment, Verdict
+from hmz.agents import AgentBase, Moment, Verdict
 
 
 class Agents(NamedTuple):
@@ -388,8 +388,8 @@ def run(agents: Agents, task: str) -> None:
 
 def test_a_flow_says_what_each_agent_has_to_be_able_to_do(tmp_path: Path) -> None:
     """Beside the type, where the flow declares the place -- and read back before the run."""
-    from humanize.agents import Moment
-    from humanize.runner import drives, wanted
+    from hmz.agents import Moment
+    from hmz.runner import drives, wanted
 
     flow = _flow(tmp_path, DEMANDING)
 
@@ -417,7 +417,7 @@ def test_an_agent_that_cannot_do_what_its_place_asks_is_refused_before_the_run(
 
 
 def test_what_a_place_asks_for_is_said_where_it_is_refused(tmp_path: Path) -> None:
-    from humanize.agents import KimiCodeCLIAgent, KimiCodeCLIAgentConfig
+    from hmz.agents import KimiCodeCLIAgent, KimiCodeCLIAgentConfig
 
     flow = _flow(tmp_path, DEMANDING)
     agents = [
@@ -430,7 +430,7 @@ def test_what_a_place_asks_for_is_said_where_it_is_refused(tmp_path: Path) -> No
 
 
 def test_a_plain_tuple_says_how_many_agents_and_nothing_more(tmp_path: Path) -> None:
-    from humanize.runner import drives
+    from hmz.runner import drives
 
     assert drives(
         _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase, AgentBase"))
@@ -549,7 +549,7 @@ def test_a_flow_for_other_agents_than_these_is_refused_before_it_is_run(
         Runner(flow, [ShellAgent(AgentConfig(model="m", effort="high"))])
 
 
-def test_python_m_humanize_is_the_humanize_command(
+def test_python_m_hmz_is_the_hmz_command(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     flow = _flow(tmp_path, RECORD.replace("AGENTS", "AgentBase"))
@@ -557,7 +557,7 @@ def test_python_m_humanize_is_the_humanize_command(
         sys, "argv", ["hmz", "exec", "-f", flow, "-a", "claude/m:high", "task"]
     )
     with pytest.raises(SystemExit) as stopped:
-        runpy.run_module("humanize", run_name="__main__")
+        runpy.run_module("hmz", run_name="__main__")
     assert stopped.value.code == 0
     assert _seen(tmp_path)["task"] == "task"
 
@@ -592,7 +592,7 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     so one of yours sharing a name with one of humanize's is listed beside it rather than
     instead of it.
     """
-    from humanize.flows import find, found
+    from hmz.flows import find, found
 
     home, project = tmp_path / "home", tmp_path / "project"
     for where in (home / ".humanize/flows", project / ".humanize/flows"):
@@ -615,7 +615,7 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     # `-f` still takes a bare name, and the nearest flow answering to it is what runs.
     assert find("chat") == str((project / ".humanize/flows/chat.py").resolve())
     assert find("yours") == str((home / ".humanize/flows/yours.py").resolve())
-    assert find("ralph_loop").endswith("src/humanize/flows/builtin/ralph_loop.py")
+    assert find("ralph_loop").endswith("src/hmz/flows/builtin/ralph_loop.py")
     # And it takes what the list calls one, which is a path, `~` and all.
     assert find("~/.humanize/flows/yours.py") == str(
         (home / ".humanize/flows/yours.py").resolve()
@@ -652,9 +652,9 @@ def test_the_chat_flow_is_one_session_for_as_long_as_it_is_told_things(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Talking to a coding agent, with no loop around it: the turns are a conversation."""
-    from humanize.agents import HumanAgent
-    from humanize.flows.builtin.chat import Chat
-    from humanize.flows.builtin.chat import run as chat
+    from hmz.agents import HumanAgent
+    from hmz.flows.builtin.chat import Chat
+    from hmz.flows.builtin.chat import run as chat
 
     agent = ShellAgent(AgentConfig(model="m", effort="high"))
     said = ["echo third", "echo second"]
@@ -675,9 +675,9 @@ def test_the_chat_flow_run_from_a_command_line_does_the_one_thing_it_was_given(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Nobody is at a prompt there, so there is nothing to wait for and it returns."""
-    from humanize.agents import HumanAgent
-    from humanize.flows.builtin.chat import Chat
-    from humanize.flows.builtin.chat import run as chat
+    from hmz.agents import HumanAgent
+    from hmz.flows.builtin.chat import Chat
+    from hmz.flows.builtin.chat import run as chat
 
     agent = ShellAgent(AgentConfig(model="m", effort="high"))
 

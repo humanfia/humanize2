@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize import tracing
-from humanize.tracing import collector
+from hmz import tracing
+from hmz.tracing import collector
 from tests.tracing.conftest import (
     CLAUDE_ELSEWHERE,
     CLAUDE_SESSION,

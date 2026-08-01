@@ -122,9 +122,9 @@ Give an agent's config an anchored [machine](machines.md) and its turns land the
 other change to the [flow](flows.md):
 
 ```python
-from humanize.agents import ClaudeCodeAgentConfig
-from humanize.coganchor import AnchorConfig
-from humanize.machines import AnchoredConfig
+from hmz.agents import ClaudeCodeAgentConfig
+from hmz.coganchor import AnchorConfig
+from hmz.machines import AnchoredConfig
 
 config = ClaudeCodeAgentConfig(
     model="claude-opus-4-8",
@@ -177,7 +177,7 @@ The same program serves both ends — the bundle shipped to a target runs `hmz a
 ## From Python
 
 ```python
-from humanize.coganchor import AnchorConfig, check, connect
+from hmz.coganchor import AnchorConfig, check, connect
 
 config = AnchorConfig(target="ssh://build-box", workspace="/srv/project")
 

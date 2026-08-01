@@ -21,14 +21,14 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import BaseModel
 
-from humanize.agents import (
+from hmz.agents import (
     CodexAgent,
     CodexAgentConfig,
     Event,
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
 )
-from humanize.agents import codex as appservers
+from hmz.agents import codex as appservers
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -911,7 +911,7 @@ def test_codex_grants_what_a_turn_asks_to_be_allowed_to_do(codex: _FakeServer) -
 def test_a_hook_may_refuse_what_codex_asked_to_be_allowed_to_do(
     codex: _FakeServer,
 ) -> None:
-    from humanize.agents import Moment, Verdict
+    from hmz.agents import Moment, Verdict
 
     agent = CodexAgent(
         CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="auto")
@@ -934,7 +934,7 @@ def test_codex_is_widened_by_handing_back_the_permissions_it_asked_for(
 
 
 def test_a_widening_a_hook_refuses_is_granted_nothing(codex: _FakeServer) -> None:
-    from humanize.agents import Moment, Verdict
+    from hmz.agents import Moment, Verdict
 
     agent = CodexAgent(
         CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="auto")

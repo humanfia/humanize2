@@ -14,10 +14,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.agents import AgentConfig, Stopped
-from humanize.cli import main
-from humanize.cycle import cycles, opened
-from humanize.runner import NotAFlow, Runner, configures, drives, wanted
+from hmz.agents import AgentConfig, Stopped
+from hmz.cli import main
+from hmz.cycle import cycles, opened
+from hmz.runner import NotAFlow, Runner, configures, drives, wanted
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ import json
 from pathlib import Path
 from typing import NamedTuple
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 class Agents(NamedTuple):
@@ -60,7 +60,7 @@ FANNED = """
 import json
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 async def run(agents: tuple[AgentBase], task: str) -> None:
@@ -76,7 +76,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 class Config(BaseModel):
@@ -95,7 +95,7 @@ async def run(agents: tuple[AgentBase], task: str, config: Config | None = None)
 
 #: A coroutine flow that fails partway, which is a flow that failed and not a flow to correct.
 FAILING = """
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 async def run(agents: tuple[AgentBase], task: str) -> None:
@@ -106,7 +106,7 @@ async def run(agents: tuple[AgentBase], task: str) -> None:
 #: A coroutine flow stopped by hand: the agent is told to take no further turn, and the turn
 #: after that raises where the flow is waiting for it.
 STOPPED = """
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 async def run(agents: tuple[AgentBase], task: str) -> None:
@@ -124,7 +124,7 @@ import json
 from pathlib import Path
 from typing import NamedTuple
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 class Agents(NamedTuple):
@@ -149,7 +149,7 @@ async def run(agents: Agents, task: str) -> None:
 #: A flow whose agents are a tuple of any length, which is no answer to how many it drives --
 #: refused for a coroutine exactly as it is for a function.
 UNCOUNTED = """
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 async def run(agents: tuple[AgentBase, ...], task: str) -> None:
@@ -352,7 +352,7 @@ def test_a_flow_that_is_not_a_coroutine_is_run_exactly_as_it_was(
 import json
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:

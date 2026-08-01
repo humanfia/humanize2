@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.agents import AgentConfig
+from hmz.agents import AgentConfig
 from tests.stubs import HereAnchor, ShellAgent
 
 if TYPE_CHECKING:

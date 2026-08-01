@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from humanize import backends, home, providers
-from humanize.providers import store
+from hmz import backends, home, providers
+from hmz.providers import store
 
 #: The moment a provider was made, as it is written down: UTC, to the second.
 _MADE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
@@ -248,7 +248,7 @@ def test_the_command_a_turn_is_spawned_as_names_every_path_it_is_answered_at() -
 
     spawned = provider.command(["claude", "--print"])
 
-    assert spawned[:4] == [sys.executable, "-m", "humanize", "cred"]
+    assert spawned[:4] == [sys.executable, "-m", "hmz", "cred"]
     assert spawned[spawned.index("--") + 1 :] == ["claude", "--print"]
     assert len([one for one in spawned if one.startswith("--map=")]) == len(
         provider.swaps()

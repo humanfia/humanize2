@@ -18,9 +18,9 @@ contributors; nothing here is needed to *use* humanize.
 ## The tree
 
 ```
-src/humanize/
+src/hmz/
 ├── __init__.py       home() — where humanize keeps what outlives one run
-├── __main__.py       python -m humanize
+├── __main__.py       python -m hmz
 ├── backends.py       every fact about a coding agent CLI that is not code
 ├── cycle.py          what one run of one flow was, written down as it happens
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
@@ -116,7 +116,7 @@ one — somewhere to write down a session it opened — is a `Journal` protocol 
 checked at all.
 
 1. **Every layer imports only what it may.** The table lists what each may name besides its own
-   subtree and `humanize` itself. Relative spellings are resolved, so
+   subtree and `hmz` itself. Relative spellings are resolved, so
    `from ..supervisor import Supervisor` counts exactly as the absolute form would.
 2. **No two layers name each other.** A pair that points both ways is two things put in one
    place, not one above another.
@@ -162,12 +162,12 @@ what it *must* do, in MUST/MUST NOT terms, for whoever is changing it.
 
 | | |
 | --- | --- |
-| `src/humanize/SPEC.md` | The tree, the top-level modules, and every command line |
-| `src/humanize/agents/SPEC.md` | The agent and session contract every backend keeps |
-| `src/humanize/machines/SPEC.md` | What a machine is |
-| `src/humanize/coganchor/SPEC.md` | What you are entitled to under an anchor, and what you deliberately are not |
-| `src/humanize/tracing/SPEC.md` | The collect API and how a trace is built |
-| `src/humanize/tui/SPEC.md` | Every behaviour the interface must have |
+| `src/hmz/SPEC.md` | The tree, the top-level modules, and every command line |
+| `src/hmz/agents/SPEC.md` | The agent and session contract every backend keeps |
+| `src/hmz/machines/SPEC.md` | What a machine is |
+| `src/hmz/coganchor/SPEC.md` | What you are entitled to under an anchor, and what you deliberately are not |
+| `src/hmz/tracing/SPEC.md` | The collect API and how a trace is built |
+| `src/hmz/tui/SPEC.md` | Every behaviour the interface must have |
 
 `AGENTS.md` says not to modify a SPEC unless you were told to. Change the code to match the
 SPEC; propose the SPEC change separately.
@@ -188,8 +188,8 @@ the top of the module.
 
 **A flow.** Just a `.py` file: one in `flows/builtin/` for one humanize ships, one in a
 [flowverse](flows.md#flowverses) for one it offers, one in `.humanize/flows/` for one of your
-own. They are content and import nothing of humanize but `humanize.agents` — and
-`humanize.flows.flow`, where one file holds several.
+own. They are content and import nothing of humanize but `hmz.agents` — and
+`hmz.flows.flow`, where one file holds several.
 
 ## The checks
 

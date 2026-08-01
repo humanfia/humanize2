@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from humanize.coganchor.transport import Target, build_bundle
+from hmz.coganchor.transport import Target, build_bundle
 from tests.coganchor.conftest import REPO_ROOT, Anchorage
 
 
@@ -145,7 +145,7 @@ def test_ssh_transport_bootstraps_and_runs(tmp_path: Path) -> None:
         [
             sys.executable,
             "-m",
-            "humanize",
+            "hmz",
             "anchor",
             "--target",
             "ssh://localhost",

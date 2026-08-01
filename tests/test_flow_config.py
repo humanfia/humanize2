@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from humanize.agents import AgentConfig
-from humanize.runner import (
+from hmz.agents import AgentConfig
+from hmz.runner import (
     NotAFlow,
     Runner,
     configures,
@@ -36,7 +36,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 class Config(BaseModel):
@@ -58,7 +58,7 @@ PLAIN = """
 import json
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -67,7 +67,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 
 #: A flow whose third argument is not a model, which is a flow that takes no setting up.
 NOT_A_MODEL = """
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str, config: str = "") -> None:

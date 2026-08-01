@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.agents import (
+from hmz.agents import (
     MimoCodeAgent,
     MimoCodeAgentConfig,
     OpencodeAgent,
@@ -25,7 +25,7 @@ from humanize.agents import (
     PiAgent,
     PiAgentConfig,
 )
-from humanize.machines import AnchoredConfig
+from hmz.machines import AnchoredConfig
 from tests.stubs import HereAnchor
 
 if TYPE_CHECKING:
@@ -376,7 +376,7 @@ def test_mimo_is_opencode_under_its_own_name(stubs: _Stubs) -> None:
 
 def test_the_new_backends_name_themselves_as_a_command_line_names_them() -> None:
     """`AgentBase.backend` is read off the class, so a mismatch is a backend nobody finds."""
-    from humanize import backends
+    from hmz import backends
 
     for agent, config in (
         (PiAgent, PI),

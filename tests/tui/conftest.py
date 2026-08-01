@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-import humanize.tui.app
+import hmz.tui.app
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -25,4 +25,4 @@ if TYPE_CHECKING:
 def _elsewhere(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Runs the interface somewhere temporary, with no backend, unless the test says."""
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(humanize.tui.app, "installed", dict)
+    monkeypatch.setattr(hmz.tui.app, "installed", dict)

@@ -10,8 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from humanize.agents import AgentBase, CommandSessionBase
-from humanize.coganchor import AnchorConfig
+from hmz.agents import AgentBase, CommandSessionBase
+from hmz.coganchor import AnchorConfig
 
 if TYPE_CHECKING:
     import os

@@ -27,7 +27,7 @@ hmz exec -f rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "
 Ask a flow how many it wants without running it:
 
 ```python
-from humanize.runner import drives
+from hmz.runner import drives
 
 print(drives("official/rlar"))   # ('actor', 'reviewer')
 ```
@@ -68,7 +68,7 @@ The annotation names something that only exists for a type checker:
 
 ```python
 if TYPE_CHECKING:                     # ← this is the problem
-    from humanize.agents import AgentBase
+    from hmz.agents import AgentBase
 ```
 
 Import it at runtime instead. The count has to be readable where the flow runs, not only where
@@ -318,7 +318,7 @@ That cannot reach past you on a machine several people share.
 
 - `--log-level debug` on `hmz anchor`, both ends.
 - The `SPEC.md` beside the code says what it is *supposed* to do, normatively —
-  `src/humanize/coganchor/SPEC.md` is the one worth reading when a remote session behaves
+  `src/hmz/coganchor/SPEC.md` is the one worth reading when a remote session behaves
   strangely.
 - [Architecture](architecture.md) says which layer to look in.
 - Ask in [issues](https://github.com/humanfia/humanize/issues).

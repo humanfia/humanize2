@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from humanize.agents import (
+from hmz.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.coganchor import standin
+from hmz.coganchor import standin
 from tests.coganchor.tasks import SMOKE_TASKS, SmokeTask
 
 if TYPE_CHECKING:

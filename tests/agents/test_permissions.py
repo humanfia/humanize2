@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from humanize.agents import (
+from hmz.agents import (
     PERMISSIONS,
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
@@ -27,7 +27,7 @@ from humanize.agents import (
     Moment,
     Verdict,
 )
-from humanize.agents.codex import unattended
+from hmz.agents.codex import unattended
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -200,7 +200,7 @@ def test_kimi_is_told_the_rung_as_a_mode_and_a_plan(
     permission: str, mode: str, planning: bool
 ) -> None:
     """`manual` is never used: it asks, and an unattended flow has nobody to answer."""
-    from humanize.agents.kimi import _PERMITTED
+    from hmz.agents.kimi import _PERMITTED
 
     said = _PERMITTED[permission]
     assert said["permission_mode"] == mode
@@ -209,8 +209,8 @@ def test_kimi_is_told_the_rung_as_a_mode_and_a_plan(
 
 def test_every_backend_has_something_to_say_at_every_rung() -> None:
     """A rung a backend quietly ignored would be a setting that lies."""
-    from humanize.agents import codex as codex_module
-    from humanize.agents import kimi, opencode
+    from hmz.agents import codex as codex_module
+    from hmz.agents import kimi, opencode
 
     for rung in PERMISSIONS:
         assert rung in kimi._PERMITTED

@@ -27,11 +27,11 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from humanize.coganchor import AnchorConfig
-from humanize.coganchor.proto import Channel
-from humanize.coganchor.remote import RemoteClient
-from humanize.coganchor.serve.exports import ExportTable
-from humanize.coganchor.serve.server import Server
+from hmz.coganchor import AnchorConfig
+from hmz.coganchor.proto import Channel
+from hmz.coganchor.remote import RemoteClient
+from hmz.coganchor.serve.exports import ExportTable
+from hmz.coganchor.serve.server import Server
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

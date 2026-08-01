@@ -22,9 +22,9 @@ it reads and the commands it runs.
 ## The three answers
 
 ```python
-from humanize.agents import ClaudeCodeAgentConfig
-from humanize.coganchor import AnchorConfig
-from humanize.machines import AnchoredConfig, DockerConfig
+from hmz.agents import ClaudeCodeAgentConfig
+from hmz.coganchor import AnchorConfig
+from hmz.machines import AnchoredConfig, DockerConfig
 
 here    = ClaudeCodeAgentConfig(model=…, effort=…)
 there   = ClaudeCodeAgentConfig(model=…, effort=…, machine=AnchoredConfig(
@@ -47,7 +47,7 @@ run](flows.md#asking-for-an-agent-that-can-do-something):
 ```python
 from typing import Annotated, NamedTuple
 
-from humanize.agents import AgentBase, Isolated, Remote
+from hmz.agents import AgentBase, Isolated, Remote
 
 
 class Agents(NamedTuple):
@@ -94,11 +94,11 @@ prompt, not the command line. The flow names the image, and the rest follows fro
   [any of them does](#when-the-machine-comes-up-and-when-it-goes).
 
 Which is [a container of the agent's own](#a-container-of-the-agents-own), settled where the
-flow's declaration is read rather than where the agents are chosen. `humanize.agents.isolated`
+flow's declaration is read rather than where the agents are chosen. `hmz.agents.isolated`
 is what it comes to, if the same thing is ever wanted by hand:
 
 ```python
-from humanize.agents import isolated
+from hmz.agents import isolated
 
 isolated("python:3.12")              # DockerConfig(image="python:3.12", workspace=None)
 isolated("python:3.12", "/srv/one")  # the same, holding that directory instead
@@ -126,8 +126,8 @@ An ssh host, a container someone else started, a machine left listening on a por
 directory on this machine standing in for one.
 
 ```python
-from humanize.coganchor import AnchorConfig
-from humanize.machines import AnchoredConfig
+from hmz.coganchor import AnchorConfig
+from hmz.machines import AnchoredConfig
 
 machine = AnchoredConfig(
     anchor=AnchorConfig(target="ssh://build-box", workspace="/srv/project")
@@ -151,7 +151,7 @@ and running as you — so the work it leaves behind is yours, in your own worksp
 everything else is the image's.
 
 ```python
-from humanize.machines import DockerConfig
+from hmz.machines import DockerConfig
 
 machine = DockerConfig(image="python:3.12", workspace="/path/to/project")
 ```
@@ -226,8 +226,8 @@ Two classes: the setting, and the machine it brings up.
 ```python
 from dataclasses import dataclass
 
-from humanize.coganchor import AnchorConfig
-from humanize.machines import MachineBase, MachineConfig
+from hmz.coganchor import AnchorConfig
+from hmz.machines import MachineBase, MachineConfig
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -254,12 +254,12 @@ them gets a machine of its own. `start` must take down whatever it created if it
 has to answer for what `start` got as far as creating. `stop` has a do-nothing default, which is
 what `AnchoredConfig` uses.
 
-The contract is `src/humanize/machines/SPEC.md`.
+The contract is `src/hmz/machines/SPEC.md`.
 
 ## API summary
 
 ```python
-from humanize.machines import (
+from hmz.machines import (
     MachineConfig,   # the setting: .create() -> MachineBase
     MachineBase,     # the machine: .start() -> AnchorConfig, .stop() -> None
     AnchoredConfig,  # a machine that is already running
@@ -278,7 +278,7 @@ agent.anchor   # AnchorConfig | None -- where its turns land, bringing the machi
 And what a flow writes beside a place, with the two shorthands that build the settings above:
 
 ```python
-from humanize.agents import (
+from hmz.agents import (
     Remote,     # this place may be pointed at a machine
     Isolated,   # this place is a container of the flow's own: Isolated("python:3.12")
     anchored,   # anchored("ssh://build-box") -> AnchoredConfig, from a target as it is written

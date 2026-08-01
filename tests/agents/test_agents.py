@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.agents import (
+from hmz.agents import (
     AgentBase,
     AgentConfig,
     ClaudeCodeAgent,
@@ -29,7 +29,7 @@ from humanize.agents import (
     Question,
     Stopped,
 )
-from humanize.machines import AnchoredConfig
+from hmz.machines import AnchoredConfig
 from tests.stubs import HereAnchor, ShellAgent
 
 if TYPE_CHECKING:

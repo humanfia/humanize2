@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 import pytest
 import yaml
 
-from humanize import home
-from humanize.tui.pick import Runs
-from humanize.tui.settings import Settings
+from hmz import home
+from hmz.tui.pick import Runs
+from hmz.tui.settings import Settings
 
 if TYPE_CHECKING:
     from pathlib import Path

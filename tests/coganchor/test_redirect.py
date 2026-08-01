@@ -15,13 +15,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize import cli
-from humanize.coganchor import AnchorConfig
-from humanize.coganchor.argv import parser, settings
-from humanize.coganchor.handlers import _plant
-from humanize.coganchor.linux import ptrace
-from humanize.coganchor.linux.syscalls import ARCH
-from humanize.coganchor.policy import Layout, Router
+from hmz import cli
+from hmz.coganchor import AnchorConfig
+from hmz.coganchor.argv import parser, settings
+from hmz.coganchor.handlers import _plant
+from hmz.coganchor.linux import ptrace
+from hmz.coganchor.linux.syscalls import ARCH
+from hmz.coganchor.policy import Layout, Router
 
 if TYPE_CHECKING:
     from tests.coganchor.conftest import Anchorage

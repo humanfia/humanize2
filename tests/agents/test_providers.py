@@ -17,10 +17,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize import providers
-from humanize.agents import AgentConfig, ClaudeCodeAgent, ClaudeCodeAgentConfig
-from humanize.backends import named
-from humanize.machines import MachineBase, MachineConfig
+from hmz import providers
+from hmz.agents import AgentConfig, ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.backends import named
+from hmz.machines import MachineBase, MachineConfig
 from tests.stubs import HereAnchor, ShellAgent, ShellSession
 
 if TYPE_CHECKING:
@@ -238,7 +238,7 @@ def test_what_a_provider_adds_to_the_command_line_is_added_to_the_backends(
 
     spawned = agent.spawned(["claude", "--print"])
 
-    assert spawned[:4] == [sys.executable, "-m", "humanize", "cred"]
+    assert spawned[:4] == [sys.executable, "-m", "hmz", "cred"]
     # The backend's own line, the provider's arguments at the end of it.
     assert spawned[spawned.index("--") + 1 :] == [
         "claude",
@@ -343,7 +343,7 @@ def test_a_provider_reaches_the_command_a_real_backend_builds(
 
     assert agent.environment() == {"ANTHROPIC_API_KEY": "not-real"}
     spawned = agent.spawned(["claude", "--print"])
-    assert spawned[:4] == [sys.executable, "-m", "humanize", "cred"]
+    assert spawned[:4] == [sys.executable, "-m", "hmz", "cred"]
     assert any(f"--map={home}/.claude/.credentials.json=" in one for one in spawned), (
         spawned
     )

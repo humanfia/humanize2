@@ -29,17 +29,11 @@ Repository = "https://github.com/humanfia/humanize"
 Issues = "https://github.com/humanfia/humanize/issues"
 
 [project.scripts]
-hmz = "humanize.cli:main"
+hmz = "hmz.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.2,<0.13.0"]
 build-backend = "uv_build"
-
-[tool.uv.build-backend]
-# The distribution is `hmz`, after the command; what it installs is still `humanize`.
-# Named here because the backend would otherwise look for the module under the
-# distribution's own name.
-module-name = "humanize"
 
 [dependency-groups]
 dev = [
@@ -111,27 +105,27 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # The syscall layer's domain type is the string path: it reads them out of ptrace
 # registers and puts them on a wire, so `pathlib` would only convert them twice.
-"src/humanize/coganchor/**" = ["PTH"]
+"src/hmz/coganchor/**" = ["PTH"]
 # The same, for the half of a redirected run that reads paths out of a tracee: what
 # it holds is what the process itself named, byte for byte, and back again.
-"src/humanize/providers/_trace.py" = ["PTH"]
+"src/hmz/providers/_trace.py" = ["PTH"]
 # A handle and the client it came off, a session and its agent: each pair is two
 # halves of one object declared in one file, and the underscore keeps the halves
 # out of the package's public surface rather than out of each other's.
-"src/humanize/coganchor/remote.py" = ["SLF001"]
-"src/humanize/agents/base.py" = ["SLF001"]
-"src/humanize/agents/codex.py" = ["SLF001"]
-"src/humanize/agents/kimi.py" = ["SLF001"]
+"src/hmz/coganchor/remote.py" = ["SLF001"]
+"src/hmz/agents/base.py" = ["SLF001"]
+"src/hmz/agents/codex.py" = ["SLF001"]
+"src/hmz/agents/kimi.py" = ["SLF001"]
 # Looking for a flow is allowed to find nothing. `os.path` answers False for a
 # directory it cannot read where `Path` raises, and the module says so at `where`.
-"src/humanize/flows/__init__.py" = ["PTH"]
+"src/hmz/flows/__init__.py" = ["PTH"]
 # A flow is a module with its entry points in it, and the module docstring is about
 # them -- how the flow loops, what each agent is for, and the line that starts it.
 # What a flow prints is what it says: the interface captures everything printed
 # under it into the transcript, so a warning a flow has to give is a `print`.
-"src/humanize/flows/builtin/*.py" = ["D103", "T201"]
+"src/hmz/flows/builtin/*.py" = ["D103", "T201"]
 # What a command line writes, it prints.
-"src/humanize/cli/**" = ["T201"]
+"src/hmz/cli/**" = ["T201"]
 "tests/**" = [
     "S101",    # an assert is what a test is
     "SLF001",  # a test reaches for what it tests, private or not

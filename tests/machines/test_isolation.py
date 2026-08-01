@@ -16,16 +16,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.agents import AgentConfig
-from humanize.coganchor import check
-from humanize.machines import AnchoredConfig, DockerConfig, MachineBase, MachineConfig
-from humanize.runner import Runner
+from hmz.agents import AgentConfig
+from hmz.coganchor import check
+from hmz.machines import AnchoredConfig, DockerConfig, MachineBase, MachineConfig
+from hmz.runner import Runner
 from tests.stubs import HereAnchor, ShellAgent
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from humanize.coganchor import AnchorConfig
+    from hmz.coganchor import AnchorConfig
 
 #: Small, and has the `python3` a target needs. Pulled by hand rather than by the test, so a
 #: machine without it skips instead of spending a minute on a download.
@@ -175,7 +175,7 @@ def test_a_turn_runs_in_the_container_and_leaves_its_work_in_the_workspace(
 ISOLATING = f'''
 from typing import Annotated, NamedTuple
 
-from humanize.agents import AgentBase, Isolated
+from hmz.agents import AgentBase, Isolated
 
 
 class Agents(NamedTuple):

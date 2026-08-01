@@ -14,11 +14,11 @@ from pathlib import Path
 import pytest
 from textual.widgets import Label, OptionList
 
-from humanize.agents.skills import Skill, leaving, skills
-from humanize.backends import Model
-from humanize.tui import Humanize
-from humanize.tui.pick import Models, Runs, Skills
-from humanize.tui.settings import Settings
+from hmz.agents.skills import Skill, leaving, skills
+from hmz.backends import Model
+from hmz.tui import Humanize
+from hmz.tui.pick import Models, Runs, Skills
+from hmz.tui.settings import Settings
 
 from .test_app import into_models, until
 
@@ -93,7 +93,7 @@ def test_a_backend_with_nowhere_to_keep_them_offers_none(homes: Path) -> None:
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={"kimi": (Model("kimi-code/k3", ("max",)),)},
 )
 async def test_a_cli_that_cannot_be_told_says_that_rather_than_none_installed(
@@ -124,7 +124,7 @@ def test_a_skill_with_no_front_matter_is_the_directory_it_is_in(homes: Path) -> 
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
 async def test_what_an_agent_is_loaded_with_is_chosen_beside_what_it_runs(
@@ -180,7 +180,7 @@ async def test_what_an_agent_is_loaded_with_is_chosen_beside_what_it_runs(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
 async def test_walking_out_of_the_skills_leaves_the_agent_loaded_as_it_was(
@@ -254,7 +254,7 @@ def test_what_a_backend_is_told_is_every_skill_the_agent_was_not_given(
 
 def test_an_agent_is_made_with_what_it_was_told_to_have(tmp_path: Path) -> None:
     """What the sheet answered is a setting of the agent, done to it before the flow starts."""
-    from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     app._models = [Runs("claude/m:high", "", ("writing", "hf-cli"))]
@@ -274,7 +274,7 @@ def test_an_agent_is_made_with_what_it_was_told_to_have(tmp_path: Path) -> None:
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
 async def test_the_letters_narrow_the_skills_and_space_switches_one(

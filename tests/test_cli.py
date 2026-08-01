@@ -15,7 +15,7 @@ import unittest.mock
 
 import pytest
 
-from humanize import cli
+from hmz import cli
 
 #: Every command, and what reaching it may load besides `cli` itself: the layers its work is
 #: really done in, and nothing of any other command's.
@@ -33,14 +33,14 @@ def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
     """`hmz exec` must not pay for a date parser, nor `hmz anchor` for any of it."""
     probe = (
         "import contextlib, io, sys\n"
-        "from humanize import cli\n"
+        "from hmz import cli\n"
         # The help itself goes to stdout, so it is swallowed: what is wanted is the list below.
         "with contextlib.redirect_stdout(io.StringIO()):\n"
         "    try:\n"
         f"        cli.main([{command!r}, '--help'])\n"
         "    except SystemExit:\n"
         "        pass\n"
-        "print(' '.join(m for m in sys.modules if m.startswith('humanize.')))\n"
+        "print(' '.join(m for m in sys.modules if m.startswith('hmz.')))\n"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
@@ -83,7 +83,7 @@ def test_a_line_that_names_something_that_is_not_a_command_is_a_usage_error(
 
 def test_a_line_naming_no_command_opens_the_interface() -> None:
     """`hmz` on its own, which is the way in: there is no command that opens it too."""
-    with unittest.mock.patch("humanize.tui.Humanize.run") as opened:
+    with unittest.mock.patch("hmz.tui.Humanize.run") as opened:
         assert cli.main([]) == 0
 
     assert opened.called
@@ -92,7 +92,7 @@ def test_a_line_naming_no_command_opens_the_interface() -> None:
 
 def test_a_line_of_flags_and_no_command_opens_the_interface_set_up() -> None:
     """`hmz -f <flow>`: a run that is always the same run is one line rather than three walks."""
-    with unittest.mock.patch("humanize.tui.Humanize.run") as opened:
+    with unittest.mock.patch("hmz.tui.Humanize.run") as opened:
         assert cli.main(["-f", "chat"]) == 0
 
     assert opened.called
@@ -103,7 +103,7 @@ def test_a_bad_permission_does_not_open_the_interface(
 ) -> None:
     spec = "cli=codex,model=m,effort=high,permission=readonly"
     with (
-        unittest.mock.patch("humanize.tui.Humanize.run") as opened,
+        unittest.mock.patch("hmz.tui.Humanize.run") as opened,
         pytest.raises(SystemExit) as stopped,
     ):
         cli.main(["-f", "chat", "-a", spec])

@@ -183,7 +183,7 @@ A flow is a Python file with a `run(agents, task)` in it. Put this in
 ```python
 """Two passes: do the work, then read it back and fix what is wrong."""
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:

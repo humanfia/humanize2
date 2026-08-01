@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.coganchor.netproxy import NetProxy
+from hmz.coganchor.netproxy import NetProxy
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

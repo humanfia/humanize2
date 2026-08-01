@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING, Literal
 import pytest
 from pydantic import BaseModel, Field
 
-from humanize.agents import HumanAgent, human
+from hmz.agents import HumanAgent, human
 
 if TYPE_CHECKING:
-    from humanize.agents import Question
+    from hmz.agents import Question
 
 
 class Settled(BaseModel):

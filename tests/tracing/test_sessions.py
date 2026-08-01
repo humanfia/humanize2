@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize import tracing
+from hmz import tracing
 from tests.tracing.conftest import (
     CLAUDE_ELSEWHERE,
     CLAUDE_SESSION,

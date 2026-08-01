@@ -8,7 +8,7 @@ writes the run down as `cycle`. `tracing` reads the logs back afterwards and nee
 they are. Nothing points both ways, which is checked here too.
 
 And the target half runs on the target, which may be any architecture, while
-:mod:`humanize.coganchor.linux` picks a register map at import time and refuses anything but
+:mod:`hmz.coganchor.linux` picks a register map at import time and refuses anything but
 x86-64 -- so the serving half must not reach the agent half, nor may anything a caller imports
 to configure one.
 
@@ -24,56 +24,56 @@ import subprocess
 import sys
 from pathlib import Path
 
-from humanize.coganchor.transport import build_bundle
+from hmz.coganchor.transport import build_bundle
 
 SRC = Path(__file__).resolve().parent.parent / "src"
 
-#: What each layer may import besides its own subtree and :mod:`humanize` itself. Longest
+#: What each layer may import besides its own subtree and :mod:`hmz` itself. Longest
 #: matching layer wins, and a layer it may name covers the modules inside that layer.
 ALLOWED: dict[str, set[str]] = {
     # Driving a backend is acting on the facts about it -- where it keeps the skills it
     # would load, so that an agent given some can be told about the rest -- and `backends`
     # is the leaf those are written down in. It names nothing itself, so this widens the DAG
     # without bending it, exactly as it does for a flow below.
-    "humanize.agents": {
-        "humanize.backends",
-        "humanize.coganchor",
-        "humanize.machines",
+    "hmz.agents": {
+        "hmz.backends",
+        "hmz.coganchor",
+        "hmz.machines",
         # Which account a turn runs as is a setting of the agent, so driving one reads the
         # providers. They name nothing above themselves, so this widens the DAG without
         # bending it -- as `backends` does below.
-        "humanize.providers",
+        "hmz.providers",
     },
-    "humanize.backends": set(),
-    "humanize.coganchor": set(),
-    "humanize.coganchor.serve": {"humanize.coganchor", "humanize.coganchor.proto"},
-    "humanize.cycle": {"humanize.agents"},
+    "hmz.backends": set(),
+    "hmz.coganchor": set(),
+    "hmz.coganchor.serve": {"hmz.coganchor", "hmz.coganchor.proto"},
+    "hmz.cycle": {"hmz.agents"},
     # A flow drives agents, and one that has to know where its own agent keeps its tasks
     # is reading a fact rather than a log: `backends` is the leaf that exists so a fact of
     # that kind is written once, and it names nothing, so this widens the DAG without
     # bending it.
-    "humanize.flows": {"humanize.agents", "humanize.backends"},
-    "humanize.machines": {"humanize.coganchor"},
-    "humanize.runner": {
-        "humanize.agents",
-        "humanize.backends",
-        "humanize.cycle",
-        "humanize.flows",
+    "hmz.flows": {"hmz.agents", "hmz.backends"},
+    "hmz.machines": {"hmz.coganchor"},
+    "hmz.runner": {
+        "hmz.agents",
+        "hmz.backends",
+        "hmz.cycle",
+        "hmz.flows",
     },
     # A provider is credentials for one backend, kept apart from that backend's own, and it
     # is run under the same interception a session on another machine is: the facts about the
     # CLI, and the ptrace layer that answers a path. Neither of those names it back.
-    "humanize.providers": {"humanize.backends", "humanize.coganchor"},
-    "humanize.tracing": {"humanize.backends"},
-    "humanize.tui": {
-        "humanize.agents",
-        "humanize.backends",
-        "humanize.flows",
+    "hmz.providers": {"hmz.backends", "hmz.coganchor"},
+    "hmz.tracing": {"hmz.backends"},
+    "hmz.tui": {
+        "hmz.agents",
+        "hmz.backends",
+        "hmz.flows",
         # `/providers` is where an account is made and `/agents` is where one is given to an
         # agent, so the interface reads the same leaf the agents do. It names nothing above
         # itself, so this widens the DAG without bending it.
-        "humanize.providers",
-        "humanize.runner",
+        "hmz.providers",
+        "hmz.runner",
     },
 }
 
@@ -83,10 +83,10 @@ ALLOWED: dict[str, set[str]] = {
 #: used. Loaded rather than imported, so this widens what a run may load and not what the
 #: serving half may name.
 STARTUP = {
-    "humanize",
-    "humanize.cli",
-    "humanize.cli.anchor",
-    "humanize.coganchor.anchor",
+    "hmz",
+    "hmz.cli",
+    "hmz.cli.anchor",
+    "hmz.coganchor.anchor",
 }
 
 
@@ -101,7 +101,7 @@ def _imports(source: Path) -> set[str]:
 
     Relative spellings are resolved rather than skipped: ``from ..supervisor import Supervisor``
     inside ``serve/`` reaches the agent half just as surely as the absolute spelling, and is the
-    form a refactoring tool would write. ``from humanize.coganchor import supervisor`` names that
+    form a refactoring tool would write. ``from hmz.coganchor import supervisor`` names that
     module too, so a from-import that resolves to a file on disk counts as naming it.
     """
     package = _module_name(source)
@@ -119,9 +119,7 @@ def _imports(source: Path) -> set[str]:
             named.add(module)
             named.update(f"{module}.{alias.name}" for alias in node.names)
     # A from-import names a module only when one exists on disk; the rest are the objects in it.
-    return {
-        name for name in named if name.split(".")[0] == "humanize" and _is_module(name)
-    }
+    return {name for name in named if name.split(".")[0] == "hmz" and _is_module(name)}
 
 
 def _is_module(dotted: str) -> bool:
@@ -137,7 +135,7 @@ def _covers(layer: str, name: str) -> bool:
 
 def test_the_package_is_marked_as_typed() -> None:
     """Without the marker, type checking humanize -- here or downstream -- checks nothing."""
-    assert (SRC / "humanize" / "py.typed").is_file()
+    assert (SRC / "hmz" / "py.typed").is_file()
 
 
 def test_every_layer_imports_only_what_it_may() -> None:
@@ -152,10 +150,10 @@ def test_every_layer_imports_only_what_it_may() -> None:
         bad = {
             name
             for name in _imports(source)
-            # `humanize` itself, which is where `home()` is, is every layer's to name. It is
+            # `hmz` itself, which is where `home()` is, is every layer's to name. It is
             # answered here rather than written into the table: its name is the prefix of
             # every other, so an entry saying it would silently say all of them.
-            if name != "humanize"
+            if name != "hmz"
             and not any(_covers(allowed, name) for allowed in (layer, *ALLOWED[layer]))
         }
         if bad:
@@ -182,13 +180,13 @@ def test_no_two_layers_name_each_other() -> None:
 def test_every_module_at_the_top_is_a_layer_the_table_governs() -> None:
     """One left out is unchecked, and reads from here exactly like one deliberately exempt."""
     named = {
-        f"humanize.{path.stem}"
-        for path in (SRC / "humanize").iterdir()
+        f"hmz.{path.stem}"
+        for path in (SRC / "hmz").iterdir()
         if not path.name.startswith("_")
         and (path.suffix == ".py" or (path / "__init__.py").is_file())
     }
     # The command line joins the layers and so may name any of them.
-    assert named - {"humanize.cli"} <= set(ALLOWED)
+    assert named - {"hmz.cli"} <= set(ALLOWED)
 
 
 def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
@@ -197,14 +195,14 @@ def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
     probe = (
         "import contextlib, io, sys\n"
         "sys.path.insert(0, sys.argv[1])\n"
-        "from humanize import cli\n"
+        "from hmz import cli\n"
         "with contextlib.redirect_stdout(io.StringIO()):\n"
         # A line it reads all the way through rather than `--help`, which now exits before the
         # serving half is reached at all: what is checked is what a run of it loads. The line
         # is refused for its port, which is a return rather than an exit.
         "    cli.main(['anchor', 'serve', '--export', '/project:/tmp',\n"
         "              '--listen', 'not-a-port'])\n"
-        "print('\\n'.join(m for m in sys.modules if m.split('.')[0] == 'humanize'))\n"
+        "print('\\n'.join(m for m in sys.modules if m.split('.')[0] == 'hmz'))\n"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe, str(bundle)],
@@ -217,7 +215,7 @@ def test_serving_loads_only_the_permitted_modules(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     loaded = set(result.stdout.split())
-    serve = "humanize.coganchor.serve"
+    serve = "hmz.coganchor.serve"
     assert f"{serve}.server" in loaded, "the target half did not actually run"
     assert loaded <= ALLOWED[serve] | STARTUP | {
         name for name in loaded if name.startswith(serve)

@@ -14,10 +14,10 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList, Static
 
-from humanize import providers
-from humanize.backends import Model
-from humanize.tui import Humanize
-from humanize.tui.pick import (
+from hmz import providers
+from hmz.backends import Model
+from hmz.tui import Humanize
+from hmz.tui.pick import (
     Backends,
     Models,
     Providers,
@@ -27,7 +27,7 @@ from humanize.tui.pick import (
     Ways,
     reads,
 )
-from humanize.tui.settings import Settings
+from hmz.tui.settings import Settings
 
 from .test_app import _transcript, until
 
@@ -67,7 +67,7 @@ async def test_the_command_opens_the_sheet_of_accounts() -> None:
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
 async def test_an_account_made_on_the_sheet_lands_in_the_store(
     signed_in: unittest.mock.MagicMock,
 ) -> None:
@@ -113,7 +113,7 @@ async def test_an_account_made_on_the_sheet_lands_in_the_store(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
 async def test_a_secret_is_never_drawn_back(signed_in: unittest.mock.MagicMock) -> None:
     """It is on its way into a credential store, and a screen is somewhere it is read off."""
     app = Humanize()
@@ -162,7 +162,7 @@ async def test_a_secret_is_never_drawn_back(signed_in: unittest.mock.MagicMock) 
 
 @pytest.mark.timeout(60)
 @pytest.mark.parametrize("key", ["shift+enter", "ctrl+j"])
-@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
 async def test_variables_of_your_own_are_given_a_line_apiece(
     signed_in: unittest.mock.MagicMock,
     key: str,
@@ -214,7 +214,7 @@ async def test_variables_of_your_own_are_given_a_line_apiece(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_the_account_an_agent_runs_as_is_the_first_thing_asked_about_it(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
@@ -259,7 +259,7 @@ async def test_the_account_an_agent_runs_as_is_the_first_thing_asked_about_it(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
@@ -327,7 +327,7 @@ async def test_walking_out_of_the_ways_steps_back_into_the_backends() -> None:
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_making_one_and_walking_out_of_it_changes_nothing(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
@@ -352,7 +352,7 @@ async def test_making_one_and_walking_out_of_it_changes_nothing(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_a_cli_with_no_accounts_says_where_they_come_from(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
@@ -375,7 +375,7 @@ async def test_a_cli_with_no_accounts_says_where_they_come_from(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_the_first_row_leaves_the_agent_running_as_this_machine(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
@@ -428,7 +428,7 @@ async def test_walking_out_of_the_accounts_makes_nothing_and_loses_nothing() -> 
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
 async def test_an_account_is_signed_in_again_by_the_way_it_was_made_with(
     signed_in: unittest.mock.MagicMock,
 ) -> None:
@@ -454,7 +454,7 @@ async def test_an_account_is_signed_in_again_by_the_way_it_was_made_with(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
 async def test_signing_in_again_asks_only_what_is_not_written_down(
     signed_in: unittest.mock.MagicMock,
 ) -> None:
@@ -519,7 +519,7 @@ async def test_taking_an_account_away_says_what_went_with_it() -> None:
 
 def test_an_agent_is_made_as_the_account_it_was_given() -> None:
     """What the sheet answered is a setting of the agent, done to it before the flow starts."""
-    from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     _account()
     app = Humanize()
@@ -538,7 +538,7 @@ def test_an_agent_is_made_as_the_account_it_was_given() -> None:
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_an_agent_told_to_run_as_nobody_is_a_line_to_correct(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:

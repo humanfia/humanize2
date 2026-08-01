@@ -4,7 +4,7 @@ Driving a coding agent from Python. An agent is settings; a
 [session](concepts.md#session) is memory. Which of the two a [flow](flows.md) holds decides what
 it remembers.
 
-Everything here is importable from `humanize.agents`.
+Everything here is importable from `hmz.agents`.
 
 ## Table of Contents
 
@@ -38,7 +38,7 @@ Everything here is importable from `humanize.agents`.
 Each backend has an agent class and a config class, and they take the same calls:
 
 ```python
-from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
 agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high"))
 ```
@@ -325,7 +325,7 @@ these are the same idea held here instead — hung on a live agent, taken down a
 runs, and written in the language the flow is written in.
 
 ```python
-from humanize.agents import Moment, Occasion, Verdict
+from hmz.agents import Moment, Occasion, Verdict
 
 def no_force_push(occasion: Occasion) -> Verdict | None:
     if "push --force" in occasion.about:
@@ -461,7 +461,7 @@ strings — including the ones a Ralph loop dropped a turn later. It is what a t
 say which trajectories were this agent's:
 
 ```python
-from humanize.tracing import collect
+from hmz.tracing import collect
 
 collect(agents={a.id: a.opened for a in (actor, reviewer)})
 ```
@@ -475,7 +475,7 @@ A [flow](flows.md#how-many-agents-and-what-they-are-for) that declares its agent
 A flow that is a conversation rather than a loop has two sides, and the second is you.
 
 ```python
-from humanize.agents import HumanAgent
+from hmz.agents import HumanAgent
 
 person = HumanAgent()                      # takes only an optional name=, defaulting to "human"
 person("Here is what I did. What next?")   # asks, and answers with what was typed
@@ -540,7 +540,7 @@ of its own. It is more work than any single-agent effort, which is why it sits a
 
 **Kimi Code's effort says how wide to run as well as how hard to think.** `max` is one agent;
 `swarmmax` is the same thinking at the width of a fleet of subagents. The prefix is exported as
-`humanize.agents.SWARM` for anything that has to take it apart.
+`hmz.agents.SWARM` for anything that has to take it apart.
 
 Codex's models differ from each other — `gpt-5.6-sol` takes `ultra`, `gpt-5.5` does not — so
 the interface offers each model only the efforts it takes.
@@ -600,7 +600,7 @@ dict(spent)                                  # everything it does count
 
 **A rate is tokens a second over seconds on the clock**, not seconds an agent was talking: a
 flow sleeps between rounds, commits, reads what the last turn wrote, and that time is time the
-tokens were spent over. The window defaults to five minutes — `humanize.agents.WINDOW`, the
+tokens were spent over. The window defaults to five minutes — `hmz.agents.WINDOW`, the
 same one the interface's readout is over — and a run younger than the window is measured over
 the run, so a rate read a minute in is what that minute came to rather than a fifth of it.
 
@@ -755,7 +755,7 @@ talked out of one — so what actually goes on the wire is the rest of them, wor
 looking at what is installed:
 
 ```python
-from humanize.agents.skills import leaving, skills
+from hmz.agents.skills import leaving, skills
 
 skills("claude")                       # what it would load here: yours, and this project's
 leaving("claude", ("code-review",))    # what to switch off so that only that one is left
@@ -769,7 +769,7 @@ leaving("claude", ("code-review",))    # what to switch off so that only that on
 | `pi` | — | it is told which skills to load by path, and finds none of its own to choose between |
 | `opencode`, `mimo` | — | neither offers a way of switching one off for a single run |
 
-Where each CLI keeps them is written down in `humanize.backends`; nothing is asked of the CLI
+Where each CLI keeps them is written down in `hmz.backends`; nothing is asked of the CLI
 itself, for the reason nothing else is either. The interface asks which to have on the
 [`/agents` sheet](tui.md#what-each-agent-is-loaded-with).
 
@@ -778,7 +778,7 @@ itself, for the reason nothing else is either. The interface asks which to have 
 A config's `machine` says where an agent's work goes. `None` — the default — is this machine.
 
 ```python
-from humanize.machines import AnchoredConfig, DockerConfig
+from hmz.machines import AnchoredConfig, DockerConfig
 
 ClaudeCodeAgentConfig(model=…, effort=…, machine=DockerConfig(image="python:3.12"))
 ```
@@ -930,4 +930,4 @@ class Unhooked(ValueError): ...   # a moment this backend does not run
 
 `CommandSessionBase` and `StreamSessionBase` are the two shapes a backend is driven in — one
 command per turn, or one long-lived process spoken to a line at a time. Subclass them to add a
-backend; `src/humanize/agents/SPEC.md` is the contract they have to keep.
+backend; `src/hmz/agents/SPEC.md` is the contract they have to keep.

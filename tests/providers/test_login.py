@@ -20,8 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from humanize import backends, providers
-from humanize.providers import login
+from hmz import backends, providers
+from hmz.providers import login
 from tests.providers.test_redirect import traced
 
 #: A stand-in for `claude auth login`: what a login leaves behind, without the browser.

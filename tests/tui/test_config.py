@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList, RichLog
 
-from humanize.backends import Model
-from humanize.cli import main
-from humanize.tui import Humanize
-from humanize.tui.pick import Configures, Flows, Models, Runs, setting
-from humanize.tui.settings import Settings
+from hmz.backends import Model
+from hmz.cli import main
+from hmz.tui import Humanize
+from hmz.tui.pick import Configures, Flows, Models, Runs, setting
+from hmz.tui.settings import Settings
 
 from .test_app import into_models
 
@@ -35,7 +35,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 FIRST = {"section": "first  ·  how loudly"}
 SECOND = {"section": "second  ·  how far"}
@@ -72,7 +72,7 @@ def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> No
 UNGROUPED = '''
 from pydantic import BaseModel, Field
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 class Config(BaseModel):
@@ -88,7 +88,7 @@ def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> No
 
 #: A flow that takes no setting up at all, which is what most of them are.
 PLAIN = """
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -146,7 +146,7 @@ async def test_setting_up_comes_between_the_flow_and_its_agents(flows: Path) -> 
     """Which is the only moment it can: the flow says what there is to set."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -169,7 +169,7 @@ async def test_a_flow_that_takes_no_setting_up_is_not_asked_about(flows: Path) -
     """The sheet is skipped rather than shown empty, and the walk is one step shorter."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -185,7 +185,7 @@ async def test_the_arrows_move_a_setting_and_letters_write_one(flows: Path) -> N
     """A switch and a literal step; a number and a word are typed, which is what they are."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -217,7 +217,7 @@ async def test_what_the_flow_refuses_is_said_where_it_was_typed(flows: Path) -> 
     """The model is what refuses, so a flow's own rule is enforced before anything runs."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -241,7 +241,7 @@ async def test_a_setting_outside_its_bounds_is_said_too(flows: Path) -> None:
     """The bounds are the field's own, and nothing here had to be told about them."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -264,7 +264,7 @@ async def test_escape_steps_back_to_the_flows(flows: Path) -> None:
     """A flow chosen by mistake is what you would be walking back from."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -288,7 +288,7 @@ async def test_how_it_was_set_up_is_kept_and_read_back(
     """A flow of forty settings is not one to answer again every morning."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -313,7 +313,7 @@ async def test_config_opens_the_sheet_on_its_own(flows: Path) -> None:
     """`/config` is the other half of `/agents`: one asks about the flow, one about what runs it."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -383,7 +383,7 @@ async def test_the_settings_are_drawn_in_the_sections_the_flow_grouped_them_into
     """Twenty settings in one list is a list nobody reads: the flow says which belong together."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -409,7 +409,7 @@ async def test_a_flow_that_groups_nothing_is_one_list(flows: Path) -> None:
     """No headings, no blank rows, and the arrows walk it as they walk any list."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -517,7 +517,7 @@ async def test_agents_does_not_ask_how_the_flow_is_set_up(flows: Path) -> None:
     """The two are split: `/config` asks how the flow runs, `/agents` what it runs on."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -542,7 +542,7 @@ async def test_agents_leaves_how_the_flow_is_set_up_alone(flows: Path) -> None:
     """A question it did not ask is one it must not answer, either -- even by keeping it."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -572,7 +572,7 @@ async def test_a_setting_that_is_written_carries_a_caret_under_the_cursor(
     """A blank one otherwise reads as a setting nothing can be typed into."""
     app = Humanize()
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:

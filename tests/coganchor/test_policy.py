@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from humanize.coganchor.policy import Layout, Router
+from hmz.coganchor.policy import Layout, Router
 
 
 def make_router(**kwargs: object) -> Router:

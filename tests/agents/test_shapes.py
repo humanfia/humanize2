@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel
 
-from humanize.agents import (
+from hmz.agents import (
     AgentBase,
     AgentConfig,
     ClaudeCodeAgent,

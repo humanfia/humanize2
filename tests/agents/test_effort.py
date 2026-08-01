@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from humanize.agents import (
+from hmz.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     OpencodeAgent,

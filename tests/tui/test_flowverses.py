@@ -18,11 +18,11 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList
 
-from humanize.backends import Model
-from humanize.flows import OFFICIAL, flowverses
-from humanize.flows import verses as store
-from humanize.tui import Humanize
-from humanize.tui.pick import Configures, Fetches, Flows, RunsAs
+from hmz.backends import Model
+from hmz.flows import OFFICIAL, flowverses
+from hmz.flows import verses as store
+from hmz.tui import Humanize
+from hmz.tui.pick import Configures, Fetches, Flows, RunsAs
 
 from .test_app import until
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 #: A flow, as short as one can be: what is being fetched is the file, not what it does.
 FLOW = '''"""Somebody else's loop, fetched from somewhere else."""
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -312,8 +312,8 @@ from typing import NamedTuple
 
 from pydantic import BaseModel
 
-from humanize.agents import AgentBase
-from humanize.flows import flow
+from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Drafting(NamedTuple):
@@ -348,7 +348,7 @@ def rlcr(agents: Building, task: str) -> None:
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
 async def test_one_of_the_flows_a_file_holds_is_chosen_like_any_other(
@@ -382,7 +382,7 @@ async def test_one_of_the_flows_a_file_holds_is_chosen_like_any_other(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
 async def test_each_of_them_is_set_up_with_its_own_settings(

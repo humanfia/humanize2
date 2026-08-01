@@ -9,7 +9,7 @@ from typing import IO, cast
 
 import pytest
 
-from humanize.coganchor.proto import (
+from hmz.coganchor.proto import (
     Channel,
     Frame,
     Kind,

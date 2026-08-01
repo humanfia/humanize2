@@ -12,7 +12,7 @@ is not a command is a usage error listing the commands there are. Everything aft
 name reaches that command untouched — `--help` included — so each answers for its own
 arguments.
 
-`python -m humanize` is the same command line, which is how a turn spawns itself under an
+`python -m hmz` is the same command line, which is how a turn spawns itself under an
 [anchor](remote-execution.md).
 
 ## Table of Contents
@@ -369,11 +369,11 @@ Every command is a shell around a call you can make yourself. The layer each liv
 in [Architecture](architecture.md).
 
 ```python
-from humanize.runner import Runner          # hmz exec
-from humanize.tracing import collect        # hmz collect
-from humanize.coganchor import connect      # hmz anchor
-from humanize.coganchor import check        # hmz anchor --check
-from humanize import providers              # hmz providers
+from hmz.runner import Runner          # hmz exec
+from hmz.tracing import collect        # hmz collect
+from hmz.coganchor import connect      # hmz anchor
+from hmz.coganchor import check        # hmz anchor --check
+from hmz import providers              # hmz providers
 ```
 
 - `Runner(flow, agents).run(task)` — [Flows](flows.md)

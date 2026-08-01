@@ -28,8 +28,8 @@ from pathlib import Path
 
 import pytest
 
-from humanize import cli
-from humanize.providers import redirect
+from hmz import cli
+from hmz.providers import redirect
 
 #: What the machine itself is signed in as, which a turn under a provider must never see.
 MACHINE = '{"token": "the one at this machine"}'
@@ -55,7 +55,7 @@ def cred(
       What the run came to, with its output read back.
     """
     return subprocess.run(
-        [sys.executable, "-m", "humanize", "cred", *argv],
+        [sys.executable, "-m", "hmz", "cred", *argv],
         input=stdin,
         capture_output=True,
         text=True,
@@ -207,7 +207,7 @@ def test_the_command_names_every_swap_and_then_the_program() -> None:
     assert rendered == [
         sys.executable,
         "-m",
-        "humanize",
+        "hmz",
         "cred",
         "--map=/house/.claude=/store/mine/home",  # longest first, as the table is
         "--map=/house/x=/store/y",
@@ -267,7 +267,7 @@ def test_a_run_that_cannot_be_supervised_does_not_run_unsupervised(
     def refuse(*_: object) -> int:
         raise OSError("no supervisor here")
 
-    monkeypatch.setattr("humanize.providers.redirect.run", refuse)
+    monkeypatch.setattr("hmz.providers.redirect.run", refuse)
 
     assert cli.main(["cred", "--map=/house/x=/store/y", "--", "true"]) == 1
     assert "no supervisor here" in capsys.readouterr().err
@@ -581,7 +581,7 @@ def test_two_runs_at_once_do_not_see_each_others_accounts(tmp_path: Path) -> Non
                 [
                     sys.executable,
                     "-m",
-                    "humanize",
+                    "hmz",
                     "cred",
                     f"--map={machine}={instead}",
                     "--",

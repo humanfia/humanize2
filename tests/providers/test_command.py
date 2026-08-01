@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize import backends, cli, providers
+from hmz import backends, cli, providers
 from tests.providers.test_login import CLAUDE_LOGIN, stand_in
 from tests.providers.test_redirect import traced
 

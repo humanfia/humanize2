@@ -19,10 +19,10 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import RichLog, Static
 
-from humanize.agents import AgentConfig, Event
-from humanize.tui import Humanize
-from humanize.tui.app import _KEPT
-from humanize.tui.pick import Held, Runs, reads
+from hmz.agents import AgentConfig, Event
+from hmz.tui import Humanize
+from hmz.tui.app import _KEPT
+from hmz.tui.pick import Held, Runs, reads
 from tests.stubs import ShellAgent, ShellSession
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
     from textual.pilot import Pilot
 
-    from humanize.agents import AgentBase
+    from hmz.agents import AgentBase
 
 CONFIG = AgentConfig(model="m", effort="high")
 
@@ -59,7 +59,7 @@ for line in sys.stdin:
 HOLDING = """
 import asyncio
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:

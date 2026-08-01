@@ -17,12 +17,12 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from textual.widgets import Label, OptionList, Static
 
-from humanize.agents import PERMISSIONS
-from humanize.backends import Model
-from humanize.cycle import cycles
-from humanize.tui import Humanize
-from humanize.tui.app import _HELP, _OWN, Editor, _where
-from humanize.tui.pick import Flows, Models, Runs, RunsAs
+from hmz.agents import PERMISSIONS
+from hmz.backends import Model
+from hmz.cycle import cycles
+from hmz.tui import Humanize
+from hmz.tui.app import _HELP, _OWN, Editor, _where
+from hmz.tui.pick import Flows, Models, Runs, RunsAs
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 FLOW = """
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -47,7 +47,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 AWAITED = """
 from pathlib import Path
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 async def run(agents: tuple[AgentBase], task: str) -> None:
@@ -239,8 +239,8 @@ async def test_a_flow_that_is_not_there_is_a_line_to_correct_and_not_the_end() -
 
 def test_only_the_flows_there_are_to_run_are_offered() -> None:
     """A flow anywhere else is a path typed out, not something found by walking the tree."""
-    from humanize.flows import found
-    from humanize.tui.complete import offered
+    from hmz.flows import found
+    from hmz.tui.complete import offered
 
     assert offered("/flow ", _OWN) == [one.name for one in found()]
 
@@ -274,7 +274,7 @@ async def test_what_the_flow_did_is_on_status(workspace: Path) -> None:
 @pytest.mark.timeout(60)
 async def test_a_half_typed_command_is_offered_the_rest_of_itself() -> None:
     """Offered in a list under the editor, and taken with tab: nothing is ever guessed at."""
-    from humanize.tui.app import Editor
+    from hmz.tui.app import Editor
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -303,8 +303,8 @@ async def test_enter_takes_what_is_offered_rather_than_sending_the_half_typed_li
     And the offers run out, so enter goes back to sending: `/flow` takes one flow, and a
     line that already names it has nothing left to be finished with.
     """
-    from humanize.flows import found
-    from humanize.tui.app import Editor
+    from hmz.flows import found
+    from hmz.tui.app import Editor
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -336,7 +336,7 @@ async def test_the_arrows_walk_what_was_typed_before_it() -> None:
     Which is the whole reason the draft is kept: an arrow pressed by mistake over a prompt
     somebody spent five minutes writing must not be what takes it away.
     """
-    from humanize.tui.app import Editor
+    from hmz.tui.app import Editor
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -397,7 +397,7 @@ async def test_the_arrows_are_the_editor_s_own_inside_a_prompt_of_more_than_one_
     None
 ):
     """A prompt of several lines is moved around in; only its ends walk the history."""
-    from humanize.tui.app import Editor
+    from hmz.tui.app import Editor
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -422,7 +422,7 @@ async def test_the_arrows_are_the_editor_s_own_inside_a_prompt_of_more_than_one_
 @pytest.mark.timeout(60)
 async def test_nothing_is_offered_for_what_is_not_a_command() -> None:
 
-    from humanize.tui.app import Editor
+    from hmz.tui.app import Editor
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -451,7 +451,7 @@ async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None
     the wrapper a turn is spawned as are each about a run rather than inside one. What both
     sides do have is the store of accounts, which is one thing said in two places.
     """
-    from humanize.tui.complete import about, offered
+    from hmz.tui.complete import about, offered
 
     offers = offered("/", _OWN)
 
@@ -534,7 +534,7 @@ async def test_a_line_to_a_running_flow_is_never_turned_away(workspace: Path) ->
     whichever turn starts next. There is no third answer -- a flow that is not running is
     what makes the first thing you say the task.
     """
-    from humanize.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     (workspace / "flow.py").write_text(FLOW)
     app = Humanize()
@@ -569,7 +569,7 @@ def test_what_the_agents_run_is_known_without_starting_one() -> None:
     `claude --help` took over thirty seconds on the machine this was written on, and
     `codex app-server` seventy-six -- so what they run is known rather than asked for.
     """
-    from humanize.tui.discover import installed
+    from hmz.tui.discover import installed
 
     with unittest.mock.patch("subprocess.Popen") as started:
         found = installed()
@@ -589,7 +589,7 @@ async def test_a_flow_between_two_turns_is_a_flow_that_is_running() -> None:
     thing, naming the flow and how long the run has been going rather than falling back to
     saying where it is, as if nothing were happening.
     """
-    from humanize.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -609,8 +609,8 @@ async def test_a_flow_between_two_turns_is_a_flow_that_is_running() -> None:
 @pytest.mark.timeout(60)
 async def test_a_turn_that_has_gone_quiet_still_reads_as_one_that_is_running() -> None:
     """A model thinks for minutes without a word, and the clock is what says it is alive."""
-    from humanize.agents import Event
-    from humanize.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.agents import Event
+    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"), name="one")
     app = Humanize()
@@ -632,12 +632,12 @@ async def test_the_flow_itself_is_walked_back_into_from_what_it_runs_on() -> Non
 
     Rather than a way out of both, which would mean picking the flow over from tab.
     """
-    from humanize.tui.pick import Flows
+    from hmz.tui.pick import Flows
 
     app = Humanize()
     # Whatever this machine has installed, since the sheet is only put up if there is one.
     with unittest.mock.patch(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
@@ -740,7 +740,7 @@ async def test_ctrl_c_takes_back_the_nearest_thing_and_leaves_on_two() -> None:
     """As a coding agent's terminal does: the line, then the flow, then the interface."""
     app = Humanize()
     async with app.run_test() as driver:
-        from humanize.tui.app import Editor
+        from hmz.tui.app import Editor
 
         await driver.press(*"half a prompt")
         await driver.press("ctrl+c")
@@ -802,7 +802,7 @@ def test_only_model_ids_are_offered(
     for either answers that there is no such model, and a cycle that recorded one says
     nothing.
     """
-    from humanize.tui import discover
+    from hmz.tui import discover
 
     cache = tmp_path / ".claude.json"
     cache.write_text(
@@ -831,7 +831,7 @@ def test_pi_offers_the_models_this_install_has_credentials_for(
     Read off the disk it is written on rather than asked for: `pi --list-models` is a process,
     and this is read at a prompt.
     """
-    from humanize.tui import discover
+    from hmz.tui import discover
 
     home = tmp_path / "pi-home"
     home.mkdir()
@@ -878,7 +878,7 @@ def talking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setattr(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         lambda: {"claude": (Model("claude-opus-5", ("max", "high")),)},
     )
     monkeypatch.chdir(tmp_path)
@@ -1045,7 +1045,7 @@ async def test_a_theme_asked_for_is_the_theme(monkeypatch: pytest.MonkeyPatch) -
 
 def test_the_terminal_theme_names_no_colour_of_its_own() -> None:
     """Every colour in it is one of the sixteen the terminal already has a setting for."""
-    from humanize.tui.app import _TERMINAL
+    from hmz.tui.app import _TERMINAL
 
     named = [
         _TERMINAL.primary,
@@ -1076,8 +1076,8 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
     Which is Claude Code's own shape, read off its own screen: no bars, no boxes, nothing
     indented -- every line starts where the terminal does.
     """
-    from humanize.agents import Event
-    from humanize.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.agents import Event
+    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -1110,7 +1110,7 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={
         "claude": (Model("claude-opus-5", ("max", "high", "low")),),
         "codex": (Model("gpt-5.6-sol", ("xhigh",)),),
@@ -1175,7 +1175,7 @@ async def test_what_an_agent_runs_is_one_cli_at_a_time_and_an_effort_the_arrows_
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={
         "claude": (Model("claude-opus-5", ("max", "high")),),
         "codex": (Model("gpt-5.6-sol", ("xhigh",)), Model("gpt-5.5", ("high",))),
@@ -1239,7 +1239,7 @@ async def test_the_arrows_turn_to_the_next_cli_and_the_one_before(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={
         "claude": (Model("claude-opus-5", ("max",)), Model("claude-sonnet-5", ("max",)))
     },
@@ -1279,7 +1279,7 @@ async def test_one_cli_is_a_heading_rather_than_a_row_of_tabs(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={
         "claude": (Model("claude-opus-5", ("max", "high")),),
         "codex": (Model("gpt-5.6-sol", ("xhigh",)),),
@@ -1289,7 +1289,7 @@ async def test_what_was_typed_belongs_to_the_tab_it_was_typed_into(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """A search that narrowed one CLI's accounts to one would narrow the next one's to none."""
-    from humanize import providers
+    from hmz import providers
 
     providers.add("claude", "deepseek", way="key", env={"ANTHROPIC_API_KEY": "k"})
     providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "k"})
@@ -1315,7 +1315,7 @@ async def test_what_was_typed_belongs_to_the_tab_it_was_typed_into(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={
         "claude": (Model("claude-opus-5", ("ultracode", "max", "high")),),
         "kimi": (Model("kimi-code/k3", ("max", "low"), swarms=True),),
@@ -1371,7 +1371,7 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={
         "claude": (
             Model("claude-opus-5", ("high",)),
@@ -1469,7 +1469,7 @@ async def test_a_switch_takes_on_and_off_as_well_as_being_flipped() -> None:
 
 def test_the_commands_are_offered_in_alphabetical_order() -> None:
     """The one order a list of commands has that a reader can predict."""
-    from humanize.tui.complete import offered
+    from hmz.tui.complete import offered
 
     offers = offered("/", _OWN)
 
@@ -1517,7 +1517,7 @@ async def test_two_things_said_get_two_answers_and_not_three(
     monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setattr(
-        "humanize.tui.app.installed",
+        "hmz.tui.app.installed",
         lambda: {"claude": (Model("claude-opus-5", ("high",)),)},
     )
     monkeypatch.chdir(tmp_path)
@@ -1545,7 +1545,7 @@ async def test_two_things_said_get_two_answers_and_not_three(
 
 def test_the_offers_say_what_each_command_takes() -> None:
     """A switch takes `on` or `off` as well as being flipped, and only the list says so."""
-    from humanize.tui.complete import about, takes
+    from hmz.tui.complete import about, takes
 
     for name in _OWN:
         assert about(name), name  # or it would not be offered at all
@@ -1570,7 +1570,7 @@ async def test_taking_an_offer_types_the_command_and_not_its_arguments() -> None
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
 async def test_the_box_at_the_top_says_what_this_is_and_not_what_is_set_up(
@@ -1624,7 +1624,7 @@ from typing import Literal, NamedTuple
 
 from pydantic import BaseModel, Field
 
-from humanize.agents import HumanAgent
+from hmz.agents import HumanAgent
 
 
 class Agents(NamedTuple):
@@ -1699,7 +1699,7 @@ async def test_the_person_asked_for_a_shape_is_asked_a_question_at_a_time(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
 async def test_what_an_agent_may_do_is_stepped_through_beside_what_it_runs(
@@ -1737,7 +1737,7 @@ async def test_what_an_agent_may_do_is_stepped_through_beside_what_it_runs(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.app.installed",
+    "hmz.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
 async def test_the_loosest_rung_is_written_down_as_nothing_at_all(

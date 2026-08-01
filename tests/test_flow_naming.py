@@ -12,14 +12,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from humanize.flows import about, find, flow, found, held, inside
-from humanize.runner import NotAFlow, Runner, configures, drives, wanted
+from hmz.flows import about, find, flow, found, held, inside
+from hmz.runner import NotAFlow, Runner, configures, drives, wanted
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-from humanize.agents import AgentConfig
+from hmz.agents import AgentConfig
 
 CONFIG = AgentConfig(model="m", effort="high")
 
@@ -30,8 +30,8 @@ from typing import NamedTuple
 
 from pydantic import BaseModel
 
-from humanize.agents import AgentBase
-from humanize.flows import flow
+from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 class Drafting(NamedTuple):
@@ -72,7 +72,7 @@ def _not_a_flow(agents: Drafting, task: str) -> None:
 #: A file that is one flow, the way every flow was one before any of this.
 ONE = '''"""Just the one, and it says what it does here."""
 
-from humanize.agents import AgentBase
+from hmz.agents import AgentBase
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:
@@ -83,8 +83,8 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 #: And one that is both: a `run` under the file's own name, and another beside it.
 BOTH = '''"""One under its own name, and one beside it."""
 
-from humanize.agents import AgentBase
-from humanize.flows import flow
+from hmz.agents import AgentBase
+from hmz.flows import flow
 
 
 def run(agents: tuple[AgentBase], task: str) -> None:

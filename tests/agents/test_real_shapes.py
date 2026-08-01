@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from humanize.agents import (
+from hmz.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,

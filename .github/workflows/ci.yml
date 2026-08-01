@@ -69,4 +69,4 @@ jobs:
       - name: pytest
         run: >
           uv run --frozen pytest -q
-          --cov=humanize --cov-report=term-missing --cov-report=xml
+          --cov=hmz --cov-report=term-missing --cov-report=xml
