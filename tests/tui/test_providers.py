@@ -342,9 +342,11 @@ async def test_the_first_row_leaves_the_agent_running_as_this_machine(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Models), driver)
         tuning = app.screen.query_one("#tuning", Label)
-        await until(
-            lambda: "as this machine is signed in" in str(tuning.content), driver
-        )
+        await until(lambda: "effort" in str(tuning.content), driver)
+        # The account was the step before this one, so it is not read back here: a setting
+        # shown where it cannot be changed is a setting somebody tries to change.
+        assert "as installed" not in str(tuning.content)
+        assert "deepseek" not in str(tuning.content)
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
 

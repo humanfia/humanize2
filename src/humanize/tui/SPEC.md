@@ -102,9 +102,14 @@ the cursor, and under them whatever is adjusted rather than chosen.
   are each a question nobody is being asked.
 - What an agent runs MUST be one choice rather than two, a model belonging to the CLI that runs
   it; and the CLIs MUST be read one at a time, a tab apiece, since every model of every CLI in
-  one list is a list that grows each time any of them ships a model. Tab and shift+tab MUST
-  turn between them and MUST wrap. One CLI MUST be a heading rather than a row of tabs: there
-  is nowhere to switch to, so nothing MUST say there is.
+  one list is a list that grows each time any of them ships a model. The arrows the list itself
+  is not using MUST turn between them, and MUST wrap: a sheet that asks one thing has its keys
+  free, and a chord for what a row of tabs is for would be a key to already know. One CLI MUST
+  be a heading rather than a row of tabs: there is nowhere to switch to, so nothing MUST say
+  there is.
+- A step MUST NOT read back what another step settles. What cannot be changed where it is shown
+  is a setting somebody tries to change there; what the walk has settled is on the line above
+  the prompt when it is over.
 - Typing MUST narrow the list being read and MUST belong to the tab it was typed into: a search
   that narrowed one CLI to one model would narrow the next to none, which reads as a CLI with
   nothing in it. Esc MUST clear what was typed before it leaves, on every sheet that is

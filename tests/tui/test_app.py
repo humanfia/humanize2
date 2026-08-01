@@ -1108,7 +1108,7 @@ async def test_what_an_agent_runs_is_one_cli_at_a_time_and_an_effort_the_arrows_
         assert "claude" in tabs
         assert "codex" in tabs
         assert "kimi" not in tabs  # not installed, so not a tab
-        assert "tab/shift+tab to switch" in tabs
+        assert "←/→ to switch" in tabs
 
         await into_models(app, driver)
         sheet = app.screen
@@ -1150,15 +1150,15 @@ async def test_what_an_agent_runs_is_one_cli_at_a_time_and_an_effort_the_arrows_
         "codex": (Model("gpt-5.6-sol", ("xhigh",)), Model("gpt-5.5", ("high",))),
     },
 )
-async def test_tab_and_shift_tab_turn_to_the_next_cli_and_the_one_before(
+async def test_the_arrows_turn_to_the_next_cli_and_the_one_before(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """Which is the point of the tabs: one CLI's accounts rather than everyone's at once.
 
-    They wrap, so the last tab is one press from the first however many CLIs are installed --
-    and shift+tab here is the tab before rather than the interface's own next flow, which is
-    not a thing to do from inside the sheet that is choosing what this flow runs on. What the
-    tab was left on is the CLI whose models the step after asks about.
+    They wrap, so the last tab is one press from the first however many CLIs are installed.
+    The arrows rather than tab, now that this sheet asks one thing: up and down are the
+    accounts under the tab, so left and right are the tabs. What the tab was left on is the
+    CLI whose models the step after asks about.
     """
     app = Humanize()
     async with app.run_test() as driver:
@@ -1170,18 +1170,20 @@ async def test_tab_and_shift_tab_turn_to_the_next_cli_and_the_one_before(
         await until(lambda: bool(listing.options), driver)
         flow = app._flow_named
 
-        await driver.press("tab")
+        await driver.press("right")
         await driver.pause()
         assert "[b $primary]codex" in str(sheet.query_one("#tabs", Label).content)
 
-        await driver.press("tab")  # round the end, back to the first
+        await driver.press("right")  # round the end, back to the first
         await driver.pause()
         assert "[b $primary]claude" in str(sheet.query_one("#tabs", Label).content)
 
-        await driver.press("shift+tab")  # and back the other way
+        await driver.press("left")  # and back the other way
         await driver.pause()
         assert "[b $primary]codex" in str(sheet.query_one("#tabs", Label).content)
-        # The interface's own shift+tab did not fire under the sheet.
+        # And the interface's own shift+tab is still not a thing to do from under a sheet.
+        await driver.press("shift+tab")
+        await driver.pause()
         assert app._flow_named == flow
 
         await driver.press("enter")  # as this machine is signed in, on codex
@@ -1226,7 +1228,7 @@ async def test_one_cli_is_a_heading_rather_than_a_row_of_tabs(
         assert "claude" in tabs
         assert "to switch" not in tabs
 
-        await driver.press("tab")  # nowhere to go, and nothing moves
+        await driver.press("right")  # nowhere to go, and nothing moves
         await driver.pause()
         assert [str(option.id) for option in listing.options] == ["="]
 
@@ -1271,7 +1273,7 @@ async def test_what_was_typed_belongs_to_the_tab_it_was_typed_into(
         await driver.pause()
         assert [str(option.id) for option in listing.options] == ["=deepseek"]
 
-        await driver.press("tab")
+        await driver.press("right")
         await driver.pause()
         # The next CLI is read from its whole list rather than through the last search.
         assert [str(option.id) for option in listing.options] == ["=", "=work"]
@@ -1313,7 +1315,7 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
         # Kimi has one. Which CLI it is was the step before, so that is where it is turned to.
         await driver.press("escape")
         await until(lambda: isinstance(app.screen, RunsAs), driver)
-        await driver.press("tab")
+        await driver.press("right")
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Models), driver)
         tuning = app.screen.query_one("#tuning", Label)

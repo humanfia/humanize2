@@ -661,11 +661,11 @@ class Models(Sheet[Runs]):
         )
 
     def _tuned(self) -> str:
-        """The line under the models: the effort, and the rest of what this agent is.
+        """The line under the models: the effort, and the side questions about this agent.
 
-        What is adjusted here carries the key that adjusts it. What a step of its own settled
-        -- the account it runs as, the container the flow put it in, the machine it was
-        pointed at -- is read rather than adjusted, and says so by carrying no key at all.
+        What is adjusted here carries the key that adjusts it. Where this one works is read
+        rather than adjusted where the flow settled it, and says so by carrying no key at all;
+        the account it runs as is not here at all, being the step before this one.
 
         Returns:
           The line, as markup, or "" where the letters typed have left no model to say it of.
@@ -694,11 +694,9 @@ class Models(Sheet[Runs]):
             f"{_DOT}[$secondary]◉[/] {PERMISSIONS[self._permission]}  "
             f"[$text-muted]ctrl+p to change[/]"
         )
-        as_who = self._whose.provider
-        said += (
-            f"{_DOT}[$secondary]◉[/] as "
-            f"{escape(as_who) if as_who else 'this machine is signed in'}"
-        )
+        # The account is not read back here: it was the step before this one, it is on the
+        # line above the prompt once the walk is over, and a setting shown where it cannot be
+        # changed is a setting somebody tries to change.
         if where := self._where():
             said += f"{_DOT}[$secondary]◉[/] {where}"
         return said
@@ -1526,12 +1524,11 @@ class RunsAs(Sheet[Whose]):
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
-        # The tabs: one CLI at a time, forwards and back. Priority, or the list under the
-        # cursor would take tab as moving the focus and the interface below would take
-        # shift+tab as switching the flow -- which is not a thing to do from inside a sheet
-        # that is choosing what the flow runs on.
-        Binding("tab", "next_cli", "next CLI", priority=True),
-        Binding("shift+tab", "prev_cli", "previous CLI", priority=True),
+        # The tabs, on the arrows the list is not using: up and down are the accounts under
+        # the tab, so left and right are the tabs themselves. Priority, or the list under the
+        # cursor would take them as moving between rows it has none of.
+        Binding("left", "prev_cli", "previous CLI", priority=True),
+        Binding("right", "next_cli", "next CLI", priority=True),
         # Making one is asked for here rather than somewhere else: this is the moment somebody
         # finds out they have no account for this CLI, or that the one they want is not among
         # these, and sending them out of the question to answer it would lose the question.
@@ -1618,7 +1615,7 @@ class RunsAs(Sheet[Whose]):
         )
         # Only where there is somewhere to switch to: one CLI is a heading rather than tabs.
         if len(able) > 1:
-            said += "   [$text-muted]tab/shift+tab to switch[/]"
+            said += "   [$text-muted]←/→ to switch[/]"
         return said
 
     def _turn_to(self, by: int) -> None:
@@ -1657,9 +1654,9 @@ class RunsAs(Sheet[Whose]):
         )
         needs = self._place.moments
         self.query_one("#about", Label).update(
-            f"Which coding agent takes this one's turns in {self._flow}, a tab apiece, and "
-            "under it that CLI's own accounts -- an account is one backend's. Its sessions, "
-            "its settings and its skills are the CLI's own whichever account it runs as."
+            f"Which coding agent takes this one's turns in {self._flow}, one per tab on the "
+            "arrows, and under it that CLI's own accounts -- an account is one backend's. Its "
+            "sessions, its settings and its skills are the CLI's own whichever it runs as."
             + (
                 f" This one has to run {', '.join(sorted(needs))}, so only the CLIs that do "
                 "are here."
@@ -1701,7 +1698,7 @@ class RunsAs(Sheet[Whose]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            "ctrl+n to make one · Type to search · Enter to choose · Esc to go back"
+            "←/→ CLI · ctrl+n to make one · Type to search · Enter to choose · Esc to go back"
             f"{self.searching()}"
         )
 
@@ -1713,7 +1710,9 @@ class RunsAs(Sheet[Whose]):
         if not backend:
             return []
         return [
-            ("", "as this machine is signed in", "nothing is redirected"),
+            # Two words for the account nobody chose: this is a row in a list of accounts, and
+            # what it is is the one the CLI is already signed in as.
+            ("", "as installed", "signed in as you signed it in"),
             *((one.name, one.name, _sets(one)) for one in providers.providers(backend)),
         ]
 

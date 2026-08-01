@@ -264,7 +264,7 @@ async def test_stepping_back_and_turning_to_another_cli_asks_about_that_one(
             "escape", "escape"
         )  # back to which CLI, and turn to the other
         await until(lambda: isinstance(app.screen, RunsAs), driver)
-        await driver.press("tab")
+        await driver.press("right")
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Models), driver)
         listing = app.screen.query_one("#choices", OptionList)

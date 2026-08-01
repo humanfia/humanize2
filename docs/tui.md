@@ -242,20 +242,21 @@ accounts, since an [account](providers.md) is one backend's — what signs in to
 not what signs in to codex:
 
 ```
-   claude · codex · kimi · mimo · opencode · pi   tab/shift+tab to switch
+   claude · codex · kimi · mimo · opencode · pi   ←/→ to switch
 
-   ❯ 1. as this machine is signed in ✔ nothing is redirected
+   ❯ 1. as installed              ✔ signed in as you signed it in
      2. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
      3. work                      login
 ```
 
-**tab** turns to the next CLI, **shift+tab** to the one before, and they wrap. One CLI on its
-own is a heading rather than a row of tabs: there is nowhere to switch to, so nothing says
-there is. Where the flow said that agent has to run a particular moment, only the CLIs that
+**→** turns to the next CLI, **←** to the one before, and they wrap. The arrows rather than tab,
+because this sheet asks one thing: up and down are the accounts under the tab, so left and right
+are the tabs. One CLI on its own is a heading rather than a row of tabs: there is nowhere to
+switch to, so nothing says there is. Where the flow said that agent has to run a particular moment, only the CLIs that
 run it are here — choosing one that does not is a flow that would refuse to start.
 
-The first row is what every agent ran as before there were any accounts: whatever this machine
-is already signed in as. It is asked here rather than hidden behind a chord because it decides
+`as installed` — the first row — is what every agent ran as before there were any accounts:
+the CLI signed in the way you signed it in, with nothing redirected. It is asked here rather than hidden behind a chord because it decides
 which credentials the turns run under, which is not a side question about anything: two agents
 of one CLI, one on a subscription and one on somebody's gateway, are two accounts running at
 once, each refreshing its own token and neither able to read the other's.
@@ -282,7 +283,7 @@ that runs it, and the CLI was settled a step ago, so it is named above them as a
      1. claude-opus-5           claude
    ❯ 2. claude-sonnet-5         claude
 
-   ◉ max effort  ←/→ to adjust · ◉ swarm mode off  ctrl+w to toggle · ◉ every skill  ctrl+s to choose · ◉ bypass  ctrl+p to change · ◉ as deepseek
+   ◉ max effort  ←/→ to adjust · ◉ swarm mode off  ctrl+w to toggle · ◉ every skill  ctrl+s to choose · ◉ bypass  ctrl+p to change
 ```
 
 Typing narrows the list — `cop` finds `claude-opus-5`, since nobody types a model id out — and
@@ -294,11 +295,14 @@ Under the models, the things that are adjusted rather than chosen: **←/→** t
 [what it may do](agents.md#what-an-agent-may-do). Those three really are side questions about
 the same agent, which is why they are keys here rather than steps of their own.
 
-The same line also **reads back** what a step of its own has already settled, with no key on it:
-the account from the step before, and where it works — `◉ in a container of python:3.12` for an
-agent the flow put in a container of its own, or `◉ on ssh://box` for one already pointed
-somewhere. An agent that works here says nothing there, which is what an agent nobody said
-anything about has always done.
+The account is **not** on that line. It was the step before this one, it is on the line above
+the prompt once the walk is over, and a setting shown where it cannot be changed is a setting
+somebody tries to change.
+
+Where the agent works is read back there, with no key on it, where a step of its own has
+already settled it: `◉ in a container of python:3.12` for an agent the flow put in a container
+of its own, or `◉ on ssh://box` for one already pointed somewhere. An agent that works here says
+nothing there, which is what an agent nobody said anything about has always done.
 
 Enter takes the row under the cursor and goes on: to where that agent works, if the flow says it
 may be pointed anywhere, and otherwise to the next agent the flow drives.
