@@ -100,8 +100,8 @@ def _result_failure(said: dict[str, Any]) -> str | None:
 
     if result := said.get("result"):
         return str(result)
-    errors = said.get("errors") or []
-    if isinstance(errors, list) and errors:
+    errors = cast("list[Any]", said.get("errors") or [])
+    if errors:
         return "; ".join(str(error) for error in errors)
     return reason
 
