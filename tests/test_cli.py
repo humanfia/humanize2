@@ -90,6 +90,44 @@ def test_a_line_naming_no_command_opens_the_interface() -> None:
     assert "tui" not in cli.COMMANDS
 
 
+@pytest.mark.parametrize(
+    "terminal",
+    [
+        {"TERM_PROGRAM": "iTerm.app"},
+        {"LC_TERMINAL": "iTerm2"},
+    ],
+)
+def test_a_direct_iterm_session_uses_plain_terminal_input(
+    terminal: dict[str, str],
+) -> None:
+    cli._prepare_textual_terminal(terminal)
+
+    assert terminal["TEXTUAL_DISABLE_KITTY_KEY"] == "1"
+
+
+def test_iterm_through_tmux_keeps_extended_terminal_input() -> None:
+    terminal = {
+        "TERM_PROGRAM": "tmux",
+        "LC_TERMINAL": "iTerm2",
+        "TMUX": "/tmp/tmux/default,1,0",
+    }
+
+    cli._prepare_textual_terminal(terminal)
+
+    assert "TEXTUAL_DISABLE_KITTY_KEY" not in terminal
+
+
+def test_an_explicit_textual_keyboard_choice_is_kept() -> None:
+    terminal = {
+        "TERM_PROGRAM": "iTerm.app",
+        "TEXTUAL_DISABLE_KITTY_KEY": "0",
+    }
+
+    cli._prepare_textual_terminal(terminal)
+
+    assert terminal["TEXTUAL_DISABLE_KITTY_KEY"] == "0"
+
+
 def test_a_line_of_flags_and_no_command_opens_the_interface_set_up() -> None:
     """`hmz -f <flow>`: a run that is always the same run is one line rather than three walks."""
     with unittest.mock.patch("hmz.tui.Humanize.run") as opened:

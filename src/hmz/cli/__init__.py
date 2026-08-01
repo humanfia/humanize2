@@ -24,8 +24,32 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
+    from collections.abc import MutableMapping
 
 __all__ = ["COMMANDS", "main"]
+
+
+def _prepare_textual_terminal(
+    environ: MutableMapping[str, str] | None = None,
+) -> None:
+    """Keeps Textual's extended keys off a direct iTerm2 session.
+
+    iTerm2 loses IME-composed text when Textual asks it to report every key with associated
+    text. A tmux between them handles that protocol correctly, so only the direct path needs
+    Textual's own opt-out. An explicit setting belongs to whoever launched the process.
+
+    Args:
+      environ: The process environment, or another mapping for a caller testing the choice.
+    """
+    import os
+
+    target = os.environ if environ is None else environ
+    direct_iterm = not target.get("TMUX") and (
+        target.get("TERM_PROGRAM") == "iTerm.app"
+        or target.get("LC_TERMINAL") == "iTerm2"
+    )
+    if direct_iterm:
+        target.setdefault("TEXTUAL_DISABLE_KITTY_KEY", "1")
 
 
 def _exec(argv: list[str]) -> int:
@@ -169,6 +193,10 @@ def _tui(argv: list[str]) -> int:
     Returns:
       Zero, once the interface has been closed, or two for a line to correct.
     """
+    # Textual reads this once, while it is imported, so the terminal must be prepared before
+    # reaching the lazily imported interface below.
+    _prepare_textual_terminal()
+
     from hmz.runner import configures, read_agent, set_up_from, wanted
     from hmz.tui import Humanize
     from hmz.tui.pick import Runs
