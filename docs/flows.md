@@ -17,8 +17,11 @@ branch, sleep, read files, shell out, and give up, because it is just a function
 - [Hooks in a flow](#hooks-in-a-flow)
 - [The person at the prompt](#the-person-at-the-prompt)
 - [Running one](#running-one)
+- [Several flows in one file](#several-flows-in-one-file)
 - [Where flows live](#where-flows-live)
-- [The flows humanize comes with](#the-flows-humanize-comes-with)
+- [Flowverses](#flowverses)
+- [The flows humanize ships](#the-flows-humanize-ships)
+- [The official flowverse](#the-official-flowverse)
 - [Patterns](#patterns)
 - [Building the agents yourself](#building-the-agents-yourself)
 - [Stopping](#stopping)
@@ -60,6 +63,9 @@ anywhere — a flow that reads a prompt file beside it and does not find it is n
 command line to correct.
 
 `run` may also be `async def`. Everything else on this page is the same either way.
+
+One file may hold [several flows](#several-flows-in-one-file), each marked with `@flow` and each
+run as `<flow>:<name>`. `run` is the one the file holds under its own name.
 
 ## A flow that waits for more than one thing
 
@@ -109,7 +115,7 @@ is the newer one.
 The count is checked before the first turn:
 
 ```console
-$ hmz exec -f rlar -a claude/claude-opus-4-8:high "fix the build"
+$ hmz exec -f official/rlar -a claude/claude-opus-4-8:high "fix the build"
 hmz exec: error: /.../rlar.py: run() drives 2 agents, 1 given
 ```
 
@@ -296,7 +302,7 @@ What the flow declared is readable without driving it:
 ```python
 from humanize.runner import wanted
 
-wanted("rlar")   # one Place per agent somebody has to choose: .name, .moments, .where
+wanted("official/rlar")   # one Place per agent somebody has to choose: .name, .moments, .where
 ```
 
 `where` is `None`, the `Remote` class itself, or the `Isolated` the flow wrote — which is how
@@ -377,28 +383,67 @@ In the [interface](tui.md), `/flow` picks one by name — tab and shift+tab are 
 between the agents of the flow that is running.
 Picking one stops whatever was running — a flow is chosen in order to be run.
 
+## Several flows in one file
+
+Three phases of one thing are one thing to write and three to run. Mark each entry point, and
+each is a flow of its own, called `<flow>:<name>`:
+
+```python
+"""Three phases of one thing."""
+
+from humanize.flows import flow
+
+
+@flow
+def gen_idea(agents: Drafting, task: str, config: Idea | None = None) -> None:
+    """Opens a loose idea into a repo-grounded draft."""
+
+
+@flow
+def gen_plan(agents: Planning, task: str, config: Plan | None = None) -> None:
+    """Turns that draft into a plan both sides have converged on."""
+```
+
+```sh
+hmz exec -f official/humanize1:gen-idea -a claude/claude-opus-5:max "add undo to the editor"
+hmz exec -f official/humanize1:gen-plan -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max ""
+```
+
+The name is the function's own with its underscores turned into dashes; `@flow(name="build")`
+says otherwise, and `@flow(about="…")` says what it does where flows are listed, which is
+otherwise the first line of its docstring.
+
+Each of them declares its own agents and its own settings, so `/agents` asks two questions
+rather than five and `/config` shows one phase's flags rather than three phases' at once. What
+passes between them is whatever they write — a file, usually.
+
+`@flow` marks; it does not wrap. The function is called exactly as it was, and a file with a
+plain `run` in it needs none of this: that is the flow the file holds under its own name, and is
+what every flow was.
+
 ## Where flows live
 
-`-f` takes a name or a path. A name is looked for in three places, nearest first:
+`-f` takes a name or a path. A name is looked for nearest first:
 
 | | |
 | --- | --- |
 | `.humanize/flows/*.py` | this project's own |
 | `~/.humanize/flows/*.py` | yours, in every project |
-| — | the ones humanize came with |
+| — | the ones humanize ships, and every [flowverse](#flowverses) there is |
 
 Nearest wins, so a flow of your own may stand in for one of humanize's by taking its name — a
-`.humanize/flows/rlar.py` is what `-f rlar` runs *in that project*.
+`.humanize/flows/chat.py` is what `-f chat` runs *in that project*.
 
-What a flow is **called** is another question. Only the ones humanize came with are called by a
-bare name — those names are humanize's and mean one file each. A flow of yours is called by its
-path, short enough to read:
+What a flow is **called** is another question. The ones humanize ships are called by a bare
+name; a flowverse's are called `<flowverse>/<flow>`, which is the one spelling nothing can stand
+in for; a flow of yours is called by its path, short enough to read:
 
 | | |
 | --- | --- |
-| `rlar` | one humanize came with |
-| `.humanize/flows/rlar.py` | this project's own |
-| `~/.humanize/flows/rlar.py` | yours, in every project |
+| `chat` | one humanize ships |
+| `official/rlar` | one the official flowverse holds |
+| `.humanize/flows/chat.py` | this project's own |
+| `~/.humanize/flows/chat.py` | yours, in every project |
 
 So yours is listed beside humanize's rather than instead of it, `-f` takes either, and what
 each was [set up to run](tui.md#what-it-remembers) is remembered apart — a flow of yours cannot
@@ -413,46 +458,85 @@ hmz exec -f my_loop -a claude/claude-opus-4-8:high "fix the build"
 hmz exec -f ./somewhere/else.py -a claude/claude-opus-4-8:high "fix the build"
 ```
 
-## The flows humanize comes with
+## Flowverses
 
-Six of these are flowbench's loops, written against this API. Each names the `hmz exec` line
-that starts it in its own docstring.
+A flowverse is a git repository of flows: one `.py` per flow, and whatever they import beside
+them under names starting with `_`. It is cloned into `~/.humanize/flowverses/<name>/`, and
+every flow in it is then offered under that name.
+
+Two are always there:
+
+| | |
+| --- | --- |
+| `builtin` | the flows in the package, which are [the three below](#the-flows-humanize-ships) |
+| `official` | [humanfia/flowverse](https://github.com/humanfia/flowverse), which is everything else humanize offers |
+
+`official` is listed before it has been fetched — what there is to run is not the same question
+as what has been downloaded — and neither of the two can be taken away.
+
+In the [interface](tui.md), `/flow` is where they live: left and right walk the places flows
+come from, `ctrl+n` adds one, `ctrl+r` fetches the open one again, and `ctrl+x` takes an added
+one away. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
+repository's own name is not the one you want.
+
+```sh
+hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
+```
+
+A flow from a flowverse that has not been fetched says so rather than saying there is no such
+file: the name is right, the download has not happened.
+
+A flow is a Python file, and reading one means running it — so listing what a flowverse holds
+imports every file in it. Adding one is trusting that repository with this machine, exactly as
+installing a package is.
+
+## The flows humanize ships
+
+Three, which are the shapes a flow takes. Each names the `hmz exec` line that starts it in its
+own docstring.
 
 | Flow | Agents | What it does |
 | --- | --- | --- |
 | `chat` | 1 + you | One agent, one session, and every line typed between turns is a turn of it. Talking to a coding agent with no loop around it. This is what the interface opens on. |
 | `ralph_loop` | 1 | A fresh session every turn, so nothing carries over: the agent starts from the task and the repository each time. |
 | `stateful_ralph` | 1 | One session, held for the whole run, re-sent the task every turn. |
-| `fixed_juice_ralph` | 1 | Ralph with a governor on it: it [moves the effort](agents.md#moving-the-effort-while-it-runs) a rung a round to hold the agent to `juice` output tokens per turn of the model. |
-| `continue_loop` | 1 | Sends the task once, then keeps nudging `continue`. Until a turn lands the task is sent again — `continue` on its own would open a session that never saw it. |
-| `goal` | 1 | Ralph, with the task set as the agent's [own goal](agents.md#goals). The loop only starts it over when it stopped without having met it. |
-| `flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. |
-| `rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. The review *is* the actor's next prompt, word for word, and the reviewer is also the one that says the task is finished — which is what ends the run. |
-| `humanize1` | `drafter`, `planner`, `analyst`, `builder`, `reviewer` | RLCR: an idea is opened, planned against review, then built against it. [PolyArch/humanize](https://github.com/PolyArch/humanize) as one unattended run, with every flag it takes on `/config`. Run it in a git repository. |
 
-`humanize1` is [PolyArch/humanize](https://github.com/PolyArch/humanize) as one unattended run:
-its three commands in order — `gen-idea` opens a loose idea into a repo-grounded draft,
-`gen-plan` turns that draft into a plan both sides converged on, and `start-rlcr-loop` builds it
-under review. The plugin blocks Claude's exit and puts the round to Codex in a Stop hook; so does
-this, with a [`Moment.STOP` hook](#hooks-in-a-flow) on the builder. A round is the builder
-believing the whole plan is done and trying to stop, and what the reviewer says is what it hears
-instead. Its tool validators are hooks too, on `Moment.PermissionRequest`, which is why the
-builder has to be a backend that runs it.
+Their source is the best documentation of this API there is — `src/humanize/flows/builtin/` in
+a checkout, or wherever `pip` put it.
 
-Each of the three phases can be turned off, and every flag the plugin takes is a field on
-`/config` under the plugin's own name for it — `--max`, `--full-review-round`, `--skip-impl`,
-`--agent-teams`, `--yolo`, and the rest. Each phase is set up on its own agents: the `drafter`
-opens the idea, the `planner` writes the plan against what the `analyst` reads out of the
-repository, and the `builder` builds it under the `reviewer`. What passes between them is a
-file, as it is in the plugin — the draft, then the plan.
+## The official flowverse
+
+Everything else humanize offers is in [humanfia/flowverse](https://github.com/humanfia/flowverse),
+which is [fetched](#flowverses) the first time somebody wants what is in it. Five of these are
+flowbench's loops, written against this API.
+
+| Flow | Agents | What it does |
+| --- | --- | --- |
+| `official/fixed_juice_ralph` | 1 | Ralph with a governor on it: it [moves the effort](agents.md#moving-the-effort-while-it-runs) a rung a round to hold the agent to `juice` output tokens per turn of the model. |
+| `official/continue_loop` | 1 | Sends the task once, then keeps nudging `continue`. Until a turn lands the task is sent again — `continue` on its own would open a session that never saw it. |
+| `official/goal` | 1 | Ralph, with the task set as the agent's [own goal](agents.md#goals). The loop only starts it over when it stopped without having met it. |
+| `official/flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. |
+| `official/rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. The review *is* the actor's next prompt, word for word, and the reviewer is also the one that says the task is finished — which is what ends the run. |
+| `official/humanize1:gen-idea` | `drafter` | Opens a loose idea into a repo-grounded draft. |
+| `official/humanize1:gen-plan` | `planner`, `analyst` | Turns that draft into a plan both sides have converged on. |
+| `official/humanize1:rlcr` | `builder`, `reviewer` | Builds the plan under review until nothing is left to say. Run it in a git repository. |
+
+`humanize1` is [PolyArch/humanize](https://github.com/PolyArch/humanize), and its three commands
+are [three flows in one file](#several-flows-in-one-file) — set up on their own agents, run one
+at a time, and handing to each other through the file each writes: the draft, then the plan.
+Every flag the plugin takes is a field on that phase's `/config`, under the plugin's own name
+for it — `--max`, `--full-review-round`, `--skip-impl`, `--agent-teams`, `--yolo`, and the rest.
+
+The loop is a hook. The plugin blocks Claude's exit and puts the round to Codex in a Stop hook;
+so does this, with a [`Moment.STOP` hook](#hooks-in-a-flow) on the builder. A round is the
+builder believing the whole plan is done and trying to stop, and what the reviewer says is what
+it hears instead. Its tool validators are hooks too, on `Moment.PermissionRequest`, which is why
+the builder has to be a backend that runs it.
 
 It writes what the plugin writes, where the plugin writes it: `.humanize/rlcr/<timestamp>/`
 with `state.md`, `goal-tracker.md`, and a prompt, summary, contract and review per round.
 
 Read [Security](../README.md#security) before starting any of them.
-
-Their source is the best documentation of this API there is — `src/humanize/flows/` in a
-checkout, or wherever `pip` put it.
 
 ## Patterns
 
@@ -584,7 +668,7 @@ agents = [
     ClaudeCodeAgent(config, name="reviewer"),
 ]
 
-Runner("rlar", agents).run("fix the build")
+Runner("official/rlar", agents).run("fix the build")
 ```
 
 `Runner` takes the same flow names and paths `-f` does, checks the count the same way, and

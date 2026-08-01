@@ -237,12 +237,12 @@ async def test_a_flow_that_is_not_there_is_a_line_to_correct_and_not_the_end() -
         assert "nowhere.py" in _transcript(app)
 
 
-def test_only_the_flows_humanize_came_with_are_offered() -> None:
-    """A flow of your own is a path typed out, not something found by walking the tree."""
+def test_only_the_flows_there_are_to_run_are_offered() -> None:
+    """A flow anywhere else is a path typed out, not something found by walking the tree."""
     from humanize.flows import found
     from humanize.tui.complete import offered
 
-    assert offered("/flow ", _OWN) == [name for _, name in found()]
+    assert offered("/flow ", _OWN) == [one.name for one in found()]
 
 
 @pytest.mark.timeout(60)
@@ -320,13 +320,13 @@ async def test_enter_takes_what_is_offered_rather_than_sending_the_half_typed_li
         await driver.press("enter")  # and again, for the flow it is offering now
         await driver.pause()
 
-        assert editor.text == f"/flow {found()[0][1]} "
+        assert editor.text == f"/flow {found()[0].name} "
 
         await driver.press("enter")  # nothing left to offer, so this is the line going
         await driver.pause()
 
         assert editor.text == ""
-        assert f"/flow {found()[0][1]}" in _transcript(app)
+        assert f"/flow {found()[0].name}" in _transcript(app)
 
 
 @pytest.mark.timeout(60)
@@ -1364,12 +1364,13 @@ async def test_a_list_too_long_to_walk_is_narrowed_by_typing_at_it(
         await until(lambda: bool(listing.options), driver)
         every = listing.option_count
 
-        await driver.press("c", "h", "a", "t")
+        await driver.press("r", "a", "l", "p", "h", "_")
         await driver.pause()
-        assert [str(option.id) for option in listing.options] == ["chat"]
+        assert [str(option.id) for option in listing.options] == ["ralph_loop"]
 
         await driver.press("backspace")  # and one letter back is a wider list again
         await driver.pause()
+        # `ralph` is in `stateful_ralph` too, which the underscore had ruled out.
         assert listing.option_count > 1
 
         await driver.press("z", "z")  # narrowed to nothing rather than to everything

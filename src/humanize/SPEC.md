@@ -85,6 +85,10 @@ class Runner:
   thing about a flow a command line running it cannot otherwise know. It MUST be readable where
   the flow runs rather than only where a type checker looks, since a count nothing can read
   back is not one a command line can be held to.
+- One file MAY hold several flows, each marked with `humanize.flows.flow` and each addressed as
+  `<flow>:<name>`. Which one was asked for MUST be read before the name is resolved to a file,
+  and a name no flow in the file answers to MUST be reported as a usage error saying which ones
+  it holds -- a file of three asked for by its own name is a colon away from what was meant.
 - A `NamedTuple` of agents MUST be accepted in its place, and MUST additionally say what the
   flow calls each of them. `drives` MUST report those names, so that whatever asks for the
   agents asks for them by what they are for rather than by their place in a line; a plain
@@ -127,7 +131,9 @@ Runs a flow in the current directory, on the agents it is given.
 
 Args:
 
-- `-f`, `--flow <flow>`: The Python file the flow is written in. Required.
+- `-f`, `--flow <flow>[:<name>]`: The flow: one of the ones humanize ships or a flowverse holds,
+  by name, or a file of your own, by path. Required. A file that holds several flows MUST be
+  said which, after a colon; a flowverse's own MAY be said which, `<flowverse>/<flow>`.
 - `-a`, `--agent <cli>[@<provider>]/<model>:<effort>`: One agent to drive the flow with. Repeated once for
   each agent the flow drives, in the order it takes them -- which for a flow that drives none,
   because the only side it talks to is the person at the prompt, is not at all: the person is

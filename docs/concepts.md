@@ -1,6 +1,6 @@
 # Concepts
 
-Nine words carry the whole of humanize. This page defines them once, in the order they build
+Ten words carry the whole of humanize. This page defines them once, in the order they build
 on each other, so the rest of the documentation can use them without redefining them.
 
 ## Table of Contents
@@ -11,6 +11,7 @@ on each other, so the rest of the documentation can use them without redefining 
 - [Session](#session)
 - [Turn](#turn)
 - [Flow](#flow)
+- [Flowverse](#flowverse)
 - [Cycle](#cycle)
 - [Machine](#machine)
 - [Provider](#provider)
@@ -20,10 +21,10 @@ on each other, so the rest of the documentation can use them without redefining 
 
 ## The one-sentence version
 
-A **flow** drives **agents**, each of which holds **sessions** with a coding-agent **backend**;
-a session is made of **turns**; one run of a flow is a **cycle**; an agent's turns land on a
-**machine** and may run as a **provider**; and what the whole thing did is read back as a
-**trace**.
+A **flow** — one humanize ships, or one a **flowverse** holds — drives **agents**, each of
+which holds **sessions** with a coding-agent **backend**; a session is made of **turns**; one
+run of a flow is a **cycle**; an agent's turns land on a **machine** and may run as a
+**provider**; and what the whole thing did is read back as a **trace**.
 
 ## Backend
 
@@ -134,7 +135,23 @@ what a run looks like is read off the turns going past. `run` may be `async def`
 a flow drives [many turns at once](flows.md#a-flow-that-waits-for-more-than-one-thing);
 starting one is the same either way.
 
+One file may hold several: `run` is the flow it holds under its own name, and each function
+marked with `@flow` is another, run as `<flow>:<name>`. Three phases of one thing are then one
+thing to write and three to run, each asking only for the agents it drives.
+
 See [Flows](flows.md).
+
+## Flowverse
+
+**A git repository of flows.** One `.py` per flow, cloned into `~/.humanize/flowverses/<name>/`,
+and every flow in it offered as `<name>/<flow>`.
+
+Two are always there: `builtin`, the handful in the package, and `official`, which is where the
+rest of the flows humanize offers come from — listed whether or not it has been fetched, because
+what there is to run is not the same question as what has been downloaded. Add as many more as
+you like; `/flow` is where they are added, fetched and taken away.
+
+See [Flows › Flowverses](flows.md#flowverses).
 
 ## Cycle
 

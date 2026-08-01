@@ -29,7 +29,7 @@ Ask a flow how many it wants without running it:
 ```python
 from humanize.runner import drives
 
-print(drives("rlar"))   # ('actor', 'reviewer')
+print(drives("official/rlar"))   # ('actor', 'reviewer')
 ```
 
 A `HumanAgent` place does **not** count — nobody chooses what the person runs.
@@ -37,8 +37,19 @@ A `HumanAgent` place does **not** count — nobody chooses what the person runs.
 ### `no Python file to read a flow from`
 
 `-f` named something that is not there. A name is looked for in `.humanize/flows`, then
-`~/.humanize/flows`, then among the ones humanize came with; anything with a slash or an
-extension in it is taken as a path. See [where flows live](flows.md#where-flows-live).
+`~/.humanize/flows`, then among the ones humanize ships and every
+[flowverse](flows.md#flowverses) fetched here; anything with an extension in it, or a slash
+that is not a flowverse's, is taken as a path. See [where flows live](flows.md#where-flows-live).
+
+### `the official flowverse has not been fetched yet`
+
+The name is right and the download has not happened. Open `/flow`, walk to it with the arrows,
+and press `ctrl+r`.
+
+### `nothing in it is called run, and it holds …`
+
+The file holds [several flows](flows.md#several-flows-in-one-file) and none of them under its
+own name, so which one is a colon away: `-f official/humanize1:gen-plan`.
 
 ### `a flow is a run(agents, task) whose agents are annotated with a tuple of a fixed length`
 

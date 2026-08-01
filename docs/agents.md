@@ -615,7 +615,7 @@ session it is polling anyway.
 many. That average is what an effort moves: a model asked to think harder writes more in each
 answer and takes longer over it. So it is the number to steer by when what is being held is
 how hard the thing is thinking rather than how fast a bill is running up, and it is what
-[`fixed_juice_ralph`](flows.md#the-flows-humanize-comes-with) governs on. A window with no
+[`fixed_juice_ralph`](flows.md#the-official-flowverse) governs on. A window with no
 turn in it reads as `0.0`: nothing to go on, which a flow tells apart from a turn that said
 nothing.
 

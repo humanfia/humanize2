@@ -52,7 +52,7 @@ hmz
 If you don't want to use the TUI, you can run a [flow](docs/flows.md) over the agents you name, one `-a` apiece:
 
 ```sh
-hmz exec -f flame_chase \
+hmz exec -f official/flame_chase \
     -a claude-code/claude-opus-4-8:high -a codex/gpt-5.6-sol:high "fix the build"
 ```
 
@@ -62,15 +62,16 @@ An agent is a CLI, a model and an effort, written either way round:
 hmz exec -f ralph_loop -a cli=claude,model=claude-opus-4-8,effort=high "fix the build"
 ```
 
-`-f` takes the name of a flow humanize came with, one of your own under `.humanize/flows` here or
-in your home directory, or the path to a file anywhere else.
+`-f` takes the name of a flow humanize ships, `<flowverse>/<flow>` for one it offers from a
+[flowverse](docs/flows.md#flowverses), one of your own under `.humanize/flows` here or in your
+home directory, or the path to a file anywhere else.
 
 An agent may also name the account it runs as, so that one flow drives one CLI as two
 [providers](docs/providers.md) at once — a subscription and somebody else's endpoint:
 
 ```sh
 hmz providers add claude/deepseek -w gateway
-hmz exec -f flame_chase \
+hmz exec -f official/flame_chase \
     -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
 ```
 
@@ -127,6 +128,11 @@ setting that turns them back on — `/afk` governs whether an agent may ask you 
 whether it may act. Drive one only in a workspace you are willing to have rewritten — including
 in a [container of the agent's own](docs/machines.md), which confines it to that image but
 mounts your workspace into it.
+
+**A flow is a Python file, and reading one means running it.** Listing the flows a
+[flowverse](docs/flows.md#flowverses) holds imports every file in it, so adding one is trusting
+that repository with this machine, exactly as installing a package is. Add the ones you would
+clone and run.
 
 ## Maintainers
 

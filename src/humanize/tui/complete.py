@@ -1,10 +1,11 @@
 """What the editor offers to finish, which is the only way anything is typed here.
 
 A command line is typed, never filled in on a form: `/` offers the commands, and `/flow`
-offers the flows there are -- the ones humanize came with and the ones under `.humanize/flows`
-here or in your home directory. A flow anywhere else is a path, and a path is typed: looking
-for one would mean reading every Python file below here to see which declare a flow, which is
-a guess, and far too slow to make between keystrokes.
+offers the flows there are -- the ones humanize ships, the ones every flowverse fetched here
+holds, and the ones under `.humanize/flows` here or in your home directory. A flow anywhere
+else is a path, and a path is typed: looking for one would mean reading every Python file below
+here to see which declare a flow, which is a guess, and far too slow to make between
+keystrokes.
 
 `hmz collect` and `hmz anchor` are not offered. Neither is something to do to a flow while it
 runs, and both take a command line of their own.
@@ -35,7 +36,7 @@ _ABOUT = {
 _TAKES = {
     "afk": "[on|off]",
     "details": "[on|off]",
-    "flow": "[path]",
+    "flow": "[flow]",
 }
 
 #: `/flow` and the name being typed after it. A third word is a line that has moved on.
@@ -91,7 +92,7 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
     elif words[0] == "/flow" and len(words) == _FLOW_AND_NAME:
         from humanize.flows import found
 
-        offers = [name for _, name in found()]
+        offers = [one.name for one in found()]
     else:
         return []
     return [offer for offer in offers if offer.startswith(tail) and offer != tail]

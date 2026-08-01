@@ -131,8 +131,9 @@ def _line() -> ArgumentParser:
         "-f",
         "--flow",
         default="",
-        metavar="PATH",
-        help="the flow to open on: one that came with humanize, by name, or a file of your own",
+        metavar="FLOW",
+        help="the flow to open on: one humanize ships or a flowverse holds, by name, or a "
+        "file of your own",
     )
     parser.add_argument(
         "-a",

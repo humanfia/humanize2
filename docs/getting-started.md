@@ -120,10 +120,10 @@ each time with nothing of the last turn in context:
 Then say what you want done. It will keep going until you stop it with esc — that is what a
 Ralph loop *is*. `/status` shows who is working, who handed to whom, and what it has cost.
 
-humanize comes with nine: `chat`, `ralph_loop`, `stateful_ralph`, `fixed_juice_ralph`,
-`continue_loop`, `goal`, `flame_chase`, `rlar` and `humanize1`. Six of them are flowbench's
-loops written this way. Each is described in
-[Flows](flows.md#the-flows-humanize-comes-with).
+humanize ships three — `chat`, `ralph_loop` and `stateful_ralph` — and offers the rest from
+[a flowverse](flows.md#flowverses), which is a git repository of flows. `official` is there from
+the start: press left and right in `/flow` to walk between the places flows come from, and
+`ctrl+r` on one to fetch it. Every flow is described in [Flows](flows.md#the-flows-humanize-ships).
 
 ## 4. Run one without the interface
 
@@ -135,7 +135,7 @@ hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "fix the failing tests"
 
 - `-f` is the flow, by name or by path.
 - `-a` is one agent, written `cli/model:effort`. Repeat it once for each agent the flow drives,
-  in the order the flow takes them — `rlar` drives two, so it takes two `-a`.
+  in the order the flow takes them — `official/rlar` drives two, so it takes two `-a`.
 - The last argument is the task.
 
 To narrow what one of those agents may do, use the written-out form and name one of the four
@@ -153,7 +153,7 @@ and carries on rather than waiting forever.
 If you get the count wrong, it is refused before any agent runs:
 
 ```console
-$ hmz exec -f rlar -a claude/claude-opus-4-8:high "fix the build"
+$ hmz exec -f official/rlar -a claude/claude-opus-4-8:high "fix the build"
 hmz exec: error: /.../rlar.py: run() drives 2 agents, 1 given
 ```
 
@@ -203,7 +203,8 @@ hmz exec -f twice -a claude/claude-opus-4-8:high "add a --dry-run flag"
 ```
 
 It is offered in the interface too — `/flow` lists the flows in `.humanize/flows` here, in
-`~/.humanize/flows`, and the ones humanize came with.
+`~/.humanize/flows`, the ones humanize ships, and everything in every
+[flowverse](flows.md#flowverses) fetched here, a tab apiece.
 
 ## Where to go next
 

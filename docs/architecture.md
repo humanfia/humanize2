@@ -26,7 +26,7 @@ src/humanize/
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
 ├── cli/              the command line: one module per command that has a parser
 ├── agents/           the contract, and the driver for each backend
-├── flows/            the flows humanize comes with
+├── flows/            what a flow is called and where it is found, and the three it ships
 ├── machines/         where an agent's turns land
 ├── coganchor/        running an agent here whose work lands elsewhere
 ├── tracing/          trajectories back out as a Chrome trace
@@ -44,7 +44,7 @@ a target and could be lifted out whole, so it has a name of its own.
 | `agents/` | What a flow is written against (`AgentBase`, `SessionBase`, `Event`, `Question`, `Moment`) and one driver per backend. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
 | `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |
-| `flows/` | Content. Eight flows, each a `run(agents, task)`. | — |
+| `flows/` | What a flow is called, which of the ones a file holds was asked for, and where flowverses are fetched to. `builtin/` beside it is the three humanize ships. | `flow`, `found`, `find`, `held`, `flowverses`, `add`, `fetch` |
 | `cycle.py` | The run journal. Written by `runner`, read by `tracing` and `cli`. | `Cycle`, `cycles`, `opened` |
 | `runner.py` | Loading a flow, checking its arity and what it asks of each agent, naming them, running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. | `Runner`, `drives`, `wanted`, `Place`, `flow_and_agents`, `NotAFlow` |
 | `tracing/` | Reading the backends' logs back and rendering a Chrome trace. | `collect` |
@@ -186,7 +186,10 @@ class map. Subclass `CommandSessionBase` if a turn is one run of a command line,
 `cli/__init__.py`, and an entry in `COMMANDS`. Import your layer *inside* the function, not at
 the top of the module.
 
-**A flow.** Just a file in `flows/`. They are content and import nothing but `humanize.agents`.
+**A flow.** Just a `.py` file: one in `flows/builtin/` for one humanize ships, one in a
+[flowverse](flows.md#flowverses) for one it offers, one in `.humanize/flows/` for one of your
+own. They are content and import nothing of humanize but `humanize.agents` — and
+`humanize.flows.flow`, where one file holds several.
 
 ## The checks
 

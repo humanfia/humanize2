@@ -15,7 +15,7 @@ Everything there is to read about humanize, grouped by what you came for.
 | | |
 | --- | --- |
 | [Getting started](getting-started.md) | Install it, open the prompt, run a flow, read the trace it left. Half an hour, nothing memorised. |
-| [Concepts](concepts.md) | The nine words the rest of this uses — flow, agent, session, turn, cycle, machine, provider, backend, trace — and how they fit. |
+| [Concepts](concepts.md) | The ten words the rest of this uses — flow, flowverse, agent, session, turn, cycle, machine, provider, backend, trace — and how they fit. |
 
 ## Guides
 

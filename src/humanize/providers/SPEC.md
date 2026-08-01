@@ -98,10 +98,14 @@ def run(swaps: Swaps, argv: Sequence[str]) -> int: ...
 ## `login.py`
 
 ```python
-def make(cli: str, name: str, way: Way, answers: Mapping[str, str] | None = None) -> Provider: ...
+def make(
+    cli: str, name: str, way: Way, answers: Mapping[str, str] | None = None
+) -> Provider: ...
 
 
-def sign_in(provider: Provider, way: Way, answers: Mapping[str, str] | None = None) -> int: ...
+def sign_in(
+    provider: Provider, way: Way, answers: Mapping[str, str] | None = None
+) -> int: ...
 ```
 
 - A CLI's own login MUST be what performs that CLI's login. It is a browser opened, a code read

@@ -26,7 +26,7 @@ A coding agent CLI signs in once. Claude Code keeps its account under `~/.claude
 `claude` started on this machine is whoever is signed in there — so a flow that wants two of
 them on two accounts has two accounts wanting one directory.
 
-A provider is the second directory. [flame_chase](flows.md#the-flows-humanize-comes-with) hands
+A provider is the second directory. [flame_chase](flows.md#the-official-flowverse) hands
 the same task to two agents in turn; here both are Claude Code — one on the Anthropic
 subscription running Opus, one on a DeepSeek endpoint running DeepSeek's own model:
 
@@ -35,7 +35,7 @@ hmz providers add claude/anthropic -w login          # runs `claude auth login`,
 hmz providers add claude/deepseek -w gateway \
     -s ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic   # then asks for the token
 
-hmz exec -f flame_chase \
+hmz exec -f official/flame_chase \
     -a claude@anthropic/claude-opus-5:max \
     -a claude@deepseek/deepseek-chat:high "fix the build"
 ```
@@ -237,7 +237,7 @@ ClaudeCodeAgentConfig(model="claude-opus-5", effort="max", provider="deepseek")
 On a command line, after the CLI and an `@`:
 
 ```sh
-hmz exec -f flame_chase -a claude@deepseek/claude-opus-5:max "fix the build"
+hmz exec -f official/flame_chase -a claude@deepseek/claude-opus-5:max "fix the build"
 hmz exec -f ralph_loop -a cli=claude,model=claude-opus-5,effort=max,provider=deepseek "…"
 ```
 

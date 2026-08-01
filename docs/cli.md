@@ -48,7 +48,7 @@ hmz -f|--flow <flow> [-c|--config <path>] [-a|--agent <spec>]...
 
 | Argument | |
 | --- | --- |
-| `-f`, `--flow <flow>` | The flow to open on. |
+| `-f`, `--flow <flow>[:<name>]` | The flow to open on. |
 | `-c`, `--config <path>` | A YAML file of what to set that flow up with, as [`/config`](tui.md#setting-a-flow-up) would have asked for it. Needs `-f`. |
 | `-a`, `--agent <spec>` | What each of that flow's agents runs, in the order it takes them — as many as it drives. Needs `-f`. |
 
@@ -58,7 +58,7 @@ config the flow refuses, the wrong number of agents — so a line that is wrong 
 sheet to walk back out of.
 
 ```sh
-hmz -f humanize1 -c setup.yaml
+hmz -f official/humanize1:rlcr -c setup.yaml
 ```
 
 ## `hmz exec`
@@ -71,7 +71,7 @@ hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] <task>
 
 | Argument | |
 | --- | --- |
-| `-f`, `--flow <flow>` | **Required.** The flow to drive: the name of one humanize came with, or the path to a file — which is what a flow of your own is called. See [where flows live](flows.md#where-flows-live). |
+| `-f`, `--flow <flow>[:<name>]` | **Required.** The flow to drive: the name of one humanize ships, `<flowverse>/<flow>` for one a [flowverse](flows.md#flowverses) holds, or the path to a file — which is what a flow of your own is called. A file that holds [several flows](flows.md#several-flows-in-one-file) is said which, after a colon. See [where flows live](flows.md#where-flows-live). |
 | `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](flows.md#settings-of-the-flows-own). The flow's own model checks it before the first turn. |
 | `-a`, `--agent <spec>` | **Repeated once for each agent the flow drives**, in the order it takes them — so none at all for a flow whose only side is you, since nobody chooses what the person runs. |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
@@ -116,7 +116,7 @@ different number than were given, is a usage error — reported before the first
 partway into a loop with a turn's work already behind it:
 
 ```console
-$ hmz exec -f rlar -a claude/claude-opus-4-8:high "fix the build"
+$ hmz exec -f official/rlar -a claude/claude-opus-4-8:high "fix the build"
 hmz exec: error: /.../rlar.py: run() drives 2 agents, 1 given
 ```
 
@@ -126,16 +126,16 @@ Whatever else a flow does as it is imported is the flow's own, and fails as it w
 
 ```sh
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
-hmz exec -f flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "fix the build"
-hmz exec -f rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
-hmz exec -f rlar -a claude/claude-opus-4-8:high -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only "$(cat TASK.md)"
-hmz exec -f flame_chase -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
+hmz exec -f official/flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "fix the build"
+hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
+hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only "$(cat TASK.md)"
+hmz exec -f official/flame_chase -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
 hmz exec -f ./flows/mine.py -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
 hmz exec -f ralph_loop -a pi/openai-codex/gpt-5.5:high "$(cat TASK.md)"
 hmz exec -f ralph_loop -a opencode/opencode/big-pickle:high "$(cat TASK.md)"
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high -- "--force is not a flag here"
-hmz exec -f humanize1 -c setup.yaml -a claude/claude-opus-5:max -a claude/claude-opus-5:max \
-    -a codex/gpt-5.6-sol:xhigh -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:xhigh "add undo"
+hmz exec -f official/humanize1:rlcr -c setup.yaml -a claude/claude-opus-5:max \
+    -a codex/gpt-5.6-sol:xhigh "add undo"
 ```
 
 Nobody is at a prompt, so an agent that stops to ask is told nobody answered and carries on.

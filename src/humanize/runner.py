@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import inspect
 import os
-import runpy
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -158,16 +157,35 @@ def _read(
       NotAFlow: If the file is not there, is not a flow -- nothing called `run`, or one whose
         `agents` cannot be read or says nothing about how many it takes.
     """
-    from humanize.flows import find
+    from humanize.flows import find, inside, loaded
 
+    # Which of the file's flows was asked for, before the name is resolved to a file: a file
+    # may hold several, and `humanize1:gen-plan` is one of them.
+    wanted = inside(str(flow))
     # Resolved here rather than by whoever is starting one, so that a name works wherever a
     # flow is named -- a command line, an interface, a `Runner` written by hand.
     flow = find(str(flow))
     # The same test `humanize.flows` applies, and for the same reason: a place that cannot
     # be read holds no flow, which `Path.is_file` would raise about rather than answer.
     if not os.path.isfile(flow):  # noqa: PTH113
-        raise NotAFlow(f"{flow}: no Python file to read a flow from")
-    run = runpy.run_path(str(flow)).get("run")
+        raise NotAFlow(f"{flow}: {_unfetched(str(flow))}")
+    read = loaded(flow)
+    run = _entry(read, wanted)
+    if run is None:
+        # A file that holds several flows names each of them after itself, so whoever asked
+        # for the file alone -- or for one of them under a name it does not have -- is a
+        # colon away from what they meant, and saying which ones is what ends it.
+        holds = [f"{Path(flow).stem}:{one}" for one in _holds(read)]
+        missing = f"{flow}: nothing in it is a flow called {wanted!r}"
+        if wanted and holds:
+            raise NotAFlow(f"{missing}; it holds {', '.join(holds)}")
+        if wanted:
+            raise NotAFlow(missing)
+        if holds:
+            raise NotAFlow(
+                f"{flow}: nothing in it is called run, and it holds "
+                f"{', '.join(holds)} -- name the one to run"
+            )
     try:
         # A function, so that what is read below is what the entry point will be called
         # with: a class or a partial answers with annotations that are somebody else's.
@@ -252,6 +270,66 @@ def _lands(flow: str | os.PathLike[str], agent: AgentBase, place: Place) -> None
             f"{flow}: {called} runs on this machine -- this flow does not say it works "
             "anywhere else, so it cannot be pointed at one"
         )
+
+
+def _unfetched(named: str) -> str:
+    """Why a flow that was named is not there, as far as that can be told.
+
+    Args:
+      named: What was asked for, as it was written.
+
+    Returns:
+      The reason: that the flowverse it named has not been fetched yet, where that is what
+      happened, and otherwise that there is no such file. A flowverse is offered before it is
+      fetched -- `official` is there from the start -- so "no such file" would be the answer
+      to a name that is right, given by the one thing that knows it has not been downloaded.
+    """
+    from humanize.flows import flowverses
+
+    whose, _, rest = named.partition("/")
+    for verse in flowverses():
+        if verse.name == whose and rest and not verse.fetched:
+            return (
+                f"the {whose} flowverse has not been fetched yet -- open /flow and press "
+                "ctrl+r on it"
+            )
+    return "no Python file to read a flow from"
+
+
+def _entry(inside: dict[str, Any], wanted: str) -> Callable[..., Any] | None:
+    """The flow a file was asked for, out of everything in it.
+
+    Args:
+      inside: What running the file left behind.
+      wanted: Which of its flows was asked for, or "" for the one it holds under its own name.
+
+    Returns:
+      The entry point, or None where the file holds no such flow.
+    """
+    from humanize.flows import Flow
+
+    for one in inside.values():
+        said = getattr(one, "__humanize_flow__", None)
+        if isinstance(said, Flow) and said.name == wanted:
+            return cast("Callable[..., Any]", one)
+    run = inside.get("run") if not wanted else None
+    return cast("Callable[..., Any]", run) if callable(run) else None
+
+
+def _holds(inside: dict[str, Any]) -> list[str]:
+    """What a file calls each of the flows it holds under a name of its own.
+
+    Args:
+      inside: What running the file left behind.
+
+    Returns:
+      One name apiece, in the order the file declared them. Its `run` is not among them: it
+      is the flow the file holds under its own name, and has no name of its own.
+    """
+    from humanize.flows import Flow
+
+    said = (getattr(one, "__humanize_flow__", None) for one in inside.values())
+    return [one.name for one in said if isinstance(one, Flow) and one.name]
 
 
 def _set_up(
@@ -630,8 +708,9 @@ def flow_and_agents(
         "-f",
         "--flow",
         required=True,
-        metavar="PATH",
-        help="the flow to drive: one that came with humanize, by name, or a file of your own",
+        metavar="FLOW",
+        help="the flow to drive: one humanize ships or a flowverse holds, by name, or a file "
+        "of your own; `<flow>:<name>` for one of several in a file",
     )
     parser.add_argument(
         "-a",

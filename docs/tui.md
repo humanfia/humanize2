@@ -16,6 +16,7 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 - [Questions, and being away](#questions-and-being-away)
 - [Completion](#completion)
 - [History](#history)
+- [Choosing a flow](#choosing-a-flow)
 - [What each agent is: three steps](#what-each-agent-is-three-steps)
 - [Which CLI, and which account](#which-cli-and-which-account)
 - [What each agent runs](#what-each-agent-runs)
@@ -97,7 +98,7 @@ list appears under the editor with a line about each.
 
 | Command | Takes | What it does |
 | --- | --- | --- |
-| `/flow` | `[path]` | Switches which flow runs, then [how it is set up](#setting-a-flow-up) if it takes any setting up, then [what each of its agents is](#what-each-agent-is-three-steps). With a path, takes that file. Stops whatever was running — a flow is chosen in order to be run. Looking and leaving without choosing changes nothing. |
+| `/flow` | `[flow]` | [Switches which flow runs](#choosing-a-flow), then [how it is set up](#setting-a-flow-up) if it takes any setting up, then [what each of its agents is](#what-each-agent-is-three-steps). With a name or a path, takes that one. Stops whatever was running — a flow is chosen in order to be run. Looking and leaving without choosing changes nothing. |
 | `/config` | | Sets up the flow itself, for a flow that says it can be. See [below](#setting-a-flow-up). |
 | `/agents` | | Sets what each agent of the current flow is, [three steps apiece](#what-each-agent-is-three-steps) and one agent at a time, by the name the flow calls it. It does not ask how the flow itself is set up; `/config` is that half. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and the three things that can happen to one — made, signed in again, taken away. |
@@ -247,8 +248,9 @@ in a list under the editor:
 
 - `/` offers the commands, each with a line about what it does and what it takes after its
   name.
-- `/flow ` offers the flows there are — the ones humanize came with, and the ones under
-  `.humanize/flows` here or in your home directory.
+- `/flow ` offers the flows there are — the ones humanize ships, the ones every
+  [flowverse](flows.md#flowverses) fetched here holds, and the ones under `.humanize/flows`
+  here or in your home directory.
 
 An offer is the whole of what the word becomes, so taking one replaces what was typed rather
 than being appended to it. What is offered is reconsidered when the cursor moves as well as
@@ -268,6 +270,43 @@ running alike. Both are things you wrote, and either may be worth writing again.
 been typed here yet, everything ever typed anywhere, so a fresh project still has something to
 walk back through. Which of the two it is is settled when the interface starts, so a history
 cannot change under you mid-session.
+
+## Choosing a flow
+
+`/flow` puts up the flows there are, a tab per place they come from: every
+[flowverse](flows.md#flowverses) — `builtin`, which is the package's own, `official`, which is
+where the rest come from, and whatever else has been added — and then this project's flows and
+yours where there are any.
+
+```
+  Select flow
+
+  Which flow the agents are driven through, out of the places flows come from — one per tab on
+  the arrows. The first thing you say once it is chosen is what it is to do.
+
+  builtin · official · theirs   ←/→ to switch
+
+❯ 1. chat                    Chat — one agent, one session, and every line typed between…
+  2. ralph_loop              Ralph loop (flowbench: ralph_loop) — a fresh session every…
+  3. stateful_ralph          Stateful ralph (flowbench: stateful_ralph) — one session, re-…
+
+  ←/→ flowverse · ctrl+n to add one · ctrl+r to fetch · Type to search · Enter to choose
+```
+
+| Key | |
+| --- | --- |
+| `←` `→` | The place flows come from. |
+| `ctrl+n` | Add a flowverse: a URL or an `owner/repo`, and a name to keep it under. |
+| `ctrl+r` | Fetch the open one again, or for the first time. |
+| `ctrl+x` | Take an added one away, flows and all. `builtin` and `official` are always here. |
+
+The three keys are here rather than in a menu of their own because this is the moment you find
+out that the flow you want is in a flowverse you have not added, or that the one you have is
+out of date. A fetch runs off the interface's own loop — it keeps drawing while it clones — and
+what became of it is said under the list rather than thrown at you.
+
+Typing narrows by name. What each flow says about itself is beside its name, and is not
+searched: a subsequence of a sentence matches nearly everything.
 
 ## What each agent is: three steps
 

@@ -51,13 +51,14 @@ from .discover import machines
 from .monitor import short, thousands
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
+    from collections.abc import Callable, Generator, Sequence
 
     from pydantic import BaseModel
     from pydantic.fields import FieldInfo
     from textual.app import App, ComposeResult
 
     from humanize.backends import Model, Way
+    from humanize.flows import Flowverse, Offer
     from humanize.providers import Provider
     from humanize.runner import Place
 
@@ -509,7 +510,31 @@ class Sheet[T](ModalScreen[T | None]):
 
 
 class Flows(Sheet[list[str]]):
-    """Which flow to run, which is what tab switches between."""
+    """Which flow to run, out of the places flows come from -- a tab apiece.
+
+    A flowverse is a repository of flows, and the tabs are every one there is: the handful
+    humanize ships, its own repository of the rest, whatever else has been added, and then
+    this project's flows and yours. Two of them are always there, one because it is in the
+    package and one because it is where the rest come from -- so a list that showed only what
+    had been downloaded would be a list that hid what there is to run.
+
+    The three things that can happen to a flowverse are here rather than somewhere else: this
+    is the moment somebody finds out that the flow they want is in one they have not added, or
+    that the one they have is out of date, and sending them elsewhere to fix it would lose the
+    question they came here to answer.
+    """
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        # The tabs, on the arrows the list is not using: up and down are the flows under the
+        # tab, so left and right are the tabs. Priority, or the list under the cursor would
+        # take them as moving between rows it has none of.
+        Binding("left", "prev_verse", "previous flowverse", priority=True),
+        Binding("right", "next_verse", "next flowverse", priority=True),
+        Binding("ctrl+n", "adding", "add a flowverse", priority=True),
+        Binding("ctrl+r", "refresh", "fetch it again", priority=True),
+        Binding("ctrl+x", "drop", "take it away", priority=True),
+    ]
 
     def __init__(self, current: str) -> None:
         """Initializes the switching.
@@ -519,42 +544,254 @@ class Flows(Sheet[list[str]]):
         """
         super().__init__()
         self._current = current
-        self._named: list[tuple[str, str]] = []
+        #: Every flow there is, read once: this is redrawn on every keystroke, and reading it
+        #: means running each flow file to see what it holds. Cleared when a flowverse is
+        #: fetched or taken away, which is when the list is something else.
+        self._offers: list[Offer] | None = None
+        #: Which tab is open, counting the places flows come from.
+        self._at = 0
+        #: What became of the last fetch, said under the list.
+        self._said = ""
+        #: Whether a fetch is running now, so that a second one is not started over it.
+        self._fetching = False
 
     def _ask(self) -> None:
-        """Lists every flow there is, saying where each one came from."""
+        """Lists the flows of the place that is open, and says what the tabs are."""
         self.query_one("#asked", Label).update("Select flow")
         self.query_one("#about", Label).update(
-            "Which flow the agents are driven through. The first thing you say once it is "
-            "chosen is what it is to do. A flow anywhere else is a path you type."
+            "Which flow the agents are driven through, out of the places flows come from -- "
+            "one per tab on the arrows. The first thing you say once it is chosen is what it "
+            "is to do. A flow anywhere else is a path you type."
         )
-        self.query_one("#tuning", Label).update("")
+        self._at = self._opening()
         self._fill()
 
-    def _fill(self) -> None:
-        """Puts the flows up, with the marker beside the one the cursor is on."""
+    def _all(self) -> list[Offer]:
+        """Every flow there is, read once."""
         from humanize.flows import found
 
+        if self._offers is None:
+            self._offers = found()
+        return self._offers
+
+    def _wheres(self) -> list[str]:
+        """The places flows come from, in the order the tabs go.
+
+        Returns:
+          Every flowverse there is, fetched or not, and then this project's flows and yours
+          where there are any. A flowverse is a tab whether or not it has been downloaded --
+          fetching it is what the tab is for -- but your own directories are not places to
+          add anything to, so an empty one is nothing to show a tab for.
+        """
+        from humanize.flows import flowverses, where
+
+        verses = [one.name for one in flowverses()]
+        return verses + [
+            whose
+            for whose, _ in where
+            if whose not in verses and any(one.whose == whose for one in self._all())
+        ]
+
+    def _opening(self) -> int:
+        """Which tab to open on, which is the one the flow already chosen came from."""
+        wheres = self._wheres()
+        for one in self._all():
+            if one.name == self._current and one.whose in wheres:
+                return wheres.index(one.whose)
+        return 0
+
+    def _where(self) -> str:
+        """The place whose tab is open."""
+        wheres = self._wheres()
+        return wheres[self._at % len(wheres)] if wheres else ""
+
+    def _verse(self) -> Flowverse | None:
+        """The flowverse whose tab is open, or None for one of your own directories."""
+        from humanize.flows import flowverses
+
+        return next((one for one in flowverses() if one.name == self._where()), None)
+
+    def _tabs(self) -> str:
+        """The places as a row of tabs, with the one being read marked and the rest waiting."""
+        wheres = self._wheres()
+        if not wheres:
+            return ""
+        here = self._where()
+        said = _DOT.join(
+            f"[b $primary]{escape(one)}[/]"
+            if one == here
+            else f"[$text-muted]{escape(one)}[/]"
+            for one in wheres
+        )
+        if len(wheres) > 1:
+            said += "   [$text-muted]←/→ to switch[/]"
+        return said
+
+    def _turn_to(self, by: int) -> None:
+        """Opens the tab that many along, wrapping round at either end.
+
+        Args:
+          by: One tab forward or back.
+        """
+        wheres = self._wheres()
+        if len(wheres) < 2:  # noqa: PLR2004  -- one tab is nowhere to switch to
+            return
+        self._at = (self._at + by) % len(wheres)
+        # What was typed goes with the tab it was typed into: a search that narrowed one
+        # flowverse to one flow would narrow the next one's to none, which reads as a
+        # flowverse with nothing in it rather than as a search still running.
+        self._typed = ""
+        self._said = ""
+        self.query_one("#choices", OptionList).highlighted = 0
+        self._drawn = 0
+        self._fill()
+
+    def action_next_verse(self) -> None:
+        """Opens the next place's tab."""
+        self._turn_to(1)
+
+    def action_prev_verse(self) -> None:
+        """Opens the one before it."""
+        self._turn_to(-1)
+
+    def _fill(self) -> None:
+        """Puts the open tab's flows up, with the marker beside the one the cursor is on."""
         listing = self.query_one("#choices", OptionList)
-        if not self._named:
-            self._named = [(name, whose) for whose, name in found()]
-            self._counting = len(str(len(self._named)))
-        shown = [pair for pair in self._named if self.fits(*pair)]
+        here = self._where()
+        # Searched by name and not by what it says about itself: a subsequence of a sentence
+        # is a match nobody typed, and `chat` would find every flow with those letters
+        # spread through a paragraph -- which is most of them.
+        shown = [
+            one for one in self._all() if one.whose == here and self.fits(one.name)
+        ]
+        self._counting = len(str(len(shown)))
         at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
         listing.set_options(
             Option(
                 self._row(
-                    seen, name, whose, here=seen == at, inforce=name == self._current
+                    seen,
+                    one.name,
+                    _briefly(one.about, self.size.width),
+                    here=seen == at,
+                    inforce=one.name == self._current,
                 ),
-                id=name,
+                id=one.name,
             )
-            for seen, (name, whose) in enumerate(shown)
+            for seen, one in enumerate(shown)
         )
         listing.highlighted = at if shown else None
         self._drawn = at
-        self.query_one("#keys", Label).update(
-            f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
+        self.tabbed(self._tabs())
+        said = self._nothing(shown)
+        self.query_one("#tuning", Label).update(
+            f"[$text-muted]{said}[/]" if said else ""
         )
+        self.query_one("#keys", Label).update(
+            "←/→ flowverse · ctrl+n to add one · ctrl+r to fetch · Type to search · "
+            f"Enter to choose · Esc to cancel{self.searching()}"
+        )
+
+    def _nothing(self, shown: list[Offer]) -> str:
+        """What to say under a list: how the fetch went, or why there is nothing in it."""
+        if self._fetching:
+            return f"fetching {escape(self._where())}…"
+        if self._said:
+            return self._said
+        verse = self._verse()
+        if verse is not None and not verse.fetched:
+            return f"{escape(verse.name)} has not been fetched yet; ctrl+r fetches it"
+        if not shown and not self._typed:
+            return f"nothing in {escape(self._where())} yet"
+        return ""
+
+    @work
+    async def action_adding(self) -> None:
+        """Adds a flowverse without leaving the question it was going to be chosen from."""
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        said = await showing.push_screen_wait(Fetches())
+        if said is None:
+            return
+        url, name = said
+        await self._fetches(lambda: _added(url, name))
+
+    @work
+    async def action_refresh(self) -> None:
+        """Fetches the open flowverse again, or for the first time."""
+        from humanize.flows.verses import fetch
+
+        verse = self._verse()
+        if verse is None:
+            self._said = (
+                f"{escape(self._where())} is a directory of your own, not a fetch"
+            )
+            self._fill()
+            return
+        if not verse.url:
+            self._said = (
+                f"{escape(verse.name)} came with humanize; there is nothing to fetch"
+            )
+            self._fill()
+            return
+        name = verse.name
+
+        def fetching() -> str:
+            fetch(name)
+            return name
+
+        await self._fetches(fetching)
+
+    def action_drop(self) -> None:
+        """Takes the open flowverse away, flows and all, where it is one that may go."""
+        from humanize.flows.verses import remove
+
+        verse = self._verse()
+        if verse is None:
+            return  # a directory of your own is not one of these to take away
+        try:
+            remove(verse.name)
+        except (OSError, ValueError) as why:
+            self._said = escape(str(why))
+            self._fill()
+            return
+        self._offers = None
+        self._at = 0
+        self._said = f"{escape(verse.name)} is no longer here"
+        self._fill()
+
+    async def _fetches(self, doing: Callable[[], str]) -> None:
+        """Runs one git fetch off the event loop, and shows the list it left behind.
+
+        Off the loop because a clone is seconds of network: an interface that stopped
+        redrawing while it ran would be one that looked as though it had gone away.
+
+        Args:
+          doing: What to do, answering with the flowverse it left behind.
+        """
+        import asyncio
+
+        if self._fetching:
+            return
+        self._fetching, self._said = True, ""
+        self._fill()
+        try:
+            name = await asyncio.to_thread(doing)
+        except (OSError, ValueError) as why:
+            # Said under the list rather than raised at whoever opened the sheet: the
+            # question this sheet is asking is still worth answering.
+            self._said = escape(str(why))
+            self._fetching = False
+            self._fill()
+            return
+        self._fetching, self._offers = False, None
+        wheres = self._wheres()
+        # Open on what was just fetched, which is what somebody who fetched it wants to see.
+        self._at = wheres.index(name) if name in wheres else self._at
+        self.query_one("#choices", OptionList).highlighted = 0
+        self._drawn = 0
+        self._fill()
 
     @on(OptionList.OptionSelected)
     def _took(self, event: OptionList.OptionSelected) -> None:
@@ -564,6 +801,168 @@ class Flows(Sheet[list[str]]):
           event: What was chosen.
         """
         self.dismiss([str(event.option.id)])
+
+
+def _added(url: str, name: str) -> str:
+    """Fetches a flowverse and answers with what it is called here."""
+    from humanize.flows.verses import add
+
+    return add(url, name).name
+
+
+def _written(
+    at: int, counting: int, named: str, about: str, shown: str, *, here: bool
+) -> str:
+    """One row that is written into rather than picked between.
+
+    Args:
+      at: Which one it is, counting from zero.
+      counting: How wide the numbering is, so every row starts in the same column.
+      named: What the answer is kept under.
+      about: What is being asked, said quietly beside it.
+      shown: What has been typed, as it is to be shown.
+      here: Whether the cursor is on it.
+
+    Returns:
+      The row, as markup.
+    """
+    mark = f"{_INDENT}[$primary]{_HERE}[/] " if here else f"{_INDENT}  "
+    number = f"{at + 1:>{counting}}."
+    # A block where the next letter goes, as `/config` draws one: every row here is written
+    # into, so every one of them has somewhere the next letter lands.
+    caret = "[reverse] [/reverse]" if here else ""
+    # Padded on what is shown rather than on what is written: markup is not columns.
+    label = escape(named) + " " * max(1, _SETTING - len(named))
+    room = _VALUE - len(shown) - 1
+    return (
+        f"{mark}[$text-muted]{number}[/] {label}"
+        f"[$secondary]{escape(shown)}[/]{caret}{' ' * max(1, room)}"
+        f"[$text-muted]{escape(about)}[/]"
+    )
+
+
+def _briefly(said: str, width: int) -> str:
+    """One flow's line about itself, clipped to the room the row has for it.
+
+    Args:
+      said: The line, which is the first line of what the flow says about itself and so is
+        as long as that sentence is.
+      width: How wide the sheet is.
+
+    Returns:
+      As much of it as fits beside the name, ending in an ellipsis where it was cut.
+    """
+    room = max(width - len(_INDENT) - _LABEL - 8, 20)
+    return said if len(said) <= room else f"{said[: room - 1].rstrip()}…"
+
+
+class Fetches(Sheet[tuple[str, str]]):
+    """Where a flowverse is, and what it is to be called here.
+
+    A form rather than a list, as signing in to an account is: there is nothing to pick, both
+    rows being written where they stand.
+    """
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        Binding("enter", "done", "done", priority=True),
+    ]
+
+    #: What to ask for, and what the answer means. The name is second because it is the one
+    #: with an answer already: a flowverse is called what its repository is called.
+    _ASKS = (
+        ("repository", "a URL, or owner/repo for one on GitHub"),
+        ("name", "what to call it here, blank for the repository's own name"),
+    )
+
+    def __init__(self) -> None:
+        """Initializes the asking."""
+        super().__init__()
+        self._counting = len(str(len(self._ASKS)))
+        self._typed_in: dict[str, str] = {}
+        #: What was still missing, once the form has been offered.
+        self._wrong = ""
+
+    def _ask(self) -> None:
+        """Says what a flowverse is, and what the keys do while it is being named."""
+        self.query_one("#asked", Label).update("Add a flowverse")
+        self.query_one("#about", Label).update(
+            "A git repository of flows: one `.py` file per flow, and whatever they import "
+            "beside them. It is cloned into ~/.humanize/flowverses, and every flow in it is "
+            "then offered under the name it is kept under."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _fill(self) -> None:
+        """Puts the two rows up, with the caret in the one under the cursor."""
+        listing = self.query_one("#choices", OptionList)
+        at = self._at
+        listing.set_options(
+            Option(
+                _written(
+                    seen,
+                    self._counting,
+                    held,
+                    about,
+                    self._typed_in.get(held, ""),
+                    here=seen == at,
+                ),
+                id=f"={held}",
+            )
+            for seen, (held, about) in enumerate(self._ASKS)
+        )
+        listing.highlighted = at
+        self._drawn = at
+        self.query_one("#tuning", Label).update(
+            f"[$error]{escape(self._wrong)}[/]" if self._wrong else ""
+        )
+        self.query_one("#keys", Label).update(
+            "Type to answer · Backspace to rub out · Enter to fetch it · Esc to go back"
+        )
+
+    @property
+    def _at(self) -> int:
+        """Which row the cursor is on, counting from zero."""
+        listing = self.query_one("#choices", OptionList)
+        return min(listing.highlighted or 0, len(self._ASKS) - 1)
+
+    def on_key(self, event: events.Key) -> None:
+        """Takes a letter as answering the row under the cursor.
+
+        Args:
+          event: The key.
+        """
+        held = self._ASKS[self._at][0]
+        if event.key == "backspace":
+            self._typed_in[held] = self._typed_in.get(held, "")[:-1]
+        elif event.is_printable and event.character:
+            self._typed_in[held] = self._typed_in.get(held, "") + event.character
+        else:
+            return
+        event.prevent_default()
+        event.stop()
+        self._wrong = ""
+        self._fill()
+
+    def action_done(self) -> None:
+        """Answers with where it is and what to call it, once there is somewhere to fetch."""
+        from humanize.flows.verses import where as kept
+
+        url = self._typed_in.get("repository", "").strip()
+        name = self._typed_in.get("name", "").strip()
+        if not url:
+            self._wrong = "a flowverse is a repository, and none was named"
+            self._fill()
+            return
+        if name:
+            try:
+                kept(name)
+            except ValueError as why:
+                self._wrong = str(why)
+                self._fill()
+                return
+        self.dismiss((url, name))
 
 
 class Models(Sheet[Runs]):
@@ -2100,24 +2499,11 @@ class Signing(Sheet[Signs]):
         Returns:
           The row, as markup.
         """
-        mark = f"{_INDENT}[$primary]{_HERE}[/] " if here else f"{_INDENT}  "
-        number = f"{at + 1:>{self._counting}}."
         # A bullet per character for a secret: how much has been typed is worth seeing, and
         # what it was is worth seeing once, on the way in, by the one typing it.
         value = self._typed_in.get(held, "")
         shown = "•" * len(value) if secret else value
-        named = held or "name"
-        # A block where the next letter goes, as `/config` draws one: every row here is
-        # written into, so every one of them has somewhere the next letter lands.
-        caret = "[reverse] [/reverse]" if here else ""
-        # Padded on what is shown rather than on what is written: markup is not columns.
-        label = escape(named) + " " * max(1, _SETTING - len(named))
-        room = _VALUE - len(shown) - 1
-        return (
-            f"{mark}[$text-muted]{number}[/] {label}"
-            f"[$secondary]{escape(shown)}[/]{caret}{' ' * max(1, room)}"
-            f"[$text-muted]{escape(about)}[/]"
-        )
+        return _written(at, self._counting, held or "name", about, shown, here=here)
 
     def on_key(self, event: events.Key) -> None:
         """Takes a letter as answering the question under the cursor.

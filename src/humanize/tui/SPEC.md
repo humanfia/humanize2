@@ -117,6 +117,21 @@ the cursor, and under them whatever is adjusted rather than chosen.
   here, the efforts offered MUST be the ones that model takes, and the skills offered MUST be
   the ones that CLI would load. Nothing MUST be asked of a CLI to find out -- starting one
   costs seconds a prompt has not got.
+- Which flow to run MUST be asked out of the places flows come from, a tab apiece: every
+  flowverse there is, fetched or not, and then this project's flows and yours where there are
+  any. The arrows the list itself is not using MUST turn between them, as they do between the
+  CLIs. A flowverse MUST be a tab whether or not it has been fetched -- fetching it is what the
+  tab is for -- and a directory of your own with nothing in it MUST NOT be one, there being
+  nothing to add to it.
+- Adding a flowverse, fetching one again and taking one away MUST be keys of this same sheet:
+  this is the moment somebody finds out that the flow they want is in one they have not added,
+  or that the one they have is out of date, and sending them elsewhere to fix it would lose the
+  question they came here to answer. What became of a fetch MUST be said under the list rather
+  than raised at whoever opened the sheet, and a fetch MUST NOT stop the interface redrawing
+  while it runs.
+- Each flow MUST say what it does beside its name, which is the line the flow itself says. What
+  is typed MUST narrow the list by name and not by that line: a subsequence of a sentence is a
+  match nobody typed.
 - What each agent is MUST be asked in three steps, one agent at a time and in this order: which
   CLI and which of its accounts, then which of that CLI's models at what effort, then -- only
   for an agent the flow said may be pointed at a machine -- where it works. The order is what

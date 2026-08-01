@@ -13,11 +13,11 @@ import runpy
 import shlex
 import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
-from humanize.agents import PERMISSIONS, AgentConfig, SessionBase
+from humanize.agents import PERMISSIONS, AgentConfig
 from humanize.cli import main
 from humanize.runner import NotAFlow, Runner
 from tests.stubs import ShellAgent
@@ -120,12 +120,12 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     pass
 """
 
-#: The flows humanize comes with, each of which shows the line that would start it.
+#: The flows humanize ships, each of which shows the line that would start it.
 PREBUILT = sorted(
     path
-    for path in (Path(__file__).resolve().parents[1] / "src/humanize/flows").glob(
-        "*.py"
-    )
+    for path in (
+        Path(__file__).resolve().parents[1] / "src/humanize/flows/builtin"
+    ).glob("*.py")
     if not path.stem.startswith("_")
 )
 
@@ -585,11 +585,12 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
 
     A flow written down beside the traces is one humanize knows about without being told
     where it is -- and one taking a built-in's name stands in for it, which is what makes
-    a project able to mean its own `rlar` by `rlar`.
+    a project able to mean its own `chat` by `chat`.
 
-    What each of them is *called* is another question: only the ones humanize came with are
-    called by a bare name, and a flow of yours is called by its path -- so one of yours
-    sharing a name with one of humanize's is listed beside it rather than instead of it.
+    What each of them is *called* is another question: only the ones humanize ships and the
+    ones a flowverse holds are called by a name, and a flow of yours is called by its path --
+    so one of yours sharing a name with one of humanize's is listed beside it rather than
+    instead of it.
     """
     from humanize.flows import find, found
 
@@ -599,21 +600,22 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     mine = RECORD.replace("AGENTS", "AgentBase")
     (home / ".humanize/flows/yours.py").write_text(mine)
     (project / ".humanize/flows/theirs.py").write_text(mine)
-    (project / ".humanize/flows/rlar.py").write_text(mine)  # a name humanize uses
+    (project / ".humanize/flows/chat.py").write_text(mine)  # a name humanize uses
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.chdir(project)
 
     listed = found()
 
-    assert ("local", ".humanize/flows/theirs.py") in listed
-    assert ("user", "~/.humanize/flows/yours.py") in listed
+    named = [(one.whose, one.name) for one in listed]
+    assert ("local", ".humanize/flows/theirs.py") in named
+    assert ("user", "~/.humanize/flows/yours.py") in named
     # Both, under names of their own: one is not offered as if it were the other.
-    assert ("local", ".humanize/flows/rlar.py") in listed
-    assert ("builtin", "rlar") in listed
+    assert ("local", ".humanize/flows/chat.py") in named
+    assert ("builtin", "chat") in named
     # `-f` still takes a bare name, and the nearest flow answering to it is what runs.
-    assert find("rlar") == str((project / ".humanize/flows/rlar.py").resolve())
+    assert find("chat") == str((project / ".humanize/flows/chat.py").resolve())
     assert find("yours") == str((home / ".humanize/flows/yours.py").resolve())
-    assert find("goal").endswith("src/humanize/flows/goal.py")
+    assert find("ralph_loop").endswith("src/humanize/flows/builtin/ralph_loop.py")
     # And it takes what the list calls one, which is a path, `~` and all.
     assert find("~/.humanize/flows/yours.py") == str(
         (home / ".humanize/flows/yours.py").resolve()
@@ -646,49 +648,13 @@ def test_a_flow_of_your_own_runs_by_name(
     assert driven == ["do it"]
 
 
-def test_a_failed_turn_is_taken_again_and_only_that_turn(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A round is hours and a review is one question about it, so they retry separately.
-
-    Letting a failed review send the round back would pay for the expensive half twice to
-    recover from the cheap half.
-    """
-    import subprocess as sub
-
-    from humanize.flows.humanize1 import spoken
-
-    def instant(_seconds: float) -> None:
-        """The wait between rounds, taken out of the test."""
-
-    monkeypatch.setattr("time.sleep", instant)
-    taken: list[str] = []
-
-    class _Flaky:
-        def __call__(self, prompt: str, *, suppress: bool = False) -> str:
-            taken.append(prompt)
-            if len(taken) <= 2:
-                if not suppress:
-                    # The flow has to ask for the turn suppressed, or a loop that runs for
-                    # days ends on the first turn that failed.
-                    raise sub.CalledProcessError(1, ["claude"])
-                return ""  # what a suppressed turn that failed answers with
-            # Exited clean having said nothing, which is not an answer either: forwarding it
-            # would spend a round asking the other side to reply to silence.
-            return "" if len(taken) == 3 else "answered"
-
-    said, _ = spoken(cast("SessionBase", _Flaky()), "do it")
-    assert said == "answered"
-    assert taken == ["do it"] * 4  # the same turn, four times, and no other
-
-
 def test_the_chat_flow_is_one_session_for_as_long_as_it_is_told_things(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Talking to a coding agent, with no loop around it: the turns are a conversation."""
     from humanize.agents import HumanAgent
-    from humanize.flows.chat import Chat
-    from humanize.flows.chat import run as chat
+    from humanize.flows.builtin.chat import Chat
+    from humanize.flows.builtin.chat import run as chat
 
     agent = ShellAgent(AgentConfig(model="m", effort="high"))
     said = ["echo third", "echo second"]
@@ -710,8 +676,8 @@ def test_the_chat_flow_run_from_a_command_line_does_the_one_thing_it_was_given(
 ) -> None:
     """Nobody is at a prompt there, so there is nothing to wait for and it returns."""
     from humanize.agents import HumanAgent
-    from humanize.flows.chat import Chat
-    from humanize.flows.chat import run as chat
+    from humanize.flows.builtin.chat import Chat
+    from humanize.flows.builtin.chat import run as chat
 
     agent = ShellAgent(AgentConfig(model="m", effort="high"))
 
