@@ -63,10 +63,16 @@ line, with what the flow is doing beside the transcript.
   one line needs its arrows back, and focus MUST NOT be able to leave the editor.
 - The transcript MUST be one conversation rather than every agent's at once: a flow drives
   several agents and an agent holds several sessions, and all of them interleaved is none of
-  them readable. What each session says MUST be kept against that session, the transcript
-  MUST show the one being read, and attaching to another MUST draw it again from what was
-  kept. What is kept MUST be bounded -- a flow runs for days and a Ralph loop opens a session
-  a turn -- by keeping the last few sessions and the last few lines of each.
+  them readable. What each session says MUST be kept against that session, and the transcript
+  MUST show the one being read. What is kept MUST be bounded -- a flow runs for days and a
+  Ralph loop opens a session a turn -- by keeping the last few sessions and the last few lines
+  of each.
+- Reading another session MUST NOT clear the screen, however it came to be read. A line MUST
+  say which one is being read from there down -- and, where the one being read went out from
+  under whoever was reading it rather than being stepped off, that it went -- and what that
+  session has to show MUST be drawn under that line. A loop that opens a session a turn would
+  otherwise wipe the screen every turn, taking with it the turn somebody was reading, the line
+  they typed and whatever went wrong. Only `/clear` clears.
 - tab and shift+tab MUST step to the next and the previous session that is *working*,
   wrapping, and MUST do nothing at all where none is. The ones working rather than every one
   the flow holds: with ten agents going, what somebody is stepping between is the ones

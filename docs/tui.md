@@ -173,9 +173,14 @@ nothing.
 
 The conversation you are reading is the one:
 
-- the transcript shows — moving to another draws it again from what it has said;
+- the transcript shows — moving to another writes a line saying which one is being read from
+  there down, and draws what it has said under that;
 - a line you type goes into;
 - the line above the prompt marks as `2 of 5`, against the agent holding it.
+
+**Nothing you have read is taken off the screen.** Moving to another conversation carries on
+under the line saying so, and so does a conversation ending under you — a Ralph loop drops one
+a turn, and the line then says `that conversation has gone`. Only `/clear` clears.
 
 That line also says **which agents are working**: `●` for one with a turn open, `○` for one
 that has stopped. It is the first thing to look for with several going at once, and the only

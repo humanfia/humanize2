@@ -1084,32 +1084,94 @@ class Humanize(App[None]):
         )
 
     def _now_reading(
-        self, open_now: list[tuple[AgentBase, SessionBase]], at: int
+        self,
+        open_now: list[tuple[AgentBase, SessionBase]],
+        at: int,
+        *,
+        stepped: bool = False,
     ) -> SessionBase:
-        """Reads one of the conversations there are, and draws what it has kept.
+        """Reads one of the conversations there are, carrying on under a line saying so.
+
+        The screen is not cleared to do it. A flow that opens a conversation a turn would
+        otherwise wipe the screen every time it did, and what was on it -- the turn you were
+        reading, the line you typed, what went wrong -- would be gone for having been said to
+        a conversation that is over. So what is on the screen stays on it, a line says what is
+        being read from here down, and the conversation now being read is drawn under that.
 
         Args:
           open_now: The conversations there are, as :meth:`_conversations` gives them.
           at: Which of them to read.
+          stepped: Whether somebody pressed tab for this, rather than the conversation being
+            read having gone out from under them.
 
         Returns:
           The conversation now being read.
         """
         agent, session = open_now[at]
+        # Whether one was being read, and which -- two questions, because a conversation the
+        # flow has let go of is a reference that answers None while still saying there was one.
+        reading, was = (
+            self._attached is not None,
+            self._attached() if self._attached is not None else None,
+        )
         self._attached = weakref.ref(session)
         self._attached_was = (agent.id, at)
         kept = self._keeping(session)
         # What was shown with nothing attached is the head of this conversation: the box this
-        # opened with, and whatever was said to start the flow. It was read where it was
-        # written, and a transcript that dropped it would start mid-sentence.
-        if (before := self._kept.pop(None, None)) is not None:
-            kept.lines = deque([*before.lines, *kept.lines], maxlen=_LINES)
+        # opened with, and whatever was said to start the flow. It is on the screen already --
+        # it was read where it was written -- and it is kept against this conversation so that
+        # a transcript drawn again from what was kept does not start mid-sentence.
+        head = self._kept.pop(None, None)
+        if head is not None:
+            kept.lines = deque([*head.lines, *kept.lines], maxlen=_LINES)
         kept.unread = False
-        shown = self.query_one("#transcript", Transcript)
-        shown.clear()
-        for line in kept.lines:
-            shown.write(line.content, shrink=line.shrink)
+        if session is was:
+            return (
+                session  # what is being read has not changed, so nothing has happened
+            )
+        self._reading_now(agent, at, open_now, gone=reading and not stepped)
+        if head is None:
+            # Under the line that says so: what this conversation has said, which is nothing
+            # for one just opened and everything for one being read again. Not for the first
+            # of a run -- what was kept against it then is the head, which is already up.
+            shown = self.query_one("#transcript", Transcript)
+            for line in kept.lines:
+                shown.write(line.content, shrink=line.shrink)
         return session
+
+    def _reading_now(
+        self,
+        agent: AgentBase,
+        at: int,
+        open_now: list[tuple[AgentBase, SessionBase]],
+        *,
+        gone: bool,
+    ) -> None:
+        """Says which conversation is being read from here down, and why where that is not you.
+
+        Written straight to the screen rather than kept against a conversation: it is a thing
+        that happened to the screen rather than a thing either conversation said, and one kept
+        against a conversation would be said again every time that one was read.
+
+        Args:
+          agent: Whose conversation it is.
+          at: Where it comes among all of them.
+          open_now: All of them, so that this one can be counted among that agent's.
+          gone: Whether the conversation being read went out from under whoever was reading it,
+            rather than being stepped off.
+        """
+        theirs = [one for one, (whose, _) in enumerate(open_now) if whose is agent]
+        which = (
+            f"{_DOT}{theirs.index(at) + 1} of {len(theirs)}" if len(theirs) > 1 else ""
+        )
+        # A blank line first, for the reason every other part of a turn has one: what is above
+        # this belongs to another conversation, and the two run together without it.
+        shown = self.query_one("#transcript", Transcript)
+        shown.write("")
+        shown.write(
+            f"[dim]— {'that conversation has gone, now ' if gone else ''}"
+            f"reading {escape(short(agent.id))}{which} —[/dim]"
+        )
 
     def _unread(self, session: SessionBase) -> bool:
         """Whether one conversation has said something since it was last read.
@@ -1198,7 +1260,7 @@ class Humanize(App[None]):
             landing = next((one for one in ahead if one > at), ahead[0])
         else:
             landing = next((one for one in reversed(ahead) if one < at), ahead[-1])
-        self._now_reading(open_now, landing)
+        self._now_reading(open_now, landing, stepped=True)
         self._draw()
 
     @on(TextArea.Changed)

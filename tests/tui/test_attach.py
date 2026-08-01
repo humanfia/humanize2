@@ -259,9 +259,13 @@ async def test_the_transcript_is_the_conversation_being_read_and_no_other() -> N
         await driver.press("tab")
         await driver.pause()
 
-        # Drawn again from what was kept against it, and only that.
-        assert "from the second" in _transcript(app)
-        assert "from the first" not in _transcript(app)
+        # Drawn under a line saying what is being read from here down, with what was already
+        # on the screen left where it was: a switch does not take back what you have read.
+        shown = _transcript(app)
+        assert "from the second" in shown
+        assert "from the first" in shown
+        assert shown.index("from the first") < shown.rindex("reading")
+        assert shown.rindex("reading") < shown.index("from the second")
         assert app._reading() is second
 
 
@@ -331,6 +335,32 @@ async def test_reading_nothing_at_all_is_a_key_that_does_nothing() -> None:
 
 
 @pytest.mark.timeout(60)
+async def test_stepping_between_conversations_never_clears_the_screen() -> None:
+    """Whichever way it is stepped, and however many times: the screen is a record."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        one, two = SteerableAgent(CONFIG), SteerableAgent(CONFIG)
+        app._agents = [one, two]
+        first, second = one.new(), two.new()
+        app._heard(one, first, Event(kind="begins", text="go"))
+        app._heard(two, second, Event(kind="begins", text="go"))
+        app._heard(one, first, Event(kind="text", text="from the first"))
+        app._heard(two, second, Event(kind="text", text="from the second"))
+        await driver.pause()
+
+        for _ in range(3):
+            await driver.press("tab")
+        await driver.press("shift+tab")
+        await driver.pause()
+
+        shown = _transcript(app)
+        assert "humanize" in shown  # the box it opened with is still up there
+        assert shown.count("from the first") > 1  # read again, under the line saying so
+        assert shown.count("from the second") > 1
+        assert shown.count("reading") >= 4
+
+
+@pytest.mark.timeout(60)
 async def test_a_conversation_that_goes_moves_what_is_being_read() -> None:
     """A Ralph loop drops one a turn, and the newest of that agent's is where to look next."""
     app = Humanize()
@@ -346,9 +376,12 @@ async def test_a_conversation_that_goes_moves_what_is_being_read() -> None:
         gc.collect()  # which is what the flow letting go of one amounts to
 
         assert app._reading() is second
-        assert "before it went" not in _transcript(
-            app
-        )  # the one it moved to, drawn afresh
+        # What was read is left on the screen, with a line under it saying what happened: a
+        # loop that drops a conversation a turn would otherwise wipe the screen every turn.
+        shown = _transcript(app)
+        assert "before it went" in shown
+        assert "that conversation has gone" in shown
+        assert shown.index("before it went") < shown.index("that conversation has gone")
 
 
 @pytest.mark.timeout(60)
