@@ -53,6 +53,10 @@ line, with what the flow is doing beside the transcript.
   one line needs its arrows back, and focus MUST NOT be able to leave the editor.
 - A typed line MUST reach the agent that has a turn open, not whichever was named last: an
   agent between turns may still be holding a session that would take it silently.
+- The accounts an agent may be run as MUST be reachable from here as well as from a command
+  line: an account outlives the flow that was set up with it, and the one place a person is
+  asked anything is the one place a credential can be typed. It is the one thing said in both
+  places, and the same store either way.
 - `hmz collect` and `hmz anchor` MUST NOT be commands here. Neither is a thing to do to a flow
   that is running, and a command that only ever means one thing is a command line.
 - A turn MUST be shown as it happens: which agent is taking it, each tool it uses as one
@@ -87,6 +91,15 @@ the cursor, and under them whatever is adjusted rather than chosen.
   here, the efforts offered MUST be the ones that model takes, and the skills offered MUST be
   the ones that CLI would load. Nothing MUST be asked of a CLI to find out -- starting one
   costs seconds a prompt has not got.
+- What each agent is MUST be asked in three steps, one agent at a time and in this order: which
+  CLI and which of its accounts, then which of that CLI's models at what effort, then -- only
+  for an agent the flow said may be pointed at a machine -- where it works. The order is what
+  depends on what: an account is one backend's and a model belongs to the CLI that runs it, so
+  neither is answerable before the CLI has been chosen. Esc MUST be the step before, out of the
+  first step of the first agent entirely, and a step stepped back into MUST be as it was left.
+- The last of those steps MUST NOT be put up for an agent the flow did not say may be pointed
+  at a machine: an agent that works here, and one the flow isolates in a container of its own,
+  are each a question nobody is being asked.
 - What an agent runs MUST be one choice rather than two, a model belonging to the CLI that runs
   it; and the CLIs MUST be read one at a time, a tab apiece, since every model of every CLI in
   one list is a list that grows each time any of them ships a model. Tab and shift+tab MUST
@@ -96,10 +109,16 @@ the cursor, and under them whatever is adjusted rather than chosen.
   that narrowed one CLI to one model would narrow the next to none, which reads as a CLI with
   nothing in it. Esc MUST clear what was typed before it leaves, on every sheet that is
   searched.
-- Where an agent works and which of its CLI's skills it is loaded with are each a second
-  question about that agent rather than a way of running the model, so each MUST be a key on
-  the same sheet rather than a row in it, and each MUST open a sheet of its own. Walking out of
-  one of those without answering MUST leave that agent as it was.
+- Which of its CLI's skills an agent is loaded with, what it may do, and whether it runs as a
+  fleet are each a second question about that agent rather than a way of running the model, so
+  each MUST be a key on the sheet that asks what it runs rather than a row in it, and each MUST
+  open a sheet of its own. Walking out of one of those without answering MUST leave that agent
+  as it was. Where an agent works MUST NOT be one of them: a flow that says an agent may be
+  pointed at a machine is a flow expecting to be told which, and a question somebody has to
+  already know a key for is one that does not get asked.
+- An account MUST be makeable from the step that asks for one. That step is where somebody
+  finds out they have none for that CLI, and sending them to another command to make one loses
+  the question they were answering.
 - The skills sheet MUST be a checklist: every skill starts on, which is how a CLI comes, and
   space MUST switch the one under the cursor. What it answers with MUST be the skills the agent
   is to have. A CLI that offers no way of being told which to load MUST say that, rather than

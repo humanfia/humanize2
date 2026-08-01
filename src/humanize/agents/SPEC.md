@@ -13,6 +13,9 @@
 ├── hooks.py
 ├── human.py
 ├── kimi.py
+├── mimo.py
+├── opencode.py
+├── pi.py
 └── skills.py
 ```
 
@@ -32,17 +35,38 @@ with no behaviour on them.
 ## `config.py`
 
 ```python
+class Remote: ...
+
+
+@dataclass(frozen=True, slots=True)
+class Isolated:
+    image: str = "python:3.12"
+
+
 @dataclass(frozen=True, kw_only=True)
 class AgentConfig:
     model: str
     effort: str
     machine: MachineConfig | None = None
     skills: tuple[str, ...] | None = None
+    permission: str = "bypass"
+    provider: str = ""
 ```
 
 - `machine` MUST be the `humanize.machines.MachineConfig` the agent's turns land on, or `None`
   to run them on this machine. It is one setting because it is one question: a machine that is
   already running and a machine started for the agent are both answers to it.
+- Which agents may be given one at all MUST be the flow's to say rather than a setting anybody
+  may reach for: a flow is written for one shape of work, and one whose agents read this
+  project cannot have one of them reading somebody else's. `Remote` and `Isolated` MUST be what
+  a flow writes beside a place to say it -- the first that the place may be pointed at a
+  machine, the second that it works in a container of an image the flow itself names. An
+  `Isolated` place's machine MUST be settled where the flow is read and MUST NOT be
+  configurable anywhere: nothing was asked, so there is nothing to answer differently.
+- `provider` MUST be the account this agent's turns run as, by the name a
+  `humanize.providers` provider of its CLI was made under, or "" for the CLI as whoever is at
+  this machine already runs it. It is a setting of the agent because it is the agent that
+  signs in: two agents of one CLI on two accounts are two accounts running at once.
 - `skills` MUST be the skills of its CLI the agent is to have, and MUST say what it has rather
   than what it has not: an agent told which skills to have has exactly those, whatever is
   installed afterwards. `None` MUST be the CLI as it comes, which is every skill it finds, and
@@ -129,8 +153,8 @@ class AgentBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def new(self) -> SessionBase:
-        """Opens a new session.
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> SessionBase:
+        """Opens a new session, in the directory it is given or in this one.
 
         Returns:
             A new session object.
@@ -161,6 +185,15 @@ class AgentBase(ABC):
 - `__call__` and `pursue` MUST be one turn in a session nothing keeps, which is what a Ralph
   loop is made of -- so that a flow says `agent(task)` rather than reaching through a session
   it is going to discard.
+- Every one of them MUST take the directory the turn works in, and MUST hand it to the session
+  it opens. It MUST be a session's setting rather than a turn's, because that is what it is to
+  these backends: a conversation is rooted at a directory and every turn of it is there. Which
+  is what makes one agent working in several places at once a session apiece, and a flow with a
+  worktree per task able to drive all of them at once.
+- Every call that runs a turn MUST also have a twin that is awaited, run on a thread of its
+  own, so that a flow written as `async def run` can hold as many turns as it likes without any
+  one of them stopping the rest. A batch MUST be the same call as many times over as it is
+  given prompts, one session apiece and all of them going, answering in the order it was asked.
 - `asked` MUST answer with what the user said, or `None` where there is nobody to ask -- a
   flow run from a command line, or an interface told its user is away. A backend MUST be told
   that nobody answered rather than left waiting: a turn waiting on an answer that is not
@@ -189,7 +222,7 @@ class SessionBase(ABC):
     #: Whether the backend can be held to a shape rather than asked to keep to one.
     shapes: ClassVar[bool] = False
 
-    def __init__(self, agent: AgentBase): ...
+    def __init__(self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None): ...
 
     @property
     @abstractmethod
@@ -278,6 +311,16 @@ class SessionBase(ABC):
   behind rather than a word put in, and MUST be moved into the running turn where the backend
   offers a way -- which every one driven through an app server does.
 - MUST NOT run a session in parallel; use a lock to ensure that only one turn is run at a time.
+  The whole of a turn MUST be under it -- the moments it fires and what it says as well as what
+  the backend is told -- so that two threads calling one session are two turns one after the
+  other rather than two halves of a turn each.
+- A session MUST run its turns in the directory it was opened at, and MUST say which that is.
+  For an agent whose turns land on another machine that directory MUST be named as that machine
+  names it, MUST be inside the workspace the anchor names, and MUST be reached through this
+  machine's mirror of it -- which the anchor MUST be told rather than left to guess, since two
+  supervisors cannot be nested and only one of them holds the mirror. A directory that is not
+  there, or one outside that workspace, MUST be refused before the turn rather than left to a
+  backend that cannot start in it.
 - MUST add a session to its agent's `opened` as it opens, and never for a turn that failed.
 - A turn that fails MUST raise `subprocess.CalledProcessError`, whatever it was run through, so
   that a flow catches turns rather than transports.

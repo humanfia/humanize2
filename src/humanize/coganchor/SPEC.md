@@ -15,9 +15,17 @@ The agent is told none of this and cooperates in none of it.
 
 ## What the agent observes
 
+It starts in the workspace, or in whichever directory inside it the session was
+opened at — named as the target names it, and reached through this machine's
+mirror of it.
+
 Inside the workspace it sees the target: the same file names, contents, sizes,
 modes and timestamps, at the same paths. A failure answers with the target's
 own error, not a local approximation of it.
+
+Except where a path is answered with another: a credential the agent names is
+the one it is given instead, and a syscall that cannot be given it fails rather
+than reading the one it named.
 
 Every program it spawns behaves like an ordinary local child — the same
 descriptors, the same output, the same exit status — and its parent is released
@@ -47,6 +55,11 @@ coganchor exits nothing it started is left running.
 - the agent's own executable and its re-execs
 - its state directory — claude, codex and kimi are known by name; any other
   agent keeping state inside the workspace must be named explicitly
+- anything a path is answered with, and the paths that answer it: an agent run
+  as an account of somebody else's reads its credentials from here, and what it
+  writes when a token is refreshed lands here
+- any variable named as the agent's own, so that a credential it was given to
+  reach its model provider is not handed to every command it runs there
 - anything else named as a local path or a local program
 - the agent's own network connections, unless asked otherwise, so that it can
   still reach its model provider

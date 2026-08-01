@@ -43,6 +43,12 @@ class MachineBase(ABC):
 - Where an agent's turns land MUST be one setting, not two: a machine that is already running
   and a machine started for the agent are one answer to one question, and an agent given both
   would be a state nothing could act on.
+- Which agents may be given one MUST be the flow's to say. A place a flow said nothing about
+  MUST be refused a machine before its first turn, a place it declared `Remote` MUST be the
+  only kind that may be pointed at one, and a place it declared `Isolated` MUST be given the
+  container that flow named and MUST NOT be configurable -- by anybody, anywhere. A flow is
+  written for one shape of work, and where its agents work is part of that shape rather than a
+  preference somebody expresses afterwards.
 - The setting and the machine MUST be two objects. One config drives as many agents as it is
   given to, and each of them MUST get a machine of its own.
 - `start` MUST leave the machine ready for a turn to be run against it, and MUST take down
@@ -64,4 +70,6 @@ class Dummy(MachineBase): ...
   bring up nothing.
 - A machine started for the agent MUST be given the project directory itself rather than a
   copy of it, so the work outlives the machine, and a container MUST run as the calling user,
-  so the workspace stays that user's.
+  so the workspace stays that user's. What is isolated MUST be the tools a command finds and
+  not the work: the agent goes on running here, with its own credentials and its own
+  trajectory, and only what it does reaches the container.

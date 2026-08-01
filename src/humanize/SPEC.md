@@ -13,6 +13,7 @@
 ├── cycle.py
 ├── flows
 ├── machines
+├── providers
 ├── runner.py
 ├── tracing
 └── tui
@@ -127,7 +128,7 @@ Runs a flow in the current directory, on the agents it is given.
 Args:
 
 - `-f`, `--flow <flow>`: The Python file the flow is written in. Required.
-- `-a`, `--agent <cli>/<model>:<effort>`: One agent to drive the flow with. Repeated once for
+- `-a`, `--agent <cli>[@<provider>]/<model>:<effort>`: One agent to drive the flow with. Repeated once for
   each agent the flow drives, in the order it takes them -- which for a flow that drives none,
   because the only side it talks to is the person at the prompt, is not at all: the person is
   handed over rather than chosen. A line short of an agent the flow does drive is caught as
@@ -141,6 +142,10 @@ Args:
   longer name it is installed under, and `<model>` and `<effort>` MUST be what that CLI is
   asked for. A model MAY hold slashes of its own -- Kimi Code's are `kimi-code/k3` -- so the
   CLI MUST be read from the front and the effort from after the last colon.
+- The CLI MAY be followed by `@<provider>`, which is the account that agent's turns run as: a
+  CLI is never spelled with an `@` in it, so the two are told apart wherever an agent is
+  written. `provider=` MUST say the same thing written out, and an `@` naming nothing MUST be
+  a line to correct rather than a line saying nothing.
 - Two agents of one spelling MUST be two agents, so that a flow of an actor and a reviewer at
   one configuration is what it says it is.
 - A flow that is not there, has no entry point, does not say how many agents it drives, or
@@ -169,3 +174,35 @@ Prints the output path with the number of sessions and slices it holds.
 Environment Variables:
 
 - `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `KIMI_CODE_HOME`: The path to agent home directories for discovering session logs. If not set, use the default paths of each agent. A home directory that does not exist is skipped.
+
+## `hmz providers`
+
+```shell
+hmz providers [list [<cli>] | ways <cli> | add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] | login <cli>/<name> [-s VAR=VALUE]... | show <cli>/<name> | remove <cli>/<name>]
+```
+
+The accounts an agent may be run as: what there is, how a backend can be signed into, and the
+three things that can happen to one -- made, signed in again, taken away.
+
+- It MUST be the same store the interface's own `/providers` walks: one place a thing is kept
+  is one place it is kept, whichever way somebody reached it.
+- Whatever a way asks that the line did not answer MUST be asked at the terminal, and a secret
+  MUST NOT be echoed. A line run where nobody is at a terminal MUST answer everything itself:
+  a question with no answer and no default MUST be reported rather than waited on.
+- Nothing MUST print a secret. What one holds MUST be shown as the names of the variables it
+  sets and never their values.
+
+## `hmz cred`
+
+```shell
+hmz cred --map <from>=<to> [--map ...] -- <command> [<args>...]
+```
+
+Runs a program with some of its paths answered by others, and exits with its status. What a
+turn under a provider is spawned as, and what a login run for one is spawned as.
+
+- It MUST be a command of its own rather than something the driver does in this process, for
+  the reason `hmz anchor` is: the supervisor forks the program and takes the process's signal
+  handling with it, which a flow pumping turns from threads of its own cannot lend it.
+- A line naming nothing to answer MUST be a usage error: a run with nothing to redirect is a
+  supervisor started for no reason.
