@@ -23,6 +23,19 @@ if TYPE_CHECKING:
 #: what the permission prompt of an interactive Claude fills in.
 _ASKS = "AskUserQuestion"
 
+#: Reasons that leave an answer unfinished even when a broken intermediary labels the result
+#: `success`. Claude normally keeps its own agent loop going for these rather than returning
+#: them as the result of the whole turn.
+_UNFINISHED = frozenset(
+    {
+        "max_tokens",
+        "model_context_window_exceeded",
+        "pause_turn",
+        "tool_deferred",
+        "tool_use",
+    }
+)
+
 #: What Claude calls each rung of the ladder. Its own four modes line up with them, and one of
 #: them is even called the same thing: `plan` is an agent that works everything out and changes
 #: nothing, `acceptEdits` is one that may change what it is working on without asking, Claude's
@@ -69,6 +82,28 @@ def _about(called: dict[str, Any]) -> str:
         ),
         "",
     )
+
+
+def _result_failure(said: dict[str, Any]) -> str | None:
+    """Explains why a Claude result did not finish its turn, or says that it did."""
+    reason: str | None = None
+    if said.get("is_error"):
+        reason = "the turn failed"
+    elif (subtype := said.get("subtype")) not in (None, "success"):
+        reason = f"Claude ended the turn with {subtype}"
+    elif (terminal := said.get("terminal_reason")) not in (None, "completed"):
+        reason = f"Claude ended the turn with {terminal}"
+    elif (stopped := said.get("stop_reason")) in _UNFINISHED:
+        reason = f"Claude stopped with {stopped} before completing the turn"
+    if reason is None:
+        return None
+
+    if result := said.get("result"):
+        return str(result)
+    errors = said.get("errors") or []
+    if isinstance(errors, list) and errors:
+        return "; ".join(str(error) for error in errors)
+    return reason
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -334,14 +369,15 @@ class ClaudeCodeSession(StreamSessionBase):
             # wrong, and a session is only opened by a turn that lands in it.
             self._named = str(said["session_id"])
         elif said.get("type") == "result":
-            if said.get("is_error"):
-                # `subtype` reads "success" even here, so this flag is the whole of it. The
-                # text is Claude explaining itself, which is a diagnostic and not an answer.
+            if failure := _result_failure(said):
+                # Claude has emitted `subtype: success` with `is_error: true`, so neither
+                # field is sufficient alone. The remaining reasons also guard a malformed
+                # success result that arrives while Claude is still asking to use a tool.
                 tokens, risen = self._spent(said)
                 self._settle(risen)
                 yield Event(
                     kind="failed",
-                    text=str(said.get("result") or "the turn failed"),
+                    text=failure,
                     tokens=tokens,
                     spent=risen,
                 )

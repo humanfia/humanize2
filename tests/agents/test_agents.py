@@ -512,6 +512,78 @@ def test_a_turn_the_backend_refuses_fails_rather_than_answering(
         _ = session.id
 
 
+@pytest.mark.parametrize(
+    ("result", "because"),
+    [
+        (
+            {
+                "subtype": "error_max_turns",
+                "is_error": False,
+                "terminal_reason": "max_turns",
+                "stop_reason": "tool_use",
+                "errors": ["turn limit reached"],
+            },
+            "turn limit reached",
+        ),
+        (
+            {
+                "subtype": "success",
+                "is_error": False,
+                "terminal_reason": "aborted_streaming",
+                "stop_reason": "end_turn",
+            },
+            "aborted_streaming",
+        ),
+        (
+            {
+                "subtype": "success",
+                "is_error": False,
+                "terminal_reason": "completed",
+                "stop_reason": "tool_use",
+            },
+            "tool_use",
+        ),
+    ],
+)
+def test_claude_does_not_accept_an_unfinished_result(
+    result: dict[str, object], because: str
+) -> None:
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+    ).new()
+
+    events = list(session._read(json.dumps({"type": "result", **result})))
+
+    assert len(events) == 1
+    assert events[0].kind == "failed"
+    assert because in events[0].text
+
+
+def test_claude_accepts_a_completed_result() -> None:
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+    ).new()
+
+    events = list(
+        session._read(
+            json.dumps(
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": False,
+                    "terminal_reason": "completed",
+                    "stop_reason": "end_turn",
+                    "result": "done",
+                }
+            )
+        )
+    )
+
+    assert len(events) == 1
+    assert events[0].kind == "result"
+    assert events[0].text == "done"
+
+
 def test_a_loop_that_swallows_a_failed_turn_does_not_swallow_being_stopped() -> None:
     """What `/stop` rests on: being stopped must not arrive as a failed turn.
 
