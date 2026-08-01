@@ -84,6 +84,12 @@ def parser() -> ArgumentParser:
         "under the directory it names -- and keep what it is answered with local",
     )
     built.add_argument(
+        "--chdir",
+        metavar="PATH",
+        help="where inside the workspace the agent starts, as the target names it "
+        "(default: the workspace itself)",
+    )
+    built.add_argument(
         "--private",
         metavar="NAME",
         action="append",
@@ -154,6 +160,7 @@ def settings(args: Namespace) -> AnchorConfig:
     return AnchorConfig(
         target=args.target,
         workspace=args.workspace,
+        chdir=args.chdir,
         remote_path=args.remote_path,
         shadow=args.shadow,
         local_paths=tuple(args.local_path),
@@ -185,6 +192,7 @@ def render(config: AnchorConfig, argv: Sequence[str]) -> list[str]:
     options = [f"--target={config.target}", f"--net={config.net}"]
     for flag, value in (
         ("--workspace", config.workspace),
+        ("--chdir", config.chdir),
         ("--remote-path", config.remote_path),
         ("--shadow", config.shadow),
         ("--token", config.token),

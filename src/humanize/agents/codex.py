@@ -32,6 +32,7 @@ from .hooks import EVERYWHERE, Moment, Occasion
 from .skills import leaving
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Callable, Iterator, Mapping, Sequence
 
     from pydantic import BaseModel
@@ -737,13 +738,16 @@ class CodexSession(SessionBase):
     #: in it, so the shape is asked for where the turn is started rather than in the prompt.
     shapes: ClassVar[bool] = True
 
-    def __init__(self, agent: AgentBase) -> None:
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
         """Initializes a session holding no thread yet.
 
         Args:
           agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, as for `SessionBase`.
         """
-        super().__init__(agent)
+        super().__init__(agent, cwd)
         #: The turn under way, which is what a word put in has to name.
         self._running = _Running()
 
@@ -947,6 +951,6 @@ class CodexAgent(AgentBase):
             self._server.stop()
             self._server = None
 
-    def new(self) -> CodexSession:
-        """Opens a new Codex session."""
-        return CodexSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> CodexSession:
+        """Opens a new Codex session, in the directory it is given or in this one."""
+        return CodexSession(self, cwd)

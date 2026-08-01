@@ -19,6 +19,7 @@ import pytest
 from humanize.agents import AgentConfig
 from humanize.coganchor import check
 from humanize.machines import AnchoredConfig, DockerConfig, MachineBase, MachineConfig
+from humanize.runner import Runner
 from tests.stubs import HereAnchor, ShellAgent
 
 if TYPE_CHECKING:
@@ -167,3 +168,69 @@ def test_a_turn_runs_in_the_container_and_leaves_its_work_in_the_workspace(
     assert answer
     assert answer != socket.gethostname()
     assert (tmp_path / "stamp.txt").read_text().strip() == answer
+
+
+#: A flow that says one of its agents works in a container of an image it names, and has that
+#: agent leave a mark where a person could find it afterwards.
+ISOLATING = f'''
+from typing import Annotated, NamedTuple
+
+from humanize.agents import AgentBase, Isolated
+
+
+class Agents(NamedTuple):
+    """The one this drives, in a container of its own."""
+
+    tester: Annotated[AgentBase, Isolated("{IMAGE}")]
+
+
+def run(agents: Agents, task: str) -> None:
+    agents.tester("hostname > stamp.txt; cat /etc/os-release > which.txt")
+'''
+
+
+def test_a_flow_that_isolates_an_agent_runs_it_in_the_image_it_named(
+    daemon: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Isolated mode, end to end: the flow names the image and nobody configures anything.
+
+    The container is started for the agent, the project directory is mounted into it at the
+    path it already has, and the turn runs there through coganchor -- so the work is this
+    machine's file in this machine's directory, and the tools that did it were the image's.
+    """
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "flow.py").write_text(ISOLATING)
+    agent = ShellAgent(AgentConfig(model="m", effort="high"))
+
+    Runner(tmp_path / "flow.py", [agent]).run("go")
+
+    # Nobody said where it works, and it works in a container of the image the flow named.
+    machine = agent.config.machine
+    assert isinstance(machine, DockerConfig)
+    assert machine.image == IMAGE
+    # The work is here, and it was done there.
+    assert (tmp_path / "stamp.txt").read_text().strip() != socket.gethostname()
+    assert "Debian" in (tmp_path / "which.txt").read_text()
+
+
+def test_a_session_may_be_opened_at_a_directory_on_the_machine_it_lands_on(
+    daemon: None, tmp_path: Path
+) -> None:
+    """Which directory of the target, said as the target names it: the mirror follows."""
+    (tmp_path / "packages" / "one").mkdir(parents=True)
+    (tmp_path / "packages" / "one" / "which.txt").write_text("the package")
+    agent = ShellAgent(
+        AgentConfig(
+            model="m",
+            effort="high",
+            machine=DockerConfig(image=IMAGE, workspace=str(tmp_path)),
+        )
+    )
+
+    session = agent.new(tmp_path / "packages" / "one")
+
+    # `pwd` is the shell's own, so it says where the agent was put: the mirror of that
+    # directory. What it reads and writes there is that directory's, on the target.
+    assert session("cat which.txt") == "the package"
+    assert session("pwd > where.txt; cat where.txt").endswith("packages/one")
+    assert (tmp_path / "packages" / "one" / "where.txt").exists()

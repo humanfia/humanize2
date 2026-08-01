@@ -14,6 +14,7 @@ from humanize.agents import AgentBase, CommandSessionBase
 from humanize.coganchor import AnchorConfig
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Sequence
 
 
@@ -24,7 +25,8 @@ class HereAnchor(AnchorConfig):
     A real one would spawn coganchor, which needs a target and a machine to intercept on;
     what an agent owes it is the whole call the backend built, which is what this records --
     and, for an agent that is also run under a provider, the paths that session is to answer
-    with others, since a process has one tracer and the anchor is the one that has it.
+    with others, since a process has one tracer and the anchor is the one that has it -- and
+    the directory each session works in, which is the target's to hold.
     """
 
     seen: list[list[str]] = field(default_factory=list[list[str]])
@@ -32,6 +34,7 @@ class HereAnchor(AnchorConfig):
         default_factory=list[list[tuple[str, str]]]
     )
     kept: list[list[str]] = field(default_factory=list[list[str]])
+    into: list[str] = field(default_factory=list[str])
 
     def command(
         self,
@@ -39,18 +42,22 @@ class HereAnchor(AnchorConfig):
         *,
         swaps: Sequence[tuple[str, str]] = (),
         private: Sequence[str] = (),
+        chdir: str = "",
     ) -> list[str]:
         self.seen.append(list(argv))
         self.answered.append(list(swaps))
         self.kept.append(list(private))
+        self.into.append(chdir)
         return list(argv)
 
 
 class ShellSession(CommandSessionBase):
     """Runs the prompt as a shell script, so each test spells the agent it stands in for."""
 
-    def __init__(self, agent: AgentBase) -> None:
-        super().__init__(agent)
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
+        super().__init__(agent, cwd)
         self.reads = 0
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
@@ -62,5 +69,5 @@ class ShellSession(CommandSessionBase):
 
 
 class ShellAgent(AgentBase):
-    def new(self) -> ShellSession:
-        return ShellSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> ShellSession:
+        return ShellSession(self, cwd)

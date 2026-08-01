@@ -15,6 +15,7 @@ from humanize.agents import AgentBase, AgentConfig, Event, SessionBase, Usage
 from humanize.flows import fixed_juice_ralph
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Iterator
     from pathlib import Path
 
@@ -45,8 +46,8 @@ class _Scripted(AgentBase):
         """Claude's, so that the ladder it is governed along is a real one."""
         return "claude"
 
-    def new(self) -> _ScriptedSession:
-        return _ScriptedSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> _ScriptedSession:
+        return _ScriptedSession(self, cwd)
 
     def juice(self, over: float = 300.0) -> float:
         del over

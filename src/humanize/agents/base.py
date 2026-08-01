@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from humanize.coganchor import AnchorConfig
+    from humanize.machines import MachineConfig
     from humanize.providers import Provider
 
     from .config import AgentConfig
@@ -351,13 +352,23 @@ class SessionBase(ABC):
     #: where the model is still free to answer around it.
     shapes: ClassVar[bool] = False
 
-    def __init__(self, agent: AgentBase) -> None:
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
         """Initializes an unopened session and registers it with its agent.
 
         Args:
           agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, or None for the one the flow is
+            running in. A directory rather than a turn's argument because that is what it is
+            to these backends: a session is opened at a directory and every turn of it is
+            there, which is what lets a flow drive one conversation per worktree at once. For
+            an agent whose turns land on another machine it is that machine's path, and must
+            be inside the workspace the anchor names.
         """
         self._agent = agent
+        #: Where this conversation works, as it was given, or None for wherever the flow is.
+        self._cwd = os.fspath(cwd) if cwd is not None else None
         self._id: str | None = None
         #: What this conversation is to think at from its next turn on, where it has been
         #: told something other than what its agent runs at, and None where it has not.
@@ -869,22 +880,55 @@ class SessionBase(ABC):
         between them.
         """
 
+    @property
+    def cwd(self) -> str:
+        """The directory this conversation works in, as whoever is watching would name it.
+
+        Which is the path on the machine the work lands on: the one the session was opened
+        with, or the workspace the flow is running in where it was opened with none.
+        """
+        anchor = self._agent.anchor
+        if self._cwd is not None:
+            return os.path.abspath(self._cwd)  # noqa: PTH100
+        if anchor is not None:
+            return os.path.abspath(anchor.workspace or os.getcwd())  # noqa: PTH100, PTH109
+        return os.path.abspath(os.getcwd())  # noqa: PTH100, PTH109
+
     def _workspace(self) -> str:
         """The project directory a turn of this session works in, as the backend will find it.
 
-        A backend run as a command inherits this from the flow, and coganchor puts an anchored
-        one in its mirror of the workspace instead -- which is the workspace's own path unless
-        the mirror was put somewhere else. A backend told where to work has to be told that
-        same directory, since it is the one whose files reach the target.
+        A backend run as a command works in it directly, and coganchor puts an anchored one in
+        its mirror of the workspace instead -- which is the workspace's own path unless the
+        mirror was put somewhere else. A backend told where to work has to be told that same
+        directory, since it is the one whose files reach the target.
 
         Returns:
           The absolute path to open the session at.
+
+        Raises:
+          ValueError: If the session was opened at a directory that is not there, or -- for an
+            agent whose turns land elsewhere -- at one outside the workspace the anchor names.
+            Said before the first turn rather than as a backend failing to start in it.
         """
         anchor = self._agent.anchor
-        mirror = (anchor.shadow or anchor.workspace) if anchor else None
-        # `abspath` rather than `Path.resolve`: a session opens at the directory it was
-        # given, and one reached through a symlink is not a request for what it points at.
-        return os.path.abspath(mirror or os.getcwd())  # noqa: PTH100, PTH109
+        if anchor is None:
+            where = self.cwd
+            if not os.path.isdir(where):  # noqa: PTH112
+                raise ValueError(f"{where}: no directory to open a session in")
+            return where
+        # The mirror's own path for the same place: what the agent reads and writes is the
+        # mirror, and coganchor is what makes that the target's copy.
+        workspace = os.path.abspath(anchor.workspace or os.getcwd())  # noqa: PTH100, PTH109
+        mirror = os.path.abspath(anchor.shadow or workspace)  # noqa: PTH100
+        where = self.cwd
+        if where != workspace and not where.startswith(workspace + os.sep):
+            raise ValueError(
+                f"{where} is not inside {workspace}, which is the workspace this agent's "
+                "turns land in"
+            )
+        return os.path.join(  # noqa: PTH118 -- text, as every path on this line is
+            mirror, os.path.relpath(where, workspace)
+        )
 
     def _environment(self) -> Mapping[str, str]:
         """What to set in the command's environment on top of this process's own.
@@ -1043,11 +1087,14 @@ class CommandSessionBase(SessionBase):
         with self._lock:
             self._shaping = schema
             argv, stdin = self._turn(prompt)
+            # Where the turn runs, and where it is spawned from: an anchored turn is put in
+            # the mirror by the anchor itself, so only an unanchored one is started here.
+            where = self._workspace()
             # Spawned rather than called: a supervisor forks the agent and takes the process's
             # signal handling with it, which a flow pumping turns from threads of its own has
             # no way to lend it. Whether there is one to spawn -- an anchor, a provider's own
             # paths, both -- is the agent's to say.
-            argv = self._agent.spawned(argv)
+            argv = self._agent.spawned(argv, self.cwd)
             out: list[str] = []
             err: list[str] = []
             said: queue.Queue[Event | None] = queue.Queue()
@@ -1066,6 +1113,9 @@ class CommandSessionBase(SessionBase):
                 # and the backend set. None rather than a copy where there is nothing to say,
                 # so that a turn inherits the environment as it always did.
                 env=self._environ(),
+                # The directory the session was opened at, which is this one unless it was
+                # opened at another; an anchored turn is put there by the anchor instead.
+                cwd=None if self._agent.anchor is not None else where,
             ) as proc:
                 assert proc.stdout is not None  # noqa: S101
                 assert proc.stderr is not None  # noqa: S101
@@ -1166,13 +1216,16 @@ class StreamSessionBase(SessionBase):
     the turn already under way instead of waiting for the next one.
     """
 
-    def __init__(self, agent: AgentBase) -> None:
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
         """Initializes a session holding no process yet.
 
         Args:
           agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, as for :class:`SessionBase`.
         """
-        super().__init__(agent)
+        super().__init__(agent, cwd)
         self._proc: subprocess.Popen[str] | None = None
         self._writing = threading.Lock()  # a line is written whole or not at all
         #: Answers still owed to us: the agent replies to each thing said with a turn of its
@@ -1403,7 +1456,8 @@ class StreamSessionBase(SessionBase):
         """
         if self._proc is not None and self._proc.poll() is None:
             return self._proc
-        argv = self._agent.spawned(argv)
+        where = self._workspace()
+        argv = self._agent.spawned(argv, self.cwd)
         started = subprocess.Popen(
             argv,
             stdin=subprocess.PIPE,
@@ -1415,6 +1469,9 @@ class StreamSessionBase(SessionBase):
             # This process's own, less what the agent's provider hushes and plus what it and
             # the backend set, as for a session that is one command per turn.
             env=self._environ(),
+            # And in the directory the session was opened at, as for one of those: a backend
+            # held open across its turns is held open where its conversation is rooted.
+            cwd=None if self._agent.anchor is not None else where,
         )
         assert started.stderr is not None  # noqa: S101
         with self._writing:
@@ -1574,6 +1631,27 @@ class AgentBase(ABC):
     def id(self) -> str:
         """What this agent is called, and what a trace groups its sessions under."""
         return self._id
+
+    def runs_on(self, machine: MachineConfig | None) -> None:
+        """Puts this agent's turns on the machine the flow said they land on.
+
+        For a place a flow declared as one of its own to isolate: the flow says the image and
+        nobody is asked, so the machine is settled here rather than chosen anywhere. Said
+        before the agent has opened anything, because a session resumes under the settings it
+        opened with -- which is the reason the config is frozen in the first place.
+
+        Args:
+          machine: Where its turns are to land, or None to leave them here.
+
+        Raises:
+          RuntimeError: If this agent has already opened a session, which is a conversation
+            that would resume somewhere other than it started.
+        """
+        from dataclasses import replace
+
+        if self._opened:
+            raise RuntimeError(f"{self._id} has already opened a session")
+        self._config = replace(self._config, machine=machine)
 
     def rename(self, name: str) -> None:
         """Calls this agent what the flow driving it calls it, if it has no name of its own.
@@ -1808,7 +1886,7 @@ class AgentBase(ABC):
             name: value for name, value in os.environ.items() if name not in hushed
         } | dict(added)
 
-    def spawned(self, argv: list[str]) -> list[str]:
+    def spawned(self, argv: list[str], cwd: str = "") -> list[str]:
         """One turn of this agent, as the command to actually spawn.
 
         Every backend renders its own call and then comes here, so that what a turn is wrapped
@@ -1821,6 +1899,10 @@ class AgentBase(ABC):
 
         Args:
           argv: The backend's own command for this turn.
+          cwd: Where the session it is a turn of works, as the machine it lands on names it,
+            or "" for the workspace itself. An anchored turn is told there rather than put
+            there: the agent is started in this machine's mirror of that directory, which is
+            the anchor's to work out.
 
         Returns:
           The command to spawn, which is `argv` itself for an agent that is neither anchored
@@ -1836,7 +1918,7 @@ class AgentBase(ABC):
         private = tuple(provider.env) if provider is not None else ()
         anchor = self.anchor
         if anchor is not None:
-            return anchor.command(argv, swaps=swaps, private=private)
+            return anchor.command(argv, swaps=swaps, private=private, chdir=cwd)
         return provider.command(argv) if provider is not None else argv
 
     @property
@@ -1983,15 +2065,31 @@ class AgentBase(ABC):
         return said
 
     @overload
-    def __call__(self, prompt: str, *, suppress: bool = False) -> str: ...
+    def __call__(
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str: ...
 
     @overload
     def __call__[T: BaseModel](
-        self, prompt: str, *, suppress: bool = False, schema: type[T]
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        schema: type[T],
+        cwd: str | os.PathLike[str] | None = None,
     ) -> T | None: ...
 
     def __call__[T: BaseModel](
-        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        schema: type[T] | None = None,
+        cwd: str | os.PathLike[str] | None = None,
     ) -> str | T | None:
         """Runs one turn in a session of its own, and keeps nothing.
 
@@ -2006,37 +2104,64 @@ class AgentBase(ABC):
           schema: The shape to answer in, as for :meth:`SessionBase.__call__` -- which is
             what a flow asking one agent a question rather than setting it to work wants:
             `agents.reviewer(asked, schema=Review).done` is the review read as a decision.
+          cwd: Where the turn works, or None for wherever the flow is. One agent given a
+            directory apiece is one agent working in several places at once, which is what a
+            flow with a worktree per task is doing.
 
         Returns:
           What the agent answered, stripped, or the model it was asked for.
         """
+        opened = self._opens_at(cwd)
         if schema is None:
-            return self.new()(prompt, suppress=suppress)
-        return self.new()(prompt, suppress=suppress, schema=schema)
+            return opened(prompt, suppress=suppress)
+        return opened(prompt, suppress=suppress, schema=schema)
 
-    def pursue(self, objective: str, *, suppress: bool = False) -> str:
+    def pursue(
+        self,
+        objective: str,
+        *,
+        suppress: bool = False,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str:
         """Runs a goal in a session of its own, and keeps nothing.
 
         Args:
           objective: What the agent is to have achieved before it stops.
           suppress: Whether a goal that fails answers with nothing, as for
             :meth:`SessionBase.pursue`.
+          cwd: Where it works, as for :meth:`__call__`.
 
         Returns:
           What the agent answered once it stopped, stripped.
         """
-        return self.new().pursue(objective, suppress=suppress)
+        return self._opens_at(cwd).pursue(objective, suppress=suppress)
 
     @overload
-    async def aturn(self, prompt: str, *, suppress: bool = False) -> str: ...
+    async def aturn(
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str: ...
 
     @overload
     async def aturn[T: BaseModel](
-        self, prompt: str, *, suppress: bool = False, schema: type[T]
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        schema: type[T],
+        cwd: str | os.PathLike[str] | None = None,
     ) -> T | None: ...
 
     async def aturn[T: BaseModel](
-        self, prompt: str, *, suppress: bool = False, schema: type[T] | None = None
+        self,
+        prompt: str,
+        *,
+        suppress: bool = False,
+        schema: type[T] | None = None,
+        cwd: str | os.PathLike[str] | None = None,
     ) -> str | T | None:
         """The same turn as :meth:`__call__`, awaited: `await agent.aturn(prompt)`.
 
@@ -2048,27 +2173,39 @@ class AgentBase(ABC):
           prompt: The input prompt for the turn.
           suppress: Whether a turn that fails answers with nothing, as for :meth:`__call__`.
           schema: The shape to answer in, as for :meth:`__call__`.
+          cwd: Where the turn works, as for :meth:`__call__` -- which is what makes many at
+            once many places at once.
 
         Returns:
           What :meth:`__call__` would have answered with.
         """
+        opened = self._opens_at(cwd)
         if schema is None:
-            return await self.new().aturn(prompt, suppress=suppress)
-        return await self.new().aturn(prompt, suppress=suppress, schema=schema)
+            return await opened.aturn(prompt, suppress=suppress)
+        return await opened.aturn(prompt, suppress=suppress, schema=schema)
 
-    async def apursue(self, objective: str, *, suppress: bool = False) -> str:
+    async def apursue(
+        self,
+        objective: str,
+        *,
+        suppress: bool = False,
+        cwd: str | os.PathLike[str] | None = None,
+    ) -> str:
         """The same goal as :meth:`pursue`, awaited: `await agent.apursue(objective)`.
 
         Args:
           objective: What the agent is to have achieved before it stops.
           suppress: Whether a goal that fails answers with nothing, as for :meth:`pursue`.
+          cwd: Where it works, as for :meth:`__call__`.
 
         Returns:
           What :meth:`pursue` would have answered with.
         """
-        return await self.new().apursue(objective, suppress=suppress)
+        return await self._opens_at(cwd).apursue(objective, suppress=suppress)
 
-    def batch_new(self, count: int) -> list[SessionBase]:
+    def batch_new(
+        self, count: int, cwd: str | os.PathLike[str] | None = None
+    ) -> list[SessionBase]:
         """Opens as many sessions as it is asked for, at once.
 
         Sessions cost nothing until a turn lands in one -- a session is a conversation that
@@ -2078,15 +2215,22 @@ class AgentBase(ABC):
 
         Args:
           count: How many to open. None at all for a count of nothing or less.
+          cwd: The directory they all work in, or None for the one the flow is running in. A
+            session per directory is `[agent.new(one) for one in directories]` instead.
 
         Returns:
           The sessions, in the order they were opened, which is the order the agent has them.
         """
-        return [self.new() for _ in range(max(count, 0))]
+        return [self._opens_at(cwd) for _ in range(max(count, 0))]
 
     @overload
     def batch(
-        self, prompts: Sequence[str], *, suppress: bool = False, at_once: int = 0
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
     ) -> list[str]: ...
 
     @overload
@@ -2097,6 +2241,7 @@ class AgentBase(ABC):
         suppress: bool = False,
         schema: type[T],
         at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
     ) -> list[T | None]: ...
 
     def batch[T: BaseModel](
@@ -2106,6 +2251,7 @@ class AgentBase(ABC):
         suppress: bool = False,
         schema: type[T] | None = None,
         at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
     ) -> list[Any]:
         """Runs many turns at once, each in a session of its own, and keeps none of them.
 
@@ -2125,6 +2271,8 @@ class AgentBase(ABC):
             landed: a turn already running cannot be taken back.
           schema: The shape to answer in, as for :meth:`__call__`.
           at_once: How many turns to have running at a time, or 0 for all of them.
+          cwd: Where every turn of it works, or None for wherever the flow is. A batch across
+            directories is a session apiece -- `agent.new(one)` -- gathered.
 
         Returns:
           One answer per prompt, in the order the prompts were given.
@@ -2139,8 +2287,8 @@ class AgentBase(ABC):
 
         def one(prompt: str) -> Any:
             if schema is None:
-                return self(prompt, suppress=suppress)
-            return self(prompt, suppress=suppress, schema=schema)
+                return self(prompt, suppress=suppress, cwd=cwd)
+            return self(prompt, suppress=suppress, schema=schema, cwd=cwd)
 
         # Sized to the batch rather than kept between them: a fan-out is over when its
         # answers are in, and the threads it took go with it.
@@ -2152,7 +2300,12 @@ class AgentBase(ABC):
 
     @overload
     async def abatch(
-        self, prompts: Sequence[str], *, suppress: bool = False, at_once: int = 0
+        self,
+        prompts: Sequence[str],
+        *,
+        suppress: bool = False,
+        at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
     ) -> list[str]: ...
 
     @overload
@@ -2163,6 +2316,7 @@ class AgentBase(ABC):
         suppress: bool = False,
         schema: type[T],
         at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
     ) -> list[T | None]: ...
 
     async def abatch[T: BaseModel](
@@ -2172,6 +2326,7 @@ class AgentBase(ABC):
         suppress: bool = False,
         schema: type[T] | None = None,
         at_once: int = 0,
+        cwd: str | os.PathLike[str] | None = None,
     ) -> list[Any]:
         """The same batch as :meth:`batch`, awaited: `await agent.abatch(prompts)`.
 
@@ -2180,6 +2335,7 @@ class AgentBase(ABC):
           suppress: Whether a turn that fails answers with nothing, as for :meth:`batch`.
           schema: The shape to answer in, as for :meth:`__call__`.
           at_once: How many turns to have running at a time, or 0 for all of them.
+          cwd: Where every turn of it works, as for :meth:`batch`.
 
         Returns:
           One answer per prompt, in the order the prompts were given.
@@ -2198,8 +2354,10 @@ class AgentBase(ABC):
         async def one(prompt: str) -> Any:
             async with gate:
                 if schema is None:
-                    return await self.aturn(prompt, suppress=suppress)
-                return await self.aturn(prompt, suppress=suppress, schema=schema)
+                    return await self.aturn(prompt, suppress=suppress, cwd=cwd)
+                return await self.aturn(
+                    prompt, suppress=suppress, schema=schema, cwd=cwd
+                )
 
         # Gathered whatever any of them did, and only then raised: a batch that let the first
         # failure out from under the others would leave those others running with nobody
@@ -2212,9 +2370,33 @@ class AgentBase(ABC):
                 raise said
         return list(answered)
 
+    def _opens_at(self, cwd: str | os.PathLike[str] | None) -> SessionBase:
+        """Opens a session at a directory, or wherever the flow is where none was named.
+
+        Asked for without the argument where there is none to give, so that an agent written
+        before there was anywhere else to work -- a stand-in in somebody's suite, whose `new`
+        takes only itself -- goes on being an agent.
+
+        Args:
+          cwd: The directory the conversation works in, or None.
+
+        Returns:
+          The session.
+        """
+        return self.new() if cwd is None else self.new(cwd)
+
     @abstractmethod
-    def new(self) -> SessionBase:
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> SessionBase:
         """Opens a new session, which stays unopened with the backend until its first turn.
+
+        Args:
+          cwd: The directory the conversation works in, or None for the one the flow is
+            running in. It is a session's setting rather than a turn's because that is what
+            it is to these backends: a conversation is rooted at a directory. Which is what
+            makes a session per directory the way to work in several at once::
+
+                held = [agent.new(worktree) for worktree in worktrees]
+                await asyncio.gather(*(one.aturn(task) for one in held))
 
         Returns:
           A session with no history yet.

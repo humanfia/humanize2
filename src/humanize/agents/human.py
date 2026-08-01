@@ -28,6 +28,7 @@ from .config import AgentConfig
 from .event import Event, Question
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Iterator
 
     from pydantic import BaseModel
@@ -307,10 +308,10 @@ class HumanAgent(AgentBase):
         """
         super().__init__(AgentConfig(model="human", effort=""), name=name)
 
-    def new(self) -> HumanSession:
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> HumanSession:
         """Opens a conversation with them.
 
         Returns:
           The session. There is nothing to open: the person is already there, or is not.
         """
-        return HumanSession(self)
+        return HumanSession(self, cwd)

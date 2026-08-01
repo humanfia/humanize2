@@ -162,30 +162,34 @@ async def test_a_secret_is_never_drawn_back(signed_in: unittest.mock.MagicMock) 
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
-async def test_the_account_an_agent_runs_as_is_chosen_beside_what_it_runs(
+async def test_the_account_an_agent_runs_as_is_the_first_thing_asked_about_it(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """A fourth question about the agent, so it is a key on the same sheet and not a row."""
+    """It decides which credentials the turns run under, which is no side question at all.
+
+    So it is a step of the walk rather than a chord on the models: under the tab of the CLI
+    whose accounts they are, since an account is one backend's, and read back on the step
+    after as what was already settled.
+    """
     _account()
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        tuning = app.screen.query_one("#tuning", Label)
-        await until(lambda: "effort" in str(tuning.content), driver)
-        # Never asked, which is the account whoever is at this machine is signed in as.
-        assert "as this machine is signed in" in str(tuning.content)
-
-        await driver.press("ctrl+r")
+        # The first step of the first agent, without anything being reached for.
         await until(lambda: isinstance(app.screen, RunsAs), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
+        # This machine's own first, which is what every agent ran as before there were any.
         assert [str(option.id) for option in listing.options] == ["=", "=deepseek"]
 
         await driver.press("down", "enter")
         await until(lambda: isinstance(app.screen, Models), driver)
+        tuning = app.screen.query_one("#tuning", Label)
+        # Read on the models rather than adjusted there: a step of its own answered it.
         await until(lambda: "as deepseek" in str(tuning.content), driver)
+        assert "ctrl+r" not in str(tuning.content)
+        assert "ctrl+r" not in str(app.screen.query_one("#keys", Label).content)
 
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
@@ -215,11 +219,6 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        tuning = app.screen.query_one("#tuning", Label)
-        await until(lambda: "effort" in str(tuning.content), driver)
-
-        await driver.press("ctrl+r")
         await until(lambda: isinstance(app.screen, RunsAs), driver)
         # Nothing to choose but this machine's own, which is where somebody finds out.
         assert [
@@ -228,7 +227,7 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
         ] == ["="]
 
         await driver.press("ctrl+n")
-        # Straight to the ways in: the backend is what the sheet was already asking about.
+        # Straight to the ways in: the backend is the tab the sheet is open on.
         await until(lambda: isinstance(app.screen, Ways), driver)
         await driver.press("down", "down", "enter")  # `key`, which asks for one thing
         await until(lambda: isinstance(app.screen, Signing), driver)
@@ -237,8 +236,10 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
         await driver.press(*"not-a-key")
         await driver.press("enter")
 
-        # Back to the agents, with the account made and given to this one.
+        # On to the models, with the account made and given to this one: making one here is
+        # choosing it, so the step it was asked in is answered.
         await until(lambda: isinstance(app.screen, Models), driver)
+        tuning = app.screen.query_one("#tuning", Label)
         await until(lambda: "as mine" in str(tuning.content), driver)
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
@@ -279,23 +280,22 @@ async def test_making_one_and_walking_out_of_it_changes_nothing(
 ) -> None:
     """Esc off the making is the account question again, with nothing written down."""
     app = Humanize()
+    was = None
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        await driver.press("ctrl+r")
         await until(lambda: isinstance(app.screen, RunsAs), driver)
+        was = list(app._models)
         await driver.press("ctrl+n")
         await until(lambda: isinstance(app.screen, Ways), driver)
         await driver.press("escape")
         await until(lambda: isinstance(app.screen, RunsAs), driver)
+        # And esc off the first step of the first agent is out of the walk altogether.
         await driver.press("escape")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        await driver.press("escape")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await until(lambda: not isinstance(app.screen, RunsAs), driver)
 
     assert providers.providers("claude") == []
-    assert app._models[0].provider == ""
+    assert app._models == was  # walking out changed nothing at all
 
 
 @pytest.mark.timeout(60)
@@ -308,9 +308,10 @@ async def test_a_cli_with_no_accounts_says_where_they_come_from(
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        await driver.press("ctrl+r")
         await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
         said = str(app.screen.query_one("#tuning", Label).content)
 
         assert "claude has no accounts here yet" in said
@@ -322,25 +323,28 @@ async def test_a_cli_with_no_accounts_says_where_they_come_from(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch("humanize.tui.app.installed", return_value=CLAUDE)
-async def test_walking_out_leaves_the_agent_running_as_this_machine(
+async def test_the_first_row_leaves_the_agent_running_as_this_machine(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """Declining to answer the fourth question is not declining to choose the agent."""
+    """Which is what every agent ran as before there were any accounts to choose between."""
     _account()
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        await driver.press("ctrl+r")
         await until(lambda: isinstance(app.screen, RunsAs), driver)
         await until(
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
 
-        await driver.press("down")  # walked to and then walked away from
-        await driver.press("escape")
+        await driver.press("down")  # walked to the account and then off it again
+        await driver.press("up")
+        await driver.press("enter")
         await until(lambda: isinstance(app.screen, Models), driver)
+        tuning = app.screen.query_one("#tuning", Label)
+        await until(
+            lambda: "as this machine is signed in" in str(tuning.content), driver
+        )
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
 

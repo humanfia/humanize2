@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from .agents import AgentBase, Moment
+    from .agents import AgentBase, Isolated, Moment, Remote
 
 
 #: How many arguments a flow's entry point takes when it says it can be set up with
@@ -61,11 +61,18 @@ class Place(NamedTuple):
       moments: The moments the agent filling it has to run, which the flow said by writing
         `Annotated[AgentBase, Moment.PERMISSION_REQUEST]` where it declared the place. Empty
         where it asked for nothing in particular, which is most places.
+      where: Where the agent filling it may work, which the flow said the same way -- `Remote`
+        for one that may be pointed at another machine, an `Isolated` for one that works in a
+        container the flow itself names the image of. None for a place the flow said nothing
+        about, which runs here and may not be sent anywhere: a flow is written for a shape of
+        work, and where its agents work is the flow's to say rather than a setting somebody
+        reaches for.
     """
 
     name: str
     person: bool
     moments: frozenset[Moment]
+    where: type[Remote] | Remote | Isolated | None = None
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
@@ -207,6 +214,46 @@ def _read(
     )
 
 
+def _lands(flow: str | os.PathLike[str], agent: AgentBase, place: Place) -> None:
+    """Settles where one agent's turns land, and refuses a machine the flow did not allow.
+
+    Where an agent works is the flow's to say and not a setting anybody may reach for: a flow
+    is written for one shape of work, and one whose agents read this project cannot have one
+    of them reading somebody else's. So a place says nothing and its agent runs here, or says
+    `Remote` and its agent may be pointed at a machine by whoever chose it, or says `Isolated`
+    and the machine is the flow's own -- a container of the image it named, which nobody else
+    has any say in.
+
+    Args:
+      flow: The flow, for what a refusal says.
+      agent: The agent filling the place.
+      place: What the flow declared.
+
+    Raises:
+      NotAFlow: If the agent was configured to work somewhere the flow does not put it, or if
+        it has already opened a session, which is a conversation that cannot be moved.
+    """
+    from .agents import Isolated, isolated
+
+    called = place.name or "the agent"
+    if isinstance(place.where, Isolated):
+        if agent.config.machine is not None:
+            raise NotAFlow(
+                f"{flow}: {called} works in a container of this flow's own, so there is "
+                "nothing to point it at"
+            )
+        try:
+            agent.runs_on(isolated(place.where.image))
+        except RuntimeError as opened:
+            raise NotAFlow(f"{flow}: {called} {opened}") from opened
+        return
+    if place.where is None and agent.config.machine is not None:
+        raise NotAFlow(
+            f"{flow}: {called} runs on this machine -- this flow does not say it works "
+            "anywhere else, so it cannot be pointed at one"
+        )
+
+
 def _set_up(
     flow: str | os.PathLike[str],
     setting: type[BaseModel] | None,
@@ -315,9 +362,30 @@ def _place(name: str, kind: object) -> Place:
       The place.
     """
     moments = frozenset(_moments(kind))
+    where = _where(kind)
     if get_origin(kind) is Annotated:
         kind = get_args(kind)[0]
-    return Place(name=name, person=_is_person(kind), moments=moments)
+    return Place(name=name, person=_is_person(kind), moments=moments, where=where)
+
+
+def _where(kind: object) -> type[Remote] | Remote | Isolated | None:
+    """Where a flow said the agent filling a place may work.
+
+    Args:
+      kind: What the flow annotated the place with.
+
+    Returns:
+      What it wrote beside the type -- `Remote`, or an `Isolated` naming an image -- and None
+      for a place it annotated with the type alone, which is one that works here.
+    """
+    from .agents import Isolated, Remote
+
+    if get_origin(kind) is not Annotated:
+        return None
+    for said in get_args(kind)[1:]:
+        if said is Remote or isinstance(said, (Remote, Isolated)):
+            return said
+    return None
 
 
 def _moments(kind: object) -> tuple[Moment, ...]:
@@ -443,6 +511,7 @@ class Runner:
                     f"{flow}: {place.name or 'the agent'} has to run "
                     f"{', '.join(sorted(short))}, which {agent.backend} does not"
                 )
+            _lands(flow, agent, place)
         # The person at the prompt is made here rather than given: nobody chooses what they
         # run, so nothing upstream of this was ever asked about them.
         given = iter(agents)

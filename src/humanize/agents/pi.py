@@ -19,6 +19,7 @@ from .config import AgentConfig
 from .event import Event, Question, Usage
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Iterator
 
 #: What each kind of thing pi says a turn did reads as. A message is a list of parts and pi
@@ -89,13 +90,16 @@ class PiSession(StreamSessionBase):
     anything said to it while a turn is running.
     """
 
-    def __init__(self, agent: AgentBase) -> None:
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
         """Initializes a session that has spent nothing yet.
 
         Args:
           agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, as for `SessionBase`.
         """
-        super().__init__(agent)
+        super().__init__(agent, cwd)
         #: The id pi says this session has, taken only once a turn has landed in it.
         self._named: str | None = None
         #: What the agent has said so far in the turn now running, and what went wrong with
@@ -394,6 +398,6 @@ class PiAgent(AgentBase):
     reaches for a tool, so there is no permission for a hook to be hung on.
     """
 
-    def new(self) -> PiSession:
-        """Opens a new pi session."""
-        return PiSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> PiSession:
+        """Opens a new pi session, in the directory it is given or in this one."""
+        return PiSession(self, cwd)

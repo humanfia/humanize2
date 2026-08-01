@@ -24,6 +24,7 @@ from humanize.agents import (
 )
 
 if TYPE_CHECKING:
+    import os
     from pathlib import Path
 
 CONFIG = AgentConfig(model="m", effort="high")
@@ -88,8 +89,8 @@ class _SaysAgent(AgentBase):
         self.said = said
         self.heard: list[str] = []
 
-    def new(self) -> _SaysSession:
-        return _SaysSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> _SaysSession:
+        return _SaysSession(self, cwd)
 
 
 def test_a_backend_that_cannot_be_held_to_a_shape_is_asked_for_it() -> None:

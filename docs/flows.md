@@ -13,6 +13,7 @@ branch, sleep, read files, shell out, and give up, because it is just a function
 - [How many agents, and what they are for](#how-many-agents-and-what-they-are-for)
 - [Settings of the flow's own](#settings-of-the-flows-own)
 - [Asking for an agent that can do something](#asking-for-an-agent-that-can-do-something)
+- [Where each agent works](#where-each-agent-works)
 - [Hooks in a flow](#hooks-in-a-flow)
 - [The person at the prompt](#the-person-at-the-prompt)
 - [Running one](#running-one)
@@ -244,6 +245,64 @@ hmz exec: error: /.../gated.py: builder has to run PermissionRequest, which code
 
 and the interface's `/agents` offers only the CLIs that would work for that place, so it cannot
 be chosen wrong there at all.
+
+## Where each agent works
+
+Where an agent's turns land is declared the same way, and by the same file: the flow writes it
+beside the type.
+
+```python
+from typing import Annotated, NamedTuple
+
+from humanize.agents import AgentBase, Isolated, Remote
+
+
+class Agents(NamedTuple):
+    """The three this drives, and the three places they work."""
+
+    builder: Annotated[AgentBase, Remote]                  # may be pointed at a machine
+    tester: Annotated[AgentBase, Isolated("python:3.12")]  # a container of the flow's own
+    reviewer: AgentBase                                    # here, and nowhere else
+```
+
+| Beside the type | Where that agent works |
+| --- | --- |
+| *(nothing)* | this machine, and it **cannot** be pointed anywhere else |
+| `Remote` | wherever whoever chose the agent pointed it — the only kind of place that may be pointed at all — and here where nobody did |
+| `Isolated("<image>")` | a [container of that image](machines.md#isolatedpython312), which nobody configures and nobody is asked about |
+
+**This is a change.** A machine used to be a setting of the agent that anything could reach, so
+any agent of any flow could be pointed anywhere. It is still a setting of the agent — that is how
+a `Remote` place is filled — but a flow is written for one shape of work, and one whose agents
+read *this* project cannot have one of them reading somebody else's. So the flow says which of
+them may be sent elsewhere, and nothing above it can say otherwise.
+
+Both refusals land before the first turn, for the reason the count does:
+
+```text
+/.../flow.py: reviewer runs on this machine -- this flow does not say it works anywhere else, so it cannot be pointed at one
+/.../flow.py: tester works in a container of this flow's own, so there is nothing to point it at
+```
+
+`hmz exec` prints either as `hmz exec: error: …` and runs nothing; the interface shows it as a red
+line and starts nothing. No `-a` spells a machine, so what runs into these is an agent
+[built in Python](#building-the-agents-yourself) or one moved on the interface's `/agents` sheet.
+
+A place may say more than one thing — `Annotated[AgentBase, Moment.STOP, Remote]` is a place that
+must run that moment *and* may be moved. Several arguments, read one by one, in any order.
+
+What the flow declared is readable without driving it:
+
+```python
+from humanize.runner import wanted
+
+wanted("rlar")   # one Place per agent somebody has to choose: .name, .moments, .where
+```
+
+`where` is `None`, the `Remote` class itself, or the `Isolated` the flow wrote — which is how
+whatever chooses the agents knows which of them it may offer a machine for. What each answer
+comes to, and what a container of the flow's own actually is, is in
+[Machines](machines.md#which-agents-may-be-moved-at-all).
 
 ## Hooks in a flow
 
@@ -511,7 +570,8 @@ if head() == before:
 the [provider](providers.md) whose account it runs as. A name, [where the work
 lands](machines.md), [which skills it has](agents.md#which-skills-an-agent-is-loaded-with) and
 [what it may do](agents.md#what-an-agent-may-do) are settings of the *agent* that no `-a` spells,
-so a flow that needs one is handed agents built in Python:
+so a flow that needs one is handed agents built in Python — and a machine only where the flow's
+own place for that agent [said `Remote`](#where-each-agent-works):
 
 ```python
 from humanize.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig

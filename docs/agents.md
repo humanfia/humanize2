@@ -11,6 +11,7 @@ Everything here is importable from `humanize.agents`.
 - [Making one](#making-one)
 - [Turns](#turns)
 - [Sessions](#sessions)
+- [The directory a session works in](#the-directory-a-session-works-in)
 - [Awaiting a turn](#awaiting-a-turn)
 - [Many at once](#many-at-once)
 - [Watching a turn as it happens](#watching-a-turn-as-it-happens)
@@ -120,6 +121,60 @@ than interleaving two.
 
 Discarding a session is how a flow forgets. They are held weakly by the agent, so a Ralph loop
 running for days does not grow one by a session a turn.
+
+## The directory a session works in
+
+A session is opened *at* a directory, and every turn of it runs there:
+
+```python
+session = agent.new(worktree)     # this conversation works in that directory
+session("pwd")                    # and so does every turn of it
+session.cwd                       # where that is, as an absolute path
+```
+
+It is a **session's** setting rather than a turn's, because that is what it is to these backends:
+a conversation is rooted at a directory. Leave it out — the default — and the session works in
+the directory the flow is running in, which is what every session was before there was anywhere
+else to put one.
+
+Every call that opens a session takes it, since opening one is what it settles:
+
+```python
+agent.new(worktree)                          # the session, to hold and to keep talking to
+agent("fix the tests", cwd=worktree)         # one turn in a session of its own, there
+agent.pursue(objective, cwd=worktree)
+await agent.aturn(task, cwd=worktree)        # and await agent.apursue(objective, cwd=…)
+agent.batch(prompts, cwd=worktree)           # every turn of the batch, there
+await agent.abatch(prompts, cwd=worktree)
+agent.batch_new(200, worktree)               # two hundred conversations, all in that one
+```
+
+The pattern that matters is **one agent working in several places at once** — a worktree per
+task, a checkout per shard — which is a session apiece and their turns going together:
+
+```python
+held = [agent.new(worktree) for worktree in worktrees]
+said = await asyncio.gather(*(one.aturn(task) for one in held))
+```
+
+`cwd=` on a batch is one directory for all of its turns; a batch *across* directories is the
+gather above. Either way the agent is one agent: one set of settings, one id, one
+[trace](tracing.md) — what differs is where each conversation is rooted.
+
+For an agent whose turns land on [another machine](machines.md), the directory is **that
+machine's** path, and it must be inside the workspace the anchor names. humanize puts the agent
+in this machine's mirror of it and tells the anchor to run the work in the directory itself, so a
+flow says where the work happens in the only names the far end has.
+
+A directory that is not there, or one outside that workspace, raises `ValueError` before the turn
+is run:
+
+```text
+/srv/nowhere: no directory to open a session in
+/tmp/elsewhere is not inside /srv/project, which is the workspace this agent's turns land in
+```
+
+which is a flow to correct rather than a backend that failed to start.
 
 ## Awaiting a turn
 
@@ -727,6 +782,12 @@ ClaudeCodeAgentConfig(model=…, effort=…, machine=DockerConfig(image="python:
 for — which is the first turn. Constructing an agent pulls no image and starts no container.
 See [Machines](machines.md).
 
+**Which agents may be given one at all is the flow's to say.** An agent handed to a flow whose
+place for it says nothing is refused before its first turn, because a flow is written for one
+shape of work — see [Flows › Where each agent works](flows.md#where-each-agent-works). Setting a
+`machine` here is what fills a place the flow declared `Remote`; a place it declared `Isolated`
+is settled by the flow itself and takes no `machine` from anyone.
+
 ## Which account it runs as
 
 A config's `provider` names one of the [providers](providers.md) made for its CLI. `""` — the
@@ -753,6 +814,9 @@ run as does not quietly run as yours.
 ## API summary
 
 ```python
+type Where = str | os.PathLike[str] | None   # a directory, or None for the one the flow is in
+
+
 class AgentBase:
     moments: ClassVar[frozenset[Moment]]   # the ones a hook may be hung on here
 
@@ -766,16 +830,17 @@ class AgentBase:
     provider: Provider | None
     hooks: Hooks            # what is hung on its moments
 
-    def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
-    def pursue(objective: str, *, suppress: bool = False) -> str
-    def new() -> SessionBase
+    # `cwd` is the directory the session it opens works in, or None for the flow's own.
+    def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …, cwd: Where = None) -> str | T | None
+    def pursue(objective: str, *, suppress: bool = False, cwd: Where = None) -> str
+    def new(cwd: Where = None) -> SessionBase
 
-    async def aturn(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
-    async def apursue(objective: str, *, suppress: bool = False) -> str
+    async def aturn(prompt: str, *, suppress: bool = False, schema: type[T] = …, cwd: Where = None) -> str | T | None
+    async def apursue(objective: str, *, suppress: bool = False, cwd: Where = None) -> str
 
-    def batch_new(count: int) -> list[SessionBase]
-    def batch(prompts, *, suppress: bool = False, schema: type[T] = …, at_once: int = 0) -> list[...]
-    async def abatch(prompts, *, suppress: bool = False, schema: type[T] = …, at_once: int = 0) -> list[...]
+    def batch_new(count: int, cwd: Where = None) -> list[SessionBase]
+    def batch(prompts, *, suppress: bool = False, schema: type[T] = …, at_once: int = 0, cwd: Where = None) -> list[...]
+    async def abatch(prompts, *, suppress: bool = False, schema: type[T] = …, at_once: int = 0, cwd: Where = None) -> list[...]
 
     def rename(name: str) -> None
     def stop() -> None
@@ -791,6 +856,7 @@ class AgentBase:
 class SessionBase:
     id: str                 # raises until a turn has landed
     named: str | None       # the same, or None
+    cwd: str                # where this conversation works, as the machine it lands on names it
 
     shapes: ClassVar[bool]  # whether the backend can be held to a schema
 

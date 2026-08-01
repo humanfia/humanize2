@@ -17,6 +17,7 @@ from humanize.agents import AgentBase, AgentConfig, Event, SessionBase
 from humanize.flows import rlar
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Callable, Iterator
 
     from pydantic import BaseModel
@@ -33,8 +34,8 @@ class _Scripted(AgentBase):
         #: Every prompt it was given, in order, which is what a test reads the run off.
         self.heard: list[str] = []
 
-    def new(self) -> _ScriptedSession:
-        return _ScriptedSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> _ScriptedSession:
+        return _ScriptedSession(self, cwd)
 
 
 #: What the stand-in names each session it opens, so that a test can count them: a flow that

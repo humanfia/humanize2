@@ -28,6 +28,9 @@ class AnchorConfig:
     Attributes:
       target: The machine the work lands on, as `ssh://HOST`, `docker://CONTAINER`,
         `tcp://HOST:PORT` or `local[:DIR]`, where a local target stands in for a remote one.
+      chdir: Where inside that workspace the agent starts, as the target names it, or None
+        for the workspace itself. What a session opened at a directory of its own comes to:
+        the agent is put in this machine's mirror of it, and what it does there lands there.
       workspace: The project directory as it exists on the target, defaulting to this one.
       remote_path: Where that workspace really lives on the target, if not `workspace`.
       shadow: The local mirror directory, defaulting to `workspace` so that the paths the
@@ -52,6 +55,7 @@ class AnchorConfig:
 
     target: str = "local"
     workspace: str | None = None
+    chdir: str | None = None
     remote_path: str | None = None
     shadow: str | None = None
     local_paths: tuple[str, ...] = ()
@@ -93,6 +97,7 @@ class AnchorConfig:
         *,
         swaps: Sequence[tuple[str, str]] = (),
         private: Sequence[str] = (),
+        chdir: str = "",
     ) -> list[str]:
         """Renders the invocation that runs `argv` under this anchor in a process of its own.
 
@@ -108,6 +113,9 @@ class AnchorConfig:
           private: Variables this one turn keeps to itself, on top of :attr:`private` -- the
             same thing said for the credentials a provider hands the agent as variables
             rather than as files.
+          chdir: Where inside the workspace this one session works, as the target names it,
+            in place of :attr:`chdir`. Where a session opened at a directory of its own says
+            so, rather than the settings saying it for every session.
 
         Returns:
           The command to spawn, which exits with the agent's own status.
@@ -122,8 +130,9 @@ class AnchorConfig:
                 self,
                 redirects=(*self.redirects, *swaps),
                 private=(*self.private, *private),
+                chdir=chdir or self.chdir,
             )
-            if swaps or private
+            if swaps or private or chdir
             else self
         )
         return render(answering, argv)
@@ -213,6 +222,14 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
     target, workspace, export = config.mount()
     agent = statepaths.resolve(list(command))
     shadow_root = os.path.abspath(config.shadow) if config.shadow else workspace
+    # Where the agent itself starts: the mirror of the directory it was told to work in,
+    # which is the workspace unless a session asked for one inside it.
+    started_in = shadow_root
+    if config.chdir:
+        under = os.path.abspath(config.chdir)
+        if under != workspace and not under.startswith(workspace + os.sep):
+            raise ValueError(f"{under} is not inside {workspace}")
+        started_in = os.path.join(shadow_root, os.path.relpath(under, workspace))
     redirects = tuple(
         (os.path.abspath(named), os.path.abspath(instead))
         for named, instead in config.redirects
@@ -237,6 +254,13 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
     link = transport.connect(target, [export], config.token)
     client = RemoteClient(link.channel)
     netproxy = NetProxy(client, config.net_allow) if config.net == "remote" else None
+    # The mirror fills itself in as the agent looks at things, and the one directory it
+    # cannot be asked about first is the one the agent is started in: the `chdir` happens in
+    # the forked child, before it has become the agent and before anything may talk to the
+    # target -- a reader thread cannot exist across that fork. So the directory is made here
+    # and left empty; the first thing the agent does in it is what fills it in, and a
+    # directory the target does not have is emptied again by the same reconciliation.
+    os.makedirs(started_in, exist_ok=True)
     supervisor = Supervisor(
         client,
         router,
@@ -248,11 +272,11 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
             | {
                 "HUMANIZE": __version__,
                 "HUMANIZE_TARGET": target.describe(),
-                "PWD": shadow_root,
+                "PWD": started_in,
                 # Agents surface this to the model; being explicit beats it guessing.
                 "HUMANIZE_WORKSPACE": workspace,
             },
-            cwd=shadow_root,
+            cwd=started_in,
         ),
         netproxy=netproxy,
         token=config.token,

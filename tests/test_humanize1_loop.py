@@ -27,6 +27,7 @@ from humanize.flows import humanize1
 from humanize.flows._humanize1 import loop
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Callable, Iterator
     from pathlib import Path
 
@@ -125,9 +126,9 @@ class Scripted(AgentBase):
         #: Every prompt it was given, in order, which is what a test reads the run off.
         self.heard: list[str] = []
 
-    def new(self) -> ScriptedSession:
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> ScriptedSession:
         """Opens a conversation."""
-        return ScriptedSession(self)
+        return ScriptedSession(self, cwd)
 
 
 class ScriptedSession(SessionBase):

@@ -15,14 +15,14 @@ import unittest.mock
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from textual.widgets import Label, Static
+from textual.widgets import Label, OptionList, Static
 
 from humanize.agents import PERMISSIONS
 from humanize.backends import Model
 from humanize.cycle import cycles
 from humanize.tui import Humanize
 from humanize.tui.app import _HELP, _OWN, Editor, _where
-from humanize.tui.pick import Flows, Models, Runs
+from humanize.tui.pick import Flows, Models, Runs, RunsAs
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -117,6 +117,25 @@ def _transcript(app: Humanize) -> str:
     from textual.widgets import RichLog
 
     return "\n".join(line.text for line in app.query_one("#transcript", RichLog).lines)
+
+
+async def into_models(app: Humanize, driver: Pilot[None]) -> None:
+    """Answers the first step of an agent -- its CLI and its account -- to reach the second.
+
+    Which every test that is about the models has to walk through now, an account belonging
+    to a backend and so being asked before the model that backend runs. The first row is this
+    machine's own account, which is what every agent ran as before there were any.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+    """
+    await until(lambda: isinstance(app.screen, RunsAs), driver)
+    await until(
+        lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+    )
+    await driver.press("enter")
+    await until(lambda: isinstance(app.screen, Models), driver)
 
 
 @pytest.mark.timeout(60)
@@ -255,8 +274,6 @@ async def test_what_the_flow_did_is_on_status(workspace: Path) -> None:
 @pytest.mark.timeout(60)
 async def test_a_half_typed_command_is_offered_the_rest_of_itself() -> None:
     """Offered in a list under the editor, and taken with tab: nothing is ever guessed at."""
-    from textual.widgets import OptionList
-
     from humanize.tui.app import Editor
 
     app = Humanize()
@@ -374,7 +391,6 @@ async def test_the_arrows_are_the_editor_s_own_inside_a_prompt_of_more_than_one_
 
 @pytest.mark.timeout(60)
 async def test_nothing_is_offered_for_what_is_not_a_command() -> None:
-    from textual.widgets import OptionList
 
     from humanize.tui.app import Editor
 
@@ -600,7 +616,8 @@ async def test_the_flow_itself_is_walked_back_into_from_what_it_runs_on() -> Non
             await driver.press("enter")
             await until(lambda: isinstance(app.screen, Flows), driver)
             await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Models), driver)
+            # The first step of the first agent, which is the step after the flow itself.
+            await until(lambda: isinstance(app.screen, RunsAs), driver)
 
             await driver.press("escape")
             await until(lambda: isinstance(app.screen, Flows), driver)
@@ -1073,32 +1090,35 @@ async def test_what_an_agent_runs_is_one_cli_at_a_time_and_an_effort_the_arrows_
 ) -> None:
     """As Claude Code's `/model` is: the models numbered, the effort on its own line.
 
-    A CLI and a model are still one choice, because they are one choice in fact -- a model
-    belongs to the CLI that runs it -- but the CLI is a tab and its models are the list, so
-    what is read at once is one CLI's worth rather than every model there is.
+    The CLI is settled a step earlier, an account belonging to a backend and so having to be
+    asked after it, so what is read at once is one CLI's worth of models rather than every
+    model there is -- with the CLI they belong to named above them.
     """
-    from textual.widgets import OptionList
-
     app = Humanize()
     async with app.run_test() as driver:
-        # Walked into the way it is walked into: tab, a flow, then what it runs on.
+        # Walked into the way it is walked into: a flow, then what each of its agents is.
         await driver.press(*"/flow")
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Flows), driver)
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        sheet = app.screen
-        listing = sheet.query_one("#choices", OptionList)
-        await until(lambda: bool(listing.options), driver)
 
         # A tab per CLI installed here, with the one being read marked and the others not.
-        tabs = str(sheet.query_one("#tabs", Label).content)
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        tabs = str(app.screen.query_one("#tabs", Label).content)
         assert "claude" in tabs
         assert "codex" in tabs
         assert "kimi" not in tabs  # not installed, so not a tab
         assert "tab/shift+tab to switch" in tabs
 
-        # One row per model of that CLI alone, numbered, cursor marked by `❯`.
+        await into_models(app, driver)
+        sheet = app.screen
+        listing = sheet.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+
+        # One row per model of the CLI that was chosen, numbered, cursor marked by `❯`, and
+        # that CLI as a heading: it was chosen already, so there is nowhere to switch to.
+        assert "claude" in str(sheet.query_one("#tabs", Label).content)
+        assert "to switch" not in str(sheet.query_one("#tabs", Label).content)
         rows = [str(option.prompt) for option in listing.options]
         assert [str(option.id) for option in listing.options] == [
             "claude/claude-opus-5"
@@ -1119,7 +1139,7 @@ async def test_what_an_agent_runs_is_one_cli_at_a_time_and_an_effort_the_arrows_
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
 
-    assert cast("Models", sheet)._chosen == [Runs("claude/claude-opus-5:max")]
+    assert app._models == [Runs("claude/claude-opus-5:max")]
 
 
 @pytest.mark.timeout(60)
@@ -1133,19 +1153,18 @@ async def test_what_an_agent_runs_is_one_cli_at_a_time_and_an_effort_the_arrows_
 async def test_tab_and_shift_tab_turn_to_the_next_cli_and_the_one_before(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """Which is the point of the tabs: a list of one CLI's models rather than of all of them.
+    """Which is the point of the tabs: one CLI's accounts rather than everyone's at once.
 
     They wrap, so the last tab is one press from the first however many CLIs are installed --
     and shift+tab here is the tab before rather than the interface's own next flow, which is
-    not a thing to do from inside the sheet that is choosing what this flow runs on.
+    not a thing to do from inside the sheet that is choosing what this flow runs on. What the
+    tab was left on is the CLI whose models the step after asks about.
     """
-    from textual.widgets import OptionList
-
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
         sheet = app.screen
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
@@ -1153,32 +1172,34 @@ async def test_tab_and_shift_tab_turn_to_the_next_cli_and_the_one_before(
 
         await driver.press("tab")
         await driver.pause()
-        assert [str(option.id) for option in listing.options] == [
-            "codex/gpt-5.6-sol",
-            "codex/gpt-5.5",
-        ]
-        assert "1." in str(listing.get_option_at_index(0).prompt)  # numbered afresh
+        assert "[b $primary]codex" in str(sheet.query_one("#tabs", Label).content)
 
         await driver.press("tab")  # round the end, back to the first
         await driver.pause()
-        assert [str(option.id) for option in listing.options] == [
-            "claude/claude-opus-5"
-        ]
+        assert "[b $primary]claude" in str(sheet.query_one("#tabs", Label).content)
 
         await driver.press("shift+tab")  # and back the other way
         await driver.pause()
+        assert "[b $primary]codex" in str(sheet.query_one("#tabs", Label).content)
+        # The interface's own shift+tab did not fire under the sheet.
+        assert app._flow_named == flow
+
+        await driver.press("enter")  # as this machine is signed in, on codex
+        await until(lambda: isinstance(app.screen, Models), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        # The models of the CLI the tab was left on, numbered afresh, and no others.
         assert [str(option.id) for option in listing.options] == [
             "codex/gpt-5.6-sol",
             "codex/gpt-5.5",
         ]
-        # The interface's own shift+tab did not fire under the sheet.
-        assert app._flow_named == flow
+        assert "1." in str(listing.get_option_at_index(0).prompt)
 
         await driver.press("down")  # the second of that CLI's models
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Models), driver)
 
-    assert cast("Models", sheet)._chosen == [Runs("codex/gpt-5.5:high")]
+    assert app._models == [Runs("codex/gpt-5.5:high")]
 
 
 @pytest.mark.timeout(60)
@@ -1192,13 +1213,11 @@ async def test_one_cli_is_a_heading_rather_than_a_row_of_tabs(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """There is nowhere to switch to, so nothing says there is."""
-    from textual.widgets import OptionList
-
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
         sheet = app.screen
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
@@ -1209,10 +1228,18 @@ async def test_one_cli_is_a_heading_rather_than_a_row_of_tabs(
 
         await driver.press("tab")  # nowhere to go, and nothing moves
         await driver.pause()
-        assert [str(option.id) for option in listing.options] == [
+        assert [str(option.id) for option in listing.options] == ["="]
+
+        # And the step after says whose models these are, for the same reason: one CLI.
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        models = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(models.options), driver)
+        assert [str(option.id) for option in models.options] == [
             "claude/claude-opus-5",
             "claude/claude-sonnet-5",
         ]
+        assert "to switch" not in str(app.screen.query_one("#tabs", Label).content)
 
 
 @pytest.mark.timeout(60)
@@ -1226,29 +1253,29 @@ async def test_one_cli_is_a_heading_rather_than_a_row_of_tabs(
 async def test_what_was_typed_belongs_to_the_tab_it_was_typed_into(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """A search that narrowed one CLI to one model would narrow the next one to none."""
-    from textual.widgets import OptionList
+    """A search that narrowed one CLI's accounts to one would narrow the next one's to none."""
+    from humanize import providers
 
+    providers.add("claude", "deepseek", way="key", env={"ANTHROPIC_API_KEY": "k"})
+    providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "k"})
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
         sheet = app.screen
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
 
-        await driver.press(*"opus")
+        await driver.press(*"deep")
         await driver.pause()
-        assert [str(option.id) for option in listing.options] == [
-            "claude/claude-opus-5"
-        ]
+        assert [str(option.id) for option in listing.options] == ["=deepseek"]
 
         await driver.press("tab")
         await driver.pause()
         # The next CLI is read from its whole list rather than through the last search.
-        assert [str(option.id) for option in listing.options] == ["codex/gpt-5.6-sol"]
-        assert cast("Models", sheet)._typed == ""
+        assert [str(option.id) for option in listing.options] == ["=", "=work"]
+        assert cast("RunsAs", sheet)._typed == ""
 
 
 @pytest.mark.timeout(60)
@@ -1267,32 +1294,31 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
     How hard a turn thinks and how wide it runs are not two ends of one dial: a swarm at low
     effort is a real thing to ask for, and a list that mixed them could not say it.
     """
-    from textual.widgets import OptionList
-
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/flow")
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Flows), driver)
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        sheet = app.screen
-        await until(
-            lambda: bool(sheet.query_one("#choices", OptionList).options), driver
-        )
-        tuning = sheet.query_one("#tuning", Label)
+        await into_models(app, driver)
+        tuning = app.screen.query_one("#tuning", Label)
 
         # Claude opens on ultracode, which is the hardest thing it takes, and has no swarm.
-        assert "ultracode effort" in str(tuning.content)
+        await until(lambda: "ultracode effort" in str(tuning.content), driver)
         assert "swarm" not in str(tuning.content)
         await driver.press("ctrl+w")  # nothing to toggle, so nothing happens
         await driver.pause()
         assert "swarm" not in str(tuning.content)
 
-        # Kimi has one, a tab along, and ctrl+w is what turns it on.
+        # Kimi has one. Which CLI it is was the step before, so that is where it is turned to.
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
         await driver.press("tab")
-        await driver.pause()
-        assert "swarm mode off" in str(tuning.content)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        tuning = app.screen.query_one("#tuning", Label)
+        await until(lambda: "swarm mode off" in str(tuning.content), driver)
+
         await driver.press("ctrl+w")
         await driver.pause()
         assert "swarm mode on" in str(tuning.content)
@@ -1305,7 +1331,7 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
         await until(lambda: not isinstance(app.screen, Models), driver)
 
     # One turn, at one effort, run wide -- which is how Kimi is asked for a fleet.
-    assert cast("Models", sheet)._chosen == [Runs("kimi/kimi-code/k3:swarmlow")]
+    assert app._models == [Runs("kimi/kimi-code/k3:swarmlow")]
 
 
 @pytest.mark.timeout(60)
@@ -1323,8 +1349,6 @@ async def test_a_list_too_long_to_walk_is_narrowed_by_typing_at_it(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """Every model of every CLI is longer than a screen, so the letters go into it."""
-    from textual.widgets import OptionList
-
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/flow")
@@ -1354,7 +1378,7 @@ async def test_a_list_too_long_to_walk_is_narrowed_by_typing_at_it(
 
         # Spread through the name in order, rather than a prefix: `hk` finds `claude-haiku`.
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await into_models(app, driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
         await driver.press("h", "k")
@@ -1372,8 +1396,6 @@ async def test_the_cursor_can_be_seen_in_the_lists_that_are_chosen_from() -> Non
     Claude Code marks it with `❯` against the row rather than by filling the row, so what is
     checked is the marker: it is on the row the cursor is on and on no other.
     """
-    from textual.widgets import OptionList
-
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/flow")
@@ -1538,97 +1560,6 @@ async def test_taking_an_offer_types_the_command_and_not_its_arguments() -> None
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
-    "humanize.tui.pick.machines", return_value=[("ssh://box", "ssh config")]
-)
-@unittest.mock.patch(
-    "humanize.tui.app.installed",
-    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
-)
-async def test_where_an_agent_works_is_set_beside_what_it_runs(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
-    _machines: unittest.mock.MagicMock,  # noqa: PT019
-) -> None:
-    """A second question about the agent, so it is a key on the same sheet and not a row."""
-    from textual.widgets import OptionList
-
-    from humanize.tui.pick import Anchors
-
-    app = Humanize()
-    async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        sheet = app.screen
-        tuning = sheet.query_one("#tuning", Label)
-        await until(lambda: "effort" in str(tuning.content), driver)
-        assert "on this machine" in str(tuning.content)
-
-        await driver.press("ctrl+a")
-        await until(lambda: isinstance(app.screen, Anchors), driver)
-        anchors = app.screen
-        listing = anchors.query_one("#choices", OptionList)
-        await until(lambda: bool(listing.options), driver)
-        # This machine first, then the ones there are to be found.
-        assert [str(option.id) for option in listing.options] == ["=", "=ssh://box"]
-
-        await driver.press("down")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        await until(lambda: "ssh://box" in str(tuning.content), driver)
-
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
-
-    # It rides along with what the agent runs, and is what the line above the prompt says.
-    assert cast("Models", sheet)._chosen == [
-        Runs("claude/claude-opus-5:max", "ssh://box")
-    ]
-    assert app._models == [Runs("claude/claude-opus-5:max", "ssh://box")]
-    assert app.settings.agents(app._flow_named) == [
-        Runs("claude/claude-opus-5:max", "ssh://box")
-    ]
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch("humanize.tui.pick.machines", return_value=[])
-@unittest.mock.patch(
-    "humanize.tui.app.installed",
-    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
-)
-async def test_a_machine_nothing_here_can_see_is_a_target_that_is_typed(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
-    _machines: unittest.mock.MagicMock,  # noqa: PT019
-) -> None:
-    """The list is a convenience; a target is a string, and any string that reads as one goes."""
-    from textual.widgets import OptionList
-
-    from humanize.tui.pick import Anchors
-
-    app = Humanize()
-    async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        await driver.press("ctrl+a")
-        await until(lambda: isinstance(app.screen, Anchors), driver)
-        listing = app.screen.query_one("#choices", OptionList)
-        await until(lambda: bool(listing.options), driver)
-
-        await driver.press(*"nonsense")
-        await driver.pause()
-        # Not a target and not a row, so there is nothing there to choose.
-        assert [str(option.id) for option in listing.options] == []
-
-        for _ in range(len("nonsense")):
-            await driver.press("backspace")
-        await driver.press(*"docker://box")
-        await driver.pause()
-
-        assert [str(option.id) for option in listing.options] == ["=docker://box"]
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch(
     "humanize.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
@@ -1765,14 +1696,12 @@ async def test_the_person_asked_for_a_shape_is_asked_a_question_at_a_time(
 async def test_what_an_agent_may_do_is_stepped_through_beside_what_it_runs(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """A second question about the agent, adjusted rather than chosen from a list of four."""
-    from textual.widgets import OptionList
-
+    """A side question about the agent, adjusted rather than chosen from a list of four."""
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await into_models(app, driver)
         sheet = app.screen
         await until(
             lambda: bool(sheet.query_one("#choices", OptionList).options), driver
@@ -1806,13 +1735,11 @@ async def test_the_loosest_rung_is_written_down_as_nothing_at_all(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """A file written before there was such a setting reads the same way as one that has it."""
-    from textual.widgets import OptionList
-
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await into_models(app, driver)
         sheet = app.screen
         await until(
             lambda: bool(sheet.query_one("#choices", OptionList).options), driver

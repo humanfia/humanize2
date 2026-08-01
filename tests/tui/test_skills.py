@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import unittest.mock
 from pathlib import Path
-from typing import cast
 
 import pytest
 from textual.widgets import Label, OptionList
@@ -21,7 +20,7 @@ from humanize.tui import Humanize
 from humanize.tui.pick import Models, Runs, Skills
 from humanize.tui.settings import Settings
 
-from .test_app import until
+from .test_app import into_models, until
 
 SKILL = """---
 name: {name}
@@ -106,7 +105,7 @@ async def test_a_cli_that_cannot_be_told_says_that_rather_than_none_installed(
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await into_models(app, driver)
         await driver.press("ctrl+s")
         await until(lambda: isinstance(app.screen, Skills), driver)
         said = str(app.screen.query_one("#tuning", Label).content)
@@ -132,12 +131,12 @@ async def test_what_an_agent_is_loaded_with_is_chosen_beside_what_it_runs(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     homes: Path,
 ) -> None:
-    """A third question about the agent, so it is a key on the same sheet and not a row."""
+    """A side question about the agent, so it is a key on the model step and not a row."""
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await into_models(app, driver)
         sheet = app.screen
         tuning = sheet.query_one("#tuning", Label)
         await until(lambda: "effort" in str(tuning.content), driver)
@@ -175,7 +174,6 @@ async def test_what_an_agent_is_loaded_with_is_chosen_beside_what_it_runs(
     # It rides along with what the agent runs, and is kept with it: the ones it has, in the
     # order the CLI lists them, rather than the one that was switched off.
     chosen = Runs("claude/claude-opus-5:max", "", ("hf-cli", "housekeeping"))
-    assert cast("Models", sheet)._chosen == [chosen]
     assert app._models == [chosen]
     assert app.settings.agents(app._flow_named) == [chosen]
 
@@ -189,12 +187,12 @@ async def test_walking_out_of_the_skills_leaves_the_agent_loaded_as_it_was(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     homes: Path,
 ) -> None:
-    """Declining to answer the second question is not declining to choose the agent."""
+    """Declining to answer a side question is not declining to choose the agent."""
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await into_models(app, driver)
         await driver.press("ctrl+s")
         await until(lambda: isinstance(app.screen, Skills), driver)
         listing = app.screen.query_one("#choices", OptionList)
@@ -288,7 +286,7 @@ async def test_the_letters_narrow_the_skills_and_space_switches_one(
     async with app.run_test() as driver:
         await driver.press(*"/agents")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await into_models(app, driver)
         await driver.press("ctrl+s")
         await until(lambda: isinstance(app.screen, Skills), driver)
         sheet = app.screen

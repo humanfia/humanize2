@@ -86,6 +86,12 @@ session("do the task")        # opens it
 session("keep going")         # resumes it, the first turn still in context
 ```
 
+A session is also **rooted at a directory** — `agent.new(worktree)` — because that is what a
+conversation is to these backends: it is opened somewhere and every turn of it is there. Left
+unsaid, it is the directory the flow is running in. Which is what lets one agent work in several
+places at once: a session per worktree, their turns going together. See
+[Agents](agents.md#the-directory-a-session-works-in).
+
 Every session the backend opened is written down under an id, which is how its transcript is
 found again later.
 
@@ -119,8 +125,9 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 The annotation on `agents` is load-bearing. Its length is how many agents the flow drives —
 the one thing about a flow that the command line starting it cannot otherwise know — so it is
 checked before the first turn rather than hours into a loop. A `NamedTuple` says what each one
-is *for* as well as how many there are, and an `Annotated[AgentBase, Moment.…]` says what that
-one has to be able to do, which is checked at the same moment.
+is *for* as well as how many there are, an `Annotated[AgentBase, Moment.…]` says what that one
+has to be able to do, and an `Annotated[AgentBase, Remote]` or `Annotated[AgentBase, Isolated(…)]`
+says where it may work. All of it is checked at the same moment.
 
 A flow is ordinary Python and may branch any way it likes. Nothing asks it what it is doing;
 what a run looks like is read off the turns going past. `run` may be `async def`, which is how
@@ -154,7 +161,11 @@ Cycles live under `~/.humanize/cycles/`. See [Tracing](tracing.md#cycles).
 | **One that is already running** | an ssh host, a container, a listening port. The agent process stays here — keeping its credentials and its link to its model provider — and everything it *does* happens there. |
 | **One started for the agent** | a container of an image you name, brought up on the first turn and removed with the agent. |
 
-It is one setting because it is one question. See [Machines](machines.md).
+It is one setting because it is one question. **Which agents it may be asked of is the flow's to
+say**: a place a flow's agents annotation says nothing about runs here and cannot be pointed
+anywhere, `Annotated[AgentBase, Remote]` is one that may be, and
+`Annotated[AgentBase, Isolated("python:3.12")]` is a container of the flow's own that nobody
+configures. See [Machines](machines.md).
 
 ## Provider
 

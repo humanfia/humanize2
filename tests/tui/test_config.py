@@ -20,6 +20,8 @@ from humanize.tui import Humanize
 from humanize.tui.pick import Configures, Flows, Models, Runs, setting
 from humanize.tui.settings import Settings
 
+from .test_app import into_models
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
@@ -158,7 +160,7 @@ async def test_setting_up_comes_between_the_flow_and_its_agents(flows: Path) -> 
             assert "say it twice" in shown  # the line the field was declared with
 
             await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Models), driver)
+            await into_models(app, driver)
             assert isinstance(app.screen, Models)
 
 
@@ -173,7 +175,7 @@ async def test_a_flow_that_takes_no_setting_up_is_not_asked_about(flows: Path) -
         async with app.run_test() as driver:
             await driver.press(*"/flow plain")
             await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Models), driver)
+            await into_models(app, driver)
 
             assert isinstance(app.screen, Models)
 
@@ -295,7 +297,7 @@ async def test_how_it_was_set_up_is_kept_and_read_back(
             await until(lambda: isinstance(app.screen, Configures), driver)
             await driver.press("right")  # loud on
             await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Models), driver)
+            await into_models(app, driver)
             await driver.press("enter")
             await until(lambda: app._config is not None, driver)
 
@@ -319,7 +321,7 @@ async def test_config_opens_the_sheet_on_its_own(flows: Path) -> None:
             await driver.press("enter")
             await until(lambda: isinstance(app.screen, Configures), driver)
             await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Models), driver)
+            await into_models(app, driver)
             await driver.press("enter")
             await until(lambda: not isinstance(app.screen, Models), driver)
 
@@ -523,13 +525,13 @@ async def test_agents_does_not_ask_how_the_flow_is_set_up(flows: Path) -> None:
             await driver.press("enter")
             await until(lambda: isinstance(app.screen, Configures), driver)
             await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Models), driver)
+            await into_models(app, driver)
             await driver.press("enter")
             await until(lambda: not isinstance(app.screen, Models), driver)
 
             await driver.press(*"/agents")
             await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Models), driver)
+            await into_models(app, driver)
 
             # Straight to what the agents run, with nothing about the flow itself on the way.
             assert isinstance(app.screen, Models)
@@ -549,13 +551,13 @@ async def test_agents_leaves_how_the_flow_is_set_up_alone(flows: Path) -> None:
             await until(lambda: isinstance(app.screen, Configures), driver)
             await driver.press("right")  # loud on
             await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Models), driver)
+            await into_models(app, driver)
             await driver.press("enter")
             await until(lambda: not isinstance(app.screen, Models), driver)
 
             await driver.press(*"/agents")
             await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Models), driver)
+            await into_models(app, driver)
             await driver.press("enter")
             await until(lambda: not isinstance(app.screen, Models), driver)
 

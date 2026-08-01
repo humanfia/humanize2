@@ -56,16 +56,21 @@ from .discover import installed
 from .history import History
 from .monitor import Monitor, short, thousands
 from .pick import (
+    Anchors,
     Backends,
     Configures,
     Flows,
     Models,
     Providers,
     Runs,
+    RunsAs,
     Signing,
     Status,
+    Whose,
+    called,
     handed_over,
     made,
+    pointed,
     reads,
 )
 from .settings import Settings
@@ -84,7 +89,7 @@ if TYPE_CHECKING:
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
 #: runs on is an agent apiece rather than one model, so its `/models` is `/agents` -- which
-#: asks once for each agent the flow drives. `hmz collect` and `hmz anchor` are not here:
+#: asks three things of each agent the flow drives. `hmz collect` and `hmz anchor` are not here:
 #: neither is a thing to do to a flow that is running, and both are a command line of their
 #: own.
 _OWN = (
@@ -124,6 +129,13 @@ _PINNED = 5
 #: How narrow a terminal a pinned line is still given room in, so that the arithmetic below
 #: cannot ask for a negative number of columns.
 _NARROW = 20
+
+#: The three steps one agent of a flow is configured in, in the order they are asked: which
+#: coding agent takes its turns and as whom, which model it runs and at what effort, and --
+#: only for a place the flow said may be pointed anywhere -- which machine its work lands on.
+#: Each depends on the one before it: an account belongs to a backend, and a model belongs to
+#: the CLI that runs it.
+_WHO, _WHAT, _WHERE = 0, 1, 2
 
 #: The flow the interface opens on, which is the one that is only talking to one agent.
 _STARTS_ON = "chat"
@@ -1258,13 +1270,13 @@ class Humanize(App[None]):
 
     @work
     async def action_flow(self, named: str = "", *, setting: bool = True) -> None:
-        """Switches which flow runs, how it is set up, and what each of its agents runs.
+        """Switches which flow runs, how it is set up, and what each of its agents is.
 
-        The three are asked as one walk rather than as three dialogs: how the flow is set up
-        is asked next because only the flow that was just chosen says what there is to set,
-        and what each agent runs after that because a flow says for itself how many it
-        drives. Esc off any of them is a step back to the one before, since what you would
-        be walking back from is the choice that led there.
+        Asked as one walk rather than as a handful of dialogs: how the flow is set up is asked
+        next because only the flow that was just chosen says what there is to set, and each of
+        its agents after that because a flow says for itself how many it drives -- three steps
+        apiece, which :meth:`_each_agent` walks. Esc off any of them is a step back to the one
+        before, since what you would be walking back from is the choice that led there.
 
         Args:
           named: A flow of your own, as a path. Left out, the ones humanize came with are
@@ -1318,7 +1330,7 @@ class Humanize(App[None]):
                     if named:
                         return  # nothing to step back into: this walk began here
                     continue  # back to the flows, which is where this walk came from
-            chosen = await self.push_screen_wait(Models(switching, places, agents))
+            chosen = await self._each_agent(switching, places, agents)
             if chosen is not None:
                 # A flow is chosen in order to be run, so whatever is running stops: the
                 # interface opens on one already, and a choice that quietly went to the back
@@ -1347,6 +1359,84 @@ class Humanize(App[None]):
                 # Back to how it is set up, which is the step this walk came through.
                 continue
             # And otherwise round again, which is the step back off the leftmost column.
+
+    async def _each_agent(
+        self,
+        flow: str,
+        places: tuple[Place, ...],
+        agents: dict[str, tuple[Model, ...]],
+    ) -> list[Runs] | None:
+        """Asks what each agent of a flow is, three steps apiece and one agent at a time.
+
+        Three because each depends on the one before it: which coding agent takes its turns
+        and which account it runs as, then which of that CLI's models at what effort, then --
+        only where the flow said this one may be pointed at a machine -- where its work lands.
+        An account belongs to a backend and a model belongs to the CLI that runs it, so
+        neither is answerable until the CLI has been chosen.
+
+        Esc off any of them is the step before: off the third into the second, off the second
+        into the first, off the first into the agent before it, and off the first step of the
+        first agent, out of the walk entirely -- which changes nothing at all. Stepping back
+        into a step finds it as it was left, since a question that had forgotten its own
+        answer would be a different question.
+
+        Args:
+          flow: The flow whose agents these are.
+          places: One place per agent it drives, in the order it takes them.
+          agents: The CLIs installed here, and what each of them says it runs.
+
+        Returns:
+          What each of them runs, in the order the flow takes them -- and nothing at all for
+          a flow that drives none, which is a flow that talks only to the person at this
+          prompt. None where the walk was left.
+        """
+        whose: dict[int, Whose] = {}
+        runs: dict[int, Runs] = {}
+        at, step = 0, _WHO
+        while at < len(places):
+            named = called(places, at)
+            if step == _WHO:
+                signed = await self.push_screen_wait(
+                    RunsAs(flow, named, places[at], agents, whose.get(at))
+                )
+                if signed is None:
+                    at -= 1
+                    if at < 0:
+                        return None  # the step before the first of these is out of the walk
+                    step = _WHERE if pointed(places[at]) else _WHAT
+                    continue
+                whose[at] = signed
+                step = _WHAT
+            elif step == _WHAT:
+                held = whose[at]
+                chosen = await self.push_screen_wait(
+                    Models(
+                        flow,
+                        named,
+                        held,
+                        agents.get(held.cli, ()),
+                        places[at],
+                        runs.get(at),
+                    )
+                )
+                if chosen is None:
+                    step = _WHO
+                    continue
+                runs[at] = chosen
+                if pointed(places[at]):
+                    step = _WHERE
+                else:
+                    # A place the flow said nothing about works here and is not asked, so
+                    # answering the model is the whole of that agent.
+                    at, step = at + 1, _WHO
+            else:
+                where = await self.push_screen_wait(Anchors(named, runs[at].anchor))
+                if where is None:
+                    step = _WHAT
+                    continue
+                runs[at] = runs[at]._replace(anchor=where)
+                at, step = at + 1, _WHO
+        return [runs[one] for one in range(len(places))]
 
     def action_agents(self) -> None:
         """Sets what each of the flow's agents runs, which is what `/agents` is for.

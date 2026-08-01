@@ -9,6 +9,11 @@ drives `mimo` should find a file called that.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import os
+
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -43,6 +48,6 @@ class MimoCodeAgentConfig(AgentConfig):
 class MimoCodeAgent(OpencodeAgent):
     """mimocode, driven through its own command line, one run per turn."""
 
-    def new(self) -> MimoCodeSession:
-        """Opens a new mimocode session."""
-        return MimoCodeSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> MimoCodeSession:
+        """Opens a new mimocode session, in the directory it is given or in this one."""
+        return MimoCodeSession(self, cwd)

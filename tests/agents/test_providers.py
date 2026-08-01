@@ -40,8 +40,8 @@ class _ClaudeShellAgent(ShellAgent):
     def backend(self) -> str:
         return "claude"
 
-    def new(self) -> _ClaudeShellSession:
-        return _ClaudeShellSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> _ClaudeShellSession:
+        return _ClaudeShellSession(self, cwd)
 
 
 @pytest.fixture

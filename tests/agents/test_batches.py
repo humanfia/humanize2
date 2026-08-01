@@ -31,6 +31,7 @@ from humanize.agents import (
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Callable, Iterator
 
 CONFIG = AgentConfig(model="m", effort="high")
@@ -118,8 +119,8 @@ class _InProcessAgent(AgentBase):
             self._counted += 1
             return self._counted
 
-    def new(self) -> _InProcessSession:
-        return _InProcessSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> _InProcessSession:
+        return _InProcessSession(self, cwd)
 
 
 class _Widest:
@@ -396,8 +397,8 @@ async def test_a_goal_awaited_is_the_backends_own_goal() -> None:
             return f"pursued: {objective}"
 
     class _GoalAgent(_InProcessAgent):
-        def new(self) -> _Goal:
-            return _Goal(self)
+        def new(self, cwd: str | os.PathLike[str] | None = None) -> _Goal:
+            return _Goal(self, cwd)
 
     agent = _GoalAgent()
 

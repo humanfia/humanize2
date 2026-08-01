@@ -1,6 +1,7 @@
 # Machines
 
-Where an agent's turns land. One setting on the agent's config, with three answers.
+Where an agent's turns land. One setting on the agent's config, with three answers — and, for an
+agent a [flow](flows.md) drives, the flow says whether it may be given any answer but the first.
 
 The agent process always stays on **this** machine, whichever answer you give — keeping its
 credentials, its state directory and its link to its model provider. What moves is the project
@@ -9,6 +10,7 @@ it reads and the commands it runs.
 ## Table of Contents
 
 - [The three answers](#the-three-answers)
+- [Which agents may be moved at all](#which-agents-may-be-moved-at-all)
 - [This machine](#this-machine)
 - [A machine that is already running](#a-machine-that-is-already-running)
 - [A container of the agent's own](#a-container-of-the-agents-own)
@@ -33,6 +35,83 @@ its_own = ClaudeCodeAgentConfig(model=…, effort=…, machine=DockerConfig(imag
 It is **one** setting because it is one question. A machine that is already running and a
 machine started for the agent are both answers to "where does this work land", and an agent has
 one answer to that.
+
+## Which agents may be moved at all
+
+Whether that question may be asked of a given agent is the **[flow's](flows.md)** to say, and not
+a setting anybody may reach for. A flow is written for one shape of work, and one whose agents
+read this project cannot have one of them reading somebody else's. So a flow declares it beside
+each agent it drives, exactly as it declares [the moments that agent must
+run](flows.md#asking-for-an-agent-that-can-do-something):
+
+```python
+from typing import Annotated, NamedTuple
+
+from humanize.agents import AgentBase, Isolated, Remote
+
+
+class Agents(NamedTuple):
+    builder: Annotated[AgentBase, Remote]                  # may be pointed at a machine
+    tester: Annotated[AgentBase, Isolated("python:3.12")]  # a container of the flow's own
+    reviewer: AgentBase                                    # here, and nowhere else
+```
+
+### A place that says nothing
+
+Runs here, and **cannot be pointed anywhere**. This is a change: it used to be that anything
+could be given a machine at the prompt. An agent that was configured with one and handed to such
+a place is refused before the first turn, naming the flow that refused it:
+
+```text
+/.../flow.py: reviewer runs on this machine -- this flow does not say it works anywhere else, so it cannot be pointed at one
+```
+
+Most places are this one, and a flow that says nothing about where its agents work is a flow
+whose agents work where it does.
+
+### `Remote`
+
+The only kind of place that may be pointed at a machine. *Which* machine is not the flow's
+business — it is settled by whoever chose the agent, as a `machine=` on its config or on the
+interface's `/agents` sheet — and it may be either of the two answers below. A `Remote` place
+that nobody pointed anywhere runs here, like any other.
+
+`Remote` is the class itself, written beside the type. It takes no arguments and carries nothing:
+all it says is that this is a place where the question may be asked.
+
+### `Isolated("python:3.12")`
+
+A container of the flow's own, and the one machine **nobody configures** — not the person at the
+prompt, not the command line. The flow names the image, and the rest follows from it:
+
+- the project directory is mounted into the container **at the path it already has here**, so a
+  path is the same path on both sides and the work outlives the container;
+- the agent goes on running **here**, with its own credentials and its own trajectory — what is
+  isolated is the tools and the libraries a command finds, not the work;
+- the work reaches the container through [coganchor](remote-execution.md), as a `docker://`
+  target, which is the road every other machine's work takes too;
+- it comes up on the agent's first turn and goes when the agent does, as
+  [any of them does](#when-the-machine-comes-up-and-when-it-goes).
+
+Which is [a container of the agent's own](#a-container-of-the-agents-own), settled where the
+flow's declaration is read rather than where the agents are chosen. `humanize.agents.isolated`
+is what it comes to, if the same thing is ever wanted by hand:
+
+```python
+from humanize.agents import isolated
+
+isolated("python:3.12")              # DockerConfig(image="python:3.12", workspace=None)
+isolated("python:3.12", "/srv/one")  # the same, holding that directory instead
+```
+
+An agent configured with a machine and handed to such a place is refused, since there was nothing
+to answer — and so is one that has already opened a session, which is a conversation that cannot
+be moved after the fact:
+
+```text
+/.../flow.py: tester works in a container of this flow's own, so there is nothing to point it at
+/.../flow.py: tester ClaudeCodeAgent#1a2b3c4d has already opened a session
+```
 
 ## This machine
 
@@ -92,6 +171,11 @@ The container:
 
 An image with no `python3` in it is refused as the container starts, rather than a turn later.
 
+A flow that wants this for one of its own agents writes
+[`Isolated("python:3.12")`](#isolatedpython312) beside the place instead of building a config:
+the image is then the flow's, the workspace is the directory the flow is running in, and nobody
+is asked anything.
+
 **Requirements:** everything the answer above needs, plus the `docker` command and a daemon to
 reach.
 
@@ -126,6 +210,7 @@ The same for every kind:
 | The work to happen on a bigger box, a GPU host, or a machine with the right toolchain | **already running**, `ssh://` |
 | To keep reconnecting cheap across a long loop of short turns | **already running**, `tcp://` with a listening target |
 | The agent confined to a toolchain that is not yours, without giving up your workspace | **a container of its own** |
+| A flow's own agent confined that way, with nobody asked which image | `Isolated("…")` [beside the place](#isolatedpython312) |
 | To confine what the agent may *do* | none of these — see below |
 
 **Isolation here is about environment, not permission.** A container gives the agent a
@@ -188,4 +273,15 @@ And on the agent side:
 
 ```python
 agent.anchor   # AnchorConfig | None -- where its turns land, bringing the machine up if it must
+```
+
+And what a flow writes beside a place, with the two shorthands that build the settings above:
+
+```python
+from humanize.agents import (
+    Remote,     # this place may be pointed at a machine
+    Isolated,   # this place is a container of the flow's own: Isolated("python:3.12")
+    anchored,   # anchored("ssh://build-box") -> AnchoredConfig, from a target as it is written
+    isolated,   # isolated("python:3.12") -> DockerConfig, which is what Isolated comes to
+)
 ```

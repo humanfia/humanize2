@@ -6,16 +6,18 @@ with `❯` against the one under the cursor and a `✔` against the one already 
 under them the one setting that is adjusted rather than chosen -- the effort -- on a line the
 left and right arrows move along. The keys are said at the bottom and nowhere else.
 
-What one agent runs is a CLI, a model and an effort. The first two are still one choice --
-picking a row picks the pair, because a model belongs to the CLI that runs it -- but they are
-read one CLI at a time: a tab apiece, only for the CLIs that are actually installed, and the
-models of that one under it. Every model of every CLI in one list is a list that grows each
-time any of them ships a model, and a list you scroll to the end of to find one thing is one
-you read rather than use. The effort is the line with the arrows on it, exactly as Claude
-Code's is.
+One agent is three steps, in this order and one agent at a time: which coding agent takes its
+turns and which account it runs as (:class:`RunsAs`), which model it runs and at what effort
+(:class:`Models`), and -- only where the flow said that one may be pointed at a machine --
+where its work lands (:class:`Anchors`). The order is the order of what depends on what: an
+account belongs to a backend and a model belongs to the CLI that runs it, so neither can be
+asked before the CLI has been. The CLIs are read one at a time, a tab apiece and only the ones
+installed here, since every model of every CLI in one list is a list that grows each time any
+of them ships a model. The effort is the line with the arrows on it, exactly as Claude Code's
+is, and beside it the things that really are side questions about the same agent.
 
-`/status` is the third of them, and is read rather than answered -- Claude Code's own, which
-is a rule across, fields down the left and their values lined up beside them.
+`/status` is the last of them, and is read rather than answered -- Claude Code's own, which is
+a rule across, fields down the left and their values lined up beside them.
 """
 
 from __future__ import annotations
@@ -41,7 +43,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-from humanize.agents import DRIVEN, PERMISSIONS, SWARM, Moment, anchored
+from humanize.agents import DRIVEN, PERMISSIONS, SWARM, anchored
 from humanize.agents.skills import Skill, skills
 from humanize.backends import named
 
@@ -78,6 +80,9 @@ __all__ = [
     "Skills",
     "Status",
     "Ways",
+    "Whose",
+    "called",
+    "pointed",
     "reads",
     "setting",
 ]
@@ -102,6 +107,73 @@ class Runs(NamedTuple):
     skills: tuple[str, ...] | None = None
     permission: str = ""
     provider: str = ""
+
+
+class Whose(NamedTuple):
+    """Which coding agent takes one agent's turns, and the account they run as.
+
+    The two halves of the first step, and one answer rather than two because the second is
+    only answerable once the first has been: an account is one backend's, so the accounts
+    offered are the CLI's own.
+
+    Attributes:
+      cli: The backend, by the name humanize drives it under.
+      provider: The account, by the name a provider of that CLI was made under, or "" to run
+        as this machine is already signed in.
+    """
+
+    cli: str
+    provider: str = ""
+
+
+def called(places: tuple[Place, ...], at: int) -> str:
+    """What to call the agent being configured, which every step of configuring it says.
+
+    In one place because it is said in three, and an agent that read as two different things
+    between one step and the next would be two.
+
+    Args:
+      places: One place per agent the flow drives, in the order it takes them.
+      at: Which of them is being asked about, counting from zero.
+
+    Returns:
+      The name the flow calls it, or where it comes among them for a flow that named none.
+    """
+    return places[at].name or f"agent {at + 1} of {len(places)}"
+
+
+def pointed(place: Place) -> bool:
+    """Whether where one agent works is a question anybody is asked about it.
+
+    Only for a place the flow declared `Remote`: a flow that says so is a flow that expects
+    to be told where that agent works, and one that says nothing has said its agent works
+    here. A container the flow named is not asked about either -- the flow settled it, and
+    nobody else has any say in it.
+
+    Args:
+      place: What the flow declared.
+
+    Returns:
+      True if there is a machine to be chosen for it, which is a step of its own.
+    """
+    from humanize.agents import Remote
+
+    return place.where is Remote or isinstance(place.where, Remote)
+
+
+def _settled(place: Place) -> str:
+    """The container a flow put one of its agents in, where it named one.
+
+    Args:
+      place: What the flow declared.
+
+    Returns:
+      The image, or "" for an agent that works here and one that is asked where it works --
+      neither of which is something the flow settled.
+    """
+    from humanize.agents import Isolated
+
+    return place.where.image if isinstance(place.where, Isolated) else ""
 
 
 #: What Claude Code rules the top of a sheet with, and how far in everything under it sits.
@@ -439,160 +511,138 @@ class Flows(Sheet[list[str]]):
         self.dismiss([str(event.option.id)])
 
 
-class Models(Sheet[list[Runs]]):
-    """What each of the flow's agents runs, asked once apiece as `/agents` does."""
+class Models(Sheet[Runs]):
+    """Which model one agent runs and how hard it thinks, which is the second of its steps.
+
+    Which CLI it is was settled the step before, because an account belongs to a backend and
+    could not be asked about until it was, so this is that CLI's models and nothing else: a
+    row is the model, and picking one picks the pair -- a model belongs to the CLI that runs
+    it -- with the CLI named above them as a heading, there being nowhere left to switch to.
+
+    The effort is the line with the arrows on it, exactly as Claude Code's is, and on it the
+    three that really are side questions about the same agent: how wide the turn runs, what
+    it may do without being asked, and which of its CLI's skills it is loaded with. What a
+    step of its own answered is read there rather than adjusted.
+    """
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
         ("left", "easier", "less effort"),
         ("right", "harder", "more effort"),
-        # The tabs: one CLI at a time, forwards and back. Priority, or the list under the
-        # cursor would take tab as moving the focus and the interface below would take
-        # shift+tab as switching the flow -- which is not a thing to do from inside a sheet
-        # that is choosing what the flow runs on.
-        Binding("tab", "next_cli", "next CLI", priority=True),
-        Binding("shift+tab", "prev_cli", "previous CLI", priority=True),
         # Not an arrow, because swarm mode is not a step along the efforts: it is a second
         # thing to say about a turn -- how wide it runs, rather than how hard -- and a turn
-        # that is both is written down as both. A chord, because tab is the tabs and the
-        # letters are searching.
+        # that is both is written down as both. A chord, because the letters are searching.
         Binding("ctrl+w", "swarm", "swarm mode", priority=True),
         # Nor is what the agent may do while it works: it is one of four words rather than a
         # step along the efforts, so it is stepped through by a chord of its own. Adjusted
         # here rather than chosen from a sheet, because four words fit on the line the effort
         # is on and a list of four is a list nobody would want to walk to.
         Binding("ctrl+p", "permit", "permission", priority=True),
-        # Nor is where the work lands a way of running the model, so it is neither an arrow
-        # nor a row: it is a second question about this agent, and it opens a sheet of its
-        # own. A chord rather than a letter, because the letters are searching.
-        Binding("ctrl+a", "anchor", "anchor", priority=True),
-        # And what it is loaded with is a third, for the same reason and in the same way.
+        # And what it is loaded with is a third, for the same reason and in the same way: a
+        # side question about this agent, which opens a sheet of its own and comes back here.
         Binding("ctrl+s", "skills", "skills", priority=True),
-        # And which account it signs in as is a fourth. Not a row either: a provider belongs
-        # to the CLI rather than to the model, so two models of one CLI are the same account.
-        Binding("ctrl+r", "runs_as", "runs as", priority=True),
     ]
 
     def __init__(
-        self, flow: str, wanted: tuple[Place, ...], agents: dict[str, tuple[Model, ...]]
+        self,
+        flow: str,
+        named: str,
+        whose: Whose,
+        models: tuple[Model, ...],
+        place: Place,
+        now: Runs | None = None,
     ) -> None:
-        """Initializes the configuring.
+        """Initializes the choosing.
 
         Args:
-          flow: The flow whose agents these are.
-          wanted: One place per agent the flow drives, in the order it takes them: what the
-            flow calls each -- "" apiece for a flow that said how many it drives and nothing
-            more -- and the moments it needs that one to run.
-          agents: The CLIs installed here, and what each says it runs.
+          flow: The flow whose agent this is.
+          named: What the flow calls it, which every step of configuring it says.
+          whose: The CLI that takes its turns and the account they run as, as the step before
+            answered.
+          models: What that CLI says it runs.
+          place: What the flow declared about this one, which is where a container it settled
+            is read from.
+          now: What this step answered last time it was walked through, or None for one being
+            asked for the first time. Esc is the step before, and a step before that had
+            forgotten itself would be a different question.
         """
         super().__init__()
         self._flow = flow
-        self._wanted = wanted
-        #: What each CLI installed here runs, which is a tab apiece and its models under it.
-        self._agents = dict(agents)
-        self._chosen: list[Runs] = []
+        self._named = named
+        self._whose = whose
+        self._models = models
+        self._place = place
+        self._now = now
         self._effort = 0
         #: Whether the turn runs as a fleet rather than as one agent, for a model that takes
         #: it. Held here rather than among the efforts, and asked of each agent afresh.
         self._swarm = False
-        #: Where this one's turns land, which is this machine until it is said otherwise.
-        self._anchor = ""
         #: What it may do without being asked, counting the rungs: the loosest until it is
         #: said otherwise, which is what an agent nobody has been asked about has always run
         #: at.
         self._permission = len(PERMISSIONS) - 1
-        #: Which of a CLI's skills this one is to have, per CLI, for a CLI that has been
-        #: asked about at all: the answer belongs to the CLI it was given about, and the tab
-        #: may yet be turned to another one.
-        self._skills: dict[str, tuple[str, ...]] = {}
-        #: Which account it signs in as, per CLI and for the same reason: a provider is one
-        #: backend's, and the one chosen under this tab means nothing under the next.
-        self._providers: dict[str, str] = {}
-        #: Which tab is open, counting the CLIs this agent could be.
-        self._at = 0
+        #: Which of the CLI's skills this one is to have, or None for one that has not been
+        #: asked -- which is the CLI as it comes, and so every skill it finds.
+        self._skills: tuple[str, ...] | None = None
+        #: Which row the cursor lands on when the list first goes up, which is the model this
+        #: step was answered with before, if it was.
+        self._start = 0
         #: The models the letters typed so far have left, which is what the cursor is walking.
         self._shown: list[Model] = []
 
     def _ask(self) -> None:
-        """Asks for one more agent, from the models down."""
-        at = len(self._chosen)
-        named = self._wanted[at].name or f"agent {at + 1} of {len(self._wanted)}"
-        self.query_one("#asked", Label).update(f"Select what {named} runs")
-        needs = self._wanted[at].moments
+        """Asks what this one runs, from the models down."""
+        self.query_one("#asked", Label).update(f"Select what {self._named} runs")
         self.query_one("#about", Label).update(
-            f"Which coding agent takes this one's turns in {self._flow}, and the model it "
-            "runs at. Two agents at one model are still two agents."
-            + (
-                f" This one has to run {', '.join(sorted(needs))}, so only the CLIs that do "
-                "are here."
-                if needs
-                else ""
-            )
+            f"Which model of {self._whose.cli} takes this one's turns in {self._flow}, and "
+            "how hard it thinks. Two agents at one model are still two agents."
         )
-        self._effort = 0
-        self._swarm = False
-        self._anchor = ""
-        self._permission = len(PERMISSIONS) - 1
-        self._skills = {}
-        self._providers = {}
-        self._at = 0
-        self._typed = ""  # each agent is asked about from the first tab again
+        self._read_back()
         self._fill()
         self.query_one("#choices", OptionList).focus()
 
-    def _able(self) -> list[str]:
-        """The CLIs that could take this agent's turns, which is not always all of them.
+    def _read_back(self) -> None:
+        """Puts the sheet back where a walk that stepped on from here left it.
 
-        Which is what the tabs are: the ones installed here, less any the flow has ruled out.
-        A flow that hangs a hook on a moment only some backends run said so where it declared
-        the place; a CLI that does not run that moment is not one to offer for it, since
-        choosing it is a flow that would refuse to start.
-
-        Returns:
-          One CLI per tab, in the order the tabs go.
+        Read off what this step answered with rather than kept beside it: that answer is the
+        whole of what was said, and a second copy of it would be a second thing to keep true.
         """
-        # The last one again once every place is answered: putting the rows up moves the
-        # cursor, and that asks for them again -- after the last choice has been taken.
-        at = min(len(self._chosen), len(self._wanted) - 1)
-        needs = self._wanted[at].moments if self._wanted else frozenset[Moment]()
-        return [
-            backend
-            for backend in sorted(self._agents)
-            if not needs or (backend in DRIVEN and needs <= DRIVEN[backend][0].moments)
-        ]
-
-    def _tabs(self) -> str:
-        """The CLIs as a row of tabs, with the one being read marked and the rest waiting.
-
-        Returns:
-          The line, as markup, or "" where there is no CLI to show a tab for at all.
-        """
-        able = self._able()
-        if not able:
-            return ""
-        here = self._backend()
-        said = _DOT.join(
-            f"[b $primary]{escape(one)}[/]"
-            if one == here
-            else f"[$text-muted]{escape(one)}[/]"
-            for one in able
+        if self._now is None:
+            return
+        cli, _, rest = self._now.spec.partition("/")
+        if cli != self._whose.cli:
+            # Answered about another backend, the step before having been walked back into
+            # and turned to a different tab: its models, its efforts and its skills are its
+            # own, and none of them means anything here.
+            return
+        name, _, effort = rest.rpartition(":")
+        # `swarm` in front of the effort is how a fleet is written down, so it comes off
+        # again before the effort is looked for among the ones the model takes.
+        self._swarm = effort.startswith(SWARM)
+        wanted = effort.removeprefix(SWARM)
+        self._start = next(
+            (at for at, one in enumerate(self._models) if one.name == name), 0
         )
-        # Only where there is somewhere to switch to: one CLI is a heading rather than tabs.
-        if len(able) > 1:
-            said += "   [$text-muted]tab/shift+tab to switch[/]"
-        return said
+        efforts = self._models[self._start].efforts if self._models else ()
+        self._effort = efforts.index(wanted) if wanted in efforts else 0
+        self._skills = self._now.skills
+        # Only a rung that was written down: the loosest is written as nothing at all, which
+        # is what an agent nobody was asked about runs at anyway.
+        if self._now.permission in PERMISSIONS:
+            self._permission = PERMISSIONS.index(self._now.permission)
 
     def _fill(self) -> None:
-        """Puts the tab's models up, and under them the effort the arrows move along."""
+        """Puts the CLI's models up, and under them everything else this agent is."""
         listing = self.query_one("#choices", OptionList)
-        backend = self._backend()
+        backend = self._whose.cli
         self._shown = [
-            model
-            for model in self._agents.get(backend, ())
-            if self.fits(model.name, backend)
+            model for model in self._models if self.fits(model.name, backend)
         ]
         self._counting = len(str(len(self._shown)))
-        at = min(listing.highlighted or 0, max(len(self._shown) - 1, 0))
+        # Where the cursor is, or where it is to land the first time the list goes up: `or 0`
+        # would send it back there every time it was walked onto the first row.
+        here = listing.highlighted if listing.highlighted is not None else self._start
+        at = min(here, max(len(self._shown) - 1, 0))
         listing.set_options(
             Option(
                 self._row(seen, model.name, backend, here=seen == at, inforce=False),
@@ -602,118 +652,89 @@ class Models(Sheet[list[Runs]]):
         )
         listing.highlighted = at if self._shown else None
         self._drawn = at
-        self.tabbed(self._tabs())
+        # The CLI these are the models of, as a heading rather than a row of tabs: it was
+        # chosen a step ago, so there is nowhere to switch to and nothing says there is.
+        self.tabbed(f"[b $primary]{escape(backend)}[/]" if backend else "")
+        self.query_one("#tuning", Label).update(self._tuned())
+        self.query_one("#keys", Label).update(
+            f"Type to search · Enter to choose · Esc to go back{self.searching()}"
+        )
+
+    def _tuned(self) -> str:
+        """The line under the models: the effort, and the rest of what this agent is.
+
+        What is adjusted here carries the key that adjusts it. What a step of its own settled
+        -- the account it runs as, the container the flow put it in, the machine it was
+        pointed at -- is read rather than adjusted, and says so by carrying no key at all.
+
+        Returns:
+          The line, as markup, or "" where the letters typed have left no model to say it of.
+        """
         efforts = self._efforts()
         self._effort = min(self._effort, len(efforts) - 1) if efforts else 0
-        tuned = (
+        if not efforts:
+            return ""
+        said = (
             f"[$secondary]◉[/] {efforts[self._effort]} effort  "
             f"[$text-muted]←/→ to adjust[/]"
-            if efforts
-            else ""
         )
-        if tuned and self._swarms():
-            said = "on" if self._swarm else "off"
-            tuned += (
-                f"{_DOT}[$secondary]◉[/] swarm mode {said}  "
+        if self._swarms():
+            on = "on" if self._swarm else "off"
+            said += (
+                f"{_DOT}[$secondary]◉[/] swarm mode {on}  "
                 f"[$text-muted]ctrl+w to toggle[/]"
             )
-        if tuned:
-            tuned += (
-                f"{_DOT}[$secondary]◉[/] on {escape(self._anchor or 'this machine')}  "
-                f"[$text-muted]ctrl+a to move[/]"
-            )
-            having = self._skills.get(self._backend())
-            tuned += (
-                f"{_DOT}[$secondary]◉[/] "
-                f"{'every skill' if having is None else f'{len(having)} skills'}  "
-                f"[$text-muted]ctrl+s to choose[/]"
-            )
-            tuned += (
-                f"{_DOT}[$secondary]◉[/] {PERMISSIONS[self._permission]}  "
-                f"[$text-muted]ctrl+p to change[/]"
-            )
-            as_who = self._providers.get(self._backend())
-            tuned += (
-                f"{_DOT}[$secondary]◉[/] as "
-                f"{escape(as_who) if as_who else 'this machine is signed in'}  "
-                f"[$text-muted]ctrl+r to change[/]"
-            )
-        self.query_one("#tuning", Label).update(tuned)
-        self.query_one("#keys", Label).update(
-            f"Type to search · Enter to choose · Esc to cancel{self.searching()}"
-            + (
-                f"{_DOT}{escape(' · '.join(runs.spec for runs in self._chosen))}"
-                if self._chosen
-                else ""
-            )
+        having = self._skills
+        said += (
+            f"{_DOT}[$secondary]◉[/] "
+            f"{'every skill' if having is None else f'{len(having)} skills'}  "
+            f"[$text-muted]ctrl+s to choose[/]"
         )
+        said += (
+            f"{_DOT}[$secondary]◉[/] {PERMISSIONS[self._permission]}  "
+            f"[$text-muted]ctrl+p to change[/]"
+        )
+        as_who = self._whose.provider
+        said += (
+            f"{_DOT}[$secondary]◉[/] as "
+            f"{escape(as_who) if as_who else 'this machine is signed in'}"
+        )
+        if where := self._where():
+            said += f"{_DOT}[$secondary]◉[/] {where}"
+        return said
 
-    @work
-    async def action_anchor(self) -> None:
-        """Asks where this agent's turns land, and comes back here either way.
+    def _where(self) -> str:
+        """Where this one works, where that is settled rather than still to be asked.
 
-        A walk out of the anchors without choosing leaves this one where it was: the machine
-        is a second question about the agent, and declining to answer it is not declining to
-        choose the agent.
+        Returns:
+          The container the flow named, or the machine a walk that has been past the step
+          after this was pointed at, and "" for one that works here -- which is what an agent
+          nobody has said anything about has always done, and is nothing new to say.
         """
-        # textual types the property off the bare generic, so what it hands back is an `App`
-        # of nothing in particular.
-        showing = cast(
-            "App[None]",
-            self.app,  # pyright: ignore[reportUnknownMemberType]
-        )
-        where = await showing.push_screen_wait(Anchors(self._anchor))
-        if where is not None:
-            self._anchor = where
-            self._fill()
+        if image := _settled(self._place):
+            return f"in a container of {escape(image)}"
+        anchor = self._now.anchor if self._now is not None else ""
+        return f"on {escape(anchor)}" if anchor else ""
 
     @work
     async def action_skills(self) -> None:
         """Asks which of its CLI's skills this agent is to be without, and comes back here.
 
         A walk out without answering leaves this one loaded as it was: what the agent runs is
-        the question this sheet asks, and declining to answer a second one is not declining
+        the question this step asks, and declining to answer a side question is not declining
         that.
         """
-        backend = self._backend()
+        backend = self._whose.cli
         if not backend:
             return
         showing = cast(
             "App[None]",
             self.app,  # pyright: ignore[reportUnknownMemberType]
         )
-        chosen = await showing.push_screen_wait(
-            Skills(backend, self._skills.get(backend))
-        )
+        chosen = await showing.push_screen_wait(Skills(backend, self._skills))
         if chosen is not None:
-            self._skills[backend] = chosen
+            self._skills = chosen
             self._fill()
-
-    @work
-    async def action_runs_as(self) -> None:
-        """Asks which account this agent's turns run as, and comes back here either way.
-
-        A walk out without answering leaves it running as this machine is signed in, which
-        is what every agent ran as before there were providers to choose between.
-        """
-        backend = self._backend()
-        if not backend:
-            return
-        showing = cast(
-            "App[None]",
-            self.app,  # pyright: ignore[reportUnknownMemberType]
-        )
-        chosen = await showing.push_screen_wait(
-            RunsAs(backend, self._providers.get(backend, ""))
-        )
-        if chosen is not None:
-            self._providers[backend] = chosen
-            self._fill()
-
-    def _backend(self) -> str:
-        """The CLI whose tab is open, or "" where there is no tab to be on."""
-        able = self._able()
-        return able[self._at % len(able)] if able else ""
 
     def _efforts(self) -> tuple[str, ...]:
         """What the model under the cursor takes, hardest first, or none where none is."""
@@ -731,33 +752,6 @@ class Models(Sheet[list[Runs]]):
             return None
         listing = self.query_one("#choices", OptionList)
         return self._shown[min(listing.highlighted or 0, len(self._shown) - 1)]
-
-    def _turn_to(self, by: int) -> None:
-        """Opens the tab that many along, wrapping round at either end.
-
-        What is typed goes with the tab it was typed into: a search that narrowed one CLI's
-        models to one would narrow the next one's to none, which reads as a CLI with nothing
-        in it rather than as a search still running.
-
-        Args:
-          by: One tab forward or back.
-        """
-        able = self._able()
-        if len(able) < 2:  # noqa: PLR2004  -- one tab is nowhere to switch to
-            return
-        self._at = (self._at + by) % len(able)
-        self._typed = ""
-        self.query_one("#choices", OptionList).highlighted = 0
-        self._drawn = 0
-        self._fill()
-
-    def action_next_cli(self) -> None:
-        """Opens the next CLI's tab."""
-        self._turn_to(1)
-
-    def action_prev_cli(self) -> None:
-        """Opens the one before it."""
-        self._turn_to(-1)
 
     def action_swarm(self) -> None:
         """Turns swarm mode on or off, for a model that has one to turn on."""
@@ -786,7 +780,7 @@ class Models(Sheet[list[Runs]]):
 
     @on(OptionList.OptionSelected)
     def _took(self, event: OptionList.OptionSelected) -> None:
-        """Takes this agent whole, and asks for the next one the flow drives.
+        """Answers with this agent, less where it works, which is the step after.
 
         Args:
           event: What was chosen.
@@ -794,15 +788,16 @@ class Models(Sheet[list[Runs]]):
         # `swarm` in front of the effort is how Kimi is asked for a fleet: one turn at one
         # effort, run wide. A model that does not take it is chosen at the effort alone.
         wide = SWARM if self._swarm and self._swarms() else ""
-        self._chosen.append(
+        self.dismiss(
             Runs(
                 spec=f"{event.option.id}:{wide}{self._efforts()[self._effort]}",
-                anchor=self._anchor,
-                # Only what was said about the CLI actually chosen: a walk through the
-                # skills of one and then a turn to another tab is a choice about the other.
+                # Whatever the step after this settled last time round, so that walking back
+                # into this one and on again is the walk it was rather than a way of losing
+                # the machine. A place nobody may point anywhere never has one.
+                anchor=self._now.anchor if self._now is not None else "",
                 # Nothing said at all is the CLI as it comes, which is None rather than a
                 # list of every skill it happens to have installed today.
-                skills=self._skills.get(self._backend()),
+                skills=self._skills,
                 # Only where it is a narrowing: the loosest rung is what an agent nobody has
                 # been asked about runs at, and saying so is saying nothing.
                 permission=(
@@ -810,23 +805,17 @@ class Models(Sheet[list[Runs]]):
                     if self._permission < len(PERMISSIONS) - 1
                     else ""
                 ),
-                # And only the account chosen for the CLI actually taken, for the reason the
-                # skills are: a provider is one backend's, and the tab may have been turned
-                # since it was picked.
-                provider=self._providers.get(self._backend(), ""),
+                provider=self._whose.provider,
             )
         )
-        if len(self._chosen) < len(self._wanted):
-            self._ask()
-            return
-        self.dismiss(self._chosen)
 
 
 class Skills(Sheet[tuple[str, ...]]):
     """Which of a CLI's skills one agent is loaded with, switched on and off one at a time.
 
-    A second question about the agent, like the machine it works on: what it runs is one
-    choice, and what it is loaded with is another. Found the way the CLI itself finds them --
+    A side question about the agent, like what it may do without being asked: what it runs is
+    the step this hangs off, and what it is loaded with is another. Found the way the CLI
+    itself finds them --
     the skills you have installed and the ones this project keeps -- so the list is the list
     the agent would have had, and what is left marked is what it will have.
 
@@ -962,6 +951,12 @@ class Skills(Sheet[tuple[str, ...]]):
 class Anchors(Sheet[str]):
     """Where one agent's turns land: this machine, or one an anchor reaches.
 
+    The last of the three steps one agent is configured in, and only for a place the flow
+    declared `Remote`: a flow that says so is one that expects to be told where that agent
+    works, and one that said nothing has said its agent works here. Which is why this is a
+    step rather than a chord -- a flow that declares one and buries it in a key is a flow
+    whose question only somebody who already knew about it would answer.
+
     The agent itself runs here whatever is chosen -- its credentials, its state directory and
     its link to its model provider stay put. What moves is the project it reads and the
     commands it runs, which is why this is a question about the agent rather than about the
@@ -972,19 +967,22 @@ class Anchors(Sheet[str]):
     a string, and the row for what has been typed appears as soon as it reads as one.
     """
 
-    def __init__(self, current: str) -> None:
+    def __init__(self, named: str, current: str = "") -> None:
         """Initializes the moving.
 
         Args:
+          named: What the flow calls the agent this is about, which every step of configuring
+            it says.
           current: The target this agent is on now, or "" for this machine.
         """
         super().__init__()
+        self._named = named
         self._current = current
         self._found: list[tuple[str, str]] | None = None
 
     def _ask(self) -> None:
         """Lists the machines there are to work on, and says what choosing one does."""
-        self.query_one("#asked", Label).update("Select where this agent works")
+        self.query_one("#asked", Label).update(f"Select where {self._named} works")
         self.query_one("#about", Label).update(
             "The machine its work lands on. The agent still runs here; what moves is the "
             "project it reads and the commands it runs. Anywhere else is a target you type "
@@ -1027,7 +1025,7 @@ class Anchors(Sheet[str]):
         listing.highlighted = at if shown else None
         self._drawn = at
         self.query_one("#keys", Label).update(
-            f"Type a target · Enter to choose · Esc to cancel{self.searching()}"
+            f"Type a target · Enter to choose · Esc to go back{self.searching()}"
         )
 
     @on(OptionList.OptionSelected)
@@ -1408,10 +1406,10 @@ class Configures(Sheet["BaseModel"]):
 class Picks(Sheet[str]):
     """A question that is only a list of named things, answered by picking one of them.
 
-    Three of the sheets here are that and nothing else -- which account an agent runs as,
-    which CLI a new one is for, and how to sign into it -- and three lists drawn three ways
-    would read as three different kinds of question. So the drawing is here, and each of them
-    says only what it asks and what there is to choose between.
+    Two of the sheets here are that and nothing else -- which CLI a new account is for, and
+    how to sign into it -- and two lists drawn two ways would read as two different kinds of
+    question. So the drawing is here, and each of them says only what it asks and what there
+    is to choose between.
     """
 
     #: The question at the top of the sheet, and the line under it saying what choosing one
@@ -1511,42 +1509,224 @@ def _sets(provider: Provider) -> str:
     return f"{provider.way}{_DOT}{variables}" if variables else provider.way
 
 
-class RunsAs(Picks):
-    """Which account one agent's turns run as: one of its CLI's, or this machine's own.
+class RunsAs(Sheet[Whose]):
+    """Which coding agent takes one agent's turns, and the account they run as: its first step.
 
-    A question about the agent like the machine it works on and the skills it is loaded with,
-    and asked in the same place for the same reason: two agents of one CLI may be two
+    Two halves of one question, in this order because an account belongs to a backend: what
+    signs in to Claude Code is not what signs in to codex, so the accounts under each tab are
+    that backend's own. The CLIs are a tab apiece and only the ones installed here, less any
+    the flow ruled out by asking that place for a moment they do not run -- a CLI that would
+    make the flow refuse to start is not one to offer for it.
+
+    The account is a step rather than a chord because it decides which credentials the turns
+    run under, which is not a side question about anything: two agents of one CLI may be two
     accounts -- one on a subscription and one on somebody's gateway, each refreshing its own
-    token -- which is the whole of what a provider is for.
+    token -- and that is the whole of what a provider is for.
     """
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
+        # The tabs: one CLI at a time, forwards and back. Priority, or the list under the
+        # cursor would take tab as moving the focus and the interface below would take
+        # shift+tab as switching the flow -- which is not a thing to do from inside a sheet
+        # that is choosing what the flow runs on.
+        Binding("tab", "next_cli", "next CLI", priority=True),
+        Binding("shift+tab", "prev_cli", "previous CLI", priority=True),
         # Making one is asked for here rather than somewhere else: this is the moment somebody
         # finds out they have no account for this CLI, or that the one they want is not among
         # these, and sending them out of the question to answer it would lose the question.
         Binding("ctrl+n", "new", "new", priority=True),
     ]
 
-    asked = "Select which account this agent runs as"
-    about = (
-        "The credentials its turns are run under. Its sessions, its settings and its skills "
-        "are the CLI's own either way; only the account moves."
-    )
-    keys = "ctrl+n to make one · "
-
-    def __init__(self, backend: str, current: str) -> None:
+    def __init__(
+        self,
+        flow: str,
+        named: str,
+        place: Place,
+        agents: dict[str, tuple[Model, ...]],
+        now: Whose | None = None,
+    ) -> None:
         """Initializes the choosing.
 
         Args:
-          backend: The CLI whose accounts these are.
-          current: The one this agent runs as now, or "" for this machine's own.
+          flow: The flow whose agent this is.
+          named: What the flow calls it, which every step of configuring it says.
+          place: What the flow declared about it, which is what the moments it has to run are
+            read from.
+          agents: The CLIs installed here, and what each says it runs.
+          now: What this step answered last time it was walked through, or None for one being
+            asked for the first time -- esc is the step before, and a step before that had
+            forgotten itself would be a different question.
         """
-        super().__init__(current)
-        self._backend = backend
+        super().__init__()
+        self._flow = flow
+        self._named = named
+        self._place = place
+        #: What each CLI installed here runs, which is a tab apiece. What they run is the
+        #: next step's; this one needs only the names.
+        self._agents = dict(agents)
+        self._now = now or Whose("")
+        able = self._able()
+        #: Which tab is open, counting the CLIs this one could be, opening on the one it is
+        #: already for a walk that has been here before.
+        self._at = able.index(self._now.cli) if self._now.cli in able else 0
+        #: The accounts of the tab that is open, read once per tab: looking means reading a
+        #: directory, and this is redrawn on every keystroke.
+        self._found: list[tuple[str, str, str]] | None = None
         #: What became of the last account made from here, said under the list: a login that
         #: exited badly is worth knowing about where it was asked for.
         self._said = ""
+
+    def _able(self) -> list[str]:
+        """The CLIs that could take this agent's turns, which is not always all of them.
+
+        Which is what the tabs are: the ones installed here, less any the flow has ruled out.
+        A flow that hangs a hook on a moment only some backends run said so where it declared
+        the place; a CLI that does not run that moment is not one to offer for it, since
+        choosing it is a flow that would refuse to start.
+
+        Returns:
+          One CLI per tab, in the order the tabs go.
+        """
+        needs = self._place.moments
+        return [
+            backend
+            for backend in sorted(self._agents)
+            if not needs or (backend in DRIVEN and needs <= DRIVEN[backend][0].moments)
+        ]
+
+    def _backend(self) -> str:
+        """The CLI whose tab is open, or "" where there is no tab to be on."""
+        able = self._able()
+        return able[self._at % len(able)] if able else ""
+
+    def _tabs(self) -> str:
+        """The CLIs as a row of tabs, with the one being read marked and the rest waiting.
+
+        Returns:
+          The line, as markup, or "" where there is no CLI to show a tab for at all.
+        """
+        able = self._able()
+        if not able:
+            return ""
+        here = self._backend()
+        said = _DOT.join(
+            f"[b $primary]{escape(one)}[/]"
+            if one == here
+            else f"[$text-muted]{escape(one)}[/]"
+            for one in able
+        )
+        # Only where there is somewhere to switch to: one CLI is a heading rather than tabs.
+        if len(able) > 1:
+            said += "   [$text-muted]tab/shift+tab to switch[/]"
+        return said
+
+    def _turn_to(self, by: int) -> None:
+        """Opens the tab that many along, wrapping round at either end.
+
+        What is typed goes with the tab it was typed into, as it does on the models: a search
+        that narrowed one CLI's accounts to one would narrow the next one's to none, which
+        reads as a CLI with nothing in it rather than as a search still running.
+
+        Args:
+          by: One tab forward or back.
+        """
+        able = self._able()
+        if len(able) < 2:  # noqa: PLR2004  -- one tab is nowhere to switch to
+            return
+        self._at = (self._at + by) % len(able)
+        self._typed = ""
+        self._found = None  # another backend's accounts, which are another list
+        self._said = ""
+        self.query_one("#choices", OptionList).highlighted = 0
+        self._drawn = 0
+        self._fill()
+
+    def action_next_cli(self) -> None:
+        """Opens the next CLI's tab."""
+        self._turn_to(1)
+
+    def action_prev_cli(self) -> None:
+        """Opens the one before it."""
+        self._turn_to(-1)
+
+    def _ask(self) -> None:
+        """Says whose turns these are, and what choosing a CLI and an account settles."""
+        self.query_one("#asked", Label).update(
+            f"Select what takes {self._named}'s turns, and the account they run as"
+        )
+        needs = self._place.moments
+        self.query_one("#about", Label).update(
+            f"Which coding agent takes this one's turns in {self._flow}, a tab apiece, and "
+            "under it that CLI's own accounts -- an account is one backend's. Its sessions, "
+            "its settings and its skills are the CLI's own whichever account it runs as."
+            + (
+                f" This one has to run {', '.join(sorted(needs))}, so only the CLIs that do "
+                "are here."
+                if needs
+                else ""
+            )
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _fill(self) -> None:
+        """Puts the open tab's accounts up, this machine's own first."""
+        listing = self.query_one("#choices", OptionList)
+        if self._found is None:
+            self._found = self._accounts()
+        shown = [row for row in self._found if self.fits(row[1], row[2])]
+        self._counting = len(str(len(shown)))
+        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
+        listing.set_options(
+            Option(
+                self._row(
+                    seen,
+                    label,
+                    about,
+                    here=seen == at,
+                    inforce=Whose(self._backend(), answer) == self._now,
+                ),
+                # Every row answers with an account's name and "" is one of the answers,
+                # which an id of its own keeps tellable from a row that was never chosen.
+                id=f"={answer}",
+            )
+            for seen, (answer, label, about) in enumerate(shown)
+        )
+        listing.highlighted = at if shown else None
+        self._drawn = at
+        self.tabbed(self._tabs())
+        said = self._nothing()
+        self.query_one("#tuning", Label).update(
+            f"[$text-muted]{said}[/]" if said else ""
+        )
+        self.query_one("#keys", Label).update(
+            "ctrl+n to make one · Type to search · Enter to choose · Esc to go back"
+            f"{self.searching()}"
+        )
+
+    def _accounts(self) -> list[tuple[str, str, str]]:
+        """This machine's own first, and then every account the open tab's CLI has here."""
+        from humanize import providers
+
+        backend = self._backend()
+        if not backend:
+            return []
+        return [
+            ("", "as this machine is signed in", "nothing is redirected"),
+            *((one.name, one.name, _sets(one)) for one in providers.providers(backend)),
+        ]
+
+    def _nothing(self) -> str:
+        """Says what came of making one, or where they come from for a CLI that has none."""
+        if self._said:
+            return self._said
+        backend = self._backend()
+        if not backend:
+            return "no coding agent installed here can take this one's turns"
+        if len(self._found or []) > 1:
+            return ""
+        return f"{escape(backend)} has no accounts here yet; ctrl+n makes one"
 
     @work
     async def action_new(self) -> None:
@@ -1557,16 +1737,19 @@ class RunsAs(Picks):
         chosen straight away -- making one here is choosing it -- unless its own way in failed,
         which is said under the list and left for whoever is looking to decide about.
         """
+        backend = self._backend()
+        if not backend:
+            return  # no CLI to make an account for, so nothing for the key to be about
         # textual types the property off the bare generic, as it does everywhere else here.
         showing = cast(
             "App[None]",
             self.app,  # pyright: ignore[reportUnknownMemberType]
         )
-        outcome = await made(showing, self._backend)
+        outcome = await made(showing, backend)
         if outcome.why:
             self._said = escape(outcome.why)
         if outcome.provider is None:
-            self._rows = None  # it may have been made and then failed; look again
+            self._found = None  # it may have been made and then failed; look again
             self._fill()
             return
         if outcome.status:
@@ -1574,30 +1757,19 @@ class RunsAs(Picks):
                 f"{escape(outcome.provider.name)} is written down, but signing it in "
                 f"exited {outcome.status}"
             )
-            self._rows = None
+            self._found = None
             self._fill()
             return
-        self.dismiss(outcome.provider.name)
+        self.dismiss(Whose(backend, outcome.provider.name))
 
-    def rows(self) -> list[tuple[str, str, str]]:
-        """This machine's own first, and then every account that CLI has here."""
-        from humanize import providers
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Answers with the CLI whose tab is open and the account that was picked.
 
-        return [
-            ("", "as this machine is signed in", "nothing is redirected"),
-            *(
-                (one.name, one.name, _sets(one))
-                for one in providers.providers(self._backend)
-            ),
-        ]
-
-    def nothing(self) -> str:
-        """Says what came of making one, or where they come from for a CLI that has none."""
-        if self._said:
-            return self._said
-        if len(self._rows or []) > 1:
-            return ""
-        return f"{escape(self._backend)} has no accounts here yet; ctrl+n makes one"
+        Args:
+          event: What was chosen.
+        """
+        self.dismiss(Whose(self._backend(), str(event.option.id).removeprefix("=")))
 
 
 class Made(NamedTuple):
@@ -2018,8 +2190,8 @@ class Providers(Sheet[Doing]):
         self.query_one("#asked", Label).update("Accounts an agent may run as")
         self.query_one("#about", Label).update(
             "One named set of credentials per account, kept apart from the CLI's own and "
-            "from each other's. An agent is given one where the agents are chosen, on "
-            "ctrl+r, and runs its turns as that account."
+            "from each other's. An agent is given one where the agents are chosen, in the "
+            "first of the three steps that configure it, and runs its turns as that account."
         )
         self._fill()
         self.query_one("#choices", OptionList).focus()

@@ -15,6 +15,7 @@ from .hooks import EVERYWHERE, Moment
 from .skills import leaving
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Iterator
 
 #: The tool Claude reaches for when it wants a person rather than a file. Its input is a list
@@ -90,13 +91,16 @@ class ClaudeCodeSession(StreamSessionBase):
     #: hands it back, so a turn asked for a shape answers in it or does not answer.
     shapes: ClassVar[bool] = True
 
-    def __init__(self, agent: AgentBase) -> None:
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
         """Initializes a session that has spent nothing yet.
 
         Args:
           agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, as for `SessionBase`.
         """
-        super().__init__(agent)
+        super().__init__(agent, cwd)
         #: What each model has cost so far, by kind, as Claude counts it: a running total per
         #: process, so what a turn cost is the rise across it.
         self._counted: dict[str, Counter[str]] = {}
@@ -478,6 +482,6 @@ class ClaudeCodeAgent(AgentBase):
     #: one backend here where a hook can say no to something and have the agent hear it.
     moments: ClassVar[frozenset[Moment]] = EVERYWHERE | {Moment.PERMISSION_REQUEST}
 
-    def new(self) -> ClaudeCodeSession:
-        """Opens a new Claude Code session."""
-        return ClaudeCodeSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> ClaudeCodeSession:
+        """Opens a new Claude Code session, in the directory it is given or in this one."""
+        return ClaudeCodeSession(self, cwd)

@@ -22,6 +22,7 @@ from .config import AgentConfig
 from .event import Event, Usage
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Iterator
 
 #: What each kind of event reads as. A step beginning or ending is the turn's own plumbing,
@@ -64,13 +65,16 @@ class OpencodeSession(CommandSessionBase):
     command: ClassVar[str] = "opencode"
     permits: ClassVar[str] = "OPENCODE_PERMISSION"
 
-    def __init__(self, agent: AgentBase) -> None:
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
         """Initializes a session that has run no turn yet.
 
         Args:
           agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, as for `SessionBase`.
         """
-        super().__init__(agent)
+        super().__init__(agent, cwd)
         #: What the agent has said so far in the turn now running, and what went wrong with
         #: it if anything did.
         self._said = ""
@@ -302,6 +306,6 @@ class OpencodeAgentConfig(AgentConfig):
 class OpencodeAgent(AgentBase):
     """opencode, driven through its own command line, one run per turn."""
 
-    def new(self) -> OpencodeSession:
-        """Opens a new opencode session."""
-        return OpencodeSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> OpencodeSession:
+        """Opens a new opencode session, in the directory it is given or in this one."""
+        return OpencodeSession(self, cwd)

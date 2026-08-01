@@ -36,8 +36,10 @@ CONFIG = AgentConfig(model="m", effort="high")
 class Steerable(ShellSession):
     """A session a word can be put into, which a shell-backed one has no process for."""
 
-    def __init__(self, agent: AgentBase) -> None:
-        super().__init__(agent)
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
+        super().__init__(agent, cwd)
         self.put_in: list[str] = []
 
     def interject(self, text: str) -> None:
@@ -48,9 +50,9 @@ class Steerable(ShellSession):
 class SteerableAgent(ShellAgent):
     """An agent whose sessions take a word put in rather than refusing it."""
 
-    def new(self) -> Steerable:
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> Steerable:
         """Opens one."""
-        return Steerable(self)
+        return Steerable(self, cwd)
 
 
 #: A flow that runs until a file appears, so that a line can be typed while it is up and the

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     # client behind a container.
     from humanize.machines import MachineConfig
 
-__all__ = ["PERMISSIONS", "AgentConfig", "anchored"]
+__all__ = ["PERMISSIONS", "AgentConfig", "Isolated", "Remote", "anchored", "isolated"]
 
 #: What an agent may do without being asked, loosest last. Named the way these CLIs name them
 #: rather than in a vocabulary of humanize's own, so that a rung reads as the thing it is
@@ -31,6 +31,43 @@ __all__ = ["PERMISSIONS", "AgentConfig", "anchored"]
 #: A backend with no sandbox of its own cannot tell `workspace-write` from `auto`, and says so
 #: where it maps them rather than pretending to a rung it has not got.
 PERMISSIONS = ("read-only", "workspace-write", "auto", "bypass")
+
+
+class Remote:
+    """What a flow writes beside an agent that may be pointed at another machine.
+
+    Where an agent's turns land is not a setting anybody may reach for: a flow is written for
+    one shape of work, and one whose agents read this project cannot have one of them reading
+    somebody else's. So a flow says which of its agents may be sent elsewhere, by writing this
+    where it declares them::
+
+        class Agents(NamedTuple):
+            builder: Annotated[AgentBase, Remote]
+            reviewer: AgentBase
+
+    and only that one may be given a machine. The others run here, whatever anybody chooses.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class Isolated:
+    """What a flow writes beside an agent that is to work in a container of its own.
+
+    A machine nobody configures: the flow says the image, humanize starts the container, the
+    project directory is mounted into it at the path it already has, and the agent -- which
+    goes on running here, with its own credentials and its own trajectory -- reaches it
+    through coganchor. What is isolated is the tools and the libraries a command finds, not
+    the work::
+
+        class Agents(NamedTuple):
+            tester: Annotated[AgentBase, Isolated("python:3.12")]
+
+    Attributes:
+      image: The image to run, which needs a `python3` for coganchor's target half and
+        whatever else the flow expects the agent to reach for.
+    """
+
+    image: str = "python:3.12"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -101,3 +138,24 @@ def anchored(target: str) -> MachineConfig | None:
     from humanize.machines import AnchoredConfig
 
     return AnchoredConfig(anchor=AnchorConfig(target=target))
+
+
+def isolated(image: str, workspace: str | None = None) -> MachineConfig:
+    """A container of the agent's own, holding the project directory it is to work in.
+
+    What :class:`Isolated` comes to, built where a flow's declaration is read rather than by
+    whoever is choosing agents: an isolated agent is one nobody configures, so nothing above
+    this is asked which image or which directory.
+
+    Args:
+      image: The image to run.
+      workspace: The directory to mount, defaulting to the one the flow is running in. It is
+        mounted rather than copied, at the path it already has, so the work outlives the
+        container.
+
+    Returns:
+      The machine to configure such an agent with.
+    """
+    from humanize.machines import DockerConfig
+
+    return DockerConfig(image=image, workspace=workspace)

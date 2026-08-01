@@ -33,6 +33,7 @@ from .config import AgentConfig
 from .event import Event, Question, Usage, say
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Iterator, Mapping
 
     from pydantic import BaseModel
@@ -213,13 +214,16 @@ class KimiCodeCLISession(SessionBase):
 
     _agent: KimiCodeCLIAgent  # every turn is submitted to the server this agent holds
 
-    def __init__(self, agent: AgentBase) -> None:
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
         """Initializes a session running nothing yet.
 
         Args:
           agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, as for `SessionBase`.
         """
-        super().__init__(agent)
+        super().__init__(agent, cwd)
         #: The turn under way, which is what a word put in is steered into.
         self._running = _Running()
         #: What this session has cost so far, by kind, as the daemon counts it: a running
@@ -635,6 +639,6 @@ class KimiCodeCLIAgent(AgentBase):
             self._server.stop()
             self._server = None
 
-    def new(self) -> KimiCodeCLISession:
-        """Opens a new Kimi Code session."""
-        return KimiCodeCLISession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> KimiCodeCLISession:
+        """Opens a new Kimi session, in the directory it is given or in this one."""
+        return KimiCodeCLISession(self, cwd)

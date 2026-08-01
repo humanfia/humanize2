@@ -12,7 +12,14 @@ from .base import (
 )
 from .claude import ClaudeCodeAgent, ClaudeCodeAgentConfig, ClaudeCodeSession
 from .codex import CodexAgent, CodexAgentConfig, CodexSession
-from .config import PERMISSIONS, AgentConfig, anchored
+from .config import (
+    PERMISSIONS,
+    AgentConfig,
+    Isolated,
+    Remote,
+    anchored,
+    isolated,
+)
 from .event import Event, Question, Stopped, Usage
 from .hooks import EVERYWHERE, Hook, Hooks, Hung, Moment, Occasion, Unhooked, Verdict
 from .human import HumanAgent, HumanSession
@@ -55,6 +62,7 @@ __all__ = [
     "HumanAgent",
     "HumanSession",
     "Hung",
+    "Isolated",
     "KimiCodeCLIAgent",
     "KimiCodeCLIAgentConfig",
     "KimiCodeCLISession",
@@ -71,6 +79,7 @@ __all__ = [
     "PiAgentConfig",
     "PiSession",
     "Question",
+    "Remote",
     "SessionBase",
     "Stopped",
     "StreamSessionBase",
@@ -78,4 +87,5 @@ __all__ = [
     "Usage",
     "Verdict",
     "anchored",
+    "isolated",
 ]

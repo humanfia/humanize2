@@ -26,6 +26,7 @@ from tests.coganchor.conftest import DEFAULT_TIMEOUT, REPO_ROOT, Anchorage
 FULL = AnchorConfig(
     target="ssh://build-box",
     workspace="/srv/a project",
+    chdir="/srv/a project/packages/one",
     remote_path="/mnt/data/a project",
     shadow="/tmp/mirror",
     local_paths=("/home/me/.secrets", "/home/me/.cache"),

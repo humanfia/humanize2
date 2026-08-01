@@ -196,10 +196,13 @@ Everything after the agent's name is the agent's own.
 | --- | --- | --- |
 | `--target URL` | `$HUMANIZE_TARGET`, else `local` | `ssh://HOST`, `docker://CONTAINER`, `tcp://HOST:PORT`, or `local[:DIR]`. |
 | `--workspace PATH` | this directory | The project directory as it exists on the target. |
+| `--chdir PATH` | `--workspace` | Where inside that workspace the agent starts, as the target names it. What a [session opened at a directory](agents.md#where-a-session-works) comes to: the agent is put in this machine's mirror of it. |
 | `--remote-path PATH` | `--workspace` | Where that workspace really lives on the target, if not at the same path. |
 | `--shadow PATH` | `--workspace` | The local mirror directory. Defaulting to the workspace path is what makes the paths the agent sees the target's own. |
 | `--local-path PATH` | — | Keep this path on this machine even when it is inside the workspace. Repeatable. |
 | `--local-exec PATH` | — | Run programs under this path here rather than on the target. Repeatable. |
+| `--redirect FROM=TO` | — | Answer this path with that one — the file it names, or everything under the directory it names — and keep what it is answered with local. What a turn under a [provider](providers.md) is given. Repeatable. |
+| `--private NAME` | — | Keep this variable out of what the agent's commands are run with on the target: a credential it was given to reach its model provider is its own. Repeatable. |
 | `--net {local,remote}` | `local` | Where the agent's *own* TCP connections go. Local keeps its model provider reachable. Commands it spawns always use the target's network. |
 | `--net-allow HOST[:PORT]` | — | With `--net remote`, keep connections to this host local. Repeatable. |
 | `--token TOKEN` | `$HUMANIZE_TOKEN` | Shared secret a `tcp://` target expects. |

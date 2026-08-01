@@ -51,8 +51,8 @@ class _EchoSession(CommandSessionBase):
 
 
 class _EchoAgent(AgentBase):
-    def new(self) -> _EchoSession:
-        return _EchoSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> _EchoSession:
+        return _EchoSession(self, cwd)
 
 
 class _StubbornSession(CommandSessionBase):
@@ -66,8 +66,8 @@ class _StubbornSession(CommandSessionBase):
 
 
 class _StubbornAgent(AgentBase):
-    def new(self) -> _StubbornSession:
-        return _StubbornSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> _StubbornSession:
+        return _StubbornSession(self, cwd)
 
 
 class _QuitterSession(CommandSessionBase):
@@ -81,8 +81,8 @@ class _QuitterSession(CommandSessionBase):
 
 
 class _QuitterAgent(AgentBase):
-    def new(self) -> _QuitterSession:
-        return _QuitterSession(self)
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> _QuitterSession:
+        return _QuitterSession(self, cwd)
 
 
 @dataclass(frozen=True)
