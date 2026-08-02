@@ -1,0 +1,86 @@
+# The documentation site. Built on every change to it, and deployed to GitHub Pages from
+# main -- so a pull request finds out that a link is dead without anything being published.
+#
+# The GIFs under docs/public/demo are committed rather than rendered here: rendering one
+# wants a container with a coding agent CLI stand-in in it. See docs/tapes/README.md.
+
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/build-docs.yml
+      - docs/**
+  pull_request:
+    paths:
+      - .github/workflows/build-docs.yml
+      - docs/**
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # `lastUpdated` reads each page's last commit, and a shallow clone has none.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: docs/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: docs
+        run: pnpm install --frozen-lockfile
+
+      # Fails on a dead internal link, which is the point: a page moved without its inbound
+      # links moving is a red build rather than a 404 somebody finds later.
+      - name: Build
+        working-directory: docs
+        run: pnpm build
+
+      # VitePress checks that a link's page exists and stops there, so a `#fragment` written
+      # the way GitHub would slugify it passes the build and silently drops the reader at the
+      # top of the page. This is what catches that.
+      - name: Every #fragment resolves
+        working-directory: docs
+        run: pnpm check:anchors
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/.vitepress/dist
+
+  deploy:
+    name: deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/deploy-pages@v5
+        id: deployment

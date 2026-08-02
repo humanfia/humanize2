@@ -26,3 +26,14 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+
+  # The documentation site, which is the one part of this repository that is not Python.
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: monthly
+    groups:
+      docs:
+        patterns: ["*"]
+    commit-message:
+      prefix: docs

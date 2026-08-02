@@ -1,0 +1,5 @@
+#!/bin/sh
+# A stand-in, so that humanize offers this backend in a demo. It runs no model and signs in
+# to nothing. No tape is allowed to take a turn, so nothing should ever reach this.
+echo "codex: a stand-in for the documentation's demos; it runs nothing" >&2
+exit 1
