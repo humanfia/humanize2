@@ -914,6 +914,22 @@ class CodexAgent(AgentBase):
         self._server: _AppServer | None = None
         self._serving = threading.Lock()
 
+    def disable_goals(self) -> None:
+        """Disables both ``pursue`` and Codex's goal tools for this agent.
+
+        The feature is selected when the app server starts, so a running server cannot be
+        changed underneath sessions it already holds.
+
+        Raises:
+          RuntimeError: If this agent's app server has already started with goals enabled.
+        """
+        with self._serving:
+            if self._server is not None and self.goals_enabled:
+                raise RuntimeError(
+                    f"{self.id}: goals must be disabled before its first turn"
+                )
+            super().disable_goals()
+
     @property
     def server(self) -> _AppServer:
         """The app server this agent's turns run on, started the first time one is needed.
@@ -928,7 +944,12 @@ class CodexAgent(AgentBase):
             self._serving
         ):  # two sessions of one agent share the server rather than start two
             if self._server is None:
-                argv = ["codex", "app-server", "--stdio"]
+                argv = ["codex", "app-server"]
+                if not self.goals_enabled:
+                    # Per server rather than in config, so this flow changes no other Codex
+                    # session belonging to the user.
+                    argv += ["--disable", "goals"]
+                argv += ["--stdio"]
                 anchor = self.anchor
                 # Where the work lands is where the project's own skills are, which is this
                 # directory unless the mirror was put somewhere else.

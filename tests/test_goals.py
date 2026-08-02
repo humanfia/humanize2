@@ -25,7 +25,7 @@ from hmz.agents import (
     PiAgent,
     PiAgentConfig,
 )
-from hmz.runner import NotAFlow, Runner, wanted
+from hmz.runner import NotAFlow, Runner, flow_and_agents, wanted
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -63,6 +63,33 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     agent(task)
 '''
 
+#: The same ordinary loop, but one whose agent place initially suggests goals off. Whoever
+#: chooses the agent may still explicitly switch it back on.
+GOALS_OFF = '''"""A loop that owns its continuations unless its agent is set otherwise."""
+
+from typing import Annotated
+
+from hmz.agents import AgentBase, AgentDefaults
+from hmz.flows import flow
+
+
+@flow
+def run(
+    agents: tuple[Annotated[AgentBase, AgentDefaults(goals=False)]], task: str
+) -> None:
+    (agent,) = agents
+    agent(task)
+'''
+
+#: A required goal is more specific than an off suggestion and therefore starts on.
+REQUIRED_WHILE_OFF = PURSUING.replace(
+    "from hmz.agents import AgentBase, Goal",
+    "from hmz.agents import AgentBase, AgentDefaults, Goal",
+).replace(
+    "Annotated[AgentBase, Goal]",
+    "Annotated[AgentBase, Goal, AgentDefaults(goals=False)]",
+)
+
 
 def _written(tmp_path: Path, source: str, name: str = "pursuing") -> str:
     """Writes a flow out and answers with its path."""
@@ -83,6 +110,21 @@ def test_a_place_that_said_nothing_is_driven_by_turns(tmp_path: Path) -> None:
     (place,) = wanted(_written(tmp_path, PLAIN, "plain"))
 
     assert place.goal is False
+    assert place.goals_default is True
+
+
+def test_an_agent_place_suggests_the_initial_goal_choice(tmp_path: Path) -> None:
+    (place,) = wanted(_written(tmp_path, GOALS_OFF, "goals_off"))
+
+    assert place.goal is False
+    assert place.goals_default is False
+
+
+def test_a_required_goal_always_starts_on(tmp_path: Path) -> None:
+    (place,) = wanted(_written(tmp_path, REQUIRED_WHILE_OFF, "required"))
+
+    assert place.goal is True
+    assert place.goals_default is True
 
 
 def test_an_agent_whose_backend_has_no_goal_feature_is_refused(tmp_path: Path) -> None:
@@ -121,3 +163,47 @@ def test_a_flow_that_asks_nothing_takes_any_of_them(tmp_path: Path) -> None:
     )
 
     assert len(runner.agents) == 1
+
+
+def test_runner_does_not_apply_the_agent_place_suggestion(tmp_path: Path) -> None:
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="low"))
+
+    Runner(_written(tmp_path, GOALS_OFF, "goals_off"), [agent])
+
+    assert agent.config.goals is True
+    assert agent.goals_enabled
+
+
+def test_exec_resolves_the_agent_place_suggestion_into_its_config(
+    tmp_path: Path,
+) -> None:
+    where = _written(tmp_path, GOALS_OFF, "goals_off")
+
+    _, agents, _, _ = flow_and_agents(["-f", where, "-a", "claude/m:low", "the task"])
+
+    assert agents[0].config.goals is False
+
+
+def test_an_explicit_off_choice_is_the_agent_runtime_policy(tmp_path: Path) -> None:
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="low", goals=False))
+
+    Runner(_written(tmp_path, PLAIN, "plain"), [agent])
+
+    assert agent.config.goals is False
+    assert not agent.goals_enabled
+
+
+def test_a_required_goal_cannot_be_switched_off(tmp_path: Path) -> None:
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="low", goals=False))
+
+    with pytest.raises(NotAFlow, match="run under a goal, but goals were switched off"):
+        Runner(_written(tmp_path, PURSUING), [agent])
+
+
+def test_a_required_goal_refuses_an_agent_disabled_in_python(tmp_path: Path) -> None:
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="low"))
+    agent.disable_goals()
+
+    assert agent.config.goals is False
+    with pytest.raises(NotAFlow, match="run under a goal, but goals were switched off"):
+        Runner(_written(tmp_path, PURSUING), [agent])

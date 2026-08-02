@@ -47,11 +47,15 @@ class Settings:
         """The flow this workspace was last run with, or "" if it never has been."""
         return str(self._mine().get("flow") or "")
 
-    def agents(self, flow: str) -> list[Runs]:
+    def agents(
+        self, flow: str, goal_defaults: Sequence[bool] | None = None
+    ) -> list[Runs]:
         """What each agent of one flow was last running here, and where its turns landed.
 
         Args:
           flow: The flow they were driving.
+          goal_defaults: What each agent place currently suggests. Used only for an entry
+            written before goal selection was stored; with none, goals default on.
 
         Returns:
           One `cli/model:effort` apiece with the machine it was anchored to, the skills it is
@@ -63,7 +67,7 @@ class Settings:
         kept: dict[str, Any] = flows.get(flow) or {}
         agents: dict[str, Any] = kept.get("agents") or {}
         said: list[Runs] = []
-        for raw in agents.values():
+        for at, raw in enumerate(agents.values()):
             if not isinstance(raw, dict):
                 return []  # written by hand and not the way this writes it
             agent = cast("dict[str, Any]", raw)
@@ -87,6 +91,14 @@ class Settings:
                 if isinstance(held, list)
                 else None
             )
+            remembered_goals = agent.get("goals")
+            goals = (
+                remembered_goals
+                if isinstance(remembered_goals, bool)
+                else goal_defaults[at]
+                if goal_defaults is not None and at < len(goal_defaults)
+                else True
+            )
             said.append(
                 Runs(
                     f"{cli}/{model}:{effort}",
@@ -94,6 +106,7 @@ class Settings:
                     having,
                     str(agent.get("permission") or ""),
                     str(agent.get("provider") or ""),
+                    goals,
                 )
             )
         return said
@@ -161,6 +174,9 @@ class Settings:
                 # And once more: an agent that names no account runs as this machine is
                 # signed in, which is what every entry written before this one says.
                 agents[named]["provider"] = runs.provider
+            # Both values are material: on may be an override of a workflow whose default
+            # is off, so the settings file always records the explicit two-way choice.
+            agents[named]["goals"] = runs.goals
         mine = self._mine()
         mine["flow"] = flow
         kept: dict[str, Any] = {"agents": agents}

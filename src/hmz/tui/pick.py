@@ -103,6 +103,8 @@ class Runs(NamedTuple):
         or "" for the one an agent nobody has been asked about runs at.
       provider: The account its turns run as, by the name a provider of its CLI was made
         under, or "" to run as this machine is already signed in.
+      goals: Whether backend goals are available. This is always an on/off answer; any
+        suggestion attached to the flow's agent place is resolved before this is constructed.
     """
 
     spec: str
@@ -110,6 +112,7 @@ class Runs(NamedTuple):
     skills: tuple[str, ...] | None = None
     permission: str = ""
     provider: str = ""
+    goals: bool = True
 
 
 class Whose(NamedTuple):
@@ -999,6 +1002,9 @@ class Models(Sheet[Runs]):
         # here rather than chosen from a sheet, because four words fit on the line the effort
         # is on and a list of four is a list nobody would want to walk to.
         Binding("ctrl+p", "permit", "permission", priority=True),
+        # Goals are a two-way policy, shown and changed as on or off. A place explicitly
+        # annotated with Goal is required on and therefore has nothing to toggle.
+        Binding("ctrl+g", "goals", "backend goals", priority=True),
         # And what it is loaded with is a third, for the same reason and in the same way: a
         # side question about this agent, which opens a sheet of its own and comes back here.
         Binding("ctrl+s", "skills", "skills", priority=True),
@@ -1048,6 +1054,9 @@ class Models(Sheet[Runs]):
         #: said otherwise, which is what an agent nobody has been asked about has always run
         #: at.
         self._permission = len(PERMISSIONS) - 1
+        #: Whether backend goals remain available to this agent. Its place supplies the
+        #: initial suggestion; a remembered picker answer replaces it with a boolean.
+        self._goals = place.goals_default
         #: Which of the CLI's skills this one is to have, or None for one that has not been
         #: asked -- which is the CLI as it comes, and so every skill it finds.
         self._skills: tuple[str, ...] | None = None
@@ -1104,6 +1113,8 @@ class Models(Sheet[Runs]):
         # is what an agent nobody was asked about runs at anyway.
         if self._now.permission in PERMISSIONS:
             self._permission = PERMISSIONS.index(self._now.permission)
+        if not self._place.goal:
+            self._goals = self._now.goals
 
     def _fill(self) -> None:
         """Puts the CLI's models up, and under them everything else this agent is."""
@@ -1174,6 +1185,13 @@ class Models(Sheet[Runs]):
         said += (
             f"{_DOT}[$secondary]◉[/] {PERMISSIONS[self._permission]}  "
             f"[$text-muted]ctrl+p to change[/]"
+        )
+        goals = "on" if self._goals else "off"
+        said += f"{_DOT}[$secondary]◉[/] goals {goals}  "
+        said += (
+            "[$text-muted]required by flow[/]"
+            if self._place.goal
+            else "[$text-muted]ctrl+g to toggle[/]"
         )
         # The account is not read back here: it was the step before this one, it is on the
         # line above the prompt once the walk is over, and a setting shown where it cannot be
@@ -1297,6 +1315,12 @@ class Models(Sheet[Runs]):
         self._permission = (self._permission + 1) % len(PERMISSIONS)
         self._fill()
 
+    def action_goals(self) -> None:
+        """Switches backend goals on or off where the flow does not require them."""
+        if not self._place.goal:
+            self._goals = not self._goals
+            self._fill()
+
     def action_harder(self) -> None:
         """Moves one along the efforts, towards the one that thinks hardest."""
         self._effort = max(self._effort - 1, 0)
@@ -1335,6 +1359,7 @@ class Models(Sheet[Runs]):
                     else ""
                 ),
                 provider=self._whose.provider,
+                goals=self._goals,
             )
         )
 

@@ -228,6 +228,7 @@ def _tui(argv: list[str]) -> int:
             setting = model.model_validate(set_up_from(args.config))
         except ValueError as refused:
             parser.error(f"{args.config}: {refused}")
+    places = ()
     if args.agents:
         try:
             places = wanted(flow)
@@ -238,7 +239,12 @@ def _tui(argv: list[str]) -> int:
                 f"{flow} drives {len(places)} agents, {len(args.agents)} given"
             )
     Humanize(
-        flow=flow, agents=[Runs(spec) for spec in args.agents], config=setting
+        flow=flow,
+        agents=[
+            Runs(spec, goals=places[at].goals_default)
+            for at, spec in enumerate(args.agents)
+        ],
+        config=setting,
     ).run()
     return 0
 

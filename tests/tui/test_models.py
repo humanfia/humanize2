@@ -16,8 +16,9 @@ import pytest
 from textual.widgets import Label, OptionList
 
 from hmz.backends import Model
+from hmz.cli import main
 from hmz.tui import Humanize
-from hmz.tui.pick import Models, RunsAs
+from hmz.tui.pick import Models, Runs, RunsAs
 
 from .test_app import until
 
@@ -54,6 +55,20 @@ def run(agents: Agents, task: str) -> None:
     pass
 '''
 
+GOALS_OFF = (
+    HERE.replace(
+        "from typing import NamedTuple", "from typing import Annotated, NamedTuple"
+    )
+    .replace(
+        "from hmz.agents import AgentBase",
+        "from hmz.agents import AgentBase, AgentDefaults",
+    )
+    .replace(
+        "builder: AgentBase",
+        "builder: Annotated[AgentBase, AgentDefaults(goals=False)]",
+    )
+)
+
 
 @pytest.fixture
 def flows(tmp_path: Path) -> Path:
@@ -61,6 +76,7 @@ def flows(tmp_path: Path) -> Path:
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
     (where / "here.py").write_text(HERE)
+    (where / "goals_off.py").write_text(GOALS_OFF)
     return where
 
 
@@ -73,6 +89,37 @@ async def _to_the_models(app: Humanize, driver: Pilot[None]) -> None:
     await until(lambda: isinstance(app.screen, Models), driver)
 
 
+async def _flow_to_models(app: Humanize, driver: Pilot[None], flow: str) -> None:
+    await driver.press(*f"/flow {flow}")
+    await driver.press("enter")
+    await until(lambda: isinstance(app.screen, RunsAs), driver)
+    await driver.press("enter")
+    await until(lambda: isinstance(app.screen, Models), driver)
+
+
+def test_a_line_uses_the_agent_place_goal_suggestion(flows: Path) -> None:
+    """Naming models on the command line does not silently switch goals back on."""
+    opened: list[Humanize] = []
+
+    def opens(app: Humanize) -> None:
+        opened.append(app)
+
+    with unittest.mock.patch.object(Humanize, "run", opens):
+        assert (
+            main(
+                [
+                    "-f",
+                    ".humanize/flows/goals_off.py",
+                    "-a",
+                    "codex/said:low",
+                ]
+            )
+            == 0
+        )
+
+    assert opened[0]._models == [Runs("codex/said:low", goals=False)]
+
+
 def _under(app: Humanize) -> str:
     """The line under the list, which says what became of asking."""
     return str(app.screen.query_one("#tuning", Label).content)
@@ -81,6 +128,76 @@ def _under(app: Humanize) -> str:
 def _rows(app: Humanize) -> int:
     """How many models are on the sheet."""
     return len(app.screen.query_one("#choices", OptionList).options)
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
+async def test_goals_are_an_on_off_choice_from_the_agent_place_suggestion(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019
+    flows: Path,
+) -> None:
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _flow_to_models(app, driver, "goals_off")
+        await until(lambda: "goals off" in _under(app), driver)
+
+        await driver.press("ctrl+g")
+        await until(lambda: "goals on" in _under(app), driver)
+        await driver.press("ctrl+g")
+        await until(lambda: "goals off" in _under(app), driver)
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    assert app._models[0].goals is False
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
+async def test_a_user_can_override_the_agent_place_suggestion_to_on(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019
+    flows: Path,
+) -> None:
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _flow_to_models(app, driver, "goals_off")
+        await until(lambda: "goals off" in _under(app), driver)
+        await driver.press("ctrl+g", "enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    assert app._models[0].goals is True
+    assert app.settings.agents("goals_off")[0].goals is True
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
+async def test_opening_directly_uses_the_agent_place_goal_suggestion(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019
+    flows: Path,
+) -> None:
+    app = Humanize(flow="goals_off")
+
+    async with app.run_test() as driver:
+        await driver.pause()
+
+    assert app._models == [Runs("claude/claude-nine:high", goals=False)]
+
+
+def test_a_goal_choice_is_written_to_the_agent_config(
+    flows: Path,
+) -> None:
+    from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    app = Humanize(
+        flow="goals_off",
+        agents=[Runs("claude/claude-nine:high", goals=False)],
+    )
+    made = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-nine", effort="high"))
+
+    (configured,) = app._as_they_were_set_up([made])
+
+    assert configured is not made
+    assert configured.config.goals is False
+    assert not configured.goals_enabled
 
 
 @pytest.mark.timeout(60)

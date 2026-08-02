@@ -38,6 +38,11 @@ with no behaviour on them.
 class Goal: ...
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AgentDefaults:
+    goals: bool = True
+
+
 class Remote: ...
 
 
@@ -54,7 +59,13 @@ class AgentConfig:
     skills: tuple[str, ...] | None = None
     permission: str = "bypass"
     provider: str = ""
+    goals: bool = True
 ```
+
+- `goals` MUST be the explicit on/off availability of backend goals for this agent. It has
+  no inherited or automatic state. `AgentDefaults` MAY be written beside a flow's agent type
+  to suggest its initial picker value, but MUST be resolved into `AgentConfig.goals` before
+  the agent is constructed and MUST NOT let the flow change it afterwards.
 
 - `machine` MUST be the `hmz.machines.MachineConfig` the agent's turns land on, or `None`
   to run them on this machine. It is one setting because it is one question: a machine that is

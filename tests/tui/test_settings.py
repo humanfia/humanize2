@@ -54,6 +54,7 @@ def test_an_agent_is_kept_under_what_its_flow_calls_it(tmp_path: Path) -> None:
         "cli": "codex",
         "model": "n",
         "effort": "low",
+        "goals": True,
     }
     # A flow that says only how many it drives has nothing to call them, so they are
     # numbered -- and a model holding slashes of its own survives the round trip.
@@ -211,3 +212,38 @@ def test_what_an_agent_may_do_is_kept_and_read_back(tmp_path: Path) -> None:
     written = held["workspaces"][str(tmp_path.resolve())]["flows"]["rlar"]["agents"]
     assert written["actor"]["permission"] == "read-only"
     assert "permission" not in written["reviewer"]
+
+
+def test_goal_choices_are_kept_as_on_or_off(tmp_path: Path) -> None:
+    kept = Settings(tmp_path)
+    kept.remember(
+        "rlar",
+        ("actor", "reviewer"),
+        [Runs("claude/m:high", goals=False), Runs("codex/n:low", goals=True)],
+    )
+
+    assert Settings(tmp_path).agents("rlar") == [
+        Runs("claude/m:high", goals=False),
+        Runs("codex/n:low", goals=True),
+    ]
+    held = yaml.safe_load((home() / "settings.yaml").read_text())
+    agents = held["workspaces"][str(tmp_path.resolve())]["flows"]["rlar"]["agents"]
+    assert agents["actor"]["goals"] is False
+    assert agents["reviewer"]["goals"] is True
+
+
+def test_an_old_entry_takes_the_current_agent_place_suggestion(tmp_path: Path) -> None:
+    kept = Settings(tmp_path)
+    kept.remember("rlar", ("actor",), [Runs("claude/m:high")])
+    where = home() / "settings.yaml"
+    held = yaml.safe_load(where.read_text())
+    agent = held["workspaces"][str(tmp_path.resolve())]["flows"]["rlar"]["agents"][
+        "actor"
+    ]
+    del agent["goals"]
+    where.write_text(yaml.safe_dump(held, sort_keys=False))
+
+    assert Settings(tmp_path).agents("rlar", (False,)) == [
+        Runs("claude/m:high", goals=False)
+    ]
+    assert Settings(tmp_path).agents("rlar") == [Runs("claude/m:high", goals=True)]

@@ -11,7 +11,16 @@ if TYPE_CHECKING:
     # client behind a container.
     from hmz.machines import MachineConfig
 
-__all__ = ["PERMISSIONS", "AgentConfig", "Isolated", "Remote", "anchored", "isolated"]
+__all__ = [
+    "PERMISSIONS",
+    "AgentConfig",
+    "AgentDefaults",
+    "Goal",
+    "Isolated",
+    "Remote",
+    "anchored",
+    "isolated",
+]
 
 #: What an agent may do without being asked, loosest last. Named the way these CLIs name them
 #: rather than in a vocabulary of humanize's own, so that a rung reads as the thing it is
@@ -46,6 +55,20 @@ class Goal:
     and an agent whose backend has no goal feature is refused before the first turn rather
     than raising in the middle of one, which is where a loop would otherwise find out.
     """
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AgentDefaults:
+    """The initial goal availability offered for one place in a flow.
+
+    This is only an input to agent selection. Once an agent is chosen, the effective value
+    lives in :attr:`AgentConfig.goals` and can be changed independently in the picker.
+
+    Attributes:
+      goals: Whether a newly selected agent starts with backend goals available.
+    """
+
+    goals: bool = True
 
 
 class Remote:
@@ -118,6 +141,9 @@ class AgentConfig:
         two agents of one CLI, one on a subscription and one on somebody's gateway, are two
         accounts running at once, each refreshing its own token and neither able to read the
         other's -- which is what a provider is for.
+      goals: Whether backend goals are available to this agent. This is always an explicit
+        on/off setting; a flow may suggest the initial picker value with `AgentDefaults`, but
+        that suggestion is resolved before the agent is constructed.
     """
 
     model: str
@@ -126,6 +152,7 @@ class AgentConfig:
     skills: tuple[str, ...] | None = None
     permission: str = "bypass"
     provider: str = ""
+    goals: bool = True
 
 
 def anchored(target: str) -> MachineConfig | None:

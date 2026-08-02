@@ -1001,8 +1001,12 @@ class SessionBase(ABC):
         Raises:
           NotImplementedError: If this backend has no goal feature to reach for, whether or
             not `suppress` is set: a flow asking for one it has not got is a flow to correct.
+          RuntimeError: If goals were disabled for this agent, whether or not `suppress` is
+            set: a flow that disabled them retains control of every continuation.
           subprocess.CalledProcessError: If the turn fails and `suppress` is not set.
         """
+        if not self._agent.goals_enabled:
+            raise RuntimeError(f"{self._agent.id}: goals are disabled")
         try:
             return self._pursue(objective)
         except subprocess.CalledProcessError:
@@ -1702,6 +1706,25 @@ class AgentBase(ABC):
         looks from inside one: a process killed under a turn is a turn that could not finish.
         """
         return self._stopped
+
+    @property
+    def goals_enabled(self) -> bool:
+        """Whether this agent may be run under a backend goal.
+
+        This is a per-agent runtime policy, distinct from :attr:`pursues`, which says whether
+        the backend has a goal feature at all.
+        """
+        return self._config.goals
+
+    def disable_goals(self) -> None:
+        """Prevents this agent and its sessions from starting backend goals.
+
+        Ordinary turns are unaffected. Backends that expose goals outside ``pursue`` may
+        override this to disable the corresponding runtime feature as well.
+        """
+        from dataclasses import replace
+
+        self._config = replace(self._config, goals=False)
 
     @property
     def backend(self) -> str:

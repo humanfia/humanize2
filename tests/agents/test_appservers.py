@@ -895,6 +895,57 @@ def test_a_codex_server_is_told_which_skills_its_agent_is_not_to_load(
     ]
 
 
+def test_codex_can_disable_goals_before_its_server_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The per-agent policy also removes Codex's goal feature from its app server."""
+    started: list[list[str]] = []
+
+    class _Recording:
+        def __init__(
+            self, argv: list[str], env: Mapping[str, str] | None = None
+        ) -> None:
+            del env
+            started.append(argv)
+            self._agents: list[Any] = []
+
+        def stop(self) -> None:
+            """Nothing was started, so there is nothing to take down."""
+
+    monkeypatch.setattr(appservers, "_AppServer", _Recording)
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high"))
+    agent.disable_goals()
+
+    assert not agent.goals_enabled
+    assert agent.server is not None
+    assert started == [["codex", "app-server", "--disable", "goals", "--stdio"]]
+    with pytest.raises(RuntimeError, match="goals are disabled"):
+        agent.new().pursue("the suite passes", suppress=True)
+
+
+def test_codex_refuses_to_disable_goals_after_its_server_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A server's feature set cannot be changed underneath threads it already holds."""
+
+    class _Recording:
+        def __init__(
+            self, argv: list[str], env: Mapping[str, str] | None = None
+        ) -> None:
+            del argv, env
+            self._agents: list[Any] = []
+
+        def stop(self) -> None:
+            """Nothing was started, so there is nothing to take down."""
+
+    monkeypatch.setattr(appservers, "_AppServer", _Recording)
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high"))
+    assert agent.server is not None
+
+    with pytest.raises(RuntimeError, match="before its first turn"):
+        agent.disable_goals()
+
+
 def test_codex_grants_what_a_turn_asks_to_be_allowed_to_do(codex: _FakeServer) -> None:
     """At the rung that means the asking is granted, the answer is yes.
 

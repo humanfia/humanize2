@@ -39,6 +39,37 @@ The awaited twin is `agent.apursue(objective)`, and a session has both as well:
 On a backend without one, `pursue` raises `NotImplementedError` — **whether or not `suppress` is
 set**. Asking for a feature that is not there is a flow to correct, not a turn to retry.
 
+## Disabling goals
+
+A flow that owns every continuation can suggest `off` for each agent it declares:
+
+```python
+from typing import Annotated, NamedTuple
+
+from hmz.agents import AgentBase, AgentDefaults
+
+class Agents(NamedTuple):
+    actor: Annotated[AgentBase, AgentDefaults(goals=False)]
+    reviewer: Annotated[AgentBase, AgentDefaults(goals=False)]
+```
+
+The marker only supplies the model picker's initial value. `ctrl+g` switches the selected
+agent between `on` and `off`; the resolved value is saved on that agent's `AgentConfig`. The
+picker and config have no third state, and the flow does not change an agent after it is made.
+
+Python callers set the same policy directly when they construct one agent:
+
+```python
+agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high", goals=False))
+```
+
+`agent.disable_goals()` remains the imperative equivalent before the first turn.
+
+Ordinary turns continue to work, but later calls to `pursue` raise `RuntimeError`, even with
+`suppress=True`. Codex starts that agent's app server with its goal tools disabled; Claude Code
+has no separate runtime feature, so HMZ refuses its goal before invoking the CLI. Neither path
+changes the user's global backend configuration.
+
 ## Asking for an agent that has one
 
 A flow built on `pursue` says so where it declares its agents, and is refused before its first

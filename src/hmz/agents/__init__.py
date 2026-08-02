@@ -15,6 +15,7 @@ from .codex import CodexAgent, CodexAgentConfig, CodexSession
 from .config import (
     PERMISSIONS,
     AgentConfig,
+    AgentDefaults,
     Goal,
     Isolated,
     Remote,
@@ -50,6 +51,7 @@ __all__ = [
     "WINDOW",
     "AgentBase",
     "AgentConfig",
+    "AgentDefaults",
     "ClaudeCodeAgent",
     "ClaudeCodeAgentConfig",
     "ClaudeCodeSession",

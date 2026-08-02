@@ -132,6 +132,9 @@ class Place(NamedTuple):
       goal: Whether the flow runs this one under the backend's own goal feature, which it
         said by writing `Annotated[AgentBase, Goal]` where it declared the place. Only three
         backends have one, so a flow built on it is not a flow any agent can drive.
+      goals_default: Whether the agent picker initially offers backend goals on or off for
+        this place, which a flow may suggest with `AgentDefaults(goals=False)`. Once selected,
+        the effective value belongs to the agent's config. A required `Goal` always starts on.
       where: Where the agent filling it may work, which the flow said the same way -- `Remote`
         for one that may be pointed at another machine, an `Isolated` for one that works in a
         container the flow itself names the image of. None for a place the flow said nothing
@@ -145,6 +148,7 @@ class Place(NamedTuple):
     moments: frozenset[Moment]
     where: type[Remote] | Remote | Isolated | None = None
     goal: bool = False
+    goals_default: bool = True
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
@@ -687,10 +691,16 @@ def _place(name: str, kind: object) -> Place:
     moments = frozenset(_moments(kind))
     where = _where(kind)
     goal = _goal(kind)
+    goals_default = _goals_default(kind)
     if get_origin(kind) is Annotated:
         kind = get_args(kind)[0]
     return Place(
-        name=name, person=_is_person(kind), moments=moments, where=where, goal=goal
+        name=name,
+        person=_is_person(kind),
+        moments=moments,
+        where=where,
+        goal=goal,
+        goals_default=True if goal else goals_default,
     )
 
 
@@ -729,6 +739,22 @@ def _goal(kind: object) -> bool:
     if get_origin(kind) is not Annotated:
         return False
     return any(said is Goal for said in get_args(kind)[1:])
+
+
+def _goals_default(kind: object) -> bool:
+    """The initial on/off choice a flow suggests for this agent's goals.
+
+    The suggestion is picker metadata, not runtime policy. The picker resolves it into the
+    boolean on `AgentConfig` before constructing the agent.
+    """
+    from .agents import AgentDefaults
+
+    if get_origin(kind) is not Annotated:
+        return True
+    for said in get_args(kind)[1:]:
+        if isinstance(said, AgentDefaults):
+            return said.goals
+    return True
 
 
 def _moments(kind: object) -> tuple[Moment, ...]:
@@ -859,6 +885,11 @@ class Runner:
                 raise NotAFlow(
                     f"{flow}: {place.name or 'the agent'} is run under a goal, which "
                     f"{agent.backend} has no feature for"
+                )
+            if place.goal and not agent.goals_enabled:
+                raise NotAFlow(
+                    f"{flow}: {place.name or 'the agent'} is run under a goal, but goals "
+                    "were switched off for it"
                 )
             _lands(flow, agent, place)
         # The person at the prompt is made here rather than given: nobody chooses what they
@@ -1029,8 +1060,15 @@ def flow_and_agents(
     # should not have paid for three backends to say what it takes.
     from .agents import DRIVEN
 
+    # A command-line agent has no picker to resolve a place's initial suggestion, so resolve
+    # it here before constructing the config. Leave malformed or missing flows for Runner to
+    # report in its usual place; their agents use the ordinary on default in the meantime.
+    try:
+        places = wanted(args.flow)
+    except NotAFlow:
+        places = ()
     agents: list[AgentBase] = []
-    for spec in args.agents:
+    for at, spec in enumerate(args.agents):
         try:
             profile, model, effort, provider, permission = read_agent(spec)
         except ValueError as bad:
@@ -1038,14 +1076,16 @@ def flow_and_agents(
         agent, config = DRIVEN[profile.name]
         # Named rather than looked up: an account that is not there is caught by the agent
         # the first time it needs one, which says whose it was and what it was called.
+        goals = places[at].goals_default if at < len(places) else True
         configured = (
-            config(model=model, effort=effort, provider=provider)
+            config(model=model, effort=effort, provider=provider, goals=goals)
             if permission is None
             else config(
                 model=model,
                 effort=effort,
                 provider=provider,
                 permission=permission,
+                goals=goals,
             )
         )
         agents.append(agent(configured))

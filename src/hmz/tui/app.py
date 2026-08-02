@@ -197,7 +197,7 @@ def _clipped(said: str, room: int) -> str:
     return said if len(said) <= room else said[: room - 1] + "…"
 
 
-def _opens_on() -> list[Runs]:
+def _opens_on(*, goals: bool = True) -> list[Runs]:
     """The one agent the interface opens talking to, where there is one to open on.
 
     The first backend installed here that has said what it runs, at the first model it named
@@ -214,7 +214,7 @@ def _opens_on() -> list[Runs]:
             # Not the hardest effort, which is what the picker's cursor starts on: that is
             # the one to reach for, and this is the one to spend before anyone has asked for
             # anything. `high` is an effort every model of every backend here takes.
-            return [Runs(f"{backend}/{found[0].name}:high")]
+            return [Runs(f"{backend}/{found[0].name}:high", goals=goals)]
     return []
 
 
@@ -673,15 +673,37 @@ class Humanize(App[None]):
         #: that way rather than back at the default.
         self.settings = Settings()
         self._flow_named = flow or self.settings.flow or _STARTS_ON
-        self._models = (
-            list(agents) or self.settings.agents(self._flow_named) or _opens_on()
-        )
+        self._models = list(agents)
         #: One place per agent the flow drives: what the flow calls it, which is "" apiece
         #: for a flow that said how many it drives and nothing more, and the moments it needs
         #: that one to run. Kept beside the models rather than read off the flow each time the
         #: line above the prompt is drawn: that means loading and running a Python file, and
         #: this is drawn twice a second.
         self._wanted = self._places_of(self._flow_named)
+        if not self._models:
+            self._models = self.settings.agents(
+                self._flow_named,
+                tuple(place.goals_default for place in self._wanted),
+            ) or _opens_on(
+                goals=self._wanted[0].goals_default if self._wanted else True
+            )
+            # If the flow would not load, `_places_of` falls back to agents already in hand;
+            # the remembered ones were not in hand on the first read.
+            if not self._wanted and self._models:
+                self._wanted = self._places_of(self._flow_named)
+        self._models = [
+            Runs(
+                runs.spec,
+                runs.anchor,
+                runs.skills,
+                runs.permission,
+                runs.provider,
+                goals=True,
+            )
+            if at < len(self._wanted) and self._wanted[at].goal
+            else runs
+            for at, runs in enumerate(self._models)
+        ]
         #: What the flow itself is set up with, for a flow that says it can be set up at
         #: all: an instance of the model it declared, or None. Read back from what this
         #: workspace last ran, so a flow of many settings opens the way it was left.
@@ -862,7 +884,9 @@ class Humanize(App[None]):
             # Which may be the first model there is to open on, for an interface that opened
             # with nothing installed to talk to.
             if not self._models:
-                self._models = _opens_on()
+                self._models = _opens_on(
+                    goals=self._wanted[0].goals_default if self._wanted else True
+                )
             self._draw()
 
     def _welcome(self) -> None:
@@ -2249,6 +2273,7 @@ class Humanize(App[None]):
                 and runs.skills is None
                 and not runs.permission
                 and not runs.provider
+                and agent.config.goals is runs.goals
             ):
                 moved.append(agent)
                 continue
@@ -2270,6 +2295,7 @@ class Humanize(App[None]):
                         machine=anchored(runs.anchor),
                         skills=runs.skills,
                         provider=runs.provider,
+                        goals=runs.goals,
                         **({"permission": runs.permission} if runs.permission else {}),
                     )
                 )

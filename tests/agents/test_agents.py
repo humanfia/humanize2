@@ -436,6 +436,21 @@ def test_claude_pursues_through_its_own_goal_command(clis: _FakeCLIs) -> None:
     ]
 
 
+def test_disabled_goals_never_reach_claude(clis: _FakeCLIs) -> None:
+    """Claude has no feature flag for goals, so HMZ refuses them before invoking its CLI."""
+    agent = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+    )
+    session = agent.new()
+    agent.disable_goals()
+
+    assert not agent.goals_enabled
+    with pytest.raises(RuntimeError, match="goals are disabled"):
+        session.pursue("the suite passes", suppress=True)
+    assert not clis.log.exists()
+    assert session("an ordinary turn") == "an ordinary turn"
+
+
 def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -> None:
     """The agent still runs here, so the session it opens is still ours to resume."""
     anchor = HereAnchor(target="ssh://build-box", workspace="/srv/project")
