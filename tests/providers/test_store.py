@@ -220,9 +220,6 @@ def test_a_turn_is_answered_at_every_path_the_backend_keeps_a_credential_at(
     swaps = provider.swaps()
 
     assert len(swaps) == len(profile.creds)
-    assert swaps, (
-        f"{profile.name} keeps its credentials somewhere, so it names somewhere"
-    )
     for said, (real, instead) in zip(profile.creds, swaps, strict=True):
         if said.startswith("~/"):
             assert real == str(house / said[2:])
@@ -272,6 +269,13 @@ def test_a_backend_offers_its_own_ways_in_and_then_variables_of_your_own() -> No
     assert offered[: len(claude.ways)] == claude.ways
     assert offered[-1] is providers.ENV
     assert providers.ways("nope") == ()
+
+
+def test_deepseek_harness_offers_only_its_api_key_way() -> None:
+    offered = providers.ways("deepseek-harness")
+
+    assert [way.name for way in offered] == ["key"]
+    assert [one.env for one in offered[0].asks] == ["DEEPSEEK_API_KEY"]
 
 
 def test_variables_of_your_own_are_read_off_the_lines_they_were_typed_as() -> None:

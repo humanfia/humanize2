@@ -35,8 +35,23 @@ Three things to know before pointing one at a repository you care about. Each is
 pip install git+https://github.com/humanfia/humanize2.git
 ```
 
-Needs Python ≥ 3.12 and at least one of the coding agent CLIs it drives — `claude`, `codex`,
-`kimi`, `pi`, `opencode`, `mimo` — on your PATH. See
+DeepSeek Harness is an optional install that includes its Python SDK and bundled runtime:
+
+```sh
+pip install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
+# or, when hmz is an isolated uv tool:
+uv tool install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
+```
+
+To install DeepSeek's own `dsh` launcher and configuration UI (Node.js required):
+
+```sh
+npm install --global @deepseek-ai/dsh
+dsh web
+```
+
+Needs Python ≥ 3.12 and at least one supported backend: `claude`, `codex`, `kimi`, `pi`,
+`opencode` or `mimo` on your PATH, or the `dsh` extra above. See
 [Installation](https://humanfia.github.io/humanize2/guide/installation).
 
 ## Usage
@@ -47,11 +62,28 @@ To use the TUI:
 hmz
 ```
 
+DeepSeek Harness takes an API key and no subscription login. Run `dsh web`, save the key
+under **Settings -> Models**, then type `/agents` in humanize, switch to `dsh`, and choose
+`as installed`. This also uses the base URL saved in dsh. Alternatively, press **ctrl+n**
+there to make a humanize `key` account, or set the key before opening humanize:
+
+```sh
+export DEEPSEEK_API_KEY=sk-…
+hmz
+```
+
 To run a flow over the agents you name, one `-a` apiece:
 
 ```sh
 hmz exec -f official/flame_chase \
     -a claude/claude-opus-4-8:high -a codex/gpt-5.6-sol:high "fix the build"
+```
+
+To run DeepSeek Harness unattended with that environment variable:
+
+```sh
+DEEPSEEK_API_KEY=sk-… hmz exec -f ralph_loop \
+    -a dsh/deepseek-v4-flash:high "fix the build"
 ```
 
 To collect what a run left behind, and open it in [ui.perfetto.dev](https://ui.perfetto.dev):

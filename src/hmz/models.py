@@ -63,6 +63,11 @@ _LISTED = "list"
 #: What opencode and mimocode write after a model to say how much it holds.
 _ABOUT = " — "
 
+#: The advisory catalogue shipped by the official DeepSeek adapter. Its preview SDK has no
+#: model-list request, so this is both what asking it answers and what a first prompt offers
+#: before there is a cache to read.
+_DSH_MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
+
 
 def where(cli: str, provider: str = "") -> Path:
     """Where what this backend said it runs is kept, for one account.
@@ -102,10 +107,16 @@ def offered(cli: str, provider: str = "") -> tuple[Model, ...]:
       backend there is -- each of which is a catalogue to fill rather than a reason to raise
       at whoever only wanted to see a list.
     """
-    return tuple(
+    found = tuple(
         Model(name, tuple(efforts), swarms)
         for name, efforts, swarms in _read(_kept(cli, provider))
     )
+    profile = named(cli)
+    if not found and profile is not None and profile.name == "dsh":
+        return tuple(
+            Model(name, profile.efforts, profile.swarms) for name in _DSH_MODELS
+        )
+    return found
 
 
 def asked(cli: str, provider: str = "") -> str:
@@ -380,6 +391,23 @@ def _kimi(profile: Profile, run: Callable[..., str]) -> list[Model]:
     ]
 
 
+def _dsh(profile: Profile, _run: Callable[..., str]) -> list[Model]:
+    """The advisory catalogue shipped by the official DeepSeek Harness adapter.
+
+    The rc6 Python SDK has no model-list request. These are the two defaults its bundled
+    `@deepseek-ai/dsh-llm-deepseek` composition publishes; that adapter also accepts an
+    uncatalogued DeepSeek model id when one is named explicitly.
+
+    Args:
+      profile: DeepSeek Harness's own.
+      _run: Unused because its SDK protocol exposes no catalogue method.
+
+    Returns:
+      The official adapter's advisory models, in its own order.
+    """
+    return [Model(name, profile.efforts, profile.swarms) for name in _DSH_MODELS]
+
+
 def _pi(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """Pi's models, which it prints as a table of the providers it has credentials for.
 
@@ -516,6 +544,7 @@ def _write(at: Path, models: list[Model]) -> None:
 _READING: dict[str, Callable[[Profile, Callable[..., str]], list[Model]]] = {
     "claude": _claude,
     "codex": _codex,
+    "dsh": _dsh,
     "kimi": _kimi,
     "pi": _pi,
     "opencode": _listed,

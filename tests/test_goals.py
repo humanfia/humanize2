@@ -1,7 +1,7 @@
 """A flow built on the backends' own goal feature says so, and is refused an agent without one.
 
 `pursue` is the agent keeping itself going toward an objective it decides for itself is met,
-and three of the six backends have it. A flow written around that is not a flow any agent can
+and four of the seven backends have it. A flow written around that is not a flow any agent can
 drive -- so it declares it where it declares the agent, exactly as it declares a moment it
 hangs a hook on, and a run that could not work is refused before its first turn rather than
 raising in the middle of one.
@@ -18,6 +18,8 @@ from hmz.agents import (
     ClaudeCodeAgentConfig,
     CodexAgent,
     CodexAgentConfig,
+    DshAgent,
+    DshAgentConfig,
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
     OpencodeAgent,
@@ -145,11 +147,12 @@ def test_an_agent_whose_backend_has_no_goal_feature_is_refused(tmp_path: Path) -
     [
         ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="low")),
         CodexAgent(CodexAgentConfig(model="m", effort="low")),
+        DshAgent(DshAgentConfig(model="m", effort="high")),
         KimiCodeCLIAgent(KimiCodeCLIAgentConfig(model="m", effort="low")),
     ],
 )
 def test_an_agent_whose_backend_has_one_is_taken(agent: object, tmp_path: Path) -> None:
-    """The three that answer `pursue`, each of which says so on the class."""
+    """The four that answer `pursue`, each of which says so on the class."""
     runner = Runner(_written(tmp_path, PURSUING), [agent])  # pyright: ignore[reportArgumentType]
 
     assert len(runner.agents) == 1

@@ -130,7 +130,7 @@ class Place(NamedTuple):
         `Annotated[AgentBase, Moment.PERMISSION_REQUEST]` where it declared the place. Empty
         where it asked for nothing in particular, which is most places.
       goal: Whether the flow runs this one under the backend's own goal feature, which it
-        said by writing `Annotated[AgentBase, Goal]` where it declared the place. Only three
+        said by writing `Annotated[AgentBase, Goal]` where it declared the place. Only four
         backends have one, so a flow built on it is not a flow any agent can drive.
       goals_default: Whether the agent picker initially offers backend goals on or off for
         this place, which a flow may suggest with `AgentDefaults(goals=False)`. Once selected,

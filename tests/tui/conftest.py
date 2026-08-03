@@ -26,3 +26,4 @@ def _elsewhere(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Runs the interface somewhere temporary, with no backend, unless the test says."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(hmz.tui.app, "installed", dict)
+    monkeypatch.setattr(hmz.tui.app, "installable", dict)

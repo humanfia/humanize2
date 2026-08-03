@@ -33,6 +33,7 @@ The awaited twin is `agent.apursue(objective)`, and a session has both as well:
 | --- | --- |
 | Claude Code | yes |
 | Codex | yes |
+| DeepSeek Harness | yes |
 | Kimi Code | yes |
 | pi, opencode, mimocode | no |
 

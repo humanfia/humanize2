@@ -96,6 +96,33 @@ def test_reports_codex_prompt_reasoning_and_tool(
     )
 
 
+def test_reports_dsh_prompt_reasoning_tool_and_usage(
+    dsh_home: pathlib.Path, workspace: pathlib.Path
+) -> None:
+    document = tracing.collect(workspace)
+
+    assert document["otherData"]["backends"] == "dsh"
+    assert document["otherData"]["agents"] == ("dsh · deepseek-v4-flash · high")
+    assert named(document, "turn: inspect the module")["args"]["reason"] == {
+        "kind": "completed"
+    }
+    think = named(document, "think: read it first")
+    assert think["args"]["usage"] == {
+        "inputTokens": 20,
+        "outputTokens": 10,
+        "cacheReadTokens": 100,
+        "reasoningTokens": 4,
+    }
+    call = named(document, "bash: cat module.py")
+    assert call["args"]["input"] == {"command": "cat module.py"}
+    assert call["args"]["output"] == "print('hi')"
+    assert call["args"]["error"] is False
+    assert call["dur"] == 2_000_000
+    assert named(document, "say: inspected the module")["args"]["text"] == (
+        "inspected the module"
+    )
+
+
 def test_reports_kimi_prompt_reasoning_and_tool(
     kimi_home: pathlib.Path, workspace: pathlib.Path
 ) -> None:

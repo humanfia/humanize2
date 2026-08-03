@@ -12,17 +12,19 @@ import os
 import sys
 import time
 import unittest.mock
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from textual import events
 from textual.widgets import Label, OptionList, Static
 
-from hmz.agents import PERMISSIONS
+from hmz.agents import PERMISSIONS, DshSession
 from hmz.backends import Model
 from hmz.cycle import cycles
 from hmz.tui import Humanize
 from hmz.tui.app import _HELP, _OWN, Editor, _where
-from hmz.tui.pick import Flows, Models, Runs, RunsAs
+from hmz.tui.pick import Flows, Models, Runs, RunsAs, Signing, Ways
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -946,6 +948,116 @@ async def test_every_line_typed_between_turns_is_a_turn_of_one_conversation(
         await until(lambda: not app._agents, driver)
 
 
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "hmz.tui.app.installed",
+    return_value={"dsh": (Model("deepseek-v4-flash", ("max", "high", "off")),)},
+)
+async def test_deepseek_chat_explains_a_missing_api_key_instead_of_staying_blank(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands it over
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    app = Humanize(agents=[Runs("dsh/deepseek-v4-flash:high")])
+    async with app.run_test() as driver:
+        await driver.press(*"hello")
+        await driver.press("enter")
+        await until(lambda: "needs a DeepSeek API key" in _transcript(app), driver)
+        said = _transcript(app)
+
+        assert "only supports API-key login" in said
+        assert "ctrl+n" in said
+        assert "DEEPSEEK_API_KEY" in said
+
+        app.action_stop_flow()
+        await until(lambda: not app._agents, driver)
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "hmz.tui.app.installed",
+    return_value={"dsh": (Model("deepseek-v4-flash", ("max", "high", "off")),)},
+)
+async def test_deepseek_chat_sends_hello_and_draws_the_sdk_reply(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands it over
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    session_id = "session-chat"
+    message_id = "message-chat"
+    subscription = unittest.mock.MagicMock()
+    subscription.__enter__.return_value = subscription
+    subscription.next.side_effect = [
+        SimpleNamespace(
+            method="session.event",
+            payload={
+                "sessionId": session_id,
+                "event": {
+                    "type": "agent/inbox/spliced",
+                    "data": {"inserted": [{"id": message_id}]},
+                },
+            },
+        ),
+        SimpleNamespace(
+            method="session.event",
+            payload={
+                "sessionId": session_id,
+                "event": {
+                    "type": "assistant/message",
+                    "data": {
+                        "turn": 1,
+                        "step": 1,
+                        "message": {
+                            "content": [{"type": "text", "text": "hello from DeepSeek"}]
+                        },
+                        "usage": {},
+                    },
+                },
+            },
+        ),
+        SimpleNamespace(
+            method="session.event",
+            payload={
+                "sessionId": session_id,
+                "event": {
+                    "type": "turn/end",
+                    "data": {"turn": 1, "reason": {"kind": "completed"}},
+                },
+            },
+        ),
+        SimpleNamespace(
+            method="session.status",
+            payload={"sessionId": session_id, "status": "idle"},
+        ),
+    ]
+    client = unittest.mock.MagicMock()
+    client.subscribe_session_notifications.return_value = subscription
+    client.session_prompt.return_value = message_id
+    harness = unittest.mock.MagicMock()
+    harness.client = client
+
+    def running(_session: DshSession) -> unittest.mock.MagicMock:
+        return harness
+
+    monkeypatch.setattr(DshSession, "_running", running)
+    monkeypatch.setattr(
+        "hmz.agents.dsh.uuid.uuid4", lambda: SimpleNamespace(hex="chat")
+    )
+
+    app = Humanize(agents=[Runs("dsh/deepseek-v4-flash:high")])
+    async with app.run_test() as driver:
+        await driver.press(*"hello")
+        await driver.press("enter")
+        await until(lambda: "hello from DeepSeek" in _transcript(app), driver)
+
+        sent = client.session_prompt.call_args
+        assert sent.args[1] == [{"type": "text", "text": "hello"}]
+        assert sent.kwargs["notification_subscription"] is subscription
+
+        app.action_stop_flow()
+        await until(lambda: not app._agents, driver)
+
+
 @pytest.mark.timeout(90)
 async def test_a_flow_waiting_to_be_told_something_can_still_be_stopped(
     talking: Path,
@@ -1240,6 +1352,205 @@ async def test_the_arrows_turn_to_the_next_cli_and_the_one_before(
         await until(lambda: not isinstance(app.screen, Models), driver)
 
     assert app._models == [Runs("codex/gpt-5.5:high")]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "hmz.tui.app.installed",
+    return_value={
+        "claude": (Model("claude-opus-5", ("max",)),),
+        "dsh": (
+            Model("deepseek-v4-flash", ("max", "high", "off")),
+            Model("deepseek-v4-pro", ("max", "high", "off")),
+        ),
+    },
+)
+async def test_deepseek_is_selectable_from_agents(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019 -- `mock.patch` hands it over
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    dsh_home = tmp_path / "dsh-home"
+    dsh_home.mkdir()
+    (dsh_home / ".credentials.yaml").write_text("DEEPSEEK_API_KEY: saved-key\n")
+    (dsh_home / ".credentials.yaml").chmod(0o600)
+    (dsh_home / "settings.yaml").write_text(
+        "llm-deepseek:\n  baseURL: https://deepseek.example/v1\n"
+    )
+    monkeypatch.setenv("DSH_HOME", str(dsh_home))
+    goal = tmp_path / "goal.py"
+    goal.write_text(
+        """
+from typing import Annotated, NamedTuple
+
+from hmz.agents import AgentBase, Goal
+from hmz.flows import flow
+
+
+class Agents(NamedTuple):
+    worker: Annotated[AgentBase, Goal]
+
+
+@flow
+def run(agents: Agents, task: str) -> None:
+    pass
+"""
+    )
+    app = Humanize(flow=str(goal), agents=[Runs("claude/claude-opus-5:max")])
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+
+        await driver.press("right")
+        await driver.pause()
+        assert "[b $primary]dsh" in str(app.screen.query_one("#tabs", Label).content)
+        accounts = app.screen.query_one("#choices", OptionList)
+        assert [str(option.id) for option in accounts.options] == ["="]
+        assert "as installed" in str(accounts.get_option_at_index(0).prompt)
+        assert "saved by dsh" in str(accounts.get_option_at_index(0).prompt)
+
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Models), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: len(listing.options) == 2, driver)
+        assert [str(option.id) for option in listing.options] == [
+            "dsh/deepseek-v4-flash",
+            "dsh/deepseek-v4-pro",
+        ]
+
+        await driver.press("down", "enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    assert app._models == [Runs("dsh/deepseek-v4-pro:max")]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "hmz.tui.app.installed",
+    return_value={
+        "dsh": (
+            Model("deepseek-v4-flash", ("max", "high", "off")),
+            Model("deepseek-v4-pro", ("max", "high", "off")),
+        ),
+        "kimi": (Model("kimi-code/k3", ("max", "high")),),
+    },
+)
+async def test_deepseek_has_only_api_key_login_after_switching_from_kimi(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands it over
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hmz import providers
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    providers.add("kimi", "subscription", way="login")
+    app = Humanize(agents=[Runs("kimi/kimi-code/k3:high")])
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+
+        # Visit Kimi first, then switch back to dsh as the reported failing walk does.
+        await driver.press("right")
+        await driver.pause()
+        assert "[b $primary]kimi" in str(app.screen.query_one("#tabs", Label).content)
+        assert "=subscription" in [str(option.id) for option in listing.options]
+
+        await driver.press("left")
+        await driver.pause()
+        assert "[b $primary]dsh" in str(app.screen.query_one("#tabs", Label).content)
+        assert [str(option.id) for option in listing.options] == ["="]
+        assert "saved by dsh" in str(listing.get_option_at_index(0).prompt)
+
+        await driver.press("ctrl+n")
+        await until(lambda: isinstance(app.screen, Ways), driver)
+        ways = app.screen.query_one("#choices", OptionList)
+        assert [str(option.id) for option in ways.options] == ["=key"]
+        shown = " ".join(
+            [
+                str(app.screen.query_one("#asked", Label).content),
+                str(app.screen.query_one("#about", Label).content),
+                *(str(option.prompt) for option in ways.options),
+            ]
+        ).lower()
+        for stale in ("kimi", "subscription", "login", "gateway", "env"):
+            assert stale not in shown
+
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        form = app.screen.query_one("#choices", OptionList)
+        assert [str(option.id) for option in form.options] == [
+            "=",
+            "=DEEPSEEK_API_KEY",
+        ]
+        await driver.press(*"mine")
+        await driver.press("down")
+        form.post_message(events.Paste("test-key\n"))
+        await driver.pause()
+        await driver.press("enter")
+
+        await until(lambda: isinstance(app.screen, Models), driver)
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Models), driver)
+
+    made = providers.find("dsh", "mine")
+    assert made is not None
+    assert made.way == "key"
+    assert made.env == {"DEEPSEEK_API_KEY": "test-key"}
+    assert app._models == [Runs("dsh/deepseek-v4-flash:max", "", None, "", "mine")]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "hmz.tui.app.installed",
+    return_value={"claude": (Model("claude-opus-5", ("max",)),)},
+)
+@unittest.mock.patch(
+    "hmz.tui.app.installable",
+    return_value={
+        "dsh": (
+            Model("deepseek-v4-flash", ("max", "high", "off")),
+            Model("deepseek-v4-pro", ("max", "high", "off")),
+        )
+    },
+)
+async def test_agents_says_how_to_install_deepseek_when_its_sdk_is_missing(
+    _installable: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands it over
+    _installed: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands it over
+) -> None:
+    app = Humanize(agents=[Runs("claude/claude-opus-5:max")])
+    async with app.run_test() as driver:
+        await driver.press(*"/agents")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, RunsAs), driver)
+
+        await driver.press("right")
+        await driver.pause()
+        sheet = app.screen
+        assert "[b $primary]dsh" in str(sheet.query_one("#tabs", Label).content)
+        assert not sheet.query_one("#choices", OptionList).options
+        installing = str(sheet.query_one("#tuning", Label).content)
+        assert "DeepSeek Harness is not installed" in installing
+        assert "uv pip install --python" in installing
+        assert "deepseek-harness-sdk" in installing
+
+        await driver.press("enter")
+        await driver.pause()
+        assert isinstance(app.screen, RunsAs)
+
+    assert app._models == [Runs("claude/claude-opus-5:max")]
+
+
+def test_deepseek_install_hint_targets_the_python_running_humanize(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hmz.tui import pick
+
+    monkeypatch.setattr(pick.sys, "executable", "/opt/hmz/bin/python")
+
+    assert "uv pip install --python /opt/hmz/bin/python" in pick._installing("dsh")
 
 
 @pytest.mark.timeout(60)

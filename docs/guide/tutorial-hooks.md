@@ -182,7 +182,7 @@ Do not run a test suite in a `PRE_TOOL_USE` hook.
 | --- | --- | --- |
 | a `while` loop in the flow | your code, between turns | every backend |
 | a refused `STOP` hook | your code, inside the turn | every backend but `HumanAgent` |
-| [`agent.pursue`](/features/goals) | the **model**, against the objective | Claude Code, Codex, Kimi |
+| [`agent.pursue`](/features/goals) | the **model**, against the objective | Claude Code, Codex, DeepSeek Harness, Kimi |
 
 ## What you now know
 

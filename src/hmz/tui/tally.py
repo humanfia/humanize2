@@ -66,6 +66,22 @@ def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
                 "cache_creation_input_tokens",
             )
         )
+    if backend == "dsh":
+        if row.get("type") != "assistant/message":
+            return None, 0
+        data: dict[str, Any] = row.get("data") or {}
+        message = data.get("message") or {}
+        source: dict[str, Any] = message.get("source") or {}
+        usage = data.get("usage") or {}
+        return str(source.get("model") or "") or None, sum(
+            int(usage.get(name) or 0)
+            for name in (
+                "inputTokens",
+                "outputTokens",
+                "cacheReadTokens",
+                "cacheWriteTokens",
+            )
+        )
     envelope: dict[str, Any] = row.get("envelope") or {}
     payload: dict[str, Any] = row.get("payload") or envelope.get("payload") or {}
     if backend == "codex":

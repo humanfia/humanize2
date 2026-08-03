@@ -22,6 +22,7 @@ from .config import (
     anchored,
     isolated,
 )
+from .dsh import DshAgent, DshAgentConfig, DshSession
 from .event import Event, Question, Stopped, Usage
 from .hooks import EVERYWHERE, Hook, Hooks, Hung, Moment, Occasion, Unhooked, Verdict
 from .human import HumanAgent, HumanSession
@@ -37,6 +38,7 @@ from .pi import PiAgent, PiAgentConfig, PiSession
 DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
     "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
     "codex": (CodexAgent, CodexAgentConfig),
+    "dsh": (DshAgent, DshAgentConfig),
     "kimi": (KimiCodeCLIAgent, KimiCodeCLIAgentConfig),
     "mimo": (MimoCodeAgent, MimoCodeAgentConfig),
     "opencode": (OpencodeAgent, OpencodeAgentConfig),
@@ -59,6 +61,9 @@ __all__ = [
     "CodexAgentConfig",
     "CodexSession",
     "CommandSessionBase",
+    "DshAgent",
+    "DshAgentConfig",
+    "DshSession",
     "Event",
     "Goal",
     "Hook",

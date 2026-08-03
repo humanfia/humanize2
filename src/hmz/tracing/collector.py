@@ -13,7 +13,7 @@ import dateparser
 from hmz import backends
 
 from . import chrome
-from .readers import claude, codex, kimi
+from .readers import claude, codex, dsh, kimi
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -22,7 +22,12 @@ if TYPE_CHECKING:
 
 #: Which reader reads which backend's logs. Where those logs are, and in what order the
 #: backends are gone through, is :mod:`hmz.backends`.
-_READERS = {"claude": claude.collect, "codex": codex.collect, "kimi": kimi.collect}
+_READERS = {
+    "claude": claude.collect,
+    "codex": codex.collect,
+    "dsh": dsh.collect,
+    "kimi": kimi.collect,
+}
 
 
 def collect(

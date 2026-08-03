@@ -39,6 +39,10 @@ PROFILES: tuple[AgentProfile, ...] = (
         state_paths=("~/.codex",),
     ),
     AgentProfile(
+        name="dsh",
+        state_paths=("~/.dsh",),
+    ),
+    AgentProfile(
         name="kimi",
         state_paths=("~/.kimi-code", "~/.kimi"),
     ),
@@ -95,9 +99,12 @@ class ResolvedAgent:
 
 def profile_for(name: str) -> AgentProfile:
     """Return the known profile for ``name``, or a permissive generic one."""
-    return _BY_NAME.get(
-        os.path.basename(name), AgentProfile(name=os.path.basename(name))
-    )
+    basename = os.path.basename(name)
+    # The Python SDK launches this bundled executable directly rather than through the
+    # `dsh` CLI, but it owns the same durable session state.
+    if basename.startswith("dsh-jsonrpc-agent-"):
+        return _BY_NAME["dsh"]
+    return _BY_NAME.get(basename, AgentProfile(name=basename))
 
 
 def resolve(command: list[str]) -> ResolvedAgent:

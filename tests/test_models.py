@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from typing import TYPE_CHECKING
 
@@ -173,6 +174,34 @@ def test_every_backend_is_asked_the_way_that_backend_answers(
     found = models.ask(cli)
 
     assert [model.name for model in found] == wanted
+
+
+def test_dsh_uses_the_official_adapter_catalogue_without_starting_a_cli(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def started(*args: object, **kwargs: object) -> None:
+        raise AssertionError("dsh model discovery must not start a CLI")
+
+    monkeypatch.setattr(subprocess, "run", started)
+
+    found = models.ask("deepseek-harness")
+
+    assert [model.name for model in found] == [
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+    ]
+    assert all(model.efforts == ("max", "high", "off") for model in found)
+    assert models.offered("dsh") == found
+
+
+def test_dsh_offers_the_official_catalogue_before_it_has_been_asked() -> None:
+    found = models.offered("deepseek-harness")
+
+    assert [model.name for model in found] == [
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+    ]
+    assert all(model.efforts == ("max", "high", "off") for model in found)
 
 
 def test_a_model_takes_the_efforts_its_backend_said_that_model_takes(

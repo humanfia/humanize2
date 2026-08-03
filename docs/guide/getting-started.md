@@ -7,9 +7,9 @@ properly.
 ## What you need
 
 - **Python 3.12 or newer.**
-- **At least one coding agent CLI on your `PATH`**, already logged in: `claude`
-  ([Claude Code](https://claude.com/claude-code)), `codex`, or `kimi`. humanize drives the CLI
-  you already use; it does not talk to a model provider itself and holds no API key.
+- **At least one supported backend:** a coding agent CLI on your `PATH`, already logged in,
+  such as `claude` ([Claude Code](https://claude.com/claude-code)), `codex` or `kimi`; or the
+  optional DeepSeek Harness Python SDK with a DeepSeek API key configured.
 - **A project directory you are willing to have rewritten.** Read
   [Security](/guide/security.md) first — humanize runs every agent with permission prompts
   disabled, so an agent under it edits files without asking.
@@ -18,6 +18,43 @@ Check what you have:
 
 ```sh
 command -v claude codex kimi pi opencode mimo
+```
+
+For DeepSeek Harness instead, install the `dsh` extra and check that its SDK imports:
+
+```sh
+pip install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
+python -c 'import deepseek_harness; print("dsh installed")'
+```
+
+With an isolated uv tool, install the extra into that tool instead:
+
+```sh
+uv tool install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
+```
+
+If the tool is already installed without DeepSeek, add `--force` to that command. The `dsh`
+tab in `/agents` also shows an environment-specific command until the SDK is present.
+
+DeepSeek Harness uses API-key login only. To configure it with DeepSeek's own UI, install its
+launcher (Node.js is required), start it, and open the URL it prints:
+
+```sh
+npm install --global @deepseek-ai/dsh
+dsh web
+```
+
+You can run `npx @deepseek-ai/dsh web` instead of installing the launcher globally. Open
+**Settings -> Models**, enter the DeepSeek API key, and save. After reopening `hmz`, type
+`/agents`, switch to `dsh`, and choose `as installed`; humanize then uses the credentials and
+base URL already saved by dsh.
+
+Alternatively, press **ctrl+n** on the `dsh` tab, choose `key`, and enter an account name and
+the key. Or set it only for the process that starts humanize:
+
+```sh
+export DEEPSEEK_API_KEY=sk-…
+hmz
 ```
 
 Nothing else is required. [Isolation](/reference/machines.md#a-container-of-the-agent-s-own) wants
@@ -29,6 +66,8 @@ on the far machine — neither is needed for anything below.
 ```sh
 pip install git+https://github.com/humanfia/humanize2.git
 ```
+
+Use the `hmz[dsh]` installation above when DeepSeek Harness is the backend you want.
 
 Or, from a checkout with [uv](https://docs.astral.sh/uv/):
 
@@ -126,6 +165,31 @@ hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "fix the failing tests"
 - `-a` is one agent, written `cli/model:effort`. Repeat it once for each agent the flow drives,
   in the order the flow takes them — `official/rlar` drives two, so it takes two `-a`.
 - The last argument is the task.
+
+DeepSeek Harness uses the same agent spelling. With dsh's saved configuration, no environment
+prefix is needed:
+
+```sh
+hmz exec -f ralph_loop \
+    -a dsh/deepseek-v4-flash:high "fix the failing tests"
+```
+
+With the environment setup above instead:
+
+```sh
+DEEPSEEK_API_KEY=sk-… hmz exec -f ralph_loop \
+    -a dsh/deepseek-v4-flash:high "fix the failing tests"
+```
+
+It also offers `deepseek-v4-pro` and the efforts `max`, `high` and `off`. Its current preview
+SDK only supports the default `permission=bypass` and `skills=None`; see
+[Agents › What each backend can do](/reference/agents.md#what-each-backend-can-do).
+
+With a key account called `deepseek` instead, name that account after `@`:
+
+```sh
+hmz exec -f chat -a dsh@deepseek/deepseek-v4-flash:high "hello"
+```
 
 To narrow what one of those agents may do, use the written-out form and name one of the four
 [permission rungs](/reference/agents.md#what-an-agent-may-do):

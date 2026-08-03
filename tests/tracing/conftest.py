@@ -18,6 +18,7 @@ CLAUDE_ELSEWHERE = "7c8d9e0f-1a2b-3c4d-5e6f-708192a3b4c5"
 CODEX_THREAD = "5f6e7d8c-1a2b-3c4d-5e6f-708192a3b4c5"
 CODEX_SUBTHREAD = "9182a3b4-c5d6-e7f8-0912-a3b4c5d6e7f8"
 KIMI_SESSION = "session_20260720T100000_abcdef"
+DSH_SESSION = "session-dsh12345"
 
 
 def _stamp(offset: float) -> str:
@@ -43,7 +44,12 @@ def _write(path: pathlib.Path, records: list[dict[str, Any]]) -> None:
 def sandbox(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Hides the real agent homes so tests never read the developer's logs."""
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    for variable in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "KIMI_CODE_HOME"):
+    for variable in (
+        "CLAUDE_CONFIG_DIR",
+        "CODEX_HOME",
+        "DSH_HOME",
+        "KIMI_CODE_HOME",
+    ):
         monkeypatch.delenv(variable, raising=False)
     monkeypatch.chdir(tmp_path)
 
@@ -359,6 +365,179 @@ def codex_home(
         ],
     )
     monkeypatch.setenv("CODEX_HOME", str(home))
+    return home
+
+
+@pytest.fixture
+def dsh_home(
+    tmp_path: pathlib.Path, workspace: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> pathlib.Path:
+    """Builds a DeepSeek Harness home with one tool-using session."""
+    home = tmp_path / "dsh"
+    log = home / "sessions" / "--workspace--" / DSH_SESSION / "session.jsonl"
+    _write(
+        log,
+        [
+            {
+                "type": "session",
+                "version": 0,
+                "id": DSH_SESSION,
+                "createdAt": _millis(0),
+                "cwd": str(workspace),
+                "delegationDepth": 0,
+            },
+            {"type": "turn/start", "seq": 0, "time": _millis(0), "data": {"turn": 1}},
+            {
+                "type": "user/message",
+                "seq": 1,
+                "time": _millis(1),
+                "data": {
+                    "content": [{"type": "text", "text": "inspect the module"}],
+                    "source": {"kind": "user"},
+                    "role": "user",
+                },
+            },
+            {
+                "type": "session/title",
+                "seq": 2,
+                "time": _millis(1),
+                "data": {"title": "inspect the module"},
+            },
+            {
+                "type": "request/header",
+                "seq": 3,
+                "time": _millis(1),
+                "data": {
+                    "header": {
+                        "config": {
+                            "provider": "deepseek-official",
+                            "model": "deepseek-v4-flash",
+                            "reasoningEffort": "high",
+                            "maxTokens": 256000,
+                        }
+                    },
+                    "reason": "initial",
+                },
+            },
+            {
+                "type": "step/start",
+                "seq": 4,
+                "time": _millis(2),
+                "data": {"turn": 1, "step": 1},
+            },
+            {
+                "type": "assistant/message",
+                "seq": 5,
+                "time": _millis(3),
+                "data": {
+                    "turn": 1,
+                    "step": 1,
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {"type": "reasoning", "text": "read it first"},
+                            {
+                                "type": "tool-call",
+                                "id": "call-read",
+                                "name": "bash",
+                                "arguments": '{"command":"cat module.py"}',
+                            },
+                        ],
+                        "source": {
+                            "kind": "model",
+                            "provider": "deepseek-official",
+                            "model": "deepseek-v4-flash",
+                        },
+                    },
+                    "usage": {
+                        "inputTokens": 20,
+                        "outputTokens": 10,
+                        "cacheReadTokens": 100,
+                        "reasoningTokens": 4,
+                    },
+                },
+            },
+            {
+                "type": "tool/call",
+                "seq": 6,
+                "time": _millis(4),
+                "data": {
+                    "turn": 1,
+                    "step": 1,
+                    "callId": "call-read",
+                    "name": "bash",
+                    "arguments": '{"command":"cat module.py"}',
+                },
+            },
+            {
+                "type": "tool/result",
+                "seq": 7,
+                "time": _millis(6),
+                "data": {
+                    "turn": 1,
+                    "step": 1,
+                    "message": {
+                        "source": {"kind": "tool", "callId": "call-read"},
+                        "content": [
+                            {
+                                "type": "tool-result",
+                                "toolCallId": "call-read",
+                                "content": [{"type": "text", "text": "print('hi')"}],
+                                "isError": False,
+                            }
+                        ],
+                    },
+                },
+            },
+            {
+                "type": "step/end",
+                "seq": 8,
+                "time": _millis(6),
+                "data": {"turn": 1, "step": 1},
+            },
+            {
+                "type": "step/start",
+                "seq": 9,
+                "time": _millis(7),
+                "data": {"turn": 1, "step": 2},
+            },
+            {
+                "type": "assistant/message",
+                "seq": 10,
+                "time": _millis(8),
+                "data": {
+                    "turn": 1,
+                    "step": 2,
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {"type": "reasoning", "text": "the module is simple"},
+                            {"type": "text", "text": "inspected the module"},
+                        ],
+                        "source": {
+                            "kind": "model",
+                            "provider": "deepseek-official",
+                            "model": "deepseek-v4-flash",
+                        },
+                    },
+                    "usage": {"inputTokens": 15, "outputTokens": 8},
+                },
+            },
+            {
+                "type": "step/end",
+                "seq": 11,
+                "time": _millis(8),
+                "data": {"turn": 1, "step": 2},
+            },
+            {
+                "type": "turn/end",
+                "seq": 12,
+                "time": _millis(9),
+                "data": {"turn": 1, "reason": {"kind": "completed"}},
+            },
+        ],
+    )
+    monkeypatch.setenv("DSH_HOME", str(home))
     return home
 
 

@@ -20,6 +20,7 @@ agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="h
 | --- | --- | --- | --- |
 | Claude Code | `ClaudeCodeAgent` | `ClaudeCodeAgentConfig` | `ClaudeCodeSession` |
 | Codex | `CodexAgent` | `CodexAgentConfig` | `CodexSession` |
+| DeepSeek Harness | `DshAgent` | `DshAgentConfig` | `DshSession` |
 | Kimi Code | `KimiCodeCLIAgent` | `KimiCodeCLIAgentConfig` | `KimiCodeCLISession` |
 | pi | `PiAgent` | `PiAgentConfig` | `PiSession` |
 | opencode | `OpencodeAgent` | `OpencodeAgentConfig` | `OpencodeSession` |
@@ -29,6 +30,21 @@ agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="h
 pi, opencode and mimocode name a model as `provider/id` — `openai-codex/gpt-5.5`,
 `opencode/big-pickle`, `xiaomi/mimo-v2.5` — because a model there belongs to the provider that
 serves it, and the CLI is asked for the pair.
+
+DeepSeek Harness is an optional Python SDK backend. Install it with the `dsh` extra as shown
+in [Installation](/guide/installation#install-humanize). It supports API-key login only:
+leave `provider` empty to use the credentials and base URL saved by dsh (or its environment),
+or make a `key` account from `/agents` with **ctrl+n** and give its name as `provider`. Then
+construct it like any other agent:
+
+```python
+from hmz.agents import DshAgent, DshAgentConfig
+
+agent = DshAgent(DshAgentConfig(model="deepseek-v4-flash", effort="high"))
+```
+
+It also offers `deepseek-v4-pro`. The SDK and bundled runtime are currently a developer
+preview; humanize supports `deepseek-harness-sdk>=0.1.0rc6,<0.2`.
 
 A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land), the
 [skills it is loaded with](#which-skills-an-agent-is-loaded-with),
@@ -427,7 +443,7 @@ sessions under:
 
 ```python
 agent.id       # the name you gave it, the name the flow calls it, or one nothing else answers to
-agent.backend  # "claude", "codex", "kimi", "pi", "opencode" or "mimo"
+agent.backend  # "claude", "codex", "dsh", "kimi", "pi", "opencode" or "mimo"
 agent.opened   # the backend's id for every session this agent ever opened, oldest first
 agent.sessions # the ones somebody still holds
 agent.config   # what it runs at
@@ -508,6 +524,7 @@ against a list, so a value your account has and this page does not still works.
 | --- | --- |
 | Claude Code | `low`, `medium`, `high`, `xhigh`, `max`, and `ultracode` |
 | Codex | `low`, `medium`, `high`, `xhigh`, and `max`/`ultra` on the models that take them |
+| DeepSeek Harness | `off`, `high`, `max` |
 | Kimi Code | `low`, `medium`, `high`, `max`, each also as `swarm…` |
 | pi | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
 | opencode, mimocode | the model variant: `minimal`, `low`, `medium`, `high`, `xhigh` |
@@ -541,10 +558,9 @@ a model does not think harder halfway through an answer, and a flow that changed
 would be describing a turn that never happened.
 
 Each backend carries it the way that backend takes it. Codex, Kimi Code, opencode and mimocode
-take the effort with each turn, so the next turn simply carries the new one. Claude Code takes
-it as an argument of the process it is held open as, so moving it ends that process and
-resumes the conversation in one started at the new effort — the same thing asking for a shape
-does. pi has a command for it, and is told.
+take the effort with each turn, so the next turn simply carries the new one. Claude Code and
+DeepSeek Harness take it when their runtime starts, so moving it restarts that runtime and
+resumes the same conversation at the new effort. pi has a command for it, and is told.
 
 A `swarm` prefix moves with it on Kimi Code: `agent.effort = "swarmmax"` is `max` thinking at
 the width of a fleet, from the next turn on.
@@ -584,8 +600,8 @@ the run, so a rate read a minute in is what that minute came to rather than a fi
 **It moves while the turn is still running.** A turn is minutes long, so a number that only
 moved when one ended would stand still for all of them: every backend here is read as it says
 what each request to the model cost — Claude Code and pi on the message it answered with,
-Codex on `thread/tokenUsage/updated`, opencode and mimocode on each step, Kimi Code from the
-session it is polling anyway.
+Codex on `thread/tokenUsage/updated`, DeepSeek Harness and pi on finalized assistant messages,
+opencode and mimocode on each step, Kimi Code from the session it is polling anyway.
 
 **`juice()` is the third reading, and it is not a clock at all.** It is what one turn of the
 *model* came out with — one request and the answer to it, of which a turn a flow asks for is
@@ -606,13 +622,17 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 
 ## What each backend can do
 
-| | Claude Code | Codex | Kimi Code | pi | opencode, mimocode |
-| --- | --- | --- | --- | --- | --- |
-| Driven through | its command line, held open | its app server | its app server | its command line, held open | its command line, one run per turn |
-| [`interject`](#talking-to-a-turn-already-running) | yes — answered within the same turn | yes — a steer on the running turn | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended |
-| [`pursue`](#goals) | yes | yes | yes | no | no |
-| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | yes | yes | no | no | no |
-| Sub-agents in a trace | yes | yes | yes | no | no |
+| | Claude Code | Codex | DeepSeek Harness | Kimi Code | pi | opencode, mimocode |
+| --- | --- | --- | --- | --- | --- | --- |
+| Driven through | its command line, held open | its app server | its Python SDK | its app server | its command line, held open | its command line, one run per turn |
+| [`interject`](#talking-to-a-turn-already-running) | yes — answered within the same turn | yes — a steer on the running turn | no | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended |
+| [`pursue`](#goals) | yes | yes | yes | yes | no | no |
+| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | yes | yes | no | no | no | no |
+| Sub-agents in a trace | yes | yes | no | yes | no | no |
+
+DeepSeek Harness currently accepts only `permission="bypass"` and `skills=None`. Its preview
+SDK exposes neither a per-session sandbox/approval control nor exact per-agent skill selection;
+another value is rejected before the runtime starts rather than silently ignored.
 
 opencode and mimocode keep a session in a database rather than in a log file, so there is
 nothing for `hmz collect` to gather and nothing for the interface to read a running cost out
@@ -696,12 +716,12 @@ interface it is made on `/agents` with `ctrl+p`.
 Every backend has a ladder of its own and none of them has the same four rungs, so each driver
 reaches for whichever of its own settings says the same thing:
 
-| Rung | Claude Code | Codex | Kimi Code | pi | opencode, mimocode |
-| --- | --- | --- | --- | --- | --- |
-| `read-only` | `plan` mode | `read-only` sandbox | plan mode | without `bash`, `edit`, `write` | `edit` and `bash` denied |
-| `workspace-write` | `acceptEdits` mode | `workspace-write` sandbox | plan mode off | — | `webfetch` denied |
-| `auto` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | nothing denied |
-| `bypass` | `bypassPermissions` | `danger-full-access` | `yolo` mode | — | — |
+| Rung | Claude Code | Codex | DeepSeek Harness | Kimi Code | pi | opencode, mimocode |
+| --- | --- | --- | --- | --- | --- | --- |
+| `read-only` | `plan` mode | `read-only` sandbox | — | plan mode | without `bash`, `edit`, `write` | `edit` and `bash` denied |
+| `workspace-write` | `acceptEdits` mode | `workspace-write` sandbox | — | plan mode off | — | `webfetch` denied |
+| `auto` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | — | nothing denied |
+| `bypass` | `bypassPermissions` | `danger-full-access` | supported | `yolo` mode | — | — |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one. Where a backend cannot tell two rungs apart it says so
@@ -740,6 +760,7 @@ leaving("claude", ("code-review",))    # what to switch off so that only that on
 | --- | --- | --- |
 | `claude` | `--disallowedTools "Skill(<name>)"` | the agent is refused the skill. Claude still lists it — no flag takes one off that list |
 | `codex` | `-c skills.config=[{name="<name>", enabled=false}]` on its app server | the skill is not loaded for that server, and the user's own `config.toml` is untouched |
+| `dsh` | — | the preview SDK cannot select an exact skill set; `skills` must be `None` |
 | `kimi` | — | `kimi web` takes no `--skills-dir`, so a skill it finds is one it loads |
 | `pi` | — | it is told which skills to load by path, and finds none of its own to choose between |
 | `opencode`, `mimo` | — | neither offers a way of switching one off for a single run |

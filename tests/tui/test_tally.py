@@ -20,6 +20,8 @@ from hmz.agents import (
     ClaudeCodeAgentConfig,
     CodexAgent,
     CodexAgentConfig,
+    DshAgent,
+    DshAgentConfig,
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
 )
@@ -62,7 +64,12 @@ def _said(model: str, output: int) -> dict[str, object]:
 @pytest.fixture
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Puts every backend's home somewhere this test owns."""
-    for variable in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "KIMI_CODE_HOME"):
+    for variable in (
+        "CLAUDE_CONFIG_DIR",
+        "CODEX_HOME",
+        "DSH_HOME",
+        "KIMI_CODE_HOME",
+    ):
         monkeypatch.setenv(variable, str(tmp_path / variable.lower()))
     return tmp_path
 
@@ -157,6 +164,42 @@ def test_a_codex_thread_is_counted_from_the_rollout_it_writes(home: Path) -> Non
     tally.read()
 
     assert monitor.spent == {"gpt-5.6-sol": 1500}
+
+
+def test_a_dsh_session_is_counted_from_its_assistant_messages(home: Path) -> None:
+    log = (
+        home / "dsh_home" / "sessions" / "--tmp-work--" / "session-d1" / "session.jsonl"
+    )
+    _rows(
+        log,
+        {
+            "type": "assistant/message",
+            "data": {
+                "message": {
+                    "source": {
+                        "kind": "model",
+                        "provider": "deepseek-official",
+                        "model": "deepseek-v4-pro",
+                    }
+                },
+                "usage": {
+                    "inputTokens": 11,
+                    "outputTokens": 7,
+                    "cacheReadTokens": 3,
+                    "cacheWriteTokens": 2,
+                    "reasoningTokens": 5,
+                },
+            },
+        },
+    )
+    agent = DshAgent(DshAgentConfig(model="deepseek-v4-flash", effort="high"))
+    agent.new()._adopt("session-d1")
+    monitor = Monitor()
+
+    Tally([agent], monitor).read()
+
+    # The log names the actual model, and reasoning is already part of output.
+    assert monitor.spent == {"deepseek-v4-pro": 23}
 
 
 def test_a_kimi_session_is_counted_from_the_steps_its_daemon_writes(home: Path) -> None:

@@ -46,7 +46,7 @@ class Goal:
     """What a flow writes beside an agent it runs under the backend's own goal feature.
 
     `pursue` is the agent keeping itself going toward an objective it decides for itself is
-    met, and three backends have it. A flow built on that is not a flow any agent can drive,
+    met, and four backends have it. A flow built on that is not a flow any agent can drive,
     so it says which of its agents has to have one, by writing this where it declares them::
 
         class Agents(NamedTuple):

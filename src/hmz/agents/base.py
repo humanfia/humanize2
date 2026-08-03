@@ -1573,7 +1573,7 @@ class AgentBase(ABC):
 
     #: Whether this backend has a goal feature of its own -- one where the agent decides for
     #: itself that an objective has been met, and a turn that would have ended starts another
-    #: instead, which is what `pursue` reaches for. Three of them have; a flow that runs its
+    #: instead, which is what `pursue` reaches for. Four of them have; a flow that runs its
     #: agent under a goal says so where it declares them, and is then refused an agent that
     #: has not rather than raising on the first turn.
     pursues: ClassVar[bool] = False

@@ -11,10 +11,11 @@ turns and which account it runs as (:class:`RunsAs`), which model it runs and at
 (:class:`Models`), and -- only where the flow said that one may be pointed at a machine --
 where its work lands (:class:`Anchors`). The order is the order of what depends on what: an
 account belongs to a backend and a model belongs to the CLI that runs it, so neither can be
-asked before the CLI has been. The CLIs are read one at a time, a tab apiece and only the ones
-installed here, since every model of every CLI in one list is a list that grows each time any
-of them ships a model. The effort is the line with the arrows on it, exactly as Claude Code's
-is, and beside it the things that really are side questions about the same agent.
+asked before the CLI has been. The backends are read one at a time, a tab apiece: the ones
+installed here plus an optional one the sheet can teach somebody to install. Every model of
+every CLI in one list is a list that grows each time any of them ships a model. The effort is
+the line with the arrows on it, exactly as Claude Code's is, and beside it the things that
+really are side questions about the same agent.
 
 `/status` is the last of them, and is read rather than answered -- Claude Code's own, which is
 a rule across, fields down the left and their values lined up beside them.
@@ -23,7 +24,10 @@ a rule across, fields down the left and their values lined up beside them.
 from __future__ import annotations
 
 import contextlib
+import shlex
+import sys
 import time
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -2095,9 +2099,10 @@ class RunsAs(Sheet[Whose]):
 
     Two halves of one question, in this order because an account belongs to a backend: what
     signs in to Claude Code is not what signs in to codex, so the accounts under each tab are
-    that backend's own. The CLIs are a tab apiece and only the ones installed here, less any
-    the flow ruled out by asking that place for a moment they do not run -- a CLI that would
-    make the flow refuse to start is not one to offer for it.
+    that backend's own. The backends are a tab apiece: the ones installed here, plus an
+    optional one that can be installed from this sheet, less any the flow ruled out by asking
+    that place for a moment they do not run. A backend that would make the flow refuse to
+    start is not offered.
 
     The account is a step rather than a chord because it decides which credentials the turns
     run under, which is not a side question about anything: two agents of one CLI may be two
@@ -2125,6 +2130,8 @@ class RunsAs(Sheet[Whose]):
         place: Place,
         agents: dict[str, tuple[Model, ...]],
         now: Whose | None = None,
+        *,
+        unavailable: frozenset[str] = frozenset(),
     ) -> None:
         """Initializes the choosing.
 
@@ -2133,18 +2140,20 @@ class RunsAs(Sheet[Whose]):
           named: What the flow calls it, which every step of configuring it says.
           place: What the flow declared about it, which is what the moments it has to run are
             read from.
-          agents: The CLIs installed here, and what each says it runs.
+          agents: The backends offered here, and what each says it runs.
           now: What this step answered last time it was walked through, or None for one being
             asked for the first time -- esc is the step before, and a step before that had
             forgotten itself would be a different question.
+          unavailable: The optional backends among them that still need installing.
         """
         super().__init__()
         self._flow = flow
         self._named = named
         self._place = place
-        #: What each CLI installed here runs, which is a tab apiece. What they run is the
+        #: What each backend offered here runs, which is a tab apiece. What they run is the
         #: next step's; this one needs only the names.
         self._agents = dict(agents)
+        self._unavailable = unavailable
         self._now = now or Whose("")
         able = self._able()
         #: Which tab is open, counting the CLIs this one could be, opening on the one it is
@@ -2160,8 +2169,8 @@ class RunsAs(Sheet[Whose]):
     def _able(self) -> list[str]:
         """The CLIs that could take this agent's turns, which is not always all of them.
 
-        Which is what the tabs are: the ones installed here, less any the flow has ruled out.
-        A flow that hangs a hook on a moment only some backends run said so where it declared
+        Which is what the tabs are: the ones offered here, less any the flow has ruled out. A
+        flow that hangs a hook on a moment only some backends run said so where it declared
         the place; a CLI that does not run that moment is not one to offer for it, since
         choosing it is a flow that would refuse to start.
 
@@ -2286,8 +2295,13 @@ class RunsAs(Sheet[Whose]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            "←/→ CLI · ctrl+n to make one · Type to search · Enter to choose · Esc to go back"
-            f"{self.searching()}"
+            (
+                "←/→ CLI · Esc to go back"
+                if self._backend() in self._unavailable
+                else "←/→ CLI · ctrl+n to make one · Type to search · "
+                "Enter to choose · Esc to go back"
+            )
+            + self.searching()
         )
 
     def _accounts(self) -> list[tuple[str, str, str]]:
@@ -2297,11 +2311,28 @@ class RunsAs(Sheet[Whose]):
         backend = self._backend()
         if not backend:
             return []
+        if backend in self._unavailable:
+            return []
+        found = providers.providers(backend)
+        if backend == "dsh":
+            found = [
+                one
+                for one in found
+                if one.way == "key" and one.env.get("DEEPSEEK_API_KEY", "").strip()
+            ]
         return [
             # Two words for the account nobody chose: this is a row in a list of accounts, and
             # what it is is the one the CLI is already signed in as.
-            ("", "as installed", "signed in as you signed it in"),
-            *((one.name, one.name, _sets(one)) for one in providers.providers(backend)),
+            (
+                "",
+                "as installed",
+                (
+                    "using credentials and the base URL saved by dsh, or this environment"
+                    if backend == "dsh"
+                    else "signed in as you signed it in"
+                ),
+            ),
+            *((one.name, one.name, _sets(one)) for one in found),
         ]
 
     def _nothing(self) -> str:
@@ -2311,6 +2342,15 @@ class RunsAs(Sheet[Whose]):
         backend = self._backend()
         if not backend:
             return "no coding agent installed here can take this one's turns"
+        if backend in self._unavailable:
+            return _installing(backend)
+        if backend == "dsh":
+            if self._found:
+                return ""
+            return (
+                "DeepSeek Harness needs an API key; ctrl+n stores one, or set "
+                "DEEPSEEK_API_KEY and reopen hmz"
+            )
         if len(self._found or []) > 1:
             return ""
         return f"{escape(backend)} has no accounts here yet; ctrl+n makes one"
@@ -2325,7 +2365,7 @@ class RunsAs(Sheet[Whose]):
         which is said under the list and left for whoever is looking to decide about.
         """
         backend = self._backend()
-        if not backend:
+        if not backend or backend in self._unavailable:
             return  # no CLI to make an account for, so nothing for the key to be about
         # textual types the property off the bare generic, as it does everywhere else here.
         showing = cast(
@@ -2357,6 +2397,18 @@ class RunsAs(Sheet[Whose]):
           event: What was chosen.
         """
         self.dismiss(Whose(self._backend(), str(event.option.id).removeprefix("=")))
+
+
+def _installing(backend: str) -> str:
+    """The command that adds an optional backend to this Python environment."""
+    if backend != "dsh":
+        return f"install {backend}, then reopen humanize"
+    executable = str(Path(sys.executable).absolute())
+    command = (
+        f"uv pip install --python {shlex.quote(executable)} "
+        "'deepseek-harness-sdk>=0.1.0rc6,<0.2'"
+    )
+    return f"DeepSeek Harness is not installed; run: {command}; then reopen hmz"
 
 
 class Made(NamedTuple):
@@ -2708,6 +2760,22 @@ class Signing(Sheet[Signs]):
         else:
             return
         event.prevent_default()
+        event.stop()
+        self._wrong = ""
+        self._fill()
+
+    def on_paste(self, event: events.Paste) -> None:
+        """Pastes an answer into the question under the cursor."""
+        if not self._fields or not event.text:
+            event.stop()
+            return
+        held = self._fields[self._at][0]
+        pasted = event.text.replace("\r\n", "\n").replace("\r", "\n")
+        if held != _TYPED:
+            # A clipboard commonly ends in a newline. Single-value fields follow
+            # Textual Input and take one line; only the free-form env row is multiline.
+            pasted = pasted.split("\n", 1)[0]
+        self._typed_in[held] = self._typed_in.get(held, "") + pasted
         event.stop()
         self._wrong = ""
         self._fill()

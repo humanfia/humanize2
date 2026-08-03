@@ -20,6 +20,8 @@ repos:
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
+        # Cordis uses DeepSeek's `!!js` values, which are outside standard YAML's type set.
+        exclude: ^src/hmz/agents/dsh\.cordis\.yml$
       - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: trailing-whitespace

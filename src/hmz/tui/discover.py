@@ -1,9 +1,10 @@
 """Which agents are installed here, what each one runs, and where their turns could land.
 
-Nothing is typed in: a backend that is not on this machine is not offered, and an effort a
-model does not take is not offered against it. What each backend runs is what that backend
-last said it runs, which :mod:`hmz.models` keeps -- read off the disk here, because asking
-means starting a coding agent and a prompt cannot wait on one.
+Installed backends are found here, and optional backends somebody can add are named separately
+so the picker can teach them how. An effort a model does not take is not offered against it.
+What each backend runs is what that backend last said it runs, which :mod:`hmz.models` keeps --
+read off the disk here, because asking means starting a coding agent and a prompt cannot wait
+on one.
 
 Nothing is asked of the backends either. Measured on the machine this was written on,
 `claude --help` took over thirty seconds, `codex app-server` seventy-six, and `kimi web` about
@@ -13,6 +14,7 @@ on the key that says to ask again -- and read here.
 
 from __future__ import annotations
 
+import importlib.util
 import shutil
 import subprocess
 from pathlib import Path
@@ -24,7 +26,7 @@ from hmz.backends import PROFILES
 if TYPE_CHECKING:
     from hmz.backends import Model
 
-__all__ = ["installed", "machines"]
+__all__ = ["installable", "installed", "machines"]
 
 #: How long the machines around here are given to name themselves before the list goes up
 #: without them. A docker daemon that is not answering is not a reason to sit at a sheet.
@@ -44,8 +46,29 @@ def installed() -> dict[str, tuple[Model, ...]]:
     return {
         profile.name: models.offered(profile.name)
         for profile in PROFILES
-        if shutil.which(profile.name) is not None
+        if _is_installed(profile.name)
     }
+
+
+def installable() -> dict[str, tuple[Model, ...]]:
+    """Optional backends that can be added to this humanize installation.
+
+    These are kept apart from :func:`installed`: they belong in the agent picker so that
+    somebody can discover and install them, but they must not make an unopened prompt look
+    ready to run or be asked for models in the background.
+
+    Returns:
+      One entry per supported optional backend missing from this Python environment, with
+      the models it will offer once installed.
+    """
+    return {"dsh": models.offered("dsh")} if not _is_installed("dsh") else {}
+
+
+def _is_installed(backend: str) -> bool:
+    """Whether a backend's executable or Python SDK is installed here."""
+    if backend == "dsh":
+        return importlib.util.find_spec("deepseek_harness") is not None
+    return shutil.which(backend) is not None
 
 
 def machines() -> list[tuple[str, str]]:

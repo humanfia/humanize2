@@ -52,11 +52,16 @@ def ways(cli: str) -> tuple[backends.Way, ...]:
       cli: The backend, by any name it answers to.
 
     Returns:
-      What that backend offers, in the order it offers them, and the one every backend has --
-      variables of your own -- last. Nothing at all for a name no backend answers to.
+      What that backend offers, in the order it offers them, and variables of your own last
+      where that backend accepts arbitrary credentials. DeepSeek Harness takes only its
+      named API-key way. Nothing at all for a name no backend answers to.
     """
     profile = backends.named(cli)
-    return (*profile.ways, ENV) if profile is not None else ()
+    if profile is None:
+        return ()
+    if profile.name == "dsh":
+        return profile.ways
+    return (*profile.ways, ENV)
 
 
 @dataclass(frozen=True, slots=True)
