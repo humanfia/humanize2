@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .acp import AcpAgent, AcpAgentConfig, AcpSession
 from .agy import (
     AntigravityCLIAgent,
     AntigravityCLIAgentConfig,
@@ -55,12 +56,40 @@ DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
     "qwen": (QwenCodeAgent, QwenCodeAgentConfig),
 }
 
+
+def driver(backend: str) -> tuple[type[AgentBase], type[AgentConfig]]:
+    """What drives one backend, whether humanize wrote the driver or somebody added the CLI.
+
+    Args:
+      backend: The backend, by the name a command line calls it.
+
+    Returns:
+      The agent class and the config class to build it from. A CLI added by hand is driven by
+      the one class that speaks the Agent Client Protocol, since the protocol is the whole of
+      what is known about it.
+
+    Raises:
+      KeyError: If nothing here drives it and nobody has added it.
+    """
+    from hmz import backends
+
+    held = DRIVEN.get(backend)
+    if held is not None:
+        return held
+    if backend in backends.speaking():
+        return (AcpAgent, AcpAgentConfig)
+    raise KeyError(backend)
+
+
 __all__ = [
     "DRIVEN",
     "EVERYWHERE",
     "PERMISSIONS",
     "SWARM",
     "WINDOW",
+    "AcpAgent",
+    "AcpAgentConfig",
+    "AcpSession",
     "AgentBase",
     "AgentConfig",
     "AgentDefaults",

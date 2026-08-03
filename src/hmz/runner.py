@@ -1035,7 +1035,7 @@ def flow_and_agents(
         help="one agent, repeated once for each the flow drives, in the order it takes "
         "them; also written cli=CLI,model=MODEL,effort=EFFORT with optional "
         "permission=PERMISSION. CLI is one of "
-        f"{', '.join(sorted(one.name for one in backends.PROFILES))}",
+        f"{', '.join(sorted(one.name for one in backends.profiles()))}",
     )
     parser.add_argument(
         "-c",
@@ -1058,7 +1058,7 @@ def flow_and_agents(
 
     # Only now that the line is known to name agents: `--help` has already exited, and it
     # should not have paid for three backends to say what it takes.
-    from .agents import DRIVEN
+    from .agents import driver
 
     # A command-line agent has no picker to resolve a place's initial suggestion, so resolve
     # it here before constructing the config. Leave malformed or missing flows for Runner to
@@ -1073,7 +1073,7 @@ def flow_and_agents(
             profile, model, effort, provider, permission = read_agent(spec)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
-        agent, config = DRIVEN[profile.name]
+        agent, config = driver(profile.name)
         # Named rather than looked up: an account that is not there is caught by the agent
         # the first time it needs one, which says whose it was and what it was called.
         goals = places[at].goals_default if at < len(places) else True

@@ -31,7 +31,28 @@ name the interface shows. The classes keep the product's own full name.
 | `qwen` | `QwenCodeAgent` | `QwenCodeAgentConfig` | `QwenCodeSession` |
 | `opencode` | `OpencodeAgent` | `OpencodeAgentConfig` | `OpencodeSession` |
 | `mimo` | `MimoCodeAgent` | `MimoCodeAgentConfig` | `MimoCodeSession` |
+| whatever you added | `AcpAgent` | `AcpAgentConfig` | `AcpSession` |
 | you | `HumanAgent` | — (takes only `name=`) | `HumanSession` |
+
+## A CLI of your own
+
+Any coding agent that speaks the [Agent Client Protocol](https://agentclientprotocol.com) can
+be driven from here without humanize knowing anything else about it. Add one in the interface:
+`/providers`, then **c**, and give the command that starts it — `my-agent --acp`, `grok agent
+stdio`, `qwen --acp`. It is written down under humanize's own home, so it is a backend from the
+next prompt on, in this workspace and every other, and `-a my-agent/...` names it.
+
+humanize spawns that command and speaks JSON-RPC to it over its own stdin and stdout:
+`session/new` opens the conversation, `session/prompt` takes each turn, and what the agent says
+while a turn runs arrives as `session/update` notifications. Each tool call it asks permission
+for is granted — by the **kind** of the option it offers rather than by the option's id, since
+the ids are each agent's own words.
+
+The protocol says nothing about which models an agent runs or how hard it can be asked to
+think, so neither is offered: both rows read `as configured`, and the agent runs as whoever
+installed it set it up. It cannot be steered mid-turn either — every agent spells that
+extension its own way — and it has no goal feature, no permission rungs and no logs for
+`hmz collect` to read.
 
 `pi`, `opencode` and `mimo` name a model as `provider/id` — `openai-codex/gpt-5.5`,
 `opencode/big-pickle`, `xiaomi/mimo-v2.5` — because a model there belongs to the provider that

@@ -26,7 +26,7 @@ import subprocess
 from typing import TYPE_CHECKING, Any, cast
 
 from hmz import home, providers
-from hmz.backends import Model, named
+from hmz.backends import Model, named, speaking
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -121,6 +121,11 @@ def offered(cli: str, provider: str = "") -> tuple[Model, ...]:
         for name, efforts, swarms in _read(_kept(cli, provider))
     )
     profile = named(cli)
+    if not found and profile is not None and profile.name in speaking():
+        # The protocol says nothing about which models an agent runs: that is the agent's own
+        # to know, and it runs as whoever installed it configured it. One row so that an
+        # agent can be configured at all.
+        return (Model(profile.efforts[0], profile.efforts, profile.swarms),)
     if not found and profile is not None and profile.name in _ADVISORY:
         return tuple(
             Model(name, profile.efforts, profile.swarms)

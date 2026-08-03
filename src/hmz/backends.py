@@ -21,8 +21,24 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
-__all__ = ["PROFILES", "Asked", "Model", "Profile", "Way", "named", "read"]
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+__all__ = [
+    "PROFILES",
+    "Asked",
+    "Model",
+    "Profile",
+    "Way",
+    "forget",
+    "named",
+    "profiles",
+    "read",
+    "remember",
+    "speaking",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -835,6 +851,143 @@ PROFILES = (
 )
 
 
+#: Where the CLIs somebody added themselves are written down, under humanize's own home. A
+#: file rather than a setting of one workspace: a CLI is installed on a machine, and a flow
+#: run in the next directory along is run against the same one.
+_SPOKEN = "acp.json"
+
+#: What is offered for a CLI that speaks only the Agent Client Protocol. The protocol says
+#: nothing about which models an agent runs or how hard it may be asked to think -- both are
+#: the agent's own -- so one of each is offered and neither is sent.
+_UNSAID = "as configured"
+
+
+def _spoken() -> Path:
+    """Where the added CLIs are kept."""
+    from hmz import home
+
+    return home() / _SPOKEN
+
+
+def speaking() -> dict[str, tuple[str, ...]]:
+    """Every CLI somebody has added, and the command that starts each one.
+
+    Returns:
+      One entry per CLI, by the name it was added under, holding the command to run. Nothing
+      at all where none has been added or where what was written cannot be read back -- a
+      file nobody can read is a list to fill rather than a reason to refuse to start.
+    """
+    import json
+
+    try:
+        held = json.loads(_spoken().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(held, dict):
+        return {}
+    found: dict[str, tuple[str, ...]] = {}
+    for name, argv in cast("dict[str, object]", held).items():
+        if not isinstance(argv, list):
+            continue
+        given = tuple(str(one) for one in cast("list[object]", argv))
+        if given:
+            found[name] = given
+    return found
+
+
+def remember(name: str, command: Sequence[str]) -> None:
+    """Writes down a CLI that speaks the protocol, so that it is a backend from now on.
+
+    Args:
+      name: What to call it, which is what an `-a` will name and what the prompt will show.
+        The command it is installed as, by convention, since that is how every other backend
+        here is named.
+      command: What to run to start it, as argv -- `["my-agent", "--acp"]`. There is no
+        discovery in the protocol and no flag every agent agrees on, so this is asked for.
+
+    Raises:
+      ValueError: If it is not named, has no command, or would shadow a backend humanize
+        already drives -- two backends answering to one name is a name nobody can resolve.
+    """
+    import json
+
+    named_as = name.strip()
+    argv = [str(one) for one in command if str(one).strip()]
+    if not named_as or not argv:
+        raise ValueError("an added CLI needs a name and a command to start it with")
+    if any(named_as in one.aliases for one in PROFILES):
+        raise ValueError(f"{named_as} is already a backend humanize drives")
+    held = speaking()
+    held[named_as] = tuple(argv)
+    at = _spoken()
+    at.parent.mkdir(parents=True, exist_ok=True)
+    # Whole and then moved into place, so that a list read while it is being written is
+    # either the old one or the new one and never half of each.
+    beside = at.parent / f".{at.name}.new"
+    beside.write_text(
+        json.dumps({one: list(argv) for one, argv in held.items()}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    beside.replace(at)
+
+
+def forget(name: str) -> bool:
+    """Takes an added CLI away again.
+
+    Args:
+      name: What it was added under.
+
+    Returns:
+      Whether there was one to take away.
+    """
+    import json
+
+    held = speaking()
+    if name not in held:
+        return False
+    del held[name]
+    at = _spoken()
+    at.write_text(
+        json.dumps({one: list(argv) for one, argv in held.items()}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return True
+
+
+def profiles() -> tuple[Profile, ...]:
+    """Every backend there is: the ones humanize drives, and the ones somebody added.
+
+    Read each time rather than settled at import: a CLI added at the prompt is a backend from
+    that moment, and a list built once would be a list that says otherwise until the next run.
+
+    Returns:
+      The built-in profiles in their own order, and then the added ones in the order they
+      were written down.
+    """
+    return (*PROFILES, *(_speaks(name) for name in speaking()))
+
+
+def _speaks(name: str) -> Profile:
+    """The profile of a CLI known only by the protocol it speaks.
+
+    Args:
+      name: What it was added under.
+
+    Returns:
+      A profile saying the little there is to say: it has no home humanize can find, no logs
+      it can read, and one rung of an effort ladder, because the protocol describes none of
+      those. What it does have is a name to be chosen by.
+    """
+    return Profile(
+        name=name,
+        aliases=(name,),
+        home_var="",
+        home_dir="",
+        logs=(),
+        efforts=(_UNSAID,),
+    )
+
+
 def named(backend: str) -> Profile | None:
     """The backend a name stands for, whichever of its spellings was used.
 
@@ -844,7 +997,7 @@ def named(backend: str) -> Profile | None:
     Returns:
       Its profile, or None for a name no backend answers to.
     """
-    return next((one for one in PROFILES if backend in one.aliases), None)
+    return next((one for one in profiles() if backend in one.aliases), None)
 
 
 def read(spec: str) -> tuple[Profile, str, str, str, str | None]:

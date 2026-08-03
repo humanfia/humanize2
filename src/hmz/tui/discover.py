@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from hmz import models
-from hmz.backends import PROFILES
+from hmz.backends import profiles, speaking
 
 if TYPE_CHECKING:
     from hmz.backends import Model
@@ -45,7 +45,7 @@ def installed() -> dict[str, tuple[Model, ...]]:
     """
     return {
         profile.name: models.offered(profile.name)
-        for profile in PROFILES
+        for profile in profiles()
         if _is_installed(profile.name)
     }
 
@@ -68,6 +68,9 @@ def _is_installed(backend: str) -> bool:
     """Whether a backend's executable or Python SDK is installed here."""
     if backend == "dsh":
         return importlib.util.find_spec("deepseek_harness") is not None
+    # A CLI somebody added is started by the command they gave rather than by its own name.
+    if (added := speaking().get(backend)) is not None:
+        return bool(added) and shutil.which(added[0]) is not None
     return shutil.which(backend) is not None
 
 

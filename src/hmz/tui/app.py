@@ -74,6 +74,7 @@ from .pick import (
     Runs,
     RunsAs,
     Signing,
+    Speaks,
     Status,
     Whose,
     asks,
@@ -2011,12 +2012,38 @@ class Humanize(App[None]):
                 return
             # The three words `hmz providers` uses for the same three things, which is where
             # the sheet took them from: one vocabulary for one list of things to do.
-            if doing.what == "add":
+            if doing.what == "speaks":
+                await self._add_speaking()
+            elif doing.what == "add":
                 await self._make_provider()
             elif doing.what == "login":
                 await self._sign_provider_in(doing.cli, doing.name)
             else:
                 self._drop_provider(doing.cli, doing.name)
+
+    async def _add_speaking(self) -> None:
+        """Asks for a CLI of your own that speaks ACP, and writes it down as a backend.
+
+        Here rather than anywhere else because this is the moment somebody finds out that the
+        agent they want to run is not one humanize drives: sending them to a command line to
+        add it would lose the question they came here to answer. What is written down outlives
+        the run, so it is a backend from the next prompt on, in this workspace and every other.
+        """
+        from hmz import backends
+
+        said = await self.push_screen_wait(Speaks())
+        if said is None:
+            return
+        command, name = said
+        try:
+            backends.remember(name, shlex.split(command))
+        except (OSError, ValueError) as why:
+            self.show(f"hmz: {why}", "red")
+            return
+        self.show(
+            f"[dim]{escape(name)} is written down: `{escape(command)}` "
+            f"starts it, and it is a backend from here on[/dim]"
+        )
 
     async def _make_provider(self) -> None:
         """Asks which CLI, and then walks that backend's own way in.

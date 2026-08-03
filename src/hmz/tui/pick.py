@@ -47,7 +47,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-from hmz.agents import DRIVEN, PERMISSIONS, SWARM, anchored
+from hmz.agents import PERMISSIONS, SWARM, anchored, driver
 from hmz.agents.skills import Skill, skills
 from hmz.backends import named
 
@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
     from textual.app import App, ComposeResult
 
+    from hmz.agents import AgentBase
     from hmz.backends import Model, Way
     from hmz.flows import Flowverse, Offer
     from hmz.providers import Provider
@@ -971,6 +972,119 @@ class Fetches(Sheet[tuple[str, str]]):
                 self._fill()
                 return
         self.dismiss((url, name))
+
+
+class Speaks(Sheet[tuple[str, str]]):
+    """A CLI of your own that speaks the Agent Client Protocol, and what starts it.
+
+    A form rather than a list, as adding a flowverse is: there is nothing to pick, both rows
+    being written where they stand. Two questions because the protocol answers neither -- it
+    has no discovery and no flag every agent agrees on -- so the command is asked for, and the
+    name it is to be known by here is asked for beside it.
+    """
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        Binding("enter", "done", "done", priority=True),
+    ]
+
+    #: What to ask for, and what the answer means. The command first, since the name has an
+    #: answer already: a CLI is called what it is installed as.
+    _ASKS = (
+        ("command", "what starts it, as you would type it: my-agent --acp"),
+        ("name", "what to call it here, blank for the command's own name"),
+    )
+
+    def __init__(self) -> None:
+        """Initializes the asking."""
+        super().__init__()
+        self._counting = len(str(len(self._ASKS)))
+        self._typed_in: dict[str, str] = {}
+        #: What was still missing, once the form has been offered.
+        self._wrong = ""
+
+    def _ask(self) -> None:
+        """Says what one of these is, and what the keys do while it is being named."""
+        self.query_one("#asked", Label).update("Add a CLI that speaks ACP")
+        self.query_one("#about", Label).update(
+            "Any coding agent that speaks the Agent Client Protocol can be driven from here. "
+            "humanize spawns the command you give and talks to it over its own stdin and "
+            "stdout. The protocol says nothing about which models it runs or how hard it can "
+            "be asked to think, so it runs as whoever installed it configured it."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _fill(self) -> None:
+        """Puts the two rows up, with the caret in the one under the cursor."""
+        listing = self.query_one("#choices", OptionList)
+        at = self._at
+        listing.set_options(
+            Option(
+                _written(
+                    seen,
+                    self._counting,
+                    held,
+                    about,
+                    self._typed_in.get(held, ""),
+                    here=seen == at,
+                ),
+                id=f"={held}",
+            )
+            for seen, (held, about) in enumerate(self._ASKS)
+        )
+        listing.highlighted = at
+        self._drawn = at
+        self.query_one("#tuning", Label).update(
+            f"[$error]{escape(self._wrong)}[/]" if self._wrong else ""
+        )
+        self.query_one("#keys", Label).update(
+            "Type to answer · Backspace to rub out · Enter to add it · Esc to go back"
+        )
+
+    @property
+    def _at(self) -> int:
+        """Which row the cursor is on, counting from zero."""
+        listing = self.query_one("#choices", OptionList)
+        return min(listing.highlighted or 0, len(self._ASKS) - 1)
+
+    def on_key(self, event: events.Key) -> None:
+        """Takes a letter as answering the row under the cursor.
+
+        Args:
+          event: The key.
+        """
+        held = self._ASKS[self._at][0]
+        if event.key == "backspace":
+            self._typed_in[held] = self._typed_in.get(held, "")[:-1]
+        elif event.is_printable and event.character:
+            self._typed_in[held] = self._typed_in.get(held, "") + event.character
+        else:
+            return
+        event.prevent_default()
+        event.stop()
+        self._wrong = ""
+        self._fill()
+
+    def action_done(self) -> None:
+        """Answers with the command and the name, once there is something to start."""
+        said = self._typed_in.get("command", "").strip()
+        name = self._typed_in.get("name", "").strip()
+        if not said:
+            self._wrong = "nothing was given to start it with"
+            self._fill()
+            return
+        try:
+            argv = shlex.split(said)
+        except ValueError as why:  # an unbalanced quote is a line to correct
+            self._wrong = str(why)
+            self._fill()
+            return
+        if not argv:
+            self._wrong = "nothing was given to start it with"
+            self._fill()
+            return
+        self.dismiss((said, name or Path(argv[0]).name))
 
 
 class Models(Sheet[Runs]):
@@ -2181,9 +2295,9 @@ class RunsAs(Sheet[Whose]):
         return [
             backend
             for backend in sorted(self._agents)
-            if backend in DRIVEN
-            and needs <= DRIVEN[backend][0].moments
-            and (not pursuing or DRIVEN[backend][0].pursues)
+            if (drives := _drives(backend)) is not None
+            and needs <= drives.moments
+            and (not pursuing or drives.pursues)
         ]
 
     def _backend(self) -> str:
@@ -2399,6 +2513,24 @@ class RunsAs(Sheet[Whose]):
         self.dismiss(Whose(self._backend(), str(event.option.id).removeprefix("=")))
 
 
+def _drives(backend: str) -> type[AgentBase] | None:
+    """What drives one backend, or None for a name nothing here drives.
+
+    A CLI somebody added themselves is driven too -- by the one class that speaks the Agent
+    Client Protocol -- so this asks what would build it rather than reading one table.
+
+    Args:
+      backend: The backend, by name.
+
+    Returns:
+      The agent class, or None.
+    """
+    try:
+        return driver(backend)[0]
+    except KeyError:
+        return None
+
+
 def _installing(backend: str) -> str:
     """The command that adds an optional backend to this Python environment."""
     if backend != "dsh":
@@ -2552,7 +2684,7 @@ class Backends(Picks):
 
     def rows(self) -> list[tuple[str, str, str]]:
         """Every backend there is, saying how each of them can be signed into."""
-        from hmz.backends import PROFILES
+        from hmz.backends import profiles
         from hmz.providers import ways
 
         return [
@@ -2561,7 +2693,7 @@ class Backends(Picks):
                 profile.name,
                 ", ".join(way.name for way in ways(profile.name)),
             )
-            for profile in PROFILES
+            for profile in profiles()
         ]
 
 
@@ -2839,6 +2971,8 @@ class Doing(NamedTuple):
 _ADD = "add"
 _LOGIN = "login"
 _REMOVE = "remove"
+#: Not a thing done to an account: a CLI of your own for accounts to be made against.
+_SPEAKS = "speaks"
 
 
 class Providers(Sheet[Doing]):
@@ -2863,6 +2997,8 @@ class Providers(Sheet[Doing]):
         Binding("a", "add", "make one", priority=True),
         Binding("l", "again", "sign in again", priority=True),
         Binding("r", "drop", "take away", priority=True),
+        # And the one thing here that is not an account: a CLI of your own to run them on.
+        Binding("c", "speaks", "add an ACP CLI", priority=True),
     ]
 
     def __init__(self) -> None:
@@ -2949,6 +3085,10 @@ class Providers(Sheet[Doing]):
     def action_add(self) -> None:
         """Answers that another one is to be made, which the interface walks through."""
         self.dismiss(Doing(_ADD))
+
+    def action_speaks(self) -> None:
+        """Answers that a CLI of your own is to be added, which the interface asks for."""
+        self.dismiss(Doing(_SPEAKS))
 
     def action_again(self) -> None:
         """Answers that the one under the cursor is to be signed in again."""
