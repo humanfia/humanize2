@@ -88,6 +88,15 @@ class Transcript(ScrollView, can_focus=False):
 
     It does not take focus. The editor is the only thing on the screen that is typed at, and a
     click that begins a selection must not be a click that stops the prompt from working.
+
+    It stays at the end while it is at the end. What is written is written as it happens, so
+    the bottom of it is where the flow is, and it follows that until somebody scrolls away to
+    read something further up -- and follows it again as soon as they come back down. Being at
+    the end is therefore held as a thing that was asked for rather than worked out from where
+    the scrollbar is: the transcript is one of several things sharing the height of a terminal
+    -- a list of commands opens over it, the editor grows a row per line typed into it, the
+    terminal itself is resized -- and each of those leaves the last line of it further up the
+    screen without anybody having scrolled anything.
     """
 
     DEFAULT_CSS = """
@@ -140,10 +149,6 @@ class Transcript(ScrollView, can_focus=False):
         """
         written = _Written(content, shrink)
         self._written.append(written)
-        # Only while it is already there: a transcript that jumped to the end while somebody
-        # was reading -- or selecting -- half a screen back would be one that cannot be read
-        # from while a flow is running, which is most of the time there is anything to read.
-        following = self.scroll_offset.y >= self.max_scroll_y
         if (
             self._drawn_at > 0
             and self._drawn_at == self.scrollable_content_region.width
@@ -152,8 +157,6 @@ class Transcript(ScrollView, can_focus=False):
             self._measured()
         else:
             self._draw()
-        if following:
-            self.scroll_end(animate=False, immediate=False, x_axis=False)
 
     def clear(self) -> None:
         """Empties it, and lets go of a selection that was over what is now gone."""
@@ -165,6 +168,37 @@ class Transcript(ScrollView, can_focus=False):
         self._let_go()
         self.virtual_size = Size(0, 0)
         self.refresh()
+
+    def on_mount(self) -> None:
+        """Starts it following the end, which is where what is being written lands.
+
+        Textual's own anchor, which pins a widget to the bottom as it is laid out rather than
+        as it is written to. That is the difference that matters: what is added to a transcript
+        is not the only thing that moves its end away from the bottom of the screen, and every
+        other thing that does -- the offers opening over it, the editor growing, the terminal
+        being resized -- happens as a layout and not as a write.
+        """
+        self.anchor()
+
+    def watch_scroll_y(self, old_value: float, new_value: float) -> None:
+        """Takes the anchor up again where somebody has scrolled back down to the end.
+
+        Scrolling anywhere at all lets the anchor go -- which is what keeps the transcript
+        still while something further up is being read -- and coming back to the bottom is how
+        somebody says there is nothing up there any more. Textual takes the anchor up again
+        itself for a widget that scrolls the ordinary way, but :class:`ScrollView` answers a
+        scroll by drawing it and nothing else, so it is said here.
+
+        Args:
+          old_value: Where it was scrolled to.
+          new_value: Where it is scrolled to now.
+        """
+        super().watch_scroll_y(old_value, new_value)
+        if new_value >= self.max_scroll_y:
+            # Said as a scroll to the end it is already at, that being what takes the anchor
+            # up. Down the page only: a box Rich drew too wide for the terminal is read by
+            # scrolling across it, and reaching the end is no reason to be taken back.
+            self.scroll_end(animate=False, immediate=True, x_axis=False)
 
     def on_resize(self) -> None:
         """Draws everything again where the terminal is now a different width.
