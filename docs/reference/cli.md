@@ -232,6 +232,54 @@ to a shell on that machine — read [Security](/guide/security.md).
 hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 ```
 
+## `hmz flowverses`
+
+Where flows come from: a git repository of flows apiece, cloned under humanize's home and
+offered under the name it is kept there. See [Flowverses](/features/flowverses.md).
+
+```
+hmz flowverses list [-q|--quiet]
+hmz flowverses show <name>
+hmz flowverses add <url> [<name>]
+hmz flowverses fetch <name>
+hmz flowverses remove <name>
+```
+
+The same places the interface's [`/flow`](/reference/tui.md) walks a tab at a time — a machine being set
+up, a CI job that runs somebody else's flow, or a line in a script is not always a moment you
+are sitting in the interface. Naming no command at all lists them.
+
+| Command | |
+| --- | --- |
+| `list` | Every place flows come from, in the order they are offered: the name, whether it has been fetched, and where from. `-q` prints just the names, one a line, for a script to read. |
+| `show <name>` | What one is — where from, where kept, whether fetched — and the name each flow in it is offered under, which is what `-f` takes, with the line each says about itself. |
+| `add <url> [<name>]` | Fetches one. `<url>` is a URL, a path, or `owner/repo` for one on GitHub; `<name>` is what to keep it under, defaulting to the repository's own name as `git clone` does. |
+| `fetch <name>` | Fetches it again, or for the first time — which is what `official` usually has done to it. What the repository says now, not a merge into what you have. |
+| `remove <name>` | Takes it away, flows and all. |
+
+What was added is findable by `-f` at once — it is the same store, reached another way:
+
+```sh
+hmz flowverses add you/my-flowverse mine
+hmz exec -f mine/review -a claude/claude-opus-5:high "the payments module"
+```
+
+**One that has not been fetched says so** where it would have said what it holds, rather than
+saying it holds nothing — `official` is listed from the start, and what there is to run is not
+the same question as what has been downloaded.
+
+**`show` is the line that reads them, and the only one.** What a file holds is not a fact its
+name carries — one file may hold [several flows](/reference/flows.md#several-flows-in-one-file), and the
+file beside them may hold none — so the only way to say what `-f` would take is to import them,
+as `/flow` does for the same question. `list`, `add` and `fetch` read nothing: a repository that
+has just been cloned off the internet is not one to import unasked, and asking which places
+there are is not asking about any of them.
+
+So the name `show` prints is always a name `-f` takes — `official/humanize1:gen-plan`, not the
+`official/humanize1` its filename would suggest, and never a `conftest.py` that holds no flow at
+all. Adding one is still trusting that repository with this machine, exactly as installing a
+package is. See [Security](/guide/security.md).
+
 ## `hmz providers`
 
 The accounts an agent may be run as: one named set of credentials per provider, kept apart from
@@ -340,6 +388,7 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
 | `.humanize/<datetime>.trace.json` | `hmz collect` | The trace. Relative to the current directory, not to the workspace named. |
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
+| `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **ctrl+n** | A [flowverse](/features/flowverses.md), cloned. Every flow in it is offered as `<name>/<flow>`. |
 | `.humanize/flows/*.py` | you | This project's own flows. |
 | `~/.humanize/flows/*.py` | you | Your flows, in every project. |
 
@@ -367,6 +416,7 @@ from hmz.tracing import collect        # hmz collect
 from hmz.coganchor import connect      # hmz anchor
 from hmz.coganchor import check        # hmz anchor --check
 from hmz import providers              # hmz providers
+from hmz.flows import verses           # hmz flowverses
 ```
 
 - `Runner(flow, agents).run(task)` — [Flows](/reference/flows.md)
@@ -374,3 +424,5 @@ from hmz import providers              # hmz providers
 - `connect(command, config)` / `check(config)` — [Remote execution](/reference/remote-execution.md)
 - `providers.providers(cli)` / `providers.find(cli, name)` / `providers.remove(cli, name)` —
   [Providers](/reference/providers.md)
+- `verses.flowverses()` / `verses.add(url, name)` / `verses.fetch(name)` / `verses.remove(name)` —
+  [Flowverses](/features/flowverses.md)

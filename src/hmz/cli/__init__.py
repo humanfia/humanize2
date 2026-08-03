@@ -104,6 +104,20 @@ def _anchor(argv: list[str]) -> int:
     return anchor(argv)
 
 
+def _flowverses(argv: list[str]) -> int:
+    """Lists, fetches and takes away the places flows come from.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      Zero, or two for a line to correct.
+    """
+    from .flowverses import flowverses
+
+    return flowverses(argv)
+
+
 def _cred(argv: list[str]) -> int:
     """Runs a program whose credentials are kept somewhere other than where it looks.
 
@@ -258,6 +272,7 @@ COMMANDS = {
         "aggregate the trajectories agents left behind into a Chrome trace",
     ),
     "anchor": (_anchor, "run an agent here that acts on another machine"),
+    "flowverses": (_flowverses, "the places flows come from"),
     "providers": (_providers, "the accounts an agent may be run as"),
     "cred": (_cred, "run an agent whose credentials are kept somewhere else"),
 }

@@ -530,6 +530,9 @@ come from, `ctrl+n` adds one, `ctrl+r` fetches the open one again, and `ctrl+x` 
 one away. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
 repository's own name is not the one you want.
 
+[`hmz flowverses`](/reference/cli.md#hmz-flowverses) is the same, said as arguments, for a machine
+being set up or a script: `list`, `show`, `add`, `fetch`, `remove`.
+
 ```sh
 hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
 ```

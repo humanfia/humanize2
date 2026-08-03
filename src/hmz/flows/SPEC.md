@@ -48,6 +48,9 @@ def loaded(where_: str | os.PathLike[str]) -> dict[str, Any]: ...
 def held(where_: str | os.PathLike[str]) -> list[Flow]: ...
 
 
+def offers(one: Flowverse) -> list[Offer]: ...
+
+
 def found() -> list[Offer]: ...
 
 
@@ -90,6 +93,11 @@ def about(named_: str) -> str: ...
   what they import and what sets their tests up -- but one that will not run MUST be, under the
   name it would have had: it is a flow somebody named, and saying so where it is picked beats
   hiding it.
+- What one flowverse offers MUST be worked out in `offers` and nowhere else, and `found` MUST
+  be that asked of each flowverse in turn. Anything wanting a single flowverse's flows MUST ask
+  it too rather than building a name from a filename: a file may hold several flows and the file
+  beside it none, so a name spelled out anywhere else is a name `-f` would refuse -- and two
+  places deciding what a flow is called is two places to drift.
 
 ## `verses.py`
 
@@ -127,8 +135,18 @@ def flows(one: Flowverse) -> list[str]: ...
   once somebody had thought to add it would be a list that hid what there is to run.
 - A name MUST be one directory name, and one that could climb out of the directory they are
   kept in MUST be refused wherever it is given.
+- Neither of the two that are always listed MUST be a name a flowverse can be added under.
+  Cloned into `builtin` a repository would be in nobody's list, since that name is skipped when
+  they are listed; cloned into `official` it would be shown against humanize's own URL. Both
+  MUST be refused where the name is given rather than discovered afterwards.
 - Fetching one again MUST take what the repository says now rather than merge into it: a
   flowverse is a copy of somebody else's repository, not a branch of your own, and a merge
   nobody asked for is a fetch that fails the next time it is run.
 - A fetch that failed MUST leave the list as it was and say what git said. Nothing here MUST
-  wait on the network without a limit.
+  wait on the network without a limit -- and since a clone called off for reaching that limit
+  is killed rather than allowed to fail, what it had written by then MUST be taken away here:
+  git tidies up after its own failures and cannot tidy up after being killed, and a name held
+  by a flowverse that is not there is a name that cannot be used again.
+- Where a flowverse came from MUST be read without interpolation. A `%` in a URL is ordinary --
+  a percent-encoded password, or a path with one in it -- and reading it as the start of a
+  substitution would raise where every listing of the flowverses passes.

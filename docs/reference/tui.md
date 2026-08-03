@@ -339,6 +339,9 @@ out that the flow you want is in a flowverse you have not added, or that the one
 out of date. A fetch runs off the interface's own loop — it keeps drawing while it clones — and
 what became of it is said under the list rather than thrown at you.
 
+The same places are on the command line as [`hmz flowverses`](/reference/cli.md#hmz-flowverses), for a
+machine being set up or a script.
+
 Typing narrows by name. What each flow says about itself is beside its name, and is not
 searched: a subsequence of a sentence matches nearly everything.
 

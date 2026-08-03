@@ -254,6 +254,42 @@ Environment Variables:
 
 - `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `KIMI_CODE_HOME`: The path to agent home directories for discovering session logs. If not set, use the default paths of each agent. A home directory that does not exist is skipped.
 
+## `hmz flowverses`
+
+```shell
+hmz flowverses [list [-q] | show <name> | add <url> [<name>] | fetch <name> | remove <name>]
+```
+
+Where flows come from: what places there are, what one of them holds, and the three things
+that can happen to a flowverse -- added, fetched again, taken away.
+
+- It MUST be the same store the interface's own `/flow` walks a tab at a time, for the reason
+  `hmz providers` is the same store as `/providers`: one place a thing is kept is one place it
+  is kept, whichever way somebody reached it. What it added MUST be findable by `-f` at once.
+- A flow MUST be listed under the name it is offered by, which is the one `-f` takes, and that
+  name MUST be asked of `hmz.flows.offers` rather than worked out here. A name built from a
+  filename is a name `-f` would refuse: a file may hold several flows, and the file beside it
+  may hold none at all.
+- Saying which places there are MUST NOT read a flow; saying what one of them holds MUST. What
+  a file holds is not a fact its name carries, so the second question has no cheap answer -- but
+  it MUST be asked only of the flowverse named, and MUST NOT be asked by a line that only
+  listed them or only fetched one. A repository that has just been cloned off the internet MUST
+  NOT be imported unasked: fetching one is not the same as saying to run it this second.
+- One that has not been fetched MUST say so where it would have said what it holds, rather
+  than saying it holds nothing.
+- Nothing MUST print a secret. Where a flowverse came from MUST be printed with whatever was
+  signed into the URL taken out: a private one is added as `https://x-access-token:$TOKEN@...`,
+  git keeps that verbatim, and this line is printed every time the flowverses are listed -- so
+  a token printed once is a token in the log of every job that ran it.
+- Where one came from MUST be answered from which flowverse it is rather than from whether its
+  URL is empty. An empty URL means both "the package's own" and "a directory whose origin could
+  not be read", and answering the second with the first puts humanize's name on somebody else's
+  flows.
+- A line that could not be carried out -- a name none answers to, a name already taken, one of
+  the two that are always there being removed or added over, a fetch git refused, a directory
+  that will not go -- MUST say so where it can be read and exit non-zero, and MUST leave the
+  list as it was. None of those MUST reach whoever typed the line as a traceback.
+
 ## `hmz providers`
 
 ```shell

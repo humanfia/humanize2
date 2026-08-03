@@ -155,18 +155,35 @@ def add(url: str, name: str = "") -> Flowverse:
       The flowverse, fetched.
 
     Raises:
-      ValueError: If the name is not one a flowverse may have, or one is already called that.
-      OSError: If git is not there, or the fetch failed. What git said is attached.
+      ValueError: If the name is not one a flowverse may have, one is already called that, or
+        it is one of the two that are always listed -- those two are humanize's own, and a
+        repository cloned into either slot is one nobody could reach.
+      OSError: If git is not there, or the fetch failed. What git said is attached, and
+        whatever it had written before it failed is taken away again.
     """
     said = url.strip()
     if not said:
         raise ValueError("no repository to fetch a flowverse from")
     called = name or _called(said)
+    if called == BUILTIN:
+        # Cloned there, it would be in nobody's list: the flows humanize ships are the package's
+        # and this name is spoken for, so the directory would sit there offering nothing and
+        # refusing to be taken away again.
+        raise ValueError(
+            f"{BUILTIN} is what the flows humanize ships are called; pick another name"
+        )
+    if called == OFFICIAL:
+        # This one is listed from the start with humanize's own URL against it, so a stranger's
+        # repository here would be shown as humanize's own.
+        raise ValueError(
+            f"{OFFICIAL} is humanize's own repository of flows; "
+            f"`fetch {OFFICIAL}` gets it, and another name holds another one"
+        )
     at = where(called)
     if at.exists():
         raise ValueError(f"there is already a flowverse called {called!r}")
     at.parent.mkdir(parents=True, exist_ok=True)
-    _git("clone", "--depth", "1", _url_of(said), str(at))
+    _clone(said, at)
     return Flowverse(
         name=called, url=_url(at), at=at, fetched=_cloned(at), fixed=called == OFFICIAL
     )
@@ -199,7 +216,7 @@ def fetch(name: str) -> Flowverse:
         )
     if not one.fetched:
         one.at.parent.mkdir(parents=True, exist_ok=True)
-        _git("clone", "--depth", "1", _url_of(one.url), str(one.at))
+        _clone(one.url, one.at)
     else:
         # Fetched and reset rather than pulled: a flowverse is a copy of somebody else's
         # repository, not a branch of your own, and a merge nobody asked for is a fetch that
@@ -258,6 +275,30 @@ def flows(one: Flowverse) -> list[str]:
         for path in one.at.glob("*.py")
         if not path.name.startswith("_") and path.is_file()
     )
+
+
+def _clone(url: str, at: Path) -> None:
+    """Clones a repository, and leaves nothing behind where it could not.
+
+    git tidies up after its own failures, but not after being killed: a clone called off for
+    taking too long is stopped where it stood, and what it had written so far stays. That is a
+    name taken by a flowverse that is not there -- and since a name already taken is refused,
+    it is a name that cannot be used again until somebody finds the directory and removes it.
+
+    Args:
+      url: Where the repository is, as somebody wrote it.
+      at: The directory to clone into, which must not already be there.
+
+    Raises:
+      OSError: If git is not there, or the clone failed. What git said is attached.
+    """
+    import shutil
+
+    try:
+        _git("clone", "--depth", "1", _url_of(url), str(at))
+    except OSError:
+        shutil.rmtree(at, ignore_errors=True)
+        raise
 
 
 def _git(*said: str) -> None:
@@ -335,12 +376,16 @@ def _url(at: Path) -> str:
     Returns:
       The URL, or "" for one that cannot be read -- which is one that is not there.
     """
-    held = configparser.ConfigParser(strict=False)
+    # No interpolation: a `%` in a URL is ordinary -- a percent-encoded password, or a path
+    # with one in it -- and configparser's default would read it as the start of a substitution
+    # and raise. Lazily, too: it raises where the value is read rather than where the file is,
+    # so the read is inside the try along with it.
+    held = configparser.ConfigParser(strict=False, interpolation=None)
     try:
         held.read(at / ".git" / "config")
+        return held.get('remote "origin"', "url", fallback="").strip()
     except (OSError, configparser.Error):
         return ""
-    return held.get('remote "origin"', "url", fallback="").strip()
 
 
 def _directories(at: Path) -> list[Path]:

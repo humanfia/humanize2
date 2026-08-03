@@ -25,7 +25,38 @@ file — the name is right, the download has not happened.
 
 ## Adding one
 
-At the prompt, `/flow` is where they live:
+### From a command line
+
+`hmz flowverses` is the same store, reached without opening anything:
+
+```sh
+hmz flowverses                       # what places flows come from
+hmz flowverses add you/my-flowverse yours
+hmz flowverses show yours            # what it holds, by the name -f takes
+hmz flowverses fetch yours           # again, or for the first time
+hmz flowverses remove yours          # flows and all
+```
+
+That is the way in for a machine being set up, a CI job that runs a flow somebody else wrote,
+or anywhere the interface is not open. What it added is findable by `-f` at once:
+
+```sh
+hmz flowverses add you/my-flowverse yours
+hmz exec -f yours/review -a claude/claude-opus-5:high "the payments module"
+```
+
+`add` names it after the repository when you do not, as `git clone` does. `list -q` prints just
+the names, one a line, for a script to read.
+
+`show` prints the name `-f` takes — so `official/humanize1:gen-plan` rather than the
+`official/humanize1` its filename would suggest. Working that out means **importing** the files,
+which is what `/flow` does for the same question; `list`, `add` and `fetch` read nothing, so a
+repository you have just cloned is never run until you ask what is in it. See
+[CLI reference](/reference/cli#hmz-flowverses).
+
+### At the prompt
+
+`/flow` is where they live:
 
 | Key | |
 | --- | --- |

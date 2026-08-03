@@ -42,6 +42,7 @@ __all__ = [
     "found",
     "held",
     "loaded",
+    "offers",
     "where",
 ]
 
@@ -241,19 +242,9 @@ def found() -> list[Offer]:
       offered and remembered under a name of its own. A file that holds several says so,
       `<name>:<inside>` apiece.
     """
-    from .verses import flows as inside
-
     listed: list[Offer] = []
     for verse in flowverses():
-        for base in inside(verse):
-            listed.extend(
-                Offer(
-                    verse.name,
-                    one if verse.name == BUILTIN else f"{verse.name}/{one}",
-                    said,
-                )
-                for one, said in _named(verse.at / f"{base}.py", base)
-            )
+        listed.extend(offers(verse))
     for whose, folder in where:
         for path in sorted(glob(os.path.join(os.path.expanduser(folder), "*.py"))):
             base = os.path.basename(path)
@@ -267,6 +258,39 @@ def found() -> list[Offer]:
                 Offer(whose, one, said) for one, said in _named(Path(path), called)
             )
     return listed
+
+
+def offers(one: Flowverse) -> list[Offer]:
+    """Every flow one flowverse offers, and the name each is offered by.
+
+    The one place that rule is written down. :func:`found` asks this of every flowverse in
+    turn, and so does anything that wants a single one's -- two places working out what a flow
+    is called is two places to drift, and a name that drifts is a name `-f` will not take.
+
+    Args:
+      one: The flowverse.
+
+    Returns:
+      One per flow, by file, alphabetically: `<flowverse>/<flow>`, except for the flows
+      humanize ships, which are called by a bare name. A file that holds several names each of
+      them, `<file>:<inside>` apiece, and a file that holds none is not among them -- a
+      directory of flows has files beside them that are not one.
+
+      Nothing at all for a flowverse that has not been fetched, which is not the same answer as
+      one that holds nothing, and is why :class:`Flowverse` says which it is.
+
+    Note:
+      Reading a flow means running it, so every file in the flowverse is imported to find out
+      what it holds. Whoever added it is trusting that repository with this machine; this is
+      where that trust is spent.
+    """
+    from .verses import flows as inside
+
+    return [
+        Offer(one.name, name if one.name == BUILTIN else f"{one.name}/{name}", said)
+        for base in inside(one)
+        for name, said in _named(one.at / f"{base}.py", base)
+    ]
 
 
 def _named(at: Path, called: str) -> list[tuple[str, str]]:

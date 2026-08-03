@@ -23,6 +23,7 @@ COMMANDS = [
     ("exec", {"runner", "backends"}),
     ("collect", set[str]()),
     ("anchor", {"coganchor"}),
+    ("flowverses", set[str]()),
 ]
 
 

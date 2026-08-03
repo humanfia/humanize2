@@ -77,6 +77,13 @@ It is cloned into `~/.humanize/flowverses/yours/`, and every flow in it is then 
 
 `builtin` and `official` are always there and cannot be taken away.
 
+Or without opening anything, which is how a machine being set up or a CI job would do it:
+
+```sh
+hmz flowverses add you/my-flowverse yours
+hmz flowverses show yours
+```
+
 ## Step 4 — run one
 
 ```sh
@@ -104,6 +111,9 @@ That is the reason to publish two small flows rather than one large one.
 **ctrl+r** in `/flow` fetches the open flowverse again. It runs off the interface's own loop — the
 screen keeps drawing while it clones — and what became of it is said under the list rather than
 thrown at you.
+
+`hmz flowverses fetch yours` is the same fetch, which is the one a cron job or a build step
+would run.
 
 A flow from a flowverse that has not been fetched says so, rather than saying there is no such
 file: the name is right, the download has not happened.
