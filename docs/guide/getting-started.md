@@ -23,21 +23,12 @@ Check what you have:
 command -v agy claude codex grok kimi pi qwen opencode mimo
 ```
 
-For DeepSeek Harness instead, install the `dsh` extra and check that its SDK imports:
+DeepSeek Harness needs nothing extra: its SDK and the runtime its turns are taken on arrive
+with humanize. Check that it imports:
 
 ```sh
-pip install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
 python -c 'import deepseek_harness; print("dsh installed")'
 ```
-
-With an isolated uv tool, install the extra into that tool instead:
-
-```sh
-uv tool install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
-```
-
-If the tool is already installed without DeepSeek, add `--force` to that command. The `dsh`
-tab in `/agents` also shows an environment-specific command until the SDK is present.
 
 DeepSeek Harness uses API-key login only. To configure it with DeepSeek's own UI, install its
 launcher (Node.js is required), start it, and open the URL it prints:
@@ -69,8 +60,6 @@ on the far machine — neither is needed for anything below.
 ```sh
 pip install git+https://github.com/humanfia/humanize2.git
 ```
-
-Use the `hmz[dsh]` installation above when DeepSeek Harness is the backend you want.
 
 Or, from a checkout with [uv](https://docs.astral.sh/uv/):
 

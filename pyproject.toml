@@ -11,22 +11,23 @@ license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = [
     "dateparser>=1.4.2",
+    # DeepSeek Harness is driven through its own Python SDK, which also brings the runtime
+    # its turns are taken on. An ordinary dependency rather than an extra: a backend humanize
+    # drives is not a thing an install should be able to have half of.
+    "deepseek-harness-sdk>=0.1.0rc6,<0.2",
     # A flow says what it can be configured with by declaring a model, and the menu that
     # asks is read off that model: the types, the bounds and the combinations a flow
     # refuses are all written once, where the flow declares them.
     "pydantic>=2.9",
     "pyfiglet>=1.0",
+    # dsh reads a project's `.env` the way its own CLI does, and reading one is somebody
+    # else's solved problem.
+    "python-dotenv>=1.1",
     "pyyaml>=6.0.3",
     # Named because the interface imports it directly. It arrives with textual either
     # way, but a dependency you import is one you declare.
     "rich>=15",
     "textual>=8.2.8",
-]
-
-[project.optional-dependencies]
-dsh = [
-    "deepseek-harness-sdk>=0.1.0rc6,<0.2",
-    "python-dotenv>=1.1",
 ]
 
 [project.urls]

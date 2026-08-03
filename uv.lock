@@ -193,17 +193,13 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "dateparser" },
+    { name = "deepseek-harness-sdk" },
     { name = "pydantic" },
     { name = "pyfiglet" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "rich" },
     { name = "textual" },
-]
-
-[package.optional-dependencies]
-dsh = [
-    { name = "deepseek-harness-sdk" },
-    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -221,15 +217,14 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "dateparser", specifier = ">=1.4.2" },
-    { name = "deepseek-harness-sdk", marker = "extra == 'dsh'", specifier = ">=0.1.0rc6,<0.2" },
+    { name = "deepseek-harness-sdk", specifier = ">=0.1.0rc6,<0.2" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pyfiglet", specifier = ">=1.0" },
-    { name = "python-dotenv", marker = "extra == 'dsh'", specifier = ">=1.1" },
+    { name = "python-dotenv", specifier = ">=1.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rich", specifier = ">=15" },
     { name = "textual", specifier = ">=8.2.8" },
 ]
-provides-extras = ["dsh"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -25,24 +25,10 @@ pip install git+https://github.com/humanfia/humanize2.git
 uv tool install git+https://github.com/humanfia/humanize2.git
 ```
 
-```sh [pip + DeepSeek Harness]
-pip install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
-```
-
-```sh [uv tool + DeepSeek Harness]
-uv tool install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
-```
-
 ```sh [from a checkout]
 git clone https://github.com/humanfia/humanize2.git
 cd humanize2
 uv sync
-```
-
-```sh [checkout + DeepSeek Harness]
-git clone https://github.com/humanfia/humanize2.git
-cd humanize2
-uv sync --extra dsh
 ```
 
 :::
@@ -62,34 +48,11 @@ hmz 0.1.0
 From a checkout with `uv sync`, the command lives in that checkout's environment — `uv run hmz`,
 or activate `.venv` first.
 
-### Add DeepSeek Harness to an existing install
+### DeepSeek Harness
 
-An extra is chosen when a package is installed; upgrading an installation that did not include
-`dsh` does not add it. For an existing pip installation, run the **pip + DeepSeek Harness**
-command above. For an existing uv tool installation, replace it in place with:
-
-```sh
-uv tool install --force 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
-```
-
-For a checkout, sync the extra into that checkout's `.venv`:
-
-```sh
-uv sync --extra dsh
-```
-
-Then reopen `hmz`. Before the SDK is installed, the `dsh` tab in `/agents` also prints a
-command that targets the exact Python environment running `hmz`.
-
-The Python extra is all humanize needs to run DeepSeek Harness. DeepSeek's own `dsh` launcher
-is useful for its Web configuration UI and is installed separately with Node.js:
-
-```sh
-npm install --global @deepseek-ai/dsh
-dsh web
-```
-
-For a one-off run without a global install, use `npx @deepseek-ai/dsh web`.
+Nothing to add: its SDK and the runtime its turns are taken on are ordinary dependencies of
+humanize, so any install that has humanize has them. It still needs an API key — see
+[Accounts](#accounts) below.
 
 ## Check what you have
 

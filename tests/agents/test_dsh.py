@@ -622,7 +622,13 @@ def test_the_runtime_composition_uses_only_plugins_bundled_with_the_sdk() -> Non
     assert "@deepseek-ai/dsh-credentials-local" not in configured_plugins
 
 
-def test_missing_sdk_names_the_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_missing_sdk_says_the_install_is_broken(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A broken install rather than a choice made when humanize was installed.
+
+    It is an ordinary dependency now, so there is no extra to have been left out of.
+    """
     real_import = importlib.import_module
 
     def missing(name: str) -> object:
@@ -633,5 +639,5 @@ def test_missing_sdk_names_the_extra(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(dsh, "_harness_type", _REAL_HARNESS_TYPE)
     monkeypatch.setattr(importlib, "import_module", missing)
 
-    with pytest.raises(ModuleNotFoundError, match=r"pip install 'hmz\[dsh\]'"):
+    with pytest.raises(ModuleNotFoundError, match=r"humanize depends"):
         DshAgent(configured())("work")

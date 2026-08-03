@@ -35,13 +35,8 @@ Three things to know before pointing one at a repository you care about. Each is
 pip install git+https://github.com/humanfia/humanize2.git
 ```
 
-DeepSeek Harness is an optional install that includes its Python SDK and bundled runtime:
-
-```sh
-pip install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
-# or, when hmz is an isolated uv tool:
-uv tool install 'hmz[dsh] @ git+https://github.com/humanfia/humanize2.git'
-```
+DeepSeek Harness arrives with humanize: its Python SDK and the runtime its turns are taken on
+are ordinary dependencies, so there is nothing extra to install for it.
 
 To install DeepSeek's own `dsh` launcher and configuration UI (Node.js required):
 
