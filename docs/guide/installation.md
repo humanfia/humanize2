@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **Python 3.12 or newer** | 3.12, 3.13 and 3.14 are the ones CI runs the tests on. |
-| **At least one supported backend** | `claude`, `codex`, `grok`, `kimi`, `pi`, `qwen`, `opencode` or `mimo` on your `PATH`, or the optional DeepSeek Harness Python SDK. |
+| **At least one supported backend** | `agy`, `claude`, `codex`, `grok`, `kimi`, `pi`, `qwen`, `opencode` or `mimo` on your `PATH`, or the optional DeepSeek Harness Python SDK. |
 | **A project you are willing to have rewritten** | Read [Security](/guide/security) first. |
 
 Nothing else. Two features want more, and neither is needed for anything in the tutorials:
@@ -96,7 +96,7 @@ For a one-off run without a global install, use `npx @deepseek-ai/dsh web`.
 humanize can run the backends installed in its environment. Check the CLI backends with:
 
 ```sh
-command -v claude codex grok kimi pi qwen opencode mimo
+command -v agy claude codex grok kimi pi qwen opencode mimo
 ```
 
 A CLI backend that is not on your `PATH` is simply not offered. The `dsh` tab remains visible

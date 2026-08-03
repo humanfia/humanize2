@@ -10,7 +10,8 @@ properly.
 - **At least one supported backend:** a coding agent CLI on your `PATH`, already logged in,
   such as `claude` ([Claude Code](https://claude.com/claude-code)), `codex`, `kimi`,
   `qwen` ([Qwen Code](https://github.com/QwenLM/qwen-code)) or
-  `grok` ([Grok Build](https://x.ai/cli)); or the optional DeepSeek Harness Python SDK with a
+  `grok` ([Grok Build](https://x.ai/cli)) or
+  `agy` ([Antigravity CLI](https://antigravity.google/docs/cli)); or the optional DeepSeek Harness Python SDK with a
   DeepSeek API key configured.
 - **A project directory you are willing to have rewritten.** Read
   [Security](/guide/security.md) first — humanize runs every agent with permission prompts
@@ -19,7 +20,7 @@ properly.
 Check what you have:
 
 ```sh
-command -v claude codex grok kimi pi qwen opencode mimo
+command -v agy claude codex grok kimi pi qwen opencode mimo
 ```
 
 For DeepSeek Harness instead, install the `dsh` extra and check that its SDK imports:

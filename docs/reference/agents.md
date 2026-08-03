@@ -21,6 +21,7 @@ name the interface shows. The classes keep the product's own full name.
 
 | Backend | Agent | Config | Session |
 | --- | --- | --- | --- |
+| `agy` | `AntigravityCLIAgent` | `AntigravityCLIAgentConfig` | `AntigravityCLISession` |
 | `claude` | `ClaudeCodeAgent` | `ClaudeCodeAgentConfig` | `ClaudeCodeSession` |
 | `codex` | `CodexAgent` | `CodexAgentConfig` | `CodexSession` |
 | `dsh` | `DshAgent` | `DshAgentConfig` | `DshSession` |
@@ -529,6 +530,7 @@ against a list, so a value your account has and this page does not still works.
 
 | Backend | Efforts |
 | --- | --- |
+| `agy` | `low`, `medium`, `high` |
 | `claude` | `low`, `medium`, `high`, `xhigh`, `max`, and `ultracode` |
 | `codex` | `low`, `medium`, `high`, `xhigh`, and `max`/`ultra` on the models that take them |
 | `dsh` | `off`, `high`, `max` |
@@ -537,6 +539,10 @@ against a list, so a value your account has and this page does not still works.
 | `pi` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
 | `qwen` | `low`, `medium`, `high`, `xhigh`, `max` |
 | `opencode`, `mimo` | the model variant: `minimal`, `low`, `medium`, `high`, `xhigh` |
+
+**Antigravity CLI has one switch for what an agent may do** — approve every tool, or stop and
+ask — and nobody is at a prompt to be asked, so `read-only` and `workspace-write` are refused
+where the agent is made rather than quietly run as the rung above.
 
 **Grok Build refuses a level the model does not advertise** rather than ignoring it, so a turn
 asked for one fails with the list of the ones that model takes. The shipped models take
@@ -639,14 +645,14 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 
 ## What each backend can do
 
-| | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Driven through | its command line, held open | its app server | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, one run per turn | its command line, one run per turn |
-| [`interject`](#talking-to-a-turn-already-running) | yes — answered within the same turn | yes — a steer on the running turn | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended | no — a run per turn has ended |
-| [`pursue`](#goals) | yes | yes | yes | no | yes | no | no | no |
-| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | yes | yes | no | no | no | no | no | no |
-| A turn held to a shape | in the prompt | `outputSchema` | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt |
-| Sub-agents in a trace | yes | yes | no | no | yes | no | no | no |
+| | `agy` | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Driven through | its command line, one run per turn | its command line, held open | its app server | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, one run per turn | its command line, one run per turn |
+| [`interject`](#talking-to-a-turn-already-running) | no — a run per turn has ended | yes — answered within the same turn | yes — a steer on the running turn | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended | no — a run per turn has ended |
+| [`pursue`](#goals) | no | yes | yes | yes | no | yes | no | no | no |
+| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no |
+| A turn held to a shape | `--json-schema` | in the prompt | `outputSchema` | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt |
+| Sub-agents in a trace | no | yes | yes | no | no | yes | no | no | no |
 
 DeepSeek Harness currently accepts only `permission="bypass"` and `skills=None`. Its preview
 SDK exposes neither a per-session sandbox/approval control nor exact per-agent skill selection;
@@ -734,12 +740,12 @@ interface it is made on `/agents` with `ctrl+p`.
 Every backend has a ladder of its own and none of them has the same four rungs, so each driver
 reaches for whichever of its own settings says the same thing:
 
-| Rung | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `read-only` | `plan` mode | `read-only` sandbox | — | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied |
-| `workspace-write` | `acceptEdits` mode | `workspace-write` sandbox | — | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied |
-| `auto` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | — | — | — | nothing denied |
-| `bypass` | `bypassPermissions` | `danger-full-access` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — |
+| Rung | `agy` | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `read-only` | refused | `plan` mode | `read-only` sandbox | — | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied |
+| `workspace-write` | refused | `acceptEdits` mode | `workspace-write` sandbox | — | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied |
+| `auto` | `--dangerously-skip-permissions` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | — | — | — | nothing denied |
+| `bypass` | `--dangerously-skip-permissions` | `bypassPermissions` | `danger-full-access` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one. Where a backend cannot tell two rungs apart it says so

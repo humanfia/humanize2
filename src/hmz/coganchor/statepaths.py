@@ -26,6 +26,10 @@ class AgentProfile:
 
 PROFILES: tuple[AgentProfile, ...] = (
     AgentProfile(
+        name="agy",
+        state_paths=("~/.gemini",),
+    ),
+    AgentProfile(
         name="claude",
         state_paths=(
             "~/.claude",

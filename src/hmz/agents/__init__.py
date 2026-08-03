@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from .agy import (
+    AntigravityCLIAgent,
+    AntigravityCLIAgentConfig,
+    AntigravityCLISession,
+)
 from .base import (
     WINDOW,
     AgentBase,
@@ -38,6 +43,7 @@ from .qwen import QwenCodeAgent, QwenCodeAgentConfig, QwenCodeSession
 #: whoever offers the backends at a prompt asks what each of them can do, and neither should
 #: have to know that `kimi` is a `KimiCodeCLIAgent` for itself.
 DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
+    "agy": (AntigravityCLIAgent, AntigravityCLIAgentConfig),
     "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
     "codex": (CodexAgent, CodexAgentConfig),
     "dsh": (DshAgent, DshAgentConfig),
@@ -58,6 +64,9 @@ __all__ = [
     "AgentBase",
     "AgentConfig",
     "AgentDefaults",
+    "AntigravityCLIAgent",
+    "AntigravityCLIAgentConfig",
+    "AntigravityCLISession",
     "ClaudeCodeAgent",
     "ClaudeCodeAgentConfig",
     "ClaudeCodeSession",

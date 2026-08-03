@@ -445,6 +445,31 @@ def _pi(profile: Profile, run: Callable[..., str]) -> list[Model]:
     return found
 
 
+def _agy(profile: Profile, run: Callable[..., str]) -> list[Model]:
+    """What Antigravity CLI runs, which it lists as a slug and the name a person reads.
+
+    Two columns a line, so the slug is the first word: the rest is what its own picker shows.
+    It has to be signed in to answer -- the catalogue is the account's -- and says so where the
+    list would be.
+
+    Args:
+      profile: Antigravity CLI's own.
+      run: What puts the question.
+
+    Returns:
+      One per model it offers, at its own reasoning levels, which it says of itself rather
+      than of each model.
+    """
+    found: list[Model] = []
+    for line in run(["models"]).splitlines():
+        columns = line.split()
+        # A line with nothing on it, and the line that says to sign in, are not models.
+        if not columns or len(columns) < 2:  # noqa: PLR2004
+            continue
+        found.append(Model(columns[0], profile.efforts, profile.swarms))
+    return found
+
+
 def _grok(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """Grok Build's catalogue, which it prints as a list with the default marked.
 
@@ -598,6 +623,7 @@ def _write(at: Path, models: list[Model]) -> None:
 #: asked, which is every one of them: a backend nobody can ask is a backend nobody can choose
 #: a model of, and there would be nothing to offer at the prompt.
 _READING: dict[str, Callable[[Profile, Callable[..., str]], list[Model]]] = {
+    "agy": _agy,
     "claude": _claude,
     "codex": _codex,
     "dsh": _dsh,

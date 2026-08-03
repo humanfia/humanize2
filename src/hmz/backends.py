@@ -268,6 +268,9 @@ _GATEWAY = (
     "an endpoint speaking this CLI's own protocol -- a proxy, a router, another vendor"
 )
 
+#: What Antigravity CLI calls its reasoning levels, hardest first.
+_AGY = ("high", "medium", "low")
+
 #: Every backend humanize drives, as each of them reported itself. Codex says which efforts
 #: each of its models takes and they differ, so they are written down as it gave them.
 PROFILES = (
@@ -368,6 +371,55 @@ PROFILES = (
                 asks=(
                     Asked(env="ANTHROPIC_VERTEX_PROJECT_ID", about="the project id"),
                     Asked(env="CLOUD_ML_REGION", about="the region", fixed="us-east5"),
+                ),
+            ),
+        ),
+    ),
+    Profile(
+        name="agy",
+        aliases=("agy", "antigravity"),
+        # Nothing moves it: no variable of its own, and neither `XDG_CONFIG_HOME` nor the
+        # names its siblings use are read. Only the home directory it is under, and a hidden
+        # flag. So there is no variable to name here, and `directory()` reads the one place.
+        home_var="",
+        home_dir=".gemini/antigravity-cli",
+        # None: a conversation here is rows of a SQLite database whose payloads are protobuf,
+        # so there is no log to read a run's cost out of as it is spent, and none to gather.
+        logs=(),
+        efforts=_AGY,
+        # What a sign-in leaves behind where there is no keyring to put it in -- a session on
+        # a machine with no desktop, which is where a flow runs. The keyring is the first
+        # choice and is not a path.
+        creds=("antigravity-oauth-token",),
+        ambient=(
+            "AGY_ADC_AUTH",
+            "CLOUD_CODE_URL",
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+            "GOOGLE_APPLICATION_CREDENTIALS",
+        ),
+        ways=(
+            Way(
+                name="login",
+                about="sign in to a Google account, in a session opened for it",
+                # It signs in from inside itself, so the way in is agy with the terminal
+                # handed over: a headless turn then runs on what that left behind.
+                argv=("agy",),
+            ),
+            Way(
+                name="key",
+                about="a Gemini API key, from AI Studio",
+                asks=(Asked(env="GEMINI_API_KEY", about="the API key", secret=True),),
+            ),
+            Way(
+                name="adc",
+                about="Google Application Default Credentials, for a service account",
+                sets=(("AGY_ADC_AUTH", "1"),),
+                asks=(
+                    Asked(
+                        env="GOOGLE_APPLICATION_CREDENTIALS",
+                        about="the service account file, as a path",
+                    ),
                 ),
             ),
         ),

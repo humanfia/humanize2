@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import (
+    AntigravityCLIAgent,
+    AntigravityCLIAgentConfig,
     GrokBuildAgent,
     GrokBuildAgentConfig,
     MimoCodeAgent,
@@ -40,6 +42,7 @@ OPENCODE = OpencodeAgentConfig(model="opencode/big-pickle", effort="high")
 MIMO = MimoCodeAgentConfig(model="xiaomi/mimo-v2.5", effort="low")
 QWEN = QwenCodeAgentConfig(model="qwen3-coder-plus", effort="xhigh")
 GROK = GrokBuildAgentConfig(model="grok-4.6", effort="xhigh")
+AGY = AntigravityCLIAgentConfig(model="gemini-3.5-flash-medium", effort="high")
 
 #: A `pi --mode rpc`: it names the session it was given, then answers each command written to
 #: it with the events one agent run is made of. A prompt of `boom` is refused outright and one
@@ -258,6 +261,54 @@ out({"type": "end", "stopReason": "end_turn", "sessionId": session, "num_turns":
 """
 
 
+#: An `agy --print`: the prompt is inside the command line, and it answers in the events of
+#: one turn -- one `init`, then a step apiece, then one `result`. A prompt of `boom` comes back
+#: as a result whose status is not success, which is how this backend says a turn did not land.
+_AGY = """
+import json, os, pathlib, sys
+
+log = pathlib.Path(LOG)
+argv = sys.argv[1:]
+flags = dict(zip(sys.argv, sys.argv[1:]))
+said = flags.get("--print", "")
+with log.open("a") as stream:
+    json.dump({"argv": argv, "stdin": said,
+               "inherited": os.environ.get("A_THING_THE_FLOW_HAS")}, stream)
+    stream.write("\\n")
+
+talk = flags.get("--conversation", "conv-agy-stub")
+
+
+def out(line):
+    print(json.dumps(line), flush=True)
+
+
+if said == "quiet":
+    sys.exit(0)
+out({"event": "init", "conversation_id": talk,
+     "init": {"cwd": os.getcwd(), "permission_mode": "always-proceed",
+              "model": flags.get("--model")}})
+if said == "boom":
+    out({"event": "result", "result": {"conversation_id": talk, "status": "ERROR",
+         "response": "", "error": "agy would not take it", "num_turns": 0,
+         "usage": {"input_tokens": 1, "output_tokens": 0}}})
+    sys.exit(0)
+out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 0,
+     "state": "ACTIVE", "step_type": "THINKING", "text_delta": "thinking about " + said}})
+out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 1,
+     "state": "ACTIVE", "step_type": "TOOL", "tool_name": "run_command",
+     "tool_info": {"command": "echo " + said}}})
+out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 1,
+     "state": "DONE", "step_type": "TOOL", "tool_name": "run_command"}})
+out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 2,
+     "state": "ACTIVE", "step_type": "RESPONSE", "text_delta": said}})
+out({"event": "result", "result": {"conversation_id": talk, "status": "SUCCESS",
+     "response": said, "num_turns": 1, "duration_seconds": 1,
+     "usage": {"input_tokens": 5, "output_tokens": 2, "thinking_tokens": 1,
+               "cache_read_tokens": 1}}})
+"""
+
+
 @dataclass(frozen=True)
 class _Call:
     """One invocation of a stand-in CLI: what it was asked for, and what it was fed."""
@@ -300,6 +351,7 @@ def stubs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _Stubs:
     _install(binaries, "opencode", _OPENCODE, log)
     _install(binaries, "mimo", _OPENCODE, log)
     _install(binaries, "qwen", _QWEN, log)
+    _install(binaries, "agy", _AGY, log)
     _install(binaries, "grok", _GROK, log)
     monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
     return _Stubs(log)
@@ -698,3 +750,62 @@ def test_neither_qwen_nor_grok_has_a_goal_feature(stubs: _Stubs) -> None:
         QwenCodeAgent(QWEN).new().pursue("the suite passes")
     with pytest.raises(NotImplementedError):
         GrokBuildAgent(GROK).new().pursue("the suite passes")
+
+
+def test_agy_is_one_run_per_turn_resuming_the_conversation_it_opened(
+    stubs: _Stubs,
+) -> None:
+    """Its id is minted by the CLI and named on the line the stream opens with."""
+    session = AntigravityCLIAgent(AGY).new()
+    assert session("hi") == "hi"
+    assert session("again") == "again"
+
+    opened, again = stubs.calls()
+    assert "--print" in opened.argv
+    assert opened.argv[opened.argv.index("--effort") + 1] == "high"
+    assert "--dangerously-skip-permissions" in opened.argv
+    assert "--conversation" not in opened.argv
+    assert again.argv[again.argv.index("--conversation") + 1] == session.id
+
+
+def test_agy_says_what_the_turn_did_and_what_it_cost(stubs: _Stubs) -> None:
+    """A tool is shown as it starts rather than once per state it passes through."""
+    said = list(AntigravityCLIAgent(AGY).new().stream("hi"))
+
+    kinds = [event.kind for event in said]
+    assert kinds == ["reasoning", "tool", "text", "result"]
+    assert "run_command echo hi" in said[1].text
+    assert said[-1].spent.total == 9
+    assert said[-1].tokens == {"gemini-3.5-flash-medium": 9}
+
+
+def test_agy_reports_a_result_that_did_not_succeed_as_a_failed_turn(
+    stubs: _Stubs,
+) -> None:
+    """It says how the run ended in a word of its own as well as in its exit status."""
+    with pytest.raises(subprocess.CalledProcessError) as raised:
+        AntigravityCLIAgent(AGY).new()("boom")
+    assert "would not take it" in str(raised.value.stderr)
+
+
+def test_agy_that_said_nothing_at_all_is_a_failed_turn(stubs: _Stubs) -> None:
+    with pytest.raises(subprocess.CalledProcessError):
+        AntigravityCLIAgent(AGY).new()("quiet")
+
+
+@pytest.mark.parametrize("permission", ["read-only", "workspace-write"])
+def test_agy_refuses_a_rung_it_has_no_way_of_running_at(permission: str) -> None:
+    """One switch, and nobody at a prompt to answer it: the rest is said rather than faked."""
+    with pytest.raises(ValueError, match="no way of being allowed less"):
+        AntigravityCLIAgent(
+            AntigravityCLIAgentConfig(model="m", effort="high", permission=permission)
+        )
+
+
+def test_agy_cannot_be_talked_to_mid_turn_and_has_no_goal_feature(
+    stubs: _Stubs,
+) -> None:
+    with pytest.raises(NotImplementedError):
+        AntigravityCLIAgent(AGY).new().interject("hello?")
+    with pytest.raises(NotImplementedError):
+        AntigravityCLIAgent(AGY).new().pursue("the suite passes")
