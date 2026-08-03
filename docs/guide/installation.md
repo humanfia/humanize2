@@ -96,7 +96,7 @@ switch to `dsh`, and choose `as installed`. That choice uses dsh's normal config
 the saved key and any `llm-deepseek.baseURL` in `$DSH_HOME/settings.yaml`, then its environment
 layers. `$DSH_HOME` defaults to `~/.dsh`.
 
-To keep a separate key in humanize's provider store instead, press **ctrl+n** on the `dsh` tab,
+To keep a separate key in humanize's provider store instead, choose `dsh` on the `cli` row and press **a** on the `provider` row,
 choose `key`, and enter an account name and the key. The same account can be made from a
 terminal; this command asks for the key without putting it in the command itself:
 

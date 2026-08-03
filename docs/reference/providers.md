@@ -229,12 +229,12 @@ hmz exec -f official/flame_chase -a claude@deepseek/claude-opus-5:max "fix the b
 hmz exec -f ralph_loop -a cli=claude,model=claude-opus-5,effort=max,provider=deepseek "…"
 ```
 
-In the interface it is the **first** of the three steps `/agents` walks for each agent — which
+In the interface it is the `provider` row of the sheet an agent is set up on — which
 CLI, and which of its accounts — because an account belongs to a backend and everything after it
 is about how that backend runs. See [TUI › What each agent is: three
 steps](/reference/tui.md#what-each-agent-is-three-steps).
 
-**ctrl+n on that step makes one there and then**, so finding out you have no account for this
+**`a` on that row makes one there and then**, so finding out you have no account for this
 CLI is not a reason to leave the question: it asks how to sign in and what that way needs, hands
 the terminal to the CLI's own login where the way has one, and comes back with the new account
 chosen for that agent. It is the same walk `/providers` runs without the question already

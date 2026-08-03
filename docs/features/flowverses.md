@@ -62,9 +62,9 @@ repository you have just cloned is never run until you ask what is in it. See
 | Key | |
 | --- | --- |
 | **←** **→** | Walk the places flows come from, a tab apiece — every flowverse, then `local` and `user` |
-| **ctrl+n** | Add one: a URL or an `owner/repo`, and a name to keep it under |
-| **ctrl+r** | Fetch the open one again, or for the first time |
-| **ctrl+x** | Take an added one away, flows and all |
+| **a** | Add one: a URL or an `owner/repo`, and a name to keep it under |
+| **r** | Fetch the one under the cursor again, or for the first time |
+| **d** **d** | Take an added one away, flows and all |
 
 Those keys are there rather than in a menu of their own because that is the moment you find out
 that the flow you want is in a flowverse you have not added, or that the one you have is out of
@@ -127,7 +127,7 @@ my-flowverse/
 └── README.md
 ```
 
-Add it with **ctrl+n** in `/flow`, or clone it into `~/.humanize/flowverses/<name>/` yourself.
+Add it with **a** in `/flow`, or clone it into `~/.humanize/flowverses/<name>/` yourself.
 There is a [tutorial](/guide/tutorial-flowverse).
 
 ::: danger Adding one is trusting that repository with this machine

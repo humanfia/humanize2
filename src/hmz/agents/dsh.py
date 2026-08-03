@@ -46,7 +46,8 @@ _EXTRA = (
 )
 _KEY_REQUIRED = (
     "DeepSeek Harness only supports API-key login and needs a DeepSeek API key. Save one "
-    "in dsh under Settings -> Models; in hmz, open /agents, switch to dsh, press ctrl+n, "
+    "in dsh under Settings -> Models; in hmz, set an agent to dsh and press a on its "
+    "provider row, "
     "and create a key account; or set DEEPSEEK_API_KEY before starting hmz."
 )
 _GOAL = "Use create_goal to pursue this objective until it is complete:\n\n{}"

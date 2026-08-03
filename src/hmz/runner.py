@@ -537,7 +537,7 @@ def _unfetched(named: str) -> str:
         if verse.name == whose and rest and not verse.fetched:
             return (
                 f"the {whose} flowverse has not been fetched yet -- open /flow and press "
-                "ctrl+r on it"
+                "r on it"
             )
     return "no Python file to read a flow from"
 

@@ -1,9 +1,9 @@
 """Choosing a flow out of the places flows come from, and adding a place to the list.
 
-The flows are a tab apiece by where they came from -- humanize's own, its repository of the
-rest, whatever else has been added, and then this project's and yours -- so what is checked
-here is that the tabs are those places, that the arrows walk them, and that the three things
-that can happen to a flowverse happen from the same sheet the flow is chosen at.
+The flows are read under a heading per place they came from -- humanize's own, its repository
+of the rest, whatever else has been added, and then this project's and yours -- so what is
+checked here is that those headings are there, that the list is one list, and that the three
+things that can happen to a flowverse happen from the same page the flow is chosen at.
 
 Driven headlessly, as every test of the interface is, so what is checked is where a keystroke
 lands rather than how it is drawn.
@@ -22,9 +22,9 @@ from hmz.backends import Model
 from hmz.flows import OFFICIAL, flowverses
 from hmz.flows import verses as store
 from hmz.tui import Humanize
-from hmz.tui.pick import Configures, Fetches, Flows, RunsAs
+from hmz.tui.pick import Agent, Configures, Fetches, Flows
 
-from .test_app import until
+from .test_app import into_agent, onto, until
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -75,14 +75,23 @@ async def _open(app: Humanize, driver: Pilot[None]) -> Flows:
     return sheet
 
 
-def _rows(sheet: Flows) -> list[str]:
-    """What the list is offering now, by name."""
-    return [str(one.id) for one in sheet.query_one("#choices", OptionList).options]
+def _rows(sheet: Flows, whose: str = "") -> list[str]:
+    """What the list is offering now, by name, under one heading or under all of them."""
+    listed = [
+        str(one.id or "").partition("\x1f")
+        for one in sheet.query_one("#choices", OptionList).options
+        if one.id
+    ]
+    return [name for where, _, name in listed if name and where.startswith(whose)]
 
 
-def _tabs(sheet: Flows) -> str:
-    """The row of tabs, as it is drawn."""
-    return str(sheet.query_one("#tabs", Label).content)
+def _headings(sheet: Flows) -> list[str]:
+    """The places flows come from, as the headings drawn above each place's flows."""
+    return [
+        str(one.id or "").partition("\x1f")[0]
+        for one in sheet.query_one("#choices", OptionList).options
+        if one.id
+    ]
 
 
 def _under(sheet: Flows) -> str:
@@ -97,32 +106,33 @@ async def test_the_tabs_are_the_places_flows_come_from() -> None:
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        assert "builtin" in _tabs(sheet)
-        assert OFFICIAL in _tabs(sheet)
-        # The tab that is open is the first, which is the flows humanize itself ships.
-        assert _rows(sheet) == ["chat", "ralph_loop", "stateful_ralph"]
+        assert "builtin" in _headings(sheet)
+        assert OFFICIAL in _headings(sheet)
+        # And under the first of them the flows humanize itself ships.
+        assert _rows(sheet, "builtin") == ["chat", "ralph_loop", "stateful_ralph"]
 
 
 @pytest.mark.timeout(60)
-async def test_the_arrows_walk_the_tabs(theirs: Path) -> None:
-    """Up and down are the flows under one, so left and right are the tabs themselves."""
+async def test_every_place_is_a_heading_in_one_list(theirs: Path) -> None:
+    """One list, read down, rather than a tab apiece: the tabs are the menu's pages now."""
     store.add(str(theirs))
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        await driver.press("right")  # official, which has not been fetched
-        await driver.pause()
-        assert _rows(sheet) == []
-        assert "has not been fetched yet" in _under(sheet)
+        assert _headings(sheet) == ["builtin"] * 3 + [OFFICIAL, "theirs"]
+        # The one that has not been fetched is still a row, saying what it is waiting for.
+        assert _rows(sheet, OFFICIAL) == []
+        assert _rows(sheet, "theirs") == ["theirs/loop"]
 
-        await driver.press("right")  # and the one that was added, which has
-        await driver.pause()
-        assert _rows(sheet) == ["theirs/loop"]
-
-        await driver.press("left", "left")  # back round to where it opened
-        await driver.pause()
-        assert _rows(sheet) == ["chat", "ralph_loop", "stateful_ralph"]
+        await onto(app, driver, f"{OFFICIAL}\x1f")
+        assert "not fetched yet" in str(
+            sheet.query_one("#choices", OptionList)
+            .get_option_at_index(
+                sheet.query_one("#choices", OptionList).highlighted or 0
+            )
+            .prompt
+        )
 
 
 @pytest.mark.timeout(60)
@@ -131,7 +141,9 @@ async def test_a_flow_says_what_it_does_beside_its_name() -> None:
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        drawn = str(sheet.query_one("#choices", OptionList).get_option("chat").prompt)
+        drawn = str(
+            sheet.query_one("#choices", OptionList).get_option("builtin\x1fchat").prompt
+        )
 
         assert "one agent, one session" in drawn
 
@@ -146,10 +158,8 @@ async def test_the_flows_of_your_own_are_a_tab_of_their_own(tmp_path: Path) -> N
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        assert "local" in _tabs(sheet)
-        await driver.press("left")  # the last tab, which is the nearest place
-        await driver.pause()
-        assert _rows(sheet) == [".humanize/flows/mine.py"]
+        assert "local" in _headings(sheet)
+        assert _rows(sheet, "local") == [".humanize/flows/mine.py"]
 
 
 @pytest.mark.timeout(60)
@@ -161,12 +171,11 @@ async def test_one_is_fetched_from_the_sheet_it_would_be_chosen_at(
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        await driver.press("right")
-        await driver.pause()
-        assert _rows(sheet) == []
+        await onto(app, driver, f"{OFFICIAL}\x1f")
+        assert _rows(sheet, OFFICIAL) == []
 
-        await driver.press("ctrl+r")
-        await until(lambda: _rows(sheet) == ["official/loop"], driver)
+        await driver.press("r")
+        await until(lambda: _rows(sheet, OFFICIAL) == ["official/loop"], driver)
 
         assert store.named(OFFICIAL) is not None
         assert "has not been fetched" not in _under(sheet)
@@ -181,10 +190,9 @@ async def test_a_fetch_that_failed_is_said_under_the_list(
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        await driver.press("right")
-        await driver.pause()
+        await onto(app, driver, f"{OFFICIAL}\x1f")
 
-        await driver.press("ctrl+r")
+        await driver.press("r")
         await until(lambda: "does not exist" in _under(sheet), driver)
 
         assert isinstance(app.screen, Flows)  # still here, still asking
@@ -198,7 +206,7 @@ async def test_there_is_nothing_to_fetch_for_the_ones_in_the_package() -> None:
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        await driver.press("ctrl+r")
+        await driver.press("r")
         await until(lambda: "nothing to fetch" in _under(sheet), driver)
 
 
@@ -209,14 +217,14 @@ async def test_one_is_added_from_the_same_sheet(theirs: Path) -> None:
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        await driver.press("ctrl+n")
+        await driver.press("a")
         await until(lambda: isinstance(app.screen, Fetches), driver)
         await driver.press(*str(theirs))
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Flows), driver)
 
-        # Fetched, and the tab it was fetched into is the one now open.
-        await until(lambda: _rows(sheet) == ["theirs/loop"], driver)
+        # Fetched, and the cursor is on the first flow it brought.
+        await until(lambda: _rows(sheet, "theirs") == ["theirs/loop"], driver)
         assert [one.name for one in flowverses()][-1] == "theirs"
 
 
@@ -227,7 +235,7 @@ async def test_a_flowverse_with_no_repository_named_is_refused_where_it_was_type
     app = Humanize()
     async with app.run_test() as driver:
         await _open(app, driver)
-        await driver.press("ctrl+n")
+        await driver.press("a")
         await until(lambda: isinstance(app.screen, Fetches), driver)
         sheet = app.screen
 
@@ -244,7 +252,7 @@ async def test_a_name_that_is_not_one_is_refused_before_anything_is_cloned() -> 
     app = Humanize()
     async with app.run_test() as driver:
         await _open(app, driver)
-        await driver.press("ctrl+n")
+        await driver.press("a")
         await until(lambda: isinstance(app.screen, Fetches), driver)
         sheet = app.screen
 
@@ -264,11 +272,15 @@ async def test_one_that_was_added_may_be_taken_away_from_here(theirs: Path) -> N
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        await driver.press("right", "right")
-        await driver.pause()
-        assert _rows(sheet) == ["theirs/loop"]
+        await onto(app, driver, "theirs\x1ftheirs/loop")
+        assert _rows(sheet, "theirs") == ["theirs/loop"]
 
-        await driver.press("ctrl+x")
+        # Twice, since it cannot be undone: the first press says what the second one does.
+        await driver.press("d")
+        await until(lambda: "press d again" in _under(sheet), driver)
+        assert [one.name for one in flowverses()] == ["builtin", OFFICIAL, "theirs"]
+
+        await driver.press("d")
         await driver.pause()
 
         assert [one.name for one in flowverses()] == ["builtin", OFFICIAL]
@@ -282,11 +294,12 @@ async def test_neither_of_humanize_s_own_may_be_taken_away() -> None:
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        await driver.press("ctrl+x")
+        await driver.press("d")
+        await driver.press("d")
         await driver.pause()
 
         assert "always here" in _under(sheet)
-        assert _rows(sheet) == ["chat", "ralph_loop", "stateful_ralph"]
+        assert _rows(sheet, "builtin") == ["chat", "ralph_loop", "stateful_ralph"]
 
 
 @pytest.mark.timeout(60)
@@ -296,15 +309,14 @@ async def test_the_flow_that_is_picked_is_the_one_that_was_chosen(theirs: Path) 
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        await driver.press("right", "right")
-        await until(lambda: _rows(sheet) == ["theirs/loop"], driver)
+        await onto(app, driver, "theirs\x1ftheirs/loop")
+        await until(lambda: _rows(sheet, "theirs") == ["theirs/loop"], driver)
 
         await driver.press("enter")
-        await driver.pause()
+        await until(lambda: sheet._tab == 1, driver)
 
-        assert not isinstance(
-            app.screen, Flows
-        )  # on to what it runs, which is the next step
+        # On to what it runs, which is the page beside it, holding that flow's own agents.
+        assert sheet._flow == "theirs/loop"
 
 
 #: A file that is three flows and no `run`, which is what humanize1 is.
@@ -364,21 +376,20 @@ async def test_one_of_the_flows_a_file_holds_is_chosen_like_any_other(
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        await driver.press("left")  # this project's own flows, which is the last tab
-        await until(
-            lambda: _rows(sheet) != ["chat", "ralph_loop", "stateful_ralph"], driver
-        )
 
-        assert _rows(sheet) == [
+        assert _rows(sheet, "local") == [
             ".humanize/flows/three.py:gen-idea",
             ".humanize/flows/three.py:rlcr",
         ]
 
-        await driver.press("down")  # the second of them, which drives two agents
+        # The second of them, which drives two agents.
+        await onto(app, driver, "local\x1f.humanize/flows/three.py:rlcr")
         await driver.press("enter")
 
         # On to what that flow drives, rather than a refusal that the file has no `run`.
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await until(lambda: sheet._tab == 1, driver)
+        await into_agent(app, driver)
+        assert isinstance(app.screen, Agent)
         assert "builder" in str(app.screen.query_one("#asked", Label).content)
 
 
@@ -398,10 +409,15 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        await driver.press("left")
-        await until(lambda: bool(_rows(sheet)), driver)
+        await until(lambda: bool(_rows(sheet, "local")), driver)
 
-        await driver.press("enter")  # the first of them, which says it takes an `n`
+        # The first of them, which says it takes an `n`.
+        await onto(app, driver, "local\x1f.humanize/flows/three.py:gen-idea")
+        await driver.press("enter")
+        await until(lambda: sheet._tab == 1, driver)
+        await driver.press("shift+tab")
+        await until(lambda: sheet._tab == 0, driver)
+        await driver.press("c")
 
         await until(lambda: isinstance(app.screen, Configures), driver)
         assert "n" in str(app.screen.query_one("#choices", OptionList).options[0].id)

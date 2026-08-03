@@ -83,7 +83,8 @@ them.
 DeepSeek Harness is an optional Python SDK backend. Install it with the `dsh` extra as shown
 in [Installation](/guide/installation#install-humanize). It supports API-key login only:
 leave `provider` empty to use the credentials and base URL saved by dsh (or its environment),
-or make a `key` account from `/agents` with **ctrl+n** and give its name as `provider`. Then
+or make a `key` account from the `provider` row of an agent with **a** and give its name as
+`provider`. Then
 construct it like any other agent:
 
 ```python
@@ -776,7 +777,7 @@ hmz exec -f ralph_loop \
 `bypass` is the default, because that is what a flow driving an agent unattended has always
 run it at: a flow watches its agent rather than gating it, and a turn waiting on an approval
 nobody is there to give is a flow that has stopped. Anything tighter is a choice, and in the
-interface it is made on `/agents` with `ctrl+p`.
+interface it is the `permission` row of the sheet an agent is set up on, stepped on the arrows.
 
 Every backend has a ladder of its own and none of them has the same four rungs, so each driver
 reaches for whichever of its own settings says the same thing:

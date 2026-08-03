@@ -20,24 +20,37 @@ from hmz import providers
 from hmz.backends import Model
 from hmz.tui import Humanize
 from hmz.tui.pick import (
+    Accounts,
+    Agent,
     Backends,
-    Models,
     Providers,
     Runs,
-    RunsAs,
     Signing,
     Ways,
     reads,
 )
 from hmz.tui.settings import Settings
 
-from .test_app import _transcript, until
+from .test_app import (
+    _transcript,
+    into_agent,
+    into_flows,
+    keeps,
+    opens,
+    rows,
+    until,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 #: What one installed CLI looks like, for the tests that walk the agents sheet.
 CLAUDE = {"claude": (Model("claude-opus-5", ("max", "high")),)}
+
+
+def _under(app: Humanize) -> str:
+    """What is said under the list, which is where a menu reports itself."""
+    return str(app.screen.query_one("#tuning", Label).content)
 
 
 def _kept(cli: str, name: str = "") -> tuple[Model, ...]:
@@ -134,8 +147,12 @@ async def test_an_account_made_on_the_sheet_lands_in_the_store(
         await driver.press(*"mine")
         await driver.press("enter")
 
-        # And the sheet comes back with the new one on it.
+        # And the sheet is still the sheet, with the new one on it.
         await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: "mine" in [one.name for one in providers.providers("claude")],
+            driver,
+        )
         await driver.press("escape")
         await until(lambda: not isinstance(app.screen, Providers), driver)
         said = _transcript(app)
@@ -318,42 +335,39 @@ async def test_the_account_an_agent_runs_as_is_the_first_thing_asked_about_it(
 ) -> None:
     """It decides which credentials the turns run under, which is no side question at all.
 
-    So it is a step of the walk rather than a chord on the models: under the tab of the CLI
-    whose accounts they are, since an account is one backend's, and read back on the step
-    after as what was already settled.
+    So it is a row of the agent's own, under the CLI whose accounts they are -- an account
+    being one backend's -- and above the model, which is the account's to name.
     """
     _account()
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        # The first step of the first agent, without anything being reached for.
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "provider")
+        await until(lambda: isinstance(app.screen, Accounts), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
         # This machine's own first, which is what every agent ran as before there were any.
-        assert [str(option.id) for option in listing.options] == ["=", "=deepseek"]
+        assert rows(app) == ["", "deepseek"]
 
         await driver.press("down", "enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        tuning = app.screen.query_one("#tuning", Label)
-        await until(lambda: "max effort" in str(tuning.content), driver)
-        # Not read back here and not adjustable here: a step of its own answered it, and a
-        # setting shown where it cannot be changed is a setting somebody tries to change.
-        assert "deepseek" not in str(tuning.content)
-        assert "deepseek" not in str(app.screen.query_one("#keys", Label).content)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        assert "deepseek" in str(
+            listing.get_option_at_index(rows(app).index("provider")).prompt
+        )
 
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await keeps(app, driver)
+        await keeps(app, driver)
         await driver.pause()
         # And on the line above the prompt, beside what it runs.
         assert "deepseek" in str(app.query_one("#above", Static).content)
 
-    chosen = Runs("claude/claude-opus-5:max", "", None, "", "deepseek")
+    chosen = Runs("claude/claude-opus-5:high", "", None, "", "deepseek")
     assert app._models == [chosen]
     assert app.settings.agents(app._flow_named) == [chosen]
     assert reads(("builder",), [chosen]) == [
-        "builder · claude/claude-opus-5:max · deepseek"
+        "builder · claude/claude-opus-5:high · deepseek"
     ]
 
 
@@ -380,17 +394,15 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
     monkeypatch.setattr(hmz.models, "ask", note)
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "provider")
+        await until(lambda: isinstance(app.screen, Accounts), driver)
         # Nothing to choose but this machine's own, which is where somebody finds out.
-        assert [
-            str(option.id)
-            for option in app.screen.query_one("#choices", OptionList).options
-        ] == ["="]
+        assert rows(app) == [""]
 
-        await driver.press("ctrl+n")
-        # Straight to the ways in: the backend is the tab the sheet is open on.
+        await driver.press("a")
+        # Straight to the ways in: the backend is the one the agent is already on.
         await until(lambda: isinstance(app.screen, Ways), driver)
         await driver.press("down", "down", "enter")  # `key`, which asks for one thing
         await until(lambda: isinstance(app.screen, Signing), driver)
@@ -399,19 +411,25 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
         await driver.press(*"not-a-key")
         await driver.press("enter")
 
-        # On to the models, with the account made and given to this one: making one here is
-        # choosing it, so the step it was asked in is answered.
-        await until(lambda: isinstance(app.screen, Models), driver)
-        tuning = app.screen.query_one("#tuning", Label)
-        await until(lambda: "max effort" in str(tuning.content), driver)
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        # Back to the agent, with the account made and given to it: making one here is
+        # choosing it, so the row it was asked from is answered.
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(
+            lambda: (
+                "mine"
+                in str(listing.get_option_at_index(rows(app).index("provider")).prompt)
+            ),
+            driver,
+        )
+        await keeps(app, driver)
+        await keeps(app, driver)
         await driver.pause()
 
     made = providers.find("claude", "mine")
     assert made is not None
     assert dict(made.env) == {"ANTHROPIC_API_KEY": "not-a-key"}
-    assert app._models == [Runs("claude/claude-opus-5:max", "", None, "", "mine")]
+    assert app._models == [Runs("claude/claude-opus-5:high", "", None, "", "mine")]
     # The backends installed here are asked as the interface opens, and an account as it
     # lands: an account is made in order to run turns as, and which models those turns may
     # name is the account's rather than this machine's.
@@ -449,17 +467,20 @@ async def test_making_one_and_walking_out_of_it_changes_nothing(
     app = Humanize()
     was = None
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
         was = list(app._models)
-        await driver.press("ctrl+n")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "provider")
+        await until(lambda: isinstance(app.screen, Accounts), driver)
+        await driver.press("a")
         await until(lambda: isinstance(app.screen, Ways), driver)
         await driver.press("escape")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
-        # And esc off the first step of the first agent is out of the walk altogether.
+        await until(lambda: isinstance(app.screen, Accounts), driver)
+        # And esc off the accounts is back on the agent, which was not changed by looking.
         await driver.press("escape")
-        await until(lambda: not isinstance(app.screen, RunsAs), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Providers | Agent) is False, driver)
 
     assert providers.providers("claude") == []
     assert app._models == was  # walking out changed nothing at all
@@ -473,9 +494,10 @@ async def test_a_cli_with_no_accounts_says_where_they_come_from(
     """A sheet holding one row that changes nothing has to say why it is the only one."""
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "provider")
+        await until(lambda: isinstance(app.screen, Accounts), driver)
         await until(
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
@@ -484,8 +506,8 @@ async def test_a_cli_with_no_accounts_says_where_they_come_from(
         assert "claude has no accounts here yet" in said
         # And says where one comes from without sending anybody out of the question: the
         # moment somebody finds out they have none is the moment to be offered one.
-        assert "ctrl+n makes one" in said
-        assert "ctrl+n to make one" in str(app.screen.query_one("#keys", Label).content)
+        assert "a makes one" in said
+        assert "a to make one" in str(app.screen.query_one("#keys", Label).content)
 
 
 @pytest.mark.timeout(60)
@@ -497,9 +519,10 @@ async def test_the_first_row_leaves_the_agent_running_as_this_machine(
     _account()
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "provider")
+        await until(lambda: isinstance(app.screen, Accounts), driver)
         await until(
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
@@ -507,17 +530,16 @@ async def test_the_first_row_leaves_the_agent_running_as_this_machine(
         await driver.press("down")  # walked to the account and then off it again
         await driver.press("up")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        tuning = app.screen.query_one("#tuning", Label)
-        await until(lambda: "effort" in str(tuning.content), driver)
-        # The account was the step before this one, so it is not read back here: a setting
-        # shown where it cannot be changed is a setting somebody tries to change.
-        assert "as installed" not in str(tuning.content)
-        assert "deepseek" not in str(tuning.content)
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        assert "as local" in str(
+            listing.get_option_at_index(rows(app).index("provider")).prompt
+        )
 
-    assert app._models == [Runs("claude/claude-opus-5:max")]
+        await keeps(app, driver)
+        await keeps(app, driver)
+
+    assert app._models == [Runs("claude/claude-opus-5:high")]
 
 
 @pytest.mark.timeout(60)
@@ -601,6 +623,73 @@ async def test_signing_in_again_asks_only_what_is_not_written_down(
 
 
 @pytest.mark.timeout(60)
+async def test_correcting_what_one_holds_is_held_until_the_menu_is_saved() -> None:
+    """Enter on an account is the way in it was made by, asked again with what it holds."""
+    providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "old"})
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        form = app.screen.query_one("#choices", OptionList)
+        # Only what the way asks, and a secret starts blank: it is on its way into a
+        # credential store, and nothing reads one back out to be corrected in place.
+        assert [str(one.id) for one in form.options] == ["=OPENAI_API_KEY"]
+        assert "old" not in str(form.get_option_at_index(0).prompt)
+
+        await driver.press(*"new")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: "is corrected when this menu is saved" in _under(app), driver
+        )
+        # Held: what is on the disk is still what was there.
+        held = providers.find("codex", "work")
+        assert held is not None
+        assert dict(held.env) == {"OPENAI_API_KEY": "old"}
+
+        await keeps(app, driver)
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    corrected = providers.find("codex", "work")
+    assert corrected is not None
+    assert dict(corrected.env) == {"OPENAI_API_KEY": "new"}
+
+
+@pytest.mark.timeout(60)
+async def test_marking_one_as_a_fallback_is_held_until_the_menu_is_saved() -> None:
+    """It is a property of the account: what goes down is what needs somewhere else to run."""
+    providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "k"})
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        await driver.press("f")
+        await driver.pause()
+        held = providers.find("codex", "work")
+        assert held is not None
+        assert not held.fallback  # said, and held until the menu is saved
+
+        await keeps(app, driver)
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    marked = providers.find("codex", "work")
+    assert marked is not None
+    assert marked.fallback
+
+
+@pytest.mark.timeout(60)
 async def test_taking_an_account_away_says_what_went_with_it() -> None:
     """Credentials are what is going, and a line that said less would be understating it."""
     _account()
@@ -613,17 +702,26 @@ async def test_taking_an_account_away_says_what_went_with_it() -> None:
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
 
-        await driver.press("r")
-        await until(lambda: not providers.providers(), driver)
-        # The sheet comes back, with nothing on it now.
+        # Twice, because it cannot be undone -- and held until the menu is saved.
+        await driver.press("d")
         await until(
             lambda: (
-                isinstance(app.screen, Providers)
-                and not app.screen.query_one("#choices", OptionList).options
+                "press d again" in str(app.screen.query_one("#tuning", Label).content)
             ),
             driver,
         )
-        await driver.press("escape")
+        assert providers.find("claude", "deepseek") is not None
+        await driver.press("d")
+        await until(
+            lambda: (
+                "when this menu is saved"
+                in str(app.screen.query_one("#tuning", Label).content)
+            ),
+            driver,
+        )
+        assert providers.find("claude", "deepseek") is not None
+
+        await keeps(app, driver)
         await until(lambda: not isinstance(app.screen, Providers), driver)
         said = _transcript(app)
 

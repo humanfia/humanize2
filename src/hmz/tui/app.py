@@ -56,7 +56,6 @@ from textual.theme import Theme
 from textual.widgets import OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
-from hmz.backends import Model
 from hmz.runner import flow_and_agents
 
 from .complete import about, hinted, offered, takes
@@ -64,25 +63,20 @@ from .discover import installable, installed
 from .history import History
 from .monitor import Monitor, short, thousands
 from .pick import (
-    Anchors,
-    Backends,
+    Chosen,
     Configures,
     Flows,
     Held,
-    Models,
     Providers,
     Runs,
-    RunsAs,
-    Signing,
-    Speaks,
+    Saved,
     Status,
-    Whose,
-    asks,
-    called,
-    handed_over,
-    made,
-    pointed,
+    config_of,
+    model_of,
+    opens_on,
+    places_of,
     reads,
+    settled,
 )
 from .selecting import Choices, Transcript
 from .settings import Settings
@@ -94,8 +88,6 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from hmz.agents import AgentBase, Event, Question, SessionBase
-    from hmz.backends import Model, Way
-    from hmz.providers import Provider
     from hmz.runner import Place
 
 #: What the editor understands, named as opencode names them, one step along: what answers
@@ -193,27 +185,6 @@ def _clipped(said: str, room: int) -> str:
       It, or as much of it as fits with an ellipsis where the rest was.
     """
     return said if len(said) <= room else said[: room - 1] + "…"
-
-
-def _opens_on(*, goals: bool = True) -> list[Runs]:
-    """The one agent the interface opens talking to, where there is one to open on.
-
-    The first backend installed here that has said what it runs, at the first model it named
-    -- which is that CLI's own idea of what it runs by default, and the only idea of it worth
-    having. Nothing is written down here: a model to open on that was named in this file
-    would be a model this file was right about on the day it was written.
-
-    Returns:
-      The one agent, or nothing at all where no backend here has yet said what it runs --
-      which is a catalogue to fill rather than a model to guess at.
-    """
-    for backend, found in installed().items():
-        if found:
-            # Not the hardest effort, which is what the picker's cursor starts on: that is
-            # the one to reach for, and this is the one to spend before anyone has asked for
-            # anything. `high` is an effort every model of every backend here takes.
-            return [Runs(f"{backend}/{found[0].name}:high", goals=goals)]
-    return []
 
 
 #: How many cells the bar opencode spins in its status line is wide. Blocks, not braille --
@@ -681,34 +652,28 @@ class Humanize(App[None]):
         #: line above the prompt is drawn: that means loading and running a Python file, and
         #: this is drawn twice a second.
         self._wanted = self._places_of(self._flow_named)
+        # What is installed here and what each of them says it runs, which is what a place
+        # nothing was remembered for falls back on.
+        backends = installed()
         if not self._models:
             self._models = self.settings.agents(
                 self._flow_named,
                 tuple(place.goals_default for place in self._wanted),
-            ) or _opens_on(
-                goals=self._wanted[0].goals_default if self._wanted else True
+            ) or opens_on(
+                backends,
+                goals=self._wanted[0].goals_default if self._wanted else True,
             )
             # If the flow would not load, `_places_of` falls back to agents already in hand;
             # the remembered ones were not in hand on the first read.
             if not self._wanted and self._models:
                 self._wanted = self._places_of(self._flow_named)
-        self._models = [
-            Runs(
-                runs.spec,
-                runs.anchor,
-                runs.skills,
-                runs.permission,
-                runs.provider,
-                goals=True,
-            )
-            if at < len(self._wanted) and self._wanted[at].goal
-            else runs
-            for at, runs in enumerate(self._models)
-        ]
+        self._models = settled(self._models, self._wanted, backends)
         #: What the flow itself is set up with, for a flow that says it can be set up at
         #: all: an instance of the model it declared, or None. Read back from what this
         #: workspace last ran, so a flow of many settings opens the way it was left.
-        self._config = config or self._config_of(self._flow_named)
+        self._config = config or config_of(
+            self._flow_named, self.settings.config(self._flow_named)
+        )
         #: What has been typed here before, which the arrows walk. Read now rather than each
         #: time it is asked for: a run started here writes this project's own history into
         #: being, and what is being walked must not change under whoever is walking it.
@@ -761,58 +726,17 @@ class Humanize(App[None]):
           will not load, since a name is a label on something that runs and not a reason for
           anything to stop.
         """
-        from hmz.runner import Place, wanted
+        from hmz.runner import Place
 
-        try:
-            # By the name it was chosen under, not by the file that name resolves to: a file
-            # may hold several flows, and which of them was asked for is the half after the
-            # colon -- which resolving the name to a path throws away.
-            return wanted(flow)
-        except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
-            return tuple(
-                Place(name="", person=False, moments=frozenset()) for _ in self._models
-            )
-
-    @staticmethod
-    def _model_of(flow: str) -> type[BaseModel] | None:
-        """What a flow says it can be set up with, if it says anything.
-
-        Args:
-          flow: The flow, by name or as a path.
-
-        Returns:
-          The model to ask with, or None for a flow that takes no setting up -- and for one
-          that will not load, which is a flow to report where it is run rather than here.
-        """
-        from hmz.runner import configures
-
-        try:
-            return configures(flow)
-        except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
-            return None
-
-    def _config_of(self, flow: str) -> BaseModel | None:
-        """How this workspace last set a flow up, read back through the flow's own model.
-
-        Args:
-          flow: The flow.
-
-        Returns:
-          What it was set up with, or None for a flow that takes no setting up, has not been
-          set up here, or has since changed enough that what was kept no longer reads -- a
-          setting file is a convenience, and one that no longer fits is one to start over
-          from rather than to refuse to open on.
-        """
-        model = self._model_of(flow)
-        if model is None:
-            return None
-        kept = self.settings.config(flow)
-        if not kept:
-            return None
-        try:
-            return model.model_validate(kept)
-        except Exception:  # noqa: BLE001 -- what was kept no longer fits the flow
-            return None
+        # By the name it was chosen under, not by the file that name resolves to: a file may
+        # hold several flows, and which of them was asked for is the half after the colon --
+        # which resolving the name to a path throws away.
+        places = places_of(flow)
+        if places is not None:
+            return places
+        return tuple(
+            Place(name="", person=False, moments=frozenset()) for _ in self._models
+        )
 
     @property
     def _named_by(self) -> tuple[str, ...]:
@@ -866,7 +790,7 @@ class Humanize(App[None]):
 
         In the background and one at a time, because asking means starting a coding agent:
         a prompt cannot wait on one, and six at once is six of them. A backend that will not
-        answer is left alone rather than retried -- ctrl+r on the models is what asks again.
+        answer is left alone rather than retried -- `r` on the models is what asks again.
         """
         import asyncio
 
@@ -885,8 +809,9 @@ class Humanize(App[None]):
             # Which may be the first model there is to open on, for an interface that opened
             # with nothing installed to talk to.
             if not self._models:
-                self._models = _opens_on(
-                    goals=self._wanted[0].goals_default if self._wanted else True
+                self._models = opens_on(
+                    installed(),
+                    goals=self._wanted[0].goals_default if self._wanted else True,
                 )
             self._draw()
 
@@ -1759,218 +1684,173 @@ class Humanize(App[None]):
         self.show(f"[dim]{where}[/dim]")
 
     @work
-    async def action_flow(self, named: str = "", *, setting: bool = True) -> None:
-        """Switches which flow runs, how it is set up, and what each of its agents is.
+    async def action_flow(self, named: str = "", *, opening: int = 0) -> None:
+        """Opens the flow menu: which flow runs, and what each of its agents is.
 
-        Asked as one walk rather than as a handful of dialogs: how the flow is set up is asked
-        next because only the flow that was just chosen says what there is to set, and each of
-        its agents after that because a flow says for itself how many it drives -- three steps
-        apiece, which :meth:`_each_agent` walks. Esc off any of them is a step back to the one
-        before, since what you would be walking back from is the choice that led there.
+        One menu of two pages rather than a walk of a sheet per question. Nothing in it is
+        applied until it is saved on the way out, so opening it to look at the flows and
+        walking back out again leaves the interface exactly as ready to be typed at as it was.
+
+        Not refused while a flow runs. The page that chooses one is shut then -- a flow is
+        chosen in order to be started, and there is one going -- but the page its agents are
+        set up on is open, that being where somebody halfway through a run finds out that an
+        agent is thinking too little or is allowed too much.
 
         Args:
-          named: A flow of your own, as a path. Left out, the ones humanize came with are
-            listed instead -- a path is typed, since guessing which files below here are
-            flows means reading all of them.
-          setting: Whether to ask how the flow is set up on the way past. `/agents` is the
-            one that does not: it is the other half of `/config`, and a question it did not
-            ask is one it must not put up.
+          named: A flow of your own, as a path, to open the menu already holding.
+          opening: Which page to open on, counting from zero.
         """
-        from hmz.runner import wanted
-
-        if self._mid_run("no choosing a flow"):
+        # Opened whether or not there is a backend to run one on: which flow to run is worth
+        # reading either way, and the sheet an agent is set up on says for itself that there
+        # is nothing installed to set it up as.
+        agents = installed()
+        unavailable = installable()
+        agents.update(unavailable)
+        running = bool(self._agents)
+        if named and running:
+            self.show("hmz: a flow is running; no choosing a flow", "red")
             return
-        while True:
-            picked = named or await self.push_screen_wait(Flows(self._flow_named))
-            if picked is None:
-                return
-            # Nothing is taken until a choice lands: walking in to look at the flows and
-            # walking back out again must leave the interface as ready to be typed at as it
-            # was, rather than holding a flow with nothing to run it on.
-            switching = picked if isinstance(picked, str) else picked[0]
-            agents = installed()
-            unavailable = installable()
-            agents.update(unavailable)
-            if not agents:
-                self.show("hmz: no coding agent is installed here", "red")
-                return
-            try:
-                # One place per agent the flow drives: what it calls each -- a name apiece
-                # where it declared them as a named tuple -- how many there are either way,
-                # and what it needs each of them to be able to do. Asked by the name it was
-                # chosen under: a file may hold several flows, and the half after the colon
-                # is which of them this is.
-                places = wanted(switching)
-            except Exception as why:  # noqa: BLE001 -- a flow that will not load
-                self.show(f"hmz: {why}", "red")
-                return
-            # How the flow itself runs, for a flow that says it can be set up: asked of the
-            # flow being switched to rather than of the one in force, since the settings
-            # belong to the model that flow declared and to no other.
-            model = self._model_of(switching) if setting else None
-            held = (
-                self._config
-                if switching == self._flow_named
-                else self._config_of(switching)
+        # What is in hand is what is in hand for the flow the interface is set up on. A menu
+        # opened straight into another flow is handed none, and reads what that one was last
+        # set up with here -- which is what turning to it would have read.
+        holding = self._models if not named or named == self._flow_named else ()
+        chosen = await self.push_screen_wait(
+            Flows(
+                named or self._flow_named,
+                holding,
+                self._config if holding else None,
+                agents,
+                self.settings.flows(),
+                unavailable=frozenset(unavailable),
+                running=running,
+                opening=opening,
             )
-            if model is not None:
-                held = await self.push_screen_wait(
-                    Configures(
-                        switching, model, held if isinstance(held, model) else None
-                    )
-                )
-                if held is None:
-                    if named:
-                        return  # nothing to step back into: this walk began here
-                    continue  # back to the flows, which is where this walk came from
-            chosen = await self._each_agent(
-                switching, places, agents, frozenset(unavailable)
-            )
-            if chosen is not None:
-                # A flow is chosen in order to be run, so whatever is running stops: the
-                # interface opens on one already, and a choice that quietly went to the back
-                # of the queue behind it would read as no choice at all. Answering the same
-                # way twice is not a choice, though, and must not end the conversation.
-                if (switching, list(chosen), held) != (
-                    self._flow_named,
-                    self._models,
-                    self._config,
-                ):
-                    self.action_stop_flow()
-                self._flow_named, self._models = switching, list(chosen)
-                self._wanted, self._config = places, held
-                self.settings.remember(
-                    switching,
-                    self._named_by,
-                    self._models,
-                    held.model_dump(mode="json") if held is not None else None,
-                )
-                self.show("[dim]say what to do, and the flow starts on it[/dim]")
-                self._draw()
-                return
-            if named and model is None:
-                return  # a flow of your own, and nothing before this to step back into
-            if named:
-                # Back to how it is set up, which is the step this walk came through.
-                continue
-            # And otherwise round again, which is the step back off the leftmost column.
+        )
+        if chosen is None:
+            return  # walked out without saving, which changes nothing at all
+        self._took_flow(chosen, running=running)
 
-    async def _each_agent(
-        self,
-        flow: str,
-        places: tuple[Place, ...],
-        agents: dict[str, tuple[Model, ...]],
-        unavailable: frozenset[str],
-    ) -> list[Runs] | None:
-        """Asks what each agent of a flow is, three steps apiece and one agent at a time.
-
-        Three because each depends on the one before it: which coding agent takes its turns
-        and which account it runs as, then which of that CLI's models at what effort, then --
-        only where the flow said this one may be pointed at a machine -- where its work lands.
-        An account belongs to a backend and a model belongs to the CLI that runs it, so
-        neither is answerable until the CLI has been chosen.
-
-        Esc off any of them is the step before: off the third into the second, off the second
-        into the first, off the first into the agent before it, and off the first step of the
-        first agent, out of the walk entirely -- which changes nothing at all. Stepping back
-        into a step finds it as it was left, since a question that had forgotten its own
-        answer would be a different question.
+    def _took_flow(self, chosen: Chosen, *, running: bool) -> None:
+        """Applies what the flow menu was saved with, and writes it down.
 
         Args:
-          flow: The flow whose agents these are.
-          places: One place per agent it drives, in the order it takes them.
-          agents: The backends offered here, and what each of them says it runs.
-          unavailable: The optional backends among them that still need installing.
-
-        Returns:
-          What each of them runs, in the order the flow takes them -- and nothing at all for
-          a flow that drives none, which is a flow that talks only to the person at this
-          prompt. None where the walk was left.
+          chosen: The flow, its agents, and how the flow itself is set up.
+          running: Whether a flow was running when the menu opened, which is what decides
+            between starting fresh and changing the agents under a run.
         """
-        from hmz import models
+        places = places_of(chosen.flow)
+        same = (chosen.flow, list(chosen.agents), chosen.config) == (
+            self._flow_named,
+            self._models,
+            self._config,
+        )
+        if not running and not same:
+            # A flow is chosen in order to be run, so whatever is running stops: the interface
+            # opens on one already, and a choice that quietly went to the back of the queue
+            # behind it would read as no choice at all. Answering the same way twice is not a
+            # choice, though, and must not end the conversation.
+            self.action_stop_flow()
+        self._flow_named, self._models = chosen.flow, list(chosen.agents)
+        self._wanted = places if places is not None else self._places_of(chosen.flow)
+        self._config = chosen.config
+        self.settings.remember(
+            chosen.flow,
+            self._named_by,
+            self._models,
+            chosen.config.model_dump(mode="json")
+            if chosen.config is not None
+            else None,
+        )
+        if running:
+            self._reconfigured()
+        elif not same:
+            self.show("[dim]say what to do, and the flow starts on it[/dim]")
+        self._draw()
 
-        whose: dict[int, Whose] = {}
-        runs: dict[int, Runs] = {}
-        at, step = 0, _WHO
-        while at < len(places):
-            named = called(places, at)
-            if step == _WHO:
-                signed = await self.push_screen_wait(
-                    RunsAs(
-                        flow,
-                        named,
-                        places[at],
-                        agents,
-                        whose.get(at),
-                        unavailable=unavailable,
-                    )
+    def _reconfigured(self) -> None:
+        """Sets the agents of a run that is going to what they have just been changed to.
+
+        An agent is configured once and read from there on, so what a running one is doing now
+        is what it was set up with, and what it is asked for next is what it is set up with by
+        the time it is asked. So the ones whose CLI has not changed are set up where they
+        stand: the turn under way finishes as it started -- a model does not think harder
+        halfway through an answer -- and everything asked for after it is at the new model,
+        effort, account, skills, rung and machine.
+
+        A CLI that has changed is not one of those. What drives a backend is the class the
+        agent is, and the flow is holding the agents it was handed when it started; one of
+        them cannot become another backend without becoming another object, which is a thing
+        only starting the flow again does. So that one is written down and runs from the next
+        time the flow is started.
+        """
+        from dataclasses import replace
+
+        from hmz.agents import anchored
+
+        for at, agent in enumerate(self._agents):
+            if at >= len(self._models):
+                break
+            runs = self._models[at]
+            cli, _, rest = runs.spec.partition("/")
+            model, _, effort = rest.rpartition(":")
+            if cli != agent.backend:
+                self.show(
+                    f"[dim]{escape(agent.id)} is {escape(cli)} from the next run; "
+                    "an agent cannot become another backend under the flow holding it[/dim]"
                 )
-                if signed is None:
-                    at -= 1
-                    if at < 0:
-                        return None  # the step before the first of these is out of the walk
-                    step = _WHERE if pointed(places[at]) else _WHAT
-                    continue
-                whose[at] = signed
-                step = _WHAT
-            elif step == _WHAT:
-                held = whose[at]
-                chosen = await self.push_screen_wait(
-                    Models(
-                        flow,
-                        named,
-                        held,
-                        # What that account may name rather than what the CLI says as whoever
-                        # is at this machine: two accounts of one CLI are two catalogues, and
-                        # the step before this one settled which. The one nobody chose is
-                        # already in hand, having been read when the walk began.
-                        models.offered(held.cli, held.provider)
-                        if held.provider
-                        else agents.get(held.cli, ()),
-                        places[at],
-                        runs.get(at),
-                    )
+                continue
+            try:
+                machine = anchored(runs.anchor)
+            except ValueError as why:  # a target that cannot be read is one to correct
+                self.show(f"hmz: {escape(agent.id)}: {why}", "red")
+                continue
+            # Said to the agent rather than to a session: what a person changes here they
+            # change about the agent, and every conversation it opens from now on is at it.
+            agent.reconfigure(
+                replace(
+                    agent.config,
+                    model=model,
+                    effort=effort,
+                    machine=machine,
+                    skills=runs.skills,
+                    provider=runs.provider,
+                    goals=runs.goals,
+                    **({"permission": runs.permission} if runs.permission else {}),
                 )
-                if chosen is None:
-                    step = _WHO
-                    continue
-                runs[at] = chosen
-                if pointed(places[at]):
-                    step = _WHERE
-                else:
-                    # A place the flow said nothing about works here and is not asked, so
-                    # answering the model is the whole of that agent.
-                    at, step = at + 1, _WHO
-            else:
-                where = await self.push_screen_wait(Anchors(named, runs[at].anchor))
-                if where is None:
-                    step = _WHAT
-                    continue
-                runs[at] = runs[at]._replace(anchor=where)
-                at, step = at + 1, _WHO
-        return [runs[one] for one in range(len(places))]
+            )
+            self.show(
+                f"[dim]{escape(agent.id)} is {escape(runs.spec)} "
+                "from its next turn[/dim]"
+            )
 
     def action_agents(self) -> None:
-        """Sets what each of the flow's agents runs, which is what `/agents` is for.
+        """Opens the agents saved under a name, which is what `/agents` is for.
 
-        Neither the flow nor how it is set up is asked for again: `/config` is the other
-        half, and this one is about what the flow runs on. So esc is a way out rather than a
-        step back into a question this did not come through.
+        Not the agents of the flow: those are the second page of `/flow`, and are what this
+        run is driven by. These are the ones written down to be imported there -- the reviewer
+        you always use, the cheap one you fan out across, the one on somebody's gateway -- and
+        belong to no flow and no workspace at all.
         """
-        if self._mid_run("no setting agents"):
-            return
-        self.action_flow(self._flow_named, setting=False)
+        self._saved_agents()
+
+    @work
+    async def _saved_agents(self) -> None:
+        """Reads the saved agents, and says so where the menu was saved."""
+        agents = installed()
+        agents.update(installable())
+        for one in await self.push_screen_wait(Saved(agents)) or ():
+            self.show(one)
 
     @work
     async def action_config(self) -> None:
         """Sets up the flow itself, which is what `/config` is for.
 
-        Only what the flow says it takes, and nothing about the agents: `/agents` is the
+        Only what the flow says it takes, and nothing about the agents: the flow menu is the
         other half, and a flow that says it takes no setting up says so here.
         """
         if self._mid_run("no setting up a flow"):
             return
-        model = self._model_of(self._flow_named)
+        model = model_of(self._flow_named)
         if model is None:
             self.show(f"hmz: {self._flow_named} takes no setting up", "red")
             return
@@ -1994,219 +1874,16 @@ class Humanize(App[None]):
 
     @work
     async def action_providers(self) -> None:
-        """Walks the accounts an agent may be run as, which is what `/providers` is for.
-
-        The sheet comes back after each thing done to one, since what it says is what there
-        is now: an account made or taken away is a list that has changed. Esc closes it, and
-        esc off any of the sheets it opens is a step back into the one before -- so a walk in
-        to look at them and out again changes nothing.
+        """Opens the accounts an agent may be run as, which is what `/providers` is for.
 
         Not refused while a flow runs. What it holds is not what is running: an agent reads
-        the account it was configured with once, so one made or taken away now is one the
-        next run sees. A login that takes the terminal does hold the rest of the interface up
+        the account it was configured with once, so one made or taken away now is one the next
+        session sees. A login that takes the terminal does hold the rest of the interface up
         while it has it, which is what handing the terminal over means.
         """
-        while True:
-            doing = await self.push_screen_wait(Providers())
-            if doing is None:
-                return
-            # The three words `hmz providers` uses for the same three things, which is where
-            # the sheet took them from: one vocabulary for one list of things to do.
-            if doing.what == "fallback":
-                self._mark_fallback(doing.cli, doing.name)
-            elif doing.what == "speaks":
-                await self._add_speaking()
-            elif doing.what == "add":
-                await self._make_provider()
-            elif doing.what == "login":
-                await self._sign_provider_in(doing.cli, doing.name)
-            else:
-                self._drop_provider(doing.cli, doing.name)
-
-    def _mark_fallback(self, cli: str, name: str) -> None:
-        """Switches whether one account is where a turn goes when another one fails.
-
-        Args:
-          cli: The backend the account is for.
-          name: Which account.
-        """
-        from hmz import providers
-
-        found = providers.find(cli, name)
-        if found is None:
-            return
-        providers.marks(cli, name, fallback=not found.fallback)
-        self.show(
-            f"[dim]{escape(cli)}/{escape(name)} is "
-            + (
-                "where a turn goes when another account fails"
-                if not found.fallback
-                else "no longer a fallback"
-            )
-            + "[/dim]"
-        )
-
-    async def _add_speaking(self) -> None:
-        """Asks for a CLI of your own that speaks ACP, and writes it down as a backend.
-
-        Here rather than anywhere else because this is the moment somebody finds out that the
-        agent they want to run is not one humanize drives: sending them to a command line to
-        add it would lose the question they came here to answer. What is written down outlives
-        the run, so it is a backend from the next prompt on, in this workspace and every other.
-        """
-        from hmz import backends
-
-        said = await self.push_screen_wait(Speaks())
-        if said is None:
-            return
-        command, name = said
-        try:
-            backends.remember(name, shlex.split(command))
-        except (OSError, ValueError) as why:
-            self.show(f"hmz: {why}", "red")
-            return
-        self.show(
-            f"[dim]{escape(name)} is written down: `{escape(command)}` "
-            f"starts it, and it is a backend from here on[/dim]"
-        )
-
-    async def _make_provider(self) -> None:
-        """Asks which CLI, and then walks that backend's own way in.
-
-        Two questions rather than one, because the second is only answerable once the first
-        has been: a backend's ways in are its own. The rest of the walk is the one the sheet
-        an agent's account is chosen on runs, so making one from either place is the same
-        thing done in the same order.
-        """
-        while True:
-            cli = await self.push_screen_wait(Backends())
-            if cli is None:
-                return  # nothing before this to step back into
-            outcome = await made(self, cli)
-            # Walking out of the first question the walk itself asks is a step back into the
-            # one asked here, since that is the step before it. Only here: the same walk from
-            # the sheet an agent's account is chosen on has nothing behind it but that sheet.
-            if outcome.provider is not None or outcome.why:
-                break
-        made_one = outcome.provider
-        if made_one is None:  # a name or a directory that will not do
-            self.show(f"hmz: {outcome.why}", "red")
-            return
-        self.show(
-            f"[dim]{escape(made_one.cli)}/{escape(made_one.name)} is written down at "
-            f"{escape(str(made_one.at))}[/dim]"
-        )
-        if outcome.status:
-            self.show(f"hmz: signing it in exited {outcome.status}", "red")
-            return
-        if outcome.way_runs:
-            self.show(
-                f"[dim]{escape(made_one.cli)}/{escape(made_one.name)} is signed in[/dim]"
-            )
-        # What it runs is asked as soon as it lands, since that is what an account is for.
-        self.show(
-            f"[dim]{escape(made_one.cli)} says it runs {outcome.runs} models as "
-            f"{escape(made_one.name)}[/dim]"
-            if outcome.runs
-            else f"[dim]{escape(made_one.cli)} did not say what it runs as "
-            f"{escape(made_one.name)}; ctrl+r on its models asks again[/dim]"
-        )
-
-    async def _sign_provider_in(self, cli: str, name: str) -> None:
-        """Runs one account's own way in again, asking for whatever it still needs.
-
-        Args:
-          cli: The backend it is for.
-          name: What the account is called.
-        """
-        from hmz import providers as held
-        from hmz.providers import login as signing
-
-        provider = held.find(cli, name)
-        if provider is None:
-            self.show(f"hmz: no provider {cli}/{name}", "red")
-            return
-        way = signing.way_of(cli, provider.way)
-        if way is None or not way.argv:
-            self.show(
-                f"hmz: {cli}/{name} was made by {provider.way}, which has nothing to run; "
-                "make it again to change what it holds",
-                "red",
-            )
-            return
-        # What it already holds answers what it can. A key the CLI keeps in its own store is
-        # not among them -- it was never kept here -- so it is asked for again.
-        answers = dict(provider.env)
-        if signing.asked(way, answers):
-            signs = await self.push_screen_wait(Signing(cli, way, name=name))
-            if signs is None:
-                return  # walked out, which signs nothing in and changes nothing
-            answers |= signs.answers
-        if not self._signed_in(provider, way, answers):
-            return
-        # Signed in again is possibly a different account, and certainly a fresh answer to
-        # what it runs: an account that has just changed hands is one to ask again.
-        runs = await asks(cli, name)
-        self.show(
-            f"[dim]{escape(cli)} says it runs {runs} models as {escape(name)}[/dim]"
-            if runs
-            else f"[dim]{escape(cli)} did not say what it runs as {escape(name)}; "
-            "ctrl+r on its models asks again[/dim]"
-        )
-
-    def _signed_in(self, provider: Provider, way: Way, answers: dict[str, str]) -> bool:
-        """Hands the terminal to a backend's own way in, and says what came of it.
-
-        A login is a browser opened, a code read out, a token exchanged: it owns the screen
-        while it runs, and there is nothing for this interface to draw over it. A way that is
-        only answers has already happened, having been written down.
-
-        Args:
-          provider: The account being signed in.
-          way: The way in, whose own command is what runs.
-          answers: What its questions were answered with.
-
-        Returns:
-          Whether it landed, so that what follows a login knows there was one.
-        """
-        from hmz.providers import login as signing
-
-        if not way.argv:
-            return False
-        try:
-            with handed_over(self):
-                status = signing.sign_in(provider, way, answers)
-        except OSError as why:  # the backend's own command is not on this machine
-            self.show(f"hmz: {way.argv[0]}: {why}", "red")
-            return False
-        if status:
-            self.show(f"hmz: {way.argv[0]} exited {status}", "red")
-            return False
-        self.show(
-            f"[dim]{escape(provider.cli)}/{escape(provider.name)} is signed in[/dim]"
-        )
-        return True
-
-    def _drop_provider(self, cli: str, name: str) -> None:
-        """Takes one account away, credentials and all, and says so.
-
-        Args:
-          cli: The backend it is for.
-          name: What it is called.
-        """
-        from hmz import providers as held
-
-        try:
-            gone = held.remove(cli, name)
-        except ValueError as why:  # a name nothing could ever have been kept under
-            self.show(f"hmz: {why}", "red")
-            return
-        if not gone:
-            self.show(f"hmz: no provider {cli}/{name}", "red")
-            return
-        self.show(
-            f"[dim]{escape(cli)}/{escape(name)} is gone, credentials and all[/dim]"
-        )
+        said = await self.push_screen_wait(Providers())
+        for one in said or ():
+            self.show(one)
 
     def _at_turn_start(self) -> list[str]:
         """What a turn starting folds into its prompt, which is one waiting line, or none.

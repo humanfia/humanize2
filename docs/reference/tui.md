@@ -130,10 +130,10 @@ list appears under the editor with a line about each.
 
 | Command | Takes | What it does |
 | --- | --- | --- |
-| `/flow` | `[flow]` | [Switches which flow runs](#choosing-a-flow), then [how it is set up](#setting-a-flow-up) if it takes any setting up, then [what each of its agents is](#what-each-agent-is-three-steps). With a name or a path, takes that one. Refused while a flow is running — a flow is chosen in order to be run, so esc stops that one first. Looking and leaving without choosing changes nothing. |
-| `/config` | | Sets up the flow itself, for a flow that says it can be. See [below](#setting-a-flow-up). |
-| `/agents` | | Sets what each agent of the current flow is, [three steps apiece](#what-each-agent-is-three-steps) and one agent at a time, by the name the flow calls it. It does not ask how the flow itself is set up; `/config` is that half. |
-| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and the three things that can happen to one — made, signed in again, taken away. |
+| `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one. The first page is shut while a flow is running; the second never is. Nothing lands until you save on the way out. |
+| `/config` | | Sets up the flow itself, for a flow that says it can be. Also **c** on the Flow page. See [below](#setting-a-flow-up). |
+| `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
+| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, corrected, signed in again, marked as a fallback, taken away. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
@@ -308,40 +308,71 @@ been typed here yet, everything ever typed anywhere, so a fresh project still ha
 walk back through. Which of the two it is is settled when the interface starts, so a history
 cannot change under you mid-session.
 
+## The menus, and when what they hold lands
+
+`/flow`, `/agents` and `/providers` are menus rather than walks. Three things are true of all
+of them:
+
+- **No key is a chord.** A menu asks one thing and its keys are its own, so nothing here needs
+  a modifier held down.
+- **Typing does not search.** Every letter is a key, so a search is asked for with **s** and
+  left with **esc**, which clears what was typed. While one is running the letters go into it.
+- **Nothing lands until you save on the way out.** Esc asks, and offers to keep editing. A menu
+  you only looked at asks nothing.
+
+A menu of several pages shows their titles across the top, and **tab** / **shift+tab** turn
+between them. A page that cannot be opened right now is still a title, struck through.
+
 ## Choosing a flow
 
-`/flow` puts up the flows there are, a tab per place they come from: every
+`/flow` opens on two pages — **Flow** and **Agents** — and the first of them puts up the flows
+there are, under a heading per place they come from: every
 [flowverse](/reference/flows.md#flowverses) — `builtin`, which is the package's own, `official`, which is
 where the rest come from, and whatever else has been added — and then `local`, this project's
 flows under `.humanize/flows`, and `user`, yours under `~/.humanize/flows`, each where there
 are any.
 
 ```
-  Select flow
+  Flow
 
-  Which flow the agents are driven through, out of the places flows come from — one per tab on
-  the arrows. The first thing you say once it is chosen is what it is to do.
+  Which flow the agents are driven through. The first thing you say once it is chosen is what
+  it is to do. A flow anywhere else is a path you type.
 
-  builtin · official · local   ←/→ to switch
+  Flow · Agents   tab/shift+tab to switch
 
+  builtin
 ❯ 1. chat                    Chat — one agent, one session, and every line typed between…
   2. ralph_loop              Ralph loop (flowbench: ralph_loop) — a fresh session every…
   3. stateful_ralph          Stateful ralph (flowbench: stateful_ralph) — one session, re-…
 
-  ←/→ flowverse · ctrl+n to add one · ctrl+r to fetch · Type to search · Enter to choose
+  official
+     not fetched yet; r fetches it
+
+  Enter to choose · a adds a flowverse · r fetches one · d twice takes one away · c sets the
+  flow up · Esc to close · s to search
 ```
 
 | Key | |
 | --- | --- |
-| `←` `→` | The place flows come from. |
-| `ctrl+n` | Add a flowverse: a URL or an `owner/repo`, and a name to keep it under. |
-| `ctrl+r` | Fetch the open one again, or for the first time. |
-| `ctrl+x` | Take an added one away, flows and all. `builtin` and `official` are always here. |
+| `a` | Add a flowverse: a URL or an `owner/repo`, and a name to keep it under. |
+| `r` | Fetch the one under the cursor again, or for the first time. |
+| `d` `d` | Take an added one away, flows and all. `builtin` and `official` are always here. |
+| `c` | [Set the flow itself up](#setting-a-flow-up), for a flow that says it can be. |
 
-The three keys are here rather than in a menu of their own because this is the moment you find
-out that the flow you want is in a flowverse you have not added, or that the one you have is
-out of date. A fetch runs off the interface's own loop — it keeps drawing while it clones — and
-what became of it is said under the list rather than thrown at you.
+The flowverse keys are here rather than in a menu of their own because this is the moment you
+find out that the flow you want is in a flowverse you have not added, or that the one you have
+is out of date. A fetch runs off the interface's own loop — it keeps drawing while it clones —
+and what became of it is said under the list rather than thrown at you. A flowverse with
+nothing in it is still a row, so the cursor can land on it and `r` can fetch it.
+
+Choosing a flow reads back what that flow was last set up with here and turns to the **Agents**
+page, which is the next thing to answer.
+
+**The Flow page is shut while a flow is running** — a flow is chosen in order to be started,
+and there is one going. The Agents page never is: an agent thinking too little, on the wrong
+account or allowed too much is something you find out halfway through a run. What you save then
+reaches the agents that are running, each of them from its next turn on. A CLI you changed is
+the one thing that cannot be swapped under a flow already holding that agent, and says so.
 
 The same places are on the command line as [`hmz flowverses`](/reference/cli.md#hmz-flowverses), for a
 machine being set up or a script.
@@ -349,122 +380,138 @@ machine being set up or a script.
 Typing narrows by name. What each flow says about itself is beside its name, and is not
 searched: a subsequence of a sentence matches nearly everything.
 
-## What each agent is: three steps
+## What each agent is
 
-`/agents` asks it one agent at a time, by the name the flow calls each — and each agent is
-three steps, in this order:
+The **Agents** page of `/flow` lists what the flow drives, by the name the flow calls each, and
+enter opens one. Everything that agent is is a row of one sheet:
 
-1. **[Which CLI, and which account](#which-cli-and-which-account)** its turns run as.
-2. **[Which model, and at what effort](#what-each-agent-runs)**.
-3. **[Where it works](#where-each-agent-works)** — only for an agent the flow says may be
-   pointed at a machine. For every other agent this step does not exist.
+```
+  Set up builder
 
-The order is the order of what depends on what: an account is one backend's, and a model
-belongs to the CLI that runs it, so neither question can be put before the CLI has been
-chosen. A two-agent flow is at most six sheets: the first agent's three, then the second's.
+  What this one agent is. Enter opens the row under the cursor, and the arrows step the ones
+  that are a rung rather than a list. Nothing is applied until this sheet is left and saving is
+  confirmed.
 
-**Esc is always the step before.** Off the third into the second, off the second into the
-first, off the first into the agent before it — and off the first step of the first agent,
-out of the walk entirely, changing nothing at all. A step you walk back into is as you left
-it.
+    1. import       ▸                          copy a saved agent into this one
+  ❯ 2. cli          claude ▸                   which coding agent takes its turns
+    3. provider     as local ▸                 the account those turns run as
+    4. model        claude-opus-5 ▸            which of that CLI's models it runs
+    5. effort       high                       how hard it thinks
+    6. skills       every skill ▸              which of its CLI's skills it is loaded with
+    7. permission   bypass                     what it may do without being asked
+    8. goals        on                         whether the backend's own goals are available
+    9. where        this machine ▸             the machine its work lands on
+   10. save         ▸                          save this as an agent you can import
 
-Answering the last step of the last agent is what takes the lot: it is written down, the line
-above the prompt says it. Nothing was running: the walk is refused while a flow is, so esc has
-already stopped it — a flow is set up in order to be run.
+  Enter to open · Esc to close
+```
+
+One sheet rather than a walk of three, because an agent is one thing: a CLI, an account, a
+model at an effort, a set of skills, a rung of what it may do and a machine its work lands on.
+A walk meant that changing the effort of an agent already set up was four keypresses through two
+sheets with nothing to say.
+
+The rows are in the order of what depends on what. The CLI settles which accounts there are and
+which models that CLI will name; the account settles which of them it may name. **Changing the
+CLI lets go of the model**, which belonged to the CLI before it.
+
+**The arrows step a row that is a rung in an order** — the effort, what it may do, swarm mode,
+whether goals are available. Everything else opens a sheet of its own and comes back. `where` is
+a row only for an agent [the flow says may be pointed at a machine](#where-each-agent-works);
+for one the flow put in a container it is read rather than opened, and for one that works here
+it is not there at all.
+
+Esc off the sheet asks about anything you changed and hands it back to the menu, which is still
+holding it: nothing is written down until the menu itself is saved.
 
 ## Which CLI, and which account
 
-The first step. A tab per CLI **that is actually installed here**, and under it that CLI's own
-accounts, since an [account](/reference/providers.md) is one backend's — what signs in to Claude Code is
-not what signs in to codex:
+Two rows, in that order, because an [account](/reference/providers.md) is one backend's — what signs in
+to Claude Code is not what signs in to codex. The CLIs are the ones **actually installed here**,
+less any the flow ruled out by needing a moment or a goal feature that backend has not got:
 
 ```
-   claude · codex · kimi · mimo · opencode · pi   ←/→ to switch
+   Select the account its turns run as
 
-   ❯ 1. as installed              ✔ signed in as you signed it in
+   ❯ 1. as local                  signed in as you signed it in
      2. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
      3. work                      login
+
+   a to make one · Enter to choose · Esc to cancel · s to search
 ```
 
-**→** turns to the next CLI, **←** to the one before, and they wrap. The arrows rather than tab,
-because this sheet asks one thing: up and down are the accounts under the tab, so left and right
-are the tabs. One CLI on its own is a heading rather than a row of tabs: there is nowhere to
-switch to, so nothing says there is. Where the flow said that agent has to run a particular moment, only the CLIs that
-run it are here — choosing one that does not is a flow that would refuse to start.
+`as local` — always the first row — is what every agent ran as before there were any accounts:
+the CLI signed in the way you signed it in, with nothing redirected.
 
-`as installed` — the first row — is what every agent ran as before there were any accounts:
-the CLI signed in the way you signed it in, with nothing redirected. It is asked here rather than hidden behind a chord because it decides
-which credentials the turns run under, which is not a side question about anything: two agents
-of one CLI, one on a subscription and one on somebody's gateway, are two accounts running at
-once, each refreshing its own token and neither able to read the other's.
-
-**ctrl+n makes one without leaving the question.** This is the moment you find out that the
-account you want is not there, so it is the moment to be offered it: ctrl+n asks how to sign in
-and what that way needs — the same walk [`/providers`](#the-accounts-themselves) runs, minus the
-question this tab has already answered — hands the terminal to the CLI's own login where the
-way has one, and comes back with the new account chosen. A CLI with no accounts yet says
-`claude has no accounts here yet; ctrl+n makes one` under the list, and one whose login exited
-badly says that there instead, leaving the account written down for another try.
+**`a` makes one without leaving the question.** This is the moment you find out that the account
+you want is not there, so it is the moment to be offered it: `a` asks how to sign in and what
+that way needs — the same walk [`/providers`](#the-accounts-themselves) runs, minus the question
+this row has already answered — hands the terminal to the CLI's own login where the way has one,
+and comes back with the new account chosen. A CLI with no accounts yet says
+`claude has no accounts here yet; a makes one` under the list.
 
 An agent given an account that has since been taken away is a red line when the flow is started,
 before any turn has run — never a traceback half an hour in.
 
 ## What each agent runs
 
-The second step: which of that CLI's models, and how hard it thinks. A model belongs to the CLI
-that runs it, and the CLI was settled a step ago, so it is named above them as a heading:
+The `model` row: which of that CLI's models, and under it the effort, stepped where it stands.
 
 ```
-   claude
+   Select what claude runs
 
-     1. claude-opus-5           claude
-   ❯ 2. claude-sonnet-5         claude
+   Which model of claude takes this one's turns, and how hard it may be asked to think. These
+   are what it last said it runs as this account; r asks it again.
 
-   ◉ max effort  ←/→ to adjust · ◉ swarm mode off  ctrl+w to toggle · ◉ every skill  ctrl+s to choose · ◉ bypass  ctrl+p to change
+     1. claude-opus-5           max, high
+   ❯ 2. claude-sonnet-5         max, high
+
+   r to ask it again · Enter to choose · Esc to cancel · s to search
 ```
 
-Typing narrows the list — a few letters anywhere in a name find it, since nobody types a model
-id out — and esc clears what was typed before it steps back.
-
-**The list is what that CLI said it runs as the account chosen a step ago**, not a list written
+**The list is what that CLI said it runs as the account chosen above it**, not a list written
 into humanize: a CLI ships a model without asking anybody, and which of them you may name
 depends on the account. It is asked the first time the interface opens, and again whenever an
-account is made. **ctrl+r** asks it again from here, which is where you find out that the model
-you came for is not in the list. A CLI that has never been asked says so where the list would
-be; one that will not answer says why, under the list, and leaves the sheet up.
+account is made. **r** asks it again from here, which is where you find out that the model you
+came for is not in the list. A CLI that has never been asked says so where the list would be;
+one that will not answer says why, under the list, and leaves the sheet up.
 
-Under the models, the things that are adjusted rather than chosen: **←/→** the effort,
-**ctrl+w** [swarm mode](/reference/agents.md#efforts) for a model that has one, **ctrl+s**
-[what it is loaded with](#what-each-agent-is-loaded-with), **ctrl+p**
-[what it may do](/reference/agents.md#what-an-agent-may-do). Those three really are side questions about
-the same agent, which is why they are keys here rather than steps of their own.
+Choosing a model you were not already on starts the effort at the hardest that model takes —
+the one to reach for. Choosing the one you are on leaves the effort where you had it.
 
-The account is **not** on that line. It was the step before this one, it is on the line above
-the prompt once the walk is over, and a setting shown where it cannot be changed is a setting
-somebody tries to change.
+## Agents kept under a name
 
-Where the agent works is read back there, with no key on it, where a step of its own has
-already settled it: `◉ in a container of python:3.12` for an agent the flow put in a container
-of its own, or `◉ on ssh://box` for one already pointed somewhere. An agent that works here says
-nothing there, which is what an agent nobody said anything about has always done.
+`/agents` is not the flow's agents. It is the agents written down under a name, to be imported
+wherever a flow's agent is set up: the reviewer you always use, the cheap one you fan out
+across, the one on somebody's gateway. An agent is a CLI, an account, a model at an effort and
+what it may do — none of which is a thing about the flow that happens to be driving it.
 
-Enter takes the row under the cursor and goes on: to where that agent works, if the flow says it
-may be pointed anywhere, and otherwise to the next agent the flow drives.
+| Key | |
+| --- | --- |
+| `enter` | Set one up, on the same sheet a flow's agent is set up on. |
+| `a` | Add one. It has a `name` row of its own, which a flow's agent has not. |
+| `d` `d` | Take one away. |
+
+They live in `~/.humanize/agents.yaml`, and land there when the menu is saved.
+
+**A flow imports a copy.** The `import` row of a flow's agent copies everything the saved one
+is; changing it afterwards changes that flow's agent alone. The `save` row is the other half:
+what you tuned inside a flow, written down under a new name or over one already there.
 
 ## Where each agent works
 
-The third step, and **only for an agent whose place the flow declared `Remote`**. Where an
+The `where` row, and **only for an agent whose place the flow declared `Remote`**. Where an
 agent works is the flow's to say rather than a setting anybody may reach for — a flow written to
 read this project cannot have one of its agents reading somebody else's — so:
 
 | What the flow declared | What you are asked |
 | --- | --- |
-| `Annotated[AgentBase, Remote]` | this step: which machine its work lands on |
-| `Annotated[AgentBase, Isolated("python:3.12")]` | nothing; the flow named the image, and the model step says `◉ in a container of python:3.12` |
-| `AgentBase` | nothing; it works here |
+| `Annotated[AgentBase, Remote]` | a `where` row: which machine its work lands on |
+| `Annotated[AgentBase, Isolated("python:3.12")]` | nothing; the flow named the image, and the row reads `in a container of python:3.12` |
+| `AgentBase` | nothing; it works here, and there is no row |
 
 The sheet lists what this machine can see — each container that is running, each host with an
-entry in your `~/.ssh/config` — and anything else is a target you type:
+entry in your `~/.ssh/config` — and anything else is a target you type after **s**:
 
 | Typed | Where the work goes |
 | --- | --- |
@@ -473,7 +520,7 @@ entry in your `~/.ssh/config` — and anything else is a target you type:
 | `ssh://<host>` | a host you can reach |
 | `tcp://<host>:<port>` | a coganchor target listening there |
 
-An agent the flow says may move but that nobody has pointed anywhere still works here: the step
+An agent the flow says may move but that nobody has pointed anywhere still works here: the row
 is offered, not forced. The agent itself runs here whatever you choose — its credentials, its
 state directory and its link to its model provider stay put. What moves is the project it reads
 and the commands it runs. See [Remote execution](/reference/remote-execution.md).
@@ -484,9 +531,8 @@ both red lines when the flow is started, before any turn has run.
 
 ## What each agent is loaded with
 
-On the model step, **ctrl+s** asks which of that CLI's skills this agent is to have. A side
-question about the same agent, so a key rather than a step: the tuning line says
-`◉ every skill · ctrl+s to choose`.
+The `skills` row asks which of that CLI's skills this agent is to have. Until it is answered the
+row reads `every skill`, which is how a CLI comes.
 
 ```
    ❯ 1. [✔] code-review    Review the current diff… (yours)
@@ -507,8 +553,8 @@ a CLI with no way of being told anything does, is in
 
 ## The accounts themselves
 
-`/providers` is all of them, grouped by the CLI each belongs to, with the way it was made by and
-the variables it sets. Their names, never a value: this is drawn where somebody can read it.
+`/providers` is all of them, under a heading per CLI, with the way each was made by and the
+variables it sets. Their names, never a value: this is drawn where somebody can read it.
 
 ```
    claude
@@ -521,15 +567,23 @@ the variables it sets. Their names, never a value: this is drawn where somebody 
 
 | Key | What it does |
 | --- | --- |
-| **enter** or **a** | Makes one: which CLI, then how to sign in, then what that way asks |
+| **enter** | Corrects what the one under the cursor holds, by the way it was made with |
+| **a** | Makes one: which CLI, then how to sign in, then what that way asks |
 | **l** | Signs the one under the cursor in again, by the way it was made with |
-| **r** | Takes it away, credentials and all |
-| **esc** | Closes the sheet; off any sheet it opens, a step back to the one before |
+| **f** | Marks it as where a turn goes when the account it was running under fails |
+| **d** **d** | Takes it away, credentials and all |
+| **c** | Adds a CLI of your own that speaks ACP, for accounts to be made against |
+| **esc** | Closes the menu, asking about anything it is holding |
+
+Taking one away, marking one as a fallback and correcting what one holds are **held until the
+menu is saved**. Making one and signing one in are not: both own the terminal while they run,
+and something that has already happened is not a draft.
 
 Making one is three questions rather than one form, because each is only answerable once the one
 before it has been: a backend's [ways in](/reference/providers.md#the-ways-in) are its own, and what a way
 asks is the way's. A secret is drawn as bullets and never shown back — it is on its way into a
-credential store.
+credential store, which is also why correcting an account starts its secrets blank: you type one
+again or you leave it as it was.
 
 A way with a login command of its own is **handed the terminal**: its browser or its device code
 owns the screen until it is done, and what it writes lands in that account's own directory rather
@@ -571,13 +625,13 @@ over the headings.
 | **↑ ↓** | Move between settings |
 | **← →** | Move the one under the cursor along: a switch flips, a choice steps, a number goes up or down by one |
 | letters | Write the one under the cursor, for the ones that are written rather than stepped |
-| **enter** | Take the lot, and go on to the agents |
-| **esc** | Back to the flows, changing nothing |
+| **enter** | Take the lot, and hand it back to the menu holding it |
+| **esc** | Back to the menu, changing nothing |
 
-It comes between choosing the flow and choosing its agents, which is the only place it can:
-only the flow just chosen says what there is to set. `/config` opens it on its own, and
-`/agents` never does — the two are halves of one question, and each asks only its own. So
-does `hmz -f <flow> -c <setup.yaml>`, which opens the interface already set up. See
+It is opened with **c** on the Flow page, and what it answers is held with the rest of that
+menu until the menu is saved: setting a flow up is a thing about the flow rather than about
+what runs it. `/config` opens it on its own, for a flow already chosen. So does
+`hmz -f <flow> -c <setup.yaml>`, which opens the interface already set up. See
 [CLI › hmz](/reference/cli.md#hmz).
 
 Nothing in the interface knows what any of the settings mean. The types say how a value moves,
@@ -600,7 +654,9 @@ agent in the middle does not silently hand the reviewer's model to the builder. 
 is read back through the flow's own model, so a setting the flow has since dropped or renamed
 is one it starts over from rather than one that quietly comes back.
 
-It lives in `~/.humanize/settings.yaml`. See [CLI reference](/reference/cli.md#files).
+It lives in `~/.humanize/settings.yaml`. The agents you saved under a name live beside it in
+`~/.humanize/agents.yaml`, which is neither a workspace's nor a flow's. See
+[CLI reference](/reference/cli.md#files).
 
 ## Colours
 
@@ -615,8 +671,8 @@ would be a guess about the background it lands on.
 
 - **Open twice.** `hmz` with no command is the only way in — with or without `-f`, `-c` and
   `-a`, which say how it opens rather than opening a second one.
-- **Run two flows at once.** `/flow`, `/agents` and `/config` are all refused while one is
-  running, in red: `no choosing a flow while a flow is running: esc stops it first`.
+- **Run two flows at once.** The Flow page of `/flow` is shut while one is running, and
+  `/config` is refused. What each agent is stays open: that is the half worth changing mid-run.
 - **Guess at a bad line.** A line it cannot carry out is shown and the interface stays up. Only
   `/exit` closes it.
 - **Ask the flow anything.** What is drawn beside and under the transcript is kept from the

@@ -49,7 +49,7 @@ ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
 
 :::
 
-At the prompt it is on the model step of `/agents`: **←/→** adjusts the effort, and **ctrl+w**
+At the prompt it is the `effort` row of the sheet an agent is set up on: **←/→** adjusts it, and the `swarm` row
 turns swarm mode on for a model that has one.
 
 ## Moving it while the flow runs

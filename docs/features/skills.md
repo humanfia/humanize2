@@ -44,8 +44,8 @@ nothing acts on is a list that lies.
 
 ## At the prompt
 
-On the model step of `/agents`, **ctrl+s**. A side question about the same agent, so a key rather
-than a step of its own; the tuning line reads `◉ every skill · ctrl+s to choose`.
+The `skills` row of the sheet an agent is set up on. A question about the same agent, so a row rather
+than a row of its own; the row reads `every skill ▸`.
 
 ```
    ❯ 1. [✔] code-review    Review the current diff… (yours)
@@ -71,7 +71,7 @@ Where each CLI keeps its skills is written down in `hmz.backends`:
 
 No `-a` spells a skill list. An agent loaded with a particular set is one
 [built in Python](/reference/flows#building-the-agents-yourself) and handed to `Runner`, or one
-set up on the `/agents` sheet — where the choice is
+set up on the sheet an agent is set up on — where the choice is
 [remembered per agent, per flow, per project](/features/settings).
 
 ```python

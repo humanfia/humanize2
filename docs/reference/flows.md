@@ -528,7 +528,7 @@ Two are always there:
 as what has been downloaded — and neither of the two can be taken away.
 
 In the [interface](/reference/tui.md), `/flow` is where they live: left and right walk the places flows
-come from, `ctrl+n` adds one, `ctrl+r` fetches the open one again, and `ctrl+x` takes an added
+come from, `a` adds one, `r` fetches the one under the cursor again, and `d` twice takes an added
 one away. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
 repository's own name is not the one you want.
 

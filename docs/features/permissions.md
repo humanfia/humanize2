@@ -43,8 +43,7 @@ hmz exec: error: bad agent 'cli=codex,model=gpt-5.6-sol,effort=high,permission=r
 permission must be one of read-only, workspace-write, auto, bypass, not 'rdonly'
 ```
 
-At the prompt it is **ctrl+p** on the model step of `/agents`, and the tuning line reads it back:
-`◉ bypass · ctrl+p to change`.
+At the prompt it is the `permission` row of the sheet an agent is set up on, stepped on **←/→**.
 
 ## What each backend actually does
 

@@ -60,7 +60,7 @@ In `hmz`:
 /flow
 ```
 
-**ctrl+n**. It asks for a URL or an `owner/repo`, and a name to keep it under if the repository's
+**a**. It asks for a URL or an `owner/repo`, and a name to keep it under if the repository's
 own name is not the one you want:
 
 ```
@@ -74,9 +74,9 @@ It is cloned into `~/.humanize/flowverses/yours/`, and every flow in it is then 
 | Key in `/flow` | |
 | --- | --- |
 | **←** **→** | walk the places flows come from, a tab apiece |
-| **ctrl+n** | add one |
-| **ctrl+r** | fetch the open one again, or for the first time |
-| **ctrl+x** | take an added one away, flows and all |
+| **a** | add one |
+| **r** | fetch the one under the cursor again, or for the first time |
+| **d** **d** | take an added one away, flows and all |
 
 `builtin` and `official` are always there and cannot be taken away.
 
@@ -111,7 +111,7 @@ That is the reason to publish two small flows rather than one large one.
 
 ## Step 6 — keep it up to date
 
-**ctrl+r** in `/flow` fetches the open flowverse again. It runs off the interface's own loop — the
+**r** in `/flow` fetches the flowverse under the cursor again. It runs off the interface's own loop — the
 screen keeps drawing while it clones — and what became of it is said under the list rather than
 thrown at you.
 
@@ -159,7 +159,7 @@ Run that in the repository's own CI and a flow that stopped loading is a red bui
 
 - A flowverse is a git repository with a `flows/` directory, one `.py` per flow, `_`-prefixed
   files ignored.
-- **ctrl+n** / **ctrl+r** / **ctrl+x** in `/flow` add, fetch and remove.
+- **a** / **r** / **d d** in `/flow` add, fetch and remove.
 - `<flowverse>/<flow>` is the unshadowable spelling, and `calls` takes it too.
 - Import-time side effects run for anyone who lists your flowverse.
 

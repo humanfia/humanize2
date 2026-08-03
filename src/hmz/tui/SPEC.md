@@ -183,90 +183,162 @@ interface's to hand over.
 
 ## `pick.py`
 
-The sheets: which flow, how it is set up, what each of its agents runs and where, and how the
-run is going. Each MUST be drawn the way Claude Code draws its own `/model` -- a rule across the
-top, the question and a line about it, the choices numbered with a marker against the one under
-the cursor, and under them whatever is adjusted rather than chosen.
+The sheets: which flow, how it is set up, what each of its agents is, the agents kept under a
+name, the accounts they run as, and how the run is going. Each MUST be drawn the way Claude
+Code draws its own `/model` -- a rule across the top, the question and a line about it, the
+choices numbered with a marker against the one under the cursor, and under them whatever is
+adjusted rather than chosen.
 
-- Nothing MUST be typed in that could be found: the CLIs offered MUST be the ones installed
-  here, the models offered MUST be the ones that CLI said it runs as the account chosen for
-  it, the efforts offered MUST be the ones that model takes, and the skills offered MUST be
-  the ones that CLI would load. Nothing MUST be asked of a CLI while a sheet is being drawn
-  -- starting one costs seconds a prompt has not got -- so what was kept is what is read.
-- The models MUST be askable again from the sheet they are chosen on, on `ctrl+r`, which is
-  the key a flowverse is fetched again on. This is where somebody finds out that the model
-  they came for is not in the list, and sending them elsewhere to fix it would lose the
-  question they came to answer. Asking MUST NOT stop the interface redrawing, and what came
-  of it MUST be said under the list rather than raised at whoever opened the sheet.
-- A CLI that has never said what it runs as the chosen account MUST say so where the list
-  would be, and MUST say which key asks it: an empty list that explains nothing reads as a
-  CLI with no models.
-- Which flow to run MUST be asked out of the places flows come from, a tab apiece: every
-  flowverse there is, fetched or not, and then this project's flows and yours where there are
-  any. The arrows the list itself is not using MUST turn between them, as they do between the
-  CLIs. A flowverse MUST be a tab whether or not it has been fetched -- fetching it is what the
-  tab is for -- and a directory of your own with nothing in it MUST NOT be one, there being
-  nothing to add to it.
-- Adding a flowverse, fetching one again and taking one away MUST be keys of this same sheet:
+### The keys
+
+- No key here MUST be a chord. A sheet asks one thing and its keys are its own, so a key that
+  needed a modifier held down would be a key somebody had to already know about; what is
+  reached with one is either a letter or a key a terminal already has.
+- Typing MUST NOT be what searches. Every letter on these sheets is a key of its own, so a
+  search MUST be asked for -- on `s` -- and MUST be left on esc, which clears what was typed
+  before it goes. While one is running the letters MUST reach it rather than the keys they
+  otherwise are, and esc MUST come out of the search before it leaves the sheet.
+- A menu of several pages MUST show their titles, and tab and shift+tab MUST turn between
+  them: that is the one pair of keys a terminal has for exactly this. A page that may not be
+  opened MUST still be a title, struck through, and MUST be stepped over rather than opened.
+- Taking anything away MUST be asked for twice on the same key, the first press saying what
+  the second one does. Moving the cursor MUST put it down again, so that a stray press is
+  harmless.
+
+### What lands, and when
+
+- A menu MUST hold everything changed in it until it is left and saving is confirmed. Turning
+  a page MUST apply nothing: what is read on the second page is what the first is holding, and
+  a menu that applied each page as it was left would be one where walking out changed things
+  nobody confirmed.
+- Esc on a menu holding changes MUST ask whether to save them, and MUST offer to stay. Esc on
+  one holding none MUST just leave: a walk in to look and out again is not a question anybody
+  wants asked of them.
+- What runs an external command MUST NOT be held: making an account and signing one in own the
+  terminal while they run, and something that has already happened is not a draft.
+
+### Which flow, and what drives it
+
+- The flow menu MUST be two pages: which flow to run, and what each of its agents is. Two
+  because they are two questions about one thing and are not open at the same moments.
+- The page that chooses a flow MUST be shut while a flow is running: a flow is chosen in order
+  to be started, and there is one going. The page its agents are set up on MUST never be shut
+  -- an agent thinking too little, on the wrong account or allowed too much is found out
+  halfway through a run.
+- What is saved while a flow runs MUST reach the agents that are running, as far as it can:
+  each of them MUST be set up as it now stands from its next turn on. A CLI that has changed
+  MUST NOT be swapped under the flow holding that agent -- a backend is the class the agent is
+  -- and MUST be said to take effect from the next run rather than silently doing nothing.
+- The flows MUST be read under a heading per place they come from: every flowverse there is,
+  fetched or not, and then this project's flows and yours where there are any. A flowverse
+  MUST be a heading whether or not it has been fetched -- fetching it is what the heading is
+  for -- and MUST have a row under it saying so, since a key about a flowverse is a key about
+  the row under the cursor. A directory of your own with nothing in it MUST NOT be a heading,
+  there being nothing to add to it.
+- Adding a flowverse, fetching one again and taking one away MUST be keys of this same page:
   this is the moment somebody finds out that the flow they want is in one they have not added,
   or that the one they have is out of date, and sending them elsewhere to fix it would lose the
   question they came here to answer. What became of a fetch MUST be said under the list rather
-  than raised at whoever opened the sheet, and a fetch MUST NOT stop the interface redrawing
+  than raised at whoever opened the menu, and a fetch MUST NOT stop the interface redrawing
   while it runs.
+- Setting the flow itself up MUST be a key of that page rather than a page of its own: it is a
+  thing about the flow rather than about what drives it, and what it answers MUST be held with
+  the rest until the menu is saved.
 - Each flow MUST say what it does beside its name, which is the line the flow itself says. What
   is typed MUST narrow the list by name and not by that line: a subsequence of a sentence is a
   match nobody typed.
-- What each agent is MUST be asked in three steps, one agent at a time and in this order: which
-  CLI and which of its accounts, then which of that CLI's models at what effort, then -- only
-  for an agent the flow said may be pointed at a machine -- where it works. The order is what
-  depends on what: an account is one backend's and a model belongs to the CLI that runs it, so
-  neither is answerable before the CLI has been chosen. Esc MUST be the step before, out of the
-  first step of the first agent entirely, and a step stepped back into MUST be as it was left.
-- The last of those steps MUST NOT be put up for an agent the flow did not say may be pointed
-  at a machine: an agent that works here, and one the flow isolates in a container of its own,
-  are each a question nobody is being asked.
-- What an agent runs MUST be one choice rather than two, a model belonging to the CLI that runs
-  it; and the CLIs MUST be read one at a time, a tab apiece, since every model of every CLI in
-  one list is a list that grows each time any of them ships a model. The arrows the list itself
-  is not using MUST turn between them, and MUST wrap: a sheet that asks one thing has its keys
-  free, and a chord for what a row of tabs is for would be a key to already know. One CLI MUST
-  be a heading rather than a row of tabs: there is nowhere to switch to, so nothing MUST say
-  there is.
-- A step MUST NOT read back what another step settles. What cannot be changed where it is shown
-  is a setting somebody tries to change there; what the walk has settled is on the line above
-  the prompt when it is over.
-- Typing MUST narrow the list being read and MUST belong to the tab it was typed into: a search
-  that narrowed one CLI to one model would narrow the next to none, which reads as a CLI with
-  nothing in it. Esc MUST clear what was typed before it leaves, on every sheet that is
-  searched.
-- Which of its CLI's skills an agent is loaded with, what it may do, and whether it runs as a
-  fleet are each a second question about that agent rather than a way of running the model, so
-  each MUST be a key on the sheet that asks what it runs rather than a row in it, and each MUST
-  open a sheet of its own. Walking out of one of those without answering MUST leave that agent
-  as it was. Where an agent works MUST NOT be one of them: a flow that says an agent may be
-  pointed at a machine is a flow expecting to be told which, and a question somebody has to
-  already know a key for is one that does not get asked.
-- An account MUST be makeable from the step that asks for one. That step is where somebody
-  finds out they have none for that CLI, and sending them to another command to make one loses
-  the question they were answering.
-- The row that takes variables of your own MUST take several, a line apiece, and MUST break
-  the line on the same keys the editor does: enter is what takes the form, so a list typed
-  into one row needs a key of its own to be a list at all.
+- Choosing a flow MUST read back what that flow was last set up with here, and MUST turn to the
+  page its agents are on: that is the next thing to answer.
+- A menu MUST NOT be saved holding an agent that names no model: a flow driven by one is a flow
+  that stops on its first turn, and the page it would be answered on is the page to be looking
+  at when that is said.
+
+### What one agent is
+
+- Everything one agent is MUST be one sheet of rows rather than a walk of a sheet per question:
+  an agent is one thing with a CLI, an account, a model at an effort, a set of skills, a rung
+  of what it may do and a machine its work lands on. A walk meant that changing the effort of
+  an agent already set up was four keypresses through two sheets with nothing to say.
+- The rows MUST be in the order of what depends on what: the CLI settles which accounts there
+  are and which models that CLI will name, and the account settles which of them it may name.
+  Changing the CLI MUST therefore let go of the model, which belonged to the CLI before it.
+- The account MUST always offer the machine's own first, as `as local`: an agent nobody has
+  been asked about runs as whoever signed the CLI in, and that is a row rather than a blank.
+- A row that is a rung in an order -- the effort, what it may do, whether it runs as a fleet,
+  whether goals are available -- MUST be stepped where it stands on the arrows. Everything else
+  MUST open a sheet of its own and come back.
+- Where an agent works MUST be a row only where the flow said that agent may be pointed at a
+  machine, and MUST be read rather than opened where the flow settled it: an agent that works
+  here, and one the flow isolates in a container of its own, are each a question nobody is
+  being asked. A saved agent belongs to no flow, so it MUST be asked every question there is.
+- Nothing MUST be typed in that could be found: the CLIs offered MUST be the ones installed
+  here less any the flow ruled out, the models offered MUST be the ones that CLI said it runs
+  as the account chosen for it, the efforts offered MUST be the ones that model takes, and the
+  skills offered MUST be the ones that CLI would load. Nothing MUST be asked of a CLI while a
+  sheet is being drawn -- starting one costs seconds a prompt has not got -- so what was kept
+  is what is read.
+- The models MUST be askable again from the sheet they are chosen on, on `r`, which is the key
+  a flowverse is fetched again on. This is where somebody finds out that the model they came
+  for is not in the list, and sending them elsewhere to fix it would lose the question they
+  came to answer. Asking MUST NOT stop the interface redrawing, and what came of it MUST be
+  said under the list rather than raised at whoever opened the sheet.
+- A CLI that has never said what it runs as the chosen account MUST say so where the list
+  would be, and MUST say which key asks it: an empty list that explains nothing reads as a
+  CLI with no models.
+- An account MUST be makeable from the row that asks for one. That row is where somebody finds
+  out they have none for that CLI, and sending them to another command to make one loses the
+  question they were answering.
 - The skills sheet MUST be a checklist: every skill starts on, which is how a CLI comes, and
   space MUST switch the one under the cursor. What it answers with MUST be the skills the agent
   is to have. A CLI that offers no way of being told which to load MUST say that, rather than
   that none are installed.
 
+### The agents kept under a name
+
+- The agents menu MUST list the agents written down under a name, and MUST NOT be the agents of
+  a flow: an agent is a CLI, an account, a model at an effort and what it may do, and none of
+  that is a thing about the flow that happens to be driving it. Enter MUST set one up, on the
+  same sheet a flow's agent is set up on; `a` MUST add one; `d` twice MUST take one away.
+- A flow MUST be able to import one where its agents are set up, and MUST take a copy: an agent
+  tuned inside a flow is that flow's, and writing the change back into the thing it was copied
+  from would change every other flow that had imported it.
+- A flow's agent MUST be saveable as one, under a new name or over one already there. Which is
+  the other half of importing: what was tuned in a flow is worth keeping.
+
+### The accounts
+
+- The accounts menu MUST list every account there is under a heading per CLI, and MUST be read
+  rather than chosen from: which account an agent runs as is asked where that agent is set up.
+  Enter MUST correct what one holds; `a` MUST make one; `d` twice MUST take one away; and
+  signing one in again and marking one as where a turn goes when another account fails MUST be
+  keys of the same page.
+- A row MUST say the name, the way it was made by and the variables it sets. Their names and
+  never a value: this is drawn where somebody can read it, and a key on a screen is a key in a
+  photograph. A secret MUST NOT be read back onto the screen to be corrected -- it is typed
+  again or it is left as it was.
+- The row that takes variables of your own MUST take several, a line apiece, and MUST break
+  the line on the same keys the editor does: enter is what takes the form, so a list typed
+  into one row needs a key of its own to be a list at all.
+
 ## `settings.py`
 
 What one workspace was last set up to run, kept under humanize's own home as `settings.yaml`
-so that opening the interface again in the same project finds it that way.
+so that opening the interface again in the same project finds it that way -- and, in a file of
+its own, the agents that were written down under a name to be reached for from any flow.
 
 - MUST be kept per flow as well as per workspace, by the name humanize's own flows have and by
   the path yours have: what an agent runs is only meaningful against the flow driving it, and a
   flow of yours MUST NOT inherit the agents of the one it shares a name with. Each agent MUST
   be keyed by the name the flow calls it, so that a flow which grows an agent in the middle does
   not silently hand the reviewer's model to the builder.
+- The agents kept under a name MUST NOT be a workspace's and MUST NOT be any flow's: what an
+  agent is is not a thing about the project it happens to be working in, so they are one file
+  of humanize's own, written whole as the menu holding them is saved.
+- Both files MUST write one agent the same way, and MUST leave out what says nothing: an agent
+  that works here, was never asked about skills, may do what an agent nobody was asked about
+  may do and runs as this machine is signed in is one every field of which is that field's own
+  silence -- so a file written before there was such a setting reads the same way as one that
+  has it.
 - A setting that was never chosen MUST be left out rather than written down as a default: a
   file written before there was such a setting and a workspace nobody has been asked MUST read
   the same way. What is read back MUST be checked before it is used -- a flow's own model

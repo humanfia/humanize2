@@ -24,7 +24,17 @@ from hmz.backends import Model
 from hmz.cycle import cycles
 from hmz.tui import Humanize
 from hmz.tui.app import _HELP, _OWN, Editor, _where
-from hmz.tui.pick import Flows, Models, Runs, RunsAs, Signing, Ways
+from hmz.tui.pick import (
+    Accounts,
+    Agent,
+    Catalogue,
+    Clis,
+    Confirms,
+    Flows,
+    Runs,
+    Signing,
+    Ways,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -141,23 +151,115 @@ def _transcript(app: Humanize) -> str:
     return app.query_one("#transcript", Transcript).text
 
 
-async def into_models(app: Humanize, driver: Pilot[None]) -> None:
-    """Answers the first step of an agent -- its CLI and its account -- to reach the second.
+def rows(app: Humanize) -> list[str]:
+    """What the sheet on top is offering, by the id each row was put up under."""
+    return [
+        str(one.id or "").removeprefix("=")
+        for one in app.screen.query_one("#choices", OptionList).options
+    ]
 
-    Which every test that is about the models has to walk through now, an account belonging
-    to a backend and so being asked before the model that backend runs. The first row is this
-    machine's own account, which is what every agent ran as before there were any.
+
+async def into_flows(app: Humanize, driver: Pilot[None]) -> None:
+    """Opens the flow menu and waits for it to have something in it.
 
     Args:
       app: The interface.
       driver: What is pumping it.
     """
-    await until(lambda: isinstance(app.screen, RunsAs), driver)
+    await driver.press(*"/flow")
+    await driver.press("enter")
+    await until(lambda: isinstance(app.screen, Flows), driver)
     await until(
         lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
     )
+
+
+async def onto(app: Humanize, driver: Pilot[None], held: str) -> None:
+    """Walks the cursor on to the row put up under one id.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+      held: The row, by its id.
+    """
+    listing = app.screen.query_one("#choices", OptionList)
+    at = rows(app).index(held)
+    for _ in range(len(listing.options)):
+        if (listing.highlighted or 0) == at:
+            return
+        await driver.press("down" if (listing.highlighted or 0) < at else "up")
+        await driver.pause()
+
+
+async def into_agent(app: Humanize, driver: Pilot[None], at: int = 0) -> None:
+    """Turns the flow menu to its agents and opens one of them.
+
+    Which every test about what an agent is has to walk through: an agent of a flow is set up
+    from the flow that drives it, on the page of the menu that is about them.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+      at: Which of the flow's agents, counting from zero.
+    """
+    await until(lambda: isinstance(app.screen, Flows), driver)
+    sheet = cast("Flows", app.screen)
+    if sheet._tab != 1:
+        await driver.press("tab")
+        await until(lambda: sheet._tab == 1, driver)
+    await until(
+        lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+    )
+    await onto(app, driver, str(at))
     await driver.press("enter")
-    await until(lambda: isinstance(app.screen, Models), driver)
+    await until(lambda: isinstance(app.screen, Agent), driver)
+
+
+async def opens(app: Humanize, driver: Pilot[None], held: str) -> None:
+    """Opens one row of the sheet an agent is set up on.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+      held: The row, by its id -- `cli`, `model`, `skills` and the rest.
+    """
+    await onto(app, driver, held)
+    await driver.press("enter")
+    await driver.pause()
+
+
+async def keeps(app: Humanize, driver: Pilot[None]) -> None:
+    """Leaves the sheet on top, saving what it is holding when it asks.
+
+    A menu applies nothing until it is left, so this is what applying one is: esc, and then
+    the first row of the question it puts up about what it is holding.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+    """
+    was = app.screen
+    await driver.press("escape")
+    await driver.pause()
+    if isinstance(app.screen, Confirms):
+        await driver.press("enter")
+    await until(lambda: app.screen is not was, driver)
+
+
+async def drops(app: Humanize, driver: Pilot[None]) -> None:
+    """Leaves the sheet on top, throwing away whatever it is holding.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+    """
+    was = app.screen
+    await driver.press("escape")
+    await driver.pause()
+    if isinstance(app.screen, Confirms):
+        await driver.press("down")
+        await driver.press("enter")
+    await until(lambda: app.screen is not was, driver)
 
 
 @pytest.mark.timeout(60)
@@ -487,9 +589,11 @@ async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None
 async def test_what_is_running_is_not_swapped_underneath_itself(
     workspace: Path,
 ) -> None:
-    """A flow drives the agents it was handed, so choosing others mid-run changes nothing.
+    """A flow is chosen in order to be started, so that page is shut while one is running.
 
-    Except what the interface says it is running, which would then be a lie. Stop it first.
+    Shut rather than gone: it says what it is and that it cannot be opened, which is what the
+    strike through its title is. The page its agents are set up on is never shut -- an agent
+    thinking too little is found out halfway through a run.
     """
     (workspace / "flow.py").write_text(FLOW)
     app = Humanize()
@@ -502,18 +606,71 @@ async def test_what_is_running_is_not_swapped_underneath_itself(
             driver,
         )
 
-        app.action_agents()
         await driver.press(*"/flow")
         await driver.press("enter")
-        await driver.pause()
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        sheet = cast("Flows", app.screen)
 
-        assert app._flow_named == "flow.py"  # neither of the two got anywhere
+        assert sheet.turnable() == (False, True)
+        assert sheet._tab == 1  # it opens on the page that is not shut
+        assert "[s]Flow[/s]" in str(sheet.query_one("#tabs", Label).content)
+        await driver.press("shift+tab")  # and there is nowhere to turn to
+        await driver.pause()
+        assert sheet._tab == 1
+
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Flows), driver)
+
+        assert app._flow_named == "flow.py"  # nothing got anywhere
         assert app._models == [Runs("claude/m:high")]
-        assert _transcript(app).count("while a flow is running") == 2
-        # And `/status` is not one of them: it is read, so there is nothing to conflict with.
+        # And `/status` is not refused either: it is read, so nothing conflicts with it.
         app.action_status()
         await driver.pause()
         assert "flow.py" in str(app.screen.query_one("#said", Label).content)
+
+
+@pytest.mark.timeout(90)
+@unittest.mock.patch(
+    "hmz.tui.app.installed",
+    return_value={"claude": (Model("m", ("max", "high")),)},
+)
+async def test_an_agent_is_set_up_again_under_the_flow_that_is_running_it(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    workspace: Path,
+) -> None:
+    """The whole reason that page is never shut.
+
+    An agent thinking too little is found out halfway through a run, and stopping the flow to
+    fix it is not the answer.
+    """
+    (workspace / "flow.py").write_text(FLOW)
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
+        await driver.press(*"start")
+        await driver.press("enter")
+        await until(
+            lambda: bool(app._agents and any(agent.sessions for agent in app._agents)),
+            driver,
+        )
+        (agent,) = app._agents
+        assert agent.config.effort == "high"
+
+        await driver.press(*"/flow")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        await into_agent(app, driver)
+        await onto(app, driver, "effort")
+        await driver.press("right")  # one harder than it was started at
+        await driver.pause()
+        await keeps(app, driver)
+        await keeps(app, driver)
+        await until(lambda: agent.config.effort == "max", driver)
+
+        # Said, and said about the agent rather than about the flow: what changed is what
+        # this one runs from its next turn on.
+        assert "claude/m:max" in _transcript(app)
+        assert app._models == [Runs("claude/m:max")]
 
 
 @pytest.mark.timeout(90)
@@ -675,31 +832,37 @@ async def test_a_turn_that_has_gone_quiet_still_reads_as_one_that_is_running() -
 
 
 @pytest.mark.timeout(60)
-async def test_the_flow_itself_is_walked_back_into_from_what_it_runs_on() -> None:
-    """The walk is one walk: esc off the first thing asked about a flow is that flow again.
+async def test_the_flow_and_its_agents_are_two_pages_of_one_menu() -> None:
+    """Two questions about one thing, turned between rather than walked through.
 
-    Rather than a way out of both, which would mean picking the flow over from tab.
+    Esc off the second is out of the menu rather than back into the first: turning between
+    them is what tab and shift+tab are for.
     """
-    from hmz.tui.pick import Flows
-
     app = Humanize()
-    # Whatever this machine has installed, since the sheet is only put up if there is one.
+    # Whatever this machine has installed, since the menu is only put up if there is one.
     with unittest.mock.patch(
         "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow")
-            await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Flows), driver)
-            await driver.press("enter")
-            # The first step of the first agent, which is the step after the flow itself.
-            await until(lambda: isinstance(app.screen, RunsAs), driver)
+            await into_flows(app, driver)
+            sheet = cast("Flows", app.screen)
+            tabs = str(sheet.query_one("#tabs", Label).content)
+            assert "Flow" in tabs
+            assert "Agents" in tabs
+            assert "tab/shift+tab to switch" in tabs
+
+            await driver.press("tab")
+            await until(lambda: sheet._tab == 1, driver)
+            assert "[b $primary]Agents" in str(sheet.query_one("#tabs", Label).content)
+
+            await driver.press("shift+tab")
+            await until(lambda: sheet._tab == 0, driver)
+            assert "[b $primary]Flow" in str(sheet.query_one("#tabs", Label).content)
 
             await driver.press("escape")
-            await until(lambda: isinstance(app.screen, Flows), driver)
+            await until(lambda: not isinstance(app.screen, Flows), driver)
 
-            assert isinstance(app.screen, Flows)  # back in the list, not out of both
             assert app._models == []
 
 
@@ -990,7 +1153,7 @@ async def test_deepseek_chat_explains_a_missing_api_key_instead_of_staying_blank
         said = _transcript(app)
 
         assert "only supports API-key login" in said
-        assert "ctrl+n" in said
+        assert "press a on its" in said
         assert "DEEPSEEK_API_KEY" in said
 
         app.action_stop_flow()
@@ -1257,61 +1420,62 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
         "codex": (Model("gpt-5.6-sol", ("xhigh",)),),
     },
 )
-async def test_what_an_agent_runs_is_one_cli_at_a_time_and_an_effort_the_arrows_move(
+async def test_what_an_agent_runs_is_a_row_of_its_own_and_an_effort_the_arrows_move(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """As Claude Code's `/model` is: the models numbered, the effort on its own line.
+    """One sheet per agent, a row per thing it is, rather than a walk of a sheet apiece.
 
-    The CLI is settled a step earlier, an account belonging to a backend and so having to be
-    asked after it, so what is read at once is one CLI's worth of models rather than every
-    model there is -- with the CLI they belong to named above them.
+    The CLI settles which models there are, so the models are opened from a row under it and
+    are that CLI's own rather than every model there is.
     """
     app = Humanize()
     async with app.run_test() as driver:
         # Walked into the way it is walked into: a flow, then what each of its agents is.
-        await driver.press(*"/flow")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Flows), driver)
-        await driver.press("enter")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        assert rows(app)[:5] == ["import", "cli", "provider", "model", "effort"]
 
-        # A tab per CLI installed here, with the one being read marked and the others not.
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
-        tabs = str(app.screen.query_one("#tabs", Label).content)
-        assert "claude" in tabs
-        assert "codex" in tabs
-        assert "kimi" not in tabs  # not installed, so not a tab
-        assert "←/→ to switch" in tabs
+        # The CLIs installed here, opened from the row that says which one it is.
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
+        assert rows(app) == ["claude", "codex"]
+        assert "kimi" not in rows(app)  # not installed, so not offered
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
 
-        await into_models(app, driver)
-        sheet = app.screen
-        listing = sheet.query_one("#choices", OptionList)
+        # And under it that CLI's models, numbered, with the cursor marked by `❯`.
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
+        listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
+        assert rows(app) == ["claude-opus-5"]
+        assert "❯" in str(listing.get_option_at_index(0).prompt)
+        assert "1." in str(listing.get_option_at_index(0).prompt)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
 
-        # One row per model of the CLI that was chosen, numbered, cursor marked by `❯`, and
-        # that CLI as a heading: it was chosen already, so there is nowhere to switch to.
-        assert "claude" in str(sheet.query_one("#tabs", Label).content)
-        assert "to switch" not in str(sheet.query_one("#tabs", Label).content)
-        rows = [str(option.prompt) for option in listing.options]
-        assert [str(option.id) for option in listing.options] == [
-            "claude/claude-opus-5"
-        ]
-        assert "❯" in rows[0]
-        assert "1." in rows[0]
+        # The effort is stepped where it stands, and starts on the hardest the model takes.
+        await onto(app, driver, "effort")
+        listing = app.screen.query_one("#choices", OptionList)
 
-        # The effort is adjusted rather than chosen, and starts on the hardest.
-        tuning = sheet.query_one("#tuning", Label)
-        assert "max effort" in str(tuning.content)
-        await driver.press("left")
-        await driver.pause()
-        assert "high effort" in str(tuning.content)  # left is less
+        def effort() -> str:
+            at = rows(app).index("effort")
+            return str(listing.get_option_at_index(at).prompt)
+
+        # It opens on what the agent runs, which is not the hardest thing there is: that is
+        # the one to reach for, and this is the one to spend before anybody asked for it.
+        assert "high" in effort()
         await driver.press("right")
         await driver.pause()
-        assert "max effort" in str(tuning.content)  # and right is more
+        assert "max" in effort()  # right is more
+        await driver.press("left")
+        await driver.pause()
+        assert "high" in effort()  # and left is less
 
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await keeps(app, driver)  # out of the agent, holding it
+        await keeps(app, driver)  # and out of the menu, saving the lot
 
-    assert app._models == [Runs("claude/claude-opus-5:max")]
+    assert app._models == [Runs("claude/claude-opus-5:high")]
 
 
 @pytest.mark.timeout(60)
@@ -1322,58 +1486,39 @@ async def test_what_an_agent_runs_is_one_cli_at_a_time_and_an_effort_the_arrows_
         "codex": (Model("gpt-5.6-sol", ("xhigh",)), Model("gpt-5.5", ("high",))),
     },
 )
-async def test_the_arrows_turn_to_the_next_cli_and_the_one_before(
+async def test_changing_the_cli_lets_go_of_the_model_that_belonged_to_the_last_one(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """Which is the point of the tabs: one CLI's accounts rather than everyone's at once.
+    """A model belongs to the CLI that runs it, so it cannot survive the CLI changing.
 
-    They wrap, so the last tab is one press from the first however many CLIs are installed.
-    The arrows rather than tab, now that this sheet asks one thing: up and down are the
-    accounts under the tab, so left and right are the tabs. What the tab was left on is the
-    CLI whose models the step after asks about.
+    Which is why the rows are in the order they are in: the CLI settles which models there
+    are to choose between, and the account settles which of them that CLI will name.
     """
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
+        await driver.press("down")  # codex
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
-        sheet = app.screen
-        listing = sheet.query_one("#choices", OptionList)
-        await until(lambda: bool(listing.options), driver)
-        flow = app._flow_named
+        await until(lambda: isinstance(app.screen, Agent), driver)
 
-        await driver.press("right")
-        await driver.pause()
-        assert "[b $primary]codex" in str(sheet.query_one("#tabs", Label).content)
-
-        await driver.press("right")  # round the end, back to the first
-        await driver.pause()
-        assert "[b $primary]claude" in str(sheet.query_one("#tabs", Label).content)
-
-        await driver.press("left")  # and back the other way
-        await driver.pause()
-        assert "[b $primary]codex" in str(sheet.query_one("#tabs", Label).content)
-        # And the interface's own tab and shift+tab are not things to do from under a sheet:
-        # a sheet is open in order to be answered, so both keys are its own while it is there.
-        await driver.press("shift+tab")
-        await driver.pause()
-        assert app._flow_named == flow
-        assert isinstance(app.screen, RunsAs)
-
-        await driver.press("enter")  # as this machine is signed in, on codex
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
-        # The models of the CLI the tab was left on, numbered afresh, and no others.
-        assert [str(option.id) for option in listing.options] == [
-            "codex/gpt-5.6-sol",
-            "codex/gpt-5.5",
-        ]
+        # The models of the CLI that was chosen, numbered afresh, and no others.
+        assert rows(app) == ["gpt-5.6-sol", "gpt-5.5"]
         assert "1." in str(listing.get_option_at_index(0).prompt)
 
         await driver.press("down")  # the second of that CLI's models
         await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+
+        await keeps(app, driver)
+        await keeps(app, driver)
 
     assert app._models == [Runs("codex/gpt-5.5:high")]
 
@@ -1423,29 +1568,36 @@ def run(agents: Agents, task: str) -> None:
     )
     app = Humanize(flow=str(goal), agents=[Runs("claude/claude-opus-5:max")])
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await into_flows(app, driver)
+        await into_agent(app, driver)
 
-        await driver.press("right")
-        await driver.pause()
-        assert "[b $primary]dsh" in str(app.screen.query_one("#tabs", Label).content)
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
+        await onto(app, driver, "dsh")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+
+        # The account it runs as, whose first row is always the machine's own.
+        await opens(app, driver, "provider")
+        await until(lambda: isinstance(app.screen, Accounts), driver)
         accounts = app.screen.query_one("#choices", OptionList)
-        assert [str(option.id) for option in accounts.options] == ["="]
-        assert "as installed" in str(accounts.get_option_at_index(0).prompt)
+        assert rows(app) == [""]
+        assert "as local" in str(accounts.get_option_at_index(0).prompt)
         assert "saved by dsh" in str(accounts.get_option_at_index(0).prompt)
-
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: len(listing.options) == 2, driver)
-        assert [str(option.id) for option in listing.options] == [
-            "dsh/deepseek-v4-flash",
-            "dsh/deepseek-v4-pro",
-        ]
+        assert rows(app) == ["deepseek-v4-flash", "deepseek-v4-pro"]
 
         await driver.press("down", "enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+
+        await keeps(app, driver)
+        await keeps(app, driver)
 
     assert app._models == [Runs("dsh/deepseek-v4-pro:max")]
 
@@ -1471,24 +1623,29 @@ async def test_deepseek_has_only_api_key_login_after_switching_from_kimi(
     providers.add("kimi", "subscription", way="login")
     app = Humanize(agents=[Runs("kimi/kimi-code/k3:high")])
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+
+        # Look at Kimi's accounts first, then come back to dsh as the failing walk does.
+        await opens(app, driver, "provider")
+        await until(lambda: isinstance(app.screen, Accounts), driver)
+        assert "subscription" in rows(app)
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
+        await onto(app, driver, "dsh")
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+
+        await opens(app, driver, "provider")
+        await until(lambda: isinstance(app.screen, Accounts), driver)
         listing = app.screen.query_one("#choices", OptionList)
-
-        # Visit Kimi first, then switch back to dsh as the reported failing walk does.
-        await driver.press("right")
-        await driver.pause()
-        assert "[b $primary]kimi" in str(app.screen.query_one("#tabs", Label).content)
-        assert "=subscription" in [str(option.id) for option in listing.options]
-
-        await driver.press("left")
-        await driver.pause()
-        assert "[b $primary]dsh" in str(app.screen.query_one("#tabs", Label).content)
-        assert [str(option.id) for option in listing.options] == ["="]
+        assert rows(app) == [""]
         assert "saved by dsh" in str(listing.get_option_at_index(0).prompt)
 
-        await driver.press("ctrl+n")
+        await driver.press("a")
         await until(lambda: isinstance(app.screen, Ways), driver)
         ways = app.screen.query_one("#choices", OptionList)
         assert [str(option.id) for option in ways.options] == ["=key"]
@@ -1515,9 +1672,18 @@ async def test_deepseek_has_only_api_key_login_after_switching_from_kimi(
         await driver.pause()
         await driver.press("enter")
 
-        await until(lambda: isinstance(app.screen, Models), driver)
+        # Making one here is choosing it, so what comes back is the agent with it on.
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
         await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+
+        await keeps(app, driver)
+        await keeps(app, driver)
 
     made = providers.find("dsh", "mine")
     assert made is not None
@@ -1546,23 +1712,22 @@ async def test_agents_says_how_to_install_deepseek_when_its_sdk_is_missing(
 ) -> None:
     app = Humanize(agents=[Runs("claude/claude-opus-5:max")])
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
+        await into_flows(app, driver)
+        await into_agent(app, driver)
 
-        await driver.press("right")
-        await driver.pause()
-        sheet = app.screen
-        assert "[b $primary]dsh" in str(sheet.query_one("#tabs", Label).content)
-        assert not sheet.query_one("#choices", OptionList).options
-        installing = str(sheet.query_one("#tuning", Label).content)
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await onto(app, driver, "dsh")
+        installing = str(listing.get_option_at_index(rows(app).index("dsh")).prompt)
         assert "DeepSeek Harness is not installed" in installing
         assert "uv pip install --python" in installing
         assert "deepseek-harness-sdk" in installing
 
-        await driver.press("enter")
-        await driver.pause()
-        assert isinstance(app.screen, RunsAs)
+        await drops(app, driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await drops(app, driver)
+        await drops(app, driver)
 
     assert app._models == [Runs("claude/claude-opus-5:max")]
 
@@ -1584,37 +1749,26 @@ def test_deepseek_install_hint_targets_the_python_running_humanize(
         "claude": (Model("claude-opus-5", ("max",)), Model("claude-sonnet-5", ("max",)))
     },
 )
-async def test_one_cli_is_a_heading_rather_than_a_row_of_tabs(
+async def test_one_cli_is_still_a_row_that_is_opened_and_answered(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """There is nowhere to switch to, so nothing says there is."""
+    """One backend is one row in the list, rather than a question that is skipped."""
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
+        assert rows(app) == ["claude"]
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
-        sheet = app.screen
-        listing = sheet.query_one("#choices", OptionList)
-        await until(lambda: bool(listing.options), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
 
-        tabs = str(sheet.query_one("#tabs", Label).content)
-        assert "claude" in tabs
-        assert "to switch" not in tabs
-
-        await driver.press("right")  # nowhere to go, and nothing moves
-        await driver.pause()
-        assert [str(option.id) for option in listing.options] == ["="]
-
-        # And the step after says whose models these are, for the same reason: one CLI.
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
         models = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(models.options), driver)
-        assert [str(option.id) for option in models.options] == [
-            "claude/claude-opus-5",
-            "claude/claude-sonnet-5",
-        ]
-        assert "to switch" not in str(app.screen.query_one("#tabs", Label).content)
+        assert rows(app) == ["claude-opus-5", "claude-sonnet-5"]
 
 
 @pytest.mark.timeout(60)
@@ -1625,32 +1779,38 @@ async def test_one_cli_is_a_heading_rather_than_a_row_of_tabs(
         "codex": (Model("gpt-5.6-sol", ("xhigh",)),),
     },
 )
-async def test_what_was_typed_belongs_to_the_tab_it_was_typed_into(
+async def test_a_search_is_asked_for_and_left_rather_than_being_what_typing_does(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """A search that narrowed one CLI's accounts to one would narrow the next one's to none."""
+    """Every letter on these sheets is a key, so the letters only search once s says so."""
     from hmz import providers
 
     providers.add("claude", "deepseek", way="key", env={"ANTHROPIC_API_KEY": "k"})
-    providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "k"})
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
-        sheet = app.screen
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "provider")
+        await until(lambda: isinstance(app.screen, Accounts), driver)
+        sheet = cast("Accounts", app.screen)
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
+        assert "s to search" in str(sheet.query_one("#keys", Label).content)
 
+        await driver.press("s")
+        await driver.pause()
+        assert sheet._searching
         await driver.press(*"deep")
         await driver.pause()
-        assert [str(option.id) for option in listing.options] == ["=deepseek"]
+        assert rows(app) == ["deepseek"]
 
-        await driver.press("right")
+        # And esc comes out of the search rather than out of the sheet.
+        await driver.press("escape")
         await driver.pause()
-        # The next CLI is read from its whole list rather than through the last search.
-        assert [str(option.id) for option in listing.options] == ["=", "=work"]
-        assert cast("RunsAs", sheet)._typed == ""
+        assert not sheet._searching
+        assert sheet._typed == ""
+        assert app.screen is sheet
+        assert rows(app) == ["", "deepseek"]
 
 
 @pytest.mark.timeout(60)
@@ -1671,39 +1831,63 @@ async def test_a_turn_is_said_to_run_hard_and_said_to_run_wide_separately(
     """
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/flow")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Flows), driver)
-        await driver.press("enter")
-        await into_models(app, driver)
-        tuning = app.screen.query_one("#tuning", Label)
+        await into_flows(app, driver)
+        await into_agent(app, driver)
 
         # Claude opens on ultracode, which is the hardest thing it takes, and has no swarm.
-        await until(lambda: "ultracode effort" in str(tuning.content), driver)
-        assert "swarm" not in str(tuning.content)
-        await driver.press("ctrl+w")  # nothing to toggle, so nothing happens
-        await driver.pause()
-        assert "swarm" not in str(tuning.content)
+        listing = app.screen.query_one("#choices", OptionList)
 
-        # Kimi has one. Which CLI it is was the step before, so that is where it is turned to.
-        await driver.press("escape")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
-        await driver.press("right")
+        def shown(held: str) -> str:
+            return str(listing.get_option_at_index(rows(app).index(held)).prompt)
+
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        tuning = app.screen.query_one("#tuning", Label)
-        await until(lambda: "swarm mode off" in str(tuning.content), driver)
-
-        await driver.press("ctrl+w")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        # Claude's hardest is an effort like any other, reached along the same arrows.
+        await onto(app, driver, "effort")
+        await driver.press("right", "right")
         await driver.pause()
-        assert "swarm mode on" in str(tuning.content)
+        assert "ultracode" in shown("effort")
+        assert "swarm" not in rows(app)  # nothing to turn on, so no row saying so
+
+        # Kimi has one, which is a row of its own rather than a rung of the effort.
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
+        await onto(app, driver, "kimi")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: "swarm" in rows(app), driver)
+        assert "off" in shown("swarm")
+
+        await onto(app, driver, "swarm")
+        await driver.press("right")
+        await driver.pause()
+        assert "on" in shown("swarm")
+        await onto(app, driver, "effort")
         await driver.press("left")  # and it is still on at another effort
         await driver.pause()
-        assert "low effort" in str(tuning.content)
-        assert "swarm mode on" in str(tuning.content)
+        assert "low" in shown("effort")
+        assert "on" in shown("swarm")
 
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await keeps(app, driver)
+        await keeps(app, driver)
 
     # One turn, at one effort, run wide -- which is how Kimi is asked for a fleet.
     assert app._models == [Runs("kimi/kimi-code/k3:swarmlow")]
@@ -1726,26 +1910,25 @@ async def test_a_list_too_long_to_walk_is_narrowed_by_typing_at_it(
     """Every model of every CLI is longer than a screen, so the letters go into it."""
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/flow")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Flows), driver)
+        await into_flows(app, driver)
         sheet = app.screen
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
         every = listing.option_count
 
+        await driver.press("s")
         await driver.press("r", "a", "l", "p", "h", "_")
         await driver.pause()
-        assert [str(option.id) for option in listing.options] == ["ralph_loop"]
+        assert [one for one in rows(app) if one] == ["builtin\x1fralph_loop"]
 
         await driver.press("backspace")  # and one letter back is a wider list again
         await driver.pause()
         # `ralph` is in `stateful_ralph` too, which the underscore had ruled out.
-        assert listing.option_count > 1
+        assert len([one for one in rows(app) if one]) > 1
 
         await driver.press("z", "z")  # narrowed to nothing rather than to everything
         await driver.pause()
-        assert listing.option_count == 0
+        assert not [one for one in rows(app) if one]
 
         await driver.press("escape")  # which esc steps back out of before it leaves
         await driver.pause()
@@ -1753,16 +1936,16 @@ async def test_a_list_too_long_to_walk_is_narrowed_by_typing_at_it(
         assert isinstance(app.screen, Flows)
 
         # Spread through the name in order, rather than a prefix: `hk` finds `claude-haiku`.
-        await driver.press("enter")
-        await into_models(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
+        await driver.press("s")
         await driver.press("h", "k")
         await driver.pause()
 
-        assert [str(option.id) for option in listing.options] == [
-            "claude/claude-haiku-4-5"
-        ]
+        assert rows(app) == ["claude-haiku-4-5"]
 
 
 @pytest.mark.timeout(60)
@@ -1774,9 +1957,7 @@ async def test_the_cursor_can_be_seen_in_the_lists_that_are_chosen_from() -> Non
     """
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/flow")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Flows), driver)
+        await into_flows(app, driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
 
@@ -2047,32 +2228,44 @@ async def test_the_person_asked_for_a_shape_is_asked_a_question_at_a_time(
 async def test_what_an_agent_may_do_is_stepped_through_beside_what_it_runs(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
-    """A side question about the agent, adjusted rather than chosen from a list of four."""
+    """A row of the agent's own, stepped where it stands rather than chosen from a list."""
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
         await driver.press("enter")
-        await into_models(app, driver)
-        sheet = app.screen
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
         await until(
-            lambda: bool(sheet.query_one("#choices", OptionList).options), driver
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
-        tuning = sheet.query_one("#tuning", Label)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+
+        def permission() -> str:
+            return str(
+                listing.get_option_at_index(rows(app).index("permission")).prompt
+            )
 
         # It opens at what an agent nobody has been asked about has always run at.
-        assert "bypass" in str(tuning.content)
-        await driver.press("ctrl+p")
+        await onto(app, driver, "permission")
+        assert "bypass" in permission()
+        await driver.press("right")
         await driver.pause()
-        assert "read-only" in str(tuning.content)
-        await driver.press("ctrl+p")
+        assert "read-only" in permission()
+        await driver.press("right")
         await driver.pause()
-        assert "workspace-write" in str(tuning.content)
+        assert "workspace-write" in permission()
 
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await keeps(app, driver)
+        await keeps(app, driver)
 
     # It rides along with what the agent runs, and is kept with it.
-    chosen = Runs("claude/claude-opus-5:max", "", None, "workspace-write")
+    chosen = Runs("claude/claude-opus-5:high", "", None, "workspace-write")
     assert app._models == [chosen]
     assert app.settings.agents(app._flow_named) == [chosen]
 
@@ -2088,19 +2281,28 @@ async def test_the_loosest_rung_is_written_down_as_nothing_at_all(
     """A file written before there was such a setting reads the same way as one that has it."""
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
         await driver.press("enter")
-        await into_models(app, driver)
-        sheet = app.screen
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
         await until(
-            lambda: bool(sheet.query_one("#choices", OptionList).options), driver
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
-        # All the way round, back to the one it opened on.
-        for _ in range(len(PERMISSIONS)):
-            await driver.press("ctrl+p")
-        await driver.pause()
         await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
 
-    assert app._models == [Runs("claude/claude-opus-5:max")]
-    assert app.settings.agents(app._flow_named) == [Runs("claude/claude-opus-5:max")]
+        # All the way round, back to the one it opened on.
+        await onto(app, driver, "permission")
+        for _ in range(len(PERMISSIONS)):
+            await driver.press("right")
+        await driver.pause()
+
+        await keeps(app, driver)
+        await keeps(app, driver)
+
+    assert app._models == [Runs("claude/claude-opus-5:high")]
+    assert app.settings.agents(app._flow_named) == [Runs("claude/claude-opus-5:high")]

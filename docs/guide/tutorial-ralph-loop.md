@@ -144,7 +144,7 @@ often it re-reads files it has already read.
 **Move the effort.** On `/agents`, second step, **←/→**. A Ralph loop of `low` turns is a
 different animal from one of `max` turns — see [Efforts](/features/efforts).
 
-**Make it read-only.** `/agents` → model step → **ctrl+p** → `read-only`. Now it can look at the
+**Make it read-only.** `/flow` → Agents → the agent → `permission` → **→** to `read-only`. Now it can look at the
 repository and change nothing, which is how you use a loop to *review* rather than to build.
 
 ## What you now know

@@ -17,10 +17,10 @@ from textual.widgets import Label, OptionList
 from hmz.agents.skills import Skill, leaving, skills
 from hmz.backends import Model
 from hmz.tui import Humanize
-from hmz.tui.pick import Models, Runs, Skills
+from hmz.tui.pick import Agent, Runs, Skills
 from hmz.tui.settings import Settings
 
-from .test_app import into_models, until
+from .test_app import into_agent, into_flows, keeps, opens, rows, until
 
 SKILL = """---
 name: {name}
@@ -103,10 +103,9 @@ async def test_a_cli_that_cannot_be_told_says_that_rather_than_none_installed(
     """Blaming the machine for what the backend cannot do would be the wrong sentence."""
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await into_models(app, driver)
-        await driver.press("ctrl+s")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "skills")
         await until(lambda: isinstance(app.screen, Skills), driver)
         said = str(app.screen.query_one("#tuning", Label).content)
 
@@ -131,18 +130,16 @@ async def test_what_an_agent_is_loaded_with_is_chosen_beside_what_it_runs(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     homes: Path,
 ) -> None:
-    """A side question about the agent, so it is a key on the model step and not a row."""
+    """A row of the agent's own, opened from the sheet that says what the agent is."""
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await into_models(app, driver)
-        sheet = app.screen
-        tuning = sheet.query_one("#tuning", Label)
-        await until(lambda: "effort" in str(tuning.content), driver)
-        assert "every skill" in str(tuning.content)  # never asked: the CLI as it comes
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        held = listing.get_option_at_index(rows(app).index("skills"))
+        assert "every skill" in str(held.prompt)  # never asked: the CLI as it comes
 
-        await driver.press("ctrl+s")
+        await opens(app, driver, "skills")
         await until(lambda: isinstance(app.screen, Skills), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
@@ -165,15 +162,22 @@ async def test_what_an_agent_is_loaded_with_is_chosen_beside_what_it_runs(
         await driver.press("space")
 
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        await until(lambda: "2 skills" in str(tuning.content), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(
+            lambda: (
+                "2 skills"
+                in str(listing.get_option_at_index(rows(app).index("skills")).prompt)
+            ),
+            driver,
+        )
 
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await keeps(app, driver)
+        await keeps(app, driver)
 
     # It rides along with what the agent runs, and is kept with it: the ones it has, in the
     # order the CLI lists them, rather than the one that was switched off.
-    chosen = Runs("claude/claude-opus-5:max", "", ("hf-cli", "housekeeping"))
+    chosen = Runs("claude/claude-opus-5:high", "", ("hf-cli", "housekeeping"))
     assert app._models == [chosen]
     assert app.settings.agents(app._flow_named) == [chosen]
 
@@ -187,24 +191,23 @@ async def test_walking_out_of_the_skills_leaves_the_agent_loaded_as_it_was(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     homes: Path,
 ) -> None:
-    """Declining to answer a side question is not declining to choose the agent."""
+    """Declining to answer a side question is not declining to set the agent up."""
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await into_models(app, driver)
-        await driver.press("ctrl+s")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "skills")
         await until(lambda: isinstance(app.screen, Skills), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
 
         await driver.press("space")  # switched off, and then walked away from
         await driver.press("escape")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await keeps(app, driver)
+        await keeps(app, driver)
 
-    assert app._models == [Runs("claude/claude-opus-5:max")]
+    assert app._models == [Runs("claude/claude-opus-5:high")]
 
 
 def test_what_a_workspace_is_loaded_with_is_kept_and_read_back(tmp_path: Path) -> None:
@@ -284,15 +287,15 @@ async def test_the_letters_narrow_the_skills_and_space_switches_one(
     """A skill is named after the directory it is in, so a space is never part of one."""
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/agents")
-        await driver.press("enter")
-        await into_models(app, driver)
-        await driver.press("ctrl+s")
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "skills")
         await until(lambda: isinstance(app.screen, Skills), driver)
         sheet = app.screen
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
 
+        await driver.press("s")
         await driver.press(*"hous")
         await driver.pause()
         assert [str(option.id) for option in listing.options] == ["housekeeping"]
@@ -314,8 +317,8 @@ async def test_the_letters_narrow_the_skills_and_space_switches_one(
         assert isinstance(app.screen, Skills)
 
         await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await keeps(app, driver)
+        await keeps(app, driver)
 
-    assert app._models == [Runs("claude/claude-opus-5:max", "", ("hf-cli", "writing"))]
+    assert app._models == [Runs("claude/claude-opus-5:high", "", ("hf-cli", "writing"))]

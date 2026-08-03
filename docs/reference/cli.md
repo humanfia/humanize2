@@ -312,7 +312,7 @@ echoed. A line with nobody at a terminal has to answer everything itself.
 
 **What an account runs is that account's**, so it is asked for as soon as one is made: which
 models a turn may name depends on which subscription, key or gateway it runs under. A CLI that
-will not say does not fail the line — the account was made — and **ctrl+r** on the models sheet
+will not say does not fail the line — the account was made — and **r** on the models sheet
 asks it again.
 
 **Values are never printed** — `show` and `list` say which variables a provider sets and not
@@ -383,13 +383,13 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened, how it ended. See [Cycles](/reference/tracing.md#cycles). |
 | `~/.humanize/providers/<cli>/<name>/provider.json` | `hmz providers add` | What a [provider](/reference/providers.md) was made by, and what a turn under it runs with. `0600`, in a directory at `0700`. |
 | `~/.humanize/providers/<cli>/<name>/{home,user}/...` | the CLI's own login | That provider's credentials, at the names the CLI keeps its own under. |
-| `~/.humanize/providers/<cli>/<name>/models.json` | `hmz providers add`, **ctrl+r** | What that CLI said it runs as that account. Goes when the account does. |
-| `~/.humanize/models/<cli>.json` | the TUI, **ctrl+r** | The same, for the CLI as you already run it. |
+| `~/.humanize/providers/<cli>/<name>/models.json` | `hmz providers add`, **r** | What that CLI said it runs as that account. Goes when the account does. |
+| `~/.humanize/models/<cli>.json` | the TUI, **r** | The same, for the CLI as you already run it. |
 | `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run. |
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
 | `.humanize/<datetime>.trace.json` | `hmz collect` | The trace. Relative to the current directory, not to the workspace named. |
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
-| `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **ctrl+n** | A [flowverse](/features/flowverses.md), cloned. Every flow in it is offered as `<name>/<flow>`. |
+| `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** | A [flowverse](/features/flowverses.md), cloned. Every flow in it is offered as `<name>/<flow>`. |
 | `.humanize/flows/*.py` | you | This project's own flows. |
 | `~/.humanize/flows/*.py` | you | Your flows, in every project. |
 

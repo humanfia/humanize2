@@ -20,7 +20,7 @@ In `hmz`:
 /flow
 ```
 
-Press **→** until the tab says `official`. If the list is empty or stale, press **ctrl+r** to
+Walk down to the `official` heading. If it has nothing under it, press **r** to
 fetch it. It keeps drawing while it clones, and says underneath what became of it.
 
 ::: danger Adding a flowverse is trusting that repository with this machine
@@ -64,7 +64,7 @@ Give the reviewer a different CLI if you have one. Give it the same one if you d
 at one configuration are still two agents, and that is the point.
 
 ::: tip Make the reviewer read-only
-On the reviewer's model step, **ctrl+p** → `read-only`. Now it can read the change and cannot
+On the reviewer's sheet, the `permission` row → `read-only`. Now it can read the change and cannot
 touch it. See [Permissions](/features/permissions).
 :::
 

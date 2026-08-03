@@ -427,7 +427,7 @@ def test_a_missing_native_api_key_failure_reaches_watchers_with_setup_guidance(
     assert len(failed) == 1
     assert "needs a DeepSeek API key" in failed[0]
     assert "Settings -> Models" in failed[0]
-    assert "ctrl+n" in failed[0]
+    assert "press a on its" in failed[0]
     assert len(Harness.made) == 1
 
 

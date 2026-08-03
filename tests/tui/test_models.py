@@ -18,9 +18,9 @@ from textual.widgets import Label, OptionList
 from hmz.backends import Model
 from hmz.cli import main
 from hmz.tui import Humanize
-from hmz.tui.pick import Models, Runs, RunsAs
+from hmz.tui.pick import Agent, Catalogue, Clis, Runs
 
-from .test_app import until
+from .test_app import into_agent, keeps, onto, opens, rows, until
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -80,21 +80,27 @@ def flows(tmp_path: Path) -> Path:
     return where
 
 
-async def _to_the_models(app: Humanize, driver: Pilot[None]) -> None:
-    """Walks in as far as the models, which is the step after the CLI and the account."""
-    await driver.press(*"/flow here")
-    await driver.press("enter")
-    await until(lambda: isinstance(app.screen, RunsAs), driver)
-    await driver.press("enter")
-    await until(lambda: isinstance(app.screen, Models), driver)
-
-
-async def _flow_to_models(app: Humanize, driver: Pilot[None], flow: str) -> None:
+async def _to_the_agent(app: Humanize, driver: Pilot[None], flow: str = "here") -> None:
+    """Opens the flow menu on one flow and opens the one agent it drives."""
     await driver.press(*f"/flow {flow}")
     await driver.press("enter")
-    await until(lambda: isinstance(app.screen, RunsAs), driver)
-    await driver.press("enter")
-    await until(lambda: isinstance(app.screen, Models), driver)
+    await into_agent(app, driver)
+
+
+async def _to_the_models(app: Humanize, driver: Pilot[None]) -> None:
+    """Opens the row the models are chosen from, which is the one under the account.
+
+    Through the CLI first where the agent has not been answered at all: a model belongs to
+    the CLI that runs it, so there is nothing to list until one has been chosen.
+    """
+    await _to_the_agent(app, driver)
+    if "—" in _value(app, "cli"):
+        await opens(app, driver, "cli")
+        await until(lambda: isinstance(app.screen, Clis), driver)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+    await opens(app, driver, "model")
+    await until(lambda: isinstance(app.screen, Catalogue), driver)
 
 
 def test_a_line_uses_the_agent_place_goal_suggestion(flows: Path) -> None:
@@ -125,6 +131,12 @@ def _under(app: Humanize) -> str:
     return str(app.screen.query_one("#tuning", Label).content)
 
 
+def _value(app: Humanize, held: str) -> str:
+    """What one row of the agent sheet is set to, as it is drawn."""
+    listing = app.screen.query_one("#choices", OptionList)
+    return str(listing.get_option_at_index(rows(app).index(held)).prompt)
+
+
 def _rows(app: Humanize) -> int:
     """How many models are on the sheet."""
     return len(app.screen.query_one("#choices", OptionList).options)
@@ -138,15 +150,17 @@ async def test_goals_are_an_on_off_choice_from_the_agent_place_suggestion(
 ) -> None:
     app = Humanize()
     async with app.run_test() as driver:
-        await _flow_to_models(app, driver, "goals_off")
-        await until(lambda: "goals off" in _under(app), driver)
+        await _to_the_agent(app, driver, "goals_off")
+        await onto(app, driver, "goals")
+        assert "off" in _value(app, "goals")
 
-        await driver.press("ctrl+g")
-        await until(lambda: "goals on" in _under(app), driver)
-        await driver.press("ctrl+g")
-        await until(lambda: "goals off" in _under(app), driver)
-        await driver.press("enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await driver.press("right")
+        await until(lambda: "on" in _value(app, "goals"), driver)
+        await driver.press("right")
+        await until(lambda: "off" in _value(app, "goals"), driver)
+
+        await keeps(app, driver)
+        await keeps(app, driver)
 
     assert app._models[0].goals is False
 
@@ -159,10 +173,14 @@ async def test_a_user_can_override_the_agent_place_suggestion_to_on(
 ) -> None:
     app = Humanize()
     async with app.run_test() as driver:
-        await _flow_to_models(app, driver, "goals_off")
-        await until(lambda: "goals off" in _under(app), driver)
-        await driver.press("ctrl+g", "enter")
-        await until(lambda: not isinstance(app.screen, Models), driver)
+        await _to_the_agent(app, driver, "goals_off")
+        await onto(app, driver, "goals")
+        assert "off" in _value(app, "goals")
+        await driver.press("right")
+        await until(lambda: "on" in _value(app, "goals"), driver)
+
+        await keeps(app, driver)
+        await keeps(app, driver)
 
     assert app._models[0].goals is True
     assert app.settings.agents("goals_off")[0].goals is True
@@ -213,7 +231,8 @@ async def test_a_cli_that_has_not_said_what_it_runs_says_which_key_asks_it(
 
         assert _rows(app) == 0
         await until(lambda: "has not said what it runs" in _under(app), driver)
-        assert "ctrl+r" in _under(app)
+        assert "r asks it" in _under(app)
+        assert "ctrl" not in _under(app)
 
 
 @pytest.mark.timeout(60)
@@ -235,10 +254,12 @@ async def test_the_key_asks_the_cli_and_puts_up_what_it_says(
         await _to_the_models(app, driver)
         assert _rows(app) == 0
 
-        await driver.press("ctrl+r")
+        await driver.press("r")
 
         await until(lambda: _rows(app) == 1, driver)
-        await until(lambda: "max effort" in _under(app), driver)
+        assert "max" in str(
+            app.screen.query_one("#choices", OptionList).get_option_at_index(0).prompt
+        )
 
 
 @pytest.mark.timeout(60)
@@ -259,11 +280,11 @@ async def test_a_cli_that_will_not_say_says_so_under_the_list(
     async with app.run_test() as driver:
         await _to_the_models(app, driver)
 
-        await driver.press("ctrl+r")
+        await driver.press("r")
 
         await until(lambda: "not logged in" in _under(app), driver)
         # And the sheet is still the sheet: the question it asks is still worth answering.
-        assert isinstance(app.screen, Models)
+        assert isinstance(app.screen, Catalogue)
         assert _rows(app) == 1
 
 
@@ -284,13 +305,14 @@ async def test_the_models_are_the_chosen_accounts_rather_than_this_machines(
     )
     app = Humanize()
     async with app.run_test() as driver:
-        await driver.press(*"/flow here")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, RunsAs), driver)
-        # The row under "as installed", which is the account just written down.
+        await _to_the_agent(app, driver)
+        await opens(app, driver, "provider")
+        # The row under "as local", which is the account just written down.
         await driver.press("down", "enter")
-        await until(lambda: isinstance(app.screen, Models), driver)
+        await until(lambda: isinstance(app.screen, Agent), driver)
 
+        await opens(app, driver, "model")
+        await until(lambda: isinstance(app.screen, Catalogue), driver)
         await until(lambda: _rows(app) == 1, driver)
         assert "claude-theirs" in str(
             app.screen.query_one("#choices", OptionList).options[0].prompt

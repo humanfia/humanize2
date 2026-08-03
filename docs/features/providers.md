@@ -46,7 +46,7 @@ ClaudeCodeAgentConfig(model="claude-opus-5", effort="max", provider="deepseek")
 ```
 
 At the prompt it is the **first** step of `/agents`: a tab per CLI that is installed, and under it
-that CLI's own accounts, with `as installed` as the first row. **ctrl+n** there makes one without
+that CLI's own accounts, with `as local` as the first row. **a** there makes one without
 leaving the question.
 
 ## What moves, and what does not
@@ -114,7 +114,7 @@ they are. A secret typed at the prompt is drawn as bullets and never shown back.
 
 **What an account runs is that account's**, so the CLI is asked as soon as one is made: which
 models a turn may name depends on which subscription, key or gateway it runs under. A CLI that
-will not say does not fail the line — the account was made — and **ctrl+r** on the models sheet
+will not say does not fail the line — the account was made — and **r** on the models sheet
 asks it again.
 
 ## In the interface

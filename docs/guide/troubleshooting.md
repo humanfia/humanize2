@@ -34,7 +34,7 @@ that is not a flowverse's, is taken as a path. See [where flows live](/reference
 ### `the official flowverse has not been fetched yet`
 
 The name is right and the download has not happened. Open `/flow`, walk to it with the arrows,
-and press `ctrl+r`.
+and press `r`.
 
 ### `nothing in it is marked @flow(), and it holds …`
 

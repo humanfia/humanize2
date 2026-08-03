@@ -186,6 +186,9 @@ class AgentBase(ABC):
     def rename(self, name: str) -> None:
         """Takes the name the flow driving this agent calls it, if it has none of its own."""
 
+    def reconfigure(self, config: AgentConfig) -> None:
+        """Sets this agent up as something else, from its next turn on."""
+
     def asked(self, question: Question) -> str | None:
         """Puts something a turn stopped to ask to whoever is driving this agent."""
 
@@ -196,6 +199,12 @@ class AgentBase(ABC):
 - `id` MUST be the given name, or one no other agent answers to when no name is given, so that
   two agents of the same config are two agents. `rename` MUST take a name from a flow only for
   an agent that was not named where it was made: a name given is a name kept.
+- `reconfigure` MUST replace what every turn from then on runs at, and MUST leave the turn
+  under way as it started: a model does not think harder halfway through an answer. It is the
+  one thing that changes a frozen config, and it is for the one case that config was frozen
+  against being read as -- somebody watching a run and saying that this agent is to go on as
+  something else. What an agent *is* MUST NOT change this way: a backend is the class the
+  agent is, and one becoming another is another object.
 - `__call__` and `pursue` MUST be one turn in a session nothing keeps, which is what a Ralph
   loop is made of -- so that a flow says `agent(task)` rather than reaching through a session
   it is going to discard.

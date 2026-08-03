@@ -120,7 +120,7 @@ codex:
 
 `as installed` is what every agent ran as before there were any accounts.
 
-**ctrl+n makes one without leaving the question** — the same walk `/providers` runs, minus the
+**a makes one without leaving the question** — the same walk `/providers` runs, minus the
 question this tab has already answered — and comes back with the new account chosen.
 
 ## Step 7 — the models are the account's
@@ -132,7 +132,7 @@ CLI is asked as soon as an account is made, and the answer is kept:
 ~/.humanize/providers/claude/deepseek/models.json
 ```
 
-**ctrl+r** on the models sheet asks it again, which is where you find out that the model you came
+**r** on the models sheet asks it again, which is where you find out that the model you came
 for is not in the list. A CLI that will not say does not fail the line — the account was made.
 
 ## What actually moves

@@ -43,7 +43,7 @@ You can run `npx @deepseek-ai/dsh web` instead of installing the launcher global
 `/agents`, switch to `dsh`, and choose `as installed`; humanize then uses the credentials and
 base URL already saved by dsh.
 
-Alternatively, press **ctrl+n** on the `dsh` tab, choose `key`, and enter an account name and
+Alternatively, choose `dsh` on the `cli` row and press **a** on the `provider` row, choose `key`, and enter an account name and
 the key. Or set it only for the process that starts humanize:
 
 ```sh
@@ -144,7 +144,7 @@ Ralph loop *is*. `/status` shows who is working, who handed to whom, and what it
 humanize ships three — `chat`, `ralph_loop` and `stateful_ralph` — and offers the rest from
 [a flowverse](/reference/flows.md#flowverses), which is a git repository of flows. `official` is there from
 the start: press left and right in `/flow` to walk between the places flows come from, and
-`ctrl+r` on one to fetch it. Every flow is described in [Flows](/reference/flows.md#the-flows-humanize-ships).
+`r` on one to fetch it. Every flow is described in [Flows](/reference/flows.md#the-flows-humanize-ships).
 
 ## 4. Run one without the interface
 

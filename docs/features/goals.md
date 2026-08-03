@@ -54,7 +54,7 @@ class Agents(NamedTuple):
     reviewer: Annotated[AgentBase, AgentDefaults(goals=False)]
 ```
 
-The marker only supplies the model picker's initial value. `ctrl+g` switches the selected
+The marker only supplies the model picker's initial value. the `goals` row switches the selected
 agent between `on` and `off`; the resolved value is saved on that agent's `AgentConfig`. The
 picker and config have no third state, and the flow does not change an agent after it is made.
 

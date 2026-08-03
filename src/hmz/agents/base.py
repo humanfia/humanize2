@@ -1718,6 +1718,26 @@ class AgentBase(ABC):
             raise RuntimeError(f"{self._id} has already opened a session")
         self._config = replace(self._config, machine=machine)
 
+    def reconfigure(self, config: AgentConfig) -> None:
+        """Sets this agent up as something else, from its next turn on.
+
+        The config is frozen because a session resumes under the settings it opened with, and
+        an agent that quietly changed model halfway through a conversation would be one
+        conversation split across two. This is the one thing that is not that: it is asked for
+        by hand, by whoever is watching the run, about an agent that is thinking too little or
+        is allowed too much -- and what it says is that everything from here on is to be the
+        other thing. The turn under way keeps what it started with, a model not thinking
+        harder halfway through an answer.
+
+        What an agent is cannot be changed this way: a backend is the class this is, and one
+        of those becoming another is another object, which is a thing only building the flow
+        again does.
+
+        Args:
+          config: What every turn of it is to run at from now on.
+        """
+        self._config = config
+
     def rename(self, name: str) -> None:
         """Calls this agent what the flow driving it calls it, if it has no name of its own.
 

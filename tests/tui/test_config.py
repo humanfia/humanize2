@@ -17,11 +17,11 @@ from textual.widgets import Label, OptionList
 from hmz.backends import Model
 from hmz.cli import main
 from hmz.tui import Humanize
-from hmz.tui.pick import Configures, Flows, Models, Runs, setting
+from hmz.tui.pick import Agent, Configures, Flows, Runs, setting
 from hmz.tui.selecting import Transcript
 from hmz.tui.settings import Settings
 
-from .test_app import into_models
+from .test_app import into_agent, keeps
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -148,6 +148,24 @@ def _rows(app: Humanize) -> str:
     return "\n".join(str(option.prompt) for option in listing.options)
 
 
+async def _set_up(app: Humanize, driver: Pilot[None], flow: str = "settable") -> None:
+    """Opens the flow menu on one flow, and the sheet that flow is set up on.
+
+    Setting a flow up is a thing about the flow rather than about its agents, so it is a key
+    on the page the flow is chosen from rather than a page or a step of its own.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+      flow: The flow to open the menu on.
+    """
+    await driver.press(*f"/flow {flow}")
+    await driver.press("enter")
+    await until(lambda: isinstance(app.screen, Flows), driver)
+    await driver.press("c")
+    await driver.pause()
+
+
 @pytest.mark.timeout(60)
 async def test_setting_up_comes_between_the_flow_and_its_agents(flows: Path) -> None:
     """Which is the only moment it can: the flow says what there is to set."""
@@ -157,8 +175,7 @@ async def test_setting_up_comes_between_the_flow_and_its_agents(flows: Path) -> 
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
 
             assert isinstance(app.screen, Configures)
@@ -166,25 +183,33 @@ async def test_setting_up_comes_between_the_flow_and_its_agents(flows: Path) -> 
             assert "loud" in shown
             assert "say it twice" in shown  # the line the field was declared with
 
+            # And it is held rather than applied: the menu is what applies it, when it is
+            # saved on the way out.
             await driver.press("enter")
-            await into_models(app, driver)
-            assert isinstance(app.screen, Models)
+            await until(lambda: isinstance(app.screen, Flows), driver)
+            await into_agent(app, driver)
+            assert isinstance(app.screen, Agent)
 
 
 @pytest.mark.timeout(60)
 async def test_a_flow_that_takes_no_setting_up_is_not_asked_about(flows: Path) -> None:
-    """The sheet is skipped rather than shown empty, and the walk is one step shorter."""
+    """The sheet is not put up empty; the key says so under the list instead."""
     app = Humanize()
     with unittest.mock.patch(
         "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow plain")
-            await driver.press("enter")
-            await into_models(app, driver)
+            await _set_up(app, driver, "plain")
+            await until(
+                lambda: (
+                    "takes no setting up"
+                    in str(app.screen.query_one("#tuning", Label).content)
+                ),
+                driver,
+            )
 
-            assert isinstance(app.screen, Models)
+            assert isinstance(app.screen, Flows)
 
 
 @pytest.mark.timeout(60)
@@ -196,8 +221,7 @@ async def test_the_arrows_move_a_setting_and_letters_write_one(flows: Path) -> N
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
             sheet = app.screen
             assert isinstance(sheet, Configures)
@@ -228,8 +252,7 @@ async def test_what_the_flow_refuses_is_said_where_it_was_typed(flows: Path) -> 
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
             sheet = app.screen
             assert isinstance(sheet, Configures)
@@ -252,8 +275,7 @@ async def test_a_setting_outside_its_bounds_is_said_too(flows: Path) -> None:
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
             sheet = app.screen
             assert isinstance(sheet, Configures)
@@ -268,18 +290,14 @@ async def test_a_setting_outside_its_bounds_is_said_too(flows: Path) -> None:
 
 @pytest.mark.timeout(60)
 async def test_escape_steps_back_to_the_flows(flows: Path) -> None:
-    """A flow chosen by mistake is what you would be walking back from."""
+    """It is a sheet the flow menu opens, so esc off it is the menu again rather than out."""
     app = Humanize()
     with unittest.mock.patch(
         "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow")
-            await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Flows), driver)
-            await driver.press(*"settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
 
             await driver.press("escape")
@@ -299,13 +317,12 @@ async def test_how_it_was_set_up_is_kept_and_read_back(
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
             await driver.press("right")  # loud on
             await driver.press("enter")
-            await into_models(app, driver)
-            await driver.press("enter")
+            await until(lambda: isinstance(app.screen, Flows), driver)
+            await keeps(app, driver)
             await until(lambda: app._config is not None, driver)
 
     assert Settings(tmp_path).config("settable")["loud"] is True
@@ -324,13 +341,12 @@ async def test_config_opens_the_sheet_on_its_own(flows: Path) -> None:
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
             await driver.press("enter")
-            await into_models(app, driver)
-            await driver.press("enter")
-            await until(lambda: not isinstance(app.screen, Models), driver)
+            await until(lambda: isinstance(app.screen, Flows), driver)
+            await keeps(app, driver)
+            await until(lambda: not isinstance(app.screen, Flows), driver)
 
             await driver.press(*"/config")
             await driver.press("enter")
@@ -377,7 +393,9 @@ def test_a_config_that_no_longer_fits_the_flow_is_started_over_from(
 
     app = Humanize()
 
-    assert app._config_of("settable") is None
+    from hmz.tui.pick import config_of
+
+    assert config_of("settable", app.settings.config("settable")) is None
 
 
 @pytest.mark.timeout(60)
@@ -391,8 +409,7 @@ async def test_the_settings_are_drawn_in_the_sections_the_flow_grouped_them_into
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
             sheet = app.screen
             assert isinstance(sheet, Configures)
@@ -417,8 +434,7 @@ async def test_a_flow_that_groups_nothing_is_one_list(flows: Path) -> None:
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow .humanize/flows/ungrouped.py")
-            await driver.press("enter")
+            await _set_up(app, driver, ".humanize/flows/ungrouped.py")
             await until(lambda: isinstance(app.screen, Configures), driver)
             sheet = app.screen
             assert isinstance(sheet, Configures)
@@ -518,27 +534,26 @@ async def test_what_a_line_says_beats_what_was_remembered(
 
 @pytest.mark.timeout(60)
 async def test_agents_does_not_ask_how_the_flow_is_set_up(flows: Path) -> None:
-    """The two are split: `/config` asks how the flow runs, `/agents` what it runs on."""
+    """The two are split: the flow's own settings are a key, its agents are a page."""
     app = Humanize()
     with unittest.mock.patch(
         "hmz.tui.app.installed",
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
             await driver.press("enter")
-            await into_models(app, driver)
-            await driver.press("enter")
-            await until(lambda: not isinstance(app.screen, Models), driver)
+            await until(lambda: isinstance(app.screen, Flows), driver)
+            await keeps(app, driver)
+            await until(lambda: not isinstance(app.screen, Flows), driver)
 
-            await driver.press(*"/agents")
+            await driver.press(*"/flow")
             await driver.press("enter")
-            await into_models(app, driver)
+            await into_agent(app, driver)
 
-            # Straight to what the agents run, with nothing about the flow itself on the way.
-            assert isinstance(app.screen, Models)
+            # Straight to what the agent is, with nothing about the flow itself on the way.
+            assert isinstance(app.screen, Agent)
 
 
 @pytest.mark.timeout(60)
@@ -550,20 +565,20 @@ async def test_agents_leaves_how_the_flow_is_set_up_alone(flows: Path) -> None:
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
             await driver.press("right")  # loud on
             await driver.press("enter")
-            await into_models(app, driver)
-            await driver.press("enter")
-            await until(lambda: not isinstance(app.screen, Models), driver)
+            await until(lambda: isinstance(app.screen, Flows), driver)
+            await keeps(app, driver)
+            await until(lambda: not isinstance(app.screen, Flows), driver)
 
-            await driver.press(*"/agents")
+            await driver.press(*"/flow")
             await driver.press("enter")
-            await into_models(app, driver)
-            await driver.press("enter")
-            await until(lambda: not isinstance(app.screen, Models), driver)
+            await into_agent(app, driver)
+            await keeps(app, driver)
+            await keeps(app, driver)
+            await until(lambda: not isinstance(app.screen, Flows), driver)
 
             assert app._config is not None
             assert app._config.model_dump()["loud"] is True
@@ -580,8 +595,7 @@ async def test_a_setting_that_is_written_carries_a_caret_under_the_cursor(
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await driver.press(*"/flow settable")
-            await driver.press("enter")
+            await _set_up(app, driver)
             await until(lambda: isinstance(app.screen, Configures), driver)
             sheet = app.screen
             assert isinstance(sheet, Configures)

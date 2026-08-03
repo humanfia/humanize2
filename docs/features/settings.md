@@ -39,7 +39,7 @@ Two related files, for completeness:
 
 | | |
 | --- | --- |
-| `~/.humanize/models/<cli>.json` | what each CLI said it runs, as you run it — refreshed with **ctrl+r** on the models sheet |
+| `~/.humanize/models/<cli>.json` | what each CLI said it runs, as you run it — refreshed with **r** on the models sheet |
 | `~/.humanize/providers/<cli>/<name>/models.json` | the same, as that [account](/features/providers) |
 
 ## Overriding it for one run
