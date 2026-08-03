@@ -127,7 +127,8 @@ Three things worth trying while it is running:
   starting a new one. If no turn is open, it is held for the next.
 - **`/details`** toggles whether tool calls and thinking are shown, or only what the agent
   says.
-- **esc** stops the flow. Two **ctrl+c** leave. One ctrl+c clears what you have half-typed.
+- **esc** stops the flow. **ctrl+c** clears what you have half-typed, and ends the turn on the
+  screen when there is nothing half-typed. **`/exit`** leaves.
 
 Type `/` and the commands appear under the editor with a line about each. Tab takes the one
 highlighted. The full list is in the [TUI reference](/reference/tui.md).

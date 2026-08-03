@@ -11,9 +11,11 @@ A flow ends when its `run` returns. Most of the interesting ones never do — a 
 | **ctrl+c**, on a `hmz exec` command line | The same. |
 | **`agent.stop()`**, from anywhere | The same, for that agent. |
 
-In the interface, **ctrl+c** takes back the nearest thing there is to take back: what is
-half-typed if anything is, the flow if not. Twice in a row leaves — and leaving is always two
-presses, whatever was going on, with the second within two seconds of the first.
+In the interface, **ctrl+c** stops one turn rather than the flow: what is half-typed if
+anything is, and otherwise the turn of the conversation being read. That conversation is closed
+under its turn, so the flow reads a turn that *failed* rather than an agent that was stopped —
+`suppress=True` catches it, the agent is still there to take the next turn, and the rest of the
+flow runs on. esc is what stops all of it.
 
 ## What a stop does to the turn under way
 

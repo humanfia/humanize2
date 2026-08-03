@@ -42,7 +42,6 @@ Sleep 2500ms
 Escape
 Sleep 1500ms
 
-# Two ctrl+c leave, whatever was going on.
-Ctrl+C
-Ctrl+C
+# `/exit` is what leaves: ctrl+c ends a turn, and there is none here to end.
+Type "/exit" Enter
 Sleep 1500ms

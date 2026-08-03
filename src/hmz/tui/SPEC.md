@@ -119,10 +119,15 @@ line, with what the flow is doing beside the transcript.
   been said that none is there. A question still up when the flow ends or is stopped MUST end
   with it, so that stopping a flow is never blocked on one.
 - `ctrl+c` MUST take back the nearest thing there is to take back: what is half-typed if
-  anything is, and the flow if not. Two of them in a row MUST leave, so that leaving is always
-  two presses and never one.
+  anything is, and the turn of the conversation being read if not. That turn MUST end the way
+  a turn whose agent fell over ends -- the conversation closed under it -- so that the flow
+  reads it as a turn that failed and carries on or stops exactly as it would have had the
+  agent gone by itself. The rest of the flow MUST be left running: what is being read is one
+  conversation of however many the flow has open, and esc is what stops all of them. It MUST
+  NOT close the interface, however many times it is pressed: it is pressed while work is
+  going on, and leaving is not what was meant by it.
 - A line that cannot be carried out MUST be shown and MUST leave the interface up. Only
-  `/exit` and two `ctrl+c` close it.
+  `/exit` closes it.
 - A key of the interface's own MUST NOT fire while a sheet is up over it: a sheet is open in
   order to be answered, and reading another conversation is not an answer to it. The key MUST
   reach the sheet instead, rather than being swallowed by the interface and doing nothing.

@@ -128,9 +128,6 @@ _HELP = (
 #: How often the right-hand column and the status line are redrawn, in seconds.
 _REFRESH = 0.5
 
-#: How long a second ctrl+c still counts as the same one, in seconds.
-_AGAIN = 2.0
-
 #: How long the status line says that something was copied, in seconds. Long enough to be
 #: read after a drag that ended somewhere else on the screen, and gone before it is mistaken
 #: for a thing about the run.
@@ -585,26 +582,31 @@ class Humanize(App[None]):
         self.exit()
 
     def action_interrupt(self) -> None:
-        """Takes back the nearest thing there is to take back, and leaves on two of these.
+        """Takes back the nearest thing there is to take back: the line, then the turn.
 
-        Which is what ctrl+c means in a coding agent's terminal: the half-written line if
-        there is one, the flow if there is not, and the interface itself if the last one
-        already took something back -- so that leaving is always two presses away and never
-        one, whatever was going on.
+        Which is what ctrl+c means in a coding agent's terminal, less the leaving: the
+        half-written line if there is one, and otherwise the turn of the conversation being
+        read. That conversation is ended under its turn, so what the flow gets back is a
+        turn that failed -- the same thing it would have got had the agent fallen over by
+        itself, and so a flow that catches its own turns carries on and one that does not
+        stops. The rest of the flow is left where it is: what is being read is one
+        conversation of however many are open, and esc is what stops all of them.
+
+        Nothing at all where there is nothing to take back, as tab does with nothing to step
+        to: this is pressed at a turn that is running, and a complaint where none is would
+        be in the way.
         """
-        twice = time.monotonic() - self._interrupted < _AGAIN
-        self._interrupted = time.monotonic()
-        if twice:
-            self.action_quit()
-            return
         editor = self.query_one(Editor)
         if editor.text:
             editor.text = ""
             return
-        if self._agents:
-            self.action_stop_flow()
+        session = self._interrupting()
+        if session is None:
             return
-        self.show("[dim]press ctrl+c again to exit[/dim]")
+        self.show("[dim]— interrupting the turn —[/dim]")
+        # On this thread, as stopping the whole flow is: closing a conversation is closing
+        # the process behind it, which is a second at the outside.
+        session.close()
 
     def __init__(
         self,
@@ -654,8 +656,6 @@ class Humanize(App[None]):
         self._asking: Question | None = None
         self._answer = ""
         self._answered = threading.Event()
-        #: When ctrl+c was last pressed, so that two of them in a row read as two.
-        self._interrupted = 0.0
         #: When something was last copied off the screen, so that the status line can say so
         #: for a moment: a clipboard is written to silently, and a gesture that says nothing
         #: is one nobody knows worked.
@@ -1107,6 +1107,20 @@ class Humanize(App[None]):
             open_now, theirs[-1] if theirs else min(was, len(open_now) - 1)
         )
 
+    def _interrupting(self) -> SessionBase | None:
+        """The conversation ctrl+c would end, which is the one being read while it works.
+
+        What is attached rather than what :meth:`_reading` would attach: this is asked of
+        the status line twice a second, and moving what is being read is a thing for a draw
+        to do rather than for a line about the keys.
+
+        Returns:
+          The conversation, or None where the one being read is between turns or gone --
+          both of which are a turn there is no taking back.
+        """
+        reading = self._attached() if self._attached is not None else None
+        return reading if reading is not None and reading in self._working else None
+
     def _now_reading(
         self,
         open_now: list[tuple[AgentBase, SessionBase]],
@@ -1557,9 +1571,10 @@ class Humanize(App[None]):
         keys.append("shift+enter newline")
         if self._agents:
             keys.append("esc stop")
-        keys.append(
-            "ctrl+c quit" if not self.query_one(Editor).text else "ctrl+c clear"
-        )
+        if self.query_one(Editor).text:
+            keys.append("ctrl+c clear")
+        elif self._interrupting() is not None:
+            keys.append("ctrl+c interrupt")
         return keys
 
     def _mid_run(self, what: str) -> bool:

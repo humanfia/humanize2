@@ -124,10 +124,11 @@ esc
 **esc** stops the flow — the whole flow, not just the turn. The turn under way is closed out and
 what it was doing is left where it got to; a stop that waited for a turn would not read as a stop.
 
-To leave: **ctrl+c** twice. One ctrl+c takes back what is half-typed if anything is, the flow if
-not. Leaving is always two presses.
+**ctrl+c** takes back something smaller: what is half-typed if anything is, and otherwise the
+turn of the conversation on the screen — which the flow reads as a turn that failed. It never
+leaves.
 
-Or:
+To leave:
 
 ```
 /exit
@@ -142,7 +143,8 @@ Or:
 | a **session** | a conversation held across turns — `chat` holds one |
 | enter, mid-turn | goes *into* the turn |
 | **esc** | stops the flow |
-| **ctrl+c** ×2 | leaves |
+| **ctrl+c** | clears the line, or ends the turn on the screen |
+| **`/exit`** | leaves |
 
 ## Check your work
 

@@ -60,7 +60,7 @@ nowhere else to look them up.
 | **shift+enter** | Breaks the line, which is what enter would do anywhere else. |
 | **ctrl+j** | The same, for a terminal that cannot tell shift+enter from enter. |
 | **esc** | Stops the flow — the whole flow, not just the turn. Dismisses the offers list first, if one is open. Silent when nothing is running. |
-| **ctrl+c** | Takes back the nearest thing there is to take back: what is half-typed if anything is, the flow if not. Twice in a row leaves. |
+| **ctrl+c** | Takes back the nearest thing there is to take back: what is half-typed if anything is, the turn of the conversation being read if not. Silent when there is neither. |
 | **↑ / ↓** | Walks what was typed here before — but only off the first and last line, so a prompt of several lines is still moved around in. Over an open offers list, moves within the list. |
 | **tab** | [Steps to the next agent that is working](#reading-one-conversation) and reads its conversation. Over an open offers list, takes the highlighted offer instead. |
 | **shift+tab** | Steps to the one before it. |
@@ -76,8 +76,12 @@ asked for it — and shift+enter does not break the line there. ctrl+j is what d
 between handles the protocol properly, so iTerm2 under tmux breaks the line on shift+enter
 like everywhere else.
 
-Leaving is always two presses and never one, whatever was going on. The second ctrl+c has to
-land within two seconds of the first to count as the same one.
+ctrl+c never leaves. It is pressed while work is going on, and what it ends is that work: the
+conversation on the screen is closed under its turn, so the flow reads the turn as one that
+failed — the same thing it would have read had the agent fallen over by itself. A flow that
+catches its own turns carries on from there; one that does not stops there. The rest of the
+flow is left running, ten conversations being what a flow may have open and one of them being
+what is on the screen. esc is what stops all of it, and `/exit` is what leaves.
 
 Focus cannot leave the editor. There is nowhere else for it to go — which is why tab and
 shift+tab are free to read the conversations. While a sheet is up over the interface they are
@@ -614,7 +618,7 @@ would be a guess about the background it lands on.
 - **Run two flows at once.** `/flow`, `/agents` and `/config` are all refused while one is
   running, in red: `no choosing a flow while a flow is running: esc stops it first`.
 - **Guess at a bad line.** A line it cannot carry out is shown and the interface stays up. Only
-  `/exit` and two ctrl+c close it.
+  `/exit` closes it.
 - **Ask the flow anything.** What is drawn beside and under the transcript is kept from the
   turns going past. A flow is a Python file that may branch any way it likes, so that is the
   only place a run is ever visible.

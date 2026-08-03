@@ -731,7 +731,8 @@ do.
 A flow ends when `run` returns — most of the built-in ones never do, and are ended from
 outside:
 
-- **esc**, or ctrl+c with nothing half-typed, in the interface.
+- **esc** in the interface. (ctrl+c there ends one turn rather than the flow: the conversation
+  being read is closed under its turn, which the flow reads as a turn that failed.)
 - **ctrl+c** on a `hmz exec` command line.
 - **`agent.stop()`** from anywhere.
 

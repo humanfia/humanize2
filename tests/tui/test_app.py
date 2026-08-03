@@ -46,6 +46,22 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     Path("said.txt").write_text(session(task) + "\\n")
 """
 
+#: A flow that catches its own turn, so that a turn ended by hand can be seen for what it
+#: leaves behind: what the call answered with, and whether the agent was stopped along with it.
+CATCHING = """
+from pathlib import Path
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    session = agents[0].new()
+    said = session(task, suppress=True)
+    Path("said.txt").write_text(f"{said!r} {agents[0].stopped}\\n")
+"""
+
 #: The same flow written as a coroutine, which the interface runs exactly as it runs the
 #: other kind: on a thread of its own, with the agents it was handed reaching back here.
 AWAITED = """
@@ -768,8 +784,8 @@ async def test_away_means_the_agent_is_told_nobody_is_there_rather_than_waiting(
 
 
 @pytest.mark.timeout(60)
-async def test_ctrl_c_takes_back_the_nearest_thing_and_leaves_on_two() -> None:
-    """As a coding agent's terminal does: the line, then the flow, then the interface."""
+async def test_ctrl_c_takes_back_the_line_and_never_the_interface() -> None:
+    """The nearest thing there is to take back, and leaving is not one of them."""
     app = Humanize()
     async with app.run_test() as driver:
         from hmz.tui.app import Editor
@@ -786,28 +802,36 @@ async def test_ctrl_c_takes_back_the_nearest_thing_and_leaves_on_two() -> None:
         await driver.press("ctrl+c")
         await driver.pause()
 
-    assert not app.is_running  # two in a row, and it leaves
+        assert app.is_running  # with nothing left to take back it stays up
 
 
 @pytest.mark.timeout(90)
-async def test_ctrl_c_with_nothing_half_typed_stops_the_flow(workspace: Path) -> None:
-    """With no line to take back, the nearest thing there is to take back is the run."""
-    (workspace / "flow.py").write_text(FLOW)
+async def test_ctrl_c_ends_the_turn_being_read_and_the_flow_reads_it_as_failed(
+    workspace: Path,
+) -> None:
+    """With no line to take back, what it takes back is the turn on the screen.
+
+    Which the flow gets as a turn that failed, exactly as it would have had the agent
+    fallen over by itself: one that catches its own turns carries on, and the agents it was
+    handed are still there to take the next one.
+    """
+    (workspace / "flow.py").write_text(CATCHING)
     app = Humanize()
     async with app.run_test() as driver:
         app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
         await driver.press(*"start")
         await driver.press("enter")
-        await until(
-            lambda: bool(app._agents and any(agent.sessions for agent in app._agents)),
-            driver,
-        )
+        await until(lambda: app._interrupting() is not None, driver)
 
         await driver.press("ctrl+c")
-        await until(lambda: not app._agents, driver)
+        await until((workspace / "said.txt").exists, driver)
 
-        assert "stopping the flow" in _transcript(app)
-        assert app.is_running  # and one press stops the flow rather than the interface
+        assert "interrupting the turn" in _transcript(app)
+        assert app.is_running  # the turn, rather than the interface
+
+    # The turn came back as a failed one and was caught, and the agent it was taken on was
+    # left to take another: only the conversation was ended, not the run.
+    assert (workspace / "said.txt").read_text().strip() == "'' False"
 
 
 @pytest.mark.timeout(60)
