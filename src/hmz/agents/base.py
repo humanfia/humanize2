@@ -691,7 +691,7 @@ class SessionBase(ABC):
                 # for. On the prompt as it is sent rather than on the one the hooks and the
                 # transcript see, which is the flow's own words: a schema in the transcript
                 # is the plumbing showing through.
-                for event in self._stream(
+                for event in self._falling_back(
                     self._shaped_ask(prompt, schema), schema=schema
                 ):
                     if event.kind == "result":
@@ -715,6 +715,50 @@ class SessionBase(ABC):
                 prompt, again = stopping.because, again + 1
         finally:
             self._heard(Event(kind="ends", text=""))
+
+    def _falling_back(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """One turn, run again under another account where the first one's account failed.
+
+        A provider goes down -- a key revoked, a gateway refusing, a subscription out of
+        quota -- and what a flow sees is a turn that failed. Where an account of that backend
+        has been marked as the one to fall back to, the turn is run again under it rather
+        than handed back as a failure: the conversation is the backend's own and is named by
+        an id, so the same session carries on under the other account.
+
+        Only once: the agent moves to the other account and stays there, so an account that
+        fails twice is a run to stop rather than one to keep moving. What the failed attempt
+        already put on the transcript stays there -- it is how somebody reading it finds out
+        the account went down and the turn was run again somewhere else.
+
+        Args:
+          prompt: The input prompt for this turn, as the backend is to be given it.
+          schema: The shape to answer in, or None.
+
+        Yields:
+          What the agent said, in the order it said it.
+
+        Raises:
+            subprocess.CalledProcessError: If the turn failed and there was nowhere to move
+              to, or if it failed again under the account it moved to.
+        """
+        try:
+            yield from self._stream(prompt, schema=schema)
+        except subprocess.CalledProcessError:
+            instead = self._agent.falls_back()
+            if instead is None:
+                raise
+            self._heard(
+                Event(
+                    kind="tool",
+                    text=f"{self._agent.backend} failed; carrying on as {instead.name}",
+                )
+            )
+            self._agent.fall_back(instead)
+        else:
+            return
+        yield from self._stream(prompt, schema=schema)
 
     def _shaped_ask(self, prompt: str, schema: type[BaseModel] | None) -> str:
         """The prompt as the backend is to be given it, shape and all.
@@ -1643,6 +1687,9 @@ class AgentBase(ABC):
         self._anchor: AnchorConfig | None = None
         # The account its turns run as, once the first of them has looked it up.
         self._provider: Provider | None = None
+        #: The account this agent moved to when its own failed, and None while it is still
+        #: running as the one it was configured with.
+        self._fell_back: Provider | None = None
         self._starting = threading.Lock()
 
     @property
@@ -1856,6 +1903,10 @@ class AgentBase(ABC):
             find the account it was told to run as must not quietly run as the one whoever
             started it happens to be signed in as.
         """
+        if self._fell_back is not None:
+            # A turn whose own account failed carries on under this one, and every turn after
+            # it does too: the account that went down is not one to try again each turn.
+            return self._fell_back
         if not self._config.provider:
             return None
         with self._starting:
@@ -1870,6 +1921,34 @@ class AgentBase(ABC):
                     )
                 self._provider = found
             return self._provider
+
+    def falls_back(self) -> Provider | None:
+        """The account a turn of this agent carries on under, once its own has failed.
+
+        Marked on the account rather than on the agent: it is the account that goes down, and
+        whichever agent was running under one when it did is the agent that needs somewhere
+        else to run. Nothing at all where none is marked, or where this agent is already
+        running under the one that was.
+
+        Returns:
+          The account to move to, or None where there is nowhere to move.
+        """
+        from hmz import providers
+
+        if self._fell_back is not None:
+            return None  # already moved: a fallback that failed is not somewhere to go
+        found = providers.falls_back(self.backend)
+        if found is None:
+            return None
+        return None if found.name == self._config.provider else found
+
+    def fall_back(self, provider: Provider) -> None:
+        """Runs every turn from here on under another account.
+
+        Args:
+          provider: The account to run as.
+        """
+        self._fell_back = provider
 
     def environment(self) -> Mapping[str, str]:
         """What this agent's turns are run with, on top of the environment they inherit.

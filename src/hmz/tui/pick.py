@@ -2973,6 +2973,8 @@ _LOGIN = "login"
 _REMOVE = "remove"
 #: Not a thing done to an account: a CLI of your own for accounts to be made against.
 _SPEAKS = "speaks"
+#: Nor is this: a mark on one, saying where a turn goes when another account fails.
+_FALLBACK = "fallback"
 
 
 class Providers(Sheet[Doing]):
@@ -2999,6 +3001,8 @@ class Providers(Sheet[Doing]):
         Binding("r", "drop", "take away", priority=True),
         # And the one thing here that is not an account: a CLI of your own to run them on.
         Binding("c", "speaks", "add an ACP CLI", priority=True),
+        # What happens to an account when the one an agent was running under goes down.
+        Binding("f", "fallback", "as fallback", priority=True),
     ]
 
     def __init__(self) -> None:
@@ -3089,6 +3093,12 @@ class Providers(Sheet[Doing]):
     def action_speaks(self) -> None:
         """Answers that a CLI of your own is to be added, which the interface asks for."""
         self.dismiss(Doing(_SPEAKS))
+
+    def action_fallback(self) -> None:
+        """Switches whether the account under the cursor is the one to fall back to."""
+        cli, _, name = self._was.partition("/")
+        if cli and name:
+            self.dismiss(Doing(_FALLBACK, cli, name))
 
     def action_again(self) -> None:
         """Answers that the one under the cursor is to be signed in again."""

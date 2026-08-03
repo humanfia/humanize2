@@ -2012,7 +2012,9 @@ class Humanize(App[None]):
                 return
             # The three words `hmz providers` uses for the same three things, which is where
             # the sheet took them from: one vocabulary for one list of things to do.
-            if doing.what == "speaks":
+            if doing.what == "fallback":
+                self._mark_fallback(doing.cli, doing.name)
+            elif doing.what == "speaks":
                 await self._add_speaking()
             elif doing.what == "add":
                 await self._make_provider()
@@ -2020,6 +2022,29 @@ class Humanize(App[None]):
                 await self._sign_provider_in(doing.cli, doing.name)
             else:
                 self._drop_provider(doing.cli, doing.name)
+
+    def _mark_fallback(self, cli: str, name: str) -> None:
+        """Switches whether one account is where a turn goes when another one fails.
+
+        Args:
+          cli: The backend the account is for.
+          name: Which account.
+        """
+        from hmz import providers
+
+        found = providers.find(cli, name)
+        if found is None:
+            return
+        providers.marks(cli, name, fallback=not found.fallback)
+        self.show(
+            f"[dim]{escape(cli)}/{escape(name)} is "
+            + (
+                "where a turn goes when another account fails"
+                if not found.fallback
+                else "no longer a fallback"
+            )
+            + "[/dim]"
+        )
 
     async def _add_speaking(self) -> None:
         """Asks for a CLI of your own that speaks ACP, and writes it down as a backend.

@@ -34,6 +34,26 @@ name the interface shows. The classes keep the product's own full name.
 | whatever you added | `AcpAgent` | `AcpAgentConfig` | `AcpSession` |
 | you | `HumanAgent` | — (takes only `name=`) | `HumanSession` |
 
+## When an account goes down
+
+An account can be marked as the one to fall back to: `/providers`, cursor on it, then **f**.
+A key gets revoked, a gateway starts refusing, a subscription runs out of quota — and what a
+flow would otherwise see is a turn that failed.
+
+With one marked, a turn whose own account fails is run again under it, on the **same**
+conversation: the session is the backend's own and is named by an id, so the other account
+picks it up where the first left off. The agent stays there for every turn after — an account
+that has gone down is not one to try again each turn — and an account that fails twice raises,
+because a fallback that failed is not somewhere to go.
+
+The mark is on the account rather than on the agent: it is the account that goes down, and
+whichever agent was running under one when it did is the agent that needs somewhere else to
+run. Only one account per backend is marked, since a fallback is where a turn goes and two of
+them is two places. It is written down beside the account, so it outlives the run.
+
+What the failed attempt already put on the transcript stays there — it is how somebody reading
+it finds out the account went down and the turn was run again somewhere else.
+
 ## A CLI of your own
 
 Any coding agent that speaks the [Agent Client Protocol](https://agentclientprotocol.com) can

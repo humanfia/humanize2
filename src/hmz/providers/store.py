@@ -17,7 +17,7 @@ import json
 import os
 import re
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -26,7 +26,17 @@ from hmz import backends, home
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-__all__ = ["ENV", "Provider", "add", "find", "providers", "ways", "where"]
+__all__ = [
+    "ENV",
+    "Provider",
+    "add",
+    "falls_back",
+    "find",
+    "marks",
+    "providers",
+    "ways",
+    "where",
+]
 
 #: What a provider may be called: a name that is one path component, holds nothing a shell or
 #: a filesystem reads as something else, and cannot climb out of the directory it names.
@@ -79,6 +89,10 @@ class Provider:
       env: What a turn run under it is given on top of the environment it inherits.
       args: What to add to the backend's own command line for such a turn.
       made: When it was made, as the moment written down.
+      fallback: Whether a turn whose own account failed carries on under this one. A
+        property of the account rather than of the agent: it is the account that goes down,
+        and whichever agent was running under one when it did is the agent that needs
+        somewhere else to run.
     """
 
     cli: str
@@ -87,6 +101,7 @@ class Provider:
     env: Mapping[str, str] = field(default_factory=dict[str, str])
     args: tuple[str, ...] = ()
     made: str = ""
+    fallback: bool = False
 
     @property
     def at(self) -> Path:
@@ -144,6 +159,7 @@ class Provider:
             "env": dict(self.env),
             "args": list(self.args),
             "made": self.made,
+            "fallback": self.fallback,
         }
 
 
@@ -221,6 +237,53 @@ def find(cli: str, name: str) -> Provider | None:
     if profile is None or not _NAMED.match(name):
         return None
     return _read(profile.name, under() / profile.name / name)
+
+
+def falls_back(cli: str) -> Provider | None:
+    """The account a turn of this backend carries on under when its own fails.
+
+    Args:
+      cli: The backend, by any name it answers to.
+
+    Returns:
+      The first account of that backend marked as a fallback, in the order they are kept, or
+      None where none is. One rather than a chain: a second account is somewhere to go when
+      the first is down, and a queue of them is a run nobody is watching go wrong.
+    """
+    return next((one for one in providers(cli) if one.fallback), None)
+
+
+def marks(cli: str, name: str, *, fallback: bool) -> bool:
+    """Marks an account as the one to fall back to, or stops it being that.
+
+    Only one at a time: marking a second unmarks the first, since a fallback is where a turn
+    goes and two of them is two places.
+
+    Args:
+      cli: The backend it is for.
+      name: Which account.
+      fallback: What to set it to.
+
+    Returns:
+      Whether there was an account of that name to mark.
+    """
+    found = find(cli, name)
+    if found is None:
+        return False
+    for one in providers(cli):
+        if one.fallback and (one.name != name or not fallback):
+            _write(replace(one, fallback=False))
+    _write(replace(found, fallback=fallback))
+    return True
+
+
+def _write(provider: Provider) -> None:
+    """Writes one provider down again, whole, where it already lives."""
+    at = provider.at
+    _kept(at)
+    beside = at / f".{_HELD}.new"
+    beside.write_text(json.dumps(provider.held(), indent=2) + "\n", encoding="utf-8")
+    beside.replace(at / _HELD)
 
 
 def add(
@@ -369,6 +432,7 @@ def _read(cli: str, at: Path) -> Provider | None:
         if isinstance(args, list)
         else (),
         made=str(held.get("made") or ""),
+        fallback=bool(held.get("fallback")),
     )
 
 
