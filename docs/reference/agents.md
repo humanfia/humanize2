@@ -16,20 +16,27 @@ from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high"))
 ```
 
+A backend is named here by the command it is installed as, which is the name `-a` takes and the
+name the interface shows. The classes keep the product's own full name.
+
 | Backend | Agent | Config | Session |
 | --- | --- | --- | --- |
-| Claude Code | `ClaudeCodeAgent` | `ClaudeCodeAgentConfig` | `ClaudeCodeSession` |
-| Codex | `CodexAgent` | `CodexAgentConfig` | `CodexSession` |
-| DeepSeek Harness | `DshAgent` | `DshAgentConfig` | `DshSession` |
-| Kimi Code | `KimiCodeCLIAgent` | `KimiCodeCLIAgentConfig` | `KimiCodeCLISession` |
-| pi | `PiAgent` | `PiAgentConfig` | `PiSession` |
-| opencode | `OpencodeAgent` | `OpencodeAgentConfig` | `OpencodeSession` |
-| mimocode | `MimoCodeAgent` | `MimoCodeAgentConfig` | `MimoCodeSession` |
+| `claude` | `ClaudeCodeAgent` | `ClaudeCodeAgentConfig` | `ClaudeCodeSession` |
+| `codex` | `CodexAgent` | `CodexAgentConfig` | `CodexSession` |
+| `dsh` | `DshAgent` | `DshAgentConfig` | `DshSession` |
+| `grok` | `GrokBuildAgent` | `GrokBuildAgentConfig` | `GrokBuildSession` |
+| `kimi` | `KimiCodeCLIAgent` | `KimiCodeCLIAgentConfig` | `KimiCodeCLISession` |
+| `pi` | `PiAgent` | `PiAgentConfig` | `PiSession` |
+| `qwen` | `QwenCodeAgent` | `QwenCodeAgentConfig` | `QwenCodeSession` |
+| `opencode` | `OpencodeAgent` | `OpencodeAgentConfig` | `OpencodeSession` |
+| `mimo` | `MimoCodeAgent` | `MimoCodeAgentConfig` | `MimoCodeSession` |
 | you | `HumanAgent` | — (takes only `name=`) | `HumanSession` |
 
-pi, opencode and mimocode name a model as `provider/id` — `openai-codex/gpt-5.5`,
+`pi`, `opencode` and `mimo` name a model as `provider/id` — `openai-codex/gpt-5.5`,
 `opencode/big-pickle`, `xiaomi/mimo-v2.5` — because a model there belongs to the provider that
-serves it, and the CLI is asked for the pair.
+serves it, and the CLI is asked for the pair. `qwen` names whatever id the OpenAI-compatible
+endpoint behind it serves, and `grok` names one out of its own catalogue: `grok models` lists
+them.
 
 DeepSeek Harness is an optional Python SDK backend. Install it with the `dsh` extra as shown
 in [Installation](/guide/installation#install-humanize). It supports API-key login only:
@@ -522,12 +529,22 @@ against a list, so a value your account has and this page does not still works.
 
 | Backend | Efforts |
 | --- | --- |
-| Claude Code | `low`, `medium`, `high`, `xhigh`, `max`, and `ultracode` |
-| Codex | `low`, `medium`, `high`, `xhigh`, and `max`/`ultra` on the models that take them |
-| DeepSeek Harness | `off`, `high`, `max` |
-| Kimi Code | `low`, `medium`, `high`, `max`, each also as `swarm…` |
-| pi | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
-| opencode, mimocode | the model variant: `minimal`, `low`, `medium`, `high`, `xhigh` |
+| `claude` | `low`, `medium`, `high`, `xhigh`, `max`, and `ultracode` |
+| `codex` | `low`, `medium`, `high`, `xhigh`, and `max`/`ultra` on the models that take them |
+| `dsh` | `off`, `high`, `max` |
+| `grok` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` — the levels the model itself advertises |
+| `kimi` | `low`, `medium`, `high`, `max`, each also as `swarm…` |
+| `pi` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
+| `qwen` | `low`, `medium`, `high`, `xhigh`, `max` |
+| `opencode`, `mimo` | the model variant: `minimal`, `low`, `medium`, `high`, `xhigh` |
+
+**Grok Build refuses a level the model does not advertise** rather than ignoring it, so a turn
+asked for one fails with the list of the ones that model takes. The shipped models take
+`low`, `medium`, `high` and `xhigh`.
+
+**Qwen Code has no flag for the effort.** It is a setting of its own `settings.json`, so a turn
+is pointed at a file of humanize's own through `QWEN_CODE_SYSTEM_SETTINGS_PATH` — two agents of
+one flow may think at two efforts, and neither is a reason to rewrite what you have configured.
 
 **`ultracode`** is Claude Code's `xhigh` thinking with the turn opted into orchestrating a fleet
 of its own. It is more work than any single-agent effort, which is why it sits above `max`.
@@ -622,13 +639,14 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 
 ## What each backend can do
 
-| | Claude Code | Codex | DeepSeek Harness | Kimi Code | pi | opencode, mimocode |
-| --- | --- | --- | --- | --- | --- | --- |
-| Driven through | its command line, held open | its app server | its Python SDK | its app server | its command line, held open | its command line, one run per turn |
-| [`interject`](#talking-to-a-turn-already-running) | yes — answered within the same turn | yes — a steer on the running turn | no | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended |
-| [`pursue`](#goals) | yes | yes | yes | yes | no | no |
-| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | yes | yes | no | no | no | no |
-| Sub-agents in a trace | yes | yes | no | yes | no | no |
+| | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Driven through | its command line, held open | its app server | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, one run per turn | its command line, one run per turn |
+| [`interject`](#talking-to-a-turn-already-running) | yes — answered within the same turn | yes — a steer on the running turn | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended | no — a run per turn has ended |
+| [`pursue`](#goals) | yes | yes | yes | no | yes | no | no | no |
+| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | yes | yes | no | no | no | no | no | no |
+| A turn held to a shape | in the prompt | `outputSchema` | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt |
+| Sub-agents in a trace | yes | yes | no | no | yes | no | no | no |
 
 DeepSeek Harness currently accepts only `permission="bypass"` and `skills=None`. Its preview
 SDK exposes neither a per-session sandbox/approval control nor exact per-agent skill selection;
@@ -716,12 +734,12 @@ interface it is made on `/agents` with `ctrl+p`.
 Every backend has a ladder of its own and none of them has the same four rungs, so each driver
 reaches for whichever of its own settings says the same thing:
 
-| Rung | Claude Code | Codex | DeepSeek Harness | Kimi Code | pi | opencode, mimocode |
-| --- | --- | --- | --- | --- | --- | --- |
-| `read-only` | `plan` mode | `read-only` sandbox | — | plan mode | without `bash`, `edit`, `write` | `edit` and `bash` denied |
-| `workspace-write` | `acceptEdits` mode | `workspace-write` sandbox | — | plan mode off | — | `webfetch` denied |
-| `auto` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | — | nothing denied |
-| `bypass` | `bypassPermissions` | `danger-full-access` | supported | `yolo` mode | — | — |
+| Rung | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `read-only` | `plan` mode | `read-only` sandbox | — | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied |
+| `workspace-write` | `acceptEdits` mode | `workspace-write` sandbox | — | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied |
+| `auto` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | — | — | — | nothing denied |
+| `bypass` | `bypassPermissions` | `danger-full-access` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one. Where a backend cannot tell two rungs apart it says so

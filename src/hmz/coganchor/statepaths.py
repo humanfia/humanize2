@@ -43,8 +43,16 @@ PROFILES: tuple[AgentProfile, ...] = (
         state_paths=("~/.dsh",),
     ),
     AgentProfile(
+        name="grok",
+        state_paths=("~/.grok",),
+    ),
+    AgentProfile(
         name="kimi",
         state_paths=("~/.kimi-code", "~/.kimi"),
+    ),
+    AgentProfile(
+        name="qwen",
+        state_paths=("~/.qwen",),
     ),
     AgentProfile(
         name="pi",

@@ -18,12 +18,16 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import (
+    GrokBuildAgent,
+    GrokBuildAgentConfig,
     MimoCodeAgent,
     MimoCodeAgentConfig,
     OpencodeAgent,
     OpencodeAgentConfig,
     PiAgent,
     PiAgentConfig,
+    QwenCodeAgent,
+    QwenCodeAgentConfig,
 )
 from hmz.machines import AnchoredConfig
 from tests.stubs import HereAnchor
@@ -34,6 +38,8 @@ if TYPE_CHECKING:
 PI = PiAgentConfig(model="openai-codex/gpt-5.5", effort="high")
 OPENCODE = OpencodeAgentConfig(model="opencode/big-pickle", effort="high")
 MIMO = MimoCodeAgentConfig(model="xiaomi/mimo-v2.5", effort="low")
+QWEN = QwenCodeAgentConfig(model="qwen3-coder-plus", effort="xhigh")
+GROK = GrokBuildAgentConfig(model="grok-4.6", effort="xhigh")
 
 #: A `pi --mode rpc`: it names the session it was given, then answers each command written to
 #: it with the events one agent run is made of. A prompt of `boom` is refused outright and one
@@ -171,6 +177,87 @@ out("step_finish", {"id": "prt_two", "type": "step-finish", "reason": "stop",
 """
 
 
+#: A `qwen`: it takes the prompt on stdin and answers in the records of one turn, which are
+#: the ones Claude Code's own `stream-json` is made of. A prompt of `boom` comes back as a
+#: result that says it errored, with the exit status still zero, which is how this backend
+#: reports a turn it could not finish; one of `quiet` says nothing at all.
+_QWEN = """
+import json, os, pathlib, sys
+
+log = pathlib.Path(LOG)
+said = sys.stdin.read()
+flags = dict(zip(sys.argv, sys.argv[1:]))
+settings = os.environ.get("QWEN_CODE_SYSTEM_SETTINGS_PATH")
+thinking = pathlib.Path(settings).read_text() if settings else None
+with log.open("a") as stream:
+    json.dump({"argv": sys.argv[1:], "stdin": said, "thinking": thinking,
+               "inherited": os.environ.get("A_THING_THE_FLOW_HAS")}, stream)
+    stream.write("\\n")
+
+session = flags.get("--resume", "ses-qwen-stub")
+
+
+def out(record):
+    print(json.dumps({"session_id": session, **record}), flush=True)
+
+
+if said == "quiet":
+    sys.exit(0)
+out({"type": "system", "subtype": "init", "model": flags.get("--model")})
+if said == "boom":
+    out({"type": "result", "subtype": "error_during_execution", "is_error": True,
+         "result": "", "error": {"message": "qwen would not take it"},
+         "usage": {"input_tokens": 1, "output_tokens": 0}})
+    sys.exit(0)
+out({"type": "assistant", "message": {"id": "msg_1", "role": "assistant", "content": [
+    {"type": "thinking", "thinking": "thinking about " + said},
+    {"type": "tool_use", "id": "call_1", "name": "run_shell_command",
+     "input": {"command": "echo " + said}},
+    {"type": "text", "text": said}],
+    "usage": {"input_tokens": 5, "output_tokens": 2, "cache_read_input_tokens": 1}}})
+out({"type": "result", "subtype": "success", "is_error": False, "result": said,
+     "usage": {"input_tokens": 2, "output_tokens": 1}})
+"""
+
+#: A `grok -p`: the prompt is inside the command line, and it answers in the lines of one
+#: turn, tagged by `type` and ending on the `end` that names the session. A prompt of `boom`
+#: comes back as an error line with the exit status still zero; one of `quiet` says nothing.
+_GROK = """
+import json, os, pathlib, sys
+
+log = pathlib.Path(LOG)
+argv = sys.argv[1:]
+said = next((one.partition("=")[2] for one in argv if one.startswith("--single=")), "")
+flags = dict(zip(sys.argv, sys.argv[1:]))
+with log.open("a") as stream:
+    json.dump({"argv": argv, "stdin": said,
+               "inherited": os.environ.get("A_THING_THE_FLOW_HAS")}, stream)
+    stream.write("\\n")
+
+session = flags.get("--resume", "ses-grok-stub")
+
+
+def out(line):
+    print(json.dumps(line), flush=True)
+
+
+if said == "quiet":
+    sys.exit(0)
+if said == "boom":
+    out({"type": "error", "message": "grok would not take it"})
+    sys.exit(0)
+out({"type": "thought", "data": "thinking about " + said})
+out({"type": "tool_call", "toolCallId": "call_1", "toolName": "run_terminal_cmd",
+     "kind": "execute", "status": "in_progress", "title": "echo " + said,
+     "rawInput": {"command": "echo " + said}})
+out({"type": "tool_call_update", "toolCallId": "call_1", "status": "completed"})
+out({"type": "text", "data": said})
+out({"type": "usage", "messageId": "resp_1", "stopReason": "end_turn",
+     "usage": {"input_tokens": 5, "output_tokens": 2, "cache_read_input_tokens": 1}})
+out({"type": "end", "stopReason": "end_turn", "sessionId": session, "num_turns": 1})
+"""
+
+
 @dataclass(frozen=True)
 class _Call:
     """One invocation of a stand-in CLI: what it was asked for, and what it was fed."""
@@ -181,6 +268,9 @@ class _Call:
     allowed: str | None = None
     #: Something the flow itself had in its environment, which a turn is run with too.
     inherited: str | None = None
+    #: The settings file a turn was pointed at, for the backend whose effort is written down
+    #: rather than given as a flag.
+    thinking: str | None = None
 
 
 @dataclass(frozen=True)
@@ -209,6 +299,8 @@ def stubs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _Stubs:
     _install(binaries, "pi", _PI, log)
     _install(binaries, "opencode", _OPENCODE, log)
     _install(binaries, "mimo", _OPENCODE, log)
+    _install(binaries, "qwen", _QWEN, log)
+    _install(binaries, "grok", _GROK, log)
     monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
     return _Stubs(log)
 
@@ -473,3 +565,136 @@ def test_a_turn_runs_in_the_flows_own_environment_and_what_it_is_told(
     (call,) = stubs.calls()
     assert call.inherited == "kept"
     assert call.allowed is not None
+
+
+def test_qwen_is_one_run_per_turn_resuming_the_session_it_opened(
+    stubs: _Stubs,
+) -> None:
+    """The first turn opens the conversation; every later one resumes the id it reported."""
+    session = QwenCodeAgent(QWEN).new()
+    assert session("hi") == "hi"
+    assert session("again") == "again"
+
+    opened, again = stubs.calls()
+    # The prompt goes on stdin: a paragraph that may open with a dash is not a command line.
+    assert opened.stdin == "hi"
+    assert "--resume" not in opened.argv
+    assert "--output-format" in opened.argv
+    assert opened.argv[opened.argv.index("--model") + 1] == "qwen3-coder-plus"
+    assert again.argv[again.argv.index("--resume") + 1] == session.id
+
+
+def test_qwen_says_what_the_turn_did_and_what_it_cost(stubs: _Stubs) -> None:
+    """The tools it reached for and the thinking on the way, and every request counted."""
+    said = list(QwenCodeAgent(QWEN).new().stream("hi"))
+
+    kinds = [event.kind for event in said]
+    assert kinds == ["reasoning", "tool", "text", "result"]
+    assert "run_shell_command echo hi" in said[1].text
+    # Both requests of the turn, the message and the result it ended on.
+    assert said[-1].spent.total == 11
+    assert said[-1].tokens == {"qwen3-coder-plus": 11}
+
+
+def test_qwen_is_told_how_hard_to_think_in_a_settings_file_of_its_own(
+    stubs: _Stubs,
+) -> None:
+    """It has no flag for the effort, and the user's own settings are not ours to write."""
+    assert QwenCodeAgent(QWEN).new()("hi") == "hi"
+
+    (call,) = stubs.calls()
+    assert call.thinking is not None
+    assert json.loads(call.thinking)["model"]["reasoningEffort"] == "xhigh"
+
+
+def test_qwen_is_given_no_tools_that_change_anything_when_it_may_change_nothing(
+    stubs: _Stubs,
+) -> None:
+    """The rung is said as refusals: the approval mode carries everything left."""
+    session = QwenCodeAgent(
+        QwenCodeAgentConfig(model="m", effort="high", permission="read-only")
+    ).new()
+    assert session("hi") == "hi"
+
+    (call,) = stubs.calls()
+    withheld = call.argv[call.argv.index("--exclude-tools") + 1]
+    assert "run_shell_command" in withheld
+    assert "write_file" in withheld
+
+
+def test_qwen_reports_a_result_that_errored_as_a_failed_turn(stubs: _Stubs) -> None:
+    """It leaves zero for a turn it could not finish and says so in its own records."""
+    with pytest.raises(subprocess.CalledProcessError) as raised:
+        QwenCodeAgent(QWEN).new()("boom")
+    assert "would not take it" in str(raised.value.stderr)
+
+
+def test_qwen_that_said_nothing_at_all_is_a_failed_turn(stubs: _Stubs) -> None:
+    with pytest.raises(subprocess.CalledProcessError):
+        QwenCodeAgent(QWEN).new()("quiet")
+
+
+def test_grok_is_one_run_per_turn_resuming_the_session_it_opened(
+    stubs: _Stubs,
+) -> None:
+    """Its prompt is inside the command line: Grok Build does not read one off stdin."""
+    session = GrokBuildAgent(GROK).new()
+    assert session("hi") == "hi"
+    assert session("again") == "again"
+
+    opened, again = stubs.calls()
+    # Written onto the flag, so that a prompt opening with a dash is still a prompt.
+    assert "--single=hi" in opened.argv
+    assert opened.argv[opened.argv.index("--effort") + 1] == "xhigh"
+    assert "--yolo" in opened.argv
+    assert again.argv[again.argv.index("--resume") + 1] == session.id
+
+
+def test_grok_says_what_the_turn_did_and_what_it_cost(stubs: _Stubs) -> None:
+    """A tool is shown as it starts rather than once per status it passes through."""
+    said = list(GrokBuildAgent(GROK).new().stream("hi"))
+
+    kinds = [event.kind for event in said]
+    assert kinds == ["reasoning", "tool", "text", "result"]
+    assert "run_terminal_cmd echo hi" in said[1].text
+    assert said[-1].spent.total == 8
+    assert said[-1].tokens == {"grok-4.6": 8}
+
+
+def test_grok_is_given_only_what_it_may_read_when_it_may_change_nothing(
+    stubs: _Stubs,
+) -> None:
+    """An allowlist rather than refusals: it is the only way a tool cannot run at all."""
+    session = GrokBuildAgent(
+        GrokBuildAgentConfig(model="m", effort="high", permission="read-only")
+    ).new()
+    assert session("hi") == "hi"
+
+    (call,) = stubs.calls()
+    assert call.argv[call.argv.index("--tools") + 1] == "read_file,grep,list_dir"
+
+
+def test_grok_reports_an_error_line_as_a_failed_turn(stubs: _Stubs) -> None:
+    with pytest.raises(subprocess.CalledProcessError) as raised:
+        GrokBuildAgent(GROK).new()("boom")
+    assert "would not take it" in str(raised.value.stderr)
+
+
+def test_grok_that_said_nothing_at_all_is_a_failed_turn(stubs: _Stubs) -> None:
+    with pytest.raises(subprocess.CalledProcessError):
+        GrokBuildAgent(GROK).new()("quiet")
+
+
+def test_neither_qwen_nor_grok_can_be_talked_to_mid_turn(stubs: _Stubs) -> None:
+    """A run per turn has ended by the time there is anything to say to it."""
+    with pytest.raises(NotImplementedError):
+        QwenCodeAgent(QWEN).new().interject("hello?")
+    with pytest.raises(NotImplementedError):
+        GrokBuildAgent(GROK).new().interject("hello?")
+
+
+def test_neither_qwen_nor_grok_has_a_goal_feature(stubs: _Stubs) -> None:
+    with pytest.raises(NotImplementedError):
+        QwenCodeAgent(QWEN).new().pursue("the suite passes")
+    with pytest.raises(NotImplementedError):
+        GrokBuildAgent(GROK).new().pursue("the suite passes")

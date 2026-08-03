@@ -68,6 +68,15 @@ _ABOUT = " — "
 #: before there is a cache to read.
 _DSH_MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
 
+#: The same for Qwen Code, which has no command that lists what it runs: it is a client of an
+#: OpenAI-compatible endpoint, so the catalogue belongs to the account rather than to the CLI.
+#: These are what it ships pointed at; any other id that endpoint serves may be named instead.
+_QWEN_MODELS = ("qwen3-coder-plus", "qwen3-coder-flash")
+
+#: The backends whose catalogue is written down here rather than asked for, which is what a
+#: prompt offers before either has been asked.
+_ADVISORY = {"dsh": _DSH_MODELS, "qwen": _QWEN_MODELS}
+
 
 def where(cli: str, provider: str = "") -> Path:
     """Where what this backend said it runs is kept, for one account.
@@ -112,9 +121,10 @@ def offered(cli: str, provider: str = "") -> tuple[Model, ...]:
         for name, efforts, swarms in _read(_kept(cli, provider))
     )
     profile = named(cli)
-    if not found and profile is not None and profile.name == "dsh":
+    if not found and profile is not None and profile.name in _ADVISORY:
         return tuple(
-            Model(name, profile.efforts, profile.swarms) for name in _DSH_MODELS
+            Model(name, profile.efforts, profile.swarms)
+            for name in _ADVISORY[profile.name]
         )
     return found
 
@@ -405,7 +415,7 @@ def _dsh(profile: Profile, _run: Callable[..., str]) -> list[Model]:
     Returns:
       The official adapter's advisory models, in its own order.
     """
-    return [Model(name, profile.efforts, profile.swarms) for name in _DSH_MODELS]
+    return [Model(name, profile.efforts, profile.swarms) for name in _ADVISORY["dsh"]]
 
 
 def _pi(profile: Profile, run: Callable[..., str]) -> list[Model]:
@@ -433,6 +443,52 @@ def _pi(profile: Profile, run: Callable[..., str]) -> list[Model]:
             Model(f"{columns[0]}/{columns[1]}", profile.efforts, profile.swarms)
         )
     return found
+
+
+def _grok(profile: Profile, run: Callable[..., str]) -> list[Model]:
+    """Grok Build's catalogue, which it prints as a list with the default marked.
+
+    A banner about how it is signed in, then the default, then one model a line behind a
+    marker: a star for the one it would use and a dash for the rest. It fetches the live
+    catalogue to answer, so what comes back is what this account may actually name.
+
+    Args:
+      profile: Grok Build's own.
+      run: What puts the question.
+
+    Returns:
+      One per model it offers, at its own reasoning levels -- which it says of itself rather
+      than of each model, so a level a model does not advertise is refused when it is asked
+      for rather than left out here.
+    """
+    found: list[Model] = []
+    for line in run(["models"]).splitlines():
+        said = line.strip()
+        # The lines about a model are the only marked ones; the banner and the default are
+        # sentences, and a sentence is not a model.
+        if not said.startswith(("* ", "- ")):
+            continue
+        name = said[2:].removesuffix(" (default)").strip()
+        if name:
+            found.append(Model(name, profile.efforts, profile.swarms))
+    return found
+
+
+def _qwen(profile: Profile, _run: Callable[..., str]) -> list[Model]:
+    """What Qwen Code runs, which is whatever the endpoint behind it serves.
+
+    It has no command that lists them: it is an OpenAI-compatible client, so its catalogue is
+    the account's rather than the CLI's, and there is nothing to ask. These are the ids Qwen
+    Code itself ships pointed at, and any other id that endpoint serves may be named instead.
+
+    Args:
+      profile: Qwen Code's own.
+      _run: Unused, there being no question to put.
+
+    Returns:
+      The advisory models, in the order Qwen Code offers them.
+    """
+    return [Model(name, profile.efforts, profile.swarms) for name in _ADVISORY["qwen"]]
 
 
 def _listed(profile: Profile, run: Callable[..., str]) -> list[Model]:
@@ -545,8 +601,10 @@ _READING: dict[str, Callable[[Profile, Callable[..., str]], list[Model]]] = {
     "claude": _claude,
     "codex": _codex,
     "dsh": _dsh,
+    "grok": _grok,
     "kimi": _kimi,
     "pi": _pi,
+    "qwen": _qwen,
     "opencode": _listed,
     "mimo": _listed,
 }

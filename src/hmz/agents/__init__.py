@@ -24,12 +24,14 @@ from .config import (
 )
 from .dsh import DshAgent, DshAgentConfig, DshSession
 from .event import Event, Question, Stopped, Usage
+from .grok import GrokBuildAgent, GrokBuildAgentConfig, GrokBuildSession
 from .hooks import EVERYWHERE, Hook, Hooks, Hung, Moment, Occasion, Unhooked, Verdict
 from .human import HumanAgent, HumanSession
 from .kimi import SWARM, KimiCodeCLIAgent, KimiCodeCLIAgentConfig, KimiCodeCLISession
 from .mimo import MimoCodeAgent, MimoCodeAgentConfig, MimoCodeSession
 from .opencode import OpencodeAgent, OpencodeAgentConfig, OpencodeSession
 from .pi import PiAgent, PiAgentConfig, PiSession
+from .qwen import QwenCodeAgent, QwenCodeAgentConfig, QwenCodeSession
 
 #: What each coding agent CLI is driven by here, under the name a command line calls it.
 #: One table rather than one apiece: whoever reads an `-a` builds an agent from it, and
@@ -39,10 +41,12 @@ DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
     "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
     "codex": (CodexAgent, CodexAgentConfig),
     "dsh": (DshAgent, DshAgentConfig),
+    "grok": (GrokBuildAgent, GrokBuildAgentConfig),
     "kimi": (KimiCodeCLIAgent, KimiCodeCLIAgentConfig),
     "mimo": (MimoCodeAgent, MimoCodeAgentConfig),
     "opencode": (OpencodeAgent, OpencodeAgentConfig),
     "pi": (PiAgent, PiAgentConfig),
+    "qwen": (QwenCodeAgent, QwenCodeAgentConfig),
 }
 
 __all__ = [
@@ -66,6 +70,9 @@ __all__ = [
     "DshSession",
     "Event",
     "Goal",
+    "GrokBuildAgent",
+    "GrokBuildAgentConfig",
+    "GrokBuildSession",
     "Hook",
     "Hooks",
     "HumanAgent",
@@ -88,6 +95,9 @@ __all__ = [
     "PiAgentConfig",
     "PiSession",
     "Question",
+    "QwenCodeAgent",
+    "QwenCodeAgentConfig",
+    "QwenCodeSession",
     "Remote",
     "SessionBase",
     "Stopped",

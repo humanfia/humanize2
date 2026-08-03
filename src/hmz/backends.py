@@ -247,6 +247,15 @@ _PI = ("max", "xhigh", "high", "medium", "low", "minimal", "off")
 #: What the official DeepSeek adapter in DeepSeek Harness calls its reasoning levels.
 _DSH = ("max", "high", "off")
 
+#: What Grok Build calls its reasoning levels, hardest first. The canonical ladder it takes
+#: at `--effort`; a model of it advertises a menu of its own, which is some of these, and a
+#: level a model does not advertise is refused outright rather than ignored.
+_GROK = ("max", "xhigh", "high", "medium", "low", "minimal", "none")
+
+#: What Qwen Code calls its reasoning levels, hardest first. It has no flag for them -- they
+#: are a setting of its own `settings.json`, which is why a turn is pointed at one of ours.
+_QWEN = ("max", "xhigh", "high", "medium", "low")
+
 #: What opencode and mimocode call a reasoning effort: a variant of the model, given as
 #: `--variant`, and provider-specific. These are the ones the models they front take; a
 #: provider with no variants of its own takes the flag and ignores it.
@@ -472,6 +481,75 @@ PROFILES = (
         ),
     ),
     Profile(
+        name="grok",
+        aliases=("grok", "grok-build"),
+        home_var="GROK_HOME",
+        home_dir=".grok",
+        # A directory per session, under one per directory the work was done in: the id names
+        # the directory rather than a file, and `updates.jsonl` is the conversation itself --
+        # the others beside it are the plan, the rewind points and what it was told.
+        logs=("sessions/*/{ident}/updates.jsonl",),
+        efforts=_GROK,
+        # No skills named: Grok Build finds them in its own home, in the shared `.agents` and
+        # in the project, but offers no way of choosing between them for one run -- which of
+        # them are off is a line in its config file. A list nothing acts on is a list that lies.
+        #
+        # Two files: the accounts it has signed into, keyed by the way each was signed in, and
+        # the tokens its MCP servers handed back, which are somebody else's and kept apart.
+        creds=("auth.json", "mcp_credentials.json"),
+        ambient=(
+            "GROK_AUTH",
+            "GROK_AUTH_PATH",
+            "GROK_AUTH_PROVIDER_COMMAND",
+            "GROK_CLI_CHAT_PROXY_BASE_URL",
+            "GROK_CODE_XAI_API_KEY",
+            "GROK_DEFAULT_MODEL",
+            "GROK_MODELS_BASE_URL",
+            "GROK_MODELS_LIST_URL",
+            "GROK_OAUTH2_CLIENT_ID",
+            "GROK_OAUTH2_ISSUER",
+            "GROK_OIDC_CLIENT_ID",
+            "GROK_OIDC_ISSUER",
+            "GROK_XAI_API_BASE_URL",
+        ),
+        ways=(
+            Way(
+                name="login",
+                about="sign in to an xAI account, in a browser",
+                argv=("grok", "login"),
+            ),
+            Way(
+                name="device",
+                about="the same, from a machine with no browser on it",
+                argv=("grok", "login", "--device-auth"),
+            ),
+            Way(
+                name="key",
+                about="an xAI API key, from the console",
+                asks=(Asked(env="XAI_API_KEY", about="the API key", secret=True),),
+            ),
+            Way(
+                name="gateway",
+                about=_GATEWAY,
+                asks=(
+                    Asked(
+                        env="GROK_MODELS_BASE_URL",
+                        about="where it is, as a URL: its models are listed at /models",
+                    ),
+                    Asked(env="XAI_API_KEY", about="the key it takes", secret=True),
+                ),
+            ),
+            Way(
+                name="oidc",
+                about="your own identity provider, for an organisation that signs in through one",
+                asks=(
+                    Asked(env="GROK_OIDC_ISSUER", about="the issuer, as a URL"),
+                    Asked(env="GROK_OIDC_CLIENT_ID", about="the client id"),
+                ),
+            ),
+        ),
+    ),
+    Profile(
         name="kimi",
         aliases=("kimi", "kimi-code"),
         home_var="KIMI_CODE_HOME",
@@ -566,6 +644,55 @@ PROFILES = (
                 # pi signs in from inside itself, so the way in is pi, handed the terminal:
                 # `/login`, whichever provider, and `/exit` when it has landed.
                 argv=("pi",),
+            ),
+        ),
+    ),
+    Profile(
+        name="qwen",
+        aliases=("qwen", "qwen-code"),
+        home_var="QWEN_HOME",
+        home_dir=".qwen",
+        # One file per session, named for the session and nothing else, under a directory per
+        # directory the work was done in.
+        logs=("projects/*/chats/{ident}.jsonl",),
+        efforts=_QWEN,
+        # No skills named: it reads them from its own home, from the shared `.agents` and from
+        # the project, and has no flag that says which to load -- `settings.json` is where
+        # that is said, and a list nothing acts on is a list that lies.
+        #
+        # What its own sign-in leaves behind, and the lock two of its processes rotate the
+        # token under. Everything else it runs as is a variable.
+        creds=("oauth_creds.json", "oauth_creds.lock"),
+        ambient=(
+            "OPENAI_API_BASE",
+            "OPENAI_API_KEY",
+            "OPENAI_BASE_URL",
+            "OPENAI_MODEL",
+            "QWEN_API_KEY",
+            "QWEN_BASE_URL",
+            "QWEN_CODE_MODEL",
+            "QWEN_MODEL",
+            "QWEN_OAUTH_MODELS",
+        ),
+        ways=(
+            Way(
+                name="login",
+                about="sign in to a Qwen account, in a session opened for it",
+                # It signs in from inside itself, so the way in is qwen with the terminal
+                # handed over: `/auth`, whichever provider, and `/quit` when it has landed.
+                argv=("qwen",),
+            ),
+            Way(
+                name="key",
+                about="a key for the OpenAI-compatible endpoint it runs against",
+                asks=(
+                    Asked(env="OPENAI_API_KEY", about="the API key", secret=True),
+                    Asked(
+                        env="OPENAI_BASE_URL",
+                        about="where it is, as a URL",
+                        fixed="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                    ),
+                ),
             ),
         ),
     ),

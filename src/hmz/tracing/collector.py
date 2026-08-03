@@ -103,9 +103,14 @@ def collect(
     window = (bounds[0], bounds[1])
     collected: list[Session] = []
     for profile in backends.PROFILES:
+        reader = _READERS.get(profile.name)
         home = profile.directory()
-        if home.is_dir():
-            collected += _READERS[profile.name](home, root, names, window)
+        # Only the backends whose logs somebody has written a reader for: the rest keep their
+        # sessions somewhere this cannot read -- rows of a database, a format nobody has taken
+        # apart yet -- and a home directory being there is not a reason to fail the whole
+        # trace.
+        if reader is not None and home.is_dir():
+            collected += reader(home, root, names, window)
 
     named = {ident: name for name, opened in (agents or {}).items() for ident in opened}
     known = {item.key: item for item in collected}

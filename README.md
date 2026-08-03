@@ -50,8 +50,8 @@ npm install --global @deepseek-ai/dsh
 dsh web
 ```
 
-Needs Python ≥ 3.12 and at least one supported backend: `claude`, `codex`, `kimi`, `pi`,
-`opencode` or `mimo` on your PATH, or the `dsh` extra above. See
+Needs Python ≥ 3.12 and at least one supported backend: `claude`, `codex`, `grok`, `kimi`,
+`pi`, `qwen`, `opencode` or `mimo` on your PATH, or the `dsh` extra above. See
 [Installation](https://humanfia.github.io/humanize2/guide/installation).
 
 ## Usage
