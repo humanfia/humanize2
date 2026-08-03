@@ -24,7 +24,7 @@ from glob import glob
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, overload
 
-from .verses import BUILTIN, OFFICIAL, Flowverse, flowverses
+from .verses import BUILTIN, FLOWS, OFFICIAL, Flowverse, flowverses, holds
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 __all__ = [
     "BUILTIN",
     "BUILTIN_AT",
+    "FLOWS",
     "OFFICIAL",
     "Flow",
     "Flowverse",
@@ -41,13 +42,15 @@ __all__ = [
     "flowverses",
     "found",
     "held",
+    "holds",
     "loaded",
     "offers",
     "where",
 ]
 
-#: Where the flows humanize itself ships are: a directory of them, as a flowverse is, rather
-#: than beside this file -- what is beside this file is how a flow is found, which is not one.
+#: Where the flows humanize itself ships are: a directory of them, rather than beside this
+#: file -- what is beside this file is how a flow is found, which is not one. They are the
+#: whole of what is there, so there is no `flows/` in it to tell them from the rest.
 BUILTIN_AT = Path(__file__).parent / "builtin"
 
 #: What a flow's own name is separated from the one inside its file by. A file that holds one
@@ -280,16 +283,17 @@ def offers(one: Flowverse) -> list[Offer]:
       one that holds nothing, and is why :class:`Flowverse` says which it is.
 
     Note:
-      Reading a flow means running it, so every file in the flowverse is imported to find out
-      what it holds. Whoever added it is trusting that repository with this machine; this is
-      where that trust is spent.
+      Reading a flow means running it, so every file in the directory the flowverse holds its
+      flows in is imported to find out what it holds -- and nothing outside it, which is what
+      that directory is for. Whoever added it is trusting that repository with this machine;
+      this is where that trust is spent.
     """
     from .verses import flows as inside
 
     return [
         Offer(one.name, name if one.name == BUILTIN else f"{one.name}/{name}", said)
         for base in inside(one)
-        for name, said in _named(one.at / f"{base}.py", base)
+        for name, said in _named(holds(one) / f"{base}.py", base)
     ]
 
 
@@ -370,7 +374,7 @@ def find(named_: str) -> str:
         # Named outright -- `official/rlar` -- which is the one spelling that says which
         # flowverse, and so the one that cannot be stood in for by a flow of your own.
         for verse in flowverses():
-            beside = verse.at / f"{rest}.py"
+            beside = holds(verse) / f"{rest}.py"
             if whose == verse.name and beside.is_file():
                 return str(beside.resolve())
     else:
@@ -381,7 +385,7 @@ def find(named_: str) -> str:
             if os.path.isfile(beside_):
                 return os.path.realpath(beside_)
         for verse in flowverses():
-            beside = verse.at / f"{at}.py"
+            beside = holds(verse) / f"{at}.py"
             if beside.is_file():
                 return str(beside.resolve())
     said = os.path.expanduser(at)

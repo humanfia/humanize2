@@ -129,8 +129,8 @@ See [Flows](/reference/flows.md).
 
 ## Flowverse
 
-**A git repository of flows.** One `.py` per flow, cloned into `~/.humanize/flowverses/<name>/`,
-and every flow in it offered as `<name>/<flow>`.
+**A git repository with a `flows/` directory in it.** One `.py` per flow, cloned into
+`~/.humanize/flowverses/<name>/`, and every flow in its `flows/` offered as `<name>/<flow>`.
 
 Two are always there: `builtin`, the handful in the package, and `official`, which is where the
 rest of the flows humanize offers come from — listed whether or not it has been fetched, because

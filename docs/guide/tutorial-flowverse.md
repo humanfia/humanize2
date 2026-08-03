@@ -9,25 +9,28 @@ you add them to.
 
 ## Step 1 — lay it out
 
-A flowverse is a git repository of flows. There is **no manifest and nothing to register**:
+A flowverse is a git repository with a `flows/` directory in it. There is **no manifest and
+nothing to register**:
 
 ```
 my-flowverse/
 ├── README.md
-├── review.py        →  yours/review
-├── nightly.py       →  yours/nightly
-└── _shared.py       →  not a flow; imported by the two above
+└── flows/
+    ├── review.py    →  yours/review
+    ├── nightly.py   →  yours/nightly
+    └── _shared.py   →  not a flow; imported by the two above
 ```
 
 | Rule | |
 | --- | --- |
+| the flows go in `flows/` | and nothing outside it is read, or run |
 | one `.py` per flow | each with a function marked `@flow` |
 | a file starting with `_` is not a flow | which is where shared code goes |
 | the flow's docstring's first line | is what is shown beside its name |
 | one file may hold several | `@flow(name="…")`, run as `<flow>:<name>` |
 
 ```python
-# review.py
+# flows/review.py
 """Review the current diff and write the findings to REVIEW.md."""
 
 from hmz.agents import AgentBase
@@ -132,8 +135,8 @@ Whoever adds your flowverse is trusting it with their machine. Earn it:
 ## The one thing to be honest about
 
 ::: danger A flow is a Python file, and reading one means running it
-Listing what a flowverse holds **imports every file in it**. Somebody adding yours is trusting
-that repository with their machine, exactly as installing a package is.
+Listing what a flowverse holds **imports every file in its `flows/`**. Somebody adding yours is
+trusting that repository with their machine, exactly as installing a package is.
 
 So: no side effects at import time, nothing that reaches the network as the module loads, and no
 `_shared.py` that does anything on import beyond defining things. Whatever a flow does as it is
@@ -154,7 +157,8 @@ Run that in the repository's own CI and a flow that stopped loading is a red bui
 
 ## What you now know
 
-- A flowverse is a git repository, one `.py` per flow, `_`-prefixed files ignored.
+- A flowverse is a git repository with a `flows/` directory, one `.py` per flow, `_`-prefixed
+  files ignored.
 - **ctrl+n** / **ctrl+r** / **ctrl+x** in `/flow` add, fetch and remove.
 - `<flowverse>/<flow>` is the unshadowable spelling, and `calls` takes it too.
 - Import-time side effects run for anyone who lists your flowverse.

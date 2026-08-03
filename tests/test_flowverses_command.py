@@ -68,11 +68,11 @@ def _commit(at: Path, why: str) -> None:
 def theirs(tmp_path: Path) -> Path:
     """A repository of two flows and something they import, to be fetched from."""
     where = tmp_path / "theirs"
-    where.mkdir()
-    (where / "loop.py").write_text(FLOW)
-    (where / "review.py").write_text(FLOW)
+    (where / store.FLOWS).mkdir(parents=True)
+    (where / store.FLOWS / "loop.py").write_text(FLOW)
+    (where / store.FLOWS / "review.py").write_text(FLOW)
     # Not a flow: what the flows beside it import, which is what the underscore means.
-    (where / "_shared.py").write_text("HELD = 1\n")
+    (where / store.FLOWS / "_shared.py").write_text("HELD = 1\n")
     _git("init", "-b", "main", at=where)
     _git("config", "user.email", "t@example.com", at=where)
     _git("config", "user.name", "t", at=where)
@@ -126,7 +126,7 @@ def test_what_was_added_is_a_flow_the_rest_of_humanize_finds_by_name(
     """Which is the whole point of adding one: the line is a different way to the same store."""
     assert run("add", str(theirs), "mine") == 0
 
-    assert flows.find("mine/loop").endswith("mine/loop.py")
+    assert flows.find("mine/loop").endswith(f"mine/{store.FLOWS}/loop.py")
     assert [one.name for one in flows.found() if one.whose == "mine"] == [
         "mine/loop",
         "mine/review",
@@ -171,11 +171,11 @@ def test_every_name_shown_is_a_name_the_rest_of_humanize_offers(
     the rest of humanize asks, and this pins the two together.
     """
     where = tmp_path / "several"
-    where.mkdir()
-    (where / "phases.py").write_text(MANY)
-    (where / "one.py").write_text(FLOW)
+    (where / store.FLOWS).mkdir(parents=True)
+    (where / store.FLOWS / "phases.py").write_text(MANY)
+    (where / store.FLOWS / "one.py").write_text(FLOW)
     # Beside the flows, and not one: it runs, and leaves no flow behind.
-    (where / "conftest.py").write_text(
+    (where / store.FLOWS / "conftest.py").write_text(
         '"""Sets their tests up, and is not a flow."""\n'
     )
     _git("init", "-b", "main", at=where)
@@ -231,8 +231,8 @@ def test_fetching_again_takes_what_the_repository_now_holds(
 ) -> None:
     """A flowverse is a copy of somebody else's repository, so a fetch is what they now have."""
     assert run("add", str(theirs), "mine") == 0
-    (theirs / "nightly.py").write_text(FLOW)
-    (theirs / "review.py").unlink()
+    (theirs / store.FLOWS / "nightly.py").write_text(FLOW)
+    (theirs / store.FLOWS / "review.py").unlink()
     _commit(theirs, "one more, one fewer")
     capsys.readouterr()
 
@@ -322,9 +322,9 @@ def test_asking_what_one_holds_is_the_line_that_reads_it(
 def _loud(tmp_path: Path) -> Path:
     """A flowverse whose one file says so when it is imported, and the file it says it in."""
     where = tmp_path / "loud"
-    where.mkdir()
+    (where / store.FLOWS).mkdir(parents=True)
     ran = tmp_path / "ran"
-    (where / "shouts.py").write_text(
+    (where / store.FLOWS / "shouts.py").write_text(
         f"import pathlib\n\npathlib.Path({str(ran)!r}).write_text('ran')\n"
     )
     _git("init", "-b", "main", at=where)
@@ -455,7 +455,7 @@ def test_a_directory_that_is_not_a_clone_is_not_called_humanizes_own(
     invite exactly that -- so where they came from is a question with no answer rather than an
     answer of humanize's own.
     """
-    byhand = store.where("byhand")
+    byhand = store.where("byhand") / store.FLOWS
     byhand.mkdir(parents=True)
     (byhand / "one.py").write_text(FLOW)
 
@@ -474,8 +474,8 @@ def test_a_url_with_a_percent_in_it_does_not_stop_the_line(
 ) -> None:
     """A percent-encoded password is an ordinary URL, and every line here reads that URL."""
     where = tmp_path / "pct%40dir"
-    where.mkdir()
-    (where / "one.py").write_text(FLOW)
+    (where / store.FLOWS).mkdir(parents=True)
+    (where / store.FLOWS / "one.py").write_text(FLOW)
     _git("init", "-b", "main", at=where)
     _git("config", "user.email", "t@example.com", at=where)
     _git("config", "user.name", "t", at=where)

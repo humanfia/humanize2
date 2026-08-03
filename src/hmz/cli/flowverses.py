@@ -34,8 +34,8 @@ def flowverses(argv: list[str]) -> int:
 
     parser = argparse.ArgumentParser(
         prog="hmz flowverses",
-        description="Where flows come from: a git repository of flows apiece, cloned under "
-        "humanize's home and offered under the name it is kept there.",
+        description="Where flows come from: a git repository with a `flows/` directory apiece, "
+        "cloned under humanize's home and offered under the name it is kept there.",
     )
     doing = parser.add_subparsers(dest="doing", metavar="COMMAND")
 
@@ -84,9 +84,9 @@ def _list(*, quiet: bool) -> int:
     """Prints every place flows come from, in the order they are offered.
 
     Says which places there are and not what any of them holds, and so reads none of them.
-    Finding out what a flowverse holds means importing every file in it, which is a great deal
-    of somebody else's code to run for a line that only asked which places there are. `show` is
-    the line that asks what is in one, and is where that is paid for.
+    Finding out what a flowverse holds means importing every file in its `flows/`, which is a
+    great deal of somebody else's code to run for a line that only asked which places there
+    are. `show` is the line that asks what is in one, and is where that is paid for.
     """
     from hmz.flows import verses as store
 

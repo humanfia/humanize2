@@ -896,9 +896,9 @@ class Fetches(Sheet[tuple[str, str]]):
         """Says what a flowverse is, and what the keys do while it is being named."""
         self.query_one("#asked", Label).update("Add a flowverse")
         self.query_one("#about", Label).update(
-            "A git repository of flows: one `.py` file per flow, and whatever they import "
-            "beside them. It is cloned into ~/.humanize/flowverses, and every flow in it is "
-            "then offered under the name it is kept under."
+            "A git repository with a `flows/` directory in it: one `.py` file per flow, and "
+            "whatever they import beside them. It is cloned into ~/.humanize/flowverses, and "
+            "every flow in it is then offered under the name it is kept under."
         )
         self._fill()
         self.query_one("#choices", OptionList).focus()

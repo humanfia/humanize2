@@ -1,10 +1,11 @@
 # Flowverses
 
-A flowverse is **a git repository of flows**: one `.py` per flow, and whatever they import beside
-them under names starting with `_`.
+A flowverse is **a git repository with a `flows/` directory in it**: one `.py` per flow, and
+whatever they import beside them under names starting with `_`.
 
-It is cloned into `~/.humanize/flowverses/<name>/`, and every flow in it is then offered as
-`<name>/<flow>`.
+It is cloned into `~/.humanize/flowverses/<name>/`, and every flow in its `flows/` is then
+offered as `<name>/<flow>`. Nothing outside that directory is read, so the repository is free to
+be a repository — a README, a pyproject, a test suite of its own.
 
 ```sh
 hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
@@ -118,9 +119,12 @@ Any git repository will do. There is no manifest and nothing to register:
 
 ```
 my-flowverse/
-├── review.py        →  yours/review
-├── nightly.py       →  yours/nightly
-└── _shared.py       →  not a flow; imported by the two above
+├── flows/
+│   ├── review.py    →  yours/review
+│   ├── nightly.py   →  yours/nightly
+│   └── _shared.py   →  not a flow; imported by the two above
+├── tests/           →  not read: only flows/ is
+└── README.md
 ```
 
 Add it with **ctrl+n** in `/flow`, or clone it into `~/.humanize/flowverses/<name>/` yourself.
@@ -128,7 +132,7 @@ There is a [tutorial](/guide/tutorial-flowverse).
 
 ::: danger Adding one is trusting that repository with this machine
 A flow is a Python file, and reading one means **running** it. Listing what a flowverse holds
-imports every file in it. Add the ones you would clone and run. See
+imports every file in its `flows/`. Add the ones you would clone and run. See
 [Security](/guide/security).
 :::
 

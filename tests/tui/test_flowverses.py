@@ -54,8 +54,8 @@ def _git(*said: str, at: Path) -> None:
 def theirs(tmp_path: Path) -> Path:
     """A repository of one flow, to be fetched from."""
     where = tmp_path / "theirs"
-    where.mkdir()
-    (where / "loop.py").write_text(FLOW)
+    (where / store.FLOWS).mkdir(parents=True)
+    (where / store.FLOWS / "loop.py").write_text(FLOW)
     _git("init", "-b", "main", at=where)
     _git("config", "user.email", "t@example.com", at=where)
     _git("config", "user.name", "t", at=where)

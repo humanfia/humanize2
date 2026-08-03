@@ -234,8 +234,9 @@ hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 
 ## `hmz flowverses`
 
-Where flows come from: a git repository of flows apiece, cloned under humanize's home and
-offered under the name it is kept there. See [Flowverses](/features/flowverses.md).
+Where flows come from: a git repository with a `flows/` directory apiece, cloned under
+humanize's home and offered under the name it is kept there. See
+[Flowverses](/features/flowverses.md).
 
 ```
 hmz flowverses list [-q|--quiet]

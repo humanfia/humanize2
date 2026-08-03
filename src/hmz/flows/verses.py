@@ -1,8 +1,12 @@
 """Where flows come from, when they come from somewhere else.
 
-A flowverse is a git repository of flows: `.py` files, one flow apiece or several where a file
-says so, and whatever they import beside them under names that start with an underscore. It is
-cloned into `~/.humanize/flowverses/<name>/`, and every flow in it is offered under that name.
+A flowverse is a git repository with a `flows/` directory in it: `.py` files, one flow apiece
+or several where a file says so, and whatever they import beside them under names that start
+with an underscore. It is cloned into `~/.humanize/flowverses/<name>/`, and every flow in it is
+offered under that name. Only that directory is read, so a repository is free to be a
+repository around it -- a README, a pyproject, a test suite -- without any of it being taken
+for a flow and run to find out. `builtin` is the one that has no repository around it, being
+the package's own, and is read where it stands.
 
 Two are always there. `builtin` is the handful humanize itself ships -- one agent talking, and
 the two shapes a loop over one agent takes -- and cannot be added or taken away because it is
@@ -27,11 +31,13 @@ from hmz import home
 
 __all__ = [
     "BUILTIN",
+    "FLOWS",
     "OFFICIAL",
     "Flowverse",
     "add",
     "fetch",
     "flowverses",
+    "holds",
     "remove",
     "under",
 ]
@@ -45,6 +51,12 @@ BUILTIN = "builtin"
 #: downloaded, and somebody who has never fetched it should still be able to see it and say so.
 OFFICIAL = "official"
 OFFICIAL_URL = "https://github.com/humanfia/flowverse"
+
+#: The directory a fetched flowverse keeps its flows in, and the only one read for them. A
+#: flowverse is a repository, and a repository has a README, a pyproject and a test suite in it:
+#: reading a flow means running it, so the ones to run are the ones somebody put here and
+#: nothing else. `builtin` has no repository around it and so has no need of this.
+FLOWS = "flows"
 
 #: What a flowverse may be called: one directory name, and one that cannot climb out of the
 #: directory they are kept in.
@@ -64,7 +76,8 @@ class Flowverse:
         offered under.
       url: Where it is fetched from, or "" for one that is not fetched from anywhere -- which
         is `builtin`, and is what makes it the one nobody can take away.
-      at: The directory its flows are read from.
+      at: The directory it is kept in, which for a fetched one is the repository rather than
+        the flows: what its flows are read from is :func:`holds`.
       fetched: Whether it is there to be read. False for one named but never fetched, which
         `official` is until somebody asks for it.
       fixed: Whether it is always listed and cannot be removed: humanize's own two.
@@ -80,6 +93,23 @@ class Flowverse:
 def under() -> Path:
     """Where every fetched flowverse is kept, which is one directory under humanize's home."""
     return home() / "flowverses"
+
+
+def holds(one: Flowverse) -> Path:
+    """The directory one flowverse's flows are read from, and the one place that is worked out.
+
+    The `flows/` inside it, except for the flows humanize ships: those are a directory of `.py`
+    files in the package with no repository around them -- no README, no pyproject, no test
+    suite to be kept out of the way -- and so are read where they stand.
+
+    Args:
+      one: The flowverse.
+
+    Returns:
+      The path, whether or not there is anything there -- a repository with no `flows/` in it
+      is a flowverse holding nothing, which is a thing to say rather than a thing to raise.
+    """
+    return one.at if one.name == BUILTIN else one.at / FLOWS
 
 
 def where(name: str) -> Path:
@@ -265,14 +295,17 @@ def flows(one: Flowverse) -> list[str]:
       one: The flowverse.
 
     Returns:
-      One name per file, alphabetically. A file whose name starts with an underscore is not a
-      flow but something the flows beside it import, and is not among them.
+      One name per file in the directory it holds them in, alphabetically. A file whose name
+      starts with an underscore is not a flow but something the flows beside it import, and is
+      not among them. Nothing at all where there is no such directory: a repository somebody
+      added that keeps its flows somewhere else holds none of them, which is what the list says.
     """
-    if not one.at.is_dir():
+    at = holds(one)
+    if not at.is_dir():
         return []
     return sorted(
         path.name.removesuffix(".py")
-        for path in one.at.glob("*.py")
+        for path in at.glob("*.py")
         if not path.name.startswith("_") and path.is_file()
     )
 

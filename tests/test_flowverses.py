@@ -1,10 +1,12 @@
 """Where flows come from when they come from somewhere else.
 
-A flowverse is somebody's repository of flows, cloned under humanize's home and offered under
-the name it is kept there. Two of them are always there whatever has been fetched -- the ones
-in the package and the one the rest come from -- so what is checked here is that the list says
-what there is to run rather than what has been downloaded, that fetching one twice is a fetch
-rather than a merge, and that the two that are always there cannot be taken away.
+A flowverse is somebody's repository with a `flows/` directory in it, cloned under humanize's
+home and offered under the name it is kept there. Two of them are always there whatever has
+been fetched -- the ones in the package and the one the rest come from -- so what is checked
+here is that the list says what there is to run rather than what has been downloaded, that the
+flows are the ones in `flows/` and nothing else the repository came with, that fetching one
+twice is a fetch rather than a merge, and that the two that are always there cannot be taken
+away.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.flows import BUILTIN, OFFICIAL, find, flowverses, found
+from hmz.flows import BUILTIN, FLOWS, OFFICIAL, find, flowverses, found
 from hmz.flows import verses as store
 
 if TYPE_CHECKING:
@@ -43,11 +45,15 @@ def _git(*said: str, at: Path) -> None:
 def theirs(tmp_path: Path) -> Path:
     """A repository of two flows and something they import, to be fetched from."""
     where = tmp_path / "theirs"
-    where.mkdir()
-    (where / "loop.py").write_text(FLOW)
-    (where / "review.py").write_text(FLOW)
+    (where / FLOWS).mkdir(parents=True)
+    (where / FLOWS / "loop.py").write_text(FLOW)
+    (where / FLOWS / "review.py").write_text(FLOW)
     # Not a flow: what the flows beside it import, which is what the underscore means.
-    (where / "_shared.py").write_text("HELD = 1\n")
+    (where / FLOWS / "_shared.py").write_text("HELD = 1\n")
+    # Nor is anything else the repository is made of: it is outside the flows directory, and
+    # only what is inside it is read.
+    (where / "README.md").write_text("# theirs\n")
+    (where / "conftest.py").write_text("HELD = 1\n")
     _git("init", "-b", "main", at=where)
     _git("config", "user.email", "t@example.com", at=where)
     _git("config", "user.name", "t", at=where)
@@ -66,6 +72,21 @@ def test_the_two_that_are_always_there_are_always_there() -> None:
     assert listed[0].url == ""
     assert listed[0].fetched
     assert listed[1].url.endswith("humanfia/flowverse")
+
+
+def test_the_flows_humanize_ships_are_read_where_they_stand() -> None:
+    """No `flows/` for those: they are the package's own, with no repository around them.
+
+    A fetched flowverse needs that directory to tell its flows from the README, the pyproject
+    and the test suite that came down with them. This one is a directory of flows and nothing
+    else, so there is nothing to tell them from.
+    """
+    one = store.named(BUILTIN)
+    assert one is not None
+
+    assert store.holds(one) == one.at
+    assert "chat" in store.flows(one)
+    assert find("chat") == str((one.at / "chat.py").resolve())
 
 
 def test_the_official_one_is_offered_before_it_is_fetched() -> None:
@@ -104,7 +125,7 @@ def test_it_may_be_called_something_else_here(theirs: Path) -> None:
     added = store.add(str(theirs), "mine")
 
     assert added.name == "mine"
-    assert (store.under() / "mine" / "loop.py").is_file()
+    assert (store.under() / "mine" / FLOWS / "loop.py").is_file()
 
 
 def test_adding_one_twice_is_refused(theirs: Path) -> None:
@@ -125,15 +146,17 @@ def test_a_repository_that_is_not_there_says_so(tmp_path: Path) -> None:
 def test_fetching_takes_what_the_repository_says_now(theirs: Path) -> None:
     """A flowverse is a copy of somebody's repository, so a fetch is what it says now."""
     store.add(str(theirs))
-    (theirs / "loop.py").write_text(FLOW.replace("A flow", "The same flow, changed"))
-    (theirs / "third.py").write_text(FLOW)
+    (theirs / FLOWS / "loop.py").write_text(
+        FLOW.replace("A flow", "The same flow, changed")
+    )
+    (theirs / FLOWS / "third.py").write_text(FLOW)
     _git("add", "-A", at=theirs)
     _git("commit", "-m", "another", at=theirs)
 
     again = store.fetch("theirs")
 
     assert store.flows(again) == ["loop", "review", "third"]
-    assert "changed" in (again.at / "loop.py").read_text()
+    assert "changed" in (store.holds(again) / "loop.py").read_text()
 
 
 def test_fetching_one_that_was_never_fetched_clones_it(
@@ -190,8 +213,8 @@ def test_its_flows_are_offered_under_its_name(theirs: Path) -> None:
 
 
 def test_a_file_beside_the_flows_that_is_not_one_is_not_offered(theirs: Path) -> None:
-    """A repository of flows holds other things: what sets their tests up, what they share."""
-    (theirs / "conftest.py").write_text("HELD = 1\n")
+    """A directory of flows holds other things: what sets their tests up, what they share."""
+    (theirs / FLOWS / "conftest.py").write_text("HELD = 1\n")
     _git("add", "-A", at=theirs)
     _git("commit", "-m", "not a flow", at=theirs)
     store.add(str(theirs))
@@ -202,9 +225,49 @@ def test_a_file_beside_the_flows_that_is_not_one_is_not_offered(theirs: Path) ->
     ]
 
 
+def test_only_the_flows_directory_is_read(theirs: Path) -> None:
+    """A flowverse is a repository, and a repository is not all flows.
+
+    Reading a flow means running it, so what a repository has outside its flows directory --
+    its own test suite, the file that configures it, whatever it was built with -- is not
+    offered and, more to the point, is never imported to find that out.
+    """
+    (theirs / "tests").mkdir()
+    (theirs / "tests" / "test_loop.py").write_text("raise AssertionError\n")
+    (theirs / "setup_hooks.py").write_text("raise AssertionError\n")
+    _git("add", "-A", at=theirs)
+    _git("commit", "-m", "a repository around the flows", at=theirs)
+    store.add(str(theirs))
+
+    # Nothing raised getting here: neither file was run, though either would have said so.
+    assert [one.name for one in found() if one.whose == "theirs"] == [
+        "theirs/loop",
+        "theirs/review",
+    ]
+    assert find("theirs/setup_hooks") == "theirs/setup_hooks"
+
+
+def test_a_repository_with_no_flows_directory_holds_nothing(tmp_path: Path) -> None:
+    """Somebody's repository that keeps its flows elsewhere, which is a thing to say."""
+    where = tmp_path / "elsewhere"
+    where.mkdir()
+    (where / "loop.py").write_text(FLOW)
+    _git("init", "-b", "main", at=where)
+    _git("config", "user.email", "t@example.com", at=where)
+    _git("config", "user.name", "t", at=where)
+    _git("add", "-A", at=where)
+    _git("commit", "-m", "flows in the wrong place", at=where)
+
+    added = store.add(str(where))
+
+    assert added.fetched  # it is here, and it holds nothing
+    assert store.flows(added) == []
+    assert [one.name for one in found() if one.whose == "elsewhere"] == []
+
+
 def test_a_flow_that_will_not_import_is_still_offered(theirs: Path) -> None:
     """It is a flow somebody named, and saying so where they pick it beats hiding it."""
-    (theirs / "broken.py").write_text("import nothing_of_the_sort\n")
+    (theirs / FLOWS / "broken.py").write_text("import nothing_of_the_sort\n")
     _git("add", "-A", at=theirs)
     _git("commit", "-m", "a flow that will not load", at=theirs)
     store.add(str(theirs))
@@ -215,7 +278,9 @@ def test_a_flow_that_will_not_import_is_still_offered(theirs: Path) -> None:
 def test_a_flow_of_a_flowverse_is_found_by_that_name(theirs: Path) -> None:
     store.add(str(theirs))
 
-    assert find("theirs/loop") == str((store.under() / "theirs" / "loop.py").resolve())
+    assert find("theirs/loop") == str(
+        (store.under() / "theirs" / FLOWS / "loop.py").resolve()
+    )
     # And a name nothing answers to is handed back as it was given, to be said about.
     assert find("theirs/nothing") == "theirs/nothing"
 
@@ -232,7 +297,9 @@ def test_a_flow_of_your_own_still_wins_a_bare_name(
 
     assert find("loop") == str((project / ".humanize/flows/loop.py").resolve())
     # But the flowverse's own name for it is not a name anything of yours can stand in for.
-    assert find("theirs/loop") == str((store.under() / "theirs" / "loop.py").resolve())
+    assert find("theirs/loop") == str(
+        (store.under() / "theirs" / FLOWS / "loop.py").resolve()
+    )
 
 
 def test_a_flow_from_a_flowverse_runs_by_that_name(theirs: Path) -> None:

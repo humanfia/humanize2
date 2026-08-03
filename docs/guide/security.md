@@ -31,7 +31,7 @@ but mounts your workspace into it.
 ## A flow is a Python file, and reading one means running it
 
 `-f` takes a Python file, and humanize imports it to find the `@flow` in it. Listing what a
-[flowverse](/features/flowverses) holds imports **every** file in it.
+[flowverse](/features/flowverses) holds imports **every** file in its `flows/`.
 
 So adding a flowverse is trusting that git repository with this machine, exactly as installing a
 package is. Add the ones you would clone and run.

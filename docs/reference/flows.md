@@ -511,9 +511,11 @@ hmz exec -f ./somewhere/else.py -a claude/claude-opus-4-8:high "fix the build"
 
 ## Flowverses
 
-A flowverse is a git repository of flows: one `.py` per flow, and whatever they import beside
-them under names starting with `_`. It is cloned into `~/.humanize/flowverses/<name>/`, and
-every flow in it is then offered under that name.
+A flowverse is a git repository with a `flows/` directory in it: one `.py` per flow, and
+whatever they import beside them under names starting with `_`. It is cloned into
+`~/.humanize/flowverses/<name>/`, and every flow in its `flows/` is then offered under that
+name. Nothing outside that directory is read, so the repository is free to have a README, a
+pyproject and a test suite of its own without any of it being taken for a flow.
 
 Two are always there:
 
@@ -541,8 +543,8 @@ A flow from a flowverse that has not been fetched says so rather than saying the
 file: the name is right, the download has not happened.
 
 A flow is a Python file, and reading one means running it — so listing what a flowverse holds
-imports every file in it. Adding one is trusting that repository with this machine, exactly as
-installing a package is.
+imports every file in its `flows/`. Adding one is trusting that repository with this machine,
+exactly as installing a package is.
 
 ## The flows humanize ships
 

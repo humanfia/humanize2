@@ -14,8 +14,12 @@ Nothing here runs one: `hmz.runner` does that, and reads a name through this.
 
 ## `builtin/`
 
-The flows humanize itself ships: a directory of `.py` files and nothing else, which is what
-every flowverse is.
+The flows humanize itself ships: a directory of `.py` files and nothing else.
+
+- Its flows MUST be read where they stand rather than from a `flows/` inside it. A fetched
+  flowverse needs that directory to tell its flows from the repository around them; there is
+  no repository around these, and a directory holding nothing else has nothing to tell them
+  from.
 
 - It MUST hold only the flows that show what a flow is -- one agent talking, and the shapes a
   loop over one agent takes. Everything else humanize offers MUST live in the official
@@ -114,6 +118,9 @@ class Flowverse:
 def flowverses() -> list[Flowverse]: ...
 
 
+def holds(one: Flowverse) -> Path: ...
+
+
 def add(url: str, name: str = "") -> Flowverse: ...
 
 
@@ -126,9 +133,17 @@ def remove(name: str) -> bool: ...
 def flows(one: Flowverse) -> list[str]: ...
 ```
 
-- A flowverse MUST be a git repository of flows, cloned into `~/.humanize/flowverses/<name>/`,
-  and every flow in it MUST be offered under that name. A file whose name starts with an
-  underscore MUST NOT be one of them: it is what the flows beside it import.
+- A flowverse MUST be a git repository with a `flows/` directory in it, cloned into
+  `~/.humanize/flowverses/<name>/`, and every flow in it MUST be offered under that name. A
+  file whose name starts with an underscore MUST NOT be one of them: it is what the flows
+  beside it import.
+- Only that directory MUST be read for flows, and a fetched flowverse with none MUST hold
+  none. A repository is a repository -- a README, a pyproject, a test suite, whatever sets the
+  tests up -- and reading a flow means running it, so what is run MUST be what somebody put
+  where the flows go rather than every `.py` file that came down with it.
+- Where the flows of one are MUST be worked out in one place, `builtin`'s reading of its own
+  directory included: everything that goes looking for a flow asks that one place, so an
+  exception written down once is an exception rather than a rule to remember.
 - Two MUST always be listed: `builtin`, which is the package's own and is fetched from nowhere,
   and `official`, which is humanize's repository of the rest. Neither MUST be removable, and
   `official` MUST be listed whether or not it has been fetched -- a list that only mentioned it

@@ -181,8 +181,8 @@ table in `agents/__init__.py`, which `runner.py` and the interface both read. Su
 the top of the module.
 
 **A flow.** Just a `.py` file: one in `flows/builtin/` for one humanize ships, one in a
-[flowverse](/reference/flows.md#flowverses) for one it offers, one in `.humanize/flows/` for one of your
-own. They are content and import nothing of humanize but `hmz.agents` — and
+[flowverse](/reference/flows.md#flowverses)'s own `flows/` for one it offers, one in
+`.humanize/flows/` for one of your own. They are content and import nothing of humanize but `hmz.agents` — and
 `hmz.flows.flow`, where one file holds several.
 
 ## The checks
