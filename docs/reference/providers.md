@@ -231,8 +231,8 @@ hmz exec -f ralph_loop -a cli=claude,model=claude-opus-5,effort=max,provider=dee
 
 In the interface it is the `provider` row of the sheet an agent is set up on — which
 CLI, and which of its accounts — because an account belongs to a backend and everything after it
-is about how that backend runs. See [TUI › What each agent is: three
-steps](/reference/tui.md#what-each-agent-is-three-steps).
+is about how that backend runs. See [TUI › What each agent
+is](/reference/tui.md#what-each-agent-is).
 
 **`a` on that row makes one there and then**, so finding out you have no account for this
 CLI is not a reason to leave the question: it asks how to sign in and what that way needs, hands

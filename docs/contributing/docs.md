@@ -8,7 +8,7 @@ The site is [VitePress](https://vitepress.dev/) under `docs/`, built and deploye
 ```sh
 cd docs
 pnpm install
-pnpm dev        # http://localhost:5173/humanize2/
+pnpm dev        # http://localhost:5173/
 ```
 
 ```sh
@@ -94,8 +94,14 @@ against is `Width 1000`, `Height` between 500 and 620, `Framerate 20`, and the
 ## The deploy
 
 `.github/workflows/build-docs.yml` builds on every push and pull request that touches `docs/`, and
-deploys to GitHub Pages on a push to `main`. The site is served under `/humanize2/`, which is what
-`base` in the config says — changing the repository name means changing both.
+deploys to GitHub Pages on a push to `main`. It is served at
+[docs.humanfia.ai](https://docs.humanfia.ai), which is a custom domain and so is the site's own
+root: the config sets **no `base`**, and `docs/public/CNAME` is what keeps the domain on the
+artifact each deploy publishes. `humanfia.github.io/humanize2` redirects here.
+
+Serving it under a subdirectory again would mean setting `base` back — and a `base` that does not
+match where the site is served is a page whose every stylesheet, script and link asks for a path
+that is not there, which is a site that looks like unstyled markdown.
 
 ## The other documentation
 

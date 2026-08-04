@@ -3,7 +3,7 @@
 ![humanize](https://socialify.git.ci/humanfia/humanize2/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2Fhumanfia%2Fhumanize2%2Fraw%2Frefs%2Fheads%2Fmain%2Fdocs%2Fpublic%2Flogo.svg&name=1&owner=1&pattern=Circuit+Board&pulls=1&stargazers=1&theme=Auto)
 
 [![CI](https://github.com/humanfia/humanize2/actions/workflows/ci.yml/badge.svg)](https://github.com/humanfia/humanize2/actions/workflows/ci.yml)
-[![docs](https://github.com/humanfia/humanize2/actions/workflows/build-docs.yml/badge.svg)](https://humanfia.github.io/humanize2/)
+[![docs](https://github.com/humanfia/humanize2/actions/workflows/build-docs.yml/badge.svg)](https://docs.humanfia.ai/)
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
@@ -22,7 +22,7 @@ Orchestrate, execute, and observe agent flows
 ## Security
 
 Three things to know before pointing one at a repository you care about. Each is explained in
-[Security](https://humanfia.github.io/humanize2/guide/security):
+[Security](https://docs.humanfia.ai/guide/security):
 
 - humanize runs every agent with **permission prompts disabled**, and nothing turns them back on.
 - **A flow is a Python file, and reading one means running it**, so adding a flowverse is trusting
@@ -47,7 +47,7 @@ dsh web
 
 Needs Python ≥ 3.12 and at least one supported backend: `agy`, `claude`, `codex`, `grok`,
 `kimi`, `pi`, `qwen`, `opencode` or `mimo` on your PATH, or the `dsh` extra above. See
-[Installation](https://humanfia.github.io/humanize2/guide/installation).
+[Installation](https://docs.humanfia.ai/guide/installation).
 
 ## Usage
 
@@ -87,12 +87,12 @@ To collect what a run left behind, and open it in [ui.perfetto.dev](https://ui.p
 hmz collect
 ```
 
-[Getting started](https://humanfia.github.io/humanize2/guide/getting-started) goes from here to a
+[Getting started](https://docs.humanfia.ai/guide/getting-started) goes from here to a
 run you can read back.
 
 ## Documentation
 
-**[humanfia.github.io/humanize2](https://humanfia.github.io/humanize2/)** — tutorials, a page per
+**[docs.humanfia.ai](https://docs.humanfia.ai/)** — tutorials, a page per
 feature, and the complete CLI, TUI and Python reference. Its source is under [docs/](docs/).
 
 ## Maintainers
@@ -103,7 +103,7 @@ feature, and the complete CLI, TUI and Python reference. Its source is under [do
 
 PRs accepted. Ask a question or discuss a substantial change first in
 [issues](https://github.com/humanfia/humanize2/issues), and see
-[Contributing](https://humanfia.github.io/humanize2/contributing/) for the checks a commit has to
+[Contributing](https://docs.humanfia.ai/contributing/) for the checks a commit has to
 pass.
 
 ```sh

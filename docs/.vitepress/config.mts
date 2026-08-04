@@ -1,17 +1,19 @@
 import { defineConfig } from 'vitepress'
 
-// Deployed to https://humanfia.github.io/humanize2/ by .github/workflows/build-docs.yml,
-// so every internal link is written from the site root and the base is prepended here.
+// Deployed to https://docs.humanfia.ai by .github/workflows/build-docs.yml, which is a
+// custom domain and so is the site's root: no base is prepended, and every internal link is
+// written from that root. The project page it was built for -- humanfia.github.io/humanize2
+// -- redirects here, so nothing is served under a subdirectory any more. A base left set to
+// one would be every stylesheet, script and link asking for a path that is not there.
 export default defineConfig({
   title: 'humanize',
   description: 'Orchestrate, execute, and observe agent flows',
-  base: '/humanize2/',
   lang: 'en-US',
   cleanUrls: true,
   lastUpdated: true,
 
   head: [
-    ['link', { rel: 'icon', href: '/humanize2/logo.svg' }],
+    ['link', { rel: 'icon', href: '/logo.svg' }],
     ['meta', { name: 'theme-color', content: '#3c8772' }],
   ],
 

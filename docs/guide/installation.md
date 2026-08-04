@@ -52,7 +52,7 @@ or activate `.venv` first.
 
 Nothing to add: its SDK and the runtime its turns are taken on are ordinary dependencies of
 humanize, so any install that has humanize has them. It still needs an API key — see
-[Accounts](#accounts) below.
+[Signing each backend in](#signing-each-backend-in) below.
 
 ## Check what you have
 
@@ -62,9 +62,9 @@ humanize can run the backends installed in its environment. Check the CLI backen
 command -v agy claude codex grok kimi pi qwen opencode mimo
 ```
 
-A CLI backend that is not on your `PATH` is simply not offered. The `dsh` tab remains visible
-in `/agents` when its SDK is missing so it can show the installation command; it becomes
-selectable when this import succeeds:
+A CLI backend that is not on your `PATH` is simply not offered. `dsh` stays in the list of CLIs
+an agent may be set to when its SDK is missing, so that it can show the installation command; it
+becomes selectable when this import succeeds:
 
 ```sh
 python -c 'import deepseek_harness; print("dsh installed")'
@@ -73,6 +73,8 @@ python -c 'import deepseek_harness; print("dsh installed")'
 If none of the CLI backends or the SDK is installed,
 `hmz` says `no coding agent is installed here` and does nothing else — see
 [Troubleshooting](/guide/troubleshooting#no-coding-agent-is-installed-here).
+
+## Signing each backend in
 
 Each CLI is logged into its own way. humanize never sees the credential:
 
@@ -84,15 +86,16 @@ Each CLI is logged into its own way. humanize never sees the credential:
 | pi | `/login`, inside `pi` |
 | opencode | `opencode auth login` |
 | mimocode | `mimo auth login` |
-| DeepSeek Harness | a DeepSeek API key saved by dsh, stored from `/agents`, or supplied as `DEEPSEEK_API_KEY` |
+| DeepSeek Harness | a DeepSeek API key saved by dsh, stored from an agent's `provider` row, or supplied as `DEEPSEEK_API_KEY` |
 
 DeepSeek Harness is currently a developer preview. The `dsh` extra installs
 `deepseek-harness-sdk>=0.1.0rc6,<0.2` and its bundled runtime; the published runtime wheels
 support Linux on x86-64 or arm64 and macOS on arm64. It does not require the `dsh` CLI.
 
 DeepSeek Harness supports API-key login only. To use dsh's own credential store, run `dsh web`,
-open **Settings -> Models**, enter the DeepSeek key, and save it. In humanize, type `/agents`,
-switch to `dsh`, and choose `as installed`. That choice uses dsh's normal configuration sources:
+open **Settings -> Models**, enter the DeepSeek key, and save it. In humanize, set an agent's
+`cli` row to `dsh` and leave its `provider` row on `as local`. That choice uses dsh's normal
+configuration sources:
 the saved key and any `llm-deepseek.baseURL` in `$DSH_HOME/settings.yaml`, then its environment
 layers. `$DSH_HOME` defaults to `~/.dsh`.
 
