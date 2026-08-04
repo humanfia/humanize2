@@ -261,8 +261,9 @@ your CLI is signed into either.
 The paths are answered by a seccomp-filtered ptrace supervisor — the technique
 [`hmz anchor`](/reference/remote-execution.md) runs a whole session under, here handling only the handful of
 syscalls that name one of those files. Everything else the agent does is untouched and runs at
-native speed, and the agent is told none of it. That supervisor is [`hmz cred`](/reference/cli.md#hmz-cred),
-which is a command of its own, and what a turn under a provider is spawned as.
+native speed, and the agent is told none of it. That supervisor is a process humanize spawns
+for itself: a supervisor forks the program it watches, and a flow pumping turns from threads
+of its own has no signal handling to lend one.
 
 ## Requirements and limits
 

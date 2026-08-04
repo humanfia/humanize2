@@ -274,8 +274,15 @@ COMMANDS = {
     "anchor": (_anchor, "run an agent here that acts on another machine"),
     "flowverses": (_flowverses, "the places flows come from"),
     "providers": (_providers, "the accounts an agent may be run as"),
-    "cred": (_cred, "run an agent whose credentials are kept somewhere else"),
 }
+
+#: What humanize spawns for itself, carried out like any command and listed as none of them.
+#: A turn taken as an account runs the CLI with the paths it keeps its credentials at pointed
+#: into that account's directory, and the supervisor doing the pointing has to be a process of
+#: its own -- it forks the program and takes the signal handling with it, which a flow pumping
+#: turns from threads of its own has none to lend. So it is a command line because there is no
+#: other way to start a process, and not because it is a thing anybody types.
+_SPAWNED = {"cred": _cred}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -299,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
         ["-h"],
     ):
         return _tui(arguments)
-    if arguments[0] not in COMMANDS:
+    if arguments[0] not in COMMANDS and arguments[0] not in _SPAWNED:
         if arguments == ["--version"]:
             # Read from the installed metadata, which costs more to reach than everything
             # else here put together -- so it is reached only when it is what was asked for.
@@ -322,4 +329,5 @@ def main(argv: list[str] | None = None) -> int:
             commands.add_parser(name, help=summary, add_help=False)
         parser.parse_args(arguments)
 
-    return COMMANDS[arguments[0]][0](arguments[1:])
+    carries = _SPAWNED.get(arguments[0])
+    return (carries or COMMANDS[arguments[0]][0])(arguments[1:])

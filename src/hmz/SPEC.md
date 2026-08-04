@@ -323,5 +323,9 @@ turn under a provider is spawned as, and what a login run for one is spawned as.
 - It MUST be a command of its own rather than something the driver does in this process, for
   the reason `hmz anchor` is: the supervisor forks the program and takes the process's signal
   handling with it, which a flow pumping turns from threads of its own cannot lend it.
+- It MUST NOT be one of the commands a listing shows, and MUST NOT be documented as a way in:
+  it is a command line because a process is started by one, not because it is a thing anybody
+  types. What it runs is whatever it is given, so a listing offering it would be offering a
+  way to run something that is not humanize.
 - A line naming nothing to answer MUST be a usage error: a run with nothing to redirect is a
   supervisor started for no reason.

@@ -171,3 +171,13 @@ def test_the_help_lists_every_command(
     # And what `hmz` itself takes, which is the other half of the same line: one help says
     # both what may be opened and what may be run, because both of them are `hmz`.
     assert all(flag in shown for flag in ("--flow", "--agent", "--config"))
+    # And nothing humanize spawns for itself: a listing offering the supervisor a turn is
+    # run under would be offering a way to run something that is not humanize.
+    assert "cred" not in shown
+
+
+def test_what_humanize_spawns_for_itself_is_carried_out_but_not_listed() -> None:
+    """A turn taken as an account is spawned as one of these; nobody types one."""
+    assert "cred" not in cli.COMMANDS
+    # Still a line that runs: it is a command line because a process is started by one.
+    assert cli.main(["cred", "--map=/house/x=/store/y", "--", "true"]) in (0, 1)

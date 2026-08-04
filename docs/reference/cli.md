@@ -326,31 +326,6 @@ hmz providers show claude/deepseek
 hmz providers remove claude/deepseek
 ```
 
-## `hmz cred`
-
-Runs a program with some of its paths answered by others. This is what a turn under a provider
-is spawned as, and it is a command of its own for the reason `hmz anchor` is: the supervisor
-forks the program and takes the process's signal handling with it.
-
-```
-hmz cred --map FROM=TO [--map FROM=TO]... -- COMMAND [ARGS...]
-```
-
-| Flag | |
-| --- | --- |
-| `--map FROM=TO` | **Required, repeatable.** Answer `FROM` with `TO` for everything below, as two absolute paths. A directory names everything inside it. |
-| `COMMAND` | The program to run and its arguments, after `--`. |
-
-Exits with the program's own status. A run that could not be supervised is **not** run
-unsupervised — the program would read the credentials of whoever is at this machine, which is a
-turn taken as the wrong account rather than a turn that failed.
-
-Needs Linux on x86-64, as running an agent under an anchor does.
-
-```sh
-hmz cred --map /home/you/.claude/.credentials.json=/home/you/.humanize/providers/claude/deepseek/home/.credentials.json -- claude
-```
-
 ## Environment variables
 
 | Variable | Read by | |
@@ -404,7 +379,7 @@ into them.
 | `1` | It could not: the target could not be reached, the listener could not be started, there is no such provider, a turn could not be supervised. |
 | `2` | The command line was wrong — argparse's own rejections, a flow that is not there or takes other agents, a malformed listen address, a non-loopback listener with no token. |
 | `130` | Interrupted. |
-| *the agent's own* | `hmz anchor` and `hmz cred` exit with the status of the program they ran, and `hmz providers add` with that of the login it ran. |
+| *the agent's own* | `hmz anchor` exits with the status of the program it ran, and `hmz providers add` with that of the login it ran. |
 
 ## Python entry points
 
