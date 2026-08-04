@@ -18,10 +18,10 @@ import pytest
 from textual.widgets import Static
 
 from hmz.agents import AgentBase, AgentConfig, Event
+from hmz.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.app import _PINNED
 from hmz.tui.monitor import short
-from hmz.tui.pick import Runs
 from hmz.tui.selecting import Transcript
 from tests.stubs import ShellAgent, ShellSession
 

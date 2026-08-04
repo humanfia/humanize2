@@ -499,7 +499,9 @@ what it may do — none of which is a thing about the flow that happens to be dr
 | `a` | Add one. It has a `name` row of its own, which a flow's agent has not. |
 | `d` `d` | Take one away. |
 
-They live in `~/.humanize/agents.yaml`, and land there when the menu is saved.
+They live in `~/.humanize/agents.yaml`, and land there when the menu is saved. The same store
+is on the command line as [`hmz agents`](/reference/cli.md#hmz-agents), for a machine being set up or a
+CI job.
 
 **A flow imports a copy.** The `import` row of a flow's agent copies everything the saved one
 is; changing it afterwards changes that flow's agent alone. The `save` row is the other half:

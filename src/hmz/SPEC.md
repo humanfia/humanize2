@@ -12,6 +12,7 @@
 ├── coganchor
 ├── cycle.py
 ├── flows
+├── kept.py
 ├── machines
 ├── models.py
 ├── providers
@@ -88,6 +89,51 @@ What each backend runs, asked of that backend and kept until it is asked again.
   model takes, in the ladder's own order, and MUST be the whole ladder where it said nothing
   of that model -- a model it says nothing about is one it will take any of them for.
 - A catalogue that has never been asked for MUST be empty rather than guessed at.
+
+## `kept.py`
+
+```python
+class Runs(NamedTuple):
+    spec: str
+    anchor: str = ""
+    skills: tuple[str, ...] | None = None
+    permission: str = ""
+    provider: str = ""
+    goals: bool = True
+
+
+class Kept(NamedTuple):
+    name: str
+    runs: Runs
+
+
+def written(runs: Runs) -> dict[str, Any]: ...
+def read_back(held: dict[str, Any], *, goals: bool = True) -> Runs | None: ...
+
+
+class Templates:
+    def __init__(self, at: Path | None = None) -> None: ...
+    def all(self) -> list[Kept]: ...
+    def find(self, name: str) -> Kept | None: ...
+    def keep(self, agents: Sequence[Kept]) -> None: ...
+```
+
+What an agent is, written down, and the ones written down under a name -- as `agents.yaml`
+under humanize's own home.
+
+- It MUST be here rather than beside the interface, and MUST name nothing but `hmz` itself:
+  both ways in read it, and a command line that had to load a terminal interface to read a
+  file of six lines would be paying for a layer it does not use.
+- One agent MUST be written the same way wherever it is written down -- under a name here, and
+  under a flow and a workspace in the interface's own settings -- so the shape is said once.
+  What says nothing MUST be left out: an agent that works here, was never asked about skills,
+  may do what an agent nobody was asked about may do and runs as this machine is signed in is
+  one every field of which is that field's own silence.
+- The agents kept under a name MUST NOT be a workspace's and MUST NOT be any flow's: what an
+  agent is is not a thing about the project it happens to be working in, and a flow that
+  imports one MUST take a copy rather than a link.
+- A file that is missing, unreadable or not what this writes MUST read as nothing written down
+  rather than as a reason to stop.
 
 ## `cycle.py`
 
@@ -289,6 +335,28 @@ that can happen to a flowverse -- added, fetched again, taken away.
   the two that are always there being removed or added over, a fetch git refused, a directory
   that will not go -- MUST say so where it can be read and exit non-zero, and MUST leave the
   list as it was. None of those MUST reach whoever typed the line as a traceback.
+
+## `hmz agents`
+
+```shell
+hmz agents [list [-q] | show <name> | add <name> <cli>[@<provider>]/<model>:<effort> [-s <skill>]... [--anchor <target>] [--goals|--no-goals] [--force] | remove <name>]
+```
+
+The agents written down under a name: what there is, what one of them is, and the two things
+that can happen to one -- written down, taken away.
+
+- It MUST be the same store the interface's own `/agents` walks, for the reason `hmz providers`
+  is the same store as `/providers`: one place a thing is kept is one place it is kept,
+  whichever way somebody reached it. What it wrote down MUST be there to be imported the next
+  time a flow's agent is set up.
+- What an agent runs MUST be said exactly as `-a` says it, permissions and account and all:
+  a second spelling for one thing is a spelling to keep in step.
+- A name already written down MUST be a refusal rather than a quiet overwrite, and MUST say
+  which line means it: an agent somebody else set up is not a thing to lose to a typo.
+- It MUST NOT be the agents of a flow. Which agent drives which flow is a thing about a
+  workspace, and is `hmz` with `-f` and `-a` or the interface's own menu.
+- Nothing here MUST reach the interface: reading a file of six lines MUST NOT cost a terminal
+  interface, so the store is `kept.py` and this names that.
 
 ## `hmz providers`
 

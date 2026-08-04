@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from hmz import home
-from hmz.tui.pick import Runs
+from hmz.kept import Runs
 from hmz.tui.settings import Settings
 
 if TYPE_CHECKING:

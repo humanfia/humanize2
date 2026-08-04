@@ -357,22 +357,17 @@ adjusted rather than chosen.
 ## `settings.py`
 
 What one workspace was last set up to run, kept under humanize's own home as `settings.yaml`
-so that opening the interface again in the same project finds it that way -- and, in a file of
-its own, the agents that were written down under a name to be reached for from any flow.
+so that opening the interface again in the same project finds it that way. The agents written
+down under a name are not here: they are `hmz.kept`, which a command line reads too.
 
 - MUST be kept per flow as well as per workspace, by the name humanize's own flows have and by
   the path yours have: what an agent runs is only meaningful against the flow driving it, and a
   flow of yours MUST NOT inherit the agents of the one it shares a name with. Each agent MUST
   be keyed by the name the flow calls it, so that a flow which grows an agent in the middle does
   not silently hand the reviewer's model to the builder.
-- The agents kept under a name MUST NOT be a workspace's and MUST NOT be any flow's: what an
-  agent is is not a thing about the project it happens to be working in, so they are one file
-  of humanize's own, written whole as the menu holding them is saved.
-- Both files MUST write one agent the same way, and MUST leave out what says nothing: an agent
-  that works here, was never asked about skills, may do what an agent nobody was asked about
-  may do and runs as this machine is signed in is one every field of which is that field's own
-  silence -- so a file written before there was such a setting reads the same way as one that
-  has it.
+- How one agent is written down MUST be `hmz.kept`'s, and this MUST write them that way: the
+  file of the ones kept under a name and this one hold the same shape, and two places writing
+  one shape is two places to drift.
 - A setting that was never chosen MUST be left out rather than written down as a default: a
   file written before there was such a setting and a workspace nobody has been asked MUST read
   the same way. What is read back MUST be checked before it is used -- a flow's own model

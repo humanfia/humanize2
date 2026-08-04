@@ -17,8 +17,9 @@ from textual.widgets import Label, OptionList
 
 from hmz.backends import Model
 from hmz.cli import main
+from hmz.kept import Runs
 from hmz.tui import Humanize
-from hmz.tui.pick import Agent, Catalogue, Clis, Runs
+from hmz.tui.pick import Agent, Catalogue, Clis
 
 from .test_app import into_agent, keeps, onto, opens, rows, until
 

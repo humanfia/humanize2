@@ -53,6 +53,9 @@ ALLOWED: dict[str, set[str]] = {
     # that kind is written once, and it names nothing, so this widens the DAG without
     # bending it.
     "hmz.flows": {"hmz.agents", "hmz.backends"},
+    # What an agent is written down as, which is a shape and a file and nothing else: the
+    # interface keeps them and a command line reads the same ones, so it sits under both.
+    "hmz.kept": set(),
     "hmz.machines": {"hmz.coganchor"},
     # What a backend runs is asked of that backend as the account whose it would be, so the
     # asking reads the facts about the CLI and the providers it could be run as. Neither
@@ -73,6 +76,9 @@ ALLOWED: dict[str, set[str]] = {
         "hmz.agents",
         "hmz.backends",
         "hmz.flows",
+        # The agents written down under a name, which `/agents` walks and `hmz agents` says
+        # from a command line. It names nothing, so this widens the DAG without bending it.
+        "hmz.kept",
         # What each CLI runs, which the sheets offer and the key on them fills again.
         "hmz.models",
         # `/providers` is where an account is made and `/agents` is where one is given to an

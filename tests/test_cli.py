@@ -24,6 +24,7 @@ COMMANDS = [
     ("collect", set[str]()),
     ("anchor", {"coganchor"}),
     ("flowverses", set[str]()),
+    ("agents", set[str]()),
 ]
 
 

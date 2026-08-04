@@ -18,9 +18,9 @@ import pytest
 from textual.widgets import Label, OptionList
 
 from hmz.backends import Model
+from hmz.kept import Kept, Runs, Templates
 from hmz.tui import Humanize
-from hmz.tui.pick import Agent, Catalogue, Clis, Imports, Names, Runs, Saved
-from hmz.tui.settings import Kept, Templates
+from hmz.tui.pick import Agent, Catalogue, Clis, Imports, Names, Saved
 
 from .test_app import drops, into_agent, into_flows, keeps, onto, opens, rows, until
 

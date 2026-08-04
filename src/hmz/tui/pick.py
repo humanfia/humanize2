@@ -50,6 +50,7 @@ from textual.widgets.option_list import Option
 from hmz.agents import PERMISSIONS, SWARM, anchored, driver
 from hmz.agents.skills import Skill, skills
 from hmz.backends import named
+from hmz.kept import Kept, Runs
 
 from .discover import machines
 from .monitor import short, thousands
@@ -85,11 +86,9 @@ __all__ = [
     "Flows",
     "Held",
     "Imports",
-    "Kept",
     "Names",
     "Picks",
     "Providers",
-    "Runs",
     "Saved",
     "Sheet",
     "Signing",
@@ -108,46 +107,6 @@ __all__ = [
     "setting",
     "settled",
 ]
-
-
-class Runs(NamedTuple):
-    """What one agent of a flow was set up to run, and where its turns land.
-
-    Attributes:
-      spec: The agent itself, as `cli/model:effort` -- the same word a command line takes.
-      anchor: The machine its work lands on, as a target, or "" to work on this one.
-      skills: The skills of its CLI it is to have, by name, or None for the CLI as it comes
-        -- which is every skill it finds.
-      permission: What it may do without being asked, as one of `hmz.agents.PERMISSIONS`,
-        or "" for the one an agent nobody has been asked about runs at.
-      provider: The account its turns run as, by the name a provider of its CLI was made
-        under, or "" to run as this machine is already signed in.
-      goals: Whether backend goals are available. This is always an on/off answer; any
-        suggestion attached to the flow's agent place is resolved before this is constructed.
-    """
-
-    spec: str
-    anchor: str = ""
-    skills: tuple[str, ...] | None = None
-    permission: str = ""
-    provider: str = ""
-    goals: bool = True
-
-
-class Kept(NamedTuple):
-    """One agent written down under a name, to be imported from any flow that wants one.
-
-    Beside :class:`Runs` because it is one: an agent is a CLI, an account, a model at an
-    effort and what it may do, and a name is the only thing a saved one has that an agent of
-    a flow has not -- a flow's is called what the flow calls it.
-
-    Attributes:
-      name: What it is called, which is what it is imported by and nothing else.
-      runs: What it is.
-    """
-
-    name: str
-    runs: Runs
 
 
 def called(places: tuple[Place, ...], at: int) -> str:
@@ -1185,7 +1144,7 @@ class Flows(Drafts[Chosen]):
           One apiece, and nothing at all for a flow this workspace has never run -- which is
           a flow whose agents fall back on the one the interface opens talking to.
         """
-        from .settings import read_back
+        from hmz.kept import read_back
 
         agents: dict[str, Any] = self._held(name).get("agents") or {}
         return [
@@ -3362,18 +3321,22 @@ class Agent(Drafts[Fitted]):
         self._is_named = naming
         cli, _, rest = runs.spec.partition("/")
         model, _, effort = rest.rpartition(":")
-        self._cli, self._model = cli, model
+        # Said outright, all of them: each is read where it is set -- what a CLI runs is
+        # looked up as the CLI that is chosen now -- so what they are has to be settled
+        # without reading what reads them.
+        self._cli: str = cli
+        self._model: str = model
         # `swarm` in front of the effort is how a fleet is written down, so it comes off again
         # before the effort is looked for among the ones the model takes.
-        self._swarm = effort.startswith(SWARM)
-        self._effort = effort.removeprefix(SWARM)
-        self._skills = runs.skills
+        self._swarm: bool = effort.startswith(SWARM)
+        self._effort: str = effort.removeprefix(SWARM)
+        self._skills: tuple[str, ...] | None = runs.skills
         self._permission = (
             PERMISSIONS.index(runs.permission)
             if runs.permission in PERMISSIONS
             else len(PERMISSIONS) - 1
         )
-        self._provider = runs.provider
+        self._provider: str = runs.provider
         self._goals = True if place is not None and place.goal else runs.goals
         self._anchor = runs.anchor
         #: What the chosen CLI says it runs as the chosen account, read once per pair: this
@@ -3756,7 +3719,7 @@ class Agent(Drafts[Fitted]):
 
     async def _imports(self, showing: App[None]) -> None:
         """Copies a saved agent into this one, name and all but the name."""
-        from .settings import Templates
+        from hmz.kept import Templates
 
         held = Templates().all()
         if not held:
@@ -3791,7 +3754,7 @@ class Agent(Drafts[Fitted]):
 
     async def _saves(self, showing: App[None]) -> None:
         """Writes this agent down under a name, new or one already there."""
-        from .settings import Kept, Templates
+        from hmz.kept import Templates
 
         if not (self._cli and self._model):
             self._said = "an agent with no model is not one to save"
@@ -4216,7 +4179,7 @@ class Saved(Drafts[list[str]]):
           agents: The backends offered here, and what each of them says it runs.
         """
         super().__init__()
-        from .settings import Templates
+        from hmz.kept import Templates
 
         self._agents = dict(agents)
         #: What the menu is holding, which is what is written down when it is saved.
@@ -4360,7 +4323,7 @@ class Saved(Drafts[list[str]]):
 
     def applied(self) -> None:
         """Writes down exactly what the menu is holding, and says what it now holds."""
-        from .settings import Templates
+        from hmz.kept import Templates
 
         Templates().keep(self._held)
         self.dismiss(

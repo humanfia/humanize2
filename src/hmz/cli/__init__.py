@@ -132,6 +132,20 @@ def _cred(argv: list[str]) -> int:
     return cred(argv)
 
 
+def _agents(argv: list[str]) -> int:
+    """Lists, writes down and takes away the agents kept under a name.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      Zero, or two for a line to correct.
+    """
+    from .agents import agents
+
+    return agents(argv)
+
+
 def _providers(argv: list[str]) -> int:
     """Lists, makes and takes away the accounts an agent may be run as.
 
@@ -211,9 +225,9 @@ def _tui(argv: list[str]) -> int:
     # reaching the lazily imported interface below.
     _prepare_textual_terminal()
 
+    from hmz.kept import Runs
     from hmz.runner import configures, read_agent, set_up_from, wanted
     from hmz.tui import Humanize
-    from hmz.tui.pick import Runs
 
     parser = _line()
     args = parser.parse_args(argv)
@@ -273,6 +287,7 @@ COMMANDS = {
     ),
     "anchor": (_anchor, "run an agent here that acts on another machine"),
     "flowverses": (_flowverses, "the places flows come from"),
+    "agents": (_agents, "the agents written down under a name"),
     "providers": (_providers, "the accounts an agent may be run as"),
 }
 
