@@ -1744,8 +1744,8 @@ def _written(
     """
     mark = f"{_INDENT}[$primary]{_HERE}[/] " if here else f"{_INDENT}  "
     number = f"{at + 1:>{counting}}."
-    # A block where the next letter goes, as `/config` draws one: every row here is written
-    # into, so every one of them has somewhere the next letter lands.
+    # A block where the next letter goes, as the settings of a flow draw one: every row here
+    # is written into, so every one of them has somewhere the next letter lands.
     caret = "[reverse] [/reverse]" if here else ""
     # Padded on what is shown rather than on what is written: markup is not columns.
     label = escape(named) + " " * max(1, _SETTING - len(named))
@@ -2991,9 +2991,10 @@ _BREAKS = ("shift+enter", "ctrl+j")
 class Signing(Sheet[Signs]):
     """What a way in has to be told before an account can be made out of it.
 
-    A form rather than a list, so it is drawn as `/config` is: one row per question, the
-    variable the answer becomes, what has been typed into it, and the question said quietly
-    beside it. What the backend called a secret is drawn as bullets and never shown back --
+    A form rather than a list, so it is drawn as the settings of a flow are: one row per
+    question, the variable the answer becomes, what has been typed into it, and the question
+    said quietly beside it. What the backend called a secret is drawn as bullets and never
+    shown back --
     it is on its way into a credential store, and a screen is somewhere it can be read off.
     """
 

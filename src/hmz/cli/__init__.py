@@ -187,7 +187,7 @@ def _line() -> ArgumentParser:
         "-c",
         "--config",
         metavar="PATH",
-        help="a YAML file of what to set that flow up with, as `/config` would ask for it; "
+        help="a YAML file of what to set that flow up with, as choosing it would ask for it; "
         "needs -f",
     )
     return parser

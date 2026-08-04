@@ -66,8 +66,8 @@ others, and nothing that is running.
 
 **Not choosing another flow.** `/flow` is refused while one is running — `no choosing a flow
 while a flow is running: esc stops it first` — since a flow drives the agents it was handed and
-must not have them swapped underneath it. Esc first, then choose; `/agents` and `/config` are
-the same, and looking and leaving without choosing changes nothing.
+must not have them swapped underneath it. Esc first, then choose; the page of `/flow` that
+chooses one is shut while one runs, and looking and leaving without choosing changes nothing.
 
 **Not a question ending.** A question still up when the flow ends or is stopped ends with it, so
 stopping is never blocked on one.

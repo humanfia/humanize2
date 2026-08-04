@@ -104,6 +104,9 @@ line, with what the flow is doing beside the transcript.
   places, and the same store either way.
 - `hmz collect` and `hmz anchor` MUST NOT be commands here. Neither is a thing to do to a flow
   that is running, and a command that only ever means one thing is a command line.
+- Setting the flow up MUST NOT be a command here either: it is asked as the flow is chosen, so
+  a command for it would be a second way in to one sheet of one menu -- and one that has to
+  say `that flow takes no setting up` for most of the flows there are.
 - A turn MUST be shown as it happens: which agent is taking it, each tool it uses as one
   compact row, and what it says. It MUST be shown once -- a backend teeing to stderr for the
   benefit of a plain terminal MUST NOT also be shown here. `/details` MUST toggle all of what

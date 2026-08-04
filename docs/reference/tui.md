@@ -131,7 +131,6 @@ list appears under the editor with a line about each.
 | Command | Takes | What it does |
 | --- | --- | --- |
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one. The first page is shut while a flow is running; the second never is. Nothing lands until you save on the way out. |
-| `/config` | | Sets up the flow itself, for a flow that says it can be. Choosing a flow asks the same thing. See [below](#setting-a-flow-up). |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, corrected, signed in again, marked as a fallback, taken away. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
@@ -639,9 +638,9 @@ over the headings.
 It opens as the flow is chosen — enter on a flow that takes settings puts it up, and answering
 it lands on the Agents page — and what it answers is held with the rest of that menu until the
 menu is saved: setting a flow up is a thing about the flow rather than about what runs it. A
-flow that takes no settings is not asked, so the walk is the same either way. `/config` opens
-it on its own, for a flow already chosen. So does `hmz -f <flow> -c <setup.yaml>`, which opens
-the interface already set up. See [CLI › hmz](/reference/cli.md#hmz).
+flow that takes no settings is not asked, so the walk is the same either way. There is no
+command for it: choosing the flow again is how you answer it again. `hmz -f <flow> -c
+<setup.yaml>` opens the interface already set up. See [CLI › hmz](/reference/cli.md#hmz).
 
 Nothing in the interface knows what any of the settings mean. The types say how a value moves,
 and the flow's own model says which combinations it will not take — so a flow that refuses
@@ -681,7 +680,8 @@ would be a guess about the background it lands on.
 - **Open twice.** `hmz` with no command is the only way in — with or without `-f`, `-c` and
   `-a`, which say how it opens rather than opening a second one.
 - **Run two flows at once.** The Flow page of `/flow` is shut while one is running, and
-  `/config` is refused. What each agent is stays open: that is the half worth changing mid-run.
+  what the flow itself takes is not asked. What each agent is stays open: that is the half
+  worth changing mid-run.
 - **Guess at a bad line.** A line it cannot carry out is shown and the interface stays up. Only
   `/exit` closes it.
 - **Ask the flow anything.** What is drawn beside and under the transcript is kept from the

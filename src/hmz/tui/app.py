@@ -64,7 +64,6 @@ from .history import History
 from .monitor import Monitor, short, thousands
 from .pick import (
     Chosen,
-    Configures,
     Flows,
     Held,
     Providers,
@@ -72,7 +71,6 @@ from .pick import (
     Saved,
     Status,
     config_of,
-    model_of,
     opens_on,
     places_of,
     reads,
@@ -98,7 +96,6 @@ if TYPE_CHECKING:
 #: own.
 _OWN = (
     "flow",
-    "config",
     "agents",
     "providers",
     "status",
@@ -1563,8 +1560,6 @@ class Humanize(App[None]):
             self.action_clear()
         elif name == "flow":
             self.action_flow(argv[0] if argv else "")
-        elif name == "config":
-            self.action_config()
         elif name == "agents":
             self.action_agents()
         elif name == "providers":
@@ -1840,37 +1835,6 @@ class Humanize(App[None]):
         agents.update(installable())
         for one in await self.push_screen_wait(Saved(agents)) or ():
             self.show(one)
-
-    @work
-    async def action_config(self) -> None:
-        """Sets up the flow itself, which is what `/config` is for.
-
-        Only what the flow says it takes, and nothing about the agents: the flow menu is the
-        other half, and a flow that says it takes no setting up says so here.
-        """
-        if self._mid_run("no setting up a flow"):
-            return
-        model = model_of(self._flow_named)
-        if model is None:
-            self.show(f"hmz: {self._flow_named} takes no setting up", "red")
-            return
-        held = await self.push_screen_wait(
-            Configures(
-                self._flow_named,
-                model,
-                self._config if isinstance(self._config, model) else None,
-            )
-        )
-        if held is None:
-            return
-        self._config = held
-        self.settings.remember(
-            self._flow_named,
-            self._named_by,
-            self._models,
-            held.model_dump(mode="json"),
-        )
-        self._draw()
 
     @work
     async def action_providers(self) -> None:

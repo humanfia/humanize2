@@ -167,8 +167,8 @@ That is the whole of it. The model is what asks: the fields are the questions, t
 how each one is answered, `description` is the line shown beside it, and whatever the model
 refuses is what the flow will not run.
 
-- `/config` in the interface is that model with a cursor on it, and `/flow` walks through it
-  between choosing the flow and choosing its agents. See [TUI › Setting a flow
+- The sheet the interface puts up as a flow is chosen is that model with a cursor on it: `/flow`
+  asks it between choosing the flow and choosing its agents. See [TUI › Setting a flow
   up](/reference/tui.md#setting-a-flow-up).
 - What you set is [remembered per flow](/reference/tui.md#what-it-remembers), so a flow of twenty
   settings is not one to answer again every morning.
@@ -410,7 +410,7 @@ run should not change under whoever renames the function. `@flow(about="…")` s
 where flows are listed, which is otherwise the first line of its docstring.
 
 Each of them declares its own agents and its own settings, so `/agents` asks two questions
-rather than five and `/config` shows one phase's flags rather than three phases' at once. What
+rather than five and setting one up shows one phase's flags rather than three phases' at once. What
 passes between them is whatever they write — a file, usually.
 
 `@flow` marks; it does not wrap. The function is called exactly as it was. A file that marks
@@ -580,7 +580,7 @@ flowbench's loops, written against this API.
 `humanize1` is [PolyArch/humanize](https://github.com/PolyArch/humanize), and its three commands
 are [three flows in one file](#several-flows-in-one-file) — set up on their own agents, run one
 at a time, and handing to each other through the file each writes: the draft, then the plan.
-Every flag the plugin takes is a field on that phase's `/config`, under the plugin's own name
+Every flag the plugin takes is a field on that phase's own settings, under the plugin's own name
 for it — `--max`, `--full-review-round`, `--skip-impl`, `--agent-teams`, `--yolo`, and the rest.
 
 The loop is a hook. The plugin blocks Claude's exit and puts the round to Codex in a Stop hook;

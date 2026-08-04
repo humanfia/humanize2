@@ -343,8 +343,8 @@ async def test_how_it_was_set_up_is_kept_and_read_back(
 
 
 @pytest.mark.timeout(60)
-async def test_config_opens_the_sheet_on_its_own(flows: Path) -> None:
-    """`/config` is the other half of `/agents`: one asks about the flow, one about what runs it."""
+async def test_setting_one_up_again_is_choosing_it_again(flows: Path) -> None:
+    """There is no command for it: the flow is where the question about the flow lives."""
     app = Humanize()
     with unittest.mock.patch(
         "hmz.tui.app.installed",
@@ -358,23 +358,23 @@ async def test_config_opens_the_sheet_on_its_own(flows: Path) -> None:
             await keeps(app, driver)
             await until(lambda: not isinstance(app.screen, Flows), driver)
 
-            await driver.press(*"/config")
-            await driver.press("enter")
-            await until(lambda: isinstance(app.screen, Configures), driver)
+            # The flow in force, chosen again, which is what asks what it takes again.
+            await _set_up(app, driver)
 
+            await until(lambda: isinstance(app.screen, Configures), driver)
             assert isinstance(app.screen, Configures)
 
 
 @pytest.mark.timeout(60)
-async def test_config_on_a_flow_that_takes_none_says_so(flows: Path) -> None:
-    """Rather than putting up a sheet with nothing on it."""
+async def test_there_is_no_command_that_sets_a_flow_up(flows: Path) -> None:
+    """A command that only ever means one row of one menu is a command nobody needs."""
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/config")
         await driver.press("enter")
         await driver.pause()
 
-        assert "takes no setting up" in app.query_one("#transcript", Transcript).text
+        assert "no such command" in app.query_one("#transcript", Transcript).text
 
 
 def test_status_says_only_what_was_changed() -> None:

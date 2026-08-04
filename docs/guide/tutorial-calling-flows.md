@@ -142,7 +142,7 @@ hmz exec -f official/humanize1:gen-plan -a claude/claude-opus-5:max -a codex/gpt
 ```
 
 Each declares its own agents and its own settings, so `/agents` asks two questions rather than
-five and `/config` shows one phase's flags rather than three phases' at once. What passes between
+five and setting one up shows one phase's flags rather than three phases' at once. What passes between
 them is whatever they write — a file, usually.
 
 **The name is what you write in the mark and nothing else.** A name written down where a flow is

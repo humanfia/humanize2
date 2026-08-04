@@ -35,7 +35,7 @@ hmz -f|--flow <flow> [-c|--config <path>] [-a|--agent <spec>]...
 | Argument | |
 | --- | --- |
 | `-f`, `--flow <flow>[:<name>]` | The flow to open on. |
-| `-c`, `--config <path>` | A YAML file of what to set that flow up with, as [`/config`](/reference/tui.md#setting-a-flow-up) would have asked for it. Needs `-f`. |
+| `-c`, `--config <path>` | A YAML file of what to set that flow up with, as [choosing the flow](/reference/tui.md#setting-a-flow-up) would have asked for it. Needs `-f`. |
 | `-a`, `--agent <spec>` | What each of that flow's agents runs, in the order it takes them — as many as it drives. Needs `-f`. |
 
 Nothing is started: the interface opens ready, and the first thing you say is still what starts

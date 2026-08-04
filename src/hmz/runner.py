@@ -1095,7 +1095,7 @@ def flow_and_agents(
 def set_up_from(said: str | os.PathLike[str]) -> dict[str, Any]:
     """Reads what a flow is to be set up with out of a file of it.
 
-    The file is what `/config` would have been walked through, written down: one field per
+    The file is what the flow menu would have asked, written down: one field per
     line, under the names the flow declared. It is not checked here -- the flow's own model
     is what checks it, and the model is not there until the flow is loaded.
 

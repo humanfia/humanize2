@@ -42,11 +42,11 @@ flow will not run.
 ## Step 2 — set it at the prompt
 
 ```
-/config
+/flow
 ```
 
-The sheet is that model with a cursor on it: one row per setting, its name, what it is set to, and
-the line the flow declared it with.
+Choose the flow, and the sheet comes up: it is that model with a cursor on it — one row per
+setting, its name, what it is set to, and the line the flow declared it with.
 
 ```
    ❯ 1. rounds                       3            how many times round
@@ -169,7 +169,7 @@ before its first turn, as one handed the wrong number of agents is.
 ## Try this
 
 `official/humanize1` takes twenty-three settings, grouped into three phases. Fetch the official
-flowverse, `/flow` it, and look at what a large `/config` is:
+flowverse, `/flow` it, choose it, and look at what a large one of these is:
 
 ```
 /flow official/humanize1:gen-idea

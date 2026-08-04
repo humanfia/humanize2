@@ -105,7 +105,7 @@ hmz exec -f ralph_loop -a claude/claude-opus-4-8:high -- "--force is not a flag 
 ## Step 6 — a flow with settings
 
 For a flow that says it [can be set up](/reference/flows#settings-of-the-flow-s-own), write a YAML
-file of what `/config` would have asked for:
+file of what choosing the flow would have asked for:
 
 ```yaml
 # setup.yaml
