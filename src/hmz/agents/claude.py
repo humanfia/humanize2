@@ -22,6 +22,17 @@ if TYPE_CHECKING:
 #: what the permission prompt of an interactive Claude fills in.
 _ASKS = "AskUserQuestion"
 
+#: Noninteractive orchestration tools that can move work beyond the ordinary turn HMZ owns.
+#: An agent whose goals are disabled remains able to use its ordinary permission-bound tools,
+#: but cannot escape into a hidden goal, subagent, wakeup, or cron lifecycle.
+_CONTINUATION_TOOLS = (
+    "Agent",
+    "ScheduleWakeup",
+    "CronCreate",
+    "CronDelete",
+    "CronList",
+)
+
 #: Reasons that leave an answer unfinished even when a broken intermediary labels the result
 #: `success`. Claude normally keeps its own agent loop going for these rather than returning
 #: them as the result of the whole turn.
@@ -188,6 +199,13 @@ class ClaudeCodeSession(StreamSessionBase):
             # Claude validates the answer against this itself, so a turn that lands has
             # answered in the shape: what comes back is the object, and nothing else.
             argv += ["--json-schema", json.dumps(self._shaping.model_json_schema())]
+        if not self._agent.goals_enabled:
+            # A tool call is a tool call, and `--disallowedTools` is that call written as a
+            # rule: an agent whose goals were switched off is refused the ones that would
+            # carry work past the turn humanize is holding -- a subagent of its own, a
+            # wakeup, anything on the scheduler. Everything else it may reach for is what its
+            # permission rung says it may, exactly as before.
+            argv += ["--disallowedTools", ",".join(_CONTINUATION_TOOLS)]
         return argv
 
     def _write(self, text: str, ticket: str = "") -> str:

@@ -135,3 +135,24 @@ def test_claude_is_held_to_the_shape_rather_than_asked_for_it() -> None:
     # The whole of what is asked: the fields, their types, and that there are no others.
     assert given["required"] == ["done", "notes"]
     assert given["additionalProperties"] is False
+
+
+def test_an_agent_whose_goals_are_off_is_refused_what_would_outlive_the_turn() -> None:
+    """One deterministic argument, and only where the goals were actually switched off.
+
+    Whose precedence is not the CLI's to decide: what humanize refuses is written once, in
+    the order it is written here, so that a command read back off a trace is the same command
+    every time.
+    """
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    session = agent.new()
+
+    assert "--disallowedTools" not in session._command()  # goals on: nothing is refused
+
+    agent.disable_goals()
+    argv = session._command()
+
+    assert argv.count("--disallowedTools") == 1
+    assert argv[argv.index("--disallowedTools") + 1] == (
+        "Agent,ScheduleWakeup,CronCreate,CronDelete,CronList"
+    )
