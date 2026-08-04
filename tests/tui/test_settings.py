@@ -6,10 +6,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 import yaml
+from textual.widgets import Label, OptionList
 
 from hmz import home
 from hmz.kept import Runs
-from hmz.tui.settings import Settings
+from hmz.settings import Settings
+
+from .test_app import until
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -247,3 +250,113 @@ def test_an_old_entry_takes_the_current_agent_place_suggestion(tmp_path: Path) -
         Runs("claude/m:high", goals=False)
     ]
     assert Settings(tmp_path).agents("rlar") == [Runs("claude/m:high", goals=True)]
+
+
+@pytest.mark.timeout(60)
+async def test_the_first_start_asks_whether_humanize_reports_itself(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Asked once, with what it means beside it, and answered for every project after that."""
+    from hmz import telemetry
+    from hmz.tui import Humanize
+    from hmz.tui.pick import Reports
+
+    monkeypatch.delenv(telemetry.SAYS, raising=False)
+    monkeypatch.chdir(tmp_path)
+    app = Humanize()
+    async with app.run_test() as driver:
+        await until(lambda: isinstance(app.screen, Reports), driver)
+        said = str(app.screen.query_one("#about", Label).content)
+        # What goes and what does not, both, where the question is asked.
+        assert "crash nobody sees" in said
+        assert "nothing you typed" in said
+        # The answer that helps is the one the cursor opens on.
+        listing = app.screen.query_one("#choices", OptionList)
+        assert [str(one.id) for one in listing.options] == ["=on", "=off"]
+
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Reports), driver)
+
+    assert Settings(tmp_path).enable_sentry is True
+
+
+@pytest.mark.timeout(60)
+async def test_walking_away_from_the_question_is_being_asked_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Silence is not a no and is not a yes: it is a question still to ask."""
+    from hmz import telemetry
+    from hmz.tui import Humanize
+    from hmz.tui.pick import Reports
+
+    monkeypatch.delenv(telemetry.SAYS, raising=False)
+    monkeypatch.chdir(tmp_path)
+    app = Humanize()
+    async with app.run_test() as driver:
+        await until(lambda: isinstance(app.screen, Reports), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Reports), driver)
+
+    assert Settings(tmp_path).enable_sentry is None
+
+
+@pytest.mark.timeout(60)
+async def test_a_machine_that_has_answered_is_not_asked_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hmz import telemetry
+    from hmz.tui import Humanize
+    from hmz.tui.pick import Reports
+
+    monkeypatch.delenv(telemetry.SAYS, raising=False)
+    monkeypatch.chdir(tmp_path)
+    Settings(tmp_path).answers(enable_sentry=False)
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.pause()
+
+        assert not isinstance(app.screen, Reports)
+
+
+@pytest.mark.timeout(60)
+async def test_the_settings_menu_is_two_pages_and_turns_the_reporting_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One page for what is true of this machine, one for what this directory is set up as."""
+    from hmz.kept import Runs
+    from hmz.tui import Humanize
+    from hmz.tui.pick import Adjusts
+
+    monkeypatch.chdir(tmp_path)
+    Settings(tmp_path).answers(enable_sentry=True)
+    Settings(tmp_path).remember("chat", ("a",), [Runs("claude/m:high")])
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/settings")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Adjusts), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        assert [str(one.id) for one in listing.options] == ["=reports", "=sent"]
+        assert "on " in str(listing.get_option_at_index(0).prompt)
+
+        await driver.press("right")  # off
+        await driver.pause()
+        assert "off " in str(listing.get_option_at_index(0).prompt)
+
+        await driver.press("tab")  # the other page: this directory
+        await driver.pause()
+        assert [str(one.id) for one in listing.options] == [
+            "=workspace",
+            "=flow",
+            "=forget",
+        ]
+        assert "chat" in str(listing.get_option_at_index(1).prompt)
+
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Adjusts), driver)
+        # Nothing lands until saving is confirmed, as on every other menu.
+        await driver.press("enter")
+        await driver.pause()
+
+    assert Settings(tmp_path).enable_sentry is False
+    assert Settings(tmp_path).flow == "chat"  # and the second page was not touched

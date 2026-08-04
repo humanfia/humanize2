@@ -56,17 +56,22 @@ from textual.theme import Theme
 from textual.widgets import OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
+from hmz import telemetry
 from hmz.runner import flow_and_agents
+from hmz.settings import Settings
 
 from .complete import about, hinted, offered, takes
 from .discover import installable, installed
 from .history import History
 from .monitor import Monitor, short, thousands
 from .pick import (
+    Adjusted,
+    Adjusts,
     Chosen,
     Flows,
     Held,
     Providers,
+    Reports,
     Runs,
     Saved,
     Status,
@@ -77,7 +82,6 @@ from .pick import (
     settled,
 )
 from .selecting import Choices, Transcript
-from .settings import Settings
 from .tally import Tally
 
 if TYPE_CHECKING:
@@ -98,6 +102,7 @@ _OWN = (
     "flow",
     "agents",
     "providers",
+    "settings",
     "status",
     "clear",
     "details",
@@ -771,6 +776,7 @@ class Humanize(App[None]):
         self._draw()
         self.set_interval(_REFRESH, self._draw)
         self._asks_what_runs()
+        self._asks_about_reports()
         # The editor is the only thing to type at, so it is the only thing that takes focus:
         # a transcript or a list that could hold it would swallow the keystrokes meant for it.
         for elsewhere in self.query("#transcript, #offers"):
@@ -1564,6 +1570,8 @@ class Humanize(App[None]):
             self.action_agents()
         elif name == "providers":
             self.action_providers()
+        elif name == "settings":
+            self.action_settings()
         elif name == "status":
             self.action_status()
         elif name == "details":
@@ -1584,6 +1592,7 @@ class Humanize(App[None]):
         elif name == "export":
             self._export()
         else:
+            telemetry.snag("unknown-command", length=len(name))
             self.show(f"hmz: no such command: /{name}", "red")
 
     def action_clear(self) -> None:
@@ -1649,6 +1658,9 @@ class Humanize(App[None]):
             given, self._given = [text for _, text in self._given], []
         if not (held or given):
             return
+        # Lines typed at a flow that is no longer there to take them. Counted rather than
+        # read: what they said is theirs, and how many of them there were is the signal.
+        telemetry.snag("lines-never-sent", how_many=len(held) + len(given))
         for (
             said
         ) in given:  # oldest first: what went to an agent went before what is queued
@@ -1834,6 +1846,79 @@ class Humanize(App[None]):
         agents.update(installable())
         for one in await self.push_screen_wait(Saved(agents)) or ():
             self.show(one)
+
+    @work
+    async def _asks_about_reports(self) -> None:
+        """Asks, once, whether humanize reports its own failures.
+
+        Only where nobody has been asked yet, and only here: the interface is the one thing
+        humanize has that has somebody at it. A headless run reports if this was answered yes
+        and is silent otherwise -- silence is not consent, and a question nobody is there to
+        answer is a run that has stopped.
+
+        Left unanswered by esc, which is asked again next time rather than taken as a no. And
+        what the interface knows about the machine is said here either way, so that a report
+        made later carries it: registered rather than gathered, so nothing is looked at on a
+        machine that reports nothing.
+        """
+        telemetry.about("machine", _machine)
+        if telemetry.enabled() is not None:
+            telemetry.start()
+            return
+        said = await self.push_screen_wait(Reports())
+        if said is None:
+            return  # asked again next time: walking away is not an answer
+        telemetry.asked(enable_sentry=said == "on")
+        self.show(
+            "[dim]humanize reports what goes wrong; /settings turns it off[/dim]"
+            if said == "on"
+            else "[dim]humanize reports nothing; /settings turns it on[/dim]"
+        )
+
+    @work
+    async def action_settings(self) -> None:
+        """Opens what humanize remembers, which is what `/settings` is for.
+
+        Two pages: what is true of this machine, and what is remembered about this directory.
+        Not refused while a flow runs -- nothing on it changes what is running.
+        """
+        # What is written down rather than what is happening: the environment may answer for
+        # one run, and a menu that showed that would be a menu offering to change a thing it
+        # cannot. The sheet says so under the list where the two differ.
+        written = self.settings.enable_sentry
+        said = await self.push_screen_wait(
+            Adjusts(
+                enable_sentry=written,
+                overridden=telemetry.enabled() is not written,
+                workspace=str(Path.cwd()),
+                flow=self.settings.flow,
+                agents=len(self.settings.agents(self.settings.flow)),
+                flows=len(self.settings.flows()),
+            )
+        )
+        if said is None:
+            return
+        self._took_settings(said, written=written)
+
+    def _took_settings(self, said: Adjusted, *, written: bool | None = None) -> None:
+        """Does what the settings menu was holding.
+
+        Args:
+          said: What it answered with.
+          written: What was written down when it opened, so that a setting nobody moved is
+            not written again.
+        """
+        if said.enable_sentry is not None and said.enable_sentry != written:
+            self.settings.answers(enable_sentry=said.enable_sentry)
+            self.show(
+                "[dim]humanize reports what goes wrong[/dim]"
+                if said.enable_sentry
+                else "[dim]humanize reports nothing[/dim]"
+            )
+        if said.forget and self.settings.forget():
+            self.show(
+                "[dim]what was remembered about this directory is forgotten[/dim]"
+            )
 
     @work
     async def action_providers(self) -> None:
@@ -2274,7 +2359,8 @@ class Humanize(App[None]):
                 status = int(stopped.code or 0)
             except Stopped:
                 return  # asked for: esc already said the flow was stopping
-            except Exception:  # noqa: BLE001 -- a flow fails any way it likes, and is shown
+            except Exception as why:  # noqa: BLE001 -- a flow fails how it likes, and is shown
+                telemetry.crash(why, doing="a flow")
                 with contextlib.suppress(RuntimeError):  # or the interface has gone
                     self.call_from_thread(
                         self.show, traceback.format_exc().strip(), "red"
@@ -2311,6 +2397,9 @@ class Humanize(App[None]):
             named = [part for runs in self._models for part in ("-a", runs.spec)]
             self._flow(["-f", self._flow_named, *named, text])
         else:
+            # Typed a task and nothing at all happened, which is the worst of these: it is
+            # somebody meeting humanize for the first time and getting a red line for it.
+            telemetry.snag("nothing-started", because="no coding agent installed")
             self.show("hmz: no coding agent is installed here", "red")
 
     def _ask(self, agent: AgentBase, question: Question) -> str | None:
@@ -2462,6 +2551,7 @@ class Humanize(App[None]):
           text: The word.
           because: What the backend said about it.
         """
+        telemetry.snag("line-refused", because=because)
         with self._saying:
             if (who, text) in self._given:
                 self._given.remove((who, text))
@@ -2508,3 +2598,39 @@ class Humanize(App[None]):
             f"it had {'them' if len(held) > 1 else 'it'}[/dim]"
         )
         self._draw()
+
+
+def _machine() -> dict[str, object]:
+    """What the interface knows about this machine, for a report of something going wrong.
+
+    Which coding agents are installed, which accounts exist and how each was signed in, what
+    each backend would load as skills, and where flows come from. Names and counts only: an
+    account's variables are named nowhere and its values are read nowhere, and a skill is its
+    name and the CLI that would load it.
+
+    Returns:
+      The description, as plain values something can write out as YAML.
+    """
+    import platform
+
+    from hmz import providers
+    from hmz.agents.skills import skills
+    from hmz.flows import flowverses
+
+    return {
+        "python": platform.python_version(),
+        "system": platform.system(),
+        "clis": sorted(installed()),
+        "accounts": [
+            {"cli": one.cli, "name": one.name or "as local", "way": one.way or "-"}
+            for one in providers.providers()
+        ],
+        "skills": {
+            cli: [one.name for one in skills(cli)]
+            for cli in sorted(installed())
+            if skills(cli)
+        },
+        "flowverses": [
+            {"name": one.name, "fetched": one.fetched} for one in flowverses()
+        ],
+    }

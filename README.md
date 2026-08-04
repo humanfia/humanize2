@@ -28,6 +28,9 @@ Three things to know before pointing one at a repository you care about. Each is
 - **A flow is a directory of Python, and reading one means running it**, so adding a flowverse
   is trusting that repository with this machine.
 - **An `hmz anchor` port is equivalent to a shell on that machine.**
+- humanize asks, once, whether to **report what goes wrong** to its developers, and says what
+  a report carries before you answer. Nothing is sent by a machine that has not answered yes:
+  `HUMANIZE_SENTRY=off` settles it for a scripted install, and `/settings` changes it later.
 
 ## Install
 

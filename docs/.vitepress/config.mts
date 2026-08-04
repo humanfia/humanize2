@@ -114,6 +114,7 @@ export default defineConfig({
             { text: 'Efforts', link: '/features/efforts' },
             { text: 'Permissions', link: '/features/permissions' },
             { text: 'Skills', link: '/features/skills' },
+            { text: 'Reporting', link: '/features/reporting' },
             { text: 'Goals', link: '/features/goals' },
             { text: 'Questions', link: '/features/questions' },
             { text: 'Answers in a shape', link: '/features/shapes' },

@@ -25,7 +25,7 @@ from typing import (
     get_type_hints,
 )
 
-from hmz import backends
+from hmz import backends, telemetry
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
@@ -1059,6 +1059,10 @@ class Runner:
         # way, so that whatever is watching reads one list of what is running under what,
         # rather than a flow it was told about and a flow it was not.
         started = _entered(self._flow)
+        # What a report of a failure in this run would carry: asked for only if one is ever
+        # made, and never otherwise. The flow and its agents by name, at what and as whom --
+        # never what any of them was told or said.
+        telemetry.about("flow", lambda: _about(self._flow, self._agents))
         try:
             with Cycle(self._flow, self._agents, task) as cycle:
                 for agent in self._agents:
@@ -1076,6 +1080,45 @@ class Runner:
                     _finished(running_now)
         finally:
             _left(started)
+
+
+def _about(flow: str, agents: Sequence[AgentBase]) -> dict[str, Any]:
+    """What one run is, for a report of something that went wrong in it.
+
+    Names and never contents: which flow, how long it has been going, and for each agent the
+    backend it drives, the model at the effort, the account by the name it was made under,
+    what it may do, where its work lands and which skills the flow mounted onto it. What the
+    flow was told, what any agent said and what is in any file are not here and are not
+    reachable from what is.
+
+    Args:
+      flow: The flow, as it was named.
+      agents: The agents it is being driven with.
+
+    Returns:
+      The description, as plain values something can write out as YAML.
+    """
+    return {
+        "flow": flow,
+        "running": [
+            {"flow": one.flow, "for": round(time.monotonic() - one.since)}
+            for one in running()
+        ],
+        "agents": [
+            {
+                "called": one.id,
+                "cli": one.backend,
+                "model": one.config.model,
+                "effort": one.config.effort,
+                "account": one.config.provider or "as this machine is signed in",
+                "may": one.config.permission,
+                "goals": one.config.goals,
+                "works": "here" if one.config.machine is None else "elsewhere",
+                "skills": [each.name for each in one.loaded],
+            }
+            for one in agents
+        ],
+    }
 
 
 def read_agent(

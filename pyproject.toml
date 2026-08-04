@@ -27,6 +27,11 @@ dependencies = [
     # Named because the interface imports it directly. It arrives with textual either
     # way, but a dependency you import is one you declare.
     "rich>=15",
+    # What a crash is reported through, for as long as humanize is early enough that a
+    # stack nobody sees is a bug nobody fixes. Off until somebody says otherwise, and an
+    # ordinary dependency rather than an extra: an install that could be missing the half
+    # that reports its own failures is an install whose failures are not reported.
+    "sentry-sdk>=2.20",
     "textual>=8.2.8",
 ]
 

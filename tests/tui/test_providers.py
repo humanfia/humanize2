@@ -19,6 +19,7 @@ from textual.widgets import Label, OptionList, Static
 from hmz import providers
 from hmz.backends import Model
 from hmz.kept import Runs
+from hmz.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import (
     Accounts,
@@ -29,7 +30,6 @@ from hmz.tui.pick import (
     Ways,
     reads,
 )
-from hmz.tui.settings import Settings
 
 from .test_app import (
     _transcript,

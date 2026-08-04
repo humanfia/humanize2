@@ -30,8 +30,14 @@ def _humanize_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
     A run writes down its cycle and what was typed at it, and neither belongs in the history
     of the person who only asked for the suite to pass.
+
+    And nothing here reports anything anywhere. Every test starts with a home nobody has
+    answered a question in, which is what humanize reads as a first start -- so without this
+    the suite would put the question to a machine nobody is sitting at, and a crash a test
+    made on purpose would be filed as a crash.
     """
     monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize-home"))
+    monkeypatch.setenv("HUMANIZE_SENTRY", "off")
 
 
 @pytest.fixture(autouse=True)

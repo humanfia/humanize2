@@ -1,9 +1,16 @@
-"""What was set up to run here, kept so that opening the interface again finds it that way.
+"""What humanize remembers: what was set up to run here, and what is true everywhere.
 
-One file under humanize's own home, holding one entry per workspace: the flow that was last
-run there, and for each flow the workspace has run, what each of its agents was running. So a
-project that is driven by one flow on two agents is driven by them again tomorrow, rather than
-falling back to the default every time it is opened.
+One file under humanize's own home. Most of it is one entry per workspace -- the flow that was
+last run there, and for each flow the workspace has run, what each of its agents was running --
+so a project driven by one flow on two agents is driven by them again tomorrow, rather than
+falling back to the default every time it is opened. Beside those is the handful of settings
+that are not a workspace's at all, which is what `enable_sentry` is: whether humanize reports
+its own failures, answered once and true wherever it is run from.
+
+A leaf rather than part of the interface, for the reason the agents kept under a name are one:
+the interface writes these and a command line has to be able to read them without loading the
+interface to do it. `hmz exec` reports a crash or does not according to the same answer the
+menu wrote.
 
 Kept per flow rather than per workspace alone, because what an agent runs is only meaningful
 against the flow that drives it: a flow's second agent is its reviewer, and the flow before it
@@ -51,6 +58,47 @@ class Settings:
     def flow(self) -> str:
         """The flow this workspace was last run with, or "" if it never has been."""
         return str(self._mine().get("flow") or "")
+
+    @property
+    def enable_sentry(self) -> bool | None:
+        """Whether humanize reports its own failures, and None while nobody has been asked.
+
+        Three answers rather than two, and the third is the one the question turns on: a
+        setting that is not there is a machine nobody has put the question to yet, which is
+        what makes the first start the first start. It is never written by being read, so a
+        run that only ever looked at it leaves the question still to ask.
+
+        Not a workspace's: it is about this machine and whoever is at it, so it is asked once
+        and answered for every project.
+        """
+        said = self._held.get("enable_sentry")
+        return said if isinstance(said, bool) else None
+
+    def answers(self, *, enable_sentry: bool) -> None:
+        """Writes down whether humanize reports its own failures.
+
+        Args:
+          enable_sentry: What was answered.
+        """
+        self._held["enable_sentry"] = enable_sentry
+        self._write()
+
+    def forget(self, workspace: str = "") -> bool:
+        """Forgets what one workspace was set up to run, leaving everything else as it is.
+
+        Args:
+          workspace: Which one, defaulting to this one.
+
+        Returns:
+          Whether there was anything written down about it.
+        """
+        where = workspace or self._where
+        workspaces = self._held.get("workspaces")
+        if not isinstance(workspaces, dict) or where not in workspaces:
+            return False
+        del cast("dict[str, Any]", workspaces)[where]
+        self._write()
+        return True
 
     def agents(
         self, flow: str, goal_defaults: Sequence[bool] | None = None
@@ -176,17 +224,46 @@ class Settings:
         return cast("dict[str, Any]", held) if isinstance(held, dict) else {}
 
     def _write(self) -> None:
-        """Puts the whole file back, keeping every other workspace's entry as it was.
+        """Puts the file back, keeping what this one was not holding.
+
+        Read again and merged rather than dumped over: this holds what it read when it was
+        made, and two of these are alive at once wherever a menu writes a setting while the
+        interface goes on remembering flows -- so a plain dump would put back a file missing
+        whatever the other one had written since. What this one is holding wins for the
+        workspace it is about and for the settings it has answered; everything else is
+        whatever is on disk now.
+
+        Whole and then moved into place, as every other file humanize writes is: one read
+        while it is being written is the old one or the new one and never half of each.
 
         A file nobody can write is not a reason to stop: what it holds is a convenience, and
         an interface that refused to run because it could not remember would be worse than
         one that forgets.
         """
+        held = self._read()
+        for name, value in self._held.items():
+            if name != "workspaces":
+                held[name] = value
+        workspaces = held.get("workspaces")
+        if not isinstance(workspaces, dict):
+            workspaces = {}
+            held["workspaces"] = workspaces
+        mine = cast("dict[str, Any]", self._held.get("workspaces") or {})
+        cast("dict[str, Any]", workspaces).update(
+            {name: value for name, value in mine.items() if name == self._where}
+        )
+        # And a workspace this one has forgotten goes from the file too, which is the one
+        # thing a merge has to be told: it is an absence rather than a value.
+        if self._where not in mine:
+            cast("dict[str, Any]", workspaces).pop(self._where, None)
+        self._held = held
         try:
             self._file.parent.mkdir(parents=True, exist_ok=True)
-            self._file.write_text(
-                yaml.safe_dump(self._held, sort_keys=False, allow_unicode=True),
+            beside = self._file.parent / f".{self._file.name}.new"
+            beside.write_text(
+                yaml.safe_dump(held, sort_keys=False, allow_unicode=True),
                 encoding="utf-8",
             )
+            beside.replace(self._file)
         except (OSError, yaml.YAMLError):
             return

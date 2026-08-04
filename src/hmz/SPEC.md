@@ -17,6 +17,8 @@
 ├── models.py
 ├── providers
 ├── runner.py
+├── settings.py
+├── telemetry.py
 ├── tracing
 └── tui
 ```
@@ -36,6 +38,88 @@ program that ships to a target and could be lifted out whole.
 ## `__init__.py`
 
 Expose `home`, and nothing else. A caller names the layer it wants.
+
+## `settings.py`
+
+```python
+class Settings:
+    def __init__(self, workspace: Path | None = None): ...
+
+    @property
+    def flow(self) -> str: ...
+
+    @property
+    def enable_sentry(self) -> bool | None: ...
+
+    def agents(self, flow: str, goal_defaults: Sequence[bool] | None = None) -> list[Runs]: ...
+
+    def config(self, flow: str) -> dict[str, Any]: ...
+
+    def flows(self) -> dict[str, Any]: ...
+
+    def remember(self, flow: str, names: tuple[str, ...], models: Sequence[Runs], config: dict[str, Any] | None = None) -> None: ...
+
+    def answers(self, *, enable_sentry: bool) -> None: ...
+
+    def forget(self, workspace: str = "") -> bool: ...
+```
+
+What humanize remembers: what each workspace was last set up to run, and the settings that are
+not a workspace's.
+
+- It MUST be a leaf, for the reason `kept.py` is one: the interface writes these and a command
+  line has to be able to read them without loading the interface to do it.
+- A setting that is not a workspace's MUST live beside the workspaces rather than inside one,
+  and MUST be tri-state where it is a question somebody has to answer: on, off, and the absence
+  that means nobody has been asked. Reading one MUST NOT write it, or the absence -- which is
+  what tells a first start from a deliberate no -- would be spent by looking.
+- Writing MUST re-read and merge rather than dump what was read at construction: two of these
+  are alive at once wherever a menu writes a setting while the interface goes on remembering
+  flows, and a plain dump would put back a file missing whatever the other had written. What
+  the writer holds MUST win for its own workspace and for the settings it has answered, and
+  everything else MUST be whatever is on disk now.
+- A file that is missing, unreadable or not what this writes MUST read as nothing remembered
+  rather than as a reason to stop.
+
+## `telemetry.py`
+
+```python
+SENT: tuple[str, ...]
+KEPT: tuple[str, ...]
+
+
+def enabled() -> bool | None: ...
+def asked(*, enable_sentry: bool) -> None: ...
+def start() -> bool: ...
+def about(name: str, said: Callable[[], object]) -> None: ...
+def held() -> dict[str, object]: ...
+def crash(why: BaseException, **said: object) -> None: ...
+def snag(name: str, **said: object) -> None: ...
+```
+
+What humanize reports about itself when something goes wrong, and what it never reports.
+
+- Nothing MUST be sent by a machine nobody has been asked on. The answer MUST be asked once,
+  by the interface, which is the one part of humanize with somebody at it; a headless run MUST
+  report only where the answer is already yes and MUST NOT ask. An environment variable MUST
+  answer for one process without writing anything down, so that a scripted install, a CI job
+  and this suite are all silent without touching what a person answered.
+- What is sent and what is not MUST both be written down in one place, MUST be shown where the
+  question is asked, and MUST be readable again afterwards from the settings menu: a question
+  nobody can answer knowing what it means is not consent.
+- Nothing MUST be sent that a person would be surprised by. No prompt, no task, no line typed,
+  nothing an agent said, no file, no path outside humanize, no directory name, no credential
+  and no variable an account sets. The switches that would collect them MUST be off, and every
+  string on the way out MUST be put through the same scrubbing whatever carried it there.
+- This MUST be a leaf naming only the settings it reads. What goes with a report is the layers'
+  own to say, and each MUST say it by handing over a callable, which MUST be run only when a
+  report is actually being made: nothing MUST be gathered on a machine that reports nothing.
+- What is not an error MUST be reportable too. A key that did nothing, a menu answered and then
+  thrown away, a line refused, a run stopped seconds in: on a tool this young that is the half
+  of the feedback a stack trace never carries, and it MUST be recorded as counts and names and
+  never as anything anybody typed.
+- Nothing here MUST be able to stop humanize running. A reporter that will not start, a
+  callable that raises and a report that cannot be sent MUST each leave the run as it was.
 
 ## `backends.py`
 

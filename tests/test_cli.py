@@ -20,7 +20,9 @@ from hmz import cli
 #: Every command, and what reaching it may load besides `cli` itself: the layers its work is
 #: really done in, and nothing of any other command's.
 COMMANDS = [
-    ("exec", {"runner", "backends"}),
+    # And the two leaves that say whether humanize reports its own failures and where the
+    # answer is kept: a command that cannot report a crash is a crash nobody hears about.
+    ("exec", {"runner", "backends", "telemetry", "settings", "kept"}),
     ("collect", set[str]()),
     ("anchor", {"coganchor"}),
     ("flowverses", set[str]()),

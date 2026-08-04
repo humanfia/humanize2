@@ -17,10 +17,10 @@ from textual.widgets import Label, OptionList
 from hmz.backends import Model
 from hmz.cli import main
 from hmz.kept import Runs
+from hmz.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Configures, Flows, setting
 from hmz.tui.selecting import Transcript
-from hmz.tui.settings import Settings
 from tests.stubs import written
 
 from .test_app import into_agent, keeps, onto

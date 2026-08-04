@@ -61,8 +61,12 @@ def _exec(argv: list[str]) -> int:
     Returns:
       Zero, once the flow has returned.
     """
+    from hmz import telemetry
     from hmz.runner import NotAFlow, Runner, flow_and_agents
 
+    # If it has been answered yes, and never otherwise: a run with nobody at a terminal is a
+    # run with nobody to ask, and silence is not an answer.
+    telemetry.start()
     path, agents, task, config = flow_and_agents(argv)
     try:
         runner = Runner(path, agents, config)
@@ -72,7 +76,14 @@ def _exec(argv: list[str]) -> int:
         # do. What the flow raises for itself is the flow's, and is left to say so itself.
         print(f"hmz exec: error: {error}", file=sys.stderr)
         raise SystemExit(2) from error
-    runner.run(task)
+    try:
+        runner.run(task)
+    except BaseException as why:
+        # Reported and then raised on exactly as it was: what a flow does when it fails is
+        # the flow's business and the person at the terminal's, and this is only humanize
+        # finding out that it happened.
+        telemetry.crash(why, doing="hmz exec")
+        raise
     return 0
 
 

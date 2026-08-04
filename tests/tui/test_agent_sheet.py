@@ -20,9 +20,9 @@ from textual.widgets import Label, OptionList
 
 from hmz.backends import Model
 from hmz.kept import Runs
+from hmz.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Anchors, Catalogue, Clis, Confirms, Flows
-from hmz.tui.settings import Settings
 from tests.stubs import written
 
 from .test_app import drops, into_agent, keeps, onto, opens, rows, until

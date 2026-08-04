@@ -56,6 +56,16 @@ ALLOWED: dict[str, set[str]] = {
     # What an agent is written down as, which is a shape and a file and nothing else: the
     # interface keeps them and a command line reads the same ones, so it sits under both.
     "hmz.kept": set(),
+    # What humanize remembers: what each workspace was set up to run, and the handful of
+    # settings that are not a workspace's. A leaf for the reason `kept` is one -- the
+    # interface writes them and a command line has to be able to read them without loading
+    # the interface to do it -- and it names `kept` because an agent is written down the
+    # same way wherever it is written down.
+    "hmz.settings": {"hmz.kept"},
+    # What humanize reports about itself, which every layer may do and none of them may be
+    # reached into to do: what goes with a report is handed over as a callable by whoever
+    # knows it. So this names only the setting that says whether to report at all.
+    "hmz.telemetry": {"hmz.settings"},
     "hmz.machines": {"hmz.coganchor"},
     # What a backend runs is asked of that backend as the account whose it would be, so the
     # asking reads the facts about the CLI and the providers it could be run as. Neither
@@ -66,6 +76,9 @@ ALLOWED: dict[str, set[str]] = {
         "hmz.backends",
         "hmz.cycle",
         "hmz.flows",
+        # What a run is, said where a report of a failure in one can reach it. The reporter
+        # names nothing above itself, so this widens the DAG without bending it.
+        "hmz.telemetry",
     },
     # A provider is credentials for one backend, kept apart from that backend's own, and it
     # is run under the same interception a session on another machine is: the facts about the
@@ -86,6 +99,13 @@ ALLOWED: dict[str, set[str]] = {
         # itself, so this widens the DAG without bending it.
         "hmz.providers",
         "hmz.runner",
+        # What was set up to run here, which the interface both reads as it opens and writes
+        # as it is answered. A leaf, like the agents kept under a name beside it.
+        "hmz.settings",
+        # The interface is where humanize's own failures are answered for -- it is the one
+        # thing here with somebody to ask -- and where what it does that nobody meant is
+        # noticed. The reporter names nothing above itself.
+        "hmz.telemetry",
     },
 }
 

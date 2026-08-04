@@ -17,9 +17,9 @@ from textual.widgets import Label, OptionList
 from hmz.agents.skills import Skill, skills
 from hmz.backends import Model
 from hmz.kept import Runs
+from hmz.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Skills
-from hmz.tui.settings import Settings
 
 from .test_app import into_agent, into_flows, keeps, opens, rows, until
 

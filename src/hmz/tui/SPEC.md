@@ -12,7 +12,6 @@
 ├── monitor.py
 ├── pick.py
 ├── selecting.py
-├── settings.py
 └── tally.py
 ```
 
@@ -370,25 +369,30 @@ adjusted rather than chosen.
   the line on the same keys the editor does: enter is what takes the form, so a list typed
   into one row needs a key of its own to be a list at all.
 
-## `settings.py`
+### What humanize remembers
 
-What one workspace was last set up to run, kept under humanize's own home as `settings.yaml`
-so that opening the interface again in the same project finds it that way. The agents written
-down under a name are not here: they are `hmz.kept`, which a command line reads too.
+- `/settings` MUST be two pages: what is true of this machine wherever humanize is run from,
+  and what is remembered about this directory. Two pages because they are two kinds of thing
+  rather than two halves of one, and both MUST always be turnable.
+- Whether humanize reports its own failures MUST be a row of the first, and what a report
+  carries -- and what it never carries -- MUST be readable from beside it: the question is
+  asked once on a first start, and this is where somebody who wants to read it again, or
+  answer differently, goes.
+- The row MUST say what is written down rather than what is happening where an environment
+  variable is answering for the run, and MUST say that it is doing so: a menu that showed the
+  override would be a menu offering to change something it cannot.
+- Forgetting what is remembered about this directory MUST be a row of the second page, and
+  MUST leave every other directory and every setting alone.
+- Nothing MUST land until the menu is left and saving is confirmed, as on every other menu.
 
-- MUST be kept per flow as well as per workspace, by the name humanize's own flows have and by
-  the path yours have: what an agent runs is only meaningful against the flow driving it, and a
-  flow of yours MUST NOT inherit the agents of the one it shares a name with. Each agent MUST
-  be keyed by the name the flow calls it, so that a flow which grows an agent in the middle does
-  not silently hand the reviewer's model to the builder.
-- How one agent is written down MUST be `hmz.kept`'s, and this MUST write them that way: the
-  file of the ones kept under a name and this one hold the same shape, and two places writing
-  one shape is two places to drift.
-- A setting that was never chosen MUST be left out rather than written down as a default: a
-  file written before there was such a setting and a workspace nobody has been asked MUST read
-  the same way. What is read back MUST be checked before it is used -- a flow's own model
-  refuses a config it no longer takes -- and a file that is missing, unreadable or not what
-  this writes MUST be a workspace with nothing remembered rather than a reason not to open.
+### The question on a first start
+
+- Whether humanize reports its own failures MUST be asked once, by the interface, on a start
+  where nobody has answered it -- and MUST NOT be asked by anything without somebody at it.
+- It MUST say why it is being asked and MUST list what would be sent and what never would,
+  where it is asked rather than somewhere to go and read.
+- The answer that helps MUST be the one it opens on. Walking away MUST leave it unanswered and
+  MUST be asked again next time: silence is neither a yes nor a no.
 
 ## `monitor.py`
 

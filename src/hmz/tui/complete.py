@@ -20,6 +20,7 @@ _ABOUT = {
     "flow": "Switch flow",
     "agents": "Set what each agent runs",
     "providers": "Manage the accounts agents run as",
+    "settings": "What humanize remembers, here and everywhere",
     "status": "Show how the run is going",
     "clear": "Clear the screen",
     "details": "Toggle tool calls and thinking",

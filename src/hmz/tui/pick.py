@@ -47,10 +47,12 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
+from hmz import telemetry
 from hmz.agents import PERMISSIONS, SWARM, anchored, driver
 from hmz.agents.skills import Skill, skills
 from hmz.backends import named
 from hmz.kept import Kept, Runs
+from hmz.telemetry import KEPT, SAYS, SENT
 
 from .discover import machines
 from .monitor import short, thousands
@@ -798,6 +800,9 @@ class Drafts[T](Sheet[T]):
         if said == _KEEP:
             self.applied()
         elif said == _DROP:
+            # Answered a menu and then threw the answers away, which is somebody finding out
+            # that what they had done was not what they meant to do.
+            telemetry.snag("changes-dropped", sheet=type(self).__name__)
             self.dismiss(None)
         # And anything else is staying here, which is what a third answer is for.
 
@@ -1714,6 +1719,7 @@ class Flows(Drafts[Chosen]):
         ]
         if missing:
             self._tab = _AGENT_PAGE
+            telemetry.snag("save-refused", missing=len(missing))
             self._said = f"{escape(', '.join(missing))} has no model yet"
             self._fill()
             return
@@ -3478,6 +3484,266 @@ class Confirms(Picks):
         )
 
 
+#: The two answers to the question humanize asks about itself on a first start.
+_REPORTS, _QUIET = "on", "off"
+
+#: The rows the settings menu is made of, by the id each is put up under.
+_SENTRY = "reports"
+_SENT = "sent"
+_WORKSPACE = "workspace"
+_RUNS = "flow"
+_FORGET = "forget"
+
+
+class Adjusted(NamedTuple):
+    """What the settings menu answers with: what to change, and what to forget.
+
+    Attributes:
+      enable_sentry: Whether humanize reports its own failures from now on, or None where
+        that was not touched.
+      forget: Whether to forget what this workspace was set up to run.
+    """
+
+    enable_sentry: bool | None = None
+    forget: bool = False
+
+
+class Adjusts(Drafts[Adjusted]):
+    """What humanize remembers: the settings that are everywhere, and this directory's.
+
+    Two pages because they are two kinds of thing rather than two halves of one. What is on
+    the first is true of this machine however many projects are driven from it -- whether
+    humanize reports its own failures is the whole of it today -- and what is on the second is
+    one directory's: the flow it opens on, and the agents that flow was last set up with.
+
+    A menu rather than a file to edit, for the reason every other menu here is one: what is
+    written down is written down in humanize's own words, and a person should not have to know
+    the shape of a YAML file to turn a thing off. Nothing lands until it is left and saving is
+    confirmed, exactly as everywhere else.
+    """
+
+    TABS: ClassVar = ("Everywhere", "This directory")
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        Binding("tab", "next_tab", "next page", priority=True),
+        Binding("shift+tab", "prev_tab", "previous page", priority=True),
+        Binding("left", "easier", "back one", priority=True),
+        Binding("right", "harder", "on one", priority=True),
+    ]
+
+    def __init__(
+        self,
+        *,
+        enable_sentry: bool | None,
+        workspace: str,
+        flow: str,
+        agents: int,
+        flows: int,
+        overridden: bool = False,
+    ) -> None:
+        """Initializes the menu on what is remembered now.
+
+        Args:
+          enable_sentry: Whether humanize reports its own failures, or None while nobody has
+            been asked.
+          workspace: The directory this is the second page of.
+          flow: The flow it was last set up to run, or "" for one it never was.
+          agents: How many agents that flow was set up with here.
+          flows: How many flows this directory has been set up to run.
+          overridden: Whether the environment is answering the reporting question for this
+            run, so that a row saying one thing while humanize does another says so.
+        """
+        super().__init__()
+        self._sentry = enable_sentry
+        self._overridden = overridden
+        self._workspace = workspace
+        self._flow = flow
+        self._agents = agents
+        self._flows = flows
+        self._forget = False
+        self._said = (
+            f"{SAYS} is set, so this run does the opposite of what this says"
+            if overridden
+            else ""
+        )
+
+    def _ask(self) -> None:
+        """Says what the menu is, and puts up the page it opened on."""
+        self.query_one("#asked", Label).update("Settings")
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _rows(self) -> list[tuple[str, str, str]]:
+        """The rows of whichever page is open: its id, what it says, and what it means."""
+        if self._tab:
+            return [
+                (
+                    _WORKSPACE,
+                    _shortly(self._workspace),
+                    "the directory these are remembered for",
+                ),
+                (
+                    _RUNS,
+                    self._flow or "nothing yet",
+                    f"the flow it opens on, set up with {self._agents} agents",
+                ),
+                (
+                    _FORGET,
+                    _YES if self._forget else _NO,
+                    f"forget what is remembered here, across {self._flows} flows",
+                ),
+            ]
+        return [
+            (
+                _SENTRY,
+                {True: _YES, False: _NO, None: "not answered yet"}[self._sentry],
+                "report what goes wrong to humanize",
+            ),
+            (_SENT, "", "what a report carries, and what it never does"),
+        ]
+
+    def _fill(self) -> None:
+        """Puts up whichever page is open, and the titles above it."""
+        self.query_one("#about", Label).update(
+            "What humanize remembers about this machine. The arrows step the row under the "
+            "cursor. Nothing lands until this menu is left and saving is confirmed."
+            if not self._tab
+            else "What humanize remembers about this directory: the flow it opens on, and "
+            "what that flow was last set up to run."
+        )
+        listing = self.query_one("#choices", OptionList)
+        rows = self._rows()
+        self._counting = len(str(len(rows)))
+        at = min(listing.highlighted or 0, len(rows) - 1)
+        listing.set_options(
+            Option(
+                self._row(
+                    seen,
+                    name,
+                    f"{value}   {about}" if value else about,
+                    here=seen == at,
+                    inforce=False,
+                ),
+                id=f"={name}",
+            )
+            for seen, (name, value, about) in enumerate(rows)
+        )
+        listing.highlighted = at
+        self._drawn = at
+        self.tabbed(self._tab_line())
+        self.query_one("#tuning", Label).update(
+            f"[$text-muted]{self._said}[/]" if self._said else ""
+        )
+        self.query_one("#keys", Label).update(
+            "Left and right to step this one · Enter opens what it opens · Esc to close"
+        )
+
+    def action_easier(self) -> None:
+        """Steps the row under the cursor back one, which for a switch is the same as on."""
+        self._step()
+
+    def action_harder(self) -> None:
+        """Steps it on one."""
+        self._step()
+
+    def _step(self) -> None:
+        """Turns round whichever switch the cursor is on."""
+        listing = self.query_one("#choices", OptionList)
+        at = listing.highlighted or 0
+        rows = self._rows()
+        held = rows[at][0] if 0 <= at < len(rows) else ""
+        if held == _SENTRY:
+            self._sentry = not self._sentry
+        elif held == _FORGET:
+            self._forget = not self._forget
+        else:
+            return
+        self._said = ""
+        self.changed()
+        self._fill()
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Says what a report carries, for the one row that is a thing to read."""
+        held = str(event.option.id or "").removeprefix("=")
+        if held == _SENT:
+            sent, kept = "; ".join(SENT), "; ".join(KEPT)
+            self._said = f"Sent: {sent}. Never: {kept}."
+            self._fill()
+            return
+        self._step()
+
+    def applied(self) -> None:
+        """Answers with what was changed, which is nothing where nothing was."""
+        self.dismiss(Adjusted(enable_sentry=self._sentry, forget=self._forget))
+
+
+#: How much of a directory a row says: the last of it, which is what tells one project from
+#: another. The rest is a home directory, which says nothing and is nobody else's business.
+_ENOUGH = 2
+
+
+def _shortly(said: str) -> str:
+    """One path, as much of it as a row has room for: the last parts of it."""
+    parts = said.rstrip("/").split("/")
+    return "/".join(parts[-_ENOUGH:]) if len(parts) > _ENOUGH else said
+
+
+class Reports(Picks):
+    """Whether humanize reports its own failures, asked once, on a first start.
+
+    Asked rather than assumed either way. Assumed on, it would be a tool that started sending
+    things about somebody's machine before they had heard of it; assumed off, it would be a
+    tool whose crashes nobody ever sees, which on something this young is how a bug survives
+    a year. So it is a question, put once, with what it means written out beside it -- what
+    goes, and what does not -- and answered for every project from then on.
+
+    Drawn as a box in the middle of the screen, for the reason the save question is: it is
+    not a sheet somebody walked to. Esc leaves it unanswered, and unanswered is asked again
+    next time rather than taken as a no.
+    """
+
+    CSS = _POPUP
+
+    asked = "Report what goes wrong to humanize?"
+
+    def __init__(self) -> None:
+        """Initializes the question on its default answer, which is yes."""
+        super().__init__()
+        sent, kept = "; ".join(SENT), "; ".join(KEPT)
+        self.about = (
+            f"humanize is early, and a crash nobody sees is a bug nobody fixes. "
+            f"Sent: {sent}. Never sent: {kept}."
+        )
+
+    def rows(self) -> list[tuple[str, str, str]]:
+        """The two answers, the one that helps first."""
+        return [
+            (
+                _REPORTS,
+                "yes, report them",
+                "what broke, and what was running when it did",
+            ),
+            (_QUIET, "no, send nothing", "nothing about this machine leaves it"),
+        ]
+
+    def check_action(
+        self,
+        action: str,
+        parameters: tuple[object, ...],
+    ) -> bool | None:
+        """Whether one of the keys is live, which a question of two answers narrows."""
+        return action != "search" and super().check_action(action, parameters)
+
+    def _fill(self) -> None:
+        """Puts the two answers up, and says what esc is here."""
+        super()._fill()
+        self.query_one("#keys", Label).update(
+            "Enter to choose · Esc to be asked again next time · /settings changes it later"
+        )
+
+
 class Fitted(NamedTuple):
     """One agent as a sheet answered with it: what it is, and what it is called.
 
@@ -4798,6 +5064,7 @@ class Providers(Drafts[list[str]]):
           credentials for it -- it is the CLI as whoever is at this machine runs it -- so the
           only things to say about it are where it falls back to and how it is tried again.
         """
+        telemetry.snag("key-does-nothing", sheet="Providers", doing=doing)
         return (
             f"there is nothing to {doing}: this is {escape(cli)} as this machine is already "
             "signed in. f and t are what it takes"
