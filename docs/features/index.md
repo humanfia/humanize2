@@ -24,7 +24,7 @@ command line and from Python, and what it will not do.
 | --- | --- |
 | [Efforts](/features/efforts) | How hard to think — and moving it while the flow runs. |
 | [Permissions](/features/permissions) | Four rungs, from `read-only` to `bypass`. |
-| [Skills](/features/skills) | Which of a CLI's skills this agent is loaded with. |
+| [Skills](/features/skills) | What an agent carries: its CLI's own installed skills, and the ones the flow brings. |
 | [Goals](/features/goals) | The backend's own goal feature: it decides when it is done. |
 | [Questions](/features/questions) | An agent stopping mid-turn to ask its user something. |
 | [Answers in a shape](/features/shapes) | A turn that answers with a pydantic model instead of prose. |

@@ -40,8 +40,9 @@ That is what [`official/rlar`](/reference/flows#the-official-flowverse) ends on,
 | | |
 | --- | --- |
 | **Claude Code** | `--json-schema`; it validates the answer itself |
+| **Antigravity**, **Grok Build**, **Qwen Code** | `--json-schema` on the run |
 | **Codex** | the turn's `outputSchema` |
-| anything else | asked in the prompt, and what it says is read back |
+| anything else — `dsh`, `kimi`, `pi`, `opencode`, `mimo` | asked in the prompt, and what it says is read back |
 
 `SessionBase.shapes` is which of the two a backend is. Either way the answer arrives as the model
 or not at all.

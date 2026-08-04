@@ -13,8 +13,10 @@ run of a flow is a **cycle**; an agent's turns land on a **machine** and may run
 ## Backend
 
 A coding agent CLI that is installed on this machine and that humanize knows how to drive.
-There are six: `claude` (Claude Code), `codex`, `kimi` (Kimi Code), `pi`, `opencode`, and
-`mimo` (mimocode).
+There are ten: `agy` (Antigravity CLI), `claude` (Claude Code), `codex`, `dsh` (DeepSeek
+Harness), `grok` (Grok Build), `kimi` (Kimi Code), `mimo` (mimocode), `opencode`, `pi` and
+`qwen` (Qwen Code) — and any CLI of your own that speaks the
+[Agent Client Protocol](/reference/agents#a-cli-of-your-own), added at `/providers`.
 
 humanize does not talk to a model provider. It drives the CLI you already have, logged in the
 way you already log in, so your credentials never pass through it. A backend that is not on
@@ -130,8 +132,9 @@ See [Flows](/reference/flows.md).
 
 ## Flowverse
 
-**A git repository with a `flows/` directory in it.** One `.py` per flow, cloned into
-`~/.humanize/flowverses/<name>/`, and every flow in its `flows/` offered as `<name>/<flow>`.
+**A git repository with a `flows/` directory in it.** One directory per flow — an
+`__init__.py`, what it imports and the `skills/` it brings — or a single `.py` for one that
+needs neither, cloned into `~/.humanize/flowverses/<name>/` and offered as `<name>/<flow>`.
 
 Two are always there: `builtin`, the handful in the package, and `official`, which is where the
 rest of the flows humanize offers come from — listed whether or not it has been fetched, because

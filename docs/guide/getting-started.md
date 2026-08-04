@@ -11,8 +11,8 @@ properly.
   such as `claude` ([Claude Code](https://claude.com/claude-code)), `codex`, `kimi`,
   `qwen` ([Qwen Code](https://github.com/QwenLM/qwen-code)) or
   `grok` ([Grok Build](https://x.ai/cli)) or
-  `agy` ([Antigravity CLI](https://antigravity.google/docs/cli)); or the optional DeepSeek Harness Python SDK with a
-  DeepSeek API key configured.
+  `agy` ([Antigravity CLI](https://antigravity.google/docs/cli)) — or nothing at all, since
+  DeepSeek Harness arrives with humanize and needs only a DeepSeek API key.
 - **A project directory you are willing to have rewritten.** Read
   [Security](/guide/security.md) first — humanize runs every agent with permission prompts
   disabled, so an agent under it edits files without asking.
@@ -40,7 +40,8 @@ dsh web
 
 You can run `npx @deepseek-ai/dsh web` instead of installing the launcher globally. Open
 **Settings -> Models**, enter the DeepSeek API key, and save. After reopening `hmz`, type
-`/agents`, switch to `dsh`, and choose `as installed`; humanize then uses the credentials and
+the agents page of `/flow`, switch a CLI to `dsh`, and leave its account on `as local`;
+humanize then uses the credentials and
 base URL already saved by dsh.
 
 Alternatively, choose `dsh` on the `cli` row and press **a** on the `provider` row, choose `key`, and enter an account name and

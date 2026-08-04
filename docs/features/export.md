@@ -11,7 +11,9 @@ exporting twice keeps both.
 
 ## What it writes
 
-**The conversation being read** — the one the transcript is showing — and not the others. Which
+**What is on the screen**: everything drawn in the transcript since the last `/clear`. Stepping
+between conversations with **tab** draws each into the same transcript, so what an export holds
+is every conversation that has been read rather than only the one showing now. Which
 that is, and how to move between them, is
 [Many conversations at once](/features/conversations).
 

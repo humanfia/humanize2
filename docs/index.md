@@ -24,8 +24,8 @@ features:
     details: A flow is a directory of Python that says what each agent is asked, in what order, and when to stop, and carries the skills it works by. Ship it, run it by name, fork one, or run one of the flows humanize already offers.
     link: /guide/tutorial-first-flow
     linkText: Write one
-  - title: Six coding agents, one interface
-    details: claude, codex, kimi, pi, opencode and mimo, driven through the CLI you already log into. humanize holds no API key and talks to no model provider itself.
+  - title: Ten coding agents, one interface
+    details: claude, codex, dsh, agy, grok, kimi, qwen, pi, opencode and mimo, driven through the CLI you already log into — and any other that speaks the Agent Client Protocol. humanize holds no API key and talks to no model provider itself.
     link: /guide/concepts
     linkText: How it fits
   - title: A prompt you can watch

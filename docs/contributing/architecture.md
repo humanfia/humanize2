@@ -30,7 +30,7 @@ a target and could be lifted out whole, so it has a name of its own.
 
 | Layer | Is | Entry points |
 | --- | --- | --- |
-| `backends.py` | Names, aliases, efforts, home directories and log globs for `claude`, `codex`, `kimi`, `pi`, `opencode` and `mimo`. Facts, not code — standard library only, and no model id anywhere in it. | `PROFILES`, `named()`, `read()` |
+| `backends.py` | Names, aliases, efforts, home directories, log globs, credential paths, ways in and skill directories for all ten backends. Facts, not code — standard library only, and no model id anywhere in it. | `PROFILES`, `named()`, `profiles()`, `read()`, `remember()` |
 | `models.py` | What each backend runs, asked of that backend the way it offers being asked, and kept per account. Nothing here is a list: a CLI ships models without asking anybody. | `ask`, `offered`, `asked`, `where` |
 | `agents/` | What a flow is written against (`AgentBase`, `SessionBase`, `Event`, `Question`, `Moment`) and one driver per backend. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |

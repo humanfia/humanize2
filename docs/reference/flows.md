@@ -250,7 +250,7 @@ Several moments are several arguments.
 
 **A goal is asked for the same way.** `agent.pursue(objective)` is the backend's own goal
 feature — the agent decides for itself that the objective has been met, and until it does, a
-turn that would have ended starts another. Three backends have one (Claude Code, codex, Kimi),
+turn that would have ended starts another. Four backends have one (Claude Code, codex, dsh, Kimi),
 so a flow built on it says so:
 
 ```python
@@ -471,6 +471,17 @@ that what it asks reaches whoever is at the prompt.
 Nothing is renamed. The agents belong to the run that was started, and what has already been
 written down about them stays true.
 
+**It is read again at every call.** `calls` holds the name rather than the function it found:
+each call runs the flow's entry point afresh, so a flow rewritten between two calls of it — by
+hand, or by an agent this very flow is driving — is the one that runs next. That is what makes
+a loop that improves its own flow a loop that then runs the improved one. A flow that was
+rewritten into something that is no longer a flow is refused at the call, the way a name that
+was wrong is refused at `calls`.
+
+**It brings its own skills.** The called flow's `skills/`, and the repositories it declared,
+are [mounted](#the-skills-a-flow-brings) onto the sessions its agents open while it runs — and
+the agents are handed back carrying the calling flow's own when it returns.
+
 **A flow that takes [settings of its own](#settings-of-the-flow-s-own) takes them here too**,
 as a third argument — an instance of that flow's model, or the fields to build one from:
 
@@ -508,7 +519,9 @@ another does not read as the flow somebody chose.
 Nearest wins, so a flow of your own may stand in for one of humanize's by taking its name — a
 `.humanize/flows/chat/` is what `-f chat` runs *in that project*. Which is what `f` in the
 flow menu is for: it copies the flow under the cursor into `.humanize/flows/`, whole, and from
-then on that name means your copy.
+then on that name means your copy. In Python that is `hmz.flows.fork(name, into=None)`, which
+copies a directory flow with its `skills/` and a single-file flow as a file, and refuses a name
+you already have a copy of rather than writing over it.
 
 What a flow is **called** is another question. The ones humanize ships are called by a bare
 name; a flowverse's are called `<flowverse>/<flow>`, which is the one spelling nothing can stand
@@ -526,7 +539,13 @@ each was [set up to run](/reference/tui.md#what-it-remembers) is remembered apar
 quietly inherit the agents or the settings of the one it shares a name with.
 
 Anything with a slash in it is a path, taken as given: a flow's directory, or a `.py` file to
-run as one. A directory whose name starts with `_` is not a flow.
+run as one — `-f ./flows/mine` and `-f ./flows/mine.py` both work, the directory being tried
+first. A directory whose name starts with `_` is not a flow.
+
+**A flow imports what travels with it.** While one is read, its own directory and the directory
+the flows are in are both on `sys.path`, and only while: `import _prompts` reaches the module
+beside the flow, and `import _shared` reaches what a flowverse keeps beside all of them. What a
+flow imports is not something the rest of the process can.
 
 ```sh
 mkdir -p .humanize/flows && cp -r my_loop .humanize/flows/
@@ -557,6 +576,15 @@ cloned under `~/.humanize/skills/` and fetched again the next time a run asks fo
 The flow's own wins a name a repository also uses: a fork that edited a skill meant the edited
 one. A backend that reads no project skills of its own carries none of this — its skills are
 the ones its CLI installs, and humanize does not switch those on or off.
+
+In a directory that holds [several flows](#several-flows-in-one-file), the `skills/` is all of
+theirs: it belongs to the directory, not to the entry point. What `@flow(skills=…)` names is
+read off the one that was asked for.
+
+**A repository that cannot be fetched stops the run before its first turn.** `hmz exec` exits
+2 with what git said, and the interface says it where the flow was started — a flow that works
+by a skill it has not got is not a flow to start and find out about an hour in. One that was
+fetched before and cannot be reached now runs on the copy already here.
 
 ## Flowverses
 
@@ -640,7 +668,7 @@ for it — `--max`, `--full-review-round`, `--skip-impl`, `--agent-teams`, `--yo
 The loop is a hook. The plugin blocks Claude's exit and puts the round to Codex in a Stop hook;
 so does this, with a [`Moment.STOP` hook](#hooks-in-a-flow) on the builder. A round is the
 builder believing the whole plan is done and trying to stop, and what the reviewer says is what
-it hears instead. Its tool validators are hooks too, on `Moment.PermissionRequest`, which is why
+it hears instead. Its tool validators are hooks too, on `Moment.PERMISSION_REQUEST`, which is why
 the builder has to be a backend that runs it.
 
 It writes what the plugin writes, where the plugin writes it: `.humanize/rlcr/<timestamp>/`
@@ -760,7 +788,7 @@ if head() == before:
 
 `-a` reaches four of an agent's settings: the CLI, the model, the effort, and — after an `@` —
 the [provider](/reference/providers.md) whose account it runs as. A name, [where the work
-lands](/reference/machines.md), [the skills it carries](/reference/agents.md#the-skills-an-agent-carries) and
+lands](/reference/machines.md) and
 [what it may do](/reference/agents.md#what-an-agent-may-do) are settings of the *agent* that no `-a` spells,
 so a flow that needs one is handed agents built in Python — and a machine only where the flow's
 own place for that agent [said `Remote`](#where-each-agent-works):

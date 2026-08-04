@@ -81,7 +81,7 @@ approximation of it.
 **Stays here**
 
 - The agent's own executable and its re-execs.
-- Its state directory. The six known CLIs are known by name; any other agent keeping state inside
+- Its state directory. The ten known CLIs are known by name; any other agent keeping state inside
   the workspace has to be named with `--local-path`.
 - Anything named `--local-path` or `--local-exec`.
 - The agent's own network connections, so it can still reach its model provider.

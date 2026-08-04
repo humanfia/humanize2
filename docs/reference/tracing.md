@@ -117,17 +117,17 @@ The backends' own home directories, which humanize only reads:
 | --- | --- | --- |
 | Claude Code | `CLAUDE_CONFIG_DIR` | `~/.claude` |
 | Codex | `CODEX_HOME` | `~/.codex` |
+| DeepSeek Harness | `DSH_HOME` | `~/.dsh` |
 | Kimi Code | `KIMI_CODE_HOME` | `~/.kimi-code` |
 
-Those three, and no others. opencode and mimocode keep a session in a database rather than in a
-log file, and nothing here reads pi's own log yet, so there is nothing to gather for any of the
-three: a run of theirs is watched as it happens rather than collected after.
+Those four, and no others. opencode, mimocode and Antigravity keep a session in a database
+rather than in a log file, and nothing here reads pi's, Grok Build's or Qwen Code's own logs
+yet, so there is nothing to gather for those: a run of theirs is watched as it happens rather
+than collected after.
 
 A home that does not exist is skipped rather than being an error, so collecting on a machine
-with only one backend installed works. A pi home that *does* exist is the exception, and a bug:
-`hmz collect` looks for a reader for every backend whose home is there, finds none for pi, and
-exits `KeyError: 'pi'`. Until that is fixed, collect with `PI_CODING_AGENT_DIR` pointed at a
-directory that is not there.
+with only one backend installed works — and so is a backend humanize has no reader for, whose
+home being there changes nothing.
 
 ## Narrowing what is collected
 

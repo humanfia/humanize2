@@ -122,8 +122,8 @@ serves it, and the CLI is asked for the pair. `qwen` names whatever id the OpenA
 endpoint behind it serves, and `grok` names one out of its own catalogue: `grok models` lists
 them.
 
-DeepSeek Harness is an optional Python SDK backend. Install it with the `dsh` extra as shown
-in [Installation](/guide/installation#install-humanize). It supports API-key login only:
+DeepSeek Harness is driven through its own Python SDK, which arrives with humanize rather
+than as an extra — there is nothing to install for it. It supports API-key login only:
 leave `provider` empty to use the credentials and base URL saved by dsh (or its environment),
 or make a `key` account from the `provider` row of an agent with **a** and give its name as
 `provider`. Then
@@ -138,10 +138,11 @@ agent = DshAgent(DshAgentConfig(model="deepseek-v4-flash", effort="high"))
 It also offers `deepseek-v4-pro`. The SDK and bundled runtime are currently a developer
 preview; humanize supports `deepseek-harness-sdk>=0.1.0rc6,<0.2`.
 
-A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land), the
-[skills it carries](#the-skills-an-agent-carries),
+A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land),
 [what it may do](#what-an-agent-may-do), [which account it runs as](#which-account-it-runs-as),
-and nothing else. It is frozen,
+whether [goals](/features/goals) are available to it, and nothing else — the
+[skills it carries](#the-skills-an-agent-carries) are not among them, being its CLI's own and
+its flow's. It is frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
 would silently split one conversation across two models.
 
@@ -535,7 +536,8 @@ sessions under:
 
 ```python
 agent.id       # the name you gave it, the name the flow calls it, or one nothing else answers to
-agent.backend  # "claude", "codex", "dsh", "kimi", "pi", "opencode" or "mimo"
+agent.backend  # "agy", "claude", "codex", "dsh", "grok", "kimi", "mimo", "opencode",
+               # "pi", "qwen" — or whatever an ACP CLI of your own was added under
 agent.opened   # the backend's id for every session this agent ever opened, oldest first
 agent.sessions # the ones somebody still holds
 agent.config   # what it runs at
@@ -610,7 +612,9 @@ since the flow states the shape of the whole answer once, in the model it is goi
 ## Efforts
 
 `effort` is passed to the backend in the backend's own wording. humanize does not check it
-against a list, so a value your account has and this page does not still works.
+against a list, so a value your account has and this page does not still works — with one
+exception: `dsh` is driven through an SDK that takes three, and an agent of it is refused
+before the runtime starts unless its effort is `max`, `high` or `off`.
 
 | Backend | Efforts |
 | --- | --- |
@@ -705,10 +709,13 @@ same one the interface's readout is over — and a run younger than the window i
 the run, so a rate read a minute in is what that minute came to rather than a fifth of it.
 
 **It moves while the turn is still running.** A turn is minutes long, so a number that only
-moved when one ended would stand still for all of them: every backend here is read as it says
-what each request to the model cost — Claude Code and pi on the message it answered with,
+moved when one ended would stand still for all of them: most backends here are read as they
+say what each request to the model cost — Claude Code on the message it answered with,
 Codex on `thread/tokenUsage/updated`, DeepSeek Harness and pi on finalized assistant messages,
 opencode and mimocode on each step, Kimi Code from the session it is polling anyway.
+Antigravity, Grok Build and Qwen Code are the exception: each is one run per turn that states
+its usage only at the end, so what they spent lands on the closing `result` and their rate
+moves a turn at a time rather than a request at a time.
 
 **`juice()` is the third reading, and it is not a clock at all.** It is what one turn of the
 *model* came out with — one request and the answer to it, of which a turn a flow asks for is
@@ -735,7 +742,7 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 | [`interject`](#talking-to-a-turn-already-running) | no — a run per turn has ended | yes — answered within the same turn | yes — a steer on the running turn | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended | no — a run per turn has ended |
 | [`pursue`](#goals) | no | yes | yes | yes | no | yes | no | no | no |
 | [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no |
-| A turn held to a shape | `--json-schema` | in the prompt | `outputSchema` | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt |
+| A turn held to a shape | `--json-schema` | `--json-schema` | `outputSchema` | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt |
 | Sub-agents in a trace | no | yes | yes | no | no | yes | no | no | no |
 
 DeepSeek Harness currently accepts only `permission="bypass"`. Its preview

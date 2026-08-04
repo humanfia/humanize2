@@ -154,6 +154,32 @@ def test_no_frame_of_a_stack_carries_what_humanize_was_working_on() -> None:
     assert "/homes/someone" not in one["value"]
 
 
+def test_the_line_that_started_this_run_is_not_sent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`hmz exec -f ralph_loop -a claude/… "$(cat TASK.md)"` puts the task on `sys.argv`.
+
+    The SDK collects it by default, under `extra`, which would put the whole of what somebody
+    asked for into a crash report. It is switched off where the reporter starts and taken off
+    again on the way out.
+    """
+    monkeypatch.setenv(telemetry.SAYS, "on")
+    assert telemetry.start()
+
+    import sentry_sdk
+    from sentry_sdk.integrations.argv import ArgvIntegration
+
+    client = sentry_sdk.get_client()
+    assert ArgvIntegration.identifier not in client.integrations
+
+    held = telemetry._before_send(
+        {"extra": {"sys.argv": ["hmz", "exec", "the task"]}}, {}
+    )
+
+    assert held is not None
+    assert "extra" not in held
+
+
 def test_what_is_sent_and_what_is_not_are_both_written_down() -> None:
     """The question cannot be answered by somebody who has not been told what it means."""
     assert len(telemetry.SENT) > 1

@@ -90,9 +90,9 @@ the agent once it exits, and when the session ends nothing it started is left ru
 ## What stays on this machine
 
 - The agent's own executable and its re-execs.
-- Its state directory. `claude`, `codex`, `kimi`, `pi`, `opencode` and `mimo` are known by
-  name; any other agent keeping
-  state inside the workspace has to be named with `--local-path`.
+- Its state directory. All ten known CLIs are known by name — `agy`, `claude`, `codex`, `dsh`,
+  `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen` — as is humanize's own `~/.humanize`; any
+  other agent keeping state inside the workspace has to be named with `--local-path`.
 - Anything named as a local path (`--local-path`) or a local program (`--local-exec`).
 - The agent's own network connections, so that it can still reach its model provider. `--net
   remote` sends them to the target instead, and `--net-allow HOST[:PORT]` keeps named hosts

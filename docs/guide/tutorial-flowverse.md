@@ -16,16 +16,19 @@ nothing to register**:
 my-flowverse/
 ├── README.md
 └── flows/
-    ├── review.py    →  yours/review
-    ├── nightly.py   →  yours/nightly
-    └── _shared.py   →  not a flow; imported by the two above
+    ├── review/          →  yours/review
+    │   ├── __init__.py      the flow
+    │   └── skills/          what it brings, if it brings any
+    ├── nightly.py       →  yours/nightly, a flow that brings nothing
+    └── _shared.py       →  not a flow; imported by the two above
 ```
 
 | Rule | |
 | --- | --- |
 | the flows go in `flows/` | and nothing outside it is read, or run |
-| one `.py` per flow | each with a function marked `@flow` |
-| a file starting with `_` is not a flow | which is where shared code goes |
+| one directory per flow | its `__init__.py` holds the function marked `@flow` |
+| or a single `.py` | for a flow with nothing to bring and nothing to import |
+| a name starting with `_` is not a flow | which is where shared code goes |
 | the flow's docstring's first line | is what is shown beside its name |
 | one file may hold several | `@flow(name="…")`, run as `<flow>:<name>` |
 
@@ -157,8 +160,8 @@ Run that in the repository's own CI and a flow that stopped loading is a red bui
 
 ## What you now know
 
-- A flowverse is a git repository with a `flows/` directory, one `.py` per flow, `_`-prefixed
-  files ignored.
+- A flowverse is a git repository with a `flows/` directory: one directory per flow, or a
+  single `.py` for one that brings nothing; `_`-prefixed names ignored.
 - **a** / **r** / **d d** in `/flow` add, fetch and remove.
 - `<flowverse>/<flow>` is the unshadowable spelling, and `calls` takes it too.
 - Import-time side effects run for anyone who lists your flowverse.

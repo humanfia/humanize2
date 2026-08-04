@@ -223,16 +223,6 @@ understands. Quote it: `--start "3 days ago"`.
 
 A `--session` with an empty entry — usually a trailing comma.
 
-### `KeyError: 'pi'`
-
-`hmz collect` looks for a reader for every backend whose home directory exists, and there is none
-for pi — so a machine with `~/.pi/agent` on it cannot collect at all, not even the backends it can
-read. Until that is fixed, point the variable at a directory that is not there:
-
-```sh
-PI_CODING_AGENT_DIR=/nonexistent hmz collect
-```
-
 ### `0 sessions, 0 slices`
 
 Nothing matched. In order of likelihood:

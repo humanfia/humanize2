@@ -49,7 +49,8 @@ dsh web
 ```
 
 Needs Python ≥ 3.12 and at least one supported backend: `agy`, `claude`, `codex`, `grok`,
-`kimi`, `pi`, `qwen`, `opencode` or `mimo` on your PATH, or the `dsh` extra above. See
+`kimi`, `pi`, `qwen`, `opencode` or `mimo` on your PATH — or none of them, since DeepSeek
+Harness arrives with humanize. See
 [Installation](https://docs.humanfia.ai/guide/installation).
 
 ## Usage
@@ -61,9 +62,10 @@ hmz
 ```
 
 DeepSeek Harness takes an API key and no subscription login. Run `dsh web`, save the key
-under **Settings -> Models**, then type `/agents` in humanize, switch to `dsh`, and choose
-`as installed`. This also uses the base URL saved in dsh. Alternatively, press **ctrl+n**
-there to make a humanize `key` account, or set the key before opening humanize:
+under **Settings -> Models**, then open `/flow` in humanize, turn to its agents, set one to
+`dsh` and leave its account row on `as local` — which uses the key and the base URL saved in
+dsh. Alternatively, press **a** on that row to make a humanize `key` account, or set the key
+before opening humanize:
 
 ```sh
 export DEEPSEEK_API_KEY=sk-…

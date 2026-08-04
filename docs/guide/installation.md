@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **Python 3.12 or newer** | 3.12, 3.13 and 3.14 are the ones CI runs the tests on. |
-| **At least one supported backend** | `agy`, `claude`, `codex`, `grok`, `kimi`, `pi`, `qwen`, `opencode` or `mimo` on your `PATH`, or the optional DeepSeek Harness Python SDK. |
+| **At least one supported backend** | `agy`, `claude`, `codex`, `grok`, `kimi`, `mimo`, `opencode`, `pi` or `qwen` on your `PATH` — or nothing at all, since DeepSeek Harness arrives with humanize and needs only a DeepSeek API key. |
 | **A project you are willing to have rewritten** | Read [Security](/guide/security) first. |
 
 Nothing else. Two features want more, and neither is needed for anything in the tutorials:
@@ -88,9 +88,11 @@ Each CLI is logged into its own way. humanize never sees the credential:
 | mimocode | `mimo auth login` |
 | DeepSeek Harness | a DeepSeek API key saved by dsh, stored from an agent's `provider` row, or supplied as `DEEPSEEK_API_KEY` |
 
-DeepSeek Harness is currently a developer preview. The `dsh` extra installs
-`deepseek-harness-sdk>=0.1.0rc6,<0.2` and its bundled runtime; the published runtime wheels
-support Linux on x86-64 or arm64 and macOS on arm64. It does not require the `dsh` CLI.
+DeepSeek Harness is currently a developer preview, and **arrives with humanize**:
+`deepseek-harness-sdk>=0.1.0rc6,<0.2` and its bundled runtime are ordinary dependencies rather
+than an extra, since a backend humanize drives is not a thing an install should be able to have
+half of. The published runtime wheels support Linux on x86-64 or arm64 and macOS on arm64. It
+does not require the `dsh` CLI.
 
 DeepSeek Harness supports API-key login only. To use dsh's own credential store, run `dsh web`,
 open **Settings -> Models**, enter the DeepSeek key, and save it. In humanize, set an agent's

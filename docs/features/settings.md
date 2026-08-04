@@ -10,6 +10,10 @@ What is remembered:
   [what it may do](/features/permissions);
 - and how the flow itself was [set up](/reference/tui#setting-a-flow-up).
 
+Beside those, in the same file, is the one setting that is not a workspace's at all:
+`enable_sentry`, the answer to the [reporting](/features/reporting) question, which is asked
+once and true wherever humanize is run from.
+
 ## Why it is kept per flow
 
 What an agent runs is only meaningful against the flow driving it. A flow's second agent is its
@@ -33,7 +37,19 @@ dropped or renamed is one it starts over from rather than one that quietly comes
 ```
 
 `$HUMANIZE_HOME/settings.yaml` where that is set. Delete it and every project starts over from
-its defaults; nothing else is lost.
+its defaults **and** the reporting question is asked again, that answer living in the same file.
+
+## Reading it, and forgetting it
+
+`/settings` is the menu over this file, in two pages:
+
+| Page | |
+| --- | --- |
+| **Everywhere** | whether humanize [reports what goes wrong](/features/reporting), and a row that says what a report carries and what it never does |
+| **This directory** | the directory itself, the flow it opens on with how many agents that flow was set up with, and a row that forgets the lot |
+
+Nothing lands until the menu is left and saving is confirmed, as on every other menu. Forgetting
+one directory leaves every other directory, and every setting, exactly as it was.
 
 Two related files, for completeness:
 

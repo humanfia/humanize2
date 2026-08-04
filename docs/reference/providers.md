@@ -133,11 +133,14 @@ input and kept in codex's own store, so it is not kept a second time as a variab
 | `login` | mimocode's own provider list, and whichever way that one takes. Runs `mimo auth login`. | — |
 | `key` | A MiMo key, which its own models run on. | `XIAOMI_API_KEY` |
 
-**Every backend, as well as its own:**
+**Every backend but `dsh`, as well as its own:**
 
 | Way | | Asks for |
 | --- | --- | --- |
 | `env` | Variables of your own: whatever this CLI reads a key or an endpoint under. | the `NAME=VALUE` lines you give it |
+
+DeepSeek Harness is the exception: it is driven through an SDK that takes an API key and
+nothing else, so `hmz providers ways dsh` offers only its own `key` way.
 
 The names are typed rather than chosen because there is no list worth keeping: pi has a variable
 for each provider it knows and opencode one for each of a hundred and eighty, across six vendors
@@ -151,20 +154,29 @@ hmz providers list [<cli>]
 hmz providers ways <cli>
 hmz providers add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login]
 hmz providers login <cli>/<name> [-s VAR=VALUE]...
-hmz providers show <cli>/<name>
+hmz providers show <cli>/[<name>]
+hmz providers falls-back <cli>/[<name>] [<name>]
+hmz providers retry <cli>/[<name>] [-n <tries>] [-p <policy>] [-t <seconds>]
 hmz providers remove <cli>/<name>
 ```
 
 A provider is named `<cli>/<name>` everywhere the command line asks for one. The name is a
 directory, so it is letters, digits, dot, dash and underscore, starting with a letter or a digit.
 
+`<cli>/` — a backend and no name at all — is **the account this machine is already signed
+into**: an account of every backend, which humanize did not make and keeps no credentials for.
+`show`, `falls-back` and `retry` take it; `add`, `login` and `remove` refuse it, there being
+nothing to make, sign in or take away.
+
 | Command | |
 | --- | --- |
 | `list` | What providers there are, or one backend's. The line is the name, the way it was made by, and the variables it sets. |
 | `ways` | How that backend can be signed into: each way, what it asks for, and what it runs. |
-| `add` | Makes one. `-w` chooses the way — the backend's first, which is `login`, when nothing says otherwise — and `-s` answers one of its questions on the line rather than being asked. Then it runs the way's own command, unless `--no-login` says only to write it down. |
+| `add` | Makes one. `-w` chooses the way — the backend's first when nothing says otherwise, which is `login` for the CLIs that sign in and `key` for `dsh` — and `-s` answers one of its questions on the line rather than being asked. Then it runs the way's own command, unless `--no-login` says only to write it down. |
 | `login` | Signs an existing one in again, by the way it was made with. For a way that has nothing to run, `add` it again instead. |
-| `show` | What one holds: the way, when it was made, where it is kept, the **names** of the variables it sets, and which paths a turn under it is given instead of which. |
+| `show` | What one holds: the way, when it was made, where it is kept, what it falls back to, how a failed turn under it is tried again, the **names** of the variables it sets, and which paths a turn under it is given instead of which. |
+| `falls-back` | Says which account of that CLI a turn carries on under when this one fails, or — with nothing after it — that this one is the end of the line. |
+| `retry` | Says how a failed turn under it is tried again before the chain moves on: `-n` how many times over, `-p` which wait, `-t` the longest the whole of it may go on for. |
 | `remove` | Takes it away, credentials and all. |
 
 Whatever a way asks that the line did not answer is asked at the terminal, and a secret is not
@@ -178,8 +190,9 @@ the token it takes:
 claude/deepseek is written down at /home/you/.humanize/providers/claude/deepseek
 
 $ hmz providers list
-claude/anthropic  login      -
+claude/anthropic  login      -  falls back to deepseek
 claude/deepseek  gateway    ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
+claude/  as local   -  2 tries, exponential-jitter
 codex/work  login      -
 
 $ hmz providers show claude/deepseek
@@ -187,6 +200,8 @@ provider    claude/deepseek
 way         gateway
 made        2026-08-11T15:01:01Z
 kept in     /home/you/.humanize/providers/claude/deepseek
+falls to    nowhere
+tried       once
 sets        ANTHROPIC_AUTH_TOKEN
 sets        ANTHROPIC_BASE_URL
 answers     /home/you/.claude/.credentials.json -> …/providers/claude/deepseek/home/.credentials.json
@@ -209,8 +224,58 @@ claude/deepseek is gone, credentials and all
 Making a provider that is already there replaces what it holds and leaves its credentials alone:
 a key corrected is not a reason to sign in again.
 
-In the interface, `/providers` walks the same list — what there is, and the three things that can
-happen to one: made, signed in again, taken away.
+In the interface, `/providers` walks the same list, with the account this machine is signed
+into last under each CLI's heading. Six things can happen to one there: **a** makes one,
+**enter** corrects what it holds, **l** signs it in again, **f** says what it falls back to,
+**t** says how a failed turn under it is tried again, and **d** twice takes it away.
+
+## When an account goes down
+
+An account says what happens when it is the one that fails, and both halves are written down
+beside it: it is the account that goes down, and whichever agent was running under one when it
+did is the agent that needs somewhere else to run.
+
+**Tried again.** Nothing is retried by default — a prompt the model refused is the same refusal
+every time, and only you know which of your accounts fails the other way. The waits are the
+ones everybody uses, `BASE` being one second and no single wait longer than a minute:
+
+| Policy | The waits before the 2nd, 3rd, 4th… try |
+| --- | --- |
+| `none` | none at all |
+| `constant` | 1s, 1s, 1s |
+| `linear` | 1s, 2s, 3s |
+| `exponential` | 1s, 2s, 4s, 8s |
+| `exponential-jitter` | anywhere up to the exponential wait — the default, and what keeps a flow's agents from all coming back on the same second |
+| `fibonacci` | 1s, 1s, 2s, 3s, 5s |
+
+`-t` is checked **before** a wait rather than after it, so a turn is never started knowing the
+time it was given is already spent.
+
+**Then the chain.** Each account names the one to carry on under, and that one names the next:
+
+```sh
+hmz providers falls-back claude/subscription key
+hmz providers falls-back claude/key gateway
+hmz providers falls-back claude/ subscription   # where an agent with no account starts
+```
+
+A turn walks it inside the conversation that was running, and the agent stays where it landed.
+A chain that comes round on itself ends at the second sight of an account; one naming an
+account that is not there ends there. Nothing may fall back *to* the machine's own account:
+an agent that is to try it is an agent given no account, which is where its chain already
+starts.
+
+From Python:
+
+```python
+from hmz import providers
+
+held = providers.find("claude", "subscription")
+providers.chain(held)                       # [subscription, key, gateway]
+providers.points("claude", "", "subscription")   # "" is the machine's own account
+providers.retrying("claude", "key", 3, "exponential-jitter", 120.0)
+providers.alone("claude")                   # where what is said about the machine's own is kept
+```
 
 ## Choosing one for an agent
 

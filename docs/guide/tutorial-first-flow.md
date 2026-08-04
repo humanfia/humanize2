@@ -86,7 +86,7 @@ session("do the task")        # opens it
 session("keep going")         # resumes it, the first turn still in context
 ```
 
-`twice.py` above holds a session, so the second turn knows what the first one did. Change it to:
+The flow above holds a session, so the second turn knows what the first one did. Change it to:
 
 ```python
 @flow

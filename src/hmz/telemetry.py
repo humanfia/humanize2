@@ -144,6 +144,7 @@ def start() -> bool:
         return bool(_started)
     try:
         import sentry_sdk
+        from sentry_sdk.integrations.argv import ArgvIntegration
     except ImportError:  # pragma: no cover -- an install missing its own dependency
         return False
     try:
@@ -169,6 +170,11 @@ def start() -> bool:
             # Profiled while something is running rather than for the life of the process:
             # an interface sitting at a prompt is not work anybody needs a profile of.
             profile_lifecycle="trace",
+            # The one default integration that would break the promise above: it attaches
+            # `sys.argv`, and `hmz exec -f ralph_loop -a claude/... "$(cat TASK.md)"` puts the
+            # whole task on it. Taken out here, and taken off again in `_before_send`, since a
+            # switch this load-bearing is worth being wrong about twice.
+            disabled_integrations=[ArgvIntegration()],
             release=_version(),
             before_send=_before_send,
             before_send_transaction=_before_send,
@@ -294,7 +300,10 @@ def _before_send(event: Any, hint: Any) -> Any:
       The report to send, with what must not leave taken out of it.
     """
     del hint
-    for gone in ("server_name", "user", "request", "modules"):
+    # `extra` is where the SDK's own integrations leave what they collected -- `sys.argv`
+    # among them, which for `hmz exec` is the task. Nothing here puts anything in it, so the
+    # whole of it goes rather than the parts of it anybody has thought of.
+    for gone in ("server_name", "user", "request", "modules", "extra"):
         event.pop(gone, None)
     for one in event.get("exception", {}).get("values", []):
         for frame in one.get("stacktrace", {}).get("frames", []):

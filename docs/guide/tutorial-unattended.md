@@ -88,7 +88,7 @@ hmz exec: error: bad agent 'claude:high': expected CLI[@PROVIDER]/MODEL:EFFORT o
 cli=CLI,model=MODEL,effort=EFFORT[,provider=PROVIDER][,permission=PERMISSION]
 
 $ hmz exec -f nosuchflow -a claude/claude-opus-5:max "fix the build"
-hmz exec: error: nosuchflow: no Python file to read a flow from
+hmz exec: error: nosuchflow: no flow to read: a flow is a directory with an __init__.py in it
 ```
 
 Everything that can be known before the first turn is checked before the first turn. That is a

@@ -51,7 +51,7 @@ the task is finished — which is what ends the run.
 Choosing the flow walks you straight into `/agents`, one agent at a time, **by the name the flow
 calls it**. Each agent is three steps:
 
-1. **Which CLI, and which account.** A tab per CLI that is installed; `as installed` is the first
+1. **Which CLI, and which account.** The CLI row, then the account row; `as local` is the first
    row. (Accounts are [providers](/features/providers) — [tutorial 16](/guide/tutorial-providers).)
 2. **Which model, and at what effort.** Type a few letters to narrow. **←/→** adjusts the effort.
 3. **Where it works** — only for an agent the flow says may be pointed at a machine. `rlar` does

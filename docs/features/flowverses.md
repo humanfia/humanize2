@@ -1,7 +1,9 @@
 # Flowverses
 
-A flowverse is **a git repository with a `flows/` directory in it**: one `.py` per flow, and
-whatever they import beside them under names starting with `_`.
+A flowverse is **a git repository with a `flows/` directory in it**: one directory per flow —
+the `__init__.py` that is the flow, whatever it imports beside it and the `skills/` it brings —
+or a single `.py` for a flow that needs neither. A name starting with `_` is not a flow but what
+the flows beside it share.
 
 It is cloned into `~/.humanize/flowverses/<name>/`, and every flow in its `flows/` is then
 offered as `<name>/<flow>`. Nothing outside that directory is read, so the repository is free to
@@ -128,10 +130,13 @@ Any git repository will do. There is no manifest and nothing to register:
 ```
 my-flowverse/
 ├── flows/
-│   ├── review.py    →  yours/review
-│   ├── nightly.py   →  yours/nightly
-│   └── _shared.py   →  not a flow; imported by the two above
-├── tests/           →  not read: only flows/ is
+│   ├── review/           →  yours/review
+│   │   ├── __init__.py       the flow
+│   │   └── skills/           what it brings, mounted onto its agents' sessions
+│   │       └── review-notes/SKILL.md
+│   ├── nightly.py       →  yours/nightly, a flow that brings nothing
+│   └── _shared.py       →  not a flow; imported by the two above
+├── tests/               →  not read: only flows/ is
 └── README.md
 ```
 

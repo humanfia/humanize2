@@ -6,6 +6,10 @@
 2. **Every handover between agents**, and how often each happened.
 3. **What each model has cost.**
 
+With, above them, what this run *is*: the **Flow** — every flow running, the one that was
+started and whatever it called, innermost last — the **Agents**, one line apiece, and **Set**,
+the flow's own settings where any were changed from what it declares.
+
 That directed graph — who handed to whom, how many times — is the shape of the run. A
 two-agent loop that was supposed to alternate and is in fact one agent doing everything looks
 different here from the first glance.
@@ -24,8 +28,8 @@ handover graph and spin a clock at them while they thought.
 ## The same three readings, elsewhere
 
 **Above the editor**, continuously: one line per agent — the name the flow calls it, what it
-runs as `cli/model:effort`, the machine and the account where those are not this one's, and how
-many conversations it holds. `●` is an agent with a turn open, `○` one that has stopped.
+runs as `cli/model:effort`, the machine, [what it may do](/features/permissions) and the account
+where those are not the ordinary ones, and how many conversations it holds. `●` is an agent with a turn open, `○` one that has stopped.
 
 **On the status line, left**: whose turn it is and how long it has been going; between turns,
 the flow and how long the run has been going. A flow that

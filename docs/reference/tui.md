@@ -18,12 +18,13 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 │                       48.2k tokens · 91/s                            │
 │ ❯ type here                                                          │  ← the editor
 ├──────────────────────────────────────────────────────────────────────┤
-│ ⠋ builder… (73s · esc to interrupt)      enter say · tab agent · …  │  ← the status line
+│ ·|· builder… (73s · esc to interrupt)    enter say · tab agent · …  │  ← the status line
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 **At the top**, the box it opens with: the name drawn large, the version, what humanize is, and
-two lines on how to begin. Nothing about what is set up to run or where it would run — the
+three lines on how to begin — what starts a flow, what `/flow` and `/agents` choose, and what
+`/providers` holds. Nothing about what is set up to run or where it would run — the
 transcript is a record, so a copy of either up there could only ever be the copy that was true
 when you opened it. Both are on the lines round the editor, which are redrawn.
 
@@ -31,7 +32,8 @@ when you opened it. Both are on the lines round the editor, which are redrawn.
 between them, is [below](#reading-one-conversation).
 
 **Above the editor**, one line per agent the flow drives: the name the flow calls it, then what
-it runs as `cli/model:effort`, then the machine its turns land on where that is not this one, the
+it runs as `cli/model:effort`, then the machine its turns land on where that is not this one,
+[what it may do](/features/permissions) where that is not the ordinary rung, the
 [account](#which-cli-and-which-account) it runs as where that is not this machine's own, and
 finally the conversations it has open — `2 of 5` on the agent holding the one you are reading,
 the count alone on the others, and `unread` against one holding a conversation that has said
@@ -130,14 +132,15 @@ list appears under the editor with a line about each.
 
 | Command | Takes | What it does |
 | --- | --- | --- |
-| `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one. The first page is shut while a flow is running; the second never is. Nothing lands until you save on the way out. |
+| `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Nothing lands until you save on the way out. |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, corrected, signed in again, pointed at what it falls back to, taken away. |
+| `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
 | `/clear` | | Clears the screen, and nothing else: the conversation being read, not the others, and nothing that is running. |
-| `/export` | | Writes what is on the screen — the conversation being read — to `.humanize/<datetime>.session.md`, as it was written rather than as it was wrapped. |
+| `/export` | | Writes what is on the screen to `.humanize/<datetime>.session.md`, as it was written rather than as it was wrapped: everything drawn there since the last `/clear`, which is every conversation that has been read rather than only the one showing now. |
 | `/exit` | | Leaves. |
 
 `/details` and `/afk` flip when given nothing, and take `on` or `off` when you want to say
@@ -309,8 +312,8 @@ cannot change under you mid-session.
 
 ## The menus, and when what they hold lands
 
-`/flow`, `/agents` and `/providers` are menus rather than walks. Three things are true of all
-of them:
+`/flow`, `/agents`, `/providers` and `/settings` are menus rather than walks. Three things are
+true of all of them:
 
 - **No key is a chord.** A menu asks one thing and its keys are its own, so nothing here needs
   a modifier held down.
@@ -348,13 +351,14 @@ that place's flows and nothing else.
   2. ralph_loop              Ralph loop (flowbench: ralph_loop) — a fresh session every…
   3. stateful_ralph          Stateful ralph (flowbench: stateful_ralph) — one session, re-…
 
-  Enter to choose · a adds a flowverse · r fetches one · d twice takes one away · Esc to
-  close · s to search
+  Enter to choose · f copies it here · a adds a flowverse · r fetches one · d twice takes
+  one away · Esc to close · s to search
 ```
 
 | Key | |
 | --- | --- |
 | `←` `→` | Read the place before or after this one, wrapping round. |
+| `f` | Copy the flow under the cursor into `.humanize/flows/`, whole — what it imports and the skills it brings — to change. Your own are looked in first, so from then on that name means your copy. |
 | `a` | Add a flowverse: a URL or an `owner/repo`, and a name to keep it under. |
 | `r` | Fetch the place being read again, or for the first time. |
 | `d` `d` | Take an added one away, flows and all. `builtin` and `official` are always here. |
@@ -434,8 +438,10 @@ holding it: nothing is written down until the menu itself is saved.
 ## Which CLI, and which account
 
 Two rows, in that order, because an [account](/reference/providers.md) is one backend's — what signs in
-to Claude Code is not what signs in to codex. The CLIs are the ones **actually installed here**,
-less any the flow ruled out by needing a moment or a goal feature that backend has not got:
+to Claude Code is not what signs in to codex. The CLIs are the ones **installed here**, less any
+the flow ruled out by needing a moment or a goal feature that backend has not got — plus any
+supported backend that is only a `pip install` away, which is listed so that it can be found
+rather than looked for, and says so on its row:
 
 ```
    Select the account its turns run as
@@ -608,7 +614,38 @@ than in the CLI's. What came of it is a line in the transcript.
 Nothing here is refused while a flow is running. An agent reads the account it was configured
 with once, so one made or taken away now is one the next run sees.
 
+The retry sheet answers in rungs rather than in numbers: the tries step through 0, 1, 2, 3, 5,
+8, 13 and 21, and the time the retrying is given through *as long as it takes*, 30s, 1m, 5m,
+15m and 1h. A text box for an integer is a text box to validate.
+
 The same accounts are on the command line as [`hmz providers`](/reference/providers.md#hmz-providers).
+
+## What humanize remembers
+
+`/settings` is two pages over `~/.humanize/settings.yaml`, and they are two kinds of thing
+rather than two halves of one:
+
+```
+   Settings
+
+   Everywhere · This directory                       tab and shift+tab
+
+   ❯ 1. reports         on   report what goes wrong to humanize
+     2. sent                 what a report carries, and what it never does
+```
+
+**Everywhere** is what is true of this machine wherever humanize is run from: whether it
+[reports what goes wrong](/features/reporting), and — on enter — the list of what a report
+carries and what it never does, said under the rows. The row shows what is **written down**: an
+environment that is answering for this run says so under the list rather than being drawn as
+the setting, since a menu cannot change it.
+
+**This directory** is what is remembered here: the directory itself, the flow it opens on and
+how many agents that flow was set up with, and a row that forgets the lot — leaving every other
+directory, and every setting, as it was.
+
+The arrows step the row under the cursor, and nothing lands until the menu is left and saving is
+confirmed.
 
 ## Setting a flow up
 
@@ -682,7 +719,8 @@ surface is the terminal's background, and everything drawn is one of the sixteen
 terminal already has a setting for, or a reversal of what is already there. A colour of its own
 would be a guess about the background it lands on.
 
-`NO_COLOR` is honoured.
+`NO_COLOR` is honoured. `TEXTUAL_THEME` names one of Textual's own themes to use instead of
+the terminal's colours; a name no theme answers to is ignored rather than refused.
 
 ## What it will not do
 

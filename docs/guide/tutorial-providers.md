@@ -113,12 +113,12 @@ codex:
 ```
    claude · codex · kimi · mimo · opencode · pi   ←/→ to switch
 
-   ❯ 1. as installed              ✔ signed in as you signed it in
+   ❯ 1. as local                  ✔ signed in as you signed it in
      2. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
      3. work                      login
 ```
 
-`as installed` is what every agent ran as before there were any accounts.
+`as local` is what every agent ran as before there were any accounts.
 
 **a makes one without leaving the question** — the same walk `/providers` runs, minus the
 question this tab has already answered — and comes back with the new account chosen.

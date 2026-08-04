@@ -45,9 +45,9 @@ In Python it is a field of the config:
 ClaudeCodeAgentConfig(model="claude-opus-5", effort="max", provider="deepseek")
 ```
 
-At the prompt it is the **first** step of `/agents`: a tab per CLI that is installed, and under it
-that CLI's own accounts, with `as local` as the first row. **a** there makes one without
-leaving the question.
+At the prompt it is the **account** row of the sheet one agent is set up on — the second page
+of `/flow`, or a saved agent in `/agents`. Opening it lists that CLI's own accounts with
+`as local` first, and **a** there makes one without leaving the question.
 
 ## What moves, and what does not
 

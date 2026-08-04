@@ -73,8 +73,9 @@ installation, and the two halves refuse to run against each other if their versi
 **Stays here**
 
 - The agent's own executable and its re-execs.
-- Its state directory. `claude`, `codex`, `kimi`, `pi`, `opencode` and `mimo` are known by name;
-  any other agent keeping state inside the workspace has to be named with `--local-path`.
+- Its state directory. All ten known CLIs are known by name — `agy`, `claude`, `codex`, `dsh`,
+  `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen` — as is humanize's own `~/.humanize`; any
+  other agent keeping state inside the workspace has to be named with `--local-path`.
 - Anything named `--local-path` or `--local-exec`.
 - The agent's own network connections, so it can still reach its model provider. `--net remote`
   sends them to the target instead; `--net-allow HOST[:PORT]` keeps named hosts local anyway.

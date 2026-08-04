@@ -76,8 +76,11 @@ The first two spellings mean the same thing. The written-out form exists because
 effort may hold the punctuation the short form separates on, and is also where settings with no
 unambiguous short spelling go.
 
-- `<cli>` is `claude`, `codex`, `kimi`, `pi`, `opencode` or `mimo`. Each also answers to the
-  longer name it is installed under: `claude-code`, `kimi-code`, `mimocode` and `mimo-code`.
+- `<cli>` is `agy`, `claude`, `codex`, `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi` or
+  `qwen` — or any CLI of your own [added at `/providers`](/reference/agents#a-cli-of-your-own).
+  Several also answer to the longer name they are installed under: `antigravity`,
+  `claude-code`, `deepseek-harness`, `grok-build`, `kimi-code`, `qwen-code`, `mimocode` and
+  `mimo-code`.
 - `<model>` and `<effort>` are whatever that CLI is asked for — humanize does not check them
   against a list, so a model your account has and this documentation does not still works.
 - A model may hold slashes of its own — Kimi Code's are `kimi-code/k3`, and pi, opencode and
@@ -297,7 +300,7 @@ hmz agents remove <name>
 | Line | |
 | --- | --- |
 | `list` | Every one written down, by name and by what it runs. `-q` prints just the names, one a line, for a script to read. |
-| `show <name>` | What one of them is: its CLI, its model at an effort, the account it runs as, what it may do, and where it works. Its skills are its CLI's own and are not written down here. |
+| `show <name>` | What one of them is: its CLI, its model at an effort, the account it runs as, what it may do, where it works, and whether its backend's goals are available to it. Its skills are its CLI's own and are not written down here. |
 | `add <name> <agent>` | Writes one down. The agent is spelled exactly as [`-a`](#hmz) spells one, so `claude@work/claude-opus-5:high` names the account too, and the written-out form may name a permission rung. |
 | `remove <name>` | Takes it away. |
 
@@ -341,9 +344,9 @@ at all lists them.
 
 | Command | |
 | --- | --- |
-| `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, and the variables it sets. |
+| `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, the variables it sets, and — where either is set — what it falls back to and how a failed turn under it is tried again. The account this machine is signed into is listed as `<cli>/  as local` wherever it has one of those. |
 | `ways <cli>` | How that backend can be signed into: each way, what it asks for, and what it runs. |
-| `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first, which is `login`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. |
+| `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first — `login` for the CLIs that sign in, `key` for `dsh`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. |
 | `login <cli>/<name>` | Signs an existing one in again, by the way it was made with, and asks it again what it runs. Takes the same `-s`. |
 | `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, what it falls back to, how it is tried again, the names of the variables it sets, and which paths a turn under it is given instead of which. |
 | `falls-back <cli>/<name> [<name>]` | Says which account of that CLI a turn carries on under when this one fails, or, with nothing after it, that this one is the end of the line. Each account naming the next is what makes a chain. |
@@ -379,12 +382,20 @@ hmz providers remove claude/deepseek
 | `HUMANIZE_TARGET` | `hmz anchor` | Default for `--target`. |
 | `HUMANIZE_TOKEN` | `hmz anchor`, `hmz anchor serve` | Default for `--token`. |
 | `HUMANIZE_LOG` | `hmz anchor`, `hmz anchor serve` | Default for `--log-level`. |
+| `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/features/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
 | `CLAUDE_CONFIG_DIR` | `hmz collect`, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
 | `CODEX_HOME` | same | Codex's home. Defaults to `~/.codex`. |
+| `DSH_HOME` | same | DeepSeek Harness's home. Defaults to `~/.dsh`. |
+| `GROK_HOME` | the model list, the cost readout | Grok Build's home. Defaults to `~/.grok`. |
 | `KIMI_CODE_HOME` | same | Kimi Code's home. Defaults to `~/.kimi-code`. |
 | `PI_CODING_AGENT_DIR` | same | pi's home. Defaults to `~/.pi/agent`. |
+| `QWEN_HOME` | same | Qwen Code's home. Defaults to `~/.qwen`. |
 | `XDG_DATA_HOME` | the model list | Where opencode and mimocode keep their data. Defaults to `~/.local/share`. |
 | `NO_COLOR` | the TUI | Honoured. |
+| `TEXTUAL_THEME` | the TUI | Names a Textual theme to use instead of humanize's own, which is your terminal's sixteen colours. A name no theme answers to is ignored. |
+
+Antigravity CLI is the one backend whose home cannot be moved: it reads no variable of its own,
+so its state is always `~/.gemini/antigravity-cli`.
 
 A backend home that does not exist is skipped rather than being an error.
 
@@ -405,8 +416,9 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/providers/<cli>/<name>/{home,user}/...` | the CLI's own login | That provider's credentials, at the names the CLI keeps its own under. |
 | `~/.humanize/providers/<cli>/<name>/models.json` | `hmz providers add`, **r** | What that CLI said it runs as that account. Goes when the account does. |
 | `~/.humanize/local/<cli>.json` | `hmz providers falls-back`, `retry`, **f**, **t** | What the account this machine is signed into does when it fails: where it falls back to, and how a turn under it is tried again. |
+| `~/.humanize/acp.json` | **c** in `/providers` | The CLIs of your own that speak the [Agent Client Protocol](/reference/agents#a-cli-of-your-own), as `{name: [argv…]}`. A backend from the moment it is written. |
 | `~/.humanize/models/<cli>.json` | the TUI, **r** | The same, for the CLI as you already run it. |
-| `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run. |
+| `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run, and the settings that are not a workspace's — `enable_sentry`, the answer to the [reporting](/features/reporting) question. |
 | `~/.humanize/agents.yaml` | `hmz agents`, `/agents` | The agents written down under a name, to be reached for from any flow. |
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
 | `.humanize/<datetime>.trace.json` | `hmz collect` | The trace. Relative to the current directory, not to the workspace named. |
