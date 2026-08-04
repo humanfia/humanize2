@@ -394,6 +394,12 @@ class SessionBase(ABC):
         #: under a lock of its own rather than under the one that serializes turns.
         self._steered: dict[str, str] = {}
         self._steering = threading.Lock()
+        #: Which account whatever this session is holding open was started under, or None
+        #: while it is holding nothing. A process, a link or a runtime carries an account's
+        #: environment and its credential paths, and neither changes under one that is
+        #: already up -- so a session that has moved account starts another rather than
+        #: speaking to the one it has. Read and written on the thread taking the turn.
+        self._as: str | None = None
         #: The shape the turn now running was asked to answer in, or None for one asked for
         #: nothing in particular. Written under the lock that serializes the turns and read
         #: by whatever builds the call, since a command line and a process's own arguments
@@ -751,38 +757,35 @@ class SessionBase(ABC):
             subprocess.CalledProcessError: If every try under every account of the chain
               failed, which is the last of them raised as the turn's own failure.
         """
+        from hmz import providers
         from hmz.providers import retry
 
         last: subprocess.CalledProcessError | None = None
-        for at, account in enumerate(self._agent.walks()):
-            if at and account is not None:
-                self._agent.fall_back(account)
-                self._heard(
-                    Event(
-                        kind="tool",
-                        text=f"{self._agent.backend} failed; "
-                        f"carrying on as {account.name}",
-                    )
-                )
-            # An agent running as whoever is at this machine has no account to have been
-            # configured with, and so nothing that says how a turn of it is tried again: it
-            # is taken once, exactly as it always was.
-            tries = account.retries if account is not None else 0
-            policy = account.policy if account is not None else retry.DEFAULT
-            allowed = account.timeout if account is not None else 0.0
+        # Which accounts this turn has been under, so that a chain read again between two of
+        # them -- another session of this agent moved it, somebody rewrote a fallback -- is
+        # walked forwards rather than back onto one that has already failed here.
+        tried: set[str] = set()
+        while True:
+            account = self._agent.node()
+            if account.name in tried:
+                break
+            tried.add(account.name)
             since = time.monotonic()
-            for attempt in range(1, tries + 2):
-                waiting = retry.waits(policy, attempt)
+            for attempt in range(1, account.retries + 2):
+                waiting = retry.waits(account.policy, attempt)
                 if attempt > 1:
                     # Checked before the wait rather than after it, so that a turn is never
                     # started knowing the time it was given is already spent.
-                    if allowed and time.monotonic() - since + waiting > allowed:
+                    if (
+                        account.timeout
+                        and time.monotonic() - since + waiting > account.timeout
+                    ):
                         break
                     self._heard(
                         Event(
                             kind="tool",
                             text=f"{self._agent.backend} failed; trying again in "
-                            f"{waiting:.0f}s ({attempt - 1} of {tries})",
+                            f"{waiting:.0f}s ({attempt - 1} of {account.retries})",
                         )
                     )
                     time.sleep(waiting)
@@ -792,6 +795,20 @@ class SessionBase(ABC):
                     last = failed
                 else:
                     return
+            instead = next(
+                (one for one in providers.chain(account)[1:] if one.name not in tried),
+                None,
+            )
+            if instead is None:
+                break
+            self._agent.fall_back(instead)
+            self._heard(
+                Event(
+                    kind="tool",
+                    text=f"{self._agent.backend} failed; carrying on as "
+                    f"{instead.name or 'this machine is signed in'}",
+                )
+            )
         if last is None:  # nothing ran at all, which is nothing this can raise about
             raise RuntimeError("no account to take the turn under")
         raise last
@@ -969,6 +986,19 @@ class SessionBase(ABC):
         Does nothing by default: a session that is one command per turn holds nothing
         between them.
         """
+
+    def elsewhere(self) -> bool:
+        """Whether what this session is holding open was started under another account.
+
+        Asked on the thread taking the turn, which is the only one that may let go of what
+        this session holds: an agent that has fallen back is an agent whose next turn has to
+        be spoken to a process started as whoever it now is.
+
+        Returns:
+          Whether to let go of it before this turn. False for a session holding nothing yet,
+          and for one whose agent has not moved.
+        """
+        return self._as is not None and self._as != self._agent.node().name
 
     @property
     def cwd(self) -> str:
@@ -1382,7 +1412,7 @@ class StreamSessionBase(SessionBase):
           subprocess.CalledProcessError: If the agent exits rather than answering.
         """
         with self._lock:
-            if schema is not self._shaping or self._stale():
+            if schema is not self._shaping or self._stale() or self.elsewhere():
                 self._shut()
             self._shaping = schema
             argv = self._command()
@@ -1593,6 +1623,9 @@ class StreamSessionBase(SessionBase):
             cwd=None if self._agent.anchor is not None else where,
         )
         assert started.stderr is not None  # noqa: S101
+        # Which account it was started as, so that an agent that falls back is an agent whose
+        # next turn starts another process rather than speaking to this one.
+        self._as = self._agent.node().name
         with self._writing:
             # A new process owes nothing for what was said to the one before it. Left standing,
             # that count is an answer this session would wait for and never be given.
@@ -1755,11 +1788,11 @@ class AgentBase(ABC):
         self._loads: tuple[Loaded, ...] = ()
         # The machine this agent's turns land on, once the first of them has brought it up.
         self._anchor: AnchorConfig | None = None
-        # The account its turns run as, once the first of them has looked it up.
-        self._provider: Provider | None = None
-        #: The account this agent moved to when its own failed, and None while it is still
-        #: running as the one it was configured with.
-        self._fell_back: Provider | None = None
+        #: Which account its turns run as now: the one it was configured with, or the one it
+        #: moved to when that failed. Looked up once, when the first turn needs it, and held
+        #: from then on -- an account taken away while a flow is running is not a reason for
+        #: the next turn of that flow to sign in as somebody else. None until it is asked for.
+        self._at: Provider | None = None
         self._starting = threading.Lock()
 
     @property
@@ -2000,9 +2033,12 @@ class AgentBase(ABC):
     def provider(self) -> Provider | None:
         """Which account this agent's turns run as, or None while they run as the CLI does.
 
-        Read once and kept: what it holds is what the agent was configured with, and a
-        provider taken away while a flow is running is not a reason for the next turn of that
-        flow to sign in as somebody else.
+        None is the account this machine is already signed into: an agent nobody gave one
+        runs the CLI exactly as whoever is at this machine runs it, with nothing added to its
+        environment, nothing taken out of it and no path answered by another. Which is why
+        this answers None for that rather than the account :meth:`node` holds -- everything
+        that asks whether a turn is run under an account is asking whether any of that is to
+        happen, and for the machine's own the answer is no.
 
         Raises:
           ValueError: If this agent was configured with a provider there is no such thing as.
@@ -2010,48 +2046,63 @@ class AgentBase(ABC):
             find the account it was told to run as must not quietly run as the one whoever
             started it happens to be signed in as.
         """
-        if self._fell_back is not None:
-            # A turn whose own account failed carries on under this one, and every turn after
-            # it does too: the account that went down is not one to try again each turn.
-            return self._fell_back
-        if not self._config.provider:
-            return None
-        with self._starting:
-            if self._provider is None:
-                from hmz import providers
+        held = self.node()
+        return held if held.name else None
 
+    def node(self) -> Provider:
+        """The account this agent is on now, whether or not it is one anybody made.
+
+        Which is where its chain is walked from: the one it was configured with, or the one
+        this machine is signed into for an agent given none, or -- once a turn has moved --
+        wherever it moved to. Read once and kept, for the reason :attr:`provider` is.
+
+        Returns:
+          The account. Never None: an agent that was given none is on the account this
+          machine is already signed into, which is an account of every backend there is.
+
+        Raises:
+          ValueError: If this agent was configured with a provider there is no such thing as.
+        """
+        from hmz import providers
+
+        with self._starting:
+            if self._at is None:
                 found = providers.find(self.backend, self._config.provider)
+                if found is None and not self._config.provider:
+                    # A backend `hmz.backends` has never heard of -- a CLI somebody is
+                    # writing, a stand-in a test drives -- still takes its turns as whoever
+                    # is at this machine. That is an account with nothing written down about
+                    # it, since there is nowhere to write it, rather than no account at all.
+                    found = providers.Provider(self.backend, providers.LOCAL, way="")
                 if found is None:
                     raise ValueError(
                         f"{self._id}: no {self.backend} provider called "
                         f"{self._config.provider!r}"
                     )
-                self._provider = found
-            return self._provider
+                self._at = found
+            return self._at
 
-    def walks(self) -> tuple[Provider | None, ...]:
+    def walks(self) -> tuple[Provider, ...]:
         """Every account a turn of this agent may be taken under, in the order it tries them.
 
-        The one it is configured with, and then whatever that account falls back to, and
-        whatever that one does: each account names the next, so a subscription that runs out
-        falls to a key and a key that is refused falls to a gateway. Said on the accounts
-        rather than on the agent because it is the account that goes down, and whichever
-        agent was running under one when it did is the agent that needs somewhere else to go.
+        The one it is on, and then whatever that account falls back to, and whatever that one
+        does: each account names the next, so a subscription that runs out falls to a key and
+        a key that is refused falls to a gateway. Said on the accounts rather than on the
+        agent because it is the account that goes down, and whichever agent was running under
+        one when it did is the agent that needs somewhere else to go.
+
+        A chain may begin at the account this machine is signed into, which is where an agent
+        nobody gave an account starts: `hmz providers falls-back claude/ spare` is what says
+        so, and until somebody does it is a chain of one, tried once.
 
         Returns:
-          One per account, the agent's own first -- which is None for an agent running as
-          whoever is at this machine, that being an account humanize did not make and so one
-          with nothing written down about where it goes next. Never empty: there is always
-          the account the turn starts under.
+          One per account, the one it is on first. From wherever it is now rather than from
+          where it started: an agent that has already moved does not walk the part of the
+          chain that failed again. Never empty.
         """
         from hmz import providers
 
-        provider = self.provider
-        if provider is None:
-            return (None,)
-        # From wherever it is now rather than from where it started: an agent that has
-        # already moved down the chain does not walk the part of it that failed again.
-        return tuple(providers.chain(provider))
+        return tuple(providers.chain(self.node()))
 
     def fall_back(self, provider: Provider) -> None:
         """Runs every turn from here on under another account.
@@ -2059,7 +2110,27 @@ class AgentBase(ABC):
         Args:
           provider: The account to run as.
         """
-        self._fell_back = provider
+        with self._starting:
+            self._at = provider
+        self.moved()
+
+    def moved(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
+        """Told that this agent is on another account from here on.
+
+        A session is a process, a server or a runtime started with an account's own
+        environment and its own credential paths, and none of that changes under a process
+        that is already up -- so everything held open under the account just left has to be
+        opened again. Nothing is torn down here, though: what holds one is the thread taking
+        turns in it, and reaching across to kill a process another thread is reading would end
+        a turn that was doing nothing wrong and might block on a pipe that thread is sitting
+        in.
+
+        So this says the account has changed and each holder answers for itself, on its own
+        thread, the next time it needs what it holds: a session compares the account its
+        process was started under with the one the agent is on now, and starts another when
+        they differ. A backend holding something of its own per agent does the same where it
+        hands that thing out.
+        """
 
     def environment(self) -> Mapping[str, str]:
         """What this agent's turns are run with, on top of the environment they inherit.

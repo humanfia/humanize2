@@ -30,8 +30,10 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ENV",
+    "LOCAL",
     "Provider",
     "add",
+    "alone",
     "chain",
     "find",
     "points",
@@ -47,6 +49,19 @@ _NAMED = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 #: What the file a provider is written down in is called.
 _HELD = "provider.json"
+
+#: What the account this machine is already signed into is called, which is no name at all.
+#: It is the CLI as whoever is at this machine runs it -- humanize did not make it, keeps no
+#: credentials for it and cannot take it away -- and it is already the spelling an agent
+#: configured with no account uses, in `AgentConfig.provider` and in `Runs.provider`. So it is
+#: an account here too, and the one thing every backend has whether or not anybody made one.
+LOCAL = ""
+
+#: Where what is written down about it is kept: one file per backend under humanize's own
+#: home, beside the catalogue that machine's own sign-in answers with. Not under `providers/`,
+#: which is the tree of accounts humanize made -- taking every one of those away must not
+#: leave a stray file behind, and the account nobody made is not one of them.
+_ALONE = "local"
 
 #: The way in that every backend has, whatever else it offers: variables of your own. Every
 #: one of these CLIs reads a key out of the environment under some name of its own -- pi has
@@ -121,7 +136,15 @@ class Provider:
 
     @property
     def at(self) -> Path:
-        """The directory this provider's credentials are kept in."""
+        """The directory this account's credentials are kept in.
+
+        Which for one humanize made is its own directory, and for the account this machine is
+        already signed into is the CLI's own home: those credentials are the CLI's, which is
+        what makes that account the one nobody has to make.
+        """
+        if not self.name:
+            profile = backends.named(self.cli)
+            return profile.directory() if profile is not None else Path()
         return where(self.cli, self.name)
 
     def swaps(self) -> tuple[tuple[str, str], ...]:
@@ -136,7 +159,10 @@ class Provider:
           nothing at all for a backend that has none written down.
         """
         profile = backends.named(self.cli)
-        if profile is None:
+        # Nothing at all for the account this machine is already signed into: what it reads is
+        # what the CLI reads, and answering those paths with themselves is a supervisor for
+        # nothing.
+        if profile is None or not self.name:
             return ()
         held: list[tuple[str, str]] = []
         for real, under in profile.credentials():
@@ -242,20 +268,71 @@ def providers(cli: str = "") -> list[Provider]:
 
 
 def find(cli: str, name: str) -> Provider | None:
-    """The provider of one backend that is called this.
+    """The account of one backend that is called this.
 
     Args:
       cli: The backend, by any name it answers to.
-      name: What the provider is called.
+      name: What the account is called, or :data:`LOCAL` for the one this machine is already
+        signed into.
 
     Returns:
-      It, or None where there is no such provider -- including for a name no provider could
-      have, since nothing can be kept under one.
+      It, or None where there is no such account -- including for a name no account could
+      have, since nothing can be kept under one. Never None for :data:`LOCAL`, which is an
+      account of every backend there is: it is the CLI as whoever is at this machine runs it,
+      and what is written down about it is only what it does when it fails.
     """
     profile = backends.named(cli)
-    if profile is None or not _NAMED.match(name):
+    if profile is None:
+        # Not a backend, so not an account of one. Said of the account this machine is signed
+        # into as well as of any other: a name nothing answers to must not be written down as
+        # though it were, or a line with a typo in it reports success and leaves a file
+        # nothing will ever read back.
+        return None
+    if name == LOCAL:
+        return _alone(profile.name)
+    if not _NAMED.match(name):
         return None
     return _read(profile.name, under() / profile.name / name)
+
+
+def alone(cli: str) -> Path:
+    """Where what is written down about the account this machine is signed into is kept.
+
+    Args:
+      cli: The backend, by the name it is called here.
+
+    Returns:
+      The file, whether or not anything has been written to it.
+    """
+    return home() / _ALONE / f"{cli}.json"
+
+
+def _alone(cli: str) -> Provider:
+    """The account this machine is already signed into, as one.
+
+    Args:
+      cli: The backend, by the name it is called here.
+
+    Returns:
+      It, with nothing but what it does when it fails: no way in, since nobody signed it in
+      here; no variables, since it is the CLI as it is already run; and no credentials of its
+      own, since the ones it reads are the CLI's. Zeros where nothing has been written down,
+      which is an account that is tried once and is the end of its own chain.
+    """
+    try:
+        said = json.loads(alone(cli).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        said = {}
+    held = cast("dict[str, Any]", said) if isinstance(said, dict) else {}
+    return Provider(
+        cli=cli,
+        name=LOCAL,
+        way="",
+        fallback=str(held.get("fallback") or ""),
+        retries=int(_counted(held.get("retries"))),
+        policy=str(held.get("policy") or retry.DEFAULT),
+        timeout=_counted(held.get("timeout")),
+    )
 
 
 def chain(provider: Provider) -> list[Provider]:
@@ -266,13 +343,14 @@ def chain(provider: Provider) -> list[Provider]:
     that is refused falls to a gateway. A run walks it to the end and stops there.
 
     Args:
-      provider: Where the turn starts, which is the account its agent was configured with.
+      provider: Where the turn starts, which is the account its agent was configured with --
+        or the one this machine is already signed into, for an agent configured with none.
 
     Returns:
       That account first, then whatever it falls back to, and so on. An account naming one
       that is not there ends the chain, as does one naming an account already in it: a loop
       is a chain that would be walked forever, and stopping at the second sight of an account
-      is what makes a run that ends.
+      is what makes a run that ends. Never empty: there is always the account it starts at.
     """
     walked = [provider]
     seen = {provider.name}
@@ -290,7 +368,8 @@ def points(cli: str, name: str, at: str) -> bool:
 
     Args:
       cli: The backend it is for.
-      name: Which account.
+      name: Which account, or :data:`LOCAL` for the one this machine is already signed into
+        -- which is where the chain of an agent nobody gave an account begins.
       at: What the account to fall back to is called, or "" for the end of the line.
 
     Returns:
@@ -300,6 +379,11 @@ def points(cli: str, name: str, at: str) -> bool:
       ValueError: If it would point at itself, or at an account of that backend that is not
         there -- either is a chain that goes nowhere, said where it was written rather than
         found on the turn that needed it.
+
+    Note:
+      A chain may begin at the account this machine is signed into and MUST NOT end there: ""
+      in this position is the end of the line, and an agent that is to try that account is an
+      agent given no account, which is where its chain starts anyway.
     """
     found = find(cli, name)
     if found is None:
@@ -318,7 +402,7 @@ def retrying(cli: str, name: str, retries: int, policy: str, timeout: float) -> 
 
     Args:
       cli: The backend it is for.
-      name: Which account.
+      name: Which account, or :data:`LOCAL` for the one this machine is already signed into.
       retries: How many tries beyond the first.
       policy: How long to wait between them, as `hmz.providers.retry.POLICIES` names them.
       timeout: The longest the retrying may go on for, in seconds, or 0.0 for no limit.
@@ -344,12 +428,54 @@ def retrying(cli: str, name: str, retries: int, policy: str, timeout: float) -> 
 
 
 def _write(provider: Provider) -> None:
-    """Writes one provider down again, whole, where it already lives."""
+    """Writes one account down again, whole, where it is kept.
+
+    Args:
+      provider: The account. The one this machine is signed into is written to its own file
+        under humanize's home rather than into the tree of accounts humanize made: it has no
+        directory, having no credentials of its own to keep in one.
+    """
+    if not provider.name:
+        at = alone(provider.cli)
+        _kept(at.parent)
+        beside = at.parent / f".{at.name}.new"
+        _writes(
+            beside,
+            json.dumps(
+                {
+                    "fallback": provider.fallback,
+                    "retries": provider.retries,
+                    "policy": provider.policy,
+                    "timeout": provider.timeout,
+                },
+                indent=2,
+            )
+            + "\n",
+        )
+        beside.replace(at)
+        return
     at = provider.at
     _kept(at)
     beside = at / f".{_HELD}.new"
-    beside.write_text(json.dumps(provider.held(), indent=2) + "\n", encoding="utf-8")
+    _writes(beside, json.dumps(provider.held(), indent=2) + "\n")
     beside.replace(at / _HELD)
+
+
+def _writes(at: Path, said: str) -> None:
+    """Writes one of these files, kept to its owner alone from the moment it exists.
+
+    Args:
+      at: The file, which is the one then moved into place.
+      said: What to put in it.
+
+    Note:
+      Made `0600` before anything is in it rather than chmodded after: what an account holds
+      is a key, a token or an endpoint somebody pays for, and a file that was readable for the
+      moment between being written and being chmodded was readable.
+    """
+    at.touch(mode=0o600, exist_ok=True)
+    at.chmod(0o600)
+    at.write_text(said, encoding="utf-8")
 
 
 def add(
@@ -399,8 +525,8 @@ def add(
     # Written whole and then moved into place, so that a provider read while it is being
     # written is either the old one or the new one and never half of each.
     beside = at / f".{_HELD}.new"
-    beside.write_text(json.dumps(provider.held(), indent=2) + "\n", encoding="utf-8")
-    beside.chmod(0o600)  # it holds keys, and keys are not for the rest of the machine
+    # It holds keys, and keys are not for the rest of the machine.
+    _writes(beside, json.dumps(provider.held(), indent=2) + "\n")
     beside.replace(held)
     ready(provider)
     return provider

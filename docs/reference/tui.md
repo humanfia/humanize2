@@ -568,9 +568,11 @@ variables it sets. Their names, never a value: this is drawn where somebody can 
    claude
    ❯ 1. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
      2. work                      login
+     3. as local                  the CLI as this machine is already signed in · falls back to work
 
    codex
-     3. personal                  key
+     4. personal                  key
+     5. as local                  the CLI as this machine is already signed in
 ```
 
 | Key | What it does |
@@ -583,6 +585,11 @@ variables it sets. Their names, never a value: this is drawn where somebody can 
 | **d** **d** | Takes it away, credentials and all |
 | **c** | Adds a CLI of your own that speaks ACP, for accounts to be made against |
 | **esc** | Closes the menu, asking about anything it is holding |
+
+The last row under each CLI is the account this machine is already signed into — the CLI as
+you run it, which is what an agent nobody gave an account runs as, and where that agent's
+chain begins. **f** and **t** are what it takes; **enter**, **l** and **d** each say why there
+is nothing to do, since humanize did not make that account and keeps no credentials for it.
 
 Taking one away, saying where it falls back to, saying how it is tried again and correcting
 what one holds are **held until the menu is saved**. Making one and signing one in are not: both own the terminal while they run,

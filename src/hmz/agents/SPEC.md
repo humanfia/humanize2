@@ -78,7 +78,10 @@ class AgentConfig:
   configurable anywhere: nothing was asked, so there is nothing to answer differently.
 - `provider` MUST be the account this agent's turns run as, by the name a
   `hmz.providers` provider of its CLI was made under, or "" for the CLI as whoever is at
-  this machine already runs it. It is a setting of the agent because it is the agent that
+  this machine already runs it -- which is an account like any other where a chain is
+  concerned, and none at all where the environment, the credentials and the command line are:
+  `AgentBase.provider` MUST answer `None` for it, so that a turn under it is the turn an agent
+  with no account has always taken. It is a setting of the agent because it is the agent that
   signs in: two agents of one CLI on two accounts are two accounts running at once.
 - What skills an agent carries MUST NOT be a setting of it. A skill installed on this machine
   is its CLI's own -- installed the way that CLI installs one, switched off the way that CLI

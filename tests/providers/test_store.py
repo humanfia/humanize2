@@ -96,11 +96,30 @@ def test_nothing_is_listed_where_nothing_has_ever_been_written_down() -> None:
     assert providers.providers() == []
 
 
-@pytest.mark.parametrize("name", ["ghost", *_NOT_NAMES])
+@pytest.mark.parametrize("name", ["ghost", *(one for one in _NOT_NAMES if one)])
 def test_nothing_is_found_for_a_provider_there_is_not(name: str) -> None:
     providers.add("claude", "mine")
 
     assert providers.find("claude", name) is None
+
+
+def test_the_account_this_machine_is_signed_into_is_always_found() -> None:
+    """It is an account of every backend there is, and the one nobody has to make.
+
+    No name at all, which is what an agent given no account is configured with: the CLI as
+    whoever is at this machine runs it. Nothing is kept for it but what it does when it
+    fails, so it is found whether or not anything has been written down.
+    """
+    held = providers.find("claude", providers.LOCAL)
+
+    assert held is not None
+    assert held.name == ""
+    assert held.way == ""  # nobody signed it in here
+    assert not held.env
+    assert held.swaps() == ()  # what it reads is what the CLI reads
+    assert held.at == Path.home() / ".claude"
+    # And it is not one of the accounts, which are the ones somebody made.
+    assert providers.providers("claude") == []
 
 
 def test_nothing_is_found_for_a_backend_there_is_not() -> None:

@@ -128,14 +128,97 @@ def test_the_tries_stop_when_the_time_they_were_given_is_spent(
     assert tally.read_text().count("main") == 1
 
 
-def test_an_agent_as_this_machine_is_signed_in_takes_its_turn_once(
+def test_an_agent_as_this_machine_is_signed_in_is_on_an_account_too(
     accounts: None,
 ) -> None:
-    """It is an account humanize did not make, so there is nothing written down about it."""
+    """One nobody made: the CLI as it is already run, and the start of a chain like any other."""
     agent = ShellAgent(AgentConfig(model="m", effort="high"))
 
-    assert agent.walks() == (None,)
+    (only,) = agent.walks()
+    assert only.name == ""  # the account this machine is signed into
+    assert only.retries == 0  # and nothing written down about it, so tried once
+    # Which is not an account anything is run *under*: nothing is added to the environment,
+    # nothing is taken out of it, and no path is answered by another.
+    assert agent.provider is None
+    assert only.swaps() == ()
     assert agent.new()("echo here") == "here"
+
+
+def test_the_chain_of_an_agent_nobody_gave_an_account_starts_at_this_machines(
+    accounts: None,
+) -> None:
+    """Which is what makes a fallback something an agent gets without being configured at all."""
+    providers.points("shell", providers.LOCAL, "spare")
+    agent = ShellAgent(AgentConfig(model="m", effort="high"))
+
+    assert [one.name for one in agent.walks()] == ["", "spare"]
+
+    # `main` is not in it at all: the chain begins where the agent is, which is this machine.
+    session = agent.new()
+    assert session(_FLAKY_HERE) == "spare"
+    assert agent.provider is not None
+    assert agent.provider.name == "spare"
+    # And from there it is an agent under an account like any other.
+    assert [one.name for one in agent.walks()] == ["spare"]
+
+
+def test_the_machines_own_account_is_tried_again_before_the_chain_moves_on(
+    accounts: None, tmp_path: Path
+) -> None:
+    """The tries are written down against it, as they are against any other account."""
+    providers.retrying("shell", providers.LOCAL, 2, "none", 0.0)
+    providers.points("shell", providers.LOCAL, "spare")
+    tally = tmp_path / "tries.txt"
+
+    assert (
+        ShellAgent(AgentConfig(model="m", effort="high")).new()(
+            _COUNTING.format(at=tally)
+        )
+        == "spare"
+    )
+
+    assert (
+        tally.read_text().count("nobody") == 3
+    )  # the first try and the two it was given
+    assert tally.read_text().count("spare") == 1
+
+
+def test_what_is_written_down_about_this_machines_account_outlives_the_run(
+    accounts: None,
+) -> None:
+    """Kept under humanize's own home rather than in the tree of accounts it made.
+
+    Taking every account of a backend away must not take this with it, and must not leave a
+    stray file among the accounts either: this is not one of the accounts humanize made.
+    """
+    providers.points("shell", providers.LOCAL, "spare")
+    providers.retrying("shell", providers.LOCAL, 1, "constant", 30.0)
+
+    held = providers.find("shell", providers.LOCAL)
+    assert held is not None
+    assert (held.fallback, held.retries, held.policy, held.timeout) == (
+        "spare",
+        1,
+        "constant",
+        30.0,
+    )
+    assert providers.alone("shell").is_file()
+    assert not providers.alone("shell").is_relative_to(providers.where("shell", "main"))
+    # And it is not one of the accounts: those are the ones somebody made.
+    assert "" not in [one.name for one in providers.providers("shell")]
+
+
+def test_nothing_may_fall_back_to_the_account_this_machine_is_signed_into(
+    accounts: None,
+) -> None:
+    """The end of the line is what that position means, so nothing may name it."""
+    providers.points("shell", "main", "spare")
+    assert providers.points("shell", "main", "")
+
+    main = providers.find("shell", "main")
+    assert main is not None
+    assert main.fallback == ""
+    assert [one.name for one in providers.chain(main)] == ["main"]
 
 
 def test_the_waits_are_the_ones_everybody_uses() -> None:
@@ -175,6 +258,14 @@ def test_a_policy_that_is_not_one_is_refused_where_it_is_written(
         providers.retrying("shell", "main", -1, "constant", 0.0)
 
 
+#: The same, for an agent on the account this machine is signed into: there is no `WHOSE` in
+#: its environment, so the first try fails on the bare `DOWN` this fixture does not set --
+#: which is what a machine with no key exported looks like. Written as a failure of its own so
+#: that a local first step is a step that fails.
+_FLAKY_HERE = (
+    'if [ -z "$WHOSE" ]; then echo "nobody is signed in" >&2; exit 1; fi; echo "$WHOSE"'
+)
+
 #: The stand-in as one line a shell session runs, since that agent takes its prompt as a
 #: script: the same two-branch behaviour, written where the prompt goes.
 _FLAKY_AS_SCRIPT = (
@@ -182,9 +273,57 @@ _FLAKY_AS_SCRIPT = (
     'echo "${WHOSE:-nobody}"'
 )
 
-#: The same, writing down which account each try was taken under.
+#: The same, writing down which account each try was taken under. A turn under the account
+#: this machine is signed into has no `WHOSE`, and fails for having none.
 _COUNTING = (
     'echo "${{WHOSE:-nobody}}" >> {at}; '
-    'if [ -n "$DOWN" ]; then echo "the account is down" >&2; exit 1; fi; '
-    'echo "${{WHOSE:-nobody}}"'
+    'if [ -n "$DOWN" ] || [ -z "$WHOSE" ]; then echo "down" >&2; exit 1; fi; '
+    'echo "${{WHOSE}}"'
 )
+
+
+def test_a_session_holding_a_process_open_starts_another_once_the_agent_has_moved(
+    accounts: None, tmp_path: Path
+) -> None:
+    """What it is holding was started as an account it has left, and nothing changes under it.
+
+    Let go of by the thread taking the turn rather than by the one that moved the agent: a
+    process another thread is reading is not one to reach across and kill.
+    """
+    agent = _agent("main")
+    session = agent.new()
+    # What a session that holds a process open writes down when it starts one. A session that
+    # is one command per turn holds nothing, so it has nothing to go stale.
+    session._as = "main"
+
+    assert not session.elsewhere()
+
+    spare = providers.find("shell", "spare")
+    assert spare is not None
+    agent.fall_back(spare)
+
+    assert (
+        session.elsewhere()
+    )  # so its next turn starts one as the account it is on now
+    assert agent.provider is not None
+    assert agent.provider.name == "spare"
+
+
+def test_a_chain_read_again_between_two_tries_is_walked_forwards(
+    accounts: None,
+) -> None:
+    """Two sessions of one agent fail at once, and neither drags it back to a dead account."""
+    providers.points("shell", "main", "second")
+    providers.points("shell", "second", "spare")
+    agent = _agent("main")
+
+    # As though another session had already moved it on: the turn takes it from where the
+    # agent is now, and the accounts it has already tried are not tried again.
+    one = agent.new()
+    # `spare` points back at `main`, so a chain read again mid-turn could walk round forever.
+    providers.points("shell", "spare", "main")
+    with pytest.raises(subprocess.CalledProcessError):
+        one(_FLAKY_AS_SCRIPT.replace('echo "${WHOSE:-nobody}"', "exit 1"))
+
+    assert agent.provider is not None
+    assert agent.provider.name == "spare"  # the end of what there was to try

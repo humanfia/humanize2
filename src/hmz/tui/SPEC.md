@@ -351,6 +351,11 @@ adjusted rather than chosen.
   Enter MUST correct what one holds; `a` MUST make one; `d` twice MUST take one away; and
   signing one in again, saying which account this one falls back to and saying how a failed
   turn under it is tried again MUST be keys of the same page.
+- The account this machine is already signed into MUST be a row too, under each CLI that has
+  an account of its own and after the ones somebody made: it is what an agent nobody gave an
+  account runs as, and where that agent's chain begins. Correcting it, signing it in and
+  taking it away MUST each say why there is nothing to do rather than doing nothing: humanize
+  did not make that account and keeps no credentials for it.
 - Where an account falls back to MUST be chosen from that CLI's own other accounts, and MUST
   offer the end of the line first: each account naming the next is what makes a chain, and an
   account cannot fall back to itself.

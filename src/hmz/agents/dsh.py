@@ -306,7 +306,11 @@ class DshSession(SessionBase):
     def _running(self) -> _Harness:
         """Returns a runtime initialized for this session's current effort."""
         effort = self.effort
-        if self._harness is not None and self._runtime_effort != effort:
+        # The account as well as the effort: a runtime is started with one account's
+        # environment and its credential paths, and neither changes under one already up.
+        if self._harness is not None and (
+            self._runtime_effort != effort or self.elsewhere()
+        ):
             self._shut()
         if self._harness is not None:
             return self._harness
@@ -349,6 +353,7 @@ class DshSession(SessionBase):
             raise
         self._harness = harness
         self._runtime_effort = effort
+        self._as = self._agent.node().name
         self._reaper = weakref.finalize(self, harness.close)
         return harness
 

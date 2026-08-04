@@ -128,9 +128,11 @@ sets:
    claude
    ❯ 1. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
      2. work                      login
+     3. as local                  the CLI as this machine is already signed in · falls back to work
 
    codex
-     3. personal                  key
+     4. personal                  key
+     5. as local                  the CLI as this machine is already signed in
 ```
 
 | Key | |
@@ -177,6 +179,17 @@ and `fibonacci`.
 hmz providers falls-back claude/subscription key
 hmz providers falls-back claude/key gateway
 ```
+
+The account this machine is already signed into is one of them — `claude/`, a backend and no
+name at all — and it is where the chain of an agent nobody gave an account begins:
+
+```sh
+hmz providers falls-back claude/ subscription
+hmz providers retry claude/ -n 2
+```
+
+so a flow you never configured an account for still has somewhere to go. Nothing may fall back
+*to* it: an agent that is to try it is an agent given no account.
 
 A turn walks it inside the conversation that was running — the session is the backend's own
 and is named by an id, so the next account picks it up where the last left off — and the agent

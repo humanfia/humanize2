@@ -8,6 +8,10 @@ in again, taken away.
 from __future__ import annotations
 
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from hmz.providers import Provider
 
 __all__ = ["providers"]
 
@@ -69,7 +73,11 @@ def providers(argv: list[str]) -> int:
     )
 
     showing = doing.add_parser("show", help="what one holds")
-    showing.add_argument("provider", metavar="CLI/NAME")
+    showing.add_argument(
+        "provider",
+        metavar="CLI/NAME",
+        help="the account, or `CLI/` for the one this machine is already signed into",
+    )
 
     dropping = doing.add_parser("remove", help="take one away, credentials and all")
     dropping.add_argument("provider", metavar="CLI/NAME")
@@ -78,7 +86,12 @@ def providers(argv: list[str]) -> int:
         "falls-back",
         help="say which account a turn carries on under when this one fails",
     )
-    falling.add_argument("provider", metavar="CLI/NAME")
+    falling.add_argument(
+        "provider",
+        metavar="CLI/NAME",
+        help="the account, or `CLI/` for the one this machine is already signed into, which "
+        "is where the chain of an agent given no account begins",
+    )
     falling.add_argument(
         "at",
         nargs="?",
@@ -90,7 +103,11 @@ def providers(argv: list[str]) -> int:
     trying = doing.add_parser(
         "retry", help="say how a failed turn under one is tried again"
     )
-    trying.add_argument("provider", metavar="CLI/NAME")
+    trying.add_argument(
+        "provider",
+        metavar="CLI/NAME",
+        help="the account, or `CLI/` for the one this machine is already signed into",
+    )
     trying.add_argument(
         "-n",
         "--tries",
@@ -119,7 +136,11 @@ def providers(argv: list[str]) -> int:
     if args.doing == "ways":
         return _ways(args.cli)
     try:
-        cli, name = _named(args.provider)
+        # `claude/` is the account this machine is already signed into: a thing to show, to
+        # point somewhere and to say how to retry, and not one to make or take away.
+        cli, name = _named(
+            args.provider, made=args.doing not in ("show", "falls-back", "retry")
+        )
     except ValueError as why:
         parser.error(str(why))
     if args.doing == "show":
@@ -147,10 +168,11 @@ def _falls_back(cli: str, name: str, at: str) -> int:
     if not said:
         print(f"hmz: no provider {cli}/{name}", file=sys.stderr)
         return 1
+    whose = f"{cli}/{name}" if name else f"{cli}, as this machine is signed in,"
     print(
-        f"{cli}/{name} falls back to {at.strip()}"
+        f"{whose} falls back to {at.strip()}"
         if at.strip()
-        else f"{cli}/{name} falls back to nowhere"
+        else f"{whose} falls back to nowhere"
     )
     return 0
 
@@ -167,10 +189,11 @@ def _retry(cli: str, name: str, tries: int, policy: str, timeout: float) -> int:
     if not said:
         print(f"hmz: no provider {cli}/{name}", file=sys.stderr)
         return 1
+    whose = f"{cli}/{name}" if name else f"{cli}, as this machine is signed in,"
     print(
-        f"{cli}/{name} is tried {tries} more times, {policy}"
+        f"{whose} is tried {tries} more times, {policy}"
         if tries
-        else f"{cli}/{name} is tried once"
+        else f"{whose} is tried once"
     )
     return 0
 
@@ -182,12 +205,51 @@ def _waits() -> tuple[tuple[str, ...], str]:
     return tuple(one.name for one in retry.POLICIES), retry.DEFAULT
 
 
-def _named(said: str) -> tuple[str, str]:
-    """Reads `CLI/NAME` into the two it names."""
+def _named(said: str, *, made: bool = True) -> tuple[str, str]:
+    """Reads `CLI/NAME` into the two it names.
+
+    Args:
+      said: What was typed.
+      made: Whether it has to be an account somebody made. `claude/` -- a CLI and no name at
+        all -- is the account this machine is already signed into, which is an account to say
+        things about and not one to make, sign in or take away.
+
+    Returns:
+      The backend and the name, which is "" for the account this machine is signed into.
+
+    Raises:
+      ValueError: If it is not that shape.
+    """
     cli, sep, name = said.partition("/")
-    if not sep or not cli.strip() or not name.strip():
-        raise ValueError(f"{said!r} is not CLI/NAME, as in claude/deepseek")
+    if not sep or not cli.strip() or (made and not name.strip()):
+        wanted = "CLI/NAME, as in claude/deepseek"
+        raise ValueError(f"{said!r} is not {wanted}")
     return cli.strip(), name.strip()
+
+
+def _also(cli: str) -> list[Provider]:
+    """The account this machine is signed into, where it says anything about itself.
+
+    Args:
+      cli: The backend to list, or "" for all of them.
+
+    Returns:
+      One per backend whose own sign-in has a chain or tries written down, since that is a
+      setting in force and a list that did not show it would be a list that hid one. Nothing
+      for the ones left as they come, which is every backend on a machine nobody has said
+      anything about them on.
+    """
+    from hmz import backends
+    from hmz import providers as held
+
+    wanted = backends.named(cli) if cli else None
+    return [
+        one
+        for profile in backends.profiles()
+        if (wanted is None or profile.name == wanted.name)
+        and (one := held.find(profile.name, held.LOCAL)) is not None
+        and (one.fallback or one.retries)
+    ]
 
 
 def _list(cli: str) -> int:
@@ -195,13 +257,22 @@ def _list(cli: str) -> int:
     from hmz import providers as held
 
     found = held.providers(cli)
-    if not found:
+    # And the account this machine is signed into, wherever it says something about itself:
+    # a chain or a set of tries in force is a thing to see, and it is an account here too.
+    mine = _also(cli)
+    if not found and not mine:
         whose = f"no {cli} providers yet" if cli else "no providers yet"
         print(f"{whose}; try `hmz providers add {cli or 'claude'}/mine`")
         return 0
-    for provider in found:
+    for provider in [*found, *mine]:
         variables = ", ".join(sorted(provider.env)) or "-"
-        print(f"{provider.cli}/{provider.name}  {provider.way:10} {variables}")
+        way = provider.way or "as local"
+        said = f"{provider.cli}/{provider.name}  {way:10} {variables}"
+        if provider.fallback:
+            said += f"  falls back to {provider.fallback}"
+        if provider.retries:
+            said += f"  {provider.retries} tries, {provider.policy}"
+        print(said)
     return 0
 
 
@@ -231,7 +302,7 @@ def _show(cli: str, name: str) -> int:
         print(f"hmz: no provider {cli}/{name}", file=sys.stderr)
         return 1
     print(f"provider    {provider.cli}/{provider.name}")
-    print(f"way         {provider.way}")
+    print(f"way         {provider.way or 'as this machine is signed in'}")
     print(f"made        {provider.made or '-'}")
     print(f"kept in     {provider.at}")
     print(f"falls to    {provider.fallback or 'nowhere'}")

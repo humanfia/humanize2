@@ -897,6 +897,9 @@ class CodexAgent(AgentBase):
         """
         super().__init__(config, name=name)
         self._server: _AppServer | None = None
+        #: Which account the server up now was started as, so that an agent which has fallen
+        #: back starts another rather than going on talking to one signed in as somebody else.
+        self._server_as = ""
         self._serving = threading.Lock()
 
     def disable_goals(self) -> None:
@@ -928,6 +931,11 @@ class CodexAgent(AgentBase):
         with (
             self._serving
         ):  # two sessions of one agent share the server rather than start two
+            if self._server is not None and self._server_as != self.node().name:
+                # Started as an account this agent has since left. Let go of rather than
+                # taken down: a turn on another thread may still be talking to it, and it is
+                # stopped by its own finalizer when the agent is collected either way.
+                self._server, self._server_as = None, ""
             if self._server is None:
                 argv = ["codex", "app-server"]
                 if not self.goals_enabled:
@@ -936,6 +944,7 @@ class CodexAgent(AgentBase):
                     argv += ["--disable", "goals"]
                 argv += ["--stdio"]
                 self._server = _AppServer(self.spawned(argv), self._environ())
+                self._server_as = self.node().name
                 self._server._agents.append(self)
                 # Held by the finalizer alone, which is what takes the server down: when the
                 # agent is collected, and at exit for one held to the end.
@@ -945,6 +954,10 @@ class CodexAgent(AgentBase):
     def stop(self) -> None:
         """Takes no further turn, and takes down the server the turn under way is waiting on."""
         super().stop()
+        self._down()
+
+    def _down(self) -> None:
+        """Takes down the server this agent holds, if it is holding one."""
         if self._server is not None:
             self._server.stop()
             self._server = None

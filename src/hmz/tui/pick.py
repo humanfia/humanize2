@@ -2231,6 +2231,8 @@ class Falls(Sheet[str]):
         """Says whose accounts these are, and what carrying on under one means."""
         self.query_one("#asked", Label).update(
             f"Where {self._cli}/{self._name} falls back to"
+            if self._name
+            else f"Where {self._cli}, as this machine is signed in, falls back to"
         )
         self.query_one("#about", Label).update(
             "The account a turn under this one carries on under, once the tries it was "
@@ -4663,10 +4665,33 @@ class Providers(Drafts[list[str]]):
         self.query_one("#choices", OptionList).focus()
 
     def _read(self) -> None:
-        """Reads every account off the disk, which is what the rows are drawn from."""
-        from hmz import providers
+        """Reads every account off the disk, which is what the rows are drawn from.
 
-        self._found = providers.providers()
+        The account this machine is already signed into is one of them, under each CLI that
+        has one of its own: it is what an agent nobody gave an account runs as, and it is
+        where that agent's chain begins, so it is a row to press f and t on like any other.
+        Under a CLI with no accounts there is nothing for it to fall back to, so it is a row
+        there only where something has already been said about it -- a chain that outlived
+        the accounts it named, or tries set from a command line -- which must not be a
+        setting in force that nothing shows.
+
+        Last in each CLI's group rather than first: what somebody came here to read is the
+        accounts they made, and this is the one that was always there.
+        """
+        from hmz import providers
+        from hmz.backends import profiles
+
+        held = providers.providers()
+        whose = {each.cli for each in held}
+        mine = [
+            one
+            for profile in profiles()
+            if (one := providers.find(profile.name, providers.LOCAL)) is not None
+            and (profile.name in whose or one.fallback or one.retries)
+        ]
+        self._found = sorted(
+            [*held, *mine], key=lambda one: (one.cli, not one.name, one.name)
+        )
 
     def _named(self, one: Provider) -> str:
         """One account as it is keyed here, which is by the CLI it belongs to and its name."""
@@ -4674,7 +4699,9 @@ class Providers(Drafts[list[str]]):
 
     def _about(self, one: Provider) -> str:
         """What a row says about one account, and what is going to happen to it."""
-        said = _sets(one)
+        said = (
+            _sets(one) if one.name else "the CLI as this machine is already signed in"
+        )
         if self._named(one) in self._edits:
             said += f"{_DOT}corrected"
         falls = self._chains.get(self._named(one), one.fallback)
@@ -4718,7 +4745,7 @@ class Providers(Drafts[list[str]]):
                 Option(
                     self._row(
                         seen,
-                        one.name,
+                        one.name or "as local",
                         self._about(one),
                         here=named == self._was,
                         inforce=False,
@@ -4759,6 +4786,23 @@ class Providers(Drafts[list[str]]):
         """The account the cursor is on, or None where the list has nothing in it."""
         return next((one for one in self._found if self._named(one) == self._was), None)
 
+    def _machines(self, cli: str, doing: str) -> str:
+        """Why the account this machine is signed into is not one to do that to.
+
+        Args:
+          cli: The backend it is of.
+          doing: What was asked for.
+
+        Returns:
+          The line to say under the list. humanize did not make that account and keeps no
+          credentials for it -- it is the CLI as whoever is at this machine runs it -- so the
+          only things to say about it are where it falls back to and how it is tried again.
+        """
+        return (
+            f"there is nothing to {doing}: this is {escape(cli)} as this machine is already "
+            "signed in. f and t are what it takes"
+        )
+
     @work
     async def action_fallback(self) -> None:
         """Asks which account a turn under this one carries on under when it fails."""
@@ -4795,7 +4839,12 @@ class Providers(Drafts[list[str]]):
             "App[None]",
             self.app,  # pyright: ignore[reportUnknownMemberType]
         )
-        chosen = await showing.push_screen_wait(Retries(named, *held))
+        chosen = await showing.push_screen_wait(
+            Retries(
+                named if one.name else f"{one.cli}, as this machine is signed in,",
+                *held,
+            )
+        )
         if chosen is None:
             return
         if chosen == (one.retries, one.policy, one.timeout):
@@ -4810,6 +4859,10 @@ class Providers(Drafts[list[str]]):
         """Marks the account under the cursor to be taken away, once d is pressed twice."""
         one = self._under()
         if one is None:
+            return
+        if not one.name:
+            self._said = self._machines(one.cli, "take away")
+            self._fill()
             return
         named = self._named(one)
         if named in self._gone:
@@ -4853,6 +4906,10 @@ class Providers(Drafts[list[str]]):
         """
         from hmz.providers import login as signing
 
+        if not one.name:
+            self._said = self._machines(one.cli, "correct")
+            self._fill()
+            return
         way = signing.way_of(one.cli, one.way)
         if way is None:
             self._said = f"{escape(one.way)} is not a way in {escape(one.cli)} has"
@@ -4943,6 +5000,10 @@ class Providers(Drafts[list[str]]):
 
         one = self._under()
         if one is None:
+            return
+        if not one.name:
+            self._said = self._machines(one.cli, "sign in")
+            self._fill()
             return
         way = signing.way_of(one.cli, one.way)
         if way is None or not way.argv:

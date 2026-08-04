@@ -844,3 +844,51 @@ def test_what_an_agent_runs_as_is_kept_and_read_back(tmp_path: Path) -> None:
     # An agent nobody named one for says nothing, which is what a file written before there
     # were any says too -- and reads back as this machine's own account.
     assert "provider" not in agents["reviewer"]
+
+
+@pytest.mark.timeout(60)
+async def test_the_account_this_machine_is_signed_into_is_a_row_of_its_own() -> None:
+    """It is what an agent nobody gave an account runs as, so it is where a chain begins."""
+    from hmz.tui.pick import Falls
+
+    providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "k"})
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+
+        # Last in its CLI's group: what somebody came here to read is the accounts they made.
+        assert [str(one.id) for one in listing.options if one.id] == [
+            "=codex/work",
+            "=codex/",
+        ]
+        assert "as local" in str(listing.options[-1].prompt)
+        assert "already signed in" in str(listing.options[-1].prompt)
+
+        await driver.press("down")  # onto it
+        await driver.pause()
+        # There is nothing to correct, sign in or take away about it, and it says so.
+        for key in ("enter", "l", "d"):
+            await driver.press(key)
+            await driver.pause()
+            assert "there is nothing to" in _under(app)
+            assert isinstance(app.screen, Providers)
+
+        # What it does take is where it falls back to.
+        await driver.press("f")
+        await until(lambda: isinstance(app.screen, Falls), driver)
+        rows = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(rows.options), driver)
+        assert [str(one.id) for one in rows.options] == ["=", "=work"]
+
+        await driver.press("down", "enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await keeps(app, driver)
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    held = providers.find("codex", providers.LOCAL)
+    assert held is not None
+    assert held.fallback == "work"

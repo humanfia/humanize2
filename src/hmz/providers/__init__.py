@@ -22,8 +22,10 @@ from __future__ import annotations
 from . import retry
 from .store import (
     ENV,
+    LOCAL,
     Provider,
     add,
+    alone,
     chain,
     env_of,
     environ,
@@ -40,8 +42,10 @@ from .store import (
 
 __all__ = [
     "ENV",
+    "LOCAL",
     "Provider",
     "add",
+    "alone",
     "chain",
     "env_of",
     "environ",

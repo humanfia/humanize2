@@ -49,6 +49,9 @@ class Provider:
 def chain(provider: Provider) -> list[Provider]: ...
 
 
+def alone(cli: str) -> Path: ...
+
+
 def points(cli: str, name: str, at: str) -> bool: ...
 
 
@@ -73,6 +76,20 @@ def retrying(
   so that a turn under a provider still traces, still counts and still loads what is installed.
 - `swaps` MUST also answer the same path with the links in it followed, where that is a
   different spelling: a home reached through one is the same file under two names.
+- The account this machine is already signed into MUST be an account here too, named `""` --
+  which is what `AgentConfig.provider` and `Runs.provider` already call it -- and MUST be
+  answered by `find` for every backend, whether or not anything has been written down about
+  it. It is the CLI as whoever is at this machine runs it: humanize did not make it, keeps no
+  credentials for it, cannot sign it in and cannot take it away, so the only things written
+  down about it are what it does when it fails. It MUST NOT be one of the accounts `providers`
+  lists -- those are the ones somebody made -- and `where` MUST go on refusing the name, since
+  it is not a directory.
+- What is written down about it MUST be kept under humanize's own home, one file per backend,
+  and MUST NOT be kept in the tree of accounts humanize made: taking every account of a
+  backend away MUST NOT leave a file behind among them, and MUST NOT take this with it.
+- It MUST answer no swaps and no variables, so that a turn under it is the turn an agent with
+  no account has always taken: nothing added to the environment, nothing taken out of it, no
+  path answered by another and no supervisor at all.
 - Where a turn goes when an account fails MUST be said on the account rather than on the
   agent: it is the account that goes down, and whichever agent was running under one when it
   did is the agent that needs somewhere else to run. It MUST be the name of another account of
@@ -87,6 +104,10 @@ def retrying(
   naming an account that is not there MUST end there: either would otherwise be a run that
   never stopped. A name that would point at itself, or at an account of that backend there is
   none of, MUST be refused where it is written rather than found by the turn that needed it.
+- A chain MAY begin at the account this machine is signed into, which is what gives an agent
+  nobody configured with an account a chain at all. It MUST NOT end there: `""` in the
+  fallback position is the end of the line, and an agent that is to try that account is an
+  agent given no account, which is where its chain already starts.
 - An account MUST also say how a turn under it is tried again before the chain moves on: how
   many times over, how long to wait between tries and how long the whole of it may go on for.
   Nothing MUST be retried by default -- a turn is taken once, as it always was -- since a

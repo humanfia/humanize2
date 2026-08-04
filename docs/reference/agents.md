@@ -66,6 +66,21 @@ so a subscription that runs out falls to a key, and a key that is refused falls 
 `/providers`, cursor on the account, then **f** asks the same thing, and **t** asks how it is
 tried again.
 
+**An agent with no account has a chain too.** The account this machine is already signed into
+is an account here as well — `claude/`, a backend and no name at all — so it is where the
+chain of an agent nobody configured begins:
+
+```sh
+hmz providers falls-back claude/ spare     # your own login, then the key
+hmz providers retry claude/ -n 2
+```
+
+It is an account for that purpose and nothing else: humanize did not make it, keeps no
+credentials for it, and a turn under it is exactly the turn it always was — nothing added to
+the environment, nothing taken out of it, no path answered by another. Nothing may fall back
+*to* it, either: an agent that is to try it is an agent given no account, which is where its
+chain already starts.
+
 It all happens on the **same** conversation: the session is the backend's own and is named by
 an id, so the account it moves to picks it up where the last one left off. The agent stays
 there for every turn after — an account that has gone down is not one to try again each turn —
@@ -74,6 +89,12 @@ comes round on itself ends at the second sight of an account.
 
 What the failed attempts already put on the transcript stay there — it is how somebody reading
 it finds out the account went down, how many times it was tried, and where the turn went next.
+
+Two edges worth knowing. A model is the account's: a chain that lands on an account whose
+catalogue does not hold this agent's model fails for a second, unrelated reason, and moving an
+agent's account is not moving its model. And whatever the agent was holding open — a Claude
+process, a Codex server, a dsh runtime — was started as the account it has left, so it is let
+go of as the agent moves and the next turn opens one as whoever the agent now is.
 
 ## A CLI of your own
 

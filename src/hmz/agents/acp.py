@@ -243,6 +243,10 @@ class AcpSession(SessionBase):
           subprocess.CalledProcessError: If the agent will not start, will not speak the
             protocol, or refuses to open a session.
         """
+        if self._link is not None and self.elsewhere():
+            # Started as an account this agent has since left: ended here, on the thread that
+            # holds it, so that the next turn opens one as whoever the agent now is.
+            self._shut()
         if self._link is not None:
             return self._link
         agent = cast("AcpAgent", self._agent)
@@ -252,6 +256,7 @@ class AcpSession(SessionBase):
             environ=self._environ(),
             cwd=None if self._agent.anchor is not None else self._workspace(),
         )
+        self._as = self._agent.node().name
         try:
             link.start()
             self._settle(

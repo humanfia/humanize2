@@ -173,7 +173,7 @@ def test_a_name_a_provider_may_not_have_is_a_line_to_correct(
     assert "is not a provider name" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("said", ["claude", "/mine", "claude/"])
+@pytest.mark.parametrize("said", ["claude", "/mine"])
 def test_something_that_is_not_a_backend_and_a_name_is_a_usage_error(
     said: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -401,3 +401,36 @@ def test_a_policy_nobody_has_is_refused_where_it_was_typed(
     assert run("retry", "claude/mine", "-n", "1", "-p", "nonesuch") == 1
 
     assert "is not a retry policy" in capsys.readouterr().err
+
+
+def test_the_account_this_machine_is_signed_into_is_said_as_a_cli_and_no_name(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`claude/` is it: an account of every backend, and the one nobody had to make."""
+    providers.add("claude", "spare", env={"ANTHROPIC_API_KEY": "s"})
+
+    assert run("falls-back", "claude/", "spare") == 0
+    assert run("retry", "claude/", "-n", "2", "-p", "constant") == 0
+
+    held = providers.find("claude", providers.LOCAL)
+    assert held is not None
+    assert (held.fallback, held.retries, held.policy) == ("spare", 2, "constant")
+    said = capsys.readouterr().out
+    assert "claude, as this machine is signed in, falls back to spare" in said
+
+    assert run("show", "claude/") == 0
+    shown = capsys.readouterr().out
+    assert "way         as this machine is signed in" in shown
+    assert "falls to    spare" in shown
+    assert "tried       2 more times, constant" in shown
+
+
+def test_the_machines_own_account_is_not_one_to_make_or_take_away(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Nobody made it and nothing is kept for it, so there is nothing to do to it."""
+    for doing in ("add", "remove", "login"):
+        with pytest.raises(SystemExit) as stopped:
+            run(doing, "claude/")
+        assert stopped.value.code == 2
+        assert "is not CLI/NAME" in capsys.readouterr().err

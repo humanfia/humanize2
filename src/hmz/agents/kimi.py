@@ -604,6 +604,9 @@ class KimiCodeCLIAgent(AgentBase):
         """
         super().__init__(config, name=name)
         self._server: _AppServer | None = None
+        #: Which account the daemon up now was started as: an agent that has fallen back
+        #: starts another rather than going on submitting turns as somebody else.
+        self._server_as = ""
         self._serving = threading.Lock()
 
     @property
@@ -619,6 +622,11 @@ class KimiCodeCLIAgent(AgentBase):
         with (
             self._serving
         ):  # two sessions of one agent share the server rather than start two
+            if self._server is not None and self._server_as != self.node().name:
+                # Started as an account this agent has since left. Let go of rather than
+                # taken down: a turn on another thread may still be talking to it, and its
+                # own finalizer stops it when the agent is collected either way.
+                self._server, self._server_as = None, ""
             if self._server is None:
                 argv = [
                     "kimi",
@@ -630,6 +638,7 @@ class KimiCodeCLIAgent(AgentBase):
                     "error",
                 ]
                 self._server = _AppServer(self.spawned(argv), self._environ())
+                self._server_as = self.node().name
                 # Held by the finalizer alone, which is what takes the daemon down: when the
                 # agent is collected, and at exit for one held to the end.
                 weakref.finalize(self, self._server.stop)

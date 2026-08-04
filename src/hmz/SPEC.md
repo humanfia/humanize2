@@ -361,12 +361,16 @@ that can happen to one -- written down, taken away.
 ## `hmz providers`
 
 ```shell
-hmz providers [list [<cli>] | ways <cli> | add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] | login <cli>/<name> [-s VAR=VALUE]... | show <cli>/<name> | falls-back <cli>/<name> [<name>] | retry <cli>/<name> [-n <tries>] [-p <policy>] [-t <seconds>] | remove <cli>/<name>]
+hmz providers [list [<cli>] | ways <cli> | add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] | login <cli>/<name> [-s VAR=VALUE]... | show <cli>/[<name>] | falls-back <cli>/[<name>] [<name>] | retry <cli>/[<name>] [-n <tries>] [-p <policy>] [-t <seconds>] | remove <cli>/<name>]
 ```
 
 The accounts an agent may be run as: what there is, how a backend can be signed into, and the
 three things that can happen to one -- made, signed in again, taken away.
 
+- `<cli>/` -- a backend and no name at all -- MUST be the account this machine is already
+  signed into, for the three lines that say something about an account rather than making one:
+  it is an account of every backend and one nobody made, so it is a thing to show, to point
+  somewhere and to say how to retry, and not one to add, sign in or take away.
 - It MUST be the same store the interface's own `/providers` walks: one place a thing is kept
   is one place it is kept, whichever way somebody reached it.
 - Whatever a way asks that the line did not answer MUST be asked at the terminal, and a secret

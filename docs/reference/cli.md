@@ -328,14 +328,16 @@ hmz providers list [<cli>]
 hmz providers ways <cli>
 hmz providers add <cli>/<name> [-w|--way <way>] [-s|--set VAR=VALUE]... [--no-login]
 hmz providers login <cli>/<name> [-s|--set VAR=VALUE]...
-hmz providers show <cli>/<name>
-hmz providers falls-back <cli>/<name> [<name>]
-hmz providers retry <cli>/<name> [-n|--tries <n>] [-p|--policy <policy>] [-t|--timeout <seconds>]
+hmz providers show <cli>/[<name>]
+hmz providers falls-back <cli>/[<name>] [<name>]
+hmz providers retry <cli>/[<name>] [-n|--tries <n>] [-p|--policy <policy>] [-t|--timeout <seconds>]
 hmz providers remove <cli>/<name>
 ```
 
-A provider is named `<cli>/<name>` — `claude/deepseek` — wherever one is asked for. Naming no
-command at all lists them.
+A provider is named `<cli>/<name>` — `claude/deepseek` — wherever one is asked for, and
+`<cli>/` with no name is the account this machine is already signed into: an account of every
+backend, which nobody made and which `show`, `falls-back` and `retry` take. Naming no command
+at all lists them.
 
 | Command | |
 | --- | --- |
@@ -402,6 +404,7 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/providers/<cli>/<name>/provider.json` | `hmz providers add` | What a [provider](/reference/providers.md) was made by, and what a turn under it runs with. `0600`, in a directory at `0700`. |
 | `~/.humanize/providers/<cli>/<name>/{home,user}/...` | the CLI's own login | That provider's credentials, at the names the CLI keeps its own under. |
 | `~/.humanize/providers/<cli>/<name>/models.json` | `hmz providers add`, **r** | What that CLI said it runs as that account. Goes when the account does. |
+| `~/.humanize/local/<cli>.json` | `hmz providers falls-back`, `retry`, **f**, **t** | What the account this machine is signed into does when it fails: where it falls back to, and how a turn under it is tried again. |
 | `~/.humanize/models/<cli>.json` | the TUI, **r** | The same, for the CLI as you already run it. |
 | `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run. |
 | `~/.humanize/agents.yaml` | `hmz agents`, `/agents` | The agents written down under a name, to be reached for from any flow. |
