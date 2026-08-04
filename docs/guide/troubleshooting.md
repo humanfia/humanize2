@@ -33,8 +33,9 @@ that is not a flowverse's, is taken as a path. See [where flows live](/reference
 
 ### `the official flowverse has not been fetched yet`
 
-The name is right and the download has not happened. Open `/flow`, walk to it with the arrows,
-and press `r`.
+The name is right and the download has not happened. Open `/flow`, which fetches it as it
+opens; `r` on it fetches it again, and `hmz flowverses fetch official` does the same from a
+command line.
 
 ### `nothing in it is marked @flow(), and it holds …`
 

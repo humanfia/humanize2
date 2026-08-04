@@ -127,6 +127,12 @@ def _under(sheet: Flows) -> str:
     return str(sheet.query_one("#tuning", Label).content)
 
 
+def _fetched() -> bool:
+    """Whether humanize's own flowverse has been cloned yet."""
+    verse = store.named(OFFICIAL)
+    return verse is not None and verse.fetched
+
+
 @pytest.mark.timeout(60)
 async def test_the_strip_is_the_places_flows_come_from() -> None:
     """Two of them always: the package, and the repository the rest come from."""
@@ -241,6 +247,26 @@ async def test_the_flows_of_your_own_are_a_place_of_their_own(tmp_path: Path) ->
         assert "local" in _places(sheet)
         await _steps(app, driver, "local")
         assert _rows(sheet) == [".humanize/flows/mine.py"]
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.usefixtures("catching_up")
+async def test_what_was_never_fetched_is_fetched_as_the_menu_opens(
+    theirs: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """It is here because its flows are wanted; a key to press for them is a key nobody would."""
+    monkeypatch.setattr(store, "OFFICIAL_URL", str(theirs))
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+
+        await until(_fetched, driver)
+        # And it left what was being read where it was: the menu opened on the place the
+        # flow in force came from, and nobody asked to be taken anywhere else.
+        assert sheet._where == "builtin"
+
+        await _steps(app, driver, OFFICIAL)
+        await until(lambda: _rows(sheet) == ["official/loop"], driver)
 
 
 @pytest.mark.timeout(60)

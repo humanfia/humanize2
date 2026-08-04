@@ -1104,8 +1104,9 @@ class Flows(Drafts[Chosen]):
         self._where = ""
         #: What became of the last fetch, said under the list.
         self._said = ""
-        #: Whether a fetch is running now, so that a second one is not started over it.
-        self._fetching = False
+        #: What is being fetched now, so that a second fetch is not started over it and so
+        #: that what is said under the list is what is being fetched. "" for none.
+        self._fetching = ""
         # The flows are shut while one is running, so the menu opens on the page that is not.
         self._tab = _AGENT_PAGE if running else opening % len(self.TABS)
 
@@ -1178,10 +1179,40 @@ class Flows(Drafts[Chosen]):
         ]
 
     def _ask(self) -> None:
-        """Says what the menu is, and puts up whichever page it opened on."""
+        """Says what the menu is, puts up the page it opened on, and catches up on fetches."""
         self.query_one("#asked", Label).update("Flow")
         self._fill()
         self.query_one("#choices", OptionList).focus()
+        self._catches_up()
+
+    @work
+    async def _catches_up(self) -> None:
+        """Fetches whatever has never been fetched, as the menu opens.
+
+        A flowverse that is here and has never been fetched is a list with nothing in it and
+        a key to press about it, which is a step nobody would choose to take: it is here
+        because its flows are wanted. humanize's own repository of the rest is the one this
+        is ever true of -- one that was added was cloned as it was added -- and it is the one
+        every flow that is not in the package is in.
+
+        Off the loop and out of the way: the menu is drawn first and stays drawn, what is
+        being read is left where it is, and a fetch that fails says so under the list. Once
+        per opening, however it goes, so that a machine with no network says so once rather
+        than hammering a server on every keystroke.
+        """
+        from hmz.flows import flowverses
+        from hmz.flows.verses import fetch
+
+        for one in flowverses():
+            if not one.url or one.fetched:
+                continue
+            name = one.name
+
+            def fetching(named: str = name) -> str:
+                fetch(named)
+                return named
+
+            await self._fetches(name, fetching, reading=False)
 
     def _turned(self) -> None:
         """Puts the cursor back on the flow being read when the flows page opens again."""
@@ -1398,7 +1429,7 @@ class Flows(Drafts[Chosen]):
     def _nothing(self) -> str:
         """What to say under the flows: how a fetch went, or that a search found nothing."""
         if self._fetching:
-            return f"fetching {escape(self._whose())}…"
+            return f"fetching {escape(self._fetching)}…"
         if self._said:
             return self._said
         if self._typed and not any(self.fits(one.name) for one in self._all()):
@@ -1484,7 +1515,7 @@ class Flows(Drafts[Chosen]):
         if said is None:
             return
         url, name = said
-        await self._fetches(lambda: _added(url, name))
+        await self._fetches(name or url, lambda: _added(url, name))
 
     @work
     async def action_refresh(self) -> None:
@@ -1512,7 +1543,7 @@ class Flows(Drafts[Chosen]):
             fetch(name)
             return name
 
-        await self._fetches(fetching)
+        await self._fetches(name, fetching)
 
     def action_drop(self) -> None:
         """Takes the flowverse being read away, flows and all, once d is pressed twice."""
@@ -1540,20 +1571,28 @@ class Flows(Drafts[Chosen]):
         self._said = f"{escape(verse.name)} is no longer here"
         self._fill()
 
-    async def _fetches(self, doing: Callable[[], str]) -> None:
+    async def _fetches(
+        self, named: str, doing: Callable[[], str], *, reading: bool = True
+    ) -> None:
         """Runs one git fetch off the event loop, and shows the list it left behind.
 
         Off the loop because a clone is seconds of network: an interface that stopped
         redrawing while it ran would be one that looked as though it had gone away.
 
         Args:
+          named: What is being fetched, said under the list while it runs. What is being
+            fetched rather than what is being read: they are the same for the key that
+            fetches one and different for every other way of getting here.
           doing: What to do, answering with the flowverse it left behind.
+          reading: Whether to read what was fetched afterwards. What somebody asked for is
+            what they want to see; what was fetched because it never had been is not
+            something to move anybody off the list they opened the menu on.
         """
         import asyncio
 
         if self._fetching:
             return
-        self._fetching, self._said = True, ""
+        self._fetching, self._said = named or "it", ""
         self._fill()
         try:
             name = await asyncio.to_thread(doing)
@@ -1561,15 +1600,15 @@ class Flows(Drafts[Chosen]):
             # Said under the list rather than raised at whoever opened the menu: the question
             # this page is asking is still worth answering.
             self._said = escape(str(why))
-            self._fetching = False
+            self._fetching = ""
             self._fill()
             return
-        self._fetching, self._offers = False, None
+        self._fetching, self._offers = "", None
         # Reading what was just fetched, on the first flow it brought: that list is what
         # somebody who fetched it fetched it to see, and one that was added is not a place
         # anybody has stepped to yet.
         first = next((one for one in self._all() if one.whose == name), None)
-        if first is not None:
+        if reading and first is not None:
             self._where, self._was = name, f"{name}{_HALVES}{first.name}"
         self._fill()
 

@@ -19,7 +19,8 @@ hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "
 | `official` | [humanfia/flowverse](https://github.com/humanfia/flowverse) — everything else humanize offers |
 
 `official` is **listed before it has been fetched**: what there is to run is not the same question
-as what has been downloaded. Neither of the two can be taken away.
+as what has been downloaded. Opening `/flow` fetches whatever has never been fetched, so in
+practice it is there by the time you look. Neither of the two can be taken away.
 
 A flow from a flowverse that has not been fetched says so, rather than saying there is no such
 file — the name is right, the download has not happened.
@@ -69,7 +70,9 @@ repository you have just cloned is never run until you ask what is in it. See
 Those keys are there rather than in a menu of their own because that is the moment you find out
 that the flow you want is in a flowverse you have not added, or that the one you have is out of
 date. A fetch runs off the interface's own loop — it keeps drawing while it clones — and what
-became of it is said under the list rather than thrown at you.
+became of it is said under the list rather than thrown at you. Opening the menu fetches
+whatever has never been fetched, in the background and without moving what you are reading, so
+`r` is for fetching one *again*.
 
 ## Where a name is looked for
 

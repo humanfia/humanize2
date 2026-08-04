@@ -358,7 +358,10 @@ that place's flows and nothing else.
 | `d` `d` | Take an added one away, flows and all. `builtin` and `official` are always here. |
 
 The page opens on the place the flow in force came from, and a fetch leaves you reading what
-it brought. The flowverse keys are here rather than in a menu of their own because this is the
+it brought. **A flowverse that has never been fetched is fetched as the menu opens** — which
+in practice is `official`, the one every flow that is not in the package is in — in the
+background, without moving what you are reading, and once per opening however it goes. The
+flowverse keys are here rather than in a menu of their own because this is the
 moment you find out that the flow you want is in a flowverse you have not added, or that the
 one you have is out of date. A fetch runs off the interface's own loop — it keeps drawing
 while it clones — and what became of it is said under the list rather than thrown at you. A

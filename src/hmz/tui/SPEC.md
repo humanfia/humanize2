@@ -251,6 +251,11 @@ adjusted rather than chosen.
   them: a search is for finding a flow whose flowverse is the thing nobody remembers, so one
   that left somebody stepping through empty lists to reach the row it found would be a search
   that answered a question nobody asked.
+- A flowverse that has never been fetched MUST be fetched as the menu opens, in the
+  background: it is here because its flows are wanted, and a list with nothing in it and a
+  key to press about it is a step nobody would choose to take. It MUST NOT hold the menu up,
+  MUST NOT move what is being read, and MUST be tried once per opening however it goes -- a
+  machine with no network says so once rather than on every keystroke.
 - Adding a flowverse, fetching one again and taking one away MUST be keys of this same page,
   and MUST be about the place being read rather than the row under the cursor -- a flowverse
   that has not been fetched is a list with no rows to be on, and fetching it is exactly what
