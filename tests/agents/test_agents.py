@@ -125,10 +125,12 @@ def clis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeCLIs:
         "for line in sys.stdin:\n"
         "    said = json.loads(line)['message']['content'][0]['text']\n"
         "    note([], said)\n"
+        "    answer = (pathlib.Path('PROJECT_FACT').read_text() "
+        "if said == 'read project fact' else said)\n"
         "    print(json.dumps({'type': 'assistant', 'message': {'content': "
         "[{'type': 'text', 'text': 'working'}]}}), flush=True)\n"
         # One answer per thing said, which is what the real one does.
-        "    print(json.dumps({'type': 'result', 'result': said}), flush=True)\n"
+        "    print(json.dumps({'type': 'result', 'result': answer}), flush=True)\n"
     )
     fake = binaries / "claude"
     fake.write_text(f"#!{sys.executable}\n{claude}")
@@ -436,19 +438,25 @@ def test_claude_pursues_through_its_own_goal_command(clis: _FakeCLIs) -> None:
     ]
 
 
-def test_disabled_goals_never_reach_claude(clis: _FakeCLIs) -> None:
-    """Claude has no feature flag for goals, so HMZ refuses them before invoking its CLI."""
+def test_disabled_goals_never_reach_claude(clis: _FakeCLIs, tmp_path: Path) -> None:
+    """A goals-off ordinary turn cannot leave HMZ through continuation tools."""
     agent = ClaudeCodeAgent(
         ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
     )
-    session = agent.new()
+    (tmp_path / "PROJECT_FACT").write_text("the frozen source fact")
+    session = agent.new(tmp_path)
     agent.disable_goals()
 
     assert not agent.goals_enabled
     with pytest.raises(RuntimeError, match="goals are disabled"):
         session.pursue("the suite passes", suppress=True)
     assert not clis.log.exists()
-    assert session("an ordinary turn") == "an ordinary turn"
+    assert session("read project fact") == "the frozen source fact"
+    launched = clis.calls()[0].argv
+    assert launched.count("--disallowedTools") == 1
+    assert launched[launched.index("--disallowedTools") + 1] == (
+        "Agent,ScheduleWakeup,CronCreate,CronDelete,CronList"
+    )
 
 
 def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -> None:

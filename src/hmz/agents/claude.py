@@ -23,6 +23,17 @@ if TYPE_CHECKING:
 #: what the permission prompt of an interactive Claude fills in.
 _ASKS = "AskUserQuestion"
 
+#: Noninteractive orchestration tools that can move work beyond the ordinary turn HMZ owns.
+#: An agent whose goals are disabled remains able to use its ordinary permission-bound tools,
+#: but cannot escape into a hidden goal, subagent, wakeup, or cron lifecycle.
+_CONTINUATION_TOOLS = (
+    "Agent",
+    "ScheduleWakeup",
+    "CronCreate",
+    "CronDelete",
+    "CronList",
+)
+
 #: Reasons that leave an answer unfinished even when a broken intermediary labels the result
 #: `success`. Claude normally keeps its own agent loop going for these rather than returning
 #: them as the result of the whole turn.
@@ -189,6 +200,9 @@ class ClaudeCodeSession(StreamSessionBase):
             # Claude validates the answer against this itself, so a turn that lands has
             # answered in the shape: what comes back is the object, and nothing else.
             argv += ["--json-schema", json.dumps(self._shaping.model_json_schema())]
+        denied: list[str] = (
+            list(_CONTINUATION_TOOLS) if not self._agent.goals_enabled else []
+        )
         if off := leaving(
             self._agent.backend, self._agent.config.skills, self._workspace()
         ):
@@ -196,7 +210,11 @@ class ClaudeCodeSession(StreamSessionBase):
             # agent is refused every skill it was not given. It is still told they exist --
             # Claude lists what is installed, and no flag takes one off that list -- so this
             # is a skill it cannot use rather than one it never hears of.
-            argv += ["--disallowedTools", ",".join(f"Skill({one})" for one in off)]
+            denied.extend(f"Skill({one})" for one in off)
+        if denied:
+            # One backend argument is the authority boundary. Keeping continuation tools first
+            # and skills in their established load order makes the resolved command stable.
+            argv += ["--disallowedTools", ",".join(denied)]
         return argv
 
     def _write(self, text: str, ticket: str = "") -> str:

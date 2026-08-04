@@ -67,9 +67,12 @@ agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high", goals=Fa
 `agent.disable_goals()` remains the imperative equivalent before the first turn.
 
 Ordinary turns continue to work, but later calls to `pursue` raise `RuntimeError`, even with
-`suppress=True`. Codex starts that agent's app server with its goal tools disabled; Claude Code
-has no separate runtime feature, so HMZ refuses its goal before invoking the CLI. Neither path
-changes the user's global backend configuration.
+`suppress=True`. Codex starts that agent's app server with its goal tools disabled. For an
+ordinary Claude Code print turn, HMZ disables the noninteractive continuation tools `Agent`,
+`ScheduleWakeup`, `CronCreate`, `CronDelete`, and `CronList`; ordinary tools remain governed by
+the agent's permission and skill configuration. These denials are combined with excluded-skill
+denials in one deterministic backend argument. Neither path changes the user's global backend
+configuration, and a Claude agent whose goals remain enabled keeps its existing command.
 
 ## Asking for an agent that has one
 

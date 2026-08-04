@@ -183,11 +183,22 @@ def test_claude_is_refused_every_skill_this_agent_was_not_given(
     )
 
     # An agent given none is refused all of them, which is not the same as never being asked.
-    none = ClaudeCodeAgent(
+    none_agent = ClaudeCodeAgent(
         ClaudeCodeAgentConfig(model="m", effort="high", skills=())
-    ).new()
+    )
+    none = none_agent.new()
     argv = none._command()
     assert (
         argv[argv.index("--disallowedTools") + 1]
         == "Skill(hf-cli),Skill(writing),Skill(housekeeping)"
+    )
+
+    # Goal and skill denials share one deterministic backend argument rather than competing
+    # flags whose precedence would belong to the CLI.
+    none_agent.disable_goals()
+    argv = none._command()
+    assert argv.count("--disallowedTools") == 1
+    assert argv[argv.index("--disallowedTools") + 1] == (
+        "Agent,ScheduleWakeup,CronCreate,CronDelete,CronList,"
+        "Skill(hf-cli),Skill(writing),Skill(housekeeping)"
     )
