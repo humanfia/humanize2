@@ -21,7 +21,7 @@ from hmz.tui.pick import Agent, Configures, Flows, Runs, setting
 from hmz.tui.selecting import Transcript
 from hmz.tui.settings import Settings
 
-from .test_app import into_agent, keeps
+from .test_app import into_agent, keeps, onto
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -149,20 +149,28 @@ def _rows(app: Humanize) -> str:
 
 
 async def _set_up(app: Humanize, driver: Pilot[None], flow: str = "settable") -> None:
-    """Opens the flow menu on one flow, and the sheet that flow is set up on.
+    """Opens the flow menu, chooses one of this project's flows, and lands where it is set up.
 
-    Setting a flow up is a thing about the flow rather than about its agents, so it is a key
-    on the page the flow is chosen from rather than a page or a step of its own.
+    Setting a flow up is a thing about the flow rather than about its agents, so it is asked
+    as the flow is chosen rather than on a key or a page of its own.
 
     Args:
       app: The interface.
       driver: What is pumping it.
-      flow: The flow to open the menu on.
+      flow: The flow to choose, by the file it is in.
     """
-    await driver.press(*f"/flow {flow}")
+    await driver.press(*"/flow")
     await driver.press("enter")
     await until(lambda: isinstance(app.screen, Flows), driver)
-    await driver.press("c")
+    sheet = app.screen
+    assert isinstance(sheet, Flows)
+    for _ in range(len(sheet._stepping())):
+        if sheet._where == "local":
+            break
+        await driver.press("right")
+        await driver.pause()
+    await onto(app, driver, f"local\x1f.humanize/flows/{flow}.py")
+    await driver.press("enter")
     await driver.pause()
 
 
@@ -184,16 +192,20 @@ async def test_setting_up_comes_between_the_flow_and_its_agents(flows: Path) -> 
             assert "say it twice" in shown  # the line the field was declared with
 
             # And it is held rather than applied: the menu is what applies it, when it is
-            # saved on the way out.
+            # saved on the way out. Answering it lands on the agents, which is the next
+            # thing to answer about the flow that was just chosen.
             await driver.press("enter")
             await until(lambda: isinstance(app.screen, Flows), driver)
+            sheet = app.screen
+            assert isinstance(sheet, Flows)
+            await until(lambda: sheet._tab == 1, driver)
             await into_agent(app, driver)
             assert isinstance(app.screen, Agent)
 
 
 @pytest.mark.timeout(60)
 async def test_a_flow_that_takes_no_setting_up_is_not_asked_about(flows: Path) -> None:
-    """The sheet is not put up empty; the key says so under the list instead."""
+    """The sheet is not put up empty: choosing it goes straight on to what drives it."""
     app = Humanize()
     with unittest.mock.patch(
         "hmz.tui.app.installed",
@@ -201,15 +213,13 @@ async def test_a_flow_that_takes_no_setting_up_is_not_asked_about(flows: Path) -
     ):
         async with app.run_test() as driver:
             await _set_up(app, driver, "plain")
-            await until(
-                lambda: (
-                    "takes no setting up"
-                    in str(app.screen.query_one("#tuning", Label).content)
-                ),
-                driver,
-            )
+            sheet = app.screen
+            assert isinstance(sheet, Flows)
+            await until(lambda: sheet._tab == 1, driver)
 
-            assert isinstance(app.screen, Flows)
+            assert isinstance(
+                app.screen, Flows
+            )  # no sheet in between, and none skipped
 
 
 @pytest.mark.timeout(60)
@@ -325,7 +335,7 @@ async def test_how_it_was_set_up_is_kept_and_read_back(
             await keeps(app, driver)
             await until(lambda: app._config is not None, driver)
 
-    assert Settings(tmp_path).config("settable")["loud"] is True
+    assert Settings(tmp_path).config(".humanize/flows/settable.py")["loud"] is True
     # And a second interface opens on it, rather than back at the flow's own defaults.
     again = Humanize()
     assert again._config is not None
@@ -434,7 +444,7 @@ async def test_a_flow_that_groups_nothing_is_one_list(flows: Path) -> None:
         return_value={"claude": (Model("opus", ("high",)),)},
     ):
         async with app.run_test() as driver:
-            await _set_up(app, driver, ".humanize/flows/ungrouped.py")
+            await _set_up(app, driver, "ungrouped")
             await until(lambda: isinstance(app.screen, Configures), driver)
             sheet = app.screen
             assert isinstance(sheet, Configures)

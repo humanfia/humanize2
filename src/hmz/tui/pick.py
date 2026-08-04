@@ -1010,12 +1010,17 @@ class Flows(Drafts[Chosen]):
     somebody finds out that the flow they want is in one they have not added, or that the one
     they have is out of date.
 
+    Choosing a flow asks what that flow itself takes, where it takes anything, and then turns
+    to what will drive it. A key that set the flow up was a key nobody pressed: a flow with
+    settings is chosen in order to be run with settings, and the moment it is chosen is the
+    one moment somebody is thinking about that flow rather than about its agents.
+
     Nothing is applied by turning a page or by walking out. What the menu holds is a draft of
     the whole of it, and it lands when it is saved on the way out.
     """
 
     TABS: ClassVar = ("Flow", "Agents")
-    LETTERS: ClassVar = frozenset({"search", "adding", "refresh", "drop", "configure"})
+    LETTERS: ClassVar = frozenset({"search", "adding", "refresh", "drop"})
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
@@ -1034,7 +1039,6 @@ class Flows(Drafts[Chosen]):
         Binding("a", "adding", "add a flowverse", priority=True),
         Binding("r", "refresh", "fetch it again", priority=True),
         Binding("d", "drop", "take it away", priority=True),
-        Binding("c", "configure", "set the flow up", priority=True),
     ]
 
     def __init__(
@@ -1068,8 +1072,10 @@ class Flows(Drafts[Chosen]):
         self._unavailable = unavailable
         self._underway = running
         self._kept = kept
-        self._flow = flow
-        self._places = places_of(flow) or ()
+        # Said outright, both of them: the flow is read where it is set, so what it is has to
+        # be settled without reading what reads it.
+        self._flow: str = flow
+        self._places: tuple[Place, ...] = places_of(flow) or ()
         if runs:
             self._runs = (
                 self._fitted(settled(runs, self._places, self._agents))
@@ -1379,7 +1385,7 @@ class Flows(Drafts[Chosen]):
         )
         self.query_one("#keys", Label).update(
             "Enter to choose · a adds a flowverse · r fetches one · d twice takes one away · "
-            f"c sets the flow up · Esc to close{self.searching()}"
+            f"Esc to close{self.searching()}"
         )
 
     def _empty(self, whose: str) -> str:
@@ -1435,36 +1441,35 @@ class Flows(Drafts[Chosen]):
             return f"{escape(self._flow)} will not load; nothing here can be set up"
         return f"{escape(self._flow)} drives no agents; it talks only to you"
 
-    def action_configure(self) -> None:
-        """Sets the flow itself up, which is a thing about the flow rather than its agents."""
-        if self._tab != _FLOW_PAGE:
-            return
-        self._configures()
-
     @work
     async def _configures(self) -> None:
-        """Asks the flow what it can be set up with, and holds the answer as a draft."""
+        """Asks what the flow itself takes, and turns to what will drive it.
+
+        Which is the moment to ask it: a flow that takes settings has just been chosen, and
+        what it is set up with is a thing about the flow rather than about its agents. A flow
+        that takes none is not asked -- a sheet with nothing on it is not a question -- and
+        the walk is the same either way, so nobody has to know which kind they picked.
+        """
         model = model_of(self._flow)
-        if model is None:
-            self._said = f"{escape(self._flow)} takes no setting up"
-            self._fill()
-            return
-        showing = cast(
-            "App[None]",
-            self.app,  # pyright: ignore[reportUnknownMemberType]
-        )
-        held = await showing.push_screen_wait(
-            Configures(
-                self._flow,
-                model,
-                self._config if isinstance(self._config, model) else None,
+        if model is not None:
+            showing = cast(
+                "App[None]",
+                self.app,  # pyright: ignore[reportUnknownMemberType]
             )
-        )
-        if held is None:
-            return  # walked out, which leaves the flow set up as the draft has it
-        self._config, self._said = held, ""
-        self.changed()
-        self._fill()
+            held = await showing.push_screen_wait(
+                Configures(
+                    self._flow,
+                    model,
+                    self._config if isinstance(self._config, model) else None,
+                )
+            )
+            if held is not None:
+                self._config = held
+                self.changed()
+            # And walking out of it leaves the flow set up as the draft has it, which is
+            # still a flow to go on and answer the agents of.
+        self._said = ""
+        self._turn_page(1)
 
     @work
     async def action_adding(self) -> None:
@@ -1591,21 +1596,21 @@ class Flows(Drafts[Chosen]):
         Args:
           name: The flow, by the name it was offered under.
         """
-        if name == self._flow:
-            self._turn_page(1)
-            return
-        places = places_of(name)
-        if places is None:
-            self._said = f"{escape(name)} will not load"
-            self._fill()
-            return
-        self._flow, self._places = name, places
-        self._runs = self._fitted(settled(self._remembered(name), places, self._agents))
-        self._config = config_of(name, self._held(name).get("config") or {})
-        self._said = ""
-        self.changed()
-        # Straight on to what it will be driven by, which is the next thing to answer.
-        self._turn_page(1)
+        if name != self._flow:
+            places = places_of(name)
+            if places is None:
+                self._said = f"{escape(name)} will not load"
+                self._fill()
+                return
+            self._flow, self._places = name, places
+            self._runs = self._fitted(
+                settled(self._remembered(name), places, self._agents)
+            )
+            self._config = config_of(name, self._held(name).get("config") or {})
+            self.changed()
+        # On to what the flow itself takes, where it takes anything, and then to what will
+        # drive it: three things about one flow, asked in the order they depend on nothing.
+        self._configures()
 
     @work
     async def _configuring(self, at: int) -> None:

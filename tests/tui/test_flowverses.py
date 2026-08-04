@@ -487,7 +487,7 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     tmp_path: Path,
 ) -> None:
-    """`/config` asks the phase that was chosen, and the one beside it takes no settings."""
+    """Choosing one asks what that phase takes, which is not what the one beside it takes."""
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
     (where / "three.py").write_text(THREE)
@@ -500,10 +500,17 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
         # The first of them, which says it takes an `n`.
         await onto(app, driver, "local\x1f.humanize/flows/three.py:gen-idea")
         await driver.press("enter")
-        await until(lambda: sheet._tab == 1, driver)
-        await driver.press("shift+tab")
-        await until(lambda: sheet._tab == 0, driver)
-        await driver.press("c")
 
         await until(lambda: isinstance(app.screen, Configures), driver)
         assert "n" in str(app.screen.query_one("#choices", OptionList).options[0].id)
+
+        # And the one beside it takes nothing, so choosing it asks nothing.
+        await driver.press("escape")
+        await until(lambda: sheet._tab == 1, driver)
+        await driver.press("shift+tab")
+        await until(lambda: sheet._tab == 0, driver)
+        await onto(app, driver, "local\x1f.humanize/flows/three.py:rlcr")
+        await driver.press("enter")
+        await until(lambda: sheet._tab == 1, driver)
+
+        assert isinstance(app.screen, Flows)

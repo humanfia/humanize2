@@ -131,7 +131,7 @@ list appears under the editor with a line about each.
 | Command | Takes | What it does |
 | --- | --- | --- |
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one. The first page is shut while a flow is running; the second never is. Nothing lands until you save on the way out. |
-| `/config` | | Sets up the flow itself, for a flow that says it can be. Also **c** on the Flow page. See [below](#setting-a-flow-up). |
+| `/config` | | Sets up the flow itself, for a flow that says it can be. Choosing a flow asks the same thing. See [below](#setting-a-flow-up). |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, corrected, signed in again, marked as a fallback, taken away. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
@@ -346,8 +346,8 @@ that place's flows and nothing else.
   2. ralph_loop              Ralph loop (flowbench: ralph_loop) — a fresh session every…
   3. stateful_ralph          Stateful ralph (flowbench: stateful_ralph) — one session, re-…
 
-  Enter to choose · a adds a flowverse · r fetches one · d twice takes one away · c sets the
-  flow up · Esc to close · s to search
+  Enter to choose · a adds a flowverse · r fetches one · d twice takes one away · Esc to
+  close · s to search
 ```
 
 | Key | |
@@ -356,7 +356,6 @@ that place's flows and nothing else.
 | `a` | Add a flowverse: a URL or an `owner/repo`, and a name to keep it under. |
 | `r` | Fetch the place being read again, or for the first time. |
 | `d` `d` | Take an added one away, flows and all. `builtin` and `official` are always here. |
-| `c` | [Set the flow itself up](#setting-a-flow-up), for a flow that says it can be. |
 
 The page opens on the place the flow in force came from, and a fetch leaves you reading what
 it brought. The flowverse keys are here rather than in a menu of their own because this is the
@@ -365,8 +364,9 @@ one you have is out of date. A fetch runs off the interface's own loop — it ke
 while it clones — and what became of it is said under the list rather than thrown at you. A
 flowverse with nothing in it says so where its flows would be, and `r` fetches it from there.
 
-Choosing a flow reads back what that flow was last set up with here and turns to the **Agents**
-page, which is the next thing to answer.
+Choosing a flow reads back what that flow was last set up with here, asks
+[what the flow itself takes](#setting-a-flow-up) where it takes anything, and lands on the
+**Agents** page, which is the next thing to answer.
 
 **The Flow page is shut while a flow is running** — a flow is chosen in order to be started,
 and there is one going. The Agents page never is: an agent thinking too little, on the wrong
@@ -630,11 +630,12 @@ over the headings.
 | **enter** | Take the lot, and hand it back to the menu holding it |
 | **esc** | Back to the menu, changing nothing |
 
-It is opened with **c** on the Flow page, and what it answers is held with the rest of that
-menu until the menu is saved: setting a flow up is a thing about the flow rather than about
-what runs it. `/config` opens it on its own, for a flow already chosen. So does
-`hmz -f <flow> -c <setup.yaml>`, which opens the interface already set up. See
-[CLI › hmz](/reference/cli.md#hmz).
+It opens as the flow is chosen — enter on a flow that takes settings puts it up, and answering
+it lands on the Agents page — and what it answers is held with the rest of that menu until the
+menu is saved: setting a flow up is a thing about the flow rather than about what runs it. A
+flow that takes no settings is not asked, so the walk is the same either way. `/config` opens
+it on its own, for a flow already chosen. So does `hmz -f <flow> -c <setup.yaml>`, which opens
+the interface already set up. See [CLI › hmz](/reference/cli.md#hmz).
 
 Nothing in the interface knows what any of the settings mean. The types say how a value moves,
 and the flow's own model says which combinations it will not take — so a flow that refuses

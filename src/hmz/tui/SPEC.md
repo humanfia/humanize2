@@ -260,13 +260,16 @@ adjusted rather than chosen.
   fetch MUST be said under the list rather than raised at whoever opened the menu, a fetch
   MUST NOT stop the interface redrawing while it runs, and what was fetched MUST be what is
   read once it is here.
-- Setting the flow itself up MUST be a key of that page rather than a page of its own: it is a
-  thing about the flow rather than about what drives it, and what it answers MUST be held with
-  the rest until the menu is saved.
+- Setting the flow itself up MUST be asked as the flow is chosen, between the flow and its
+  agents, rather than being a key or a page of its own: a flow that takes settings is chosen
+  in order to be run with settings, and that is the one moment somebody is thinking about the
+  flow rather than about what drives it. A flow that takes none MUST NOT be asked, the walk
+  being the same either way, and what is answered MUST be held with the rest until the menu is
+  saved.
 - Each flow MUST say what it does beside its name, which is the line the flow itself says. What
   is typed MUST narrow the list by name and not by that line: a subsequence of a sentence is a
   match nobody typed.
-- Choosing a flow MUST read back what that flow was last set up with here, and MUST turn to the
+- Choosing a flow MUST read back what that flow was last set up with here, and MUST end on the
   page its agents are on: that is the next thing to answer.
 - A menu MUST NOT be saved holding an agent that names no model: a flow driven by one is a flow
   that stops on its first turn, and the page it would be answered on is the page to be looking
