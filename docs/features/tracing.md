@@ -69,7 +69,7 @@ what it got to.
 
 | `event` | Written | Carries |
 | --- | --- | --- |
-| `began` | when the flow starts | `flow`, `task`, `workspace`, and one entry per agent with its id, backend, model and effort |
+| `began` | when the flow starts | `flow`, `task`, `workspace`, and one entry per agent with its id, backend, model, effort and what it may do |
 | `opened` | each time an agent opens a session | `agent`, `backend`, `session` |
 | `ended` | when the flow stops | `how`: `done`, `failed`, or `stopped` |
 

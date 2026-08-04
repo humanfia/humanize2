@@ -58,15 +58,22 @@ What each backend keeps an account in, and so what a provider of it holds:
 
 | Backend | The credential files |
 | --- | --- |
+| `agy` | `~/.gemini/antigravity-cli/antigravity-oauth-token` — what a sign-in leaves where there is no keyring to put it in |
 | `claude` | `~/.claude/.credentials.json`, `~/.claude/.claude.json`, and `~/.claude.json` outside the home |
 | `codex` | `~/.codex/auth.json` — the subscription's tokens and an API key land in the same file |
+| `grok` | `~/.grok/auth.json`, and `mcp_credentials.json` beside it — the tokens its MCP servers handed back, which are somebody else's |
 | `kimi` | `~/.kimi-code/credentials/` and `~/.kimi-code/oauth/`, each a directory and everything in it |
 | `pi` | `~/.pi/agent/auth.json`, and the lock its own processes refresh under |
+| `qwen` | `~/.qwen/oauth_creds.json`, and the lock two of its processes rotate the token under |
 | `opencode` | `~/.local/share/opencode/auth.json` and `mcp-auth.json` |
 | `mimo` | `~/.local/share/mimocode/auth.json` and `mcp-auth.json` |
 
+`dsh` keeps none: it is driven through an SDK that takes a key out of the environment, so an
+account of it is variables and nothing to redirect.
+
 Each follows the variable that moves that CLI's home — `CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
-`KIMI_CODE_HOME`, `PI_CODING_AGENT_DIR`, `XDG_DATA_HOME`. See
+`GROK_HOME`, `KIMI_CODE_HOME`, `PI_CODING_AGENT_DIR`, `QWEN_HOME`, `XDG_DATA_HOME`. Antigravity
+is the exception, reading no variable of its own. See
 [Environment variables](/reference/cli.md#environment-variables).
 
 ## The ways in
@@ -132,6 +139,37 @@ input and kept in codex's own store, so it is not kept a second time as a variab
 | --- | --- | --- |
 | `login` | mimocode's own provider list, and whichever way that one takes. Runs `mimo auth login`. | — |
 | `key` | A MiMo key, which its own models run on. | `XIAOMI_API_KEY` |
+
+**`agy`**
+
+| Way | | Asks for |
+| --- | --- | --- |
+| `login` | Sign in to a Google account, in a session opened for it. Runs `agy` and hands you the terminal. | — |
+| `key` | A Gemini API key, from AI Studio. | `GEMINI_API_KEY` |
+| `adc` | Google Application Default Credentials, for a service account. Also sets `AGY_ADC_AUTH=1`. | `GOOGLE_APPLICATION_CREDENTIALS` |
+
+**`dsh`**
+
+| Way | | Asks for |
+| --- | --- | --- |
+| `key` | A DeepSeek API key, from the platform. | `DEEPSEEK_API_KEY` |
+
+**`grok`**
+
+| Way | | Asks for |
+| --- | --- | --- |
+| `login` | Sign in to an xAI account, in a browser. Runs `grok login`. | — |
+| `device` | The same, from a machine with no browser on it. Runs `grok login --device-auth`. | — |
+| `key` | An xAI API key, from the console. | `XAI_API_KEY` |
+| `gateway` | An endpoint speaking Grok Build's own protocol; its models are listed at `/models`. | `GROK_MODELS_BASE_URL`, `XAI_API_KEY` |
+| `oidc` | Your own identity provider, for an organisation that signs in through one. | `GROK_OIDC_ISSUER`, `GROK_OIDC_CLIENT_ID` |
+
+**`qwen`**
+
+| Way | | Asks for |
+| --- | --- | --- |
+| `login` | Sign in to a Qwen account, in a session opened for it. Runs `qwen` and hands you the terminal: `/auth`, then `/quit`. | — |
+| `key` | A key for the OpenAI-compatible endpoint it runs against. | `OPENAI_API_KEY`, `OPENAI_BASE_URL` (`https://dashscope.aliyuncs.com/compatible-mode/v1`) |
 
 **Every backend but `dsh`, as well as its own:**
 
@@ -408,6 +446,9 @@ from hmz.providers.login import (
 And on the agent side:
 
 ```python
-agent.provider      # Provider | None -- which account its turns run as
+agent.provider      # Provider | None -- which account its turns run as, None being
+                    #   the account this machine is already signed into
+agent.node()        # the same as an account, never None: what the chain is walked from
+agent.walks()       # that account and everything it falls back to, in order
 agent.environment() # what those turns are run with, on top of what they inherit
 ```

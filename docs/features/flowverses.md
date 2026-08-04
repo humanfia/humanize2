@@ -70,6 +70,10 @@ repository you have just cloned is never run until you ask what is in it. See
 | **f** | Copy the flow under the cursor into `.humanize/flows/`, to change |
 | **d** **d** | Take an added one away, flows and all |
 
+A flow whose file will not import is still listed, under the name it would have had and with
+nothing beside it: it is a flow somebody named, and saying so where it is chosen beats leaving
+it off the list and letting you wonder where it went.
+
 Those keys are there rather than in a menu of their own because that is the moment you find out
 that the flow you want is in a flowverse you have not added, that the one you have is out of
 date, or that the flow is *nearly* what you want -- which is what **f** is for. A flow is a

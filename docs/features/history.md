@@ -20,6 +20,10 @@ has something to walk back through.
 Which of the two it is is settled when the interface starts, so a history cannot change under you
 mid-session. Type one line in a new project, restart, and from then on it is that project's own.
 
+**Commands go down too.** `/flow rlar` is a line you typed, and one you may want back; only a
+line identical to the one before it is left out, so holding a key down does not fill the walk
+with one thing.
+
 ## Where it lives
 
 ```

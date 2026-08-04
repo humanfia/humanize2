@@ -399,7 +399,14 @@ A flow that loops over `pursue` is running the objective again, rather than nudg
 that stopped early.
 
 On a backend with no goal feature it raises `NotImplementedError`, whether or not `suppress` is
-set: asking for a feature that is not there is a flow to correct.
+set: asking for a feature that is not there is a flow to correct. Which backends have one is
+`type(agent).pursues` — a class attribute rather than a question anybody asks the CLI — and it
+is what a flow's `Goal` annotation is checked against before its first turn.
+
+An agent whose goals were switched off raises `RuntimeError` from `pursue` instead, and is
+refused the tools that would carry work past the turn humanize is holding: Codex starts its
+server with its goal tools disabled, and Claude Code is given `--disallowedTools` naming
+`Agent`, `ScheduleWakeup`, `CronCreate`, `CronDelete` and `CronList`.
 
 ## Hooks
 
@@ -859,6 +866,9 @@ an agent will be carrying — and that is all it is:
 from hmz.agents.skills import skills
 
 skills("claude")   # what it would load here: yours, and this project's
+
+agent.loaded       # the skills the flow driving it brings, mounted onto every session
+agent.loads(...)   # what the runner calls to say so; a flow does not call this itself
 ```
 
 What humanize *does* add is [the skills a flow brings](/reference/flows.md#the-skills-a-flow-brings).
@@ -908,7 +918,10 @@ accounts at the same time, one on a subscription and one on somebody's gateway. 
 credential files move: the sessions, the settings and the skills are the CLI's own.
 
 ```python
-agent.provider       # Provider | None -- the account, read once and kept
+agent.provider       # Provider | None -- the account, read once and kept; None is the
+                     #   account this machine is already signed into
+agent.node()         # the same as an account, never None, which is where a chain starts
+agent.walks()        # that account and whatever it falls back to, in the order tried
 agent.environment()  # what its turns are run with, on top of what they inherit
 ```
 

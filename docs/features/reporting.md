@@ -52,6 +52,11 @@ are set: `send_default_pii` (which attaches the address, the machine's name and,
 `enable_logs` (what humanize logs is paths and commands), and stack-frame variables again on
 their own switch. The hostname is not sent either.
 
+One default integration is switched off for the same reason: `ArgvIntegration`, which attaches
+`sys.argv` — and `hmz exec -f ralph_loop -a claude/… "$(cat TASK.md)"` puts the whole task
+there. It is disabled where the reporter starts, and everything the SDK collects under `extra`
+is dropped again on the way out.
+
 ## The friction it notices
 
 Not everything worth reporting is an error. These are the ones humanize counts, because each
@@ -68,6 +73,23 @@ is somebody finding out that it does not work the way they expected:
 
 Each carries counts and names — which sheet, which key, how many — and never a word of what
 was typed.
+
+## From Python
+
+A layer, or a flow, says what should go with a report by handing over something that knows —
+run only when a report is actually being made, so nothing is gathered on a machine that reports
+nothing:
+
+```python
+from hmz import telemetry
+
+telemetry.about("worktrees", lambda: {"held": len(worktrees)})
+telemetry.snag("gave-up", after=3)          # not an error, and not what anybody meant either
+telemetry.crash(why, doing="my own tool")   # reported, and raised on as it was
+```
+
+`telemetry.enabled()` is the answer — `True`, `False`, or `None` for a machine nobody has asked
+— and `telemetry.SENT` and `telemetry.KEPT` are the two lists this page is written from.
 
 ## Turning it off
 

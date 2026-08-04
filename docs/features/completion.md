@@ -18,6 +18,10 @@ a list under the editor.
 | **tab** or **enter** | Take the highlighted offer. |
 | **esc** | Dismiss the list. Pressed again — with no list up — it stops the flow. |
 
+A command name that is already whole leaves a **hint** rather than offers: `/afk` shows what it
+takes after its name, and there is nothing to take, since taking an offer that is what you have
+already typed would do nothing.
+
 An offer is **the whole of what the word becomes**, so taking one replaces what was typed rather
 than being appended to it.
 
@@ -34,8 +38,9 @@ keystrokes.
 /flow ./flows/mine
 ```
 
-Nothing else completes either. Model ids are chosen on the `/agents` sheet, where the list is
-what the CLI itself said it runs; there is no completion for a task, because a task is prose.
+Nothing else completes either. Model ids are chosen where an agent is set up — the agents page
+of `/flow`, or a saved agent in `/agents` — from the list the CLI itself said it runs; there is
+no completion for a task, because a task is prose.
 
 ## Searching, on a sheet
 

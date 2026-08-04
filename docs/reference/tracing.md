@@ -87,7 +87,7 @@ a run that died is a run whose cycle still says what it got to.
 
 | `event` | Written | Carries |
 | --- | --- | --- |
-| `began` | when the flow starts | `flow`, `task`, `workspace`, and one entry per agent with its `agent` id, `backend`, `model` and `effort` |
+| `began` | when the flow starts | `flow`, `task`, `workspace`, and one entry per agent with its `agent` id, `backend`, `model`, `effort` and `permission` |
 | `opened` | each time an agent opens a session | `agent`, `backend`, `session` |
 | `ended` | when the flow stops | `how`: `done`, `failed`, or `stopped` |
 
