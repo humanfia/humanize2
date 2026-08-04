@@ -1,9 +1,10 @@
 """Choosing a flow out of the places flows come from, and adding a place to the list.
 
-The flows are read under a heading per place they came from -- humanize's own, its repository
-of the rest, whatever else has been added, and then this project's and yours -- so what is
-checked here is that those headings are there, that the list is one list, and that the three
-things that can happen to a flowverse happen from the same page the flow is chosen at.
+The flows are read a place at a time -- humanize's own, its repository of the rest, whatever
+else has been added, and then this project's and yours -- so what is checked here is that the
+arrows step between those places, that the list holds the one being read and nothing else,
+and that the three things that can happen to a flowverse happen from the same page the flow
+is chosen at.
 
 Driven headlessly, as every test of the interface is, so what is checked is where a keystroke
 lands rather than how it is drawn.
@@ -11,6 +12,7 @@ lands rather than how it is drawn.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import unittest.mock
 from typing import TYPE_CHECKING
@@ -76,7 +78,7 @@ async def _open(app: Humanize, driver: Pilot[None]) -> Flows:
 
 
 def _rows(sheet: Flows, whose: str = "") -> list[str]:
-    """What the list is offering now, by name, under one heading or under all of them."""
+    """What the list is offering now, by name, out of the place being read."""
     listed = [
         str(one.id or "").partition("\x1f")
         for one in sheet.query_one("#choices", OptionList).options
@@ -85,13 +87,39 @@ def _rows(sheet: Flows, whose: str = "") -> list[str]:
     return [name for where, _, name in listed if name and where.startswith(whose)]
 
 
-def _headings(sheet: Flows) -> list[str]:
-    """The places flows come from, as the headings drawn above each place's flows."""
+#: What a sheet colours a word with, which is what a test reading one back is not after.
+_MARKUP = re.compile(r"\[[^\]]*\]")
+
+
+def _places(sheet: Flows) -> list[str]:
+    """The places flows come from, as the strip the arrows step along says them."""
+    said = str(sheet.query_one("#tabs", Label).content).splitlines()[-1]
     return [
-        str(one.id or "").partition("\x1f")[0]
-        for one in sheet.query_one("#choices", OptionList).options
-        if one.id
+        one.strip()
+        for one in _MARKUP.sub("", said.split("←")[0]).split("·")
+        if one.strip()
     ]
+
+
+async def _steps(app: Humanize, driver: Pilot[None], whose: str) -> Flows:
+    """Steps the flows page round to the place of that name, as the arrows do.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+      whose: The place to read.
+
+    Returns:
+      The sheet, now reading that place.
+    """
+    sheet = app.screen
+    assert isinstance(sheet, Flows)
+    for _ in range(len(_places(sheet)) + 1):
+        if sheet._where == whose:
+            return sheet
+        await driver.press("right")
+        await driver.pause()
+    raise AssertionError(f"{whose} is not a place the arrows step to")
 
 
 def _under(sheet: Flows) -> str:
@@ -100,39 +128,91 @@ def _under(sheet: Flows) -> str:
 
 
 @pytest.mark.timeout(60)
-async def test_the_tabs_are_the_places_flows_come_from() -> None:
+async def test_the_strip_is_the_places_flows_come_from() -> None:
     """Two of them always: the package, and the repository the rest come from."""
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        assert "builtin" in _headings(sheet)
-        assert OFFICIAL in _headings(sheet)
-        # And under the first of them the flows humanize itself ships.
-        assert _rows(sheet, "builtin") == ["chat", "ralph_loop", "stateful_ralph"]
+        assert "builtin" in _places(sheet)
+        assert OFFICIAL in _places(sheet)
+        # And it opens on the place the flow it is set up on came from, which is the
+        # package: the flows humanize itself ships, and nothing from anywhere else.
+        assert sheet._where == "builtin"
+        assert _rows(sheet) == ["chat", "ralph_loop", "stateful_ralph"]
 
 
 @pytest.mark.timeout(60)
-async def test_every_place_is_a_heading_in_one_list(theirs: Path) -> None:
-    """One list, read down, rather than a tab apiece: the tabs are the menu's pages now."""
+async def test_the_arrows_step_between_the_places(theirs: Path) -> None:
+    """A list apiece rather than every flow there is run together under headings."""
     store.add(str(theirs))
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        assert _headings(sheet) == ["builtin"] * 3 + [OFFICIAL, "theirs"]
-        # The one that has not been fetched is still a row, saying what it is waiting for.
-        assert _rows(sheet, OFFICIAL) == []
-        assert _rows(sheet, "theirs") == ["theirs/loop"]
+        assert _places(sheet) == ["builtin", OFFICIAL, "theirs"]
 
-        await onto(app, driver, f"{OFFICIAL}\x1f")
+        await driver.press("right")
+        await until(lambda: sheet._where == OFFICIAL, driver)
+        # The one that has not been fetched is a list of one row, saying what it waits for.
+        assert _rows(sheet) == []
         assert "not fetched yet" in str(
-            sheet.query_one("#choices", OptionList)
-            .get_option_at_index(
-                sheet.query_one("#choices", OptionList).highlighted or 0
-            )
-            .prompt
+            sheet.query_one("#choices", OptionList).options[0].prompt
         )
+
+        await driver.press("right")
+        await until(lambda: sheet._where == "theirs", driver)
+        assert _rows(sheet) == ["theirs/loop"]
+
+        # And round again, which is what the far end of a strip of three is for.
+        await driver.press("right")
+        await until(lambda: sheet._where == "builtin", driver)
+        await driver.press("left")
+        await until(lambda: sheet._where == "theirs", driver)
+
+
+@pytest.mark.timeout(60)
+async def test_a_search_steps_to_the_places_it_found_something_in() -> None:
+    """Nobody remembers which flowverse a flow is in; that is what a search is for."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+
+        await driver.press("s")
+        await driver.press(*"ralph")
+        await until(lambda: _rows(sheet) == ["ralph_loop", "stateful_ralph"], driver)
+
+        # Only the places holding one, so that nothing steps through empty lists.
+        assert _places(sheet) == ["builtin"]
+
+
+@pytest.mark.timeout(60)
+async def test_the_keys_stay_inside_the_terminal(tmp_path: Path) -> None:
+    """A place of twenty flows is a list shortened to fit, not a sheet with no keys on it."""
+    where = tmp_path / ".humanize" / "flows"
+    where.mkdir(parents=True)
+    for n in range(20):
+        (where / f"flow_{n:02d}.py").write_text(FLOW)
+    app = Humanize()
+    async with app.run_test(size=(80, 20)) as driver:
+        await _open(app, driver)
+        sheet = await _steps(app, driver, "local")
+        keys = sheet.query_one("#keys", Label)
+        listing = sheet.query_one("#choices", OptionList)
+
+        assert len(_rows(sheet)) == 20  # every one of them offered, all the same
+        assert sheet.query_one("#rule", Label).region.y >= 0
+        assert keys.region.bottom <= app.size.height
+        # And the line of them wrapped rather than run off the side.
+        assert keys.region.right <= app.size.width
+        short = listing.size.height
+
+        # A taller terminal is more of them read at once, rather than the same few.
+        await driver.resize_terminal(80, 40)
+        await driver.pause()
+
+        assert listing.size.height > short
+        assert keys.region.bottom <= app.size.height
 
 
 @pytest.mark.timeout(60)
@@ -149,8 +229,8 @@ async def test_a_flow_says_what_it_does_beside_its_name() -> None:
 
 
 @pytest.mark.timeout(60)
-async def test_the_flows_of_your_own_are_a_tab_of_their_own(tmp_path: Path) -> None:
-    """A directory is not a flowverse, but it is a place flows come from, so it is a tab."""
+async def test_the_flows_of_your_own_are_a_place_of_their_own(tmp_path: Path) -> None:
+    """A directory is not a flowverse, but it is a place flows come from, so it is one."""
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
     (where / "mine.py").write_text(FLOW)
@@ -158,8 +238,9 @@ async def test_the_flows_of_your_own_are_a_tab_of_their_own(tmp_path: Path) -> N
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        assert "local" in _headings(sheet)
-        assert _rows(sheet, "local") == [".humanize/flows/mine.py"]
+        assert "local" in _places(sheet)
+        await _steps(app, driver, "local")
+        assert _rows(sheet) == [".humanize/flows/mine.py"]
 
 
 @pytest.mark.timeout(60)
@@ -170,12 +251,12 @@ async def test_one_is_fetched_from_the_sheet_it_would_be_chosen_at(
     monkeypatch.setattr(store, "OFFICIAL_URL", str(theirs))
     app = Humanize()
     async with app.run_test() as driver:
-        sheet = await _open(app, driver)
-        await onto(app, driver, f"{OFFICIAL}\x1f")
-        assert _rows(sheet, OFFICIAL) == []
+        await _open(app, driver)
+        sheet = await _steps(app, driver, OFFICIAL)
+        assert _rows(sheet) == []
 
         await driver.press("r")
-        await until(lambda: _rows(sheet, OFFICIAL) == ["official/loop"], driver)
+        await until(lambda: _rows(sheet) == ["official/loop"], driver)
 
         assert store.named(OFFICIAL) is not None
         assert "has not been fetched" not in _under(sheet)
@@ -189,8 +270,8 @@ async def test_a_fetch_that_failed_is_said_under_the_list(
     monkeypatch.setattr(store, "OFFICIAL_URL", str(tmp_path / "nowhere"))
     app = Humanize()
     async with app.run_test() as driver:
-        sheet = await _open(app, driver)
-        await onto(app, driver, f"{OFFICIAL}\x1f")
+        await _open(app, driver)
+        sheet = await _steps(app, driver, OFFICIAL)
 
         await driver.press("r")
         await until(lambda: "does not exist" in _under(sheet), driver)
@@ -223,8 +304,9 @@ async def test_one_is_added_from_the_same_sheet(theirs: Path) -> None:
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Flows), driver)
 
-        # Fetched, and the cursor is on the first flow it brought.
+        # Fetched, read where it landed, and the cursor on the first flow it brought.
         await until(lambda: _rows(sheet, "theirs") == ["theirs/loop"], driver)
+        assert sheet._where == "theirs"
         assert [one.name for one in flowverses()][-1] == "theirs"
 
 
@@ -271,9 +353,9 @@ async def test_one_that_was_added_may_be_taken_away_from_here(theirs: Path) -> N
     store.add(str(theirs))
     app = Humanize()
     async with app.run_test() as driver:
-        sheet = await _open(app, driver)
-        await onto(app, driver, "theirs\x1ftheirs/loop")
-        assert _rows(sheet, "theirs") == ["theirs/loop"]
+        await _open(app, driver)
+        sheet = await _steps(app, driver, "theirs")
+        assert _rows(sheet) == ["theirs/loop"]
 
         # Twice, since it cannot be undone: the first press says what the second one does.
         await driver.press("d")
@@ -285,6 +367,8 @@ async def test_one_that_was_added_may_be_taken_away_from_here(theirs: Path) -> N
 
         assert [one.name for one in flowverses()] == ["builtin", OFFICIAL]
         assert "no longer here" in _under(sheet)
+        # And back on the place the flow in force came from, that one having gone.
+        assert sheet._where == "builtin"
 
 
 @pytest.mark.timeout(60)
@@ -308,9 +392,9 @@ async def test_the_flow_that_is_picked_is_the_one_that_was_chosen(theirs: Path) 
     store.add(str(theirs))
     app = Humanize()
     async with app.run_test() as driver:
-        sheet = await _open(app, driver)
-        await onto(app, driver, "theirs\x1ftheirs/loop")
-        await until(lambda: _rows(sheet, "theirs") == ["theirs/loop"], driver)
+        await _open(app, driver)
+        sheet = await _steps(app, driver, "theirs")
+        await until(lambda: _rows(sheet) == ["theirs/loop"], driver)
 
         await driver.press("enter")
         await until(lambda: sheet._tab == 1, driver)
@@ -375,9 +459,10 @@ async def test_one_of_the_flows_a_file_holds_is_chosen_like_any_other(
     (where / "three.py").write_text(THREE)
     app = Humanize()
     async with app.run_test() as driver:
-        sheet = await _open(app, driver)
+        await _open(app, driver)
+        sheet = await _steps(app, driver, "local")
 
-        assert _rows(sheet, "local") == [
+        assert _rows(sheet) == [
             ".humanize/flows/three.py:gen-idea",
             ".humanize/flows/three.py:rlcr",
         ]
@@ -408,8 +493,9 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
     (where / "three.py").write_text(THREE)
     app = Humanize()
     async with app.run_test() as driver:
-        sheet = await _open(app, driver)
-        await until(lambda: bool(_rows(sheet, "local")), driver)
+        await _open(app, driver)
+        sheet = await _steps(app, driver, "local")
+        await until(lambda: bool(_rows(sheet)), driver)
 
         # The first of them, which says it takes an `n`.
         await onto(app, driver, "local\x1f.humanize/flows/three.py:gen-idea")

@@ -61,9 +61,9 @@ repository you have just cloned is never run until you ask what is in it. See
 
 | Key | |
 | --- | --- |
-| **←** **→** | Walk the places flows come from, a tab apiece — every flowverse, then `local` and `user` |
+| **←** **→** | Step between the places flows come from, a list apiece — every flowverse, then `local` and `user` |
 | **a** | Add one: a URL or an `owner/repo`, and a name to keep it under |
-| **r** | Fetch the one under the cursor again, or for the first time |
+| **r** | Fetch the one being read again, or for the first time |
 | **d** **d** | Take an added one away, flows and all |
 
 Those keys are there rather than in a menu of their own because that is the moment you find out

@@ -326,11 +326,12 @@ between them. A page that cannot be opened right now is still a title, struck th
 ## Choosing a flow
 
 `/flow` opens on two pages — **Flow** and **Agents** — and the first of them puts up the flows
-there are, under a heading per place they come from: every
+of one place at a time, with `←` and `→` stepping between the places: every
 [flowverse](/reference/flows.md#flowverses) — `builtin`, which is the package's own, `official`, which is
 where the rest come from, and whatever else has been added — and then `local`, this project's
 flows under `.humanize/flows`, and `user`, yours under `~/.humanize/flows`, each where there
-are any.
+are any. The strip above the list is the places, with the one being read marked; the list is
+that place's flows and nothing else.
 
 ```
   Flow
@@ -339,14 +340,11 @@ are any.
   it is to do. A flow anywhere else is a path you type.
 
   Flow · Agents   tab/shift+tab to switch
+  builtin · official · local   ←/→ to switch
 
-  builtin
 ❯ 1. chat                    Chat — one agent, one session, and every line typed between…
   2. ralph_loop              Ralph loop (flowbench: ralph_loop) — a fresh session every…
   3. stateful_ralph          Stateful ralph (flowbench: stateful_ralph) — one session, re-…
-
-  official
-     not fetched yet; r fetches it
 
   Enter to choose · a adds a flowverse · r fetches one · d twice takes one away · c sets the
   flow up · Esc to close · s to search
@@ -354,16 +352,18 @@ are any.
 
 | Key | |
 | --- | --- |
+| `←` `→` | Read the place before or after this one, wrapping round. |
 | `a` | Add a flowverse: a URL or an `owner/repo`, and a name to keep it under. |
-| `r` | Fetch the one under the cursor again, or for the first time. |
+| `r` | Fetch the place being read again, or for the first time. |
 | `d` `d` | Take an added one away, flows and all. `builtin` and `official` are always here. |
 | `c` | [Set the flow itself up](#setting-a-flow-up), for a flow that says it can be. |
 
-The flowverse keys are here rather than in a menu of their own because this is the moment you
-find out that the flow you want is in a flowverse you have not added, or that the one you have
-is out of date. A fetch runs off the interface's own loop — it keeps drawing while it clones —
-and what became of it is said under the list rather than thrown at you. A flowverse with
-nothing in it is still a row, so the cursor can land on it and `r` can fetch it.
+The page opens on the place the flow in force came from, and a fetch leaves you reading what
+it brought. The flowverse keys are here rather than in a menu of their own because this is the
+moment you find out that the flow you want is in a flowverse you have not added, or that the
+one you have is out of date. A fetch runs off the interface's own loop — it keeps drawing
+while it clones — and what became of it is said under the list rather than thrown at you. A
+flowverse with nothing in it says so where its flows would be, and `r` fetches it from there.
 
 Choosing a flow reads back what that flow was last set up with here and turns to the **Agents**
 page, which is the next thing to answer.
@@ -378,7 +378,9 @@ The same places are on the command line as [`hmz flowverses`](/reference/cli.md#
 machine being set up or a script.
 
 Typing narrows by name. What each flow says about itself is beside its name, and is not
-searched: a subsequence of a sentence matches nearly everything.
+searched: a subsequence of a sentence matches nearly everything. A search narrows the strip
+to the places it found something in and steps to one of them, so what you type finds a flow
+without your having to remember which flowverse it was in.
 
 ## What each agent is
 

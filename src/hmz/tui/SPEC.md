@@ -201,9 +201,17 @@ adjusted rather than chosen.
 - A menu of several pages MUST show their titles, and tab and shift+tab MUST turn between
   them: that is the one pair of keys a terminal has for exactly this. A page that may not be
   opened MUST still be a title, struck through, and MUST be stepped over rather than opened.
+- A page made of several lists MUST show what they are called, and the left and right arrows
+  MUST step between them: the list itself is walked up and down, so across is what is left,
+  and the titles are read the same way the pages' are.
 - Taking anything away MUST be asked for twice on the same key, the first press saying what
   the second one does. Moving the cursor MUST put it down again, so that a stray press is
   harmless.
+- The keys MUST be inside the terminal, whatever the sheet is holding: the list is what MUST
+  be shortened until they are, since everything else on a sheet is a line or two and the rows
+  are what there are a hundred of. The keys are the last row, so they are what falls off the
+  bottom of a short terminal, and a key nobody can see is a key nobody has. A line of them too
+  long for the width MUST wrap rather than run off the side, for the same reason.
 
 ### What lands, and when
 
@@ -229,18 +237,29 @@ adjusted rather than chosen.
   each of them MUST be set up as it now stands from its next turn on. A CLI that has changed
   MUST NOT be swapped under the flow holding that agent -- a backend is the class the agent is
   -- and MUST be said to take effect from the next run rather than silently doing nothing.
-- The flows MUST be read under a heading per place they come from: every flowverse there is,
-  fetched or not, and then this project's flows and yours where there are any. A flowverse
-  MUST be a heading whether or not it has been fetched -- fetching it is what the heading is
-  for -- and MUST have a row under it saying so, since a key about a flowverse is a key about
-  the row under the cursor. A directory of your own with nothing in it MUST NOT be a heading,
-  there being nothing to add to it.
-- Adding a flowverse, fetching one again and taking one away MUST be keys of this same page:
-  this is the moment somebody finds out that the flow they want is in one they have not added,
-  or that the one they have is out of date, and sending them elsewhere to fix it would lose the
-  question they came here to answer. What became of a fetch MUST be said under the list rather
-  than raised at whoever opened the menu, and a fetch MUST NOT stop the interface redrawing
-  while it runs.
+- The flows MUST be read a place at a time, the arrows stepping between the places: every
+  flowverse there is, fetched or not, and then this project's flows and yours where there are
+  any. All of them in one list under headings was a list nobody could see the end of, and one
+  where walking to a flow meant walking past every flow that came before it. A flowverse MUST
+  be one of the places whether or not it has been fetched -- fetching it is what having it
+  here is for -- and one with nothing in it MUST say so where its flows would be. A directory
+  of your own with nothing in it MUST NOT be one of them, there being nothing to add to it.
+- Which place is being read MUST be visible, and MUST be visible as one of however many there
+  are: a flowverse nobody can see is a flowverse nobody steps to. The place read when the page
+  opens MUST be the one the flow in force came from, that being the flow the page is about.
+- A search MUST narrow the places to the ones it found something in, and MUST step to one of
+  them: a search is for finding a flow whose flowverse is the thing nobody remembers, so one
+  that left somebody stepping through empty lists to reach the row it found would be a search
+  that answered a question nobody asked.
+- Adding a flowverse, fetching one again and taking one away MUST be keys of this same page,
+  and MUST be about the place being read rather than the row under the cursor -- a flowverse
+  that has not been fetched is a list with no rows to be on, and fetching it is exactly what
+  somebody looking at it came to do. This is the moment somebody finds out that the flow they
+  want is in one they have not added, or that the one they have is out of date, and sending
+  them elsewhere to fix it would lose the question they came here to answer. What became of a
+  fetch MUST be said under the list rather than raised at whoever opened the menu, a fetch
+  MUST NOT stop the interface redrawing while it runs, and what was fetched MUST be what is
+  read once it is here.
 - Setting the flow itself up MUST be a key of that page rather than a page of its own: it is a
   thing about the flow rather than about what drives it, and what it answers MUST be held with
   the rest until the menu is saved.

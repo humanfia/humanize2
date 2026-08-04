@@ -327,17 +327,16 @@ Anchors, Backends, Configures, Flows, Models, Providers, RunsAs, Signing, Skills
 #about { padding: 0 3 1 3; color: $text-muted; width: 1fr; }
 /* The tabs, for the one sheet that has any. A sheet with none says nothing here, and a
    label with nothing in it is a row nobody paid for. */
-#tabs { padding: 0 0 1 3; }
-OptionList { border: none; background: $background; max-height: 14; scrollbar-size: 0 0;
-             padding: 0; }
+#tabs { padding: 0 0 1 3; width: 1fr; }
+OptionList { border: none; background: $background; scrollbar-size: 0 0; padding: 0; }
 /* The marker says where the cursor is, so the row is not filled as well. */
 #choices > .option-list--option-highlighted {
     background: $background; color: $foreground; text-style: none; }
-/* As wide as the sheet, so that the settings adjusted under the models wrap onto a second
-   row rather than running off the side of a narrow terminal: a key nobody can see is a key
-   nobody has. */
+/* As wide as the sheet, so that what is said under the list and the keys under that wrap
+   onto a second row rather than running off the side of a narrow terminal: a key nobody can
+   see is a key nobody has. */
 #tuning { padding: 1 0 1 3; width: 1fr; }
-#keys { padding: 0 0 0 3; color: $text-muted; }
+#keys { padding: 0 0 0 3; color: $text-muted; width: 1fr; }
 /* The fields carry their own indent, as the numbered rows above them do. */
 #said { padding: 0 0 1 0; }
 """
@@ -345,6 +344,34 @@ OptionList { border: none; background: $background; max-height: 14; scrollbar-si
 
 #: What a menu's own keys are, said at the bottom of every sheet that has tabs.
 _TURNS = "tab/shift+tab to switch"
+
+#: And what steps between the lists one page is made of, said beside them for the same
+#: reason: a key that is not written where it works is a key somebody has to already know.
+_STEPS = "←/→ to switch"
+
+#: The most rows of choices a sheet shows however tall the terminal is: a list longer than
+#: this is one that is walked rather than read.
+_MOST = 14
+#: The fewest it shortens to before giving up. A terminal with no room for three rows has no
+#: room for the sheet either, and a list shortened to nothing is not a list.
+_LEAST = 3
+
+
+class Body(Vertical):
+    """What a sheet is drawn down, which says when it has grown taller than the terminal.
+
+    A sheet is a question with its keys under it, and the one part of it that can be any
+    length is the list in the middle: every flow there is, every model a CLI runs. Drawn as
+    tall as it likes, that list pushes the keys off the bottom of a short terminal -- so the
+    column says when its height changes and the list is shortened to fit. Resize does not
+    bubble, so nothing else would hear about it.
+    """
+
+    def on_resize(self) -> None:
+        """Tells whoever is holding this column that it is a different height now."""
+        sheet = self.screen
+        if isinstance(sheet, Sheet):
+            sheet.shortens()
 
 
 class Sheet[T](ModalScreen[T | None]):
@@ -384,6 +411,10 @@ class Sheet[T](ModalScreen[T | None]):
     _searching = False
     #: Which page is open, counting the tabs.
     _tab = 0
+    #: How many rows of choices there is room for, or None before it has been worked out.
+    #: Kept so that working it out again changes nothing where nothing has changed: setting
+    #: it is what changes the height that asks for it to be worked out.
+    _room: int | None = None
     #: Which row a key that has to be pressed twice has been pressed once on, or "" for none.
     _arming = ""
 
@@ -538,7 +569,7 @@ class Sheet[T](ModalScreen[T | None]):
         one part that is taken away again where a sheet has none -- see :meth:`tabbed` -- so
         that a sheet which is one list is drawn as one list and nothing moved down a row.
         """
-        with Vertical(id="sheet"):
+        with Body(id="sheet"):
             yield Label(id="rule")
             yield Label(id="asked")
             yield Label(id="about")
@@ -549,6 +580,7 @@ class Sheet[T](ModalScreen[T | None]):
 
     def on_mount(self) -> None:
         """Rules the top of the sheet across, and asks."""
+        self.query_one("#choices", OptionList).styles.max_height = _MOST
         self.query_one("#rule", Label).update(_RULE * self.size.width)
         # The titles where there are any, and gone rather than blank where there are not: a
         # label with nothing in it still takes the row it is padded to, and a sheet that is
@@ -565,6 +597,35 @@ class Sheet[T](ModalScreen[T | None]):
         showing = self.query_one("#tabs", Label)
         showing.display = bool(said)
         showing.update(said)
+
+    def on_resize(self) -> None:
+        """Rules the new width across, and shortens the list to the room left under it."""
+        if not self.query("#sheet"):
+            return  # resized before there is anything on it, which is nothing to fit
+        self.query_one("#rule", Label).update(_RULE * self.size.width)
+        self.shortens()
+
+    def shortens(self) -> None:
+        """Shortens the list until what is under it is inside the terminal.
+
+        The list is what gives. Everything else on a sheet is a line or two -- what is being
+        asked, what it comes to, the keys -- and the rows are what there are a hundred of, so
+        a sheet that does not fit is a sheet whose list is too long for the terminal it is
+        drawn in rather than a sheet with too much on it. The keys are the last row, so they
+        are what falls off the bottom, and a key nobody can see is a key nobody has.
+
+        Called each time the column changes height, which is each time the list is put up
+        again, and each time the terminal changes size. It settles at once: how tall the rest
+        of the sheet is does not depend on how many rows the list is showing.
+        """
+        listing = self.query_one("#choices", OptionList)
+        column = self.query_one("#sheet", Body).outer_size.height
+        rest = column - listing.outer_size.height
+        room = max(_LEAST, min(_MOST, self.size.height - rest))
+        if room == self._room:
+            return
+        self._room = room
+        listing.styles.max_height = room
 
     def action_back(self) -> None:
         """Comes out of the search, or leaves once there is no search to come out of.
@@ -940,11 +1001,14 @@ class Flows(Drafts[Chosen]):
     thinking too little, on the wrong account, or allowed too much is found out halfway
     through a run, so that page is never shut.
 
-    The flows are read under a heading per place they come from -- every flowverse there is,
-    fetched or not, and then this project's flows and yours -- rather than a tab apiece, the
-    tabs now being what the menu itself is made of. The three things that can happen to a
-    flowverse are keys of this page: this is the moment somebody finds out that the flow they
-    want is in one they have not added, or that the one they have is out of date.
+    The flows are read a place at a time -- every flowverse there is, fetched or not, and then
+    this project's flows and yours -- with the left and right arrows stepping between the
+    places and the list holding only the one being read. All of them run together under
+    headings was one list nobody could see the end of, and one where walking to a flow meant
+    walking past every flow that came before it. The three things that can happen to a
+    flowverse are keys of this page, and are about the place being read: this is the moment
+    somebody finds out that the flow they want is in one they have not added, or that the one
+    they have is out of date.
 
     Nothing is applied by turning a page or by walking out. What the menu holds is a draft of
     the whole of it, and it lands when it is saved on the way out.
@@ -959,6 +1023,11 @@ class Flows(Drafts[Chosen]):
         # the list under the cursor would take them as moving the focus about.
         Binding("tab", "next_tab", "next page", priority=True),
         Binding("shift+tab", "prev_tab", "previous page", priority=True),
+        # The places the flows come from, on the other pair: the list walks up and down, so
+        # across is what is left for stepping between the lists there are. Priority, or the
+        # list under the cursor would take them as moving between columns it has none of.
+        Binding("left", "before", "the place before", priority=True),
+        Binding("right", "after", "the place after", priority=True),
         # Letters rather than chords, and priority so they are the keys rather than the
         # search: a search is asked for, and while one is running these fall through to it.
         Binding("s", "search", "search", priority=True),
@@ -1020,9 +1089,13 @@ class Flows(Drafts[Chosen]):
         #: fetched or taken away, which is when the list is something else.
         self._offers: list[Offer] | None = None
         #: Which row of the flows the cursor is on, as `where it came from` and `which flow`:
-        #: the headings between them are rows nothing can land on, so a row number is not a
-        #: flow, and a place with nothing in it is a row with no flow on it at all.
+        #: a place with nothing in it is a row with no flow on it at all, so a row number is
+        #: not a flow. Kept whole so that it still says which list it was a row of.
         self._was = ""
+        #: Which place's flows are being read, the arrows stepping between them. "" until the
+        #: page is first drawn: which place the flow in force came from is a thing only the
+        #: list of every flow there is can say, and reading that list is running every file.
+        self._where = ""
         #: What became of the last fetch, said under the list.
         self._said = ""
         #: Whether a fetch is running now, so that a second one is not started over it.
@@ -1035,13 +1108,13 @@ class Flows(Drafts[Chosen]):
         return (not self._underway, True)
 
     def _follows(self, listing: OptionList) -> None:
-        """Takes which row the cursor is on off the list, the headings not being rows.
+        """Takes which row the cursor is on off the list, rather than off a row number.
 
-        Read here rather than kept as the cursor moves, so that the two cannot disagree: a
-        list with headings in it is a list where the row number is not the thing's number,
-        and the row under the cursor is the only thing that says which one is meant. Kept as
-        the whole id -- where it came from and which flow it is -- because a place with
-        nothing in it is a row too, and is the row the key that fetches one is about.
+        Read here rather than kept as the cursor moves, so that the two cannot disagree: the
+        list is a different list under each place, and the row under the cursor is the only
+        thing that says which flow is meant. Kept as the whole id -- where it came from and
+        which flow it is -- so that a row remembered under one place cannot be taken for a
+        row of the next.
 
         Args:
           listing: The list.
@@ -1118,11 +1191,17 @@ class Flows(Drafts[Chosen]):
             "turns, the account they run as, the model at an effort, and what it may do. "
             "Enter opens one. Nothing lands until this menu is saved on the way out."
         )
-        self.tabbed(self._tab_line())
-        if self._tab == _FLOW_PAGE:
-            self._flows_page()
-        else:
+        if self._tab != _FLOW_PAGE:
+            self.tabbed(self._tab_line())
             self._agents_page()
+            return
+        # The places under the pages, since that is what the list under them is one of: which
+        # is settled before either is drawn, so that the strip and the list agree.
+        wheres = self._stepping()
+        if self._where not in wheres:
+            self._where = self._opens(wheres)
+        self.tabbed(f"{self._tab_line()}\n{self._where_line(wheres)}")
+        self._flows_page()
 
     def _all(self) -> list[Offer]:
         """Every flow there is, read once."""
@@ -1133,13 +1212,13 @@ class Flows(Drafts[Chosen]):
         return self._offers
 
     def _wheres(self) -> list[str]:
-        """The places flows come from, in the order their headings go.
+        """The places flows come from, in the order the arrows step through them.
 
         Returns:
           Every flowverse there is, fetched or not, and then this project's flows and yours
-          where there are any. A flowverse is a heading whether or not it has been downloaded
-          -- fetching it is what the heading is for -- but your own directories are not places
-          to add anything to, so an empty one is nothing to show a heading for.
+          where there are any. A flowverse is one of them whether or not it has been
+          downloaded -- fetching it is what having it here is for -- but your own directories
+          are not places to add anything to, so an empty one is nothing to step to.
         """
         from hmz.flows import flowverses, where
 
@@ -1150,6 +1229,65 @@ class Flows(Drafts[Chosen]):
             if whose not in verses and any(one.whose == whose for one in self._all())
         ]
 
+    def _stepping(self) -> list[str]:
+        """The places there are to step between, which a search narrows to the ones it found.
+
+        Returns:
+          Every place while nothing is typed. While something is, only the places holding a
+          flow that matches it -- a search is for finding a flow whose flowverse is the thing
+          nobody remembers, so it MUST NOT leave somebody stepping through empty lists to
+          reach the one row it found. All of them again where it found nothing anywhere,
+          there being no narrower list to offer than the one that is already empty.
+        """
+        wheres = self._wheres()
+        if not self._typed:
+            return wheres
+        found = [
+            whose
+            for whose in wheres
+            if any(one.whose == whose and self.fits(one.name) for one in self._all())
+        ]
+        return found or wheres
+
+    def _opens(self, wheres: list[str]) -> str:
+        """Which place is read when the page is drawn without one already being read.
+
+        Args:
+          wheres: The places there are to step between.
+
+        Returns:
+          The one the flow in force came from, that being the flow this page is about, and
+          otherwise the first there is.
+        """
+        return next(
+            (
+                one.whose
+                for one in self._all()
+                if one.name == self._flow and one.whose in wheres
+            ),
+            wheres[0] if wheres else "",
+        )
+
+    def _where_line(self, wheres: list[str]) -> str:
+        """The places flows come from, with the one being read marked and the keys said.
+
+        Args:
+          wheres: The places, in the order the arrows step through them.
+
+        Returns:
+          The strip, as markup. Every place, so that the one being read is read as one of
+          however many there are: a flowverse nobody can see is a flowverse nobody steps to.
+        """
+        said = _DOT.join(
+            f"[b $primary]{escape(one)}[/]"
+            if one == self._where
+            else f"[$text-muted]{escape(one)}[/]"
+            for one in wheres
+        )
+        if len(wheres) > 1:
+            said += f"   [$text-muted]{_STEPS}[/]"
+        return said
+
     def _verse(self, named: str) -> Flowverse | None:
         """The flowverse of that name, or None for one of your own directories."""
         from hmz.flows import flowverses
@@ -1157,73 +1295,83 @@ class Flows(Drafts[Chosen]):
         return next((one for one in flowverses() if one.name == named), None)
 
     def _whose(self) -> str:
-        """Which place the row under the cursor came from, for the keys that are about one."""
-        whose, _, _ = self._was.partition(_HALVES)
-        return whose
+        """Which place the keys of this page are about, which is the one being read.
+
+        The place rather than whatever row the cursor happens to be on: a flowverse with
+        nothing in it is a list with no rows to be on, and fetching it is exactly what
+        somebody looking at it came to do.
+        """
+        return self._where
+
+    def action_before(self) -> None:
+        """Reads the place before this one."""
+        self._steps(-1)
+
+    def action_after(self) -> None:
+        """Reads the one after it."""
+        self._steps(1)
+
+    def _steps(self, by: int) -> None:
+        """Turns to another of the places flows come from, wrapping round at either end.
+
+        Args:
+          by: One place on or back.
+        """
+        if self._tab != _FLOW_PAGE:
+            return  # the agents of one flow come from nowhere but that flow
+        wheres = self._stepping()
+        if len(wheres) < 2:  # noqa: PLR2004 -- one place is nowhere to step to
+            return
+        at = wheres.index(self._where) if self._where in wheres else 0
+        self._where = wheres[(at + by) % len(wheres)]
+        # What a key was armed against and what a fetch had to say were both about the place
+        # being stepped off, and neither is about the one being stepped on to.
+        self._was, self._arming, self._said = "", "", ""
+        self._fill()
 
     def _flows_page(self) -> None:
-        """Puts every flow there is up, under a heading per place they come from."""
+        """Puts up the flows of the place being read, and nothing from any other place."""
         listing = self.query_one("#choices", OptionList)
         self._follows(listing)
-        shown = [one for one in self._all() if self.fits(one.name)]
-        self._counting = len(str(max(len(shown), 1)))
-        rows: list[Option] = []
-        held: list[str] = []
-        seen = 0
-        for whose in self._wheres():
-            mine = [one for one in shown if one.whose == whose]
-            if not mine and self._typed:
-                continue  # narrowed away entirely, which is not a place worth a heading
-            if rows:
-                rows.append(Option("", disabled=True))
-            rows.append(Option(f"{_INDENT}[$primary]{escape(whose)}[/]", disabled=True))
-            if not mine:
-                # A place with nothing in it, which for a flowverse is what its heading is
-                # for: an empty heading that explained nothing would read as one with no
-                # flows, and the key that fetches it is a key about the row under the cursor.
-                held.append(f"{whose}{_HALVES}")
-                rows.append(
-                    Option(
-                        f"{_INDENT}  [$text-muted]{self._empty(whose)}[/]",
-                        id=held[-1],
-                    )
-                )
-                continue
-            for one in mine:
-                held.append(f"{whose}{_HALVES}{one.name}")
-                rows.append(Option(held[-1], id=held[-1]))
-                seen += 1
+        mine = [
+            one
+            for one in self._all()
+            if one.whose == self._where and self.fits(one.name)
+        ]
+        self._counting = len(str(max(len(mine), 1)))
+        held = [f"{self._where}{_HALVES}{one.name}" for one in mine]
+        if not held and not self._typed:
+            # A place with nothing in it, which for a flowverse is what having it here is
+            # for: an empty list that explained nothing would read as one with no flows.
+            held = [f"{self._where}{_HALVES}"]
         if self._was not in held:
-            # Narrowed away, or never there: the cursor lands on the flow in force, or on the
-            # first row there is, and a list with nothing in it has nothing for it to be on.
+            # Stepped on to, narrowed away, or never there: the cursor lands on the flow in
+            # force, or on the first row, and an empty list has nothing to be on at all.
             self._was = next(
                 (one for one in held if one.partition(_HALVES)[2] == self._flow),
                 held[0] if held else "",
             )
-        landing, seen = 0, 0
-        by_name = {one.name: one for one in shown}
-        for at, row in enumerate(rows):
-            named = str(row.id or "")
-            if not named:
-                continue
-            _, _, name = named.partition(_HALVES)
-            if named == self._was:
-                landing = at
-            if not name:
-                continue
-            rows[at] = Option(
+        rows = [
+            Option(
                 self._row(
-                    seen,
-                    name,
-                    _briefly(by_name[name].about, self.size.width),
-                    here=named == self._was,
-                    inforce=name == self._flow,
+                    at,
+                    one.name,
+                    _briefly(one.about, self.size.width),
+                    here=held[at] == self._was,
+                    inforce=one.name == self._flow,
                 ),
-                id=named,
+                id=held[at],
             )
-            seen += 1
+            for at, one in enumerate(mine)
+        ]
+        if not rows and held:
+            rows = [
+                Option(
+                    f"{_INDENT}  [$text-muted]{self._empty(self._where)}[/]", id=held[0]
+                )
+            ]
         listing.set_options(rows)
-        listing.highlighted = landing if held else None
+        listing.highlighted = held.index(self._was) if self._was in held else None
         self._drawn = listing.highlighted
         said = self._nothing()
         self.query_one("#tuning", Label).update(
@@ -1362,7 +1510,7 @@ class Flows(Drafts[Chosen]):
         await self._fetches(fetching)
 
     def action_drop(self) -> None:
-        """Takes the flowverse under the cursor away, flows and all, once d is pressed twice."""
+        """Takes the flowverse being read away, flows and all, once d is pressed twice."""
         from hmz.flows.verses import remove
 
         if self._tab != _FLOW_PAGE:
@@ -1381,7 +1529,9 @@ class Flows(Drafts[Chosen]):
             self._said = escape(str(why))
             self._fill()
             return
-        self._offers = None
+        # The place that was being read has gone, so the page reads whichever place the flow
+        # in force came from, exactly as it did when it opened.
+        self._offers, self._where, self._was = None, "", ""
         self._said = f"{escape(verse.name)} is no longer here"
         self._fill()
 
@@ -1410,11 +1560,12 @@ class Flows(Drafts[Chosen]):
             self._fill()
             return
         self._fetching, self._offers = False, None
-        # On the first flow of what was just fetched, which is what somebody who fetched it
-        # wants to see.
+        # Reading what was just fetched, on the first flow it brought: that list is what
+        # somebody who fetched it fetched it to see, and one that was added is not a place
+        # anybody has stepped to yet.
         first = next((one for one in self._all() if one.whose == name), None)
         if first is not None:
-            self._was = first.name
+            self._where, self._was = name, f"{name}{_HALVES}{first.name}"
         self._fill()
 
     @on(OptionList.OptionSelected)
