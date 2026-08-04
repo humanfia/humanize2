@@ -1,9 +1,9 @@
-"""Which of a CLI's skills one agent is loaded with: found, chosen, kept, and handed over.
+"""What a CLI would load here: found the way that CLI finds it, shown, and left alone.
 
-Found the way the CLI finds them, so nothing is typed in and nothing is asked of the CLI --
-the same rule the models on the sheet beside this one are offered under. Chosen per agent,
-because two agents of one flow are two agents: the reviewer reading a change need not be
-carrying what the builder writing it was.
+A skill installed on this machine is the CLI's own -- installed the way that CLI installs
+one and switched off the way that CLI switches one off -- so humanize reads the list and
+changes nothing about it. What it does add to a session is the flow's own skills, which are
+mounted rather than installed and are tested beside the flows.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from textual.widgets import Label, OptionList
 
-from hmz.agents.skills import Skill, leaving, skills
+from hmz.agents.skills import Skill, skills
 from hmz.backends import Model
 from hmz.kept import Runs
 from hmz.tui import Humanize
@@ -86,31 +86,10 @@ def test_codex_is_read_from_all_four_places_it_looks(
     ]
 
 
-def test_a_backend_with_nowhere_to_keep_them_offers_none(homes: Path) -> None:
-    """Kimi's daemon takes no `--skills-dir`, so there is nothing to be offered a choice of."""
+def test_a_backend_that_keeps_none_here_finds_none(homes: Path) -> None:
+    """Kimi's daemon reads no directory of them, so there is nothing here to show."""
     assert skills("kimi") == []
     assert skills("not-a-cli") == []
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch(
-    "hmz.tui.app.installed",
-    return_value={"kimi": (Model("kimi-code/k3", ("max",)),)},
-)
-async def test_a_cli_that_cannot_be_told_says_that_rather_than_none_installed(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
-    homes: Path,
-) -> None:
-    """Blaming the machine for what the backend cannot do would be the wrong sentence."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        await into_flows(app, driver)
-        await into_agent(app, driver)
-        await opens(app, driver, "skills")
-        await until(lambda: isinstance(app.screen, Skills), driver)
-        said = str(app.screen.query_one("#tuning", Label).content)
-
-        assert "kimi cannot be told which skills to load" in said
 
 
 def test_a_skill_with_no_front_matter_is_the_directory_it_is_in(homes: Path) -> None:
@@ -125,175 +104,90 @@ def test_a_skill_with_no_front_matter_is_the_directory_it_is_in(homes: Path) -> 
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
     "hmz.tui.app.installed",
-    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
+    return_value={"kimi": (Model("kimi-code/k3", ("max",)),)},
 )
-async def test_what_an_agent_is_loaded_with_is_chosen_beside_what_it_runs(
+async def test_a_cli_that_keeps_none_says_that_rather_than_none_installed(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     homes: Path,
 ) -> None:
-    """A row of the agent's own, opened from the sheet that says what the agent is."""
+    """Blaming the machine for what the backend does not do would be the wrong sentence."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await into_flows(app, driver)
+        await into_agent(app, driver)
+        await opens(app, driver, "skills")
+        await until(lambda: isinstance(app.screen, Skills), driver)
+        said = str(app.screen.query_one("#tuning", Label).content)
+
+        assert "kimi keeps no skills of its own here" in said
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "hmz.tui.app.installed",
+    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
+)
+async def test_what_an_agent_carries_is_shown_and_not_switched(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    homes: Path,
+) -> None:
+    """The row reads, and the sheet it opens reads: neither is a choice anybody is offered."""
     app = Humanize()
     async with app.run_test() as driver:
         await into_flows(app, driver)
         await into_agent(app, driver)
         listing = app.screen.query_one("#choices", OptionList)
         held = listing.get_option_at_index(rows(app).index("skills"))
-        assert "every skill" in str(held.prompt)  # never asked: the CLI as it comes
+        assert "as its CLI finds them" in str(held.prompt)
 
         await opens(app, driver, "skills")
         await until(lambda: isinstance(app.screen, Skills), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
-        # Every skill the CLI would load, each with a ticked box: it starts with all of them.
+        # Every skill the CLI would load, where it came from, and no box to switch.
         assert [str(option.id) for option in listing.options] == [
             "hf-cli",
             "writing",
             "housekeeping",
         ]
-        assert all("[✔]" in str(option.prompt) for option in listing.options)
+        assert not any("[✔]" in str(option.prompt) for option in listing.options)
+        assert not any("[ ]" in str(option.prompt) for option in listing.options)
+        # And the line under them says whose they are and where to go to change one.
+        said = str(app.screen.query_one("#tuning", Label).content)
+        assert "claude's own" in said
 
-        await driver.press("down", "space")  # `writing`: switched off
+        await driver.press("space")  # nothing to switch, and nothing switches
         await driver.pause()
-        assert "[ ]" in str(listing.get_option_at_index(1).prompt)
-        assert "[✔]" not in str(listing.get_option_at_index(1).prompt)
-
-        await driver.press("space")  # and on again, which is the same key
-        await driver.pause()
-        assert "[✔]" in str(listing.get_option_at_index(1).prompt)
-        await driver.press("space")
+        assert not any("[✔]" in str(option.prompt) for option in listing.options)
 
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Agent), driver)
-        listing = app.screen.query_one("#choices", OptionList)
-        await until(
-            lambda: (
-                "2 skills"
-                in str(listing.get_option_at_index(rows(app).index("skills")).prompt)
-            ),
-            driver,
-        )
 
         await keeps(app, driver)
         await keeps(app, driver)
 
-    # It rides along with what the agent runs, and is kept with it: the ones it has, in the
-    # order the CLI lists them, rather than the one that was switched off.
-    chosen = Runs("claude/claude-opus-5:high", "", ("hf-cli", "housekeeping"))
-    assert app._models == [chosen]
-    assert app.settings.agents(app._flow_named) == [chosen]
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch(
-    "hmz.tui.app.installed",
-    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
-)
-async def test_walking_out_of_the_skills_leaves_the_agent_loaded_as_it_was(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
-    homes: Path,
-) -> None:
-    """Declining to answer a side question is not declining to set the agent up."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        await into_flows(app, driver)
-        await into_agent(app, driver)
-        await opens(app, driver, "skills")
-        await until(lambda: isinstance(app.screen, Skills), driver)
-        listing = app.screen.query_one("#choices", OptionList)
-        await until(lambda: bool(listing.options), driver)
-
-        await driver.press("space")  # switched off, and then walked away from
-        await driver.press("escape")
-        await until(lambda: isinstance(app.screen, Agent), driver)
-        await keeps(app, driver)
-        await keeps(app, driver)
-
+    # Nothing about the skills rides along with what the agent runs: they are the CLI's,
+    # and reading the list is not a change to the agent.
     assert app._models == [Runs("claude/claude-opus-5:high")]
 
 
-def test_what_a_workspace_is_loaded_with_is_kept_and_read_back(tmp_path: Path) -> None:
-    """As the anchor is: written only where there is one, so an old file reads as before."""
-    kept = Settings(tmp_path)
-    kept.remember(
-        "rlar",
-        ("actor", "reviewer"),
-        [Runs("claude/m:high", "", ("writing",)), Runs("codex/n:low")],
-    )
-
-    assert Settings(tmp_path).agents("rlar") == [
-        Runs("claude/m:high", "", ("writing",)),
-        Runs("codex/n:low"),
-    ]
-    held = Settings(tmp_path)._read()
-    agents = held["workspaces"][str(tmp_path.resolve())]["flows"]["rlar"]["agents"]
-    assert agents["actor"]["skills"] == ["writing"]
-    # An agent nobody was asked about says nothing, which is what an entry written before
-    # there were any says too -- and is read back as the CLI as it comes rather than as none.
-    assert "skills" not in agents["reviewer"]
-
-
-def test_an_agent_loaded_with_none_is_not_an_agent_nobody_asked_about(
-    tmp_path: Path,
-) -> None:
-    """Which is the whole reason the two are told apart: `[]` is a choice and nothing is not."""
-    kept = Settings(tmp_path)
-    kept.remember("rlar", ("actor",), [Runs("claude/m:high", "", ())])
-
-    assert Settings(tmp_path).agents("rlar") == [Runs("claude/m:high", "", ())]
-    held = Settings(tmp_path)._read()
-    agents = held["workspaces"][str(tmp_path.resolve())]["flows"]["rlar"]["agents"]
-    assert agents["actor"]["skills"] == []
-
-
-def test_what_a_backend_is_told_is_every_skill_the_agent_was_not_given(
-    homes: Path,
-) -> None:
-    """An agent has skills; a CLI has to be talked out of the ones it would have loaded."""
-    assert leaving("claude", None) == []  # never asked, so nothing to say
-    assert leaving("claude", ("writing",)) == ["hf-cli", "housekeeping"]
-    assert leaving("claude", ()) == ["hf-cli", "writing", "housekeeping"]
-    # A name nothing here answers to is not a skill to switch off.
-    assert leaving("claude", ("writing", "nonesuch")) == ["hf-cli", "housekeeping"]
-
-
-def test_an_agent_is_made_with_what_it_was_told_to_have(tmp_path: Path) -> None:
-    """What the sheet answered is a setting of the agent, done to it before the flow starts."""
-    from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
-
-    app = Humanize()
-    app._models = [Runs("claude/m:high", "", ("writing", "hf-cli"))]
-    made = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
-
-    (agent,) = app._as_they_were_set_up([made])
-
-    assert agent.config.skills == ("writing", "hf-cli")
-    assert agent.config.model == "m"
-    assert agent.config.machine is None  # it works here, as it did before
-
-    # And one nobody was asked about is the agent that was made, untouched.
-    app._models = [Runs("claude/m:high")]
-    again = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
-    assert app._as_they_were_set_up([again]) == [again]
-
-
 @pytest.mark.timeout(60)
 @unittest.mock.patch(
     "hmz.tui.app.installed",
     return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
 )
-async def test_the_letters_narrow_the_skills_and_space_switches_one(
+async def test_the_letters_narrow_the_skills_shown(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     homes: Path,
 ) -> None:
-    """A skill is named after the directory it is in, so a space is never part of one."""
+    """A long list is searched here as it is searched everywhere else on these sheets."""
     app = Humanize()
     async with app.run_test() as driver:
         await into_flows(app, driver)
         await into_agent(app, driver)
         await opens(app, driver, "skills")
         await until(lambda: isinstance(app.screen, Skills), driver)
-        sheet = app.screen
-        listing = sheet.query_one("#choices", OptionList)
+        listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
 
         await driver.press("s")
@@ -301,13 +195,7 @@ async def test_the_letters_narrow_the_skills_and_space_switches_one(
         await driver.pause()
         assert [str(option.id) for option in listing.options] == ["housekeeping"]
 
-        await driver.press("space")  # switched, rather than typed into the search
-        await driver.pause()
-        assert [str(option.id) for option in listing.options] == ["housekeeping"]
-        assert "[ ]" in str(listing.get_option_at_index(0).prompt)
-
-        # Esc clears the search before it leaves, as it does on every other sheet, so what
-        # was switched is still switched and the rest of the list is back.
+        # Esc clears the search before it leaves, as it does on every other sheet.
         await driver.press("escape")
         await driver.pause()
         assert [str(option.id) for option in listing.options] == [
@@ -317,9 +205,27 @@ async def test_the_letters_narrow_the_skills_and_space_switches_one(
         ]
         assert isinstance(app.screen, Skills)
 
-        await driver.press("enter")
+        await driver.press("escape")
         await until(lambda: isinstance(app.screen, Agent), driver)
-        await keeps(app, driver)
-        await keeps(app, driver)
 
-    assert app._models == [Runs("claude/claude-opus-5:high", "", ("hf-cli", "writing"))]
+
+def test_a_workspace_writes_down_no_skills_of_its_own(tmp_path: Path) -> None:
+    """What an agent is does not include them any more, so nothing about them is kept."""
+    kept = Settings(tmp_path)
+    kept.remember("rlar", ("actor",), [Runs("claude/m:high")])
+
+    assert Settings(tmp_path).agents("rlar") == [Runs("claude/m:high")]
+    held = Settings(tmp_path)._read()
+    agents = held["workspaces"][str(tmp_path.resolve())]["flows"]["rlar"]["agents"]
+    assert "skills" not in agents["actor"]
+
+
+def test_a_file_that_still_says_skills_is_read_past(tmp_path: Path) -> None:
+    """An agent written down when they were a setting is the agent it always was."""
+    from hmz.kept import read_back
+
+    runs = read_back(
+        {"cli": "claude", "model": "m", "effort": "high", "skills": ["writing"]}
+    )
+
+    assert runs == Runs("claude/m:high")

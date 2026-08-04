@@ -96,7 +96,6 @@ What each backend runs, asked of that backend and kept until it is asked again.
 class Runs(NamedTuple):
     spec: str
     anchor: str = ""
-    skills: tuple[str, ...] | None = None
     permission: str = ""
     provider: str = ""
     goals: bool = True
@@ -126,9 +125,10 @@ under humanize's own home.
   file of six lines would be paying for a layer it does not use.
 - One agent MUST be written the same way wherever it is written down -- under a name here, and
   under a flow and a workspace in the interface's own settings -- so the shape is said once.
-  What says nothing MUST be left out: an agent that works here, was never asked about skills,
-  may do what an agent nobody was asked about may do and runs as this machine is signed in is
-  one every field of which is that field's own silence.
+  What says nothing MUST be left out: an agent that works here, may do what an agent nobody
+  was asked about may do and runs as this machine is signed in is one every field of which is
+  that field's own silence. What an older file says about skills MUST be read past: they are
+  the CLI's own now, and not a thing an agent is written down with.
 - The agents kept under a name MUST NOT be a workspace's and MUST NOT be any flow's: what an
   agent is is not a thing about the project it happens to be working in, and a flow that
   imports one MUST take a copy rather than a link.
@@ -339,7 +339,7 @@ that can happen to a flowverse -- added, fetched again, taken away.
 ## `hmz agents`
 
 ```shell
-hmz agents [list [-q] | show <name> | add <name> <cli>[@<provider>]/<model>:<effort> [-s <skill>]... [--anchor <target>] [--goals|--no-goals] [--force] | remove <name>]
+hmz agents [list [-q] | show <name> | add <name> <cli>[@<provider>]/<model>:<effort> [--anchor <target>] [--goals|--no-goals] [--force] | remove <name>]
 ```
 
 The agents written down under a name: what there is, what one of them is, and the two things
@@ -361,7 +361,7 @@ that can happen to one -- written down, taken away.
 ## `hmz providers`
 
 ```shell
-hmz providers [list [<cli>] | ways <cli> | add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] | login <cli>/<name> [-s VAR=VALUE]... | show <cli>/<name> | remove <cli>/<name>]
+hmz providers [list [<cli>] | ways <cli> | add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] | login <cli>/<name> [-s VAR=VALUE]... | show <cli>/<name> | falls-back <cli>/<name> [<name>] | retry <cli>/<name> [-n <tries>] [-p <policy>] [-t <seconds>] | remove <cli>/<name>]
 ```
 
 The accounts an agent may be run as: what there is, how a backend can be signed into, and the

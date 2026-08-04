@@ -15,7 +15,7 @@ src/hmz/
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
 ├── cli/              the command line: one module per command that has a parser
 ├── agents/           the contract, and the driver for each backend
-├── flows/            what a flow is called and where it is found, and the three it ships
+├── flows/            what a flow is called, where it is found, what it brings, and the three it ships
 ├── machines/         where an agent's turns land
 ├── providers/        which account an agent runs as, kept apart from which CLI it is
 ├── coganchor/        running an agent here whose work lands elsewhere
@@ -35,7 +35,7 @@ a target and could be lifted out whole, so it has a name of its own.
 | `agents/` | What a flow is written against (`AgentBase`, `SessionBase`, `Event`, `Question`, `Moment`) and one driver per backend. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
 | `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |
-| `flows/` | What a flow is called, which of the ones a file holds was asked for, and where flowverses are fetched to. `builtin/` beside it is the three humanize ships. | `flow`, `found`, `find`, `held`, `flowverses`, `add`, `fetch` |
+| `flows/` | What a flow is called, which of the ones it holds was asked for, the skills it brings, and where flowverses are fetched to. `builtin/` beside it is the three humanize ships. | `flow`, `found`, `find`, `held`, `fork`, `brought`, `flowverses`, `add`, `fetch` |
 | `cycle.py` | The run journal. Written by `runner`, read by `tracing` and `cli`. | `Cycle`, `cycles`, `opened` |
 | `runner.py` | Loading a flow, checking its arity and what it asks of each agent, naming them, running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. | `Runner`, `drives`, `wanted`, `Place`, `flow_and_agents`, `NotAFlow` |
 | `tracing/` | Reading the backends' logs back and rendering a Chrome trace. | `collect` |
@@ -155,7 +155,7 @@ what it *must* do, in MUST/MUST NOT terms, for whoever is changing it.
 | --- | --- |
 | `src/hmz/SPEC.md` | The tree, the top-level modules, and every command line |
 | `src/hmz/agents/SPEC.md` | The agent and session contract every backend keeps |
-| `src/hmz/flows/SPEC.md` | What a flow is, how one is found, and what a flowverse holds |
+| `src/hmz/flows/SPEC.md` | What a flow is, how one is found, what it brings, and what a flowverse holds |
 | `src/hmz/machines/SPEC.md` | What a machine is |
 | `src/hmz/providers/SPEC.md` | Which account an agent runs as, and how a turn is run under it |
 | `src/hmz/coganchor/SPEC.md` | What you are entitled to under an anchor, and what you deliberately are not |
@@ -180,10 +180,11 @@ table in `agents/__init__.py`, which `runner.py` and the interface both read. Su
 `cli/__init__.py`, and an entry in `COMMANDS`. Import your layer *inside* the function, not at
 the top of the module.
 
-**A flow.** Just a `.py` file: one in `flows/builtin/` for one humanize ships, one in a
+**A flow.** Just a directory: one in `flows/builtin/` for one humanize ships, one in a
 [flowverse](/reference/flows.md#flowverses)'s own `flows/` for one it offers, one in
-`.humanize/flows/` for one of your own. They are content and import nothing of humanize but `hmz.agents` — and
-`hmz.flows.flow`, where one file holds several.
+`.humanize/flows/` for one of your own. Its `__init__.py` is the flow, whatever it imports
+lives beside it, and its `skills/` is what it brings. They are content and import nothing of
+humanize but `hmz.agents` — and `hmz.flows.flow`, where one holds several.
 
 ## The checks
 

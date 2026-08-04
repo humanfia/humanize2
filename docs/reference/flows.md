@@ -1,7 +1,26 @@
 # Flows
 
-A flow is a Python file with a function marked `@flow` in it, taking the agents and the task.
-It is the loop: which agent is asked what, in what order, and when to stop.
+A flow is a **directory**: an `__init__.py` with a function marked `@flow` in it, taking the
+agents and the task, whatever that imports beside it, and a `skills/` of the skills the flow
+works by. It is the loop: which agent is asked what, in what order, and when to stop.
+
+```
+my_loop/
+├── __init__.py          the flow
+├── _prompts.py          whatever it imports, which travels with it
+└── skills/              what its agents are given, mounted onto every session they open
+    └── review-notes/
+        └── SKILL.md
+```
+
+Everything a flow needs lives in that directory, which is what makes a flow a thing you can
+copy, fork and edit whole — `f` on one in `/flow` writes a copy into `.humanize/flows/`.
+
+**A single `.py` file is a flow too.** A flow is a module, and that is the other shape one
+has: `.humanize/flows/twice.py` is `-f twice`, exactly as a directory of that name would be.
+It brings no skills — what is beside it is the other flows, and none of it came with that one
+— so a flow that grows a `skills/` is a flow that becomes a directory. Where both exist under
+one name, the directory wins.
 
 It is ordinary Python. There is no DSL, no graph to declare, no state machine — a flow may
 branch, sleep, read files, shell out, and give up, because it is just a function.
@@ -48,8 +67,12 @@ command line to correct.
 
 A flow may also be `async def`. Everything else on this page is the same either way.
 
-One file may hold [several flows](#several-flows-in-one-file): `@flow` is the one the file holds
-under its own name, and `@flow(name="…")` is one of the rest, run as `<flow>:<name>`.
+One flow may hold [several flows](#several-flows-in-one-file): `@flow` is the one it holds
+under its directory's own name, and `@flow(name="…")` is one of the rest, run as
+`<flow>:<name>`.
+
+A flow may also name [skills](#the-skills-a-flow-brings) that live in somebody else's
+repository, and everything it brings is mounted onto every session its agents open.
 
 ## A flow that waits for more than one thing
 
@@ -478,12 +501,14 @@ another does not read as the flow somebody chose.
 
 | | |
 | --- | --- |
-| `.humanize/flows/*.py` | this project's own |
-| `~/.humanize/flows/*.py` | yours, in every project |
+| `.humanize/flows/*/` | this project's own |
+| `~/.humanize/flows/*/` | yours, in every project |
 | — | the ones humanize ships, and every [flowverse](#flowverses) there is |
 
 Nearest wins, so a flow of your own may stand in for one of humanize's by taking its name — a
-`.humanize/flows/chat.py` is what `-f chat` runs *in that project*.
+`.humanize/flows/chat/` is what `-f chat` runs *in that project*. Which is what `f` in the
+flow menu is for: it copies the flow under the cursor into `.humanize/flows/`, whole, and from
+then on that name means your copy.
 
 What a flow is **called** is another question. The ones humanize ships are called by a bare
 name; a flowverse's are called `<flowverse>/<flow>`, which is the one spelling nothing can stand
@@ -493,26 +518,51 @@ in for; a flow of yours is called by its path, short enough to read:
 | --- | --- |
 | `chat` | one humanize ships |
 | `official/rlar` | one the official flowverse holds |
-| `.humanize/flows/chat.py` | this project's own |
-| `~/.humanize/flows/chat.py` | yours, in every project |
+| `.humanize/flows/chat` | this project's own |
+| `~/.humanize/flows/chat` | yours, in every project |
 
 So yours is listed beside humanize's rather than instead of it, `-f` takes either, and what
 each was [set up to run](/reference/tui.md#what-it-remembers) is remembered apart — a flow of yours cannot
 quietly inherit the agents or the settings of the one it shares a name with.
 
-Anything with a slash or an extension in it is a path, taken as given. A file whose name starts
-with `_` is not a flow.
+Anything with a slash in it is a path, taken as given: a flow's directory, or a `.py` file to
+run as one. A directory whose name starts with `_` is not a flow.
 
 ```sh
-mkdir -p .humanize/flows && cp my_loop.py .humanize/flows/
+mkdir -p .humanize/flows && cp -r my_loop .humanize/flows/
 hmz exec -f my_loop -a claude/claude-opus-4-8:high "fix the build"
-hmz exec -f ./somewhere/else.py -a claude/claude-opus-4-8:high "fix the build"
+hmz exec -f ./somewhere/else -a claude/claude-opus-4-8:high "fix the build"
 ```
+
+## The skills a flow brings
+
+The `skills/` inside a flow is what that flow works by, laid out the way every one of these
+CLIs lays a skill out — a directory apiece, each holding a `SKILL.md`. They are **mounted**
+onto every session the flow's agents open: copied where that backend reads a project's own
+skills for as long as the session lives, and taken away again after. Nothing is installed, and
+nothing the person at this machine installed is touched.
+
+A flow may also name skills that live in somebody else's repository, where it is declared:
+
+```python
+@flow(skills=("https://github.com/humanfia/flowverse#review-notes",))
+def run(agents: Agents, task: str) -> None:
+    ...
+```
+
+which is a git URL anything can clone and, after the `#`, which of that repository's
+`skills/*` is wanted. Without one, every skill it holds is brought. Such a repository is
+cloned under `~/.humanize/skills/` and fetched again the next time a run asks for it.
+
+The flow's own wins a name a repository also uses: a fork that edited a skill meant the edited
+one. A backend that reads no project skills of its own carries none of this — its skills are
+the ones its CLI installs, and humanize does not switch those on or off.
 
 ## Flowverses
 
-A flowverse is a git repository with a `flows/` directory in it: one `.py` per flow, and
-whatever they import beside them under names starting with `_`. It is cloned into
+A flowverse is a git repository with a `flows/` directory in it: one directory per flow, each
+holding the `__init__.py` that is the flow, whatever it imports beside it, and the `skills/` it
+brings. It is cloned into
 `~/.humanize/flowverses/<name>/`, and every flow in its `flows/` is then offered under that
 name. Nothing outside that directory is read, so the repository is free to have a README, a
 pyproject and a test suite of its own without any of it being taken for a flow.
@@ -528,8 +578,8 @@ Two are always there:
 as what has been downloaded — and neither of the two can be taken away.
 
 In the [interface](/reference/tui.md), `/flow` is where they live: left and right walk the places flows
-come from, `a` adds one, `r` fetches the one under the cursor again, and `d` twice takes an added
-one away. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
+come from, `a` adds one, `r` fetches the one under the cursor again, `f` copies the flow under
+the cursor into `.humanize/flows/` to change, and `d` twice takes an added one away. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
 repository's own name is not the one you want.
 
 [`hmz flowverses`](/reference/cli.md#hmz-flowverses) is the same, said as arguments, for a machine
@@ -542,9 +592,13 @@ hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "
 A flow from a flowverse that has not been fetched says so rather than saying there is no such
 file: the name is right, the download has not happened.
 
-A flow is a Python file, and reading one means running it — so listing what a flowverse holds
-imports every file in its `flows/`. Adding one is trusting that repository with this machine,
-exactly as installing a package is.
+A flow is Python, and reading one means running it — so listing what a flowverse holds runs
+the entry point of every flow in its `flows/`. Adding one is trusting that repository with this
+machine, exactly as installing a package is.
+
+Editing a flowverse's own copy does not keep: it is somebody else's repository, and fetching it
+again takes what that repository says now. `f` on a flow copies it into `.humanize/flows/`,
+where it is yours — and where the name then means your copy.
 
 ## The flows humanize ships
 
@@ -706,7 +760,7 @@ if head() == before:
 
 `-a` reaches four of an agent's settings: the CLI, the model, the effort, and — after an `@` —
 the [provider](/reference/providers.md) whose account it runs as. A name, [where the work
-lands](/reference/machines.md), [which skills it has](/reference/agents.md#which-skills-an-agent-is-loaded-with) and
+lands](/reference/machines.md), [the skills it carries](/reference/agents.md#the-skills-an-agent-carries) and
 [what it may do](/reference/agents.md#what-an-agent-may-do) are settings of the *agent* that no `-a` spells,
 so a flow that needs one is handed agents built in Python — and a machine only where the flow's
 own place for that agent [said `Remote`](#where-each-agent-works):

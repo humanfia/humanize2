@@ -93,7 +93,7 @@ The conversation is not restarted; only the process is. It is the same thing
 ## Step 5 — a whole flow built on it
 
 ```python
-# .humanize/flows/reviewed.py
+# .humanize/flows/reviewed/__init__.py
 """Build under review, and stop when the reviewer says there is nothing left."""
 
 from typing import NamedTuple

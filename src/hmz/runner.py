@@ -8,6 +8,7 @@ line would be one the interface had to reach up into.
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 import os
 import threading
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from .agents import AgentBase, Isolated, Moment, Remote
+    from .agents.skills import Loaded
 
 
 #: How many arguments a flow's entry point takes when it says it can be set up with
@@ -252,7 +254,7 @@ def _read(
         # A file that holds several flows names each of them after itself, so whoever asked
         # for the file alone -- or for one of them under a name it does not have -- is a
         # colon away from what they meant, and saying which ones is what ends it.
-        holds = [f"{Path(flow).stem}:{one}" for one in _holds(read)]
+        holds = [f"{_called(flow)}:{one}" for one in _holds(read)]
         missing = f"{flow}: nothing in it is a flow called {wanted!r}"
         if wanted and holds:
             raise NotAFlow(f"{missing}; it holds {', '.join(holds)}")
@@ -313,6 +315,80 @@ def _read(
     )
 
 
+def carries(flow: str | os.PathLike[str], agents: Sequence[AgentBase]) -> None:
+    """Gives every agent of a flow the skills that flow works by.
+
+    A flow is a directory, and what it keeps in `skills/` -- plus whatever it named where it
+    was declared -- is mounted onto every session these agents open. Told to the agents rather
+    than configured on them: the skills are the flow's, and the same agent under another flow
+    carries that flow's instead.
+
+    Worked out here rather than at each session, because a repository named by a flow is
+    fetched to get it: a run that cannot reach one says so before the first turn rather than
+    an hour into a loop. Worked out afresh each time a flow is run or called, so that a flow
+    which has rewritten its own skills is driven by what it has now.
+
+    Args:
+      flow: The flow, as it was named.
+      agents: The agents it is being run with.
+    """
+    from hmz.flows import at as directory
+    from hmz.flows.skills import brought
+
+    where = directory(str(flow))
+    if not where:
+        return
+    declared: tuple[str, ...] = ()
+    with contextlib.suppress(Exception):
+        # What the flow said where it was declared, which is read off the flow that was asked
+        # for. A flow that will not load is left to the loading to report.
+        declared = _declares(flow)
+    try:
+        loaded = brought(where, declared)
+    except OSError as unreachable:
+        raise NotAFlow(f"{flow}: {unreachable}") from unreachable
+    for agent in agents:
+        agent.loads(loaded)
+
+
+def _declares(flow: str | os.PathLike[str]) -> tuple[str, ...]:
+    """The skills one flow named where it was declared, which live somewhere else.
+
+    Args:
+      flow: The flow, as it was named -- the half after the colon says which of the flows in
+        the directory was asked for.
+
+    Returns:
+      One identifier apiece, and nothing at all for a flow that named none.
+    """
+    from hmz.flows import Flow as Marked
+    from hmz.flows import find, inside, loaded
+
+    wanted = inside(str(flow))
+    for one in loaded(find(str(flow))).values():
+        said = getattr(one, "__humanize_flow__", None)
+        if isinstance(said, Marked) and said.name == wanted:
+            return said.skills
+    return ()
+
+
+def _called(flow: str | os.PathLike[str]) -> str:
+    """What a flow is called, given the file its entry point is in.
+
+    Args:
+      flow: The path that was run.
+
+    Returns:
+      The directory's name for a flow laid out as one -- the entry point is `__init__.py` in
+      every flow there is, and naming a flow after that would name them all the same -- and
+      the file's own name for a file somebody pointed at outright.
+    """
+    from hmz.flows import ENTRY
+
+    said = Path(flow)
+    return said.parent.name if said.name == ENTRY else said.stem
+
+
 def calls(flow: str | os.PathLike[str]) -> Flow:
     """One flow, ready for another flow to run: what it marked, found by name.
 
@@ -339,6 +415,12 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
 
         await calls("official/rlar")(agents, task)
 
+    The flow is read again at each call, and so are the skills it brings. A flow is a
+    directory on disk, and one that has been rewritten between two calls of it -- by hand, or
+    by an agent this very flow is driving -- is run as it is now rather than as it was when
+    somebody first asked for it. That is what makes a loop that improves its own flow, or its
+    own skills, a loop that then runs the improved one.
+
     Args:
       flow: The flow to call, by the name `-f` takes.
 
@@ -348,9 +430,10 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
     Raises:
       NotAFlow: If there is no such flow, or it is not one. Raised here rather than at the
         call, so that a flow which asks for another by a name that is wrong says so when it is
-        asked for rather than an hour into a loop.
+        asked for rather than an hour into a loop -- and again at each call, for a flow that
+        was rewritten into something that is no longer one.
     """
-    run, places, make, setting = _read(flow)
+    _read(flow)  # said now, so a name that is wrong is wrong where it was written
     named = str(flow)
 
     def calling(
@@ -358,7 +441,15 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
         task: str,
         config: BaseModel | dict[str, Any] | None = None,
     ) -> Awaitable[None] | None:
+        # Read afresh, which is what makes a flow rewritten since the last call the flow that
+        # runs now: a flow is a directory, and reading one is running its entry point.
+        run, places, make, setting = _read(flow)
         driven = _handed(named, places, make, agents)
+        # And the skills it works by, which are the flow's rather than the agents': a called
+        # flow brings its own, mounted onto whatever sessions it opens, and hands the agents
+        # back as it found them so that the flow which called it goes on carrying its own.
+        before = [agent.loaded for agent in driven]
+        carries(named, driven)
         # Read back through the flow's own model, which is what refuses a config a flow does
         # not take and one it takes another of -- and what puts the settings through its own
         # validators at the moment it is about to run, exactly as a run of it does.
@@ -369,15 +460,13 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
         try:
             answered = run(driven, task, *settings)
         except BaseException:
-            _left(started)
-            _wrote(driven, "returned", flow=named)
+            _ended(driven, started, named, before)
             raise
         if inspect.isawaitable(answered):
             # A flow written as a coroutine has not run yet: it is running while whoever
             # called it awaits it, so what says it is running has to last that long too.
-            return _awaited(answered, driven, started, named)
-        _left(started)
-        _wrote(driven, "returned", flow=named)
+            return _awaited(answered, driven, started, named, before)
+        _ended(driven, started, named, before)
         return None
 
     return calling
@@ -388,6 +477,7 @@ async def _awaited(
     driven: tuple[AgentBase, ...],
     started: Running,
     named: str,
+    before: Sequence[tuple[Loaded, ...]],
 ) -> None:
     """Waits for a called flow that is a coroutine, and writes down that it ended.
 
@@ -396,12 +486,32 @@ async def _awaited(
       driven: The agents it was called with, for the cycle to write to.
       started: What :func:`_entered` answered with.
       named: The flow, as it was asked for.
+      before: What each of them was carrying before it was called.
     """
     try:
         await answered
     finally:
-        _left(started)
-        _wrote(driven, "returned", flow=named)
+        _ended(driven, started, named, before)
+
+
+def _ended(
+    driven: tuple[AgentBase, ...],
+    started: Running,
+    named: str,
+    before: Sequence[tuple[Loaded, ...]],
+) -> None:
+    """Writes down that a called flow has ended, and hands its agents back as they came.
+
+    Args:
+      driven: The agents it was called with.
+      started: What :func:`_entered` answered with.
+      named: The flow, as it was asked for.
+      before: The skills each of them carried before the call, which are the calling flow's.
+    """
+    _left(started)
+    _wrote(driven, "returned", flow=named)
+    for agent, held in zip(driven, before, strict=True):
+        agent.loads(held)
 
 
 def _handed(
@@ -539,7 +649,7 @@ def _unfetched(named: str) -> str:
                 f"the {whose} flowverse has not been fetched yet -- open /flow and press "
                 "r on it"
             )
-    return "no Python file to read a flow from"
+    return "no flow to read: a flow is a directory with an __init__.py in it"
 
 
 def _entry(inside: dict[str, Any], wanted: str) -> Callable[..., Any] | None:
@@ -855,12 +965,13 @@ class Runner:
             what a flow that takes no setting up is given either way.
 
         Raises:
-          NotAFlow: If the file is not there, is not a flow -- nothing in it marked
+          NotAFlow: If the flow is not there, is not a flow -- nothing in it marked
             ``@flow()``, or one whose ``agents`` cannot be read or says nothing about how many
             it takes -- or is a
             flow that drives a different number of agents than were given, or one of them
             cannot run a moment the flow said that place has to, or was set up with something
-            that is not what it asked for.
+            that is not what it asked for, or brings a skill from a repository that cannot be
+            reached.
         """
         from .agents import HumanAgent
 
@@ -899,6 +1010,10 @@ class Runner:
         for agent, place in zip(driven, places, strict=True):
             if place.name:
                 agent.rename(place.name)
+        # What the flow works by, mounted onto every session these agents open. Before the
+        # first turn, since a repository the flow named is fetched to get it: a run that
+        # cannot reach one says so here rather than an hour into a loop.
+        carries(flow, driven)
         self._run: Flow = run
         # Only for a flow that said it takes one, so that every flow written before there
         # was such a thing is still called with the two arguments it declares.

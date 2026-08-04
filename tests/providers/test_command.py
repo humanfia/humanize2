@@ -340,3 +340,64 @@ def test_an_account_whose_cli_will_not_say_what_it_runs_is_still_an_account(
 
     assert providers.find("claude", "mine") is not None
     assert "did not say what it runs" in capsys.readouterr().err
+
+
+def test_where_an_account_falls_back_to_is_said_from_a_command_line(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A name rather than a mark: each account names the next, and a turn walks the chain."""
+    providers.add("claude", "mine", env={"ANTHROPIC_API_KEY": "k"})
+    providers.add("claude", "spare", env={"ANTHROPIC_API_KEY": "s"})
+
+    assert run("falls-back", "claude/mine", "spare") == 0
+
+    held = providers.find("claude", "mine")
+    assert held is not None
+    assert held.fallback == "spare"
+    assert "falls back to spare" in capsys.readouterr().out
+    # And said with nothing after it, it is the end of the line again.
+    assert run("falls-back", "claude/mine") == 0
+    ended = providers.find("claude", "mine")
+    assert ended is not None
+    assert not ended.fallback
+
+
+def test_a_chain_that_goes_nowhere_is_refused_where_it_was_typed(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Said at the prompt rather than found by the turn that needed somewhere to go."""
+    providers.add("claude", "mine", env={"ANTHROPIC_API_KEY": "k"})
+
+    assert run("falls-back", "claude/mine", "nonesuch") == 1
+
+    assert "no claude account called 'nonesuch'" in capsys.readouterr().err
+
+
+def test_how_an_account_is_tried_again_is_said_from_a_command_line(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """How many tries, how long to wait between them, and how long the whole may go on."""
+    providers.add("claude", "mine", env={"ANTHROPIC_API_KEY": "k"})
+
+    assert run("retry", "claude/mine", "-n", "3", "-p", "exponential", "-t", "90") == 0
+
+    held = providers.find("claude", "mine")
+    assert held is not None
+    assert (held.retries, held.policy, held.timeout) == (3, "exponential", 90.0)
+    assert "tried 3 more times, exponential" in capsys.readouterr().out
+    # And what it is is what `show` says about it.
+    assert run("show", "claude/mine") == 0
+    said = capsys.readouterr().out
+    assert "tried       3 more times, exponential, for up to 90s" in said
+    assert "falls to    nowhere" in said
+
+
+def test_a_policy_nobody_has_is_refused_where_it_was_typed(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A setting to correct rather than a turn that waits some way nobody asked for."""
+    providers.add("claude", "mine", env={"ANTHROPIC_API_KEY": "k"})
+
+    assert run("retry", "claude/mine", "-n", "1", "-p", "nonesuch") == 1
+
+    assert "is not a retry policy" in capsys.readouterr().err

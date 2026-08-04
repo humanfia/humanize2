@@ -1770,7 +1770,7 @@ class Humanize(App[None]):
         the time it is asked. So the ones whose CLI has not changed are set up where they
         stand: the turn under way finishes as it started -- a model does not think harder
         halfway through an answer -- and everything asked for after it is at the new model,
-        effort, account, skills, rung and machine.
+        effort, account, rung and machine.
 
         A CLI that has changed is not one of those. What drives a backend is the class the
         agent is, and the flow is holding the agents it was handed when it started; one of
@@ -1807,7 +1807,6 @@ class Humanize(App[None]):
                     model=model,
                     effort=effort,
                     machine=machine,
-                    skills=runs.skills,
                     provider=runs.provider,
                     goals=runs.goals,
                     **({"permission": runs.permission} if runs.permission else {}),
@@ -1966,15 +1965,15 @@ class Humanize(App[None]):
 
         Done to the agents rather than said on the line that made them: all of them are
         settings of the agent, and `hmz exec` reads a line that says what each one runs and
-        nothing else. An agent that works here, was never asked about skills and runs as this
-        machine is signed in is left exactly as it was.
+        nothing else. An agent that works here and runs as this machine is signed in is left
+        exactly as it was.
 
         Args:
           chosen: The agents the line named, in the order the flow takes them.
 
         Returns:
-          The same agents, or one set up in place of any that was given a machine, told which
-          of its CLI's skills to have, or told which account to run as.
+          The same agents, or one set up in place of any that was given a machine, a rung of
+          what it may do, or an account to run as.
 
         Raises:
             ValueError: If a target cannot be read, or an agent was given an account there is
@@ -1991,7 +1990,6 @@ class Humanize(App[None]):
             runs = self._models[at] if at < len(self._models) else Runs("")
             if (
                 not runs.anchor
-                and runs.skills is None
                 and not runs.permission
                 and not runs.provider
                 and agent.config.goals is runs.goals
@@ -2005,16 +2003,14 @@ class Humanize(App[None]):
                 raise ValueError(
                     f"no {agent.backend} provider called {runs.provider!r}"
                 )
-            # The config is frozen, so an agent that works elsewhere, without a skill its CLI
-            # would have loaded, allowed less than an agent nobody asked about, or signed in
-            # as somebody else, is another agent at the same model and effort -- which is
-            # what it is.
+            # The config is frozen, so an agent that works elsewhere, allowed less than an
+            # agent nobody asked about, or signed in as somebody else, is another agent at
+            # the same model and effort -- which is what it is.
             moved.append(
                 type(agent)(
                     replace(
                         agent.config,
                         machine=anchored(runs.anchor),
-                        skills=runs.skills,
                         provider=runs.provider,
                         goals=runs.goals,
                         **({"permission": runs.permission} if runs.permission else {}),

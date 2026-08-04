@@ -23,6 +23,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 from hmz import backends, home
 
+from . import retry
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -30,10 +32,11 @@ __all__ = [
     "ENV",
     "Provider",
     "add",
-    "falls_back",
+    "chain",
     "find",
-    "marks",
+    "points",
     "providers",
+    "retrying",
     "ways",
     "where",
 ]
@@ -89,10 +92,20 @@ class Provider:
       env: What a turn run under it is given on top of the environment it inherits.
       args: What to add to the backend's own command line for such a turn.
       made: When it was made, as the moment written down.
-      fallback: Whether a turn whose own account failed carries on under this one. A
-        property of the account rather than of the agent: it is the account that goes down,
-        and whichever agent was running under one when it did is the agent that needs
-        somewhere else to run.
+      fallback: The account a turn carries on under when this one has failed, by name, or ""
+        for one that is the end of the line. A property of the account rather than of the
+        agent: it is the account that goes down, and whichever agent was running under one
+        when it did is the agent that needs somewhere else to run. Each account naming its
+        own means a run walks a chain -- subscription, then key, then gateway -- rather than
+        having one place to go however many accounts there are.
+      retries: How many times a failed turn is tried again under this account before the
+        chain moves on, beyond the first try. Zero is the account as it comes: a turn is
+        taken once, and a failure is a failure.
+      policy: How long to wait between those tries, as :data:`hmz.providers.retry.POLICIES`
+        names them.
+      timeout: The longest the retrying under this account may go on for, in seconds, or 0.0
+        for as long as the tries take. It is checked before each wait, so a turn is never
+        started knowing it is already past.
     """
 
     cli: str
@@ -101,7 +114,10 @@ class Provider:
     env: Mapping[str, str] = field(default_factory=dict[str, str])
     args: tuple[str, ...] = ()
     made: str = ""
-    fallback: bool = False
+    fallback: str = ""
+    retries: int = 0
+    policy: str = retry.DEFAULT
+    timeout: float = 0.0
 
     @property
     def at(self) -> Path:
@@ -160,6 +176,9 @@ class Provider:
             "args": list(self.args),
             "made": self.made,
             "fallback": self.fallback,
+            "retries": self.retries,
+            "policy": self.policy,
+            "timeout": self.timeout,
         }
 
 
@@ -239,41 +258,88 @@ def find(cli: str, name: str) -> Provider | None:
     return _read(profile.name, under() / profile.name / name)
 
 
-def falls_back(cli: str) -> Provider | None:
-    """The account a turn of this backend carries on under when its own fails.
+def chain(provider: Provider) -> list[Provider]:
+    """The accounts a turn under this one walks, in the order it walks them.
+
+    Each account names the one to carry on under when it has failed, so what a turn has is a
+    chain rather than a second place: a subscription that runs out falls to a key, and a key
+    that is refused falls to a gateway. A run walks it to the end and stops there.
 
     Args:
-      cli: The backend, by any name it answers to.
+      provider: Where the turn starts, which is the account its agent was configured with.
 
     Returns:
-      The first account of that backend marked as a fallback, in the order they are kept, or
-      None where none is. One rather than a chain: a second account is somewhere to go when
-      the first is down, and a queue of them is a run nobody is watching go wrong.
+      That account first, then whatever it falls back to, and so on. An account naming one
+      that is not there ends the chain, as does one naming an account already in it: a loop
+      is a chain that would be walked forever, and stopping at the second sight of an account
+      is what makes a run that ends.
     """
-    return next((one for one in providers(cli) if one.fallback), None)
+    walked = [provider]
+    seen = {provider.name}
+    while walked[-1].fallback:
+        instead = find(walked[-1].cli, walked[-1].fallback)
+        if instead is None or instead.name in seen:
+            break
+        seen.add(instead.name)
+        walked.append(instead)
+    return walked
 
 
-def marks(cli: str, name: str, *, fallback: bool) -> bool:
-    """Marks an account as the one to fall back to, or stops it being that.
-
-    Only one at a time: marking a second unmarks the first, since a fallback is where a turn
-    goes and two of them is two places.
+def points(cli: str, name: str, at: str) -> bool:
+    """Says which account a turn under this one carries on under when it fails.
 
     Args:
       cli: The backend it is for.
       name: Which account.
-      fallback: What to set it to.
+      at: What the account to fall back to is called, or "" for the end of the line.
 
     Returns:
-      Whether there was an account of that name to mark.
+      Whether there was an account of that name to say it of.
+
+    Raises:
+      ValueError: If it would point at itself, or at an account of that backend that is not
+        there -- either is a chain that goes nowhere, said where it was written rather than
+        found on the turn that needed it.
     """
     found = find(cli, name)
     if found is None:
         return False
-    for one in providers(cli):
-        if one.fallback and (one.name != name or not fallback):
-            _write(replace(one, fallback=False))
-    _write(replace(found, fallback=fallback))
+    if at:
+        if at == name:
+            raise ValueError(f"{name} cannot fall back to itself")
+        if find(cli, at) is None:
+            raise ValueError(f"there is no {found.cli} account called {at!r}")
+    _write(replace(found, fallback=at))
+    return True
+
+
+def retrying(cli: str, name: str, retries: int, policy: str, timeout: float) -> bool:
+    """Says how a turn under one account is tried again when it fails.
+
+    Args:
+      cli: The backend it is for.
+      name: Which account.
+      retries: How many tries beyond the first.
+      policy: How long to wait between them, as `hmz.providers.retry.POLICIES` names them.
+      timeout: The longest the retrying may go on for, in seconds, or 0.0 for no limit.
+
+    Returns:
+      Whether there was an account of that name to say it of.
+
+    Raises:
+      ValueError: If the policy is not one there is, or either number is negative.
+    """
+    found = find(cli, name)
+    if found is None:
+        return False
+    if retry.named(policy) is None:
+        raise ValueError(
+            f"{policy!r} is not a retry policy: "
+            f"{', '.join(one.name for one in retry.POLICIES)}"
+        )
+    if retries < 0 or timeout < 0:
+        raise ValueError("a number of tries and a timeout are both counts, not debts")
+    _write(replace(found, retries=retries, policy=policy, timeout=timeout))
     return True
 
 
@@ -432,8 +498,30 @@ def _read(cli: str, at: Path) -> Provider | None:
         if isinstance(args, list)
         else (),
         made=str(held.get("made") or ""),
-        fallback=bool(held.get("fallback")),
+        # A name, and never a mark: an account written down when a fallback was a yes or a no
+        # names nobody, so it is the end of its own chain until somebody says otherwise.
+        fallback=str(held.get("fallback") or "")
+        if isinstance(held.get("fallback"), str)
+        else "",
+        retries=int(_counted(held.get("retries"))),
+        policy=str(held.get("policy") or retry.DEFAULT),
+        timeout=_counted(held.get("timeout")),
     )
+
+
+def _counted(said: Any) -> float:
+    """One number a provider was written down with, read as the count it is.
+
+    Args:
+      said: What the file holds, which is whatever somebody put there.
+
+    Returns:
+      It, never negative, and zero for anything that is not a number at all -- a file written
+      by hand is a file to read past rather than a reason to lose the account in it.
+    """
+    if not isinstance(said, (int, float)) or isinstance(said, bool):
+        return 0.0
+    return max(float(said), 0.0)
 
 
 def _directories(at: Path) -> list[Path]:

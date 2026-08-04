@@ -1,16 +1,21 @@
-"""What a flow is called, where it is found, and how a file says it holds more than one.
+"""What a flow is called, where it is found, and how one says it holds more than one.
+
+A flow is a directory: an `__init__.py` that is the flow itself, whatever that imports beside
+it, and a `skills/` of the skills it brings -- laid out the way every one of these CLIs lays a
+skill out, one directory apiece with a `SKILL.md` in it. So a flow is a thing that can be
+copied, forked and edited whole, and what it needs to do its work travels with it.
 
 Named rather than pathed: `hmz exec -f ralph_loop` is a name, and anything with a slash or an
-extension in it is a file taken as given. A name is looked for in the places flows come from --
+extension in it is a path taken as given. A name is looked for in the places flows come from --
 the ones humanize ships, the ones its own repository holds, whatever [flowverses](verses.py)
 have been added, and then this project's own directory and yours -- so a flow of your own may
 stand in for one of humanize's by taking its name.
 
 A flow is a function marked with :func:`flow`, and nothing else is one. `@flow()` is the flow
-its file holds under the file's own name; `@flow(name="draft")` is one of several a file holds,
-called `<file>:draft` -- so that three phases of one thing live in one file and are three things
-to run. What the function is called is the file's own business: `run`, `main`, `draft_it`, all
-the same to a name that never mentions it.
+its directory holds under the directory's own name; `@flow(name="draft")` is one of several it
+holds, called `<flow>:draft` -- so that three phases of one thing live in one flow and are
+three things to run. What the function is called is the flow's own business: `run`, `main`,
+`draft_it`, all the same to a name that never mentions it.
 """
 
 from __future__ import annotations
@@ -20,30 +25,33 @@ import os
 import runpy
 import sys
 from dataclasses import dataclass
-from glob import glob
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, overload
 
 from .verses import BUILTIN, FLOWS, OFFICIAL, Flowverse, flowverses, holds
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
 
 __all__ = [
     "BUILTIN",
     "BUILTIN_AT",
+    "ENTRY",
     "FLOWS",
     "OFFICIAL",
     "Flow",
     "Flowverse",
     "Offer",
+    "at",
     "find",
     "flow",
     "flowverses",
+    "fork",
     "found",
     "held",
     "holds",
     "loaded",
+    "offered",
     "offers",
     "where",
 ]
@@ -53,8 +61,12 @@ __all__ = [
 #: whole of what is there, so there is no `flows/` in it to tell them from the rest.
 BUILTIN_AT = Path(__file__).parent / "builtin"
 
-#: What a flow's own name is separated from the one inside its file by. A file that holds one
-#: flow is named by itself; one that holds three names each of them after it.
+#: What a flow's directory holds the flow itself in. The rest of the directory is what it
+#: imports and the `skills/` it brings, so the entry point is named rather than guessed.
+ENTRY = "__init__.py"
+
+#: What a flow's own name is separated from the one inside it by. A flow that holds one flow
+#: is named by itself; one that holds three names each of them after it.
 _INSIDE = ":"
 
 #: Where a flow of your own lives, nearest first, and what to call each place on screen. Kept
@@ -76,15 +88,20 @@ class Flow:
     """What a flow says about itself where it is written.
 
     Attributes:
-      name: What it is called inside its file, which is the half after the colon. "" for the
-        one a file holds under its own name, which is what `@flow()` marks.
+      name: What it is called inside its own directory, which is the half after the colon.
+        "" for the one it holds under the directory's own name, which is what `@flow()` marks.
       about: One line saying what it does, for whoever is choosing between them. Read off the
-        function's own docstring where the decorator was not told one, and off the file's
-        where the file is one flow and its function says nothing.
+        function's own docstring where the decorator was not told one, and off the module's
+        where the flow is one flow and its function says nothing.
+      skills: The skills it works by that live somewhere else, each a git repository anything
+        can clone with an optional `#<skill>` saying which of the ones in it is wanted. What
+        the flow keeps in its own `skills/` is not among them: that is every flow in the
+        directory's, and is found by looking rather than by being declared.
     """
 
     name: str = ""
     about: str = ""
+    skills: tuple[str, ...] = ()
 
 
 #: Where a decorated function keeps what it said about itself. On the function rather than in
@@ -99,12 +116,17 @@ def flow[**P, T](call: Callable[P, T], /) -> Callable[P, T]: ...
 
 @overload
 def flow[**P, T](
-    *, name: str = "", about: str = ""
+    *, name: str = "", about: str = "", skills: Iterable[str] = ()
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 
 def flow[**P, T](
-    call: Callable[P, T] | None = None, /, *, name: str = "", about: str = ""
+    call: Callable[P, T] | None = None,
+    /,
+    *,
+    name: str = "",
+    about: str = "",
+    skills: Iterable[str] = (),
 ) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]:
     """Marks a function as a flow. Nothing else is one.
 
@@ -114,22 +136,29 @@ def flow[**P, T](
         def run(agents: tuple[AgentBase], task: str) -> None:
             ...
 
-    is `ralph_loop`, in `ralph_loop.py`. Written with one, it is one of several that file
-    holds, and is called `<file>:<name>`::
+    is `ralph_loop`, in `ralph_loop/__init__.py`. Written with one, it is one of several that
+    flow holds, and is called `<flow>:<name>`::
 
         @flow(name="gen-idea", about="opens a loose idea into a repo-grounded draft")
         def first_pass(agents: Agents, task: str) -> None:
             ...
 
-    is `humanize1:gen-idea`. What the function is called is the file's own business either
+    is `humanize1:gen-idea`. What the function is called is the flow's own business either
     way: a name that is written down where a flow is run is a name to keep, and one taken
     from the function would change under whoever renamed it.
 
+    A flow may also name skills that live somewhere else, which are mounted onto every session
+    its agents open alongside the ones in its own `skills/`::
+
+        @flow(skills=("https://github.com/humanfia/flowverse#deep-research",))
+
     Args:
       call: The function, when the decorator is written with no arguments at all.
-      name: What to call this one among the flows its file holds, or "" for the one the file
-        holds under its own name.
+      name: What to call this one among the flows its directory holds, or "" for the one it
+        holds under the directory's own name.
       about: One line saying what it does, defaulting to the first line of its docstring.
+      skills: The skills it works by that are somewhere else, one git URL apiece with an
+        optional `#<skill>`. What it keeps in its own `skills/` needs no declaring.
 
     Returns:
       The function, unchanged but for what it now says about itself: a flow is called the way
@@ -138,41 +167,56 @@ def flow[**P, T](
     """
 
     def marks(said: Callable[P, T]) -> Callable[P, T]:
-        setattr(said, _SAID, Flow(name=name, about=about or _first(said.__doc__)))
+        setattr(
+            said,
+            _SAID,
+            Flow(
+                name=name,
+                about=about or _first(said.__doc__),
+                skills=tuple(skills),
+            ),
+        )
         return said
 
     return marks if call is None else marks(call)
 
 
 def loaded(where_: str | os.PathLike[str]) -> dict[str, Any]:
-    """Runs a flow's file and answers with what it left behind.
+    """Runs a flow's entry point and answers with what it left behind.
 
-    With its own directory importable while it runs, and only while: a flowverse is a
-    directory of flows and whatever they import beside them, and a flow that reaches for the
-    file next to it is reaching for something that came with it. Put back afterwards, since
-    what a flow imports is not something the rest of this process should be able to.
+    With its own directory importable while it runs, and only while: a flow is a directory of
+    what it needs, and one that reaches for the module next to it is reaching for something
+    that came with it. The directory the flows are in is importable too, for what a flowverse
+    keeps beside them for all of them. Put back afterwards, since what a flow imports is not
+    something the rest of this process should be able to.
+
+    Run each time rather than cached: a flow rewritten while a run is going is the flow that
+    runs next, which is what lets a flow -- or an agent driving one -- rewrite it and go on.
 
     Args:
-      where_: The Python file, already resolved.
+      where_: The flow: its directory, or the Python file to run outright.
 
     Returns:
-      Everything the file defined, by name.
+      Everything running it defined, by name.
     """
+    where_ = os.path.join(where_, ENTRY) if os.path.isdir(where_) else where_
     beside = os.path.dirname(os.path.abspath(where_))
-    sys.path.insert(0, beside)
+    among = os.path.dirname(beside)
+    sys.path[:0] = [beside, among]
     try:
         return runpy.run_path(str(where_))
     finally:
-        with contextlib.suppress(ValueError):
-            sys.path.remove(beside)
+        for one in (beside, among):
+            with contextlib.suppress(ValueError):
+                sys.path.remove(one)
 
 
 def held(where_: str | os.PathLike[str]) -> list[Flow]:
     """Every flow one file holds: its own first, and the rest as it declares them.
 
     Args:
-      where_: The Python file. It is run to be read, so whatever it does as it is imported
-        happens here.
+      where_: The flow -- its directory, or the file to read outright. It is run to be read,
+        so whatever it does as it is imported happens here.
 
     Returns:
       One per function it marked with :func:`flow`, the one it marked with no name first --
@@ -213,7 +257,9 @@ def _flows_of(inside: dict[str, Any]) -> list[Flow]:
         # The file's own docstring where the flow it holds says nothing: a file that is one
         # flow is documented as that flow, and its first line is what it does.
         if not marked.name and not marked.about:
-            marked = Flow(name="", about=_first(inside.get("__doc__")))
+            marked = Flow(
+                name="", about=_first(inside.get("__doc__")), skills=marked.skills
+            )
         said.append(marked)
     return [one for one in said if not one.name] + [one for one in said if one.name]
 
@@ -249,18 +295,63 @@ def found() -> list[Offer]:
     for verse in flowverses():
         listed.extend(offers(verse))
     for whose, folder in where:
-        for path in sorted(glob(os.path.join(os.path.expanduser(folder), "*.py"))):
-            base = os.path.basename(path)
-            # The same test `find` applies, or the two disagree: a directory or a broken link
-            # named like a flow would be listed as one and then not be there when it was
-            # picked.
-            if base.startswith("_") or not os.path.isfile(path):
+        for base in offered(Path(os.path.expanduser(folder))):
+            # The same test `find` applies, or the two disagree: a directory with no entry
+            # point in it would be listed as a flow and then not be there when it was picked.
+            at_ = entry(Path(os.path.expanduser(folder)), base)
+            if at_ is None:
                 continue
             called = os.path.join(folder, base)
-            listed.extend(
-                Offer(whose, one, said) for one, said in _named(Path(path), called)
-            )
+            listed.extend(Offer(whose, one, said) for one, said in _named(at_, called))
     return listed
+
+
+def entry(under: Path, name: str) -> Path | None:
+    """The file to run for the flow of that name in one directory of flows.
+
+    A flow is a module, and there are two shapes of one: a directory with an `__init__.py` in
+    it -- which is what a flow that brings skills or imports what came with it has to be --
+    and a single `.py` file, which is what a flow that is one function still is. The directory
+    wins where both are there, being the one that says most about itself.
+
+    Args:
+      under: The directory the flows are in.
+      name: The flow, by the name it is offered under.
+
+    Returns:
+      The path to run, or None where there is no such flow.
+    """
+    beside = under / name / ENTRY
+    if beside.is_file():
+        return beside
+    alone = under / f"{name}.py"
+    return alone if alone.is_file() else None
+
+
+def offered(under: Path) -> list[str]:
+    """Every flow in one directory of flows, by the name each is offered under.
+
+    Args:
+      under: The directory the flows are in, which may not be there at all.
+
+    Returns:
+      One name apiece, alphabetically and without repeating a name that is there both ways.
+      A name starting with an underscore is not a flow but something the flows beside it
+      import; nor is a directory with no entry point in it. Nothing at all where there is no
+      such directory.
+    """
+    found_: list[str] = []
+    try:
+        held = sorted(under.iterdir())
+    except OSError:
+        return []
+    for path in held:
+        name = path.name.removesuffix(".py")
+        if name.startswith("_") or name in found_:
+            continue
+        if (path / ENTRY).is_file() or (path.is_file() and path.suffix == ".py"):
+            found_.append(name)
+    return found_
 
 
 def offers(one: Flowverse) -> list[Offer]:
@@ -274,26 +365,27 @@ def offers(one: Flowverse) -> list[Offer]:
       one: The flowverse.
 
     Returns:
-      One per flow, by file, alphabetically: `<flowverse>/<flow>`, except for the flows
-      humanize ships, which are called by a bare name. A file that holds several names each of
-      them, `<file>:<inside>` apiece, and a file that holds none is not among them -- a
-      directory of flows has files beside them that are not one.
+      One per flow, by directory, alphabetically: `<flowverse>/<flow>`, except for the flows
+      humanize ships, which are called by a bare name. A flow that holds several names each of
+      them, `<flow>:<inside>` apiece, and a directory that holds none is not among them -- a
+      directory of flows has directories beside them that are not one.
 
       Nothing at all for a flowverse that has not been fetched, which is not the same answer as
       one that holds nothing, and is why :class:`Flowverse` says which it is.
 
     Note:
-      Reading a flow means running it, so every file in the directory the flowverse holds its
-      flows in is imported to find out what it holds -- and nothing outside it, which is what
-      that directory is for. Whoever added it is trusting that repository with this machine;
-      this is where that trust is spent.
+      Reading a flow means running it, so the entry point of every flow in the directory the
+      flowverse holds its flows in is run to find out what it holds -- and nothing outside it,
+      which is what that directory is for. Whoever added it is trusting that repository with
+      this machine; this is where that trust is spent.
     """
-    from .verses import flows as inside
+    from .verses import flows
 
     return [
         Offer(one.name, name if one.name == BUILTIN else f"{one.name}/{name}", said)
-        for base in inside(one)
-        for name, said in _named(holds(one) / f"{base}.py", base)
+        for base in flows(one)
+        if (at_ := entry(holds(one), base)) is not None
+        for name, said in _named(at_, base)
     ]
 
 
@@ -356,40 +448,62 @@ def _split(named_: str) -> tuple[str, str]:
 
 
 def find(named_: str) -> str:
-    """Where the flow called this is.
+    """Where the entry point of the flow called this is.
 
     Args:
       named_: A flow's name -- `ralph_loop`, `official/rlar`, `humanize1:gen-plan` -- or the
-        path to a file taken as given, which is what a flow of your own is called, `~` and all.
+        path to a flow taken as given, which is what a flow of your own is called, `~` and
+        all: its directory, or the file to run outright.
 
     Returns:
       The path to run: the flow the flowverse named holds, else the nearest flow of that
-      name, else the file the path names -- and `named_` itself if nothing answers to it, so
+      name, else what the path names -- and `named_` itself if nothing answers to it, so
       that whatever named it hears about it. Resolved, since a flow is free to change the
       working directory the name was resolved against.
     """
-    at, _ = _split(named_)
-    whose, _, rest = at.partition("/")
+    at_, _ = _split(named_)
+    whose, _, rest = at_.partition("/")
     if rest:
         # Named outright -- `official/rlar` -- which is the one spelling that says which
         # flowverse, and so the one that cannot be stood in for by a flow of your own.
         for verse in flowverses():
-            beside = holds(verse) / f"{rest}.py"
-            if whose == verse.name and beside.is_file():
+            beside = entry(holds(verse), rest)
+            if whose == verse.name and beside is not None:
                 return str(beside.resolve())
     else:
         # Nearest wins: this project, then yours, then whatever there is to run -- so a flow
         # of your own may stand in for one of humanize's by taking its name.
         for _, folder in where:
-            beside_ = os.path.join(os.path.expanduser(folder), f"{at}.py")
-            if os.path.isfile(beside_):
+            beside_ = entry(Path(os.path.expanduser(folder)), at_)
+            if beside_ is not None:
                 return os.path.realpath(beside_)
         for verse in flowverses():
-            beside = holds(verse) / f"{at}.py"
-            if beside.is_file():
+            beside = entry(holds(verse), at_)
+            if beside is not None:
                 return str(beside.resolve())
-    said = os.path.expanduser(at)
-    return os.path.realpath(said) if os.path.isfile(said) else at
+    # A path taken as given: the flow's directory, or the file itself for whoever points at
+    # one outright -- a flow being written, a file a test wrote out.
+    said = os.path.expanduser(at_)
+    if os.path.isfile(os.path.join(said, ENTRY)):
+        return os.path.realpath(os.path.join(said, ENTRY))
+    return os.path.realpath(said) if os.path.isfile(said) else at_
+
+
+def at(named_: str) -> str:
+    """The flow's own directory, which is where what it brings with it lives.
+
+    Args:
+      named_: A flow's name, as :func:`find` takes it.
+
+    Returns:
+      The directory its `__init__.py` is in, and "" for a name nothing answers to -- and for
+      a flow that is a single file, which has no directory of its own: what is beside such a
+      flow is the other flows, and none of it came with this one.
+    """
+    found_ = find(named_)
+    if not os.path.isfile(found_) or os.path.basename(found_) != ENTRY:
+        return ""
+    return os.path.dirname(found_)
 
 
 def inside(named_: str) -> str:
@@ -407,3 +521,51 @@ def inside(named_: str) -> str:
 def _first(said: str | None) -> str:
     """The first line of a docstring, which is what a flow says about itself in a list."""
     return (said or "").strip().splitlines()[0].strip() if said else ""
+
+
+def fork(named_: str, into: str | os.PathLike[str] | None = None) -> str:
+    """Copies one flow into this project's own, to be changed however you like.
+
+    A flow is a directory, which is what makes this a copy rather than a rewrite: the entry
+    point, whatever it imports beside it and the `skills/` it brings all come across, and what
+    lands is a flow of yours under the name it already had. Yours are looked in first, so from
+    then on that name means the copy -- `official/rlar` forked is `rlar`, and `-f rlar` runs
+    what you have since made of it.
+
+    Which is the way to change a flow at all: a flowverse is somebody else's repository and is
+    fetched again over whatever was written into it, so an edit made there is an edit that
+    goes away the next time it is fetched.
+
+    Args:
+      named_: The flow to copy, by the name it is offered under.
+      into: Where to put it, defaulting to this project's own flows.
+
+    Returns:
+      The directory it was copied to.
+
+    Raises:
+      ValueError: If there is no such flow, or there is already one of that name there --
+        which is a copy to edit, run or take away rather than one to write over.
+    """
+    import shutil
+
+    found_ = find(named_)
+    if not os.path.isfile(found_):
+        raise ValueError(f"there is no flow called {named_} to copy")
+    beside = os.path.dirname(found_)
+    whole = os.path.basename(found_) == ENTRY
+    name = os.path.basename(beside) if whole else os.path.basename(found_)
+    mine = os.path.expanduser(str(into) if into is not None else where[0][1])
+    at_ = os.path.join(mine, name)
+    if os.path.exists(at_) or os.path.exists(at_.removesuffix(".py")):
+        raise ValueError(f"there is already a flow of your own at {at_}")
+    os.makedirs(mine, exist_ok=True)
+    if whole:
+        # The whole directory: what a flow is made of travels with it, which is what makes a
+        # copy of one a flow rather than half of one.
+        shutil.copytree(beside, at_)
+    else:
+        # A flow that is one file is copied as one: a flow is a module, and this is the
+        # shape that module has.
+        shutil.copy2(found_, at_)
+    return at_

@@ -16,7 +16,7 @@ import pytest
 from hmz.agents import AgentConfig, Stopped
 from hmz.cycle import cycles, opened
 from hmz.runner import Runner
-from tests.stubs import ShellAgent
+from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -46,17 +46,17 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
 ) -> None:
     """The whole of it: what was run, by whom, at what, and every session that came of it."""
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "flow.py").write_text(FLOW)
+    written(tmp_path, "flow", FLOW)
     agents = [
         ShellAgent(CONFIG, name="actor"),
         ShellAgent(CONFIG, name="reviewer"),
     ]
 
-    Runner(tmp_path / "flow.py", agents).run("go")
+    Runner(tmp_path / "flow", agents).run("go")
 
     (cycle,) = cycles()
     began, *held, ended = _lines(cycle)
-    assert began["flow"] == str(tmp_path / "flow.py")
+    assert began["flow"] == str(tmp_path / "flow")
     assert began["task"] == "go"
     assert began["workspace"] == str(tmp_path.resolve())
     assert began["agents"] == [
@@ -89,10 +89,10 @@ def test_a_second_run_is_a_second_cycle(
 ) -> None:
     """A cycle is a run and not a workspace: running the flow again is another run."""
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "flow.py").write_text(FLOW)
+    written(tmp_path, "flow", FLOW)
 
     for _ in range(2):
-        Runner(tmp_path / "flow.py", [ShellAgent(CONFIG), ShellAgent(CONFIG)]).run("go")
+        Runner(tmp_path / "flow", [ShellAgent(CONFIG), ShellAgent(CONFIG)]).run("go")
 
     assert len(cycles()) == 2
 
@@ -102,16 +102,18 @@ def test_a_run_that_was_interrupted_says_so(
 ) -> None:
     """Esc ends a flow, and a cycle that ended that way is not one that finished."""
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "flow.py").write_text(
+    written(
+        tmp_path,
+        "flow",
         "from hmz.agents import AgentBase, Stopped\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    raise Stopped("stopped")\n'
+        '    raise Stopped("stopped")\n',
     )
 
     with pytest.raises(Stopped):
-        Runner(tmp_path / "flow.py", [ShellAgent(CONFIG)]).run("go")
+        Runner(tmp_path / "flow", [ShellAgent(CONFIG)]).run("go")
 
     (cycle,) = cycles()
     assert _lines(cycle)[-1]["how"] == "stopped"
@@ -122,16 +124,18 @@ def test_a_run_that_failed_says_so(
 ) -> None:
     """A turn that failed takes the flow with it, and the cycle says how it went."""
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "flow.py").write_text(
+    written(
+        tmp_path,
+        "flow",
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    agents[0].new()("exit 3")\n'
+        '    agents[0].new()("exit 3")\n',
     )
 
     with pytest.raises(subprocess.CalledProcessError):
-        Runner(tmp_path / "flow.py", [ShellAgent(CONFIG)]).run("go")
+        Runner(tmp_path / "flow", [ShellAgent(CONFIG)]).run("go")
 
     (cycle,) = cycles()
     assert _lines(cycle)[-1]["how"] == "failed"
@@ -144,9 +148,9 @@ def test_the_cycles_of_one_workspace_are_not_another_workspace_s(
     here, there = tmp_path / "here", tmp_path / "there"
     for where in (here, there):
         where.mkdir()
-        (where / "flow.py").write_text(FLOW)
+        written(where, "flow", FLOW)
     monkeypatch.chdir(here)
-    Runner(here / "flow.py", [ShellAgent(CONFIG), ShellAgent(CONFIG)]).run("go")
+    Runner(here / "flow", [ShellAgent(CONFIG), ShellAgent(CONFIG)]).run("go")
 
     assert len(cycles(here)) == 1
     assert cycles(there) == []

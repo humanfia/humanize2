@@ -65,11 +65,16 @@ repository you have just cloned is never run until you ask what is in it. See
 | **←** **→** | Step between the places flows come from, a list apiece — every flowverse, then `local` and `user` |
 | **a** | Add one: a URL or an `owner/repo`, and a name to keep it under |
 | **r** | Fetch the one being read again, or for the first time |
+| **f** | Copy the flow under the cursor into `.humanize/flows/`, to change |
 | **d** **d** | Take an added one away, flows and all |
 
 Those keys are there rather than in a menu of their own because that is the moment you find out
-that the flow you want is in a flowverse you have not added, or that the one you have is out of
-date. A fetch runs off the interface's own loop — it keeps drawing while it clones — and what
+that the flow you want is in a flowverse you have not added, that the one you have is out of
+date, or that the flow is *nearly* what you want -- which is what **f** is for. A flow is a
+directory, so the copy is the whole of it, skills and all, and it lands under the name it
+already had: yours are looked in first, so from then on that name means your copy. Editing a
+flowverse's own copy would not keep, since fetching it again takes what that repository says
+now. A fetch runs off the interface's own loop — it keeps drawing while it clones — and what
 became of it is said under the list rather than thrown at you. Opening the menu fetches
 whatever has never been fetched, in the background and without moving what you are reading, so
 `r` is for fetching one *again*.
@@ -80,12 +85,12 @@ whatever has never been fetched, in the background and without moving what you a
 
 | | |
 | --- | --- |
-| `.humanize/flows/*.py` | this project's own |
-| `~/.humanize/flows/*.py` | yours, in every project |
+| `.humanize/flows/*/` | this project's own |
+| `~/.humanize/flows/*/` | yours, in every project |
 | — | the ones humanize ships, and every flowverse there is |
 
 Nearest wins, so a flow of your own may stand in for one of humanize's by taking its name: a
-`.humanize/flows/chat.py` is what `-f chat` runs *in that project*.
+`.humanize/flows/chat/__init__.py` is what `-f chat` runs *in that project*.
 
 What a flow is **called** is a separate question:
 
@@ -93,8 +98,8 @@ What a flow is **called** is a separate question:
 | --- | --- |
 | `chat` | one humanize ships |
 | `official/rlar` | one a flowverse holds — the one spelling nothing can stand in for |
-| `.humanize/flows/chat.py` | this project's own |
-| `~/.humanize/flows/chat.py` | yours, in every project |
+| `.humanize/flows/chat` | this project's own |
+| `~/.humanize/flows/chat` | yours, in every project |
 
 So yours is listed *beside* humanize's rather than instead of it, and what each was
 [set up to run](/features/settings) is remembered apart.
@@ -134,7 +139,7 @@ Add it with **a** in `/flow`, or clone it into `~/.humanize/flowverses/<name>/` 
 There is a [tutorial](/guide/tutorial-flowverse).
 
 ::: danger Adding one is trusting that repository with this machine
-A flow is a Python file, and reading one means **running** it. Listing what a flowverse holds
+A flow is Python, and reading one means **running** it. Listing what a flowverse holds
 imports every file in its `flows/`. Add the ones you would clone and run. See
 [Security](/guide/security).
 :::

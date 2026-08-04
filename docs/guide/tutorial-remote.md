@@ -121,7 +121,7 @@ The same thing from a flow: give the agent's config an anchored machine, and its
 with no other change.
 
 ```python
-# .humanize/flows/onbox.py
+# .humanize/flows/onbox/__init__.py
 """Build on the box, review here."""
 
 from typing import Annotated, NamedTuple

@@ -12,10 +12,13 @@ from typing import TYPE_CHECKING
 
 from hmz.agents import AgentBase, CommandSessionBase
 from hmz.coganchor import AnchorConfig
+from hmz.flows import ENTRY
+from hmz.flows.skills import SKILLS
 
 if TYPE_CHECKING:
     import os
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
+    from pathlib import Path
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -71,3 +74,27 @@ class ShellSession(CommandSessionBase):
 class ShellAgent(AgentBase):
     def new(self, cwd: str | os.PathLike[str] | None = None) -> ShellSession:
         return ShellSession(self, cwd)
+
+
+def written(
+    under: Path, name: str, source: str, skills: Mapping[str, str] | None = None
+) -> Path:
+    """Writes one flow out the way a flow is laid out: a directory, and what is in it.
+
+    Args:
+      under: Where the flows are kept -- a flowverse's `flows/`, a `.humanize/flows`, or a
+        directory a test is pointing at outright.
+      name: What the flow is called, which is the directory it goes in.
+      source: The flow itself, which goes in its `__init__.py`.
+      skills: The skills it brings, as one `SKILL.md` per skill by the name each goes under.
+
+    Returns:
+      The flow's own directory.
+    """
+    at = under / name
+    at.mkdir(parents=True, exist_ok=True)
+    (at / ENTRY).write_text(source)
+    for called, said in (skills or {}).items():
+        (at / SKILLS / called).mkdir(parents=True, exist_ok=True)
+        (at / SKILLS / called / "SKILL.md").write_text(said)
+    return at

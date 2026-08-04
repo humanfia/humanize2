@@ -25,8 +25,8 @@ Three things to know before pointing one at a repository you care about. Each is
 [Security](https://docs.humanfia.ai/guide/security):
 
 - humanize runs every agent with **permission prompts disabled**, and nothing turns them back on.
-- **A flow is a Python file, and reading one means running it**, so adding a flowverse is trusting
-  that repository with this machine.
+- **A flow is a directory of Python, and reading one means running it**, so adding a flowverse
+  is trusting that repository with this machine.
 - **An `hmz anchor` port is equivalent to a shell on that machine.**
 
 ## Install

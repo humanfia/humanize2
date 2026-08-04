@@ -30,7 +30,7 @@ my-flowverse/
 | one file may hold several | `@flow(name="…")`, run as `<flow>:<name>` |
 
 ```python
-# flows/review.py
+# flows/review/__init__.py
 """Review the current diff and write the findings to REVIEW.md."""
 
 from hmz.agents import AgentBase
@@ -134,7 +134,7 @@ Whoever adds your flowverse is trusting it with their machine. Earn it:
 
 ## The one thing to be honest about
 
-::: danger A flow is a Python file, and reading one means running it
+::: danger A flow is Python, and reading one means running it
 Listing what a flowverse holds **imports every file in its `flows/`**. Somebody adding yours is
 trusting that repository with their machine, exactly as installing a package is.
 

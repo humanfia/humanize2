@@ -53,7 +53,7 @@ async def test_the_menu_lists_what_has_been_written_down(
     Templates().keep(
         [
             Kept("reviewer", Runs("claude/claude-opus-5:max")),
-            Kept("cheap", Runs("claude/claude-opus-5:high", "", None, "read-only")),
+            Kept("cheap", Runs("claude/claude-opus-5:high", "", "read-only")),
         ]
     )
     app = Humanize()
@@ -163,7 +163,7 @@ async def test_a_flow_imports_a_copy_rather_than_a_link(
         [
             Kept(
                 "reviewer",
-                Runs("claude/claude-opus-5:max", "", ("one",), "read-only"),
+                Runs("claude/claude-opus-5:max", "", "read-only"),
             )
         ]
     )
@@ -196,9 +196,9 @@ async def test_a_flow_imports_a_copy_rather_than_a_link(
         await keeps(app, driver)
         await keeps(app, driver)
 
-    assert app._models == [Runs("claude/claude-opus-5:high", "", ("one",), "read-only")]
+    assert app._models == [Runs("claude/claude-opus-5:high", "", "read-only")]
     assert Templates().all()[0].runs == Runs(
-        "claude/claude-opus-5:max", "", ("one",), "read-only"
+        "claude/claude-opus-5:max", "", "read-only"
     )
 
 

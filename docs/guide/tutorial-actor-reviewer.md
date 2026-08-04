@@ -12,7 +12,7 @@ must not.
 A fixed-length tuple says *how many*. A `NamedTuple` says what each one is **for**:
 
 ```python
-# .humanize/flows/pair.py
+# .humanize/flows/pair/__init__.py
 """One agent builds; a fresh one reads its work and says what is wrong."""
 
 from typing import NamedTuple

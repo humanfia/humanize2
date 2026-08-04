@@ -9,7 +9,7 @@
 ## Step 1 — declare a person among the agents
 
 ```python
-# .humanize/flows/pairing.py
+# .humanize/flows/pairing/__init__.py
 """An agent and you, taking turns."""
 
 from typing import NamedTuple

@@ -23,6 +23,7 @@ from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 from hmz.coganchor import AnchorConfig
 from hmz.machines import AnchoredConfig
 from tests.coganchor.conftest import VIRTUAL_WORKSPACE
+from tests.stubs import written
 from tests.tracing.conftest import labels
 
 if TYPE_CHECKING:
@@ -220,7 +221,9 @@ def test_one_flow_runs_two_agents_of_one_cli_as_two_accounts(
         provider = providers.add("claude", named, way="login")
         (provider.at / "home" / ".credentials.json").write_text(f'"{named}"')
 
-    (workspace / "flow.py").write_text(
+    written(
+        workspace,
+        "flow",
         """
 import json
 from pathlib import Path
@@ -232,7 +235,7 @@ from hmz.flows import flow
 @flow
 def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     Path("said.json").write_text(json.dumps([agent(task) for agent in agents]))
-"""
+""",
     )
     agents = [
         ClaudeCodeAgent(
@@ -241,7 +244,7 @@ def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
         for named in ("subscription", "gateway")
     ]
 
-    Runner(workspace / "flow.py", agents).run("who are you")
+    Runner(workspace / "flow", agents).run("who are you")
 
     assert reading.loads((workspace / "said.json").read_text()) == [
         '"subscription"',

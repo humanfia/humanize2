@@ -1,6 +1,6 @@
 # What humanize is
 
-humanize runs **flows**: Python files that drive one or more coding agents in a loop, and write
+humanize runs **flows**: directories of Python that drive one or more coding agents in a loop, and write
 down everything they did so it can be read back afterwards.
 
 It does not talk to a model provider. It drives the coding agent CLI you already have — `claude`,

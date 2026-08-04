@@ -24,12 +24,13 @@ print(drives("official/rlar"))   # ('actor', 'reviewer')
 
 A `HumanAgent` place does **not** count — nobody chooses what the person runs.
 
-### `<flow>: no Python file to read a flow from`
+### `<flow>: no flow to read: a flow is a directory with an __init__.py in it`
 
-`-f` named something that is not there. A name is looked for in `.humanize/flows`, then
-`~/.humanize/flows`, then among the ones humanize ships and every
-[flowverse](/reference/flows.md#flowverses) fetched here; anything with an extension in it, or a slash
-that is not a flowverse's, is taken as a path. See [where flows live](/reference/flows.md#where-flows-live).
+`-f` named something that is not there, or a directory with no flow in it. A name is looked
+for in `.humanize/flows`, then `~/.humanize/flows`, then among the ones humanize ships and
+every [flowverse](/reference/flows.md#flowverses) fetched here; anything with a slash that is
+not a flowverse's is taken as a path. See
+[where flows live](/reference/flows.md#where-flows-live).
 
 ### `the official flowverse has not been fetched yet`
 

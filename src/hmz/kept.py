@@ -1,7 +1,8 @@
 """What an agent is, written down, and the ones written down under a name.
 
-An agent is a CLI, an account, a model at an effort, the skills it is loaded with, what it may
-do and the machine its work lands on. That is worth saying once and reaching for from every
+An agent is a CLI, an account, a model at an effort, what it may do and the machine its work
+lands on -- and not the skills it carries, which are its CLI's own. That is worth saying once
+and reaching for from every
 flow that wants one like it, so the ones said under a name are a file of humanize's own --
 not a workspace's, since none of that is a thing about the project it happens to be working
 in, and not any flow's, since a flow that imports one takes a copy rather than a link.
@@ -37,8 +38,6 @@ class Runs(NamedTuple):
     Attributes:
       spec: The agent itself, as `cli/model:effort` -- the same word a command line takes.
       anchor: The machine its work lands on, as a target, or "" to work on this one.
-      skills: The skills of its CLI it is to have, by name, or None for the CLI as it comes
-        -- which is every skill it finds.
       permission: What it may do without being asked, as one of `hmz.agents.PERMISSIONS`,
         or "" for the one an agent nobody has been asked about runs at.
       provider: The account its turns run as, by the name a provider of its CLI was made
@@ -49,7 +48,6 @@ class Runs(NamedTuple):
 
     spec: str
     anchor: str = ""
-    skills: tuple[str, ...] | None = None
     permission: str = ""
     provider: str = ""
     goals: bool = True
@@ -81,17 +79,15 @@ def written(runs: Runs) -> dict[str, Any]:
       runs: What the agent is.
 
     Returns:
-      Its fields, less any that says nothing -- an agent that works here, was never asked
-      about skills, may do whatever an agent nobody was asked about may do, and runs as this
-      machine is signed in is one every field of which is the field's own silence.
+      Its fields, less any that says nothing -- an agent that works here, may do whatever an
+      agent nobody was asked about may do, and runs as this machine is signed in is one every
+      field of which is the field's own silence.
     """
     cli, _, rest = runs.spec.partition("/")
     model, _, effort = rest.rpartition(":")
     held: dict[str, Any] = {"cli": cli, "model": model, "effort": effort}
     if runs.anchor:
         held["anchor"] = runs.anchor
-    if runs.skills is not None:
-        held["skills"] = list(runs.skills)
     if runs.permission:
         held["permission"] = runs.permission
     if runs.provider:
@@ -116,18 +112,13 @@ def read_back(held: dict[str, Any], *, goals: bool = True) -> Runs | None:
     cli, model, effort = held.get("cli"), held.get("model"), held.get("effort")
     if not (cli and model and effort):
         return None
-    # An entry that says nothing about skills is an agent nobody has been asked about, which
-    # is its CLI as it comes rather than an agent with none; one that says nothing about what
-    # it may do runs at what such an agent has always run at; one that names no account runs
-    # as this machine is signed in.
-    having = held.get("skills")
+    # An entry that says nothing about what it may do runs at what an agent nobody has been
+    # asked about has always run at; one that names no account runs as this machine is signed
+    # in. A `skills` an older file holds is the CLI's own business now, and is read past.
     said = held.get("goals")
     return Runs(
         f"{cli}/{model}:{effort}",
         str(held.get("anchor") or ""),
-        tuple(str(one) for one in cast("list[Any]", having))
-        if isinstance(having, list)
-        else None,
         str(held.get("permission") or ""),
         str(held.get("provider") or ""),
         said if isinstance(said, bool) else goals,

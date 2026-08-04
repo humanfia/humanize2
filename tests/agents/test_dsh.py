@@ -142,14 +142,12 @@ def sdk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 def configured(
     *,
     permission: str = "bypass",
-    skills: tuple[str, ...] | None = None,
     provider: str = "",
 ) -> DshAgentConfig:
     return DshAgentConfig(
         model="deepseek-v4-flash",
         effort="high",
         permission=permission,
-        skills=skills,
         provider=provider,
     )
 
@@ -382,15 +380,6 @@ def test_permissions_the_sdk_cannot_enforce_are_refused() -> None:
     agent = DshAgent(configured(permission="read-only"))
 
     with pytest.raises(ValueError, match="permission must be 'bypass'"):
-        agent("work")
-
-    assert Harness.made == []
-
-
-def test_an_explicit_skill_selection_the_sdk_cannot_enforce_is_refused() -> None:
-    agent = DshAgent(configured(skills=("review",)))
-
-    with pytest.raises(ValueError, match="does not support selecting skills"):
         agent("work")
 
     assert Harness.made == []

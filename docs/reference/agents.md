@@ -36,23 +36,44 @@ name the interface shows. The classes keep the product's own full name.
 
 ## When an account goes down
 
-An account can be marked as the one to fall back to: `/providers`, cursor on it, then **f**.
 A key gets revoked, a gateway starts refusing, a subscription runs out of quota — and what a
-flow would otherwise see is a turn that failed.
+flow would otherwise see is a turn that failed. Two things happen first, and both are said on
+the account rather than on the agent: it is the account that goes down, and whichever agent
+was running under one when it did is the agent that needs somewhere else to run.
 
-With one marked, a turn whose own account fails is run again under it, on the **same**
-conversation: the session is the backend's own and is named by an id, so the other account
-picks it up where the first left off. The agent stays there for every turn after — an account
-that has gone down is not one to try again each turn — and an account that fails twice raises,
-because a fallback that failed is not somewhere to go.
+**It is tried again.** An account says how many times over a failed turn is taken again, how
+long to wait between tries, and how long the whole of that may go on for:
 
-The mark is on the account rather than on the agent: it is the account that goes down, and
-whichever agent was running under one when it did is the agent that needs somewhere else to
-run. Only one account per backend is marked, since a fallback is where a turn goes and two of
-them is two places. It is written down beside the account, so it outlives the run.
+```sh
+hmz providers retry claude/mine -n 3 -p exponential-jitter -t 120
+```
 
-What the failed attempt already put on the transcript stays there — it is how somebody reading
-it finds out the account went down and the turn was run again somewhere else.
+Nothing is retried by default — a turn is taken once, as it always was — because a prompt the
+model refused is the same refusal every time, and only you know which of your accounts fails
+the other way. The waits are the ones everybody uses: `none`, `constant`, `linear`,
+`exponential`, `exponential-jitter` (full jitter, which is what keeps a flow's agents from all
+coming back on the same second) and `fibonacci`.
+
+**Then the chain moves on.** Each account names the one to carry on under when it has failed,
+and that one names the next:
+
+```sh
+hmz providers falls-back claude/subscription key
+hmz providers falls-back claude/key gateway
+```
+
+so a subscription that runs out falls to a key, and a key that is refused falls to a gateway.
+`/providers`, cursor on the account, then **f** asks the same thing, and **t** asks how it is
+tried again.
+
+It all happens on the **same** conversation: the session is the backend's own and is named by
+an id, so the account it moves to picks it up where the last one left off. The agent stays
+there for every turn after — an account that has gone down is not one to try again each turn —
+and the last failure of the last account in the chain is what the turn raises. A chain that
+comes round on itself ends at the second sight of an account.
+
+What the failed attempts already put on the transcript stay there — it is how somebody reading
+it finds out the account went down, how many times it was tried, and where the turn went next.
 
 ## A CLI of your own
 
@@ -97,7 +118,7 @@ It also offers `deepseek-v4-pro`. The SDK and bundled runtime are currently a de
 preview; humanize supports `deepseek-harness-sdk>=0.1.0rc6,<0.2`.
 
 A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land), the
-[skills it is loaded with](#which-skills-an-agent-is-loaded-with),
+[skills it carries](#the-skills-an-agent-carries),
 [what it may do](#what-an-agent-may-do), [which account it runs as](#which-account-it-runs-as),
 and nothing else. It is frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
@@ -696,7 +717,7 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 | A turn held to a shape | `--json-schema` | in the prompt | `outputSchema` | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt |
 | Sub-agents in a trace | no | yes | yes | no | no | yes | no | no | no |
 
-DeepSeek Harness currently accepts only `permission="bypass"` and `skills=None`. Its preview
+DeepSeek Harness currently accepts only `permission="bypass"`. Its preview
 SDK exposes neither a per-session sandbox/approval control nor exact per-agent skill selection;
 another value is rejected before the runtime starts rather than silently ignored.
 
@@ -798,42 +819,31 @@ actually asks before it acts and waits for the answer, so it is the one where a 
 [`PERMISSION_REQUEST`](#hooks) can refuse something and have the agent hear it. Claude Code
 and Codex both run that moment; the rest have nothing to hang it on.
 
-## Which skills an agent is loaded with
+## The skills an agent carries
 
-A config's `skills` names the skills of its CLI this agent is to **have**:
-
-```python
-ClaudeCodeAgentConfig(model=…, effort=…, skills=("code-review", "run"))
-```
-
-`None` — the default — is the CLI as it comes, which is every skill it finds. A tuple is
-exactly those and nothing else, whatever is installed afterwards. It is a setting of the
-agent, so two agents of one flow may be loaded differently, and neither touches the settings
-of the CLI itself.
-
-Every backend is told the other way round — a CLI comes with its skills loaded and has to be
-talked out of one — so what actually goes on the wire is the rest of them, worked out by
-looking at what is installed:
+**A skill installed on this machine is its CLI's own.** humanize does not switch one off, does
+not write the CLI's settings, and has no per-agent list of them: what you installed is what
+every agent of that CLI carries, installed and switched off where that CLI keeps them. The
+list is readable — the [`/agents` sheet](/reference/tui.md#what-each-agent-carries) shows what
+an agent will be carrying — and that is all it is:
 
 ```python
-from hmz.agents.skills import leaving, skills
+from hmz.agents.skills import skills
 
-skills("claude")                       # what it would load here: yours, and this project's
-leaving("claude", ("code-review",))    # what to switch off so that only that one is left
+skills("claude")   # what it would load here: yours, and this project's
 ```
 
-| Backend | How it is told | What it comes to |
-| --- | --- | --- |
-| `claude` | `--disallowedTools "Skill(<name>)"` | the agent is refused the skill. Claude still lists it — no flag takes one off that list |
-| `codex` | `-c skills.config=[{name="<name>", enabled=false}]` on its app server | the skill is not loaded for that server, and the user's own `config.toml` is untouched |
-| `dsh` | — | the preview SDK cannot select an exact skill set; `skills` must be `None` |
-| `kimi` | — | `kimi web` takes no `--skills-dir`, so a skill it finds is one it loads |
-| `pi` | — | it is told which skills to load by path, and finds none of its own to choose between |
-| `opencode`, `mimo` | — | neither offers a way of switching one off for a single run |
+What humanize *does* add is [the skills a flow brings](/reference/flows.md#the-skills-a-flow-brings).
+Those are mounted onto every session the flow's agents open — copied where that backend reads
+a project's own skills for as long as the session lives, and taken away again after:
 
-Where each CLI keeps them is written down in `hmz.backends`; nothing is asked of the CLI
-itself, for the reason nothing else is either. The interface asks which to have on the
-[`/agents` sheet](/reference/tui.md#what-each-agent-is-loaded-with).
+| Backend | Where a flow's skills are mounted |
+| --- | --- |
+| `claude` | `.claude/skills/` in the workspace |
+| `codex`, `grok`, `qwen` | `.agents/skills/`, the directory more than one of these agreed to read |
+| `agy`, `dsh`, `kimi`, `mimo`, `opencode`, `pi` | — none: they carry what their CLI installs |
+
+A project's own skill of that name wins: a flow does not write over what the project keeps.
 
 ## Where the turns land
 
@@ -888,7 +898,7 @@ class AgentBase:
 
     id: str                 # what this agent is called
     backend: str            # "claude", "codex", "kimi", "pi", …
-    config: AgentConfig     # model, effort, machine, skills, permission, provider
+    config: AgentConfig     # model, effort, machine, permission, provider
     opened: list[str]       # the backend's id for every session it ever opened
     sessions: list[SessionBase]
     stopped: bool

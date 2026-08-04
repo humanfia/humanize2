@@ -19,8 +19,9 @@ import pytest
 
 from hmz.agents import PERMISSIONS, AgentConfig
 from hmz.cli import main
+from hmz.flows import ENTRY
 from hmz.runner import NotAFlow, Runner
-from tests.stubs import ShellAgent
+from tests.stubs import ShellAgent, written
 
 #: A flow that drives nothing and writes down what it was handed, next to its own file. AGENTS
 #: is filled in per test: what a flow declares there is how many agents it takes.
@@ -618,30 +619,30 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     for where in (home / ".humanize/flows", project / ".humanize/flows"):
         where.mkdir(parents=True)
     mine = RECORD.replace("AGENTS", "AgentBase")
-    (home / ".humanize/flows/yours.py").write_text(mine)
-    (project / ".humanize/flows/theirs.py").write_text(mine)
-    (project / ".humanize/flows/chat.py").write_text(mine)  # a name humanize uses
+    written(home / ".humanize/flows", "yours", mine)
+    written(project / ".humanize/flows", "theirs", mine)
+    written(project / ".humanize/flows", "chat", mine)  # a name humanize uses
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.chdir(project)
 
     listed = found()
 
     named = [(one.whose, one.name) for one in listed]
-    assert ("local", ".humanize/flows/theirs.py") in named
-    assert ("user", "~/.humanize/flows/yours.py") in named
+    assert ("local", ".humanize/flows/theirs") in named
+    assert ("user", "~/.humanize/flows/yours") in named
     # Both, under names of their own: one is not offered as if it were the other.
-    assert ("local", ".humanize/flows/chat.py") in named
+    assert ("local", ".humanize/flows/chat") in named
     assert ("builtin", "chat") in named
     # `-f` still takes a bare name, and the nearest flow answering to it is what runs.
-    assert find("chat") == str((project / ".humanize/flows/chat.py").resolve())
-    assert find("yours") == str((home / ".humanize/flows/yours.py").resolve())
-    assert find("ralph_loop").endswith("src/hmz/flows/builtin/ralph_loop.py")
+    assert find("chat") == str((project / ".humanize/flows/chat" / ENTRY).resolve())
+    assert find("yours") == str((home / ".humanize/flows/yours" / ENTRY).resolve())
+    assert find("ralph_loop").endswith(f"src/hmz/flows/builtin/ralph_loop/{ENTRY}")
     # And it takes what the list calls one, which is a path, `~` and all.
-    assert find("~/.humanize/flows/yours.py") == str(
-        (home / ".humanize/flows/yours.py").resolve()
+    assert find("~/.humanize/flows/yours") == str(
+        (home / ".humanize/flows/yours" / ENTRY).resolve()
     )
-    assert find(".humanize/flows/theirs.py") == str(
-        (project / ".humanize/flows/theirs.py").resolve()
+    assert find(".humanize/flows/theirs") == str(
+        (project / ".humanize/flows/theirs" / ENTRY).resolve()
     )
     assert find("nowhere") == "nowhere"  # a path is taken as given
 
@@ -652,8 +653,8 @@ def test_a_flow_of_your_own_runs_by_name(
     """The point of finding it: `-f theirs` starts it, with no path said anywhere."""
     project = tmp_path / "project"
     (project / ".humanize/flows").mkdir(parents=True)
-    (project / ".humanize/flows/theirs.py").write_text(
-        RECORD.replace("AGENTS", "AgentBase")
+    written(
+        project / ".humanize/flows", "theirs", RECORD.replace("AGENTS", "AgentBase")
     )
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.chdir(project)

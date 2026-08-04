@@ -14,7 +14,7 @@ library as well as a menu.
 already have:
 
 ```python
-# .humanize/flows/planned.py
+# .humanize/flows/planned/__init__.py
 """Plan it with humanize1, then build it three rounds."""
 
 from hmz.agents import AgentBase

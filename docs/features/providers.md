@@ -104,6 +104,8 @@ hmz providers ways <cli>             # how that backend can be signed into
 hmz providers add <cli>/<name>       # make one: -w <way>, -s VAR=VALUE, --no-login
 hmz providers login <cli>/<name>     # sign an existing one in again
 hmz providers show <cli>/<name>      # what it holds — never what the values are
+hmz providers falls-back <cli>/<name> [<name>]   # which account a failed turn carries on under
+hmz providers retry <cli>/<name> -n 3 -p exponential-jitter -t 120
 hmz providers remove <cli>/<name>    # take it away, credentials and all
 ```
 
@@ -135,7 +137,9 @@ sets:
 | --- | --- |
 | **enter** or **a** | Make one: which CLI, then how to sign in, then what that way asks |
 | **l** | Sign the one under the cursor in again |
-| **r** | Take it away, credentials and all |
+| **f** | Say which account a turn under this one carries on under when it fails |
+| **t** | Say how a failed turn under it is tried again: how many tries, which wait, how long |
+| **d** **d** | Take it away, credentials and all |
 
 Nothing here is refused while a flow is running. An agent reads the account it was configured
 with **once**, so one made or taken away now is one the next run sees.
@@ -154,3 +158,27 @@ flow is started, before any turn has run.
 - [Tutorial: two accounts of one CLI](/guide/tutorial-providers)
 - [Providers reference](/reference/providers)
 - [CLI › `hmz providers`](/reference/cli#hmz-providers)
+
+## When one goes down
+
+An account says what happens when it is the one that fails, and both halves are written down
+beside it rather than on any agent: it is the account that goes down, and whichever agent was
+running under one when it did is the agent that needs somewhere else to run.
+
+**Tried again.** How many times over, how long to wait between tries, and how long the whole
+of it may go on for. Nothing is retried by default — a prompt the model refused is the same
+refusal every time, and only you know which of your accounts fails the other way. The waits
+are the ones everybody uses: `none`, `constant`, `linear`, `exponential`, `exponential-jitter`
+and `fibonacci`.
+
+**Then the chain.** Each account names the one to carry on under, and that one names the next:
+
+```sh
+hmz providers falls-back claude/subscription key
+hmz providers falls-back claude/key gateway
+```
+
+A turn walks it inside the conversation that was running — the session is the backend's own
+and is named by an id, so the next account picks it up where the last left off — and the agent
+stays where it landed. See
+[Agents › When an account goes down](/reference/agents#when-an-account-goes-down).

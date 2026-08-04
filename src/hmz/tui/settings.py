@@ -63,10 +63,9 @@ class Settings:
             written before goal selection was stored; with none, goals default on.
 
         Returns:
-          One `cli/model:effort` apiece with the machine it was anchored to, the skills it is
-          loaded with, what it may do without being asked and the account it ran as, in the
-          order the flow takes them, and nothing at all for a flow this workspace has not
-          run.
+          One `cli/model:effort` apiece with the machine it was anchored to, what it may do
+          without being asked and the account it ran as, in the order the flow takes them,
+          and nothing at all for a flow this workspace has not run.
         """
         flows: dict[str, Any] = self._mine().get("flows") or {}
         kept: dict[str, Any] = flows.get(flow) or {}

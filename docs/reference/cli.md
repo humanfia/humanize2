@@ -116,7 +116,7 @@ hmz exec -f official/flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-
 hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only "$(cat TASK.md)"
 hmz exec -f official/flame_chase -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
-hmz exec -f ./flows/mine.py -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
+hmz exec -f ./flows/mine -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
 hmz exec -f ralph_loop -a pi/openai-codex/gpt-5.5:high "$(cat TASK.md)"
 hmz exec -f ralph_loop -a opencode/opencode/big-pickle:high "$(cat TASK.md)"
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high -- "--force is not a flag here"
@@ -290,14 +290,14 @@ being set up, a CI job, or anywhere the interface is not open.
 ```
 hmz agents list [-q|--quiet]
 hmz agents show <name>
-hmz agents add <name> <cli>[@<provider>]/<model>:<effort> [-s|--skill <name>]... [--anchor <target>] [--no-goals] [--force]
+hmz agents add <name> <cli>[@<provider>]/<model>:<effort> [--anchor <target>] [--no-goals] [--force]
 hmz agents remove <name>
 ```
 
 | Line | |
 | --- | --- |
 | `list` | Every one written down, by name and by what it runs. `-q` prints just the names, one a line, for a script to read. |
-| `show <name>` | What one of them is: its CLI, its model at an effort, the account it runs as, what it may do, where it works, and what it is loaded with. |
+| `show <name>` | What one of them is: its CLI, its model at an effort, the account it runs as, what it may do, and where it works. Its skills are its CLI's own and are not written down here. |
 | `add <name> <agent>` | Writes one down. The agent is spelled exactly as [`-a`](#hmz) spells one, so `claude@work/claude-opus-5:high` names the account too, and the written-out form may name a permission rung. |
 | `remove <name>` | Takes it away. |
 
@@ -310,7 +310,7 @@ that means it. Naming no command at all lists them.
 
 ```sh
 hmz agents add reviewer codex@work/gpt-5.6-sol:high --no-goals
-hmz agents add builder claude/claude-opus-5:max -s testing -s docs
+hmz agents add builder claude/claude-opus-5:max --anchor ssh://build-box
 hmz agents list -q
 ```
 
@@ -329,6 +329,8 @@ hmz providers ways <cli>
 hmz providers add <cli>/<name> [-w|--way <way>] [-s|--set VAR=VALUE]... [--no-login]
 hmz providers login <cli>/<name> [-s|--set VAR=VALUE]...
 hmz providers show <cli>/<name>
+hmz providers falls-back <cli>/<name> [<name>]
+hmz providers retry <cli>/<name> [-n|--tries <n>] [-p|--policy <policy>] [-t|--timeout <seconds>]
 hmz providers remove <cli>/<name>
 ```
 
@@ -341,7 +343,9 @@ command at all lists them.
 | `ways <cli>` | How that backend can be signed into: each way, what it asks for, and what it runs. |
 | `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first, which is `login`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. |
 | `login <cli>/<name>` | Signs an existing one in again, by the way it was made with, and asks it again what it runs. Takes the same `-s`. |
-| `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, the names of the variables it sets, and which paths a turn under it is given instead of which. |
+| `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, what it falls back to, how it is tried again, the names of the variables it sets, and which paths a turn under it is given instead of which. |
+| `falls-back <cli>/<name> [<name>]` | Says which account of that CLI a turn carries on under when this one fails, or, with nothing after it, that this one is the end of the line. Each account naming the next is what makes a chain. |
+| `retry <cli>/<name>` | Says how a failed turn under it is tried again before the chain moves on: `-n` how many times over, `-p` how long to wait between tries (`none`, `constant`, `linear`, `exponential`, `exponential-jitter`, `fibonacci`), `-t` the longest the whole of it may go on for. Nothing is retried by default. |
 | `remove <cli>/<name>` | Takes it away, credentials and all. |
 
 Whatever a way asks that the line did not answer is asked at the terminal, and a secret is not
@@ -359,6 +363,8 @@ what they are.
 hmz providers add claude/anthropic -w login
 hmz providers add claude/deepseek -w gateway -s ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
 hmz providers ways codex
+hmz providers falls-back claude/anthropic deepseek
+hmz providers retry claude/anthropic -n 3 -p exponential-jitter -t 120
 hmz providers show claude/deepseek
 hmz providers remove claude/deepseek
 ```
@@ -403,8 +409,9 @@ A backend home that does not exist is skipped rather than being an error.
 | `.humanize/<datetime>.trace.json` | `hmz collect` | The trace. Relative to the current directory, not to the workspace named. |
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
 | `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** | A [flowverse](/features/flowverses.md), cloned. Every flow in it is offered as `<name>/<flow>`. |
-| `.humanize/flows/*.py` | you | This project's own flows. |
-| `~/.humanize/flows/*.py` | you | Your flows, in every project. |
+| `~/.humanize/skills/<owner>-<repo>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows.md#the-skills-a-flow-brings), cloned. Fetched again the next time a run asks for it. |
+| `.humanize/flows/*/` | you | This project's own flows. |
+| `~/.humanize/flows/*/` | you | Your flows, in every project. |
 
 `~/.humanize` is `$HUMANIZE_HOME` where that is set. The directories are made by whatever writes
 into them.

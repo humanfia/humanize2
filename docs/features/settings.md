@@ -5,9 +5,9 @@ Opening the interface again in the same project finds it set up the way you left
 What is remembered:
 
 - the flow that was last run there;
-- for **each** flow that workspace has run — what each of its agents was running, where its turns
-  landed, which [skills](/features/skills) it was loaded with, which
-  [account](/features/providers) it ran as, and [what it may do](/features/permissions);
+- for **each** flow that workspace has run — what each of its agents was running, where its
+  turns landed, which [account](/features/providers) it ran as, and
+  [what it may do](/features/permissions);
 - and how the flow itself was [set up](/reference/tui#setting-a-flow-up).
 
 ## Why it is kept per flow

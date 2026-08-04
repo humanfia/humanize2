@@ -132,7 +132,7 @@ list appears under the editor with a line about each.
 | --- | --- | --- |
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one. The first page is shut while a flow is running; the second never is. Nothing lands until you save on the way out. |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
-| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, corrected, signed in again, marked as a fallback, taken away. |
+| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, corrected, signed in again, pointed at what it falls back to, taken away. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
@@ -404,7 +404,7 @@ enter opens one. Everything that agent is is a row of one sheet:
     3. provider     as local ▸                 the account those turns run as
     4. model        claude-opus-5 ▸            which of that CLI's models it runs
     5. effort       high                       how hard it thinks
-    6. skills       every skill ▸              which of its CLI's skills it is loaded with
+    6. skills       as its CLI finds them ▸    what it will be carrying, which its CLI keeps
     7. permission   bypass                     what it may do without being asked
     8. goals        on                         whether the backend's own goals are available
     9. where        this machine ▸             the machine its work lands on
@@ -414,7 +414,7 @@ enter opens one. Everything that agent is is a row of one sheet:
 ```
 
 One sheet rather than a walk of three, because an agent is one thing: a CLI, an account, a
-model at an effort, a set of skills, a rung of what it may do and a machine its work lands on.
+model at an effort, a rung of what it may do and a machine its work lands on.
 A walk meant that changing the effort of an agent already set up was four keypresses through two
 sheets with nothing to say.
 
@@ -538,27 +538,26 @@ Two agents of one flow may work on two machines, since it is a setting of the ag
 that cannot be read, and an agent pointed somewhere by a flow that does not say it may be, are
 both red lines when the flow is started, before any turn has run.
 
-## What each agent is loaded with
+## What each agent carries
 
-The `skills` row asks which of that CLI's skills this agent is to have. Until it is answered the
-row reads `every skill`, which is how a CLI comes.
+The `skills` row reads `as its CLI finds them`, and opening it is a reading rather than a
+choice:
 
 ```
-   ❯ 1. [✔] code-review    Review the current diff… (yours)
-     2. [ ] dataviz        Use this skill whenever you… (yours)
-     3. [✔] housekeeping   Tidies the tree (this project)
+     1. code-review    Review the current diff… (yours)
+     2. dataviz        Use this skill whenever you… (yours)
+     3. housekeeping   Tidies the tree (this project)
+
+   These are claude's own: add one, or switch one off, where claude keeps them
 ```
 
 The skills are found where the CLI itself looks — yours and this project's, read for the name
 and the line each describes itself with — and nothing is asked of the CLI, which would mean
-starting it. Every box starts ticked, which is how a CLI comes. **Space** switches the one
-under the cursor, enter takes the lot, and esc leaves the agent loaded as it was.
+starting it. **Nothing here changes any of them.** A skill installed on this machine is that
+CLI's own, and what a person installed is not something a flow is entitled to rewrite.
 
-What it answers with is the skills the agent **has**, so an agent that has been asked has
-exactly those from then on. It is a setting of the agent, so the reviewer reading a change
-need not be carrying what the builder writing it was. What each backend does with it, and what
-a CLI with no way of being told anything does, is in
-[Agents](/reference/agents.md#which-skills-an-agent-is-loaded-with).
+What a run adds to that is [the skills the flow brings](/reference/flows.md#the-skills-a-flow-brings),
+mounted onto every session its agents open and taken away again after.
 
 ## The accounts themselves
 
@@ -579,13 +578,14 @@ variables it sets. Their names, never a value: this is drawn where somebody can 
 | **enter** | Corrects what the one under the cursor holds, by the way it was made with |
 | **a** | Makes one: which CLI, then how to sign in, then what that way asks |
 | **l** | Signs the one under the cursor in again, by the way it was made with |
-| **f** | Marks it as where a turn goes when the account it was running under fails |
+| **f** | Says which account a turn under this one carries on under when it fails |
+| **t** | Says how a failed turn under it is tried again: how many tries, which wait, how long |
 | **d** **d** | Takes it away, credentials and all |
 | **c** | Adds a CLI of your own that speaks ACP, for accounts to be made against |
 | **esc** | Closes the menu, asking about anything it is holding |
 
-Taking one away, marking one as a fallback and correcting what one holds are **held until the
-menu is saved**. Making one and signing one in are not: both own the terminal while they run,
+Taking one away, saying where it falls back to, saying how it is tried again and correcting
+what one holds are **held until the menu is saved**. Making one and signing one in are not: both own the terminal while they run,
 and something that has already happened is not a draft.
 
 Making one is three questions rather than one form, because each is only answerable once the one
@@ -652,7 +652,7 @@ and the flow's own model says which combinations it will not take — so a flow 
 
 Opening the interface again in the same project finds it set up the way you left it: the flow
 that was last run there, for each flow that workspace has run, what each of its agents was
-running, where its turns landed, which skills it was loaded with and which account it ran as —
+running, where its turns landed and which account it ran as —
 and how the flow itself was set up.
 
 Kept per flow — by the name humanize's own flows have, and by the path yours have, so a flow of
@@ -687,5 +687,5 @@ would be a guess about the background it lands on.
 - **Guess at a bad line.** A line it cannot carry out is shown and the interface stays up. Only
   `/exit` closes it.
 - **Ask the flow anything.** What is drawn beside and under the transcript is kept from the
-  turns going past. A flow is a Python file that may branch any way it likes, so that is the
+  turns going past. A flow is Python that may branch any way it likes, so that is the
   only place a run is ever visible.

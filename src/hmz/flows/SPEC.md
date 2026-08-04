@@ -6,15 +6,27 @@
 .
 ├── __init__.py
 ├── builtin
+├── skills.py
 └── verses.py
 ```
 
-What a flow is called, where it is found, and which of the ones a file holds was asked for.
-Nothing here runs one: `hmz.runner` does that, and reads a name through this.
+What a flow is called, where it is found, which of the ones it holds was asked for, and what
+it brings with it. Nothing here runs one: `hmz.runner` does that, and reads a name through
+this.
+
+A flow MUST be a module, and there MUST be two shapes of one: a directory with an
+`__init__.py` in it -- beside whatever it imports and a `skills/` of the skills it works by --
+and a single `.py` file, which is what a flow that is one function still is. The directory MUST
+win a name a file also uses, being the one that says most about itself.
+
+Everything a flow needs MUST live inside its own directory, so that a flow can be copied,
+forked and edited whole: a flow whose parts are elsewhere is a flow with a hole in it wherever
+it is copied to. A flow that is a single file therefore brings no skills -- what is beside it
+is the other flows, and none of it came with that one.
 
 ## `builtin/`
 
-The flows humanize itself ships: a directory of `.py` files and nothing else.
+The flows humanize itself ships: a directory of flows and nothing else.
 
 - Its flows MUST be read where they stand rather than from a `flows/` inside it. A fetched
   flowverse needs that directory to tell its flows from the repository around them; there is
@@ -33,6 +45,7 @@ The flows humanize itself ships: a directory of `.py` files and nothing else.
 class Flow:
     name: str = ""
     about: str = ""
+    skills: tuple[str, ...] = ()
 
 
 class Offer(NamedTuple):
@@ -42,7 +55,12 @@ class Offer(NamedTuple):
 
 
 def flow[**P, T](
-    call: Callable[P, T] | None = None, /, *, name: str = "", about: str = ""
+    call: Callable[P, T] | None = None,
+    /,
+    *,
+    name: str = "",
+    about: str = "",
+    skills: Iterable[str] = (),
 ) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 
@@ -50,6 +68,9 @@ def loaded(where_: str | os.PathLike[str]) -> dict[str, Any]: ...
 
 
 def held(where_: str | os.PathLike[str]) -> list[Flow]: ...
+
+
+def at(named_: str) -> str: ...
 
 
 def offers(one: Flowverse) -> list[Offer]: ...
@@ -67,12 +88,13 @@ def inside(named_: str) -> str: ...
 def about(named_: str) -> str: ...
 ```
 
-- A flow MUST be a function marked with `flow`, and nothing else MUST be one: a file is read by
-  running it, and which of the functions it leaves behind is a flow is the file's to say rather
-  than something to read off a name. One file MAY hold several: `flow` with no name MUST be the
-  flow that file holds under its own name, and `flow(name=...)` MUST be one of its own, called
-  `<file>:<name>` -- so that three phases of one thing are one thing to write and three to run,
-  each asking only for the agents it drives and only for the settings it takes.
+- A flow MUST be a function marked with `flow`, and nothing else MUST be one: a flow is read by
+  running its entry point, and which of the functions that leaves behind is a flow is the
+  flow's to say rather than something to read off a name. One flow MAY hold several: `flow`
+  with no name MUST be the one it holds under its directory's own name, and `flow(name=...)`
+  MUST be one of its own, called `<flow>:<name>` -- so that three phases of one thing are one
+  thing to write and three to run, each asking only for the agents it drives and only for the
+  settings it takes.
 - `flow` MUST mark rather than wrap. A flow is called the way it always was, and a decorator
   between the flow and whatever reads its arguments would be a decorator that has to answer for
   them. What it marks with MUST travel on the function, since a file is read by running it.
@@ -83,13 +105,18 @@ def about(named_: str) -> str: ...
 - What a flow says about itself MUST be the first line of its docstring where the decorator was
   not told one, and for a file that is one flow MUST fall back to the file's own docstring: a
   file that is one flow is documented as that flow.
+- A name MUST resolve to the `__init__.py` of the directory called that, else to the `.py`
+  file called that. A path given outright MAY be either.
 - A flow MUST be found by name: the ones humanize ships and the ones a flowverse holds by a
   bare name, one of yours by its path. Nearest MUST win -- this project's flows, then yours,
   then whatever there is to run -- so that a project may mean its own `chat` by `chat`. A name
   qualified by a flowverse MUST be that flowverse's, and MUST NOT be stood in for.
-- A file MUST be run to be read, with its own directory importable while it runs and only
-  while: a flowverse is a directory of flows and whatever they import beside them, and what a
-  flow imports is not something the rest of the process should be able to.
+- A flow MUST be run to be read, with its own directory and the directory the flows are in
+  importable while it runs and only while: what a flow imports is not something the rest of
+  the process should be able to.
+- It MUST be run afresh each time it is read or run, and MUST NOT be cached: a flow rewritten
+  between two runs of it -- by hand, or by an agent it is itself driving -- MUST be run as it
+  is now. That is what makes a flow, and the skills it brings, a thing a run can improve.
 - Reading what a file holds MUST answer with nothing for a file that will not run: it is asked
   while a list is being drawn, and a file that will not import is one line of that list rather
   than the end of it.
@@ -131,12 +158,21 @@ def remove(name: str) -> bool: ...
 
 
 def flows(one: Flowverse) -> list[str]: ...
+
+
+def clone(url: str, at: Path) -> None: ...
+
+
+def refresh(at: Path) -> None: ...
 ```
 
 - A flowverse MUST be a git repository with a `flows/` directory in it, cloned into
   `~/.humanize/flowverses/<name>/`, and every flow in it MUST be offered under that name. A
-  file whose name starts with an underscore MUST NOT be one of them: it is what the flows
-  beside it import.
+  directory with no entry point in it, or one whose name starts with an underscore, MUST NOT
+  be one of them: it is what the flows beside it import.
+- Fetching a repository MUST be written down once and reached for by everything that fetches
+  one -- a flowverse, and a repository of skills a flow named -- so that a clone and a fetch
+  mean the same thing whichever asked for it.
 - Only that directory MUST be read for flows, and a fetched flowverse with none MUST hold
   none. A repository is a repository -- a README, a pyproject, a test suite, whatever sets the
   tests up -- and reading a flow means running it, so what is run MUST be what somebody put
@@ -165,3 +201,34 @@ def flows(one: Flowverse) -> list[str]: ...
 - Where a flowverse came from MUST be read without interpolation. A `%` in a URL is ordinary --
   a percent-encoded password, or a path with one in it -- and reading it as the start of a
   substitution would raise where every listing of the flowverses passes.
+
+## `skills.py`
+
+```python
+def brought(at: Path | str, declared: Iterable[str] = ()) -> list[Loaded]: ...
+
+
+def cached(url: str) -> Path: ...
+
+
+def fetched(url: str) -> Path: ...
+```
+
+The skills a flow works by: the ones in its own `skills/`, and the ones it named that live
+somewhere else. Nothing here installs anything, and nothing here mounts anything -- what a
+session does with them is `hmz.agents.skills`.
+
+- A flow's own skills MUST be the `skills/` inside it, read as a directory apiece each holding
+  a `SKILL.md`, which is the layout every one of these CLIs already reads a skill in. A flow
+  MUST NOT have to declare them: they are in it, and looking is what finds them.
+- A skill that lives somewhere else MUST be named where the flow is declared, as a git URL
+  anything can clone with an optional `#<skill>` saying which of that repository's `skills/*`
+  is wanted. Without one, every skill that repository holds MUST be brought.
+- Such a repository MUST be cloned under humanize's own home and fetched again the next time a
+  run asks for it, so that a skill somebody else maintains is a skill that keeps up -- and one
+  already fetched MUST go on working when the network is down.
+- The flow's own MUST win a name a repository also uses: a fork that edited a skill meant the
+  edited one.
+- A repository that cannot be fetched at all MUST stop the run where the flow is got ready
+  rather than at the first turn: a flow that works by a skill it has not got is not a flow to
+  start and find out about an hour in.

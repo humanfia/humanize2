@@ -128,7 +128,7 @@ highlighted. The full list is in the [TUI reference](/reference/tui.md).
 ## 3. Put a loop under it
 
 Talking to one agent is not the shape of most work. A **flow** is what you reach for once it
-is not: a Python file that drives one or more agents in a loop.
+is not: a directory of Python that drives one or more agents in a loop.
 
 Type `/flow` to pick one by name. Try
 `ralph_loop` — a fresh session every turn, so the agent starts from the task and the repository
@@ -175,7 +175,7 @@ DEEPSEEK_API_KEY=sk-… hmz exec -f ralph_loop \
 ```
 
 It also offers `deepseek-v4-pro` and the efforts `max`, `high` and `off`. Its current preview
-SDK only supports the default `permission=bypass` and `skills=None`; see
+SDK only supports the default `permission=bypass`; see
 [Agents › What each backend can do](/reference/agents.md#what-each-backend-can-do).
 
 With a key account called `deepseek` instead, name that account after `@`:
@@ -223,9 +223,8 @@ view of a long run that fits on a screen.
 
 ## Write a flow of your own
 
-A flow is a Python file with a function marked `@flow` in it, taking the agents and the task.
-Put this in
-`.humanize/flows/twice.py`:
+A flow is a directory whose `__init__.py` has a function marked `@flow` in it, taking the
+agents and the task. Put this in `.humanize/flows/twice/__init__.py`:
 
 ```python
 """Two passes: do the work, then read it back and fix what is wrong."""

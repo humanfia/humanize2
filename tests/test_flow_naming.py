@@ -14,16 +14,16 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import AgentConfig
-from hmz.flows import about, find, flow, found, held, inside
+from hmz.flows import ENTRY, about, find, flow, found, held, inside
 from hmz.runner import NotAFlow, Runner, configures, drives, wanted
-from tests.stubs import ShellAgent
+from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 CONFIG = AgentConfig(model="m", effort="high")
 
-#: A file that is two flows beside each other, neither of them the file's own.
+#: A flow that is two flows beside each other, neither of them the directory's own.
 THREE = '''"""Three phases of one thing, which are three things to run."""
 
 from typing import NamedTuple
@@ -117,10 +117,8 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 
 
 def _written(tmp_path: Path, source: str, name: str = "three") -> str:
-    """Writes a flow file out and answers with its path."""
-    where = tmp_path / f"{name}.py"
-    where.write_text(source)
-    return str(where)
+    """Writes a flow out as a flow is -- a directory -- and answers with its path."""
+    return str(written(tmp_path, name, source))
 
 
 def test_a_file_says_which_flows_it_holds_and_what_each_one_does(
@@ -178,15 +176,14 @@ def test_each_flow_in_a_file_is_offered_under_its_own_name(
     """`<file>:<name>`, which is what makes three of them three things to choose between."""
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     project = tmp_path / "project"
-    (project / ".humanize/flows").mkdir(parents=True)
-    (project / ".humanize/flows/three.py").write_text(THREE)
+    written(project / ".humanize/flows", "three", THREE)
     monkeypatch.chdir(project)
 
     listed = [(one.name, one.about) for one in found() if one.whose == "local"]
 
     assert listed == [
-        (".humanize/flows/three.py:gen-idea", "Opens a loose idea into a draft."),
-        (".humanize/flows/three.py:build", "builds it, under review"),
+        (".humanize/flows/three:gen-idea", "Opens a loose idea into a draft."),
+        (".humanize/flows/three:build", "builds it, under review"),
     ]
 
 
@@ -194,9 +191,9 @@ def test_which_one_was_asked_for_is_the_half_after_the_colon(tmp_path: Path) -> 
     where = _written(tmp_path, THREE)
 
     assert inside(f"{where}:gen-idea") == "gen-idea"
-    assert inside(where) == ""  # the one a file holds under its own name
-    # The file is the other half, and a path is still a path whatever is after it.
-    assert find(f"{where}:gen-idea") == where
+    assert inside(where) == ""  # the one a flow holds under its own name
+    # The flow is the other half, and a path is still a path whatever is after it.
+    assert find(f"{where}:gen-idea") == f"{where}/{ENTRY}"
 
 
 def test_each_of_them_asks_only_for_its_own_agents_and_settings(
@@ -287,3 +284,40 @@ def test_a_flow_a_file_holds_beside_its_own_is_reached_the_same_way(
     assert (
         len(agent.opened) == 2
     )  # the one that opens two sessions, not the one that opens one
+
+
+def test_a_flow_that_is_one_file_is_a_flow_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A flow is a module, and a single `.py` is one: it brings no skills, and runs."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    project = tmp_path / "project"
+    (project / ".humanize/flows").mkdir(parents=True)
+    (project / ".humanize/flows/alone.py").write_text(ONE)
+    monkeypatch.chdir(project)
+
+    assert find("alone") == str((project / ".humanize/flows/alone.py").resolve())
+    assert [one.name for one in found() if one.whose == "local"] == [
+        ".humanize/flows/alone"
+    ]
+    assert drives("alone") == ("",)
+    agent = ShellAgent(CONFIG)
+    Runner("alone", [agent]).run("echo alone")
+    assert agent.opened
+
+
+def test_a_directory_wins_a_name_a_file_also_uses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The one that says most about itself: a flow with a `skills/` cannot be a file."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    project = tmp_path / "project"
+    written(project / ".humanize/flows", "both", ONE)
+    (project / ".humanize/flows/both.py").write_text(UNMARKED)
+    monkeypatch.chdir(project)
+
+    assert find("both") == str((project / ".humanize/flows/both" / ENTRY).resolve())
+    # And it is offered once rather than twice, under the one name it has.
+    assert [one.name for one in found() if one.whose == "local"] == [
+        ".humanize/flows/both"
+    ]

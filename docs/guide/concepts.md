@@ -97,7 +97,8 @@ A turn is the unit that:
 
 ## Flow
 
-**A Python file with a function marked `@flow` in it, taking the agents and the task.** It is
+**A directory whose `__init__.py` has a function marked `@flow` in it, taking the agents and
+the task, beside the skills it brings.** It is
 the loop: what each agent is asked, in what order, and when to stop.
 
 ```python
@@ -201,7 +202,7 @@ It works on sessions no flow ever drove, too — a trace of yesterday's `claude`
 ```
 cycle ─── one run of one flow, written down
   │
-flow ──── the loop, a Python file
+flow ──── the loop, a directory of Python
   │
   ├── agent "builder"  ── backend + model + effort + machine
   │     ├── session ── turn, turn, turn …      ─┐

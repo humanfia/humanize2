@@ -23,7 +23,7 @@ from hmz.tui import Humanize
 from hmz.tui.app import _PINNED
 from hmz.tui.monitor import short
 from hmz.tui.selecting import Transcript
-from tests.stubs import ShellAgent, ShellSession
+from tests.stubs import ShellAgent, ShellSession, written
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -99,7 +99,7 @@ async def _running(app: Humanize, driver: Pilot[None]) -> None:
     Which is a flow between two turns, or one inside a sleep of its own -- the moment a line
     has nowhere to go but the queue.
     """
-    app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
+    app._flow_named, app._models = "flow", [Runs("claude/m:high")]
     app._agents = [ShellAgent(CONFIG)]
     app._queued = []
     await driver.pause()
@@ -115,7 +115,7 @@ def waiting(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     fake.chmod(0o755)
     monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    (tmp_path / "flow.py").write_text(FLOW)
+    written(tmp_path, "flow", FLOW)
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -415,7 +415,7 @@ async def test_what_a_flow_that_ended_never_took_is_said_to_have_been_dropped(
     """
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "flow.py", [Runs("claude/m:high")]
+        app._flow_named, app._models = "flow", [Runs("claude/m:high")]
         await driver.press(*"the task")
         await driver.press("enter")
         await until(lambda: bool(app._agents), driver)

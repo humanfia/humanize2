@@ -24,7 +24,7 @@ The single most important thing. A Ralph loop is a `while True`, and a CI job ha
 Bound it three ways, and take whichever fires first:
 
 ```python
-# .humanize/flows/nightly.py
+# .humanize/flows/nightly/__init__.py
 """One pass over TASK.md, bounded by rounds and by the clock."""
 
 import time

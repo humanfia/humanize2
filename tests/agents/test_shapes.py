@@ -25,32 +25,8 @@ from hmz.agents import (
 
 if TYPE_CHECKING:
     import os
-    from pathlib import Path
 
 CONFIG = AgentConfig(model="m", effort="high")
-
-SKILL = """---
-name: {name}
-description: does a thing
----
-
-Do the thing.
-"""
-
-
-@pytest.fixture
-def installed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Two skills of your own and one this project keeps, where the CLI looks for them."""
-    for named in ("writing", "hf-cli"):
-        where = tmp_path / "claude-home" / "skills" / named
-        where.mkdir(parents=True)
-        (where / "SKILL.md").write_text(SKILL.format(name=named))
-    where = tmp_path / "project" / ".claude" / "skills" / "housekeeping"
-    where.mkdir(parents=True)
-    (where / "SKILL.md").write_text(SKILL.format(name="housekeeping"))
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude-home"))
-    monkeypatch.chdir(tmp_path / "project")
-    return tmp_path
 
 
 class Verdict(BaseModel):
@@ -159,35 +135,3 @@ def test_claude_is_held_to_the_shape_rather_than_asked_for_it() -> None:
     # The whole of what is asked: the fields, their types, and that there are no others.
     assert given["required"] == ["done", "notes"]
     assert given["additionalProperties"] is False
-
-
-def test_claude_is_refused_every_skill_this_agent_was_not_given(
-    installed: Path,
-) -> None:
-    """An agent says which skills it has; a CLI has to be told which it may not use.
-
-    So what goes on the command line is the rest of them, worked out from what is actually
-    installed -- one rule per skill, as the tool call it would be: a skill is a tool here.
-    """
-    plain = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high")).new()
-    assert (
-        "--disallowedTools" not in plain._command()
-    )  # never asked: the CLI as it comes
-
-    session = ClaudeCodeAgent(
-        ClaudeCodeAgentConfig(model="m", effort="high", skills=("writing",))
-    ).new()
-    argv = session._command()
-    assert (
-        argv[argv.index("--disallowedTools") + 1] == "Skill(hf-cli),Skill(housekeeping)"
-    )
-
-    # An agent given none is refused all of them, which is not the same as never being asked.
-    none = ClaudeCodeAgent(
-        ClaudeCodeAgentConfig(model="m", effort="high", skills=())
-    ).new()
-    argv = none._command()
-    assert (
-        argv[argv.index("--disallowedTools") + 1]
-        == "Skill(hf-cli),Skill(writing),Skill(housekeeping)"
-    )

@@ -12,7 +12,7 @@ different here from the first glance.
 
 ## Where it comes from
 
-Nothing asks the flow what it is doing. A flow is a Python file that may branch any way it
+Nothing asks the flow what it is doing. A flow is Python that may branch any way it
 likes, so there is nothing to ask. What `/status` draws is kept from **the turns going past** —
 the same `begins`/`ends` events any
 [watcher](/reference/agents#watching-a-turn-as-it-happens) sees.

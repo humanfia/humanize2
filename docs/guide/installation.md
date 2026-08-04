@@ -130,7 +130,7 @@ DEEPSEEK_API_KEY=sk-… hmz exec -f ralph_loop \
 
 The other official model is `deepseek-v4-pro`; the efforts are `max`, `high` and `off`.
 The current SDK exposes no per-session permission or skill controls, so dsh agents must use
-the default `permission="bypass"` and `skills=None`.
+the default `permission="bypass"`.
 
 To run one CLI as **more than one** account at a time, that is
 [providers](/features/providers) — and it is a separate store, made with `hmz providers add`

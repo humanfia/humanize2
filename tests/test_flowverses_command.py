@@ -13,13 +13,16 @@ just cloned off the internet is not one to run unasked.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
 import pytest
 
 from hmz import cli, flows
+from hmz.flows import ENTRY
 from hmz.flows import verses as store
+from tests.stubs import written
 from tests.test_flowverses import FLOW
 
 if TYPE_CHECKING:
@@ -69,8 +72,8 @@ def theirs(tmp_path: Path) -> Path:
     """A repository of two flows and something they import, to be fetched from."""
     where = tmp_path / "theirs"
     (where / store.FLOWS).mkdir(parents=True)
-    (where / store.FLOWS / "loop.py").write_text(FLOW)
-    (where / store.FLOWS / "review.py").write_text(FLOW)
+    written(where / store.FLOWS, "loop", FLOW)
+    written(where / store.FLOWS, "review", FLOW)
     # Not a flow: what the flows beside it import, which is what the underscore means.
     (where / store.FLOWS / "_shared.py").write_text("HELD = 1\n")
     _git("init", "-b", "main", at=where)
@@ -126,7 +129,7 @@ def test_what_was_added_is_a_flow_the_rest_of_humanize_finds_by_name(
     """Which is the whole point of adding one: the line is a different way to the same store."""
     assert run("add", str(theirs), "mine") == 0
 
-    assert flows.find("mine/loop").endswith(f"mine/{store.FLOWS}/loop.py")
+    assert flows.find("mine/loop").endswith(f"mine/{store.FLOWS}/loop/{ENTRY}")
     assert [one.name for one in flows.found() if one.whose == "mine"] == [
         "mine/loop",
         "mine/review",
@@ -172,8 +175,8 @@ def test_every_name_shown_is_a_name_the_rest_of_humanize_offers(
     """
     where = tmp_path / "several"
     (where / store.FLOWS).mkdir(parents=True)
-    (where / store.FLOWS / "phases.py").write_text(MANY)
-    (where / store.FLOWS / "one.py").write_text(FLOW)
+    written(where / store.FLOWS, "phases", MANY)
+    written(where / store.FLOWS, "one", FLOW)
     # Beside the flows, and not one: it runs, and leaves no flow behind.
     (where / store.FLOWS / "conftest.py").write_text(
         '"""Sets their tests up, and is not a flow."""\n'
@@ -231,8 +234,8 @@ def test_fetching_again_takes_what_the_repository_now_holds(
 ) -> None:
     """A flowverse is a copy of somebody else's repository, so a fetch is what they now have."""
     assert run("add", str(theirs), "mine") == 0
-    (theirs / store.FLOWS / "nightly.py").write_text(FLOW)
-    (theirs / store.FLOWS / "review.py").unlink()
+    written(theirs / store.FLOWS, "nightly", FLOW)
+    shutil.rmtree(theirs / store.FLOWS / "review")
     _commit(theirs, "one more, one fewer")
     capsys.readouterr()
 
@@ -324,8 +327,10 @@ def _loud(tmp_path: Path) -> Path:
     where = tmp_path / "loud"
     (where / store.FLOWS).mkdir(parents=True)
     ran = tmp_path / "ran"
-    (where / store.FLOWS / "shouts.py").write_text(
-        f"import pathlib\n\npathlib.Path({str(ran)!r}).write_text('ran')\n"
+    written(
+        where / store.FLOWS,
+        "shouts",
+        f"import pathlib\n\npathlib.Path({str(ran)!r}).write_text('ran')\n",
     )
     _git("init", "-b", "main", at=where)
     _git("config", "user.email", "t@example.com", at=where)
@@ -457,7 +462,7 @@ def test_a_directory_that_is_not_a_clone_is_not_called_humanizes_own(
     """
     byhand = store.where("byhand") / store.FLOWS
     byhand.mkdir(parents=True)
-    (byhand / "one.py").write_text(FLOW)
+    written(byhand, "one", FLOW)
 
     assert run("list") == 0
 
@@ -475,7 +480,7 @@ def test_a_url_with_a_percent_in_it_does_not_stop_the_line(
     """A percent-encoded password is an ordinary URL, and every line here reads that URL."""
     where = tmp_path / "pct%40dir"
     (where / store.FLOWS).mkdir(parents=True)
-    (where / store.FLOWS / "one.py").write_text(FLOW)
+    written(where / store.FLOWS, "one", FLOW)
     _git("init", "-b", "main", at=where)
     _git("config", "user.email", "t@example.com", at=where)
     _git("config", "user.name", "t", at=where)

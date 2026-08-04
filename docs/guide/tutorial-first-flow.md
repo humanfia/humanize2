@@ -1,6 +1,6 @@
 # 6 · Write your first flow
 
-**Fifteen minutes.** A Python file with a loop in it, run by name from the command line and
+**Fifteen minutes.** A directory with a loop in it, run by name from the command line and
 offered in the interface.
 
 ::: tip Before you start
@@ -10,11 +10,11 @@ offered in the interface.
 ## Step 1 — write it
 
 ```sh
-mkdir -p .humanize/flows
+mkdir -p .humanize/flows/twice
 ```
 
 ```python
-# .humanize/flows/twice.py
+# .humanize/flows/twice/__init__.py
 """Two passes: do the work, then read it back and fix what is wrong."""
 
 from hmz.agents import AgentBase
@@ -159,10 +159,10 @@ one:
 
 | Lives at | Called |
 | --- | --- |
-| `.humanize/flows/twice.py` | `twice` in this project, or by path |
-| `~/.humanize/flows/twice.py` | `twice` in every project |
+| `.humanize/flows/twice/__init__.py` | `twice` in this project, or by path |
+| `~/.humanize/flows/twice/__init__.py` | `twice` in every project |
 | a [flowverse](/features/flowverses) | `<flowverse>/twice` |
-| anywhere else | its path: `-f ./flows/twice.py` |
+| anywhere else | its path: `-f ./flows/twice` |
 
 A name is looked for **nearest first**, so a flow of yours may stand in for one of humanize's by
 taking its name. A file whose name starts with `_` is not a flow.

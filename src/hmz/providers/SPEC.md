@@ -8,6 +8,7 @@
 ├── _trace.py
 ├── login.py
 ├── redirect.py
+├── retry.py
 └── store.py
 ```
 
@@ -32,6 +33,10 @@ class Provider:
     env: Mapping[str, str]
     args: tuple[str, ...]
     made: str
+    fallback: str
+    retries: int
+    policy: str
+    timeout: float
 
     @property
     def at(self) -> Path: ...
@@ -39,6 +44,17 @@ class Provider:
     def swaps(self) -> tuple[tuple[str, str], ...]: ...
 
     def command(self, argv: Sequence[str]) -> list[str]: ...
+
+
+def chain(provider: Provider) -> list[Provider]: ...
+
+
+def points(cli: str, name: str, at: str) -> bool: ...
+
+
+def retrying(
+    cli: str, name: str, retries: int, policy: str, timeout: float
+) -> bool: ...
 ```
 
 - One provider MUST be one directory, under `~/.humanize/providers/<cli>/<name>/`, holding what
@@ -57,6 +73,28 @@ class Provider:
   so that a turn under a provider still traces, still counts and still loads what is installed.
 - `swaps` MUST also answer the same path with the links in it followed, where that is a
   different spelling: a home reached through one is the same file under two names.
+- Where a turn goes when an account fails MUST be said on the account rather than on the
+  agent: it is the account that goes down, and whichever agent was running under one when it
+  did is the agent that needs somewhere else to run. It MUST be the name of another account of
+  that backend rather than a mark, so that each account names the next and what a turn walks
+  is a chain -- a subscription that runs out falling to a key, and a key that is refused
+  falling to a gateway.
+- A chain MUST be walked inside the session that was running: the conversation is the
+  backend's own and is named by an id, so it carries on under the next account rather than
+  being handed back to the flow as a failure. An agent that has moved MUST stay moved -- the
+  account that went down is not one to try again each turn.
+- A chain that comes round on itself MUST end at the second sight of an account, and one
+  naming an account that is not there MUST end there: either would otherwise be a run that
+  never stopped. A name that would point at itself, or at an account of that backend there is
+  none of, MUST be refused where it is written rather than found by the turn that needed it.
+- An account MUST also say how a turn under it is tried again before the chain moves on: how
+  many times over, how long to wait between tries and how long the whole of it may go on for.
+  Nothing MUST be retried by default -- a turn is taken once, as it always was -- since a
+  prompt the model refused is the same refusal every time and only the caller knows which of
+  its accounts fails the other way.
+- The waits MUST be the ones everybody uses under the names everybody uses them by, and none
+  MUST be invented here. The time an account was given MUST be checked before a wait rather
+  than after it, so that a turn is never started knowing it is already spent.
 
 ## `redirect.py` / `_trace.py`
 
@@ -120,3 +158,27 @@ def sign_in(
   writing its credentials file expects the directory it keeps its own in to be there.
 - Nothing here MUST print a secret. What was typed MUST NOT be echoed, and what is shown of a
   provider MUST be the names of the variables it sets and never their values.
+
+## `retry.py`
+
+```python
+@dataclass(frozen=True, slots=True)
+class Policy:
+    name: str
+    about: str
+
+
+POLICIES: tuple[Policy, ...]
+
+
+def waits(policy: str, attempt: int, base: float = BASE) -> float: ...
+```
+
+- What each policy is MUST be written down once, here, and MUST be the shapes every one of
+  these services documents: no wait, a constant one, a linear one, exponential backoff, that
+  with full jitter, and Fibonacci. A name that is not one of them MUST wait the way the
+  default does rather than not at all: a setting nobody recognises MUST NOT become a loop that
+  hammers whatever has just failed.
+- No single wait MUST be longer than a turn, however far the backoff has climbed.
+- The default MUST be exponential backoff with jitter, that being what keeps a flow's agents
+  from all coming back on the same second.

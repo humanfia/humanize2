@@ -20,6 +20,7 @@ from hmz.cli import main
 from hmz.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Catalogue, Clis
+from tests.stubs import written
 
 from .test_app import into_agent, keeps, onto, opens, rows, until
 
@@ -43,6 +44,7 @@ from typing import NamedTuple
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
+from tests.stubs import written
 
 
 class Agents(NamedTuple):
@@ -76,8 +78,8 @@ def flows(tmp_path: Path) -> Path:
     """Puts the flow where this project's own would be."""
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
-    (where / "here.py").write_text(HERE)
-    (where / "goals_off.py").write_text(GOALS_OFF)
+    written(where, "here", HERE)
+    written(where, "goals_off", GOALS_OFF)
     return where
 
 
@@ -116,7 +118,7 @@ def test_a_line_uses_the_agent_place_goal_suggestion(flows: Path) -> None:
             main(
                 [
                     "-f",
-                    ".humanize/flows/goals_off.py",
+                    ".humanize/flows/goals_off",
                     "-a",
                     "codex/said:low",
                 ]

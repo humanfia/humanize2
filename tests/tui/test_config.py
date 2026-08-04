@@ -21,6 +21,7 @@ from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Configures, Flows, setting
 from hmz.tui.selecting import Transcript
 from hmz.tui.settings import Settings
+from tests.stubs import written
 
 from .test_app import into_agent, keeps, onto
 
@@ -109,9 +110,9 @@ def flows(tmp_path: Path) -> Path:
     """Puts both flows where this project's own would be."""
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
-    (where / "settable.py").write_text(FLOW)
-    (where / "plain.py").write_text(PLAIN)
-    (where / "ungrouped.py").write_text(UNGROUPED)
+    written(where, "settable", FLOW)
+    written(where, "plain", PLAIN)
+    written(where, "ungrouped", UNGROUPED)
     return where
 
 
@@ -170,7 +171,7 @@ async def _set_up(app: Humanize, driver: Pilot[None], flow: str = "settable") ->
             break
         await driver.press("right")
         await driver.pause()
-    await onto(app, driver, f"local\x1f.humanize/flows/{flow}.py")
+    await onto(app, driver, f"local\x1f.humanize/flows/{flow}")
     await driver.press("enter")
     await driver.pause()
 
@@ -336,7 +337,7 @@ async def test_how_it_was_set_up_is_kept_and_read_back(
             await keeps(app, driver)
             await until(lambda: app._config is not None, driver)
 
-    assert Settings(tmp_path).config(".humanize/flows/settable.py")["loud"] is True
+    assert Settings(tmp_path).config(".humanize/flows/settable")["loud"] is True
     # And a second interface opens on it, rather than back at the flow's own defaults.
     again = Humanize()
     assert again._config is not None
@@ -465,14 +466,14 @@ async def test_the_line_that_opens_it_can_set_it_up(
 ) -> None:
     """`hmz -f -c -a`: a run that is always the same run is one line, not three walks."""
     (tmp_path / "setup.yaml").write_text("loud: true\nrounds: 7\n")
-    said = ["-f", ".humanize/flows/settable.py", "-c", str(tmp_path / "setup.yaml")]
+    said = ["-f", ".humanize/flows/settable", "-c", str(tmp_path / "setup.yaml")]
 
     opened: list[Humanize] = []
     with unittest.mock.patch.object(Humanize, "run", _opens(opened)):
         assert main(said) == 0
 
     (app,) = opened
-    assert app._flow_named == ".humanize/flows/settable.py"
+    assert app._flow_named == ".humanize/flows/settable"
     assert app._config is not None
     assert app._config.model_dump() == {
         "loud": True,
@@ -489,7 +490,7 @@ def test_a_line_that_sets_up_a_flow_that_takes_none_is_a_line_to_correct(
     (tmp_path / "setup.yaml").write_text("loud: true\n")
 
     with pytest.raises(SystemExit) as refused:
-        main(["-f", ".humanize/flows/plain.py", "-c", str(tmp_path / "setup.yaml")])
+        main(["-f", ".humanize/flows/plain", "-c", str(tmp_path / "setup.yaml")])
 
     assert refused.value.code == 2
 
@@ -512,7 +513,7 @@ def test_the_agents_a_line_names_have_to_be_the_ones_the_flow_drives(
         main(
             [
                 "-f",
-                ".humanize/flows/settable.py",
+                ".humanize/flows/settable",
                 "-a",
                 "claude/m:high",
                 "-a",
@@ -529,7 +530,7 @@ async def test_what_a_line_says_beats_what_was_remembered(
 ) -> None:
     """An interface opened set up is opened that way, whatever this workspace last ran."""
     Settings(tmp_path).remember(
-        ".humanize/flows/settable.py",
+        ".humanize/flows/settable",
         ("",),
         [Runs("claude/kept:high")],
         {"rounds": 2},
@@ -537,7 +538,7 @@ async def test_what_a_line_says_beats_what_was_remembered(
 
     opened: list[Humanize] = []
     with unittest.mock.patch.object(Humanize, "run", _opens(opened)):
-        assert main(["-f", ".humanize/flows/settable.py", "-a", "codex/said:low"]) == 0
+        assert main(["-f", ".humanize/flows/settable", "-a", "codex/said:low"]) == 0
 
     (app,) = opened
     assert app._models == [Runs("codex/said:low")]

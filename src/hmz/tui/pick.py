@@ -970,6 +970,11 @@ _HALVES = "\x1f"
 _FLOW_PAGE, _AGENT_PAGE = 0, 1
 
 
+#: What this project's own flows are listed under, which is where a copy of one lands: the
+#: first of the places a flow of your own may be, as `hmz.flows` names them.
+_MINE = "local"
+
+
 class Flows(Drafts[Chosen]):
     """Which flow runs and what each of its agents is: one menu, a page apiece.
 
@@ -999,7 +1004,7 @@ class Flows(Drafts[Chosen]):
     """
 
     TABS: ClassVar = ("Flow", "Agents")
-    LETTERS: ClassVar = frozenset({"search", "adding", "refresh", "drop"})
+    LETTERS: ClassVar = frozenset({"search", "adding", "refresh", "drop", "fork"})
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
@@ -1018,6 +1023,7 @@ class Flows(Drafts[Chosen]):
         Binding("a", "adding", "add a flowverse", priority=True),
         Binding("r", "refresh", "fetch it again", priority=True),
         Binding("d", "drop", "take it away", priority=True),
+        Binding("f", "fork", "copy it here to change", priority=True),
     ]
 
     def __init__(
@@ -1394,8 +1400,8 @@ class Flows(Drafts[Chosen]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            "Enter to choose · a adds a flowverse · r fetches one · d twice takes one away · "
-            f"Esc to close{self.searching()}"
+            "Enter to choose · f copies it here · a adds a flowverse · r fetches one · "
+            f"d twice takes one away · Esc to close{self.searching()}"
         )
 
     def _empty(self, whose: str) -> str:
@@ -1523,6 +1529,42 @@ class Flows(Drafts[Chosen]):
             return name
 
         await self._fetches(name, fetching)
+
+    def action_fork(self) -> None:
+        """Copies the flow under the cursor into this project's own, to be changed.
+
+        A flow is a directory, so a copy of one is a flow of yours: the entry point, what it
+        imports and the skills it brings all come across, under the name it already had --
+        and your own flows are looked in first, so from then on that name means your copy.
+
+        Which is the way to change a flow at all. A flowverse is somebody else's repository,
+        fetched again over whatever was written into it, so an edit made there is an edit
+        that goes away; a copy here is yours, and is what `f` is for.
+        """
+        from hmz.flows import fork
+
+        if self._tab != _FLOW_PAGE:
+            return
+        named = self._was.partition(_HALVES)[2]
+        if not named:
+            self._said = "no flow under the cursor to copy"
+            self._fill()
+            return
+        try:
+            at = fork(named)
+        except (OSError, ValueError) as why:
+            self._said = escape(str(why))
+            self._fill()
+            return
+        # The list is something else now: there is a flow of yours that was not there, and
+        # the name it took means it from here on.
+        self._offers, self._was = None, ""
+        self._where = _MINE
+        mine = escape(named.rpartition("/")[2])
+        self._said = (
+            f"copied to {escape(at)} -- yours to change, and {mine} now means it"
+        )
+        self._fill()
 
     def action_drop(self) -> None:
         """Takes the flowverse being read away, flows and all, once d is pressed twice."""
@@ -1953,19 +1995,18 @@ class Speaks(Sheet[tuple[str, str]]):
         self.dismiss((said, name or Path(argv[0]).name))
 
 
-class Skills(Sheet[tuple[str, ...]]):
-    """Which of a CLI's skills one agent is loaded with, switched on and off one at a time.
+class Skills(Sheet[None]):
+    """What one CLI would load here, shown and not touched.
 
-    A side question about the agent, like what it may do without being asked: what it runs is
-    the step this hangs off, and what it is loaded with is another. Found the way the CLI
-    itself finds them --
-    the skills you have installed and the ones this project keeps -- so the list is the list
-    the agent would have had, and what is left marked is what it will have.
+    A skill installed on this machine is that CLI's own: installed the way it installs one,
+    switched off the way it switches one off, and the same for every agent of every flow.
+    humanize used to switch them per agent and no longer does -- what a person has installed
+    is not something a flow is entitled to rewrite, and a list that could be adjusted here
+    while the CLI's own list said otherwise was two answers to one question.
 
-    Every skill starts on, which is how a CLI comes: a sheet that had to be walked through
-    before an agent could have any of them would be a setting nobody asked for. What it
-    answers with is the ones it is to have, since that is what an agent is then loaded with
-    -- a skill installed afterwards is not one anybody chose for this agent.
+    So this is a reading: what the agent will be carrying, where each of them came from, and
+    the line saying where to go to change it. What humanize does add is the flow's own
+    skills, which are mounted onto the sessions it opens rather than installed here.
     """
 
     LETTERS: ClassVar = frozenset({"search"})
@@ -1973,64 +2014,48 @@ class Skills(Sheet[tuple[str, ...]]):
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
         Binding("s", "search", "search", priority=True),
-        # Space is what a checklist is switched with, so it is what this one is switched
-        # with, search or no search: a skill is named after the directory it is in, so a
-        # space is never something anybody is trying to type into one.
-        Binding("space", "switch", "switch this one", priority=True),
-        # Enter is the whole sheet rather than the row under the cursor, as it is where a
-        # sheet is adjusted rather than picked from: the rows are switched where they stand.
-        # Not a letter, so it accepts the sheet while a search is running too.
-        Binding("enter", "done", "done", priority=True),
+        # Enter leaves it, as escape does: there is nothing on this sheet to answer with, so
+        # the key that accepts a sheet is the key that closes this one.
+        Binding("enter", "back", "done", priority=True),
     ]
 
-    def __init__(self, backend: str, having: tuple[str, ...] | None) -> None:
-        """Initializes the switching.
+    def __init__(self, backend: str) -> None:
+        """Initializes the reading.
 
         Args:
           backend: The CLI whose skills these are.
-          having: The ones this agent has already, or None for one that has never been asked
-            -- which is the CLI as it comes, and so all of them.
         """
         super().__init__()
         self._backend = backend
-        self._having = having
         self._found: list[Skill] | None = None
-        #: The ones marked now, which start as the ones it has. Read once the list is in
-        #: hand, since "all of them" is only a list of names after the looking.
-        self._on: set[str] | None = None
 
     def _ask(self) -> None:
-        """Says whose skills these are, and what switching one off does."""
-        self.query_one("#asked", Label).update(f"Select what {self._backend} loads")
+        """Says whose skills these are, and who is to be asked to change them."""
+        self.query_one("#asked", Label).update(f"What {self._backend} loads here")
         self.query_one("#about", Label).update(
-            "The skills this one agent is to have. They are found where the CLI itself "
-            "looks -- yours, and this project's -- and every one of them starts on. Another "
-            "agent of the same flow may be loaded with a different set."
+            "The skills this CLI finds, which every agent of it carries. They are its own: "
+            f"install one, or switch one off, the way {escape(self._backend)} itself does "
+            "it. A flow's own skills are mounted onto the sessions it opens and are not "
+            "installed here."
         )
         self._fill()
         self.query_one("#choices", OptionList).focus()
 
     def _skills(self) -> list[Skill]:
-        """The skills there are to choose between, read once: this is redrawn per keystroke."""
+        """The skills there are to show, read once: this is redrawn per keystroke."""
         if self._found is None:
             self._found = skills(self._backend)
             self._counting = len(str(len(self._found)))
-            self._on = (
-                {one.name for one in self._found}
-                if self._having is None
-                else {one.name for one in self._found if one.name in self._having}
-            )
         return self._found
 
     def _fill(self) -> None:
-        """Puts the skills up, with a mark against the ones this agent will have."""
+        """Puts the skills up, each with where it came from."""
         listing = self.query_one("#choices", OptionList)
         shown = [
             skill
             for skill in self._skills()
             if self.fits(skill.name, skill.about, skill.whose)
         ]
-        on = self._on or set()
         at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
         listing.set_options(
             Option(
@@ -2040,7 +2065,6 @@ class Skills(Sheet[tuple[str, ...]]):
                     f"{skill.about}  ({skill.whose})" if skill.about else skill.whose,
                     here=seen == at,
                     inforce=False,
-                    box=_TICKED if skill.name in on else _EMPTY,
                 ),
                 id=skill.name,
             )
@@ -2049,49 +2073,30 @@ class Skills(Sheet[tuple[str, ...]]):
         listing.highlighted = at if shown else None
         self._drawn = at
         self.query_one("#tuning", Label).update(
-            "" if self._skills() else f"[$text-muted]{self._nothing()}[/]"
+            f"[$text-muted]{self._said()}[/]" if self._said() else ""
         )
-        self.query_one("#keys", Label).update(
-            "Space to switch on and off · Enter to accept · Esc to go back"
-            f"{self.searching()}"
-        )
+        self.query_one("#keys", Label).update(f"Esc to go back{self.searching()}")
 
-    def _nothing(self) -> str:
-        """Why there is nothing to choose between, which is not always the same reason.
+    def _said(self) -> str:
+        """The line under the list: where to go to change any of this, or why there is none.
 
         Returns:
-          That a CLI which keeps skills has none installed here, or that one which offers no
-          way of being told which to load cannot be told -- a sheet that said the second was
-          the first would be blaming the machine for what the backend cannot do.
+          That these are the CLI's own and are managed there, for a CLI that keeps skills;
+          that a CLI which keeps none anywhere has none to show; and, where it keeps them
+          and none is installed, that there are none here yet.
         """
         profile = named(self._backend)
         if profile is None or not (profile.skills or profile.shared or profile.works):
-            return f"{escape(self._backend)} cannot be told which skills to load"
-        return f"{escape(self._backend)} has no skills installed here"
-
-    @property
-    def _under(self) -> str:
-        """The skill the cursor is on, or "" where the letters typed have left none."""
-        listing = self.query_one("#choices", OptionList)
-        at = listing.highlighted
-        if at is None or not 0 <= at < listing.option_count:
-            return ""
-        return str(listing.get_option_at_index(at).id or "")
-
-    def action_switch(self) -> None:
-        """Switches the skill under the cursor on, or off again."""
-        if not (named := self._under) or self._on is None:
-            return
-        if named in self._on:
-            self._on.discard(named)
-        else:
-            self._on.add(named)
-        self._fill()
-
-    def action_done(self) -> None:
-        """Answers with the skills this agent is to have, in the order they are listed."""
-        on = self._on or set()
-        self.dismiss(tuple(skill.name for skill in self._skills() if skill.name in on))
+            return f"{escape(self._backend)} keeps no skills of its own here"
+        if not self._skills():
+            return (
+                f"{escape(self._backend)} has none installed here; install one the way "
+                f"{escape(self._backend)} installs one"
+            )
+        return (
+            f"These are {escape(self._backend)}'s own: add one, or switch one off, where "
+            f"{escape(self._backend)} keeps them"
+        )
 
 
 class Anchors(Sheet[str]):
@@ -2188,6 +2193,265 @@ class Anchors(Sheet[str]):
           event: What was chosen.
         """
         self.dismiss(str(event.option.id).removeprefix("="))
+
+
+class Falls(Sheet[str]):
+    """Which account a turn under this one carries on under when it fails.
+
+    A name rather than a mark: each account names the next, so what a turn walks is a chain
+    -- a subscription that runs out falls to a key, and a key that is refused falls to a
+    gateway -- rather than there being one place every failure of that CLI goes.
+
+    Only that CLI's own accounts are offered: an account is credentials for one backend, and
+    a turn cannot be carried on under credentials for another.
+    """
+
+    LETTERS: ClassVar = frozenset({"search"})
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        Binding("s", "search", "search", priority=True),
+    ]
+
+    def __init__(self, cli: str, name: str, current: str = "") -> None:
+        """Initializes the choosing.
+
+        Args:
+          cli: The backend these accounts are of.
+          name: The account this is about, which is not among the ones offered.
+          current: What it falls back to now, or "" for the end of the line.
+        """
+        super().__init__()
+        self._cli = cli
+        self._name = name
+        self._current = current
+        self._found: list[Provider] | None = None
+
+    def _ask(self) -> None:
+        """Says whose accounts these are, and what carrying on under one means."""
+        self.query_one("#asked", Label).update(
+            f"Where {self._cli}/{self._name} falls back to"
+        )
+        self.query_one("#about", Label).update(
+            "The account a turn under this one carries on under, once the tries it was "
+            "given are spent. It happens inside the conversation that was running, and the "
+            "account it moves to has a fallback of its own -- so what a turn walks is a "
+            "chain, to the end of it."
+        )
+        self.query_one("#tuning", Label).update("")
+        self._fill()
+
+    def _accounts(self) -> list[Provider]:
+        """That CLI's own accounts, read once: this is redrawn per keystroke."""
+        from hmz import providers
+
+        if self._found is None:
+            self._found = [
+                one for one in providers.providers(self._cli) if one.name != self._name
+            ]
+        return self._found
+
+    def _fill(self) -> None:
+        """Puts the accounts up, with the end of the line first."""
+        listing = self.query_one("#choices", OptionList)
+        rows: list[tuple[str, str, str]] = [
+            ("", "nowhere", "the end of the line: a failed turn is a failed turn")
+        ]
+        rows.extend((one.name, one.name, _sets(one)) for one in self._accounts())
+        shown = [row for row in rows if self.fits(row[1], row[2])]
+        self._counting = len(str(max(len(shown), 1)))
+        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
+        listing.set_options(
+            Option(
+                self._row(
+                    seen, label, about, here=seen == at, inforce=name == self._current
+                ),
+                id=f"={name}",
+            )
+            for seen, (name, label, about) in enumerate(shown)
+        )
+        listing.highlighted = at if shown else None
+        self._drawn = at
+        self.query_one("#tuning", Label).update(
+            ""
+            if self._accounts()
+            else f"[$text-muted]{escape(self._cli)} has no other account to fall back "
+            "to; a on the menu behind this makes one[/]"
+        )
+        self.query_one("#keys", Label).update(
+            f"Enter to choose · Esc to go back{self.searching()}"
+        )
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Answers with the account that was picked, or "" for the end of the line."""
+        self.dismiss(str(event.option.id).removeprefix("="))
+
+
+#: How many times over a turn may be tried again, and how long the retrying may be given.
+#: Rungs rather than a number to type: this is a setting somebody steps through until it
+#: reads right, and a text box for an integer is a text box to validate.
+_TRIES = (0, 1, 2, 3, 5, 8, 13, 21)
+_FOR = (0.0, 30.0, 60.0, 300.0, 900.0, 3600.0)
+
+#: The rows the retry sheet is made of.
+_HOW_MANY = "tries"
+_POLICY = "policy"
+_HOW_LONG = "for"
+
+
+class Retries(Sheet[tuple[int, str, float]]):
+    """How a turn under one account is tried again before the chain moves on.
+
+    A turn fails for two kinds of reason and only one of them is worth another try: a prompt
+    the model refused is the same refusal every time, and a gateway that answered 503 is the
+    same call away from working. So an account says how many tries it gets, how long to wait
+    between them, and how long the whole of it may go on for.
+
+    Three rungs rather than three things to type: each is stepped where it stands, which is
+    how every other setting in an order is answered here.
+    """
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        Binding("left", "easier", "back one", priority=True),
+        Binding("right", "harder", "on one", priority=True),
+        Binding("enter", "done", "done", priority=True),
+    ]
+
+    def __init__(self, named: str, retries: int, policy: str, timeout: float) -> None:
+        """Initializes the sheet on what the account says now.
+
+        Args:
+          named: The account this is about, which the question at the top says.
+          retries: How many tries beyond the first it gets now.
+          policy: How long it waits between them now.
+          timeout: The longest the retrying may go on for now, or 0.0 for no limit.
+        """
+        super().__init__()
+        self._named = named
+        self._retries = retries
+        self._policy = policy
+        self._timeout = timeout
+
+    def _ask(self) -> None:
+        """Says whose account this is about, and what trying again means."""
+        self.query_one("#asked", Label).update(f"How {self._named} is tried again")
+        self.query_one("#about", Label).update(
+            "What happens when a turn under this account fails. The arrows step the row "
+            "under the cursor. Once the tries are spent, the turn carries on under whatever "
+            "this account falls back to."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _rows(self) -> list[tuple[str, str, str]]:
+        """Every row this is made of: its id, what it is now, and what it means."""
+        from hmz.providers import retry
+
+        said = retry.named(self._policy)
+        return [
+            (
+                _HOW_MANY,
+                "none" if not self._retries else str(self._retries),
+                "how many times over a failed turn is tried again",
+            ),
+            (
+                _POLICY,
+                self._policy,
+                said.about if said is not None else "how long to wait between tries",
+            ),
+            (
+                _HOW_LONG,
+                _lasting(self._timeout),
+                "the longest the trying again may go on for",
+            ),
+        ]
+
+    def _fill(self) -> None:
+        """Puts the three rows up, with the cursor where it was."""
+        listing = self.query_one("#choices", OptionList)
+        rows = self._rows()
+        self._counting = len(str(len(rows)))
+        at = min(listing.highlighted or 0, len(rows) - 1)
+        listing.set_options(
+            Option(
+                self._row(
+                    seen, name, f"{value}   {about}", here=seen == at, inforce=False
+                ),
+                id=f"={name}",
+            )
+            for seen, (name, value, about) in enumerate(rows)
+        )
+        listing.highlighted = at
+        self._drawn = at
+        self.query_one("#tuning", Label).update(
+            "[$text-muted]none, and a failed turn is a failed turn[/]"
+            if not self._retries
+            else ""
+        )
+        self.query_one("#keys", Label).update(
+            "Left and right to step this one · Enter to accept · Esc to go back"
+        )
+
+    def action_easier(self) -> None:
+        """Steps the row under the cursor back one."""
+        self._step(-1)
+
+    def action_harder(self) -> None:
+        """Steps it on one."""
+        self._step(1)
+
+    def _step(self, by: int) -> None:
+        """Moves whichever row the cursor is on, wrapping round at either end.
+
+        Args:
+          by: One rung on or back.
+        """
+        from hmz.providers import retry
+
+        listing = self.query_one("#choices", OptionList)
+        at = listing.highlighted or 0
+        held = self._rows()[at][0] if 0 <= at < len(self._rows()) else ""
+        if held == _HOW_MANY:
+            self._retries = _stepped(_TRIES, self._retries, by)
+        elif held == _POLICY:
+            names = [one.name for one in retry.POLICIES]
+            self._policy = _stepped(names, self._policy, by)
+        elif held == _HOW_LONG:
+            self._timeout = _stepped(_FOR, self._timeout, by)
+        else:
+            return
+        self._fill()
+
+    def action_done(self) -> None:
+        """Answers with what the account is to say from here on."""
+        self.dismiss((self._retries, self._policy, self._timeout))
+
+
+def _stepped[T](among: Sequence[T], held: T, by: int) -> T:
+    """One rung on or back through a list, wrapping round and starting from the nearest.
+
+    Args:
+      among: The rungs, in order.
+      held: What it is now, which need not be one of them -- a setting written by hand is
+        stepped from the first rung rather than refused.
+      by: One on or back.
+
+    Returns:
+      The rung to move to.
+    """
+    at = among.index(held) if held in among else 0
+    return among[(at + by) % len(among)]
+
+
+def _lasting(seconds: float) -> str:
+    """How long something may go on for, as a row of a sheet says it."""
+    if not seconds:
+        return "as long as it takes"
+    if seconds < 60:  # noqa: PLR2004 -- a minute, in the units the number is in
+        return f"{seconds:.0f}s"
+    return f"{seconds / 60:.0f}m"
 
 
 #: How wide the column of setting names is, and the column of their values, so that a sheet
@@ -3330,7 +3594,6 @@ class Agent(Drafts[Fitted]):
         # before the effort is looked for among the ones the model takes.
         self._swarm: bool = effort.startswith(SWARM)
         self._effort: str = effort.removeprefix(SWARM)
-        self._skills: tuple[str, ...] | None = runs.skills
         self._permission = (
             PERMISSIONS.index(runs.permission)
             if runs.permission in PERMISSIONS
@@ -3366,7 +3629,6 @@ class Agent(Drafts[Fitted]):
           asked. A row nobody is being asked about is not among them: a flow that settled
           where its agent works has not left that question open.
         """
-        having = self._skills
         rows: list[tuple[str, str, str]] = []
         if self._is_named:
             rows.append((_NAME, self._called, "what this agent is saved under"))
@@ -3388,8 +3650,8 @@ class Agent(Drafts[Fitted]):
             [
                 (
                     _SKILLS,
-                    "every skill" if having is None else f"{len(having)} skills",
-                    "which of its CLI's skills it is loaded with",
+                    "as its CLI finds them",
+                    "what it will be carrying, which its CLI keeps",
                 ),
                 (
                     _PERMIT,
@@ -3521,9 +3783,6 @@ class Agent(Drafts[Fitted]):
         return Runs(
             spec=f"{self._cli}/{self._model}:{wide}{self._effort}",
             anchor=self._anchor,
-            # Nothing said at all is the CLI as it comes, which is None rather than a list of
-            # every skill it happens to have installed today.
-            skills=self._skills,
             # Only where it is a narrowing: the loosest rung is what an agent nobody has been
             # asked about runs at, and saying so is saying nothing.
             permission=(
@@ -3660,7 +3919,7 @@ class Agent(Drafts[Fitted]):
         # An account belongs to a backend and a model belongs to the CLI that runs it, so
         # neither of them survives the CLI changing under it.
         self._cli, self._provider, self._model, self._effort = chosen, "", "", ""
-        self._skills, self._swarm = None, False
+        self._swarm = False
         self._said = ""
         self.changed()
 
@@ -3696,15 +3955,11 @@ class Agent(Drafts[Fitted]):
         self.changed()
 
     async def _chose_skills(self, showing: App[None]) -> None:
-        """Asks which of its CLI's skills it is loaded with."""
+        """Shows what its CLI would load, which is the CLI's own and is not changed here."""
         if not self._cli:
             self._said = "choose the coding agent first; the skills are its own"
             return
-        chosen = await showing.push_screen_wait(Skills(self._cli, self._skills))
-        if chosen is None:
-            return
-        self._skills, self._said = chosen, ""
-        self.changed()
+        await showing.push_screen_wait(Skills(self._cli))
 
     async def _chose_where(self, showing: App[None]) -> None:
         """Asks which machine its work lands on, where that is a question anybody is asked."""
@@ -3736,7 +3991,7 @@ class Agent(Drafts[Fitted]):
         self._cli, self._model = cli, model
         self._swarm = effort.startswith(SWARM)
         self._effort = effort.removeprefix(SWARM)
-        self._skills, self._provider = one.runs.skills, one.runs.provider
+        self._provider = one.runs.provider
         self._permission = (
             PERMISSIONS.index(one.runs.permission)
             if one.runs.permission in PERMISSIONS
@@ -4355,7 +4610,7 @@ class Providers(Drafts[list[str]]):
 
     TABS: ClassVar = ("Providers",)
     LETTERS: ClassVar = frozenset(
-        {"search", "adding", "drop", "again", "fallback", "speaks"}
+        {"search", "adding", "drop", "again", "fallback", "tries", "speaks"}
     )
 
     BINDINGS: ClassVar = [
@@ -4366,7 +4621,8 @@ class Providers(Drafts[list[str]]):
         Binding("a", "adding", "make one", priority=True),
         Binding("d", "drop", "take one away", priority=True),
         Binding("l", "again", "sign in again", priority=True),
-        Binding("f", "fallback", "as fallback", priority=True),
+        Binding("f", "fallback", "falls back to", priority=True),
+        Binding("t", "tries", "how it is tried again", priority=True),
         # And the one thing here that is not an account: a CLI of your own to run them on.
         Binding("c", "speaks", "add an ACP CLI", priority=True),
     ]
@@ -4377,8 +4633,11 @@ class Providers(Drafts[list[str]]):
         self._found: list[Provider] = []
         #: The ones to take away when this is saved, as `cli/name`.
         self._gone: set[str] = set()
-        #: The ones whose fallback mark is to be turned round when this is saved.
-        self._marks: set[str] = set()
+        #: What each one is to fall back to when this is saved, by `cli/name`: the name of
+        #: another account of that CLI, or "" for the end of the line.
+        self._chains: dict[str, str] = {}
+        #: How each one is to be tried again when this is saved, by `cli/name`.
+        self._tries: dict[str, tuple[int, str, float]] = {}
         #: What each corrected one is to hold, by `cli/name`.
         self._edits: dict[str, dict[str, str]] = {}
         #: Which account the cursor is on, as `cli/name`: the headings between them are rows
@@ -4395,8 +4654,9 @@ class Providers(Drafts[list[str]]):
         self.query_one("#about", Label).update(
             "One named set of credentials per account, kept apart from the CLI's own and "
             "from each other's. An agent is given one where it is set up, and runs its turns "
-            "as that account. Taking one away and marking one as a fallback land when this "
-            "menu is saved; making one and signing one in happen as they are asked for."
+            "as that account. Taking one away, saying where it falls back to and saying how "
+            "it is tried again land when this menu is saved; making one and signing one in "
+            "happen as they are asked for."
         )
         self._read()
         self._fill()
@@ -4417,8 +4677,14 @@ class Providers(Drafts[list[str]]):
         said = _sets(one)
         if self._named(one) in self._edits:
             said += f"{_DOT}corrected"
-        if (one.fallback) != (self._named(one) in self._marks):
-            said += f"{_DOT}fallback"
+        falls = self._chains.get(self._named(one), one.fallback)
+        if falls:
+            said += f"{_DOT}falls back to {falls}"
+        tried = self._tries.get(
+            self._named(one), (one.retries, one.policy, one.timeout)
+        )
+        if tried[0]:
+            said += f"{_DOT}{tried[0]} tries, {tried[1]}"
         if self._named(one) in self._gone:
             said += f"{_DOT}to be taken away"
         return said
@@ -4469,8 +4735,9 @@ class Providers(Drafts[list[str]]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            "Enter to correct one · a makes one · l signs one in again · f as fallback · "
-            f"d twice takes one away · c adds an ACP CLI · Esc to close{self.searching()}"
+            "Enter to correct one · a makes one · l signs one in again · f falls back to · "
+            "t tried again · d twice takes one away · c adds an ACP CLI · "
+            f"Esc to close{self.searching()}"
         )
 
     def _follows(self, listing: OptionList) -> None:
@@ -4492,16 +4759,49 @@ class Providers(Drafts[list[str]]):
         """The account the cursor is on, or None where the list has nothing in it."""
         return next((one for one in self._found if self._named(one) == self._was), None)
 
-    def action_fallback(self) -> None:
-        """Turns round whether the account under the cursor is where a failed turn goes."""
+    @work
+    async def action_fallback(self) -> None:
+        """Asks which account a turn under this one carries on under when it fails."""
         one = self._under()
         if one is None:
             return
         named = self._named(one)
-        if named in self._marks:
-            self._marks.discard(named)
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        chosen = await showing.push_screen_wait(
+            Falls(one.cli, one.name, self._chains.get(named, one.fallback))
+        )
+        if chosen is None:
+            return  # walked out, which changes nothing
+        if chosen == one.fallback:
+            self._chains.pop(named, None)
         else:
-            self._marks.add(named)
+            self._chains[named] = chosen
+        self._said = ""
+        self.changed()
+        self._fill()
+
+    @work
+    async def action_tries(self) -> None:
+        """Asks how a turn under the account under the cursor is tried again."""
+        one = self._under()
+        if one is None:
+            return
+        named = self._named(one)
+        held = self._tries.get(named, (one.retries, one.policy, one.timeout))
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        chosen = await showing.push_screen_wait(Retries(named, *held))
+        if chosen is None:
+            return
+        if chosen == (one.retries, one.policy, one.timeout):
+            self._tries.pop(named, None)
+        else:
+            self._tries[named] = chosen
         self._said = ""
         self.changed()
         self._fill()
@@ -4731,17 +5031,29 @@ class Providers(Drafts[list[str]]):
                     told.append(f"hmz: {escape(str(why))}")
                     continue
                 told.append(f"[dim]{escape(named)} is corrected[/dim]")
-            if named in self._marks:
-                providers.marks(one.cli, one.name, fallback=not one.fallback)
-                told.append(
-                    f"[dim]{escape(named)} is "
-                    + (
-                        "no longer a fallback"
-                        if one.fallback
-                        else "where a turn goes when another account fails"
+            if (falls := self._chains.get(named)) is not None:
+                try:
+                    providers.points(one.cli, one.name, falls)
+                except ValueError as why:
+                    told.append(f"hmz: {escape(str(why))}")
+                else:
+                    told.append(
+                        f"[dim]{escape(named)} falls back to {escape(falls)}[/dim]"
+                        if falls
+                        else f"[dim]{escape(named)} falls back to nowhere[/dim]"
                     )
-                    + "[/dim]"
-                )
+            if (tried := self._tries.get(named)) is not None:
+                try:
+                    providers.retrying(one.cli, one.name, *tried)
+                except ValueError as why:
+                    told.append(f"hmz: {escape(str(why))}")
+                else:
+                    told.append(
+                        f"[dim]{escape(named)} is tried {tried[0]} more times, "
+                        f"{escape(tried[1])}[/dim]"
+                        if tried[0]
+                        else f"[dim]{escape(named)} is tried once[/dim]"
+                    )
         for named in sorted(self._gone):
             cli, _, name = named.partition("/")
             try:

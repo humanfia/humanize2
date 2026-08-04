@@ -25,7 +25,7 @@ from hmz.tui import Humanize
 from hmz.tui.app import _KEPT
 from hmz.tui.pick import Held, reads
 from hmz.tui.selecting import Transcript
-from tests.stubs import ShellAgent, ShellSession
+from tests.stubs import ShellAgent, ShellSession, written
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -138,7 +138,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
     # Where the fake looks for its leave to finish, since a turn is run wherever the flow is.
     monkeypatch.setenv("HUMANIZE_HELD", str(tmp_path))
-    (tmp_path / "flow.py").write_text(HOLDING)
+    written(tmp_path, "flow", HOLDING)
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -151,7 +151,7 @@ async def _two_agents(app: Humanize, driver: Pilot[None], where: Path) -> None:
       driver: What is pumping it.
       where: The workspace it is running in.
     """
-    app._flow_named = "flow.py"
+    app._flow_named = "flow"
     app._models = [Runs("claude/m:high"), Runs("claude/m:high")]
     await driver.press(*"do it")
     await driver.press("enter")
@@ -235,7 +235,7 @@ async def test_shift_tab_no_longer_steps_to_the_next_flow(workspace: Path) -> No
         await driver.press("shift+tab")
         await driver.pause()
 
-        assert app._flow_named == "flow.py"
+        assert app._flow_named == "flow"
         _let_go(workspace)
         await until(lambda: not app._agents, driver)
 
@@ -394,7 +394,7 @@ async def test_a_line_typed_with_nothing_running_still_starts_the_flow(
     """Nothing is attached before a flow has opened anything, and that is how one starts."""
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named = "flow.py"
+        app._flow_named = "flow"
         app._models = [Runs("claude/m:high"), Runs("claude/m:high")]
         assert app._reading() is None
 

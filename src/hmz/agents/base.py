@@ -25,6 +25,7 @@ from typing import IO, TYPE_CHECKING, Any, ClassVar, Protocol, overload
 
 from .event import Event, Question, Stopped, Usage, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
+from .skills import Loaded, mount, unmount
 
 if TYPE_CHECKING:
     import asyncio
@@ -398,6 +399,11 @@ class SessionBase(ABC):
         #: by whatever builds the call, since a command line and a process's own arguments
         #: are both built from a session that is already holding the turn.
         self._shaping: type[BaseModel] | None = None
+        #: What takes away what this session mounted, once it has mounted anything. However
+        #: the session ends -- closed, or let go of by a flow that opens one a turn -- what it
+        #: put in the workspace goes with it, so it is a finalizer rather than a line in
+        #: `close`: a Ralph loop drops a session a turn and closes none of them.
+        self._unmounting: Callable[[], None] | None = None
         # A session drops itself from its agent when it is collected, so the agent neither holds
         # a flow's discarded sessions nor has to prune them while someone is reading them.
         agent._hold(self)
@@ -670,6 +676,7 @@ class SessionBase(ABC):
             prompt = "\n\n".join([prompt, *held])
         if not self._started:
             self._started = True
+            self._mounts()
             self._fire(Moment.SESSION_START, prompt=prompt)
         submitted = self._fire(Moment.USER_PROMPT_SUBMIT, prompt=prompt)
         if submitted.adds:
@@ -719,18 +726,19 @@ class SessionBase(ABC):
     def _falling_back(
         self, prompt: str, *, schema: type[BaseModel] | None = None
     ) -> Iterator[Event]:
-        """One turn, run again under another account where the first one's account failed.
+        """One turn, tried again and then run under the next account, until one lands.
 
-        A provider goes down -- a key revoked, a gateway refusing, a subscription out of
-        quota -- and what a flow sees is a turn that failed. Where an account of that backend
-        has been marked as the one to fall back to, the turn is run again under it rather
-        than handed back as a failure: the conversation is the backend's own and is named by
-        an id, so the same session carries on under the other account.
+        A turn fails for two kinds of reason and only one of them is worth another try: a
+        gateway that answered 503, a subscription that said "too many requests", a socket
+        that closed mid-stream are the same call away from working. So an account says how
+        many times a turn under it is tried again and how long to wait between tries, and
+        what to carry on under once those are spent -- and each account names the next, so
+        what a turn walks is a chain rather than a single second place.
 
-        Only once: the agent moves to the other account and stays there, so an account that
-        fails twice is a run to stop rather than one to keep moving. What the failed attempt
-        already put on the transcript stays there -- it is how somebody reading it finds out
-        the account went down and the turn was run again somewhere else.
+        All of it inside the session that was running: the conversation is the backend's own
+        and is named by an id, so the same session carries on under the next account. What a
+        failed try already put on the transcript stays there -- it is how somebody reading it
+        finds out that the account went down and where the turn went next.
 
         Args:
           prompt: The input prompt for this turn, as the backend is to be given it.
@@ -740,25 +748,53 @@ class SessionBase(ABC):
           What the agent said, in the order it said it.
 
         Raises:
-            subprocess.CalledProcessError: If the turn failed and there was nowhere to move
-              to, or if it failed again under the account it moved to.
+            subprocess.CalledProcessError: If every try under every account of the chain
+              failed, which is the last of them raised as the turn's own failure.
         """
-        try:
-            yield from self._stream(prompt, schema=schema)
-        except subprocess.CalledProcessError:
-            instead = self._agent.falls_back()
-            if instead is None:
-                raise
-            self._heard(
-                Event(
-                    kind="tool",
-                    text=f"{self._agent.backend} failed; carrying on as {instead.name}",
+        from hmz.providers import retry
+
+        last: subprocess.CalledProcessError | None = None
+        for at, account in enumerate(self._agent.walks()):
+            if at and account is not None:
+                self._agent.fall_back(account)
+                self._heard(
+                    Event(
+                        kind="tool",
+                        text=f"{self._agent.backend} failed; "
+                        f"carrying on as {account.name}",
+                    )
                 )
-            )
-            self._agent.fall_back(instead)
-        else:
-            return
-        yield from self._stream(prompt, schema=schema)
+            # An agent running as whoever is at this machine has no account to have been
+            # configured with, and so nothing that says how a turn of it is tried again: it
+            # is taken once, exactly as it always was.
+            tries = account.retries if account is not None else 0
+            policy = account.policy if account is not None else retry.DEFAULT
+            allowed = account.timeout if account is not None else 0.0
+            since = time.monotonic()
+            for attempt in range(1, tries + 2):
+                waiting = retry.waits(policy, attempt)
+                if attempt > 1:
+                    # Checked before the wait rather than after it, so that a turn is never
+                    # started knowing the time it was given is already spent.
+                    if allowed and time.monotonic() - since + waiting > allowed:
+                        break
+                    self._heard(
+                        Event(
+                            kind="tool",
+                            text=f"{self._agent.backend} failed; trying again in "
+                            f"{waiting:.0f}s ({attempt - 1} of {tries})",
+                        )
+                    )
+                    time.sleep(waiting)
+                try:
+                    yield from self._stream(prompt, schema=schema)
+                except subprocess.CalledProcessError as failed:
+                    last = failed
+                else:
+                    return
+        if last is None:  # nothing ran at all, which is nothing this can raise about
+            raise RuntimeError("no account to take the turn under")
+        raise last
 
     def _shaped_ask(self, prompt: str, schema: type[BaseModel] | None) -> str:
         """The prompt as the backend is to be given it, shape and all.
@@ -921,6 +957,11 @@ class SessionBase(ABC):
             self._ended = True
             self._fire(Moment.SESSION_END)
         self._shut()
+        if self._unmounting is not None:
+            # What the session mounted goes when the conversation does rather than whenever
+            # it is collected. Calling it is what runs it, once, whichever half gets there
+            # first: this line, or the finalizer for a session nobody closed.
+            self._unmounting()
 
     def _shut(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
         """Lets go of whatever is holding this conversation open.
@@ -978,6 +1019,31 @@ class SessionBase(ABC):
         return os.path.join(  # noqa: PTH118 -- text, as every path on this line is
             mirror, os.path.relpath(where, workspace)
         )
+
+    def _mounts(self) -> None:
+        """Gives this session the skills the flow brought, as it opens.
+
+        Where that backend reads a project's own skills, for as long as the session lives:
+        a flow works by the skills it carries, and a session of it that had none would be a
+        turn asked to do something the flow never gave it the means to do. As the session
+        opens rather than when it was made, since the directory it works in is settled by
+        then -- and per session, so a skill rewritten between turns is the one the next
+        session carries.
+
+        Nothing at all for a flow that brings none, which is most of them, and for a backend
+        that reads no such directory: those carry what their CLI installed and no more.
+        """
+        if not self._agent.loaded:
+            return
+        try:
+            workspace = self._workspace()
+        except ValueError:
+            return  # a session that cannot say where it works is one that will not run
+        mounted = mount(self._agent.backend, workspace, self._agent.loaded)
+        if mounted.at:
+            # A finalizer rather than a line in `close`, and callable so that whichever of
+            # the two gets there first is the one that runs -- once, whatever happens after.
+            self._unmounting = weakref.finalize(self, unmount, mounted)
 
     def _environment(self) -> Mapping[str, str]:
         """What to set in the command's environment on top of this process's own.
@@ -1683,6 +1749,10 @@ class AgentBase(ABC):
         #: every session this agent opens. Left unset by an agent driven by hand, which is
         #: not a run of anything.
         self.cycle: Journal | None = None
+        #: The skills the flow driving this agent brings, mounted onto every session it
+        #: opens. Set by whatever started the flow, since a skill is the flow's rather than
+        #: the agent's: the same agent under another flow carries that flow's instead.
+        self._loads: tuple[Loaded, ...] = ()
         # The machine this agent's turns land on, once the first of them has brought it up.
         self._anchor: AnchorConfig | None = None
         # The account its turns run as, once the first of them has looked it up.
@@ -1751,6 +1821,23 @@ class AgentBase(ABC):
         if not self._named:
             self._id = name
             self._hooks.agent = name
+
+    def loads(self, skills: Iterable[Loaded]) -> None:
+        """Says which skills every session this agent opens is to be given.
+
+        Told to the agent rather than configured on it, because they are the flow's: the
+        agent is what the flow was handed, and the same agent under another flow carries what
+        that flow works by instead.
+
+        Args:
+          skills: The skills, already fetched to somewhere they can be copied from.
+        """
+        self._loads = tuple(skills)
+
+    @property
+    def loaded(self) -> tuple[Loaded, ...]:
+        """The skills mounted onto every session this agent opens, which are the flow's."""
+        return self._loads
 
     @property
     def hooks(self) -> Hooks:
@@ -1942,25 +2029,29 @@ class AgentBase(ABC):
                 self._provider = found
             return self._provider
 
-    def falls_back(self) -> Provider | None:
-        """The account a turn of this agent carries on under, once its own has failed.
+    def walks(self) -> tuple[Provider | None, ...]:
+        """Every account a turn of this agent may be taken under, in the order it tries them.
 
-        Marked on the account rather than on the agent: it is the account that goes down, and
-        whichever agent was running under one when it did is the agent that needs somewhere
-        else to run. Nothing at all where none is marked, or where this agent is already
-        running under the one that was.
+        The one it is configured with, and then whatever that account falls back to, and
+        whatever that one does: each account names the next, so a subscription that runs out
+        falls to a key and a key that is refused falls to a gateway. Said on the accounts
+        rather than on the agent because it is the account that goes down, and whichever
+        agent was running under one when it did is the agent that needs somewhere else to go.
 
         Returns:
-          The account to move to, or None where there is nowhere to move.
+          One per account, the agent's own first -- which is None for an agent running as
+          whoever is at this machine, that being an account humanize did not make and so one
+          with nothing written down about where it goes next. Never empty: there is always
+          the account the turn starts under.
         """
         from hmz import providers
 
-        if self._fell_back is not None:
-            return None  # already moved: a fallback that failed is not somewhere to go
-        found = providers.falls_back(self.backend)
-        if found is None:
-            return None
-        return None if found.name == self._config.provider else found
+        provider = self.provider
+        if provider is None:
+            return (None,)
+        # From wherever it is now rather than from where it started: an agent that has
+        # already moved down the chain does not walk the part of it that failed again.
+        return tuple(providers.chain(provider))
 
     def fall_back(self, provider: Provider) -> None:
         """Runs every turn from here on under another account.

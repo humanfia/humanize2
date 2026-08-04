@@ -56,16 +56,6 @@ def agents(argv: list[str]) -> int:
         "permission=PERMISSION",
     )
     writing.add_argument(
-        "-s",
-        "--skill",
-        metavar="NAME",
-        action="append",
-        default=None,
-        dest="skills",
-        help="one of its CLI's skills to load it with; repeatable, and saying none at all "
-        "leaves it the CLI as it comes",
-    )
-    writing.add_argument(
         "--anchor",
         default="",
         metavar="TARGET",
@@ -96,7 +86,6 @@ def agents(argv: list[str]) -> int:
     return _add(
         args.name,
         args.agent,
-        skills=args.skills,
         anchor=args.anchor,
         goals=args.goals,
         force=args.force,
@@ -140,12 +129,9 @@ def _show(name: str) -> int:
     print(f"may         {runs.permission or 'whatever it is asked to'}")
     print(f"works       {runs.anchor or 'here'}")
     print(f"goals       {'on' if runs.goals else 'off'}")
-    # An agent nobody was asked about skills is its CLI as it comes, which is every skill it
-    # finds -- and is not the same answer as one that was asked and given none.
-    print(
-        "skills      "
-        + ("every skill" if runs.skills is None else ", ".join(runs.skills) or "none")
-    )
+    # The skills are the CLI's own: every one it finds here, installed and switched off the
+    # way that CLI does it, plus whatever the flow it is driving mounts onto its sessions.
+    print("skills      as its CLI finds them")
     return 0
 
 
@@ -153,7 +139,6 @@ def _add(
     name: str,
     spec: str,
     *,
-    skills: list[str] | None,
     anchor: str,
     goals: bool,
     force: bool,
@@ -188,7 +173,6 @@ def _add(
     runs = Runs(
         f"{profile.name}/{model}:{effort}",
         anchor.strip(),
-        tuple(skills) if skills is not None else None,
         permission or "",
         provider,
         goals,
@@ -233,6 +217,4 @@ def _reads(runs: Runs) -> str:
         said.append(f"on {runs.anchor}")
     if runs.permission:
         said.append(runs.permission)
-    if runs.skills is not None:
-        said.append(f"{len(runs.skills)} skills")
     return "  ".join(said)

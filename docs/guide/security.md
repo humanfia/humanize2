@@ -28,9 +28,9 @@ Drive a flow only in a workspace you are willing to have rewritten — including
 [a container of the agent's own](/features/containers), which confines the agent to that image
 but mounts your workspace into it.
 
-## A flow is a Python file, and reading one means running it
+## A flow is Python, and reading one means running it
 
-`-f` takes a Python file, and humanize imports it to find the `@flow` in it. Listing what a
+`-f` takes a flow, and humanize runs its `__init__.py` to find the `@flow` in it. Listing what a
 [flowverse](/features/flowverses) holds imports **every** file in its `flows/`.
 
 So adding a flowverse is trusting that git repository with this machine, exactly as installing a

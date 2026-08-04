@@ -16,7 +16,7 @@ import pytest
 
 from hmz.agents import AgentConfig
 from hmz.runner import NotAFlow, Runner, calls, running
-from tests.stubs import ShellAgent
+from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -63,8 +63,8 @@ def flows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     where = tmp_path / "project"
     (where / ".humanize/flows").mkdir(parents=True)
-    (where / ".humanize/flows/inner.py").write_text(INNER)
-    (where / ".humanize/flows/outer.py").write_text(OUTER)
+    written(where / ".humanize/flows", "inner", INNER)
+    written(where / ".humanize/flows", "outer", OUTER)
     monkeypatch.chdir(where)
     return where
 
@@ -90,7 +90,9 @@ def test_what_is_running_is_the_one_that_was_started_and_what_it_called(
 
 def test_the_called_flow_is_running_while_it_runs(flows: Path) -> None:
     """Read from inside it, which is the only moment it is true."""
-    (flows / ".humanize/flows/deep.py").write_text(
+    written(
+        flows / ".humanize/flows",
+        "deep",
         '"""Says what is running while it runs."""\n\n'
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
@@ -98,16 +100,18 @@ def test_the_called_flow_is_running_while_it_runs(flows: Path) -> None:
         "from hmz.runner import running\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    Path("deep.txt").write_text(" > ".join(one.flow for one in running()))\n'
+        '    Path("deep.txt").write_text(" > ".join(one.flow for one in running()))\n',
     )
-    (flows / ".humanize/flows/over.py").write_text(
+    written(
+        flows / ".humanize/flows",
+        "over",
         '"""Calls the one that says."""\n\n'
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
         "from hmz.runner import calls\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    calls("deep")(agents, task)\n'
+        '    calls("deep")(agents, task)\n',
     )
 
     Runner("over", [ShellAgent(CONFIG)]).run("go")
@@ -125,7 +129,9 @@ def test_a_flow_asked_for_by_a_name_nothing_answers_to_says_so_when_it_is_asked(
 
 def test_a_called_flow_is_handed_the_agents_it_declares(flows: Path) -> None:
     """The tuple the flow declared, named where it named them."""
-    (flows / ".humanize/flows/named.py").write_text(
+    written(
+        flows / ".humanize/flows",
+        "named",
         '"""Two agents, and it says what it calls them."""\n\n'
         "from pathlib import Path\n"
         "from typing import NamedTuple\n\n"
@@ -137,7 +143,7 @@ def test_a_called_flow_is_handed_the_agents_it_declares(flows: Path) -> None:
         "    reviewer: AgentBase\n\n\n"
         "@flow\n"
         "def run(agents: Both, task: str) -> None:\n"
-        '    Path("named.txt").write_text(type(agents).__name__ + " " + agents.builder.id)\n'
+        '    Path("named.txt").write_text(type(agents).__name__ + " " + agents.builder.id)\n',
     )
     one, two = ShellAgent(CONFIG), ShellAgent(CONFIG)
 
@@ -157,7 +163,9 @@ def test_a_called_flow_given_the_wrong_number_of_agents_says_so(flows: Path) -> 
 
 def test_a_called_flow_is_set_up_the_way_a_run_of_it_is(flows: Path) -> None:
     """Read back through the flow's own model, which is what refuses one it does not take."""
-    (flows / ".humanize/flows/settable.py").write_text(
+    written(
+        flows / ".humanize/flows",
+        "settable",
         '"""Takes a setting."""\n\n'
         "from pathlib import Path\n\n"
         "from pydantic import BaseModel\n\n"
@@ -168,7 +176,7 @@ def test_a_called_flow_is_set_up_the_way_a_run_of_it_is(flows: Path) -> None:
         "    rounds: int = 3\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> None:\n"
-        '    Path("settable.txt").write_text(str((config or Config()).rounds))\n'
+        '    Path("settable.txt").write_text(str((config or Config()).rounds))\n',
     )
 
     calls("settable")([ShellAgent(CONFIG)], "go", {"rounds": 9})
@@ -185,7 +193,9 @@ def test_a_called_flow_is_set_up_the_way_a_run_of_it_is(flows: Path) -> None:
 
 def test_a_flow_that_calls_one_written_as_a_coroutine_awaits_it(flows: Path) -> None:
     """A flow answers with whatever it answers with, so an async one is awaited by its caller."""
-    (flows / ".humanize/flows/slow.py").write_text(
+    written(
+        flows / ".humanize/flows",
+        "slow",
         '"""A flow written as a coroutine."""\n\n'
         "import asyncio\n"
         "from pathlib import Path\n\n"
@@ -195,9 +205,11 @@ def test_a_flow_that_calls_one_written_as_a_coroutine_awaits_it(flows: Path) -> 
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
         "    await asyncio.sleep(0)\n"
-        '    Path("slow.txt").write_text(",".join(one.flow for one in running()))\n'
+        '    Path("slow.txt").write_text(",".join(one.flow for one in running()))\n',
     )
-    (flows / ".humanize/flows/waits.py").write_text(
+    written(
+        flows / ".humanize/flows",
+        "waits",
         '"""Waits for the one it called."""\n\n'
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
@@ -206,7 +218,7 @@ def test_a_flow_that_calls_one_written_as_a_coroutine_awaits_it(flows: Path) -> 
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
         '    await calls("slow")(agents, task)\n'
-        '    Path("after.txt").write_text("and then this")\n'
+        '    Path("after.txt").write_text("and then this")\n',
     )
 
     Runner("waits", [ShellAgent(CONFIG)]).run("go")
@@ -235,25 +247,101 @@ def test_the_run_writes_down_the_flow_it_called(flows: Path) -> None:
 
 def test_a_flow_that_fails_is_no_longer_running(flows: Path) -> None:
     """However it ends: a list of what is running that grew would say the run never stopped."""
-    (flows / ".humanize/flows/bad.py").write_text(
+    written(
+        flows / ".humanize/flows",
+        "bad",
         '"""Raises."""\n\n'
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    raise RuntimeError("no")\n'
+        '    raise RuntimeError("no")\n',
     )
-    (flows / ".humanize/flows/tries.py").write_text(
+    written(
+        flows / ".humanize/flows",
+        "tries",
         '"""Calls the one that raises, and lets it through."""\n\n'
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
         "from hmz.runner import calls\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    calls("bad")(agents, task)\n'
+        '    calls("bad")(agents, task)\n',
     )
 
     with pytest.raises(RuntimeError, match="no"):
         Runner("tries", [ShellAgent(CONFIG)]).run("go")
 
     assert running() == ()
+
+
+def test_a_flow_rewritten_between_calls_is_the_one_that_runs_next(flows: Path) -> None:
+    """Which is what makes a loop that improves its own flows a loop that then runs them.
+
+    A flow is a directory on disk, read by running it, and `calls` reads it again at every
+    call rather than holding the function it found the first time. So a flow rewritten while
+    the run is going -- by hand, or by an agent this very flow is driving -- is run as it is
+    now. Nothing else lets a run improve the thing it is being run by.
+    """
+    written(
+        flows / ".humanize/flows",
+        "over",
+        '"""Calls the same flow twice, rewriting it in between."""\n\n'
+        "from pathlib import Path\n\n"
+        "from hmz.agents import AgentBase\n"
+        "from hmz.flows import flow\n"
+        "from hmz.runner import calls\n\n\n"
+        "@flow\n"
+        "def run(agents: tuple[AgentBase], task: str) -> None:\n"
+        '    calling = calls("inner")\n'
+        "    calling(agents, task)\n"
+        '    at = Path(".humanize/flows/inner/__init__.py")\n'
+        "    at.write_text(at.read_text().replace('Path(\"inner.txt\")', "
+        "'Path(\"rewritten.txt\")'))\n"
+        "    calling(agents, task)\n",
+    )
+
+    Runner("over", [ShellAgent(CONFIG)]).run("go")
+
+    assert (flows / "inner.txt").read_text() == "go"  # the flow as it was
+    assert (flows / "rewritten.txt").read_text() == "go"  # and as it had become
+
+
+def test_a_called_flow_brings_its_own_skills_and_hands_the_agents_back(
+    flows: Path,
+) -> None:
+    """A skill is the flow's, so the flow that called it goes on carrying its own."""
+    from hmz.agents.skills import Loaded
+
+    card = "---\nname: {name}\ndescription: does a thing\n---\n\nDo it.\n"
+    written(
+        flows / ".humanize/flows",
+        "deep",
+        INNER,
+        {"deep-notes": card.format(name="deep-notes")},
+    )
+    written(
+        flows / ".humanize/flows",
+        "over",
+        '"""Says what it is carrying, before, during and after."""\n\n'
+        "from pathlib import Path\n\n"
+        "from hmz.agents import AgentBase\n"
+        "from hmz.flows import flow\n"
+        "from hmz.runner import calls\n\n\n"
+        "@flow\n"
+        "def run(agents: tuple[AgentBase], task: str) -> None:\n"
+        "    (agent,) = agents\n"
+        '    said = [",".join(one.name for one in agent.loaded)]\n'
+        '    calls("deep")(agents, task)\n'
+        '    said.append(",".join(one.name for one in agent.loaded))\n'
+        '    Path("carried.txt").write_text("|".join(said))\n',
+        {"over-notes": card.format(name="over-notes")},
+    )
+    agent = ShellAgent(CONFIG)
+
+    Runner("over", [agent]).run("go")
+
+    # Its own before the call, and its own again after it.
+    assert (flows / "carried.txt").read_text() == "over-notes|over-notes"
+    assert [one.name for one in agent.loaded] == ["over-notes"]
+    assert isinstance(agent.loaded[0], Loaded)

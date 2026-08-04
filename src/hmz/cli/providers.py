@@ -74,6 +74,45 @@ def providers(argv: list[str]) -> int:
     dropping = doing.add_parser("remove", help="take one away, credentials and all")
     dropping.add_argument("provider", metavar="CLI/NAME")
 
+    falling = doing.add_parser(
+        "falls-back",
+        help="say which account a turn carries on under when this one fails",
+    )
+    falling.add_argument("provider", metavar="CLI/NAME")
+    falling.add_argument(
+        "at",
+        nargs="?",
+        default="",
+        metavar="NAME",
+        help="the account of that CLI to carry on under, or nothing for the end of the line",
+    )
+
+    trying = doing.add_parser(
+        "retry", help="say how a failed turn under one is tried again"
+    )
+    trying.add_argument("provider", metavar="CLI/NAME")
+    trying.add_argument(
+        "-n",
+        "--tries",
+        type=int,
+        default=0,
+        help="how many times over a failed turn is tried again, beyond the first",
+    )
+    trying.add_argument(
+        "-p",
+        "--policy",
+        default=_waits()[1],
+        help="how long to wait between tries: " + ", ".join(_waits()[0]),
+    )
+    trying.add_argument(
+        "-t",
+        "--timeout",
+        type=float,
+        default=0.0,
+        metavar="SECONDS",
+        help="the longest the trying again may go on for, or 0 for as long as it takes",
+    )
+
     args = parser.parse_args(argv)
     if args.doing in (None, "list"):
         return _list(getattr(args, "cli", ""))
@@ -89,7 +128,58 @@ def providers(argv: list[str]) -> int:
         return _remove(cli, name)
     if args.doing == "add":
         return _add(cli, name, args.way, args.given, login=not args.no_login)
+    if args.doing == "falls-back":
+        return _falls_back(cli, name, args.at)
+    if args.doing == "retry":
+        return _retry(cli, name, args.tries, args.policy, args.timeout)
     return _again(cli, name, args.given)
+
+
+def _falls_back(cli: str, name: str, at: str) -> int:
+    """Says which account a turn under this one carries on under when it fails."""
+    from hmz import providers as held
+
+    try:
+        said = held.points(cli, name, at.strip())
+    except ValueError as why:
+        print(f"hmz: {why}", file=sys.stderr)
+        return 1
+    if not said:
+        print(f"hmz: no provider {cli}/{name}", file=sys.stderr)
+        return 1
+    print(
+        f"{cli}/{name} falls back to {at.strip()}"
+        if at.strip()
+        else f"{cli}/{name} falls back to nowhere"
+    )
+    return 0
+
+
+def _retry(cli: str, name: str, tries: int, policy: str, timeout: float) -> int:
+    """Says how a failed turn under one account is tried again."""
+    from hmz import providers as held
+
+    try:
+        said = held.retrying(cli, name, tries, policy, timeout)
+    except ValueError as why:
+        print(f"hmz: {why}", file=sys.stderr)
+        return 1
+    if not said:
+        print(f"hmz: no provider {cli}/{name}", file=sys.stderr)
+        return 1
+    print(
+        f"{cli}/{name} is tried {tries} more times, {policy}"
+        if tries
+        else f"{cli}/{name} is tried once"
+    )
+    return 0
+
+
+def _waits() -> tuple[tuple[str, ...], str]:
+    """What a turn may be waited over between tries, and the one an account starts on."""
+    from hmz.providers import retry
+
+    return tuple(one.name for one in retry.POLICIES), retry.DEFAULT
 
 
 def _named(said: str) -> tuple[str, str]:
@@ -144,6 +234,16 @@ def _show(cli: str, name: str) -> int:
     print(f"way         {provider.way}")
     print(f"made        {provider.made or '-'}")
     print(f"kept in     {provider.at}")
+    print(f"falls to    {provider.fallback or 'nowhere'}")
+    print(
+        "tried       "
+        + (
+            f"{provider.retries} more times, {provider.policy}"
+            + (f", for up to {provider.timeout:.0f}s" if provider.timeout else "")
+            if provider.retries
+            else "once"
+        )
+    )
     for variable in sorted(provider.env):
         # The names, never the values: this prints where a person can read it, and a key
         # printed once is a key in a scrollback.

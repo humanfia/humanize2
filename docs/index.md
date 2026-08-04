@@ -21,7 +21,7 @@ hero:
 
 features:
   - title: One flow, many agents
-    details: A flow is a Python file that says what each agent is asked, in what order, and when to stop. Ship it, run it by name, or run one of the flows humanize already offers.
+    details: A flow is a directory of Python that says what each agent is asked, in what order, and when to stop, and carries the skills it works by. Ship it, run it by name, fork one, or run one of the flows humanize already offers.
     link: /guide/tutorial-first-flow
     linkText: Write one
   - title: Six coding agents, one interface

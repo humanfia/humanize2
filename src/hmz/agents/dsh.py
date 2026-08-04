@@ -291,8 +291,6 @@ class DshSession(SessionBase):
                 "dsh exposes no per-session sandbox or approval controls; "
                 "permission must be 'bypass'"
             )
-        if self._agent.config.skills is not None:
-            raise ValueError("dsh does not support selecting skills per agent")
 
     def _require_key(self, session_id: str) -> None:
         """Refuses an explicitly selected account that cannot authenticate dsh."""

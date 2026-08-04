@@ -29,11 +29,10 @@ from .base import AgentBase, SessionBase
 from .config import AgentConfig
 from .event import Event, Question, Usage, say
 from .hooks import EVERYWHERE, Moment, Occasion
-from .skills import leaving
 
 if TYPE_CHECKING:
     import os
-    from collections.abc import Callable, Iterator, Mapping, Sequence
+    from collections.abc import Callable, Iterator, Mapping
 
     from pydantic import BaseModel
 
@@ -705,20 +704,6 @@ class _AppServer:
         return message.get("result")
 
 
-def _toml(off: Sequence[str]) -> str:
-    """The skills to switch off, as Codex's own `skills.config` states them.
-
-    Args:
-      off: The names, as the CLI knows them.
-
-    Returns:
-      The value of the override, which `-c` reads as TOML: one inline table per skill, saying
-      that skill is off. A name is quoted with `json.dumps`, whose string is TOML's own.
-    """
-    said = ", ".join(f"{{name={json.dumps(one)}, enabled=false}}" for one in off)
-    return f"[{said}]"
-
-
 @dataclass(frozen=True, kw_only=True)
 class CodexAgentConfig(AgentConfig):
     """What Codex is configured with: the common model and effort, and nothing else."""
@@ -950,17 +935,6 @@ class CodexAgent(AgentBase):
                     # session belonging to the user.
                     argv += ["--disable", "goals"]
                 argv += ["--stdio"]
-                anchor = self.anchor
-                # Where the work lands is where the project's own skills are, which is this
-                # directory unless the mirror was put somewhere else.
-                mirror = (anchor.shadow or anchor.workspace) if anchor else None
-                if off := leaving(self.backend, self.config.skills, mirror):
-                    # The same setting Codex writes when a skill is switched off in its own
-                    # interface, given as an override of this server rather than written to
-                    # the config: the server is this agent's, so a skill switched off here is
-                    # off for this agent and for nobody else -- and the user's own settings
-                    # are left exactly as they were.
-                    argv += ["-c", f"skills.config={_toml(off)}"]
                 self._server = _AppServer(self.spawned(argv), self._environ())
                 self._server._agents.append(self)
                 # Held by the finalizer alone, which is what takes the server down: when the

@@ -17,7 +17,7 @@ Type "cd /work/demo && clear" Enter
 Show
 
 Sleep 500ms
-Type "cat .humanize/flows/twice.py" Enter
+Type "cat .humanize/flows/twice/__init__.py" Enter
 Sleep 3s
 
 Type `hmz exec -f twice -a claude:high "fix the build"` Enter

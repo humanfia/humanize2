@@ -16,8 +16,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.flows import BUILTIN, FLOWS, OFFICIAL, find, flowverses, found
+from hmz.flows import BUILTIN, ENTRY, FLOWS, OFFICIAL, find, flowverses, found
 from hmz.flows import verses as store
+from tests.stubs import written
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -46,8 +47,8 @@ def theirs(tmp_path: Path) -> Path:
     """A repository of two flows and something they import, to be fetched from."""
     where = tmp_path / "theirs"
     (where / FLOWS).mkdir(parents=True)
-    (where / FLOWS / "loop.py").write_text(FLOW)
-    (where / FLOWS / "review.py").write_text(FLOW)
+    written(where / FLOWS, "loop", FLOW)
+    written(where / FLOWS, "review", FLOW)
     # Not a flow: what the flows beside it import, which is what the underscore means.
     (where / FLOWS / "_shared.py").write_text("HELD = 1\n")
     # Nor is anything else the repository is made of: it is outside the flows directory, and
@@ -86,7 +87,7 @@ def test_the_flows_humanize_ships_are_read_where_they_stand() -> None:
 
     assert store.holds(one) == one.at
     assert "chat" in store.flows(one)
-    assert find("chat") == str((one.at / "chat.py").resolve())
+    assert find("chat") == str((one.at / "chat" / ENTRY).resolve())
 
 
 def test_the_official_one_is_offered_before_it_is_fetched() -> None:
@@ -125,7 +126,7 @@ def test_it_may_be_called_something_else_here(theirs: Path) -> None:
     added = store.add(str(theirs), "mine")
 
     assert added.name == "mine"
-    assert (store.under() / "mine" / FLOWS / "loop.py").is_file()
+    assert (store.under() / "mine" / FLOWS / "loop" / ENTRY).is_file()
 
 
 def test_adding_one_twice_is_refused(theirs: Path) -> None:
@@ -146,17 +147,15 @@ def test_a_repository_that_is_not_there_says_so(tmp_path: Path) -> None:
 def test_fetching_takes_what_the_repository_says_now(theirs: Path) -> None:
     """A flowverse is a copy of somebody's repository, so a fetch is what it says now."""
     store.add(str(theirs))
-    (theirs / FLOWS / "loop.py").write_text(
-        FLOW.replace("A flow", "The same flow, changed")
-    )
-    (theirs / FLOWS / "third.py").write_text(FLOW)
+    written(theirs / FLOWS, "loop", FLOW.replace("A flow", "The same flow, changed"))
+    written(theirs / FLOWS, "third", FLOW)
     _git("add", "-A", at=theirs)
     _git("commit", "-m", "another", at=theirs)
 
     again = store.fetch("theirs")
 
     assert store.flows(again) == ["loop", "review", "third"]
-    assert "changed" in (store.holds(again) / "loop.py").read_text()
+    assert "changed" in (store.holds(again) / "loop" / ENTRY).read_text()
 
 
 def test_fetching_one_that_was_never_fetched_clones_it(
@@ -251,7 +250,7 @@ def test_a_repository_with_no_flows_directory_holds_nothing(tmp_path: Path) -> N
     """Somebody's repository that keeps its flows elsewhere, which is a thing to say."""
     where = tmp_path / "elsewhere"
     where.mkdir()
-    (where / "loop.py").write_text(FLOW)
+    written(where, "loop", FLOW)
     _git("init", "-b", "main", at=where)
     _git("config", "user.email", "t@example.com", at=where)
     _git("config", "user.name", "t", at=where)
@@ -267,7 +266,7 @@ def test_a_repository_with_no_flows_directory_holds_nothing(tmp_path: Path) -> N
 
 def test_a_flow_that_will_not_import_is_still_offered(theirs: Path) -> None:
     """It is a flow somebody named, and saying so where they pick it beats hiding it."""
-    (theirs / FLOWS / "broken.py").write_text("import nothing_of_the_sort\n")
+    written(theirs / FLOWS, "broken", "import nothing_of_the_sort\n")
     _git("add", "-A", at=theirs)
     _git("commit", "-m", "a flow that will not load", at=theirs)
     store.add(str(theirs))
@@ -279,7 +278,7 @@ def test_a_flow_of_a_flowverse_is_found_by_that_name(theirs: Path) -> None:
     store.add(str(theirs))
 
     assert find("theirs/loop") == str(
-        (store.under() / "theirs" / FLOWS / "loop.py").resolve()
+        (store.under() / "theirs" / FLOWS / "loop" / ENTRY).resolve()
     )
     # And a name nothing answers to is handed back as it was given, to be said about.
     assert find("theirs/nothing") == "theirs/nothing"
@@ -291,14 +290,13 @@ def test_a_flow_of_your_own_still_wins_a_bare_name(
     """Nearest first: a flowverse is further away than this project's own flows directory."""
     store.add(str(theirs))
     project = tmp_path / "project"
-    (project / ".humanize/flows").mkdir(parents=True)
-    (project / ".humanize/flows/loop.py").write_text(FLOW)
+    written(project / ".humanize/flows", "loop", FLOW)
     monkeypatch.chdir(project)
 
-    assert find("loop") == str((project / ".humanize/flows/loop.py").resolve())
+    assert find("loop") == str((project / ".humanize/flows/loop" / ENTRY).resolve())
     # But the flowverse's own name for it is not a name anything of yours can stand in for.
     assert find("theirs/loop") == str(
-        (store.under() / "theirs" / FLOWS / "loop.py").resolve()
+        (store.under() / "theirs" / FLOWS / "loop" / ENTRY).resolve()
     )
 
 
@@ -319,3 +317,18 @@ def test_a_flowverse_that_has_not_been_fetched_says_so_rather_than_that_there_is
 
     with pytest.raises(NotAFlow, match="has not been fetched yet"):
         drives(f"{OFFICIAL}/rlar")
+
+
+def test_a_flowverse_may_hold_a_flow_that_is_one_file(theirs: Path) -> None:
+    """A flow is a module, and both shapes of one are offered under the flowverse's name."""
+    (theirs / FLOWS / "alone.py").write_text(FLOW)
+    _git("add", "-A", at=theirs)
+    _git("commit", "-m", "one that is a file", at=theirs)
+    store.add(str(theirs))
+
+    named = [one.name for one in found() if one.whose == "theirs"]
+
+    assert named == ["theirs/alone", "theirs/loop", "theirs/review"]
+    assert find("theirs/alone") == str(
+        (store.under() / "theirs" / FLOWS / "alone.py").resolve()
+    )

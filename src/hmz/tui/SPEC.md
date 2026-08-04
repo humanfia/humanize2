@@ -244,6 +244,11 @@ adjusted rather than chosen.
   each of them MUST be set up as it now stands from its next turn on. A CLI that has changed
   MUST NOT be swapped under the flow holding that agent -- a backend is the class the agent is
   -- and MUST be said to take effect from the next run rather than silently doing nothing.
+- A flow MUST be copyable into this project's own flows from the page it is chosen on, on a
+  key. A flow is a directory, so the copy MUST be the whole of it -- what it imports and the
+  skills it brings -- and MUST land under the name it already had, which from then on means
+  the copy. It is the only way to change a flow that keeps: a flowverse is somebody else's
+  repository and is fetched again over whatever was written into it.
 - The flows MUST be read a place at a time, the arrows stepping between the places: every
   flowverse there is, fetched or not, and then this project's flows and yours where there are
   any. All of them in one list under headings was a list nobody could see the end of, and one
@@ -290,8 +295,8 @@ adjusted rather than chosen.
 ### What one agent is
 
 - Everything one agent is MUST be one sheet of rows rather than a walk of a sheet per question:
-  an agent is one thing with a CLI, an account, a model at an effort, a set of skills, a rung
-  of what it may do and a machine its work lands on. A walk meant that changing the effort of
+  an agent is one thing with a CLI, an account, a model at an effort, a rung of what it may do
+  and a machine its work lands on. A walk meant that changing the effort of
   an agent already set up was four keypresses through two sheets with nothing to say.
 - The rows MUST be in the order of what depends on what: the CLI settles which accounts there
   are and which models that CLI will name, and the account settles which of them it may name.
@@ -308,7 +313,7 @@ adjusted rather than chosen.
 - Nothing MUST be typed in that could be found: the CLIs offered MUST be the ones installed
   here less any the flow ruled out, the models offered MUST be the ones that CLI said it runs
   as the account chosen for it, the efforts offered MUST be the ones that model takes, and the
-  skills offered MUST be the ones that CLI would load. Nothing MUST be asked of a CLI while a
+  skills shown MUST be the ones that CLI would load. Nothing MUST be asked of a CLI while a
   sheet is being drawn -- starting one costs seconds a prompt has not got -- so what was kept
   is what is read.
 - The models MUST be askable again from the sheet they are chosen on, on `r`, which is the key
@@ -322,10 +327,10 @@ adjusted rather than chosen.
 - An account MUST be makeable from the row that asks for one. That row is where somebody finds
   out they have none for that CLI, and sending them to another command to make one loses the
   question they were answering.
-- The skills sheet MUST be a checklist: every skill starts on, which is how a CLI comes, and
-  space MUST switch the one under the cursor. What it answers with MUST be the skills the agent
-  is to have. A CLI that offers no way of being told which to load MUST say that, rather than
-  that none are installed.
+- The skills sheet MUST be a reading and MUST NOT be a checklist: the skills a CLI finds are
+  that CLI's own, installed and switched off where that CLI keeps them, and the sheet MUST say
+  so under the list rather than offer a switch. A CLI that keeps none anywhere MUST say that,
+  rather than that none are installed.
 
 ### The agents kept under a name
 
@@ -344,8 +349,14 @@ adjusted rather than chosen.
 - The accounts menu MUST list every account there is under a heading per CLI, and MUST be read
   rather than chosen from: which account an agent runs as is asked where that agent is set up.
   Enter MUST correct what one holds; `a` MUST make one; `d` twice MUST take one away; and
-  signing one in again and marking one as where a turn goes when another account fails MUST be
-  keys of the same page.
+  signing one in again, saying which account this one falls back to and saying how a failed
+  turn under it is tried again MUST be keys of the same page.
+- Where an account falls back to MUST be chosen from that CLI's own other accounts, and MUST
+  offer the end of the line first: each account naming the next is what makes a chain, and an
+  account cannot fall back to itself.
+- How an account is tried again MUST be three rungs stepped where they stand -- how many
+  tries, which wait, and how long the whole may go on for -- rather than three numbers to
+  type: a text box for an integer is a text box to validate.
 - A row MUST say the name, the way it was made by and the variables it sets. Their names and
   never a value: this is drawn where somebody can read it, and a key on a screen is a key in a
   photograph. A secret MUST NOT be read back onto the screen to be corrected -- it is typed

@@ -98,9 +98,10 @@ def _project() -> None:
     WORK.mkdir(parents=True, exist_ok=True)
     for name, text in PROJECT.items():
         (WORK / name).write_text(text, encoding="utf-8")
-    flows = WORK / ".humanize" / "flows"
+    # A flow is a directory: the `__init__.py` that is the flow, and whatever it brings.
+    flows = WORK / ".humanize" / "flows" / "twice"
     flows.mkdir(parents=True, exist_ok=True)
-    (flows / "twice.py").write_text(FLOW, encoding="utf-8")
+    (flows / "__init__.py").write_text(FLOW, encoding="utf-8")
 
     if shutil.which("git") is None:
         return

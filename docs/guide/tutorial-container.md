@@ -23,7 +23,7 @@ network access to a model provider, and no login.
 The usual way. The flow writes the image beside the place, and nobody is asked anything:
 
 ```python
-# .humanize/flows/tested.py
+# .humanize/flows/tested/__init__.py
 """Build here; run the suite in a container that has the right Python."""
 
 from typing import Annotated, NamedTuple

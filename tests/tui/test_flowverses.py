@@ -25,6 +25,7 @@ from hmz.flows import OFFICIAL, flowverses
 from hmz.flows import verses as store
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Configures, Fetches, Flows
+from tests.stubs import written
 
 from .test_app import into_agent, onto, until
 
@@ -57,7 +58,7 @@ def theirs(tmp_path: Path) -> Path:
     """A repository of one flow, to be fetched from."""
     where = tmp_path / "theirs"
     (where / store.FLOWS).mkdir(parents=True)
-    (where / store.FLOWS / "loop.py").write_text(FLOW)
+    written(where / store.FLOWS, "loop", FLOW)
     _git("init", "-b", "main", at=where)
     _git("config", "user.email", "t@example.com", at=where)
     _git("config", "user.name", "t", at=where)
@@ -198,7 +199,7 @@ async def test_the_keys_stay_inside_the_terminal(tmp_path: Path) -> None:
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
     for n in range(20):
-        (where / f"flow_{n:02d}.py").write_text(FLOW)
+        written(where, f"flow_{n:02d}", FLOW)
     app = Humanize()
     async with app.run_test(size=(80, 20)) as driver:
         await _open(app, driver)
@@ -239,14 +240,14 @@ async def test_the_flows_of_your_own_are_a_place_of_their_own(tmp_path: Path) ->
     """A directory is not a flowverse, but it is a place flows come from, so it is one."""
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
-    (where / "mine.py").write_text(FLOW)
+    written(where, "mine", FLOW)
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
         assert "local" in _places(sheet)
         await _steps(app, driver, "local")
-        assert _rows(sheet) == [".humanize/flows/mine.py"]
+        assert _rows(sheet) == [".humanize/flows/mine"]
 
 
 @pytest.mark.timeout(60)
@@ -482,19 +483,19 @@ async def test_one_of_the_flows_a_file_holds_is_chosen_like_any_other(
     """The walk on from it is that flow's own: its agents, and the settings it takes."""
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
-    (where / "three.py").write_text(THREE)
+    written(where, "three", THREE)
     app = Humanize()
     async with app.run_test() as driver:
         await _open(app, driver)
         sheet = await _steps(app, driver, "local")
 
         assert _rows(sheet) == [
-            ".humanize/flows/three.py:gen-idea",
-            ".humanize/flows/three.py:rlcr",
+            ".humanize/flows/three:gen-idea",
+            ".humanize/flows/three:rlcr",
         ]
 
         # The second of them, which drives two agents.
-        await onto(app, driver, "local\x1f.humanize/flows/three.py:rlcr")
+        await onto(app, driver, "local\x1f.humanize/flows/three:rlcr")
         await driver.press("enter")
 
         # On to what that flow drives, rather than a refusal that the file has no `run`.
@@ -516,7 +517,7 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
     """Choosing one asks what that phase takes, which is not what the one beside it takes."""
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
-    (where / "three.py").write_text(THREE)
+    written(where, "three", THREE)
     app = Humanize()
     async with app.run_test() as driver:
         await _open(app, driver)
@@ -524,7 +525,7 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
         await until(lambda: bool(_rows(sheet)), driver)
 
         # The first of them, which says it takes an `n`.
-        await onto(app, driver, "local\x1f.humanize/flows/three.py:gen-idea")
+        await onto(app, driver, "local\x1f.humanize/flows/three:gen-idea")
         await driver.press("enter")
 
         await until(lambda: isinstance(app.screen, Configures), driver)
@@ -535,8 +536,58 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
         await until(lambda: sheet._tab == 1, driver)
         await driver.press("shift+tab")
         await until(lambda: sheet._tab == 0, driver)
-        await onto(app, driver, "local\x1f.humanize/flows/three.py:rlcr")
+        await onto(app, driver, "local\x1f.humanize/flows/three:rlcr")
         await driver.press("enter")
         await until(lambda: sheet._tab == 1, driver)
 
         assert isinstance(app.screen, Flows)
+
+
+@pytest.mark.timeout(60)
+async def test_a_flow_is_copied_here_to_be_changed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`f` on one is the way to change a flow at all, since a fetched one is fetched over.
+
+    A flow is a directory, so a copy of one is a flow: what it imports and the skills it
+    brings come across with it, under the name it already had -- and your own flows are
+    looked in first, so from then on that name means the copy.
+    """
+    monkeypatch.chdir(tmp_path)
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+        await onto(app, driver, "builtin\x1fchat")
+
+        await driver.press("f")
+        await until(lambda: "copied to" in _under(sheet), driver)
+
+        assert "chat now means it" in _under(sheet)
+        # And it is a flow of your own from here on, listed where your own are.
+        await _steps(app, driver, "local")
+        assert _rows(sheet) == [".humanize/flows/chat"]
+
+    at = tmp_path / ".humanize" / "flows" / "chat"
+    assert "one agent, one session" in (at / "__init__.py").read_text()
+    from hmz.flows import find
+
+    assert find("chat") == str(at / "__init__.py")
+
+
+@pytest.mark.timeout(60)
+async def test_copying_one_twice_says_the_copy_is_already_there(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A copy already made is one to edit, run or take away rather than one to write over."""
+    monkeypatch.chdir(tmp_path)
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+        await onto(app, driver, "builtin\x1fchat")
+        await driver.press("f")
+        await until(lambda: "copied to" in _under(sheet), driver)
+
+        await _steps(app, driver, "builtin")
+        await onto(app, driver, "builtin\x1fchat")
+        await driver.press("f")
+        await until(lambda: "already a flow of your own" in _under(sheet), driver)

@@ -24,7 +24,7 @@ Walk down to the `official` heading. If it has nothing under it, press **r** to
 fetch it. It keeps drawing while it clones, and says underneath what became of it.
 
 ::: danger Adding a flowverse is trusting that repository with this machine
-A flow is a Python file, and listing what a flowverse holds **imports every file in its
+A flow is Python, and listing what a flowverse holds **runs the entry point of every flow in its
 `flows/`**.
 `official` is [humanfia/flowverse](https://github.com/humanfia/flowverse). See
 [Security](/guide/security).

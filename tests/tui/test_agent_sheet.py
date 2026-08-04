@@ -23,6 +23,7 @@ from hmz.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.pick import Agent, Anchors, Catalogue, Clis, Confirms, Flows
 from hmz.tui.settings import Settings
+from tests.stubs import written
 
 from .test_app import drops, into_agent, keeps, onto, opens, rows, until
 
@@ -125,10 +126,10 @@ def flows(tmp_path: Path) -> Path:
     """Puts the four flows where this project's own would be."""
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
-    (where / "here.py").write_text(HERE)
-    (where / "remote.py").write_text(REMOTE)
-    (where / "boxed.py").write_text(BOXED)
-    (where / "pair.py").write_text(PAIR)
+    written(where, "here", HERE)
+    written(where, "remote", REMOTE)
+    written(where, "boxed", BOXED)
+    written(where, "pair", PAIR)
     return where
 
 
@@ -434,7 +435,9 @@ async def test_the_flow_may_rule_a_backend_out_of_the_clis_offered(
     """A CLI that cannot do what the place needs is one choosing would refuse to start on."""
     where = tmp_path / ".humanize" / "flows"
     where.mkdir(parents=True)
-    (where / "goal.py").write_text(
+    written(
+        where,
+        "goal",
         '''
 """One agent, under a goal of its own."""
 
@@ -453,7 +456,7 @@ class Agents(NamedTuple):
 @flow
 def run(agents: Agents, task: str) -> None:
     pass
-'''
+''',
     )
     app = Humanize()
     async with app.run_test() as driver:

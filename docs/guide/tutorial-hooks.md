@@ -13,7 +13,7 @@ Codex — they are the two backends that run `PERMISSION_REQUEST`.
 The gentlest hook does nothing but look:
 
 ```python
-# .humanize/flows/watched.py
+# .humanize/flows/watched/__init__.py
 """A Ralph loop that says what its agent reached for."""
 
 from hmz.agents import AgentBase, Moment, Occasion, Verdict

@@ -29,7 +29,6 @@ def test_one_written_down_is_one_the_interface_would_find() -> None:
     kept = Templates().find("mine")
     assert kept is not None
     assert kept.runs.spec == "claude/claude-opus-5:high"
-    assert kept.runs.skills is None  # never asked, which is its CLI as it comes
 
 
 def test_the_account_and_the_rest_are_written_down_too() -> None:
@@ -39,10 +38,6 @@ def test_the_account_and_the_rest_are_written_down_too() -> None:
             "add",
             "remote",
             "codex@work/gpt-5.6:high",
-            "-s",
-            "docs",
-            "-s",
-            "review",
             "--anchor",
             "ssh://build-box",
             "--no-goals",
@@ -53,7 +48,6 @@ def test_the_account_and_the_rest_are_written_down_too() -> None:
     kept = Templates().find("remote")
     assert kept is not None
     assert kept.runs.provider == "work"
-    assert kept.runs.skills == ("docs", "review")
     assert kept.runs.anchor == "ssh://build-box"
     assert kept.runs.goals is False
 

@@ -14,7 +14,7 @@ A loop that has more than one turn going at a time has to be able to wait for se
 once. So write `async def run`:
 
 ```python
-# .humanize/flows/fanout.py
+# .humanize/flows/fanout/__init__.py
 """One agent, one turn per file, all of them going at once."""
 
 import asyncio

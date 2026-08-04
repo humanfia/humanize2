@@ -56,7 +56,6 @@ class AgentConfig:
     model: str
     effort: str
     machine: MachineConfig | None = None
-    skills: tuple[str, ...] | None = None
     permission: str = "bypass"
     provider: str = ""
     goals: bool = True
@@ -81,11 +80,10 @@ class AgentConfig:
   `hmz.providers` provider of its CLI was made under, or "" for the CLI as whoever is at
   this machine already runs it. It is a setting of the agent because it is the agent that
   signs in: two agents of one CLI on two accounts are two accounts running at once.
-- `skills` MUST be the skills of its CLI the agent is to have, and MUST say what it has rather
-  than what it has not: an agent told which skills to have has exactly those, whatever is
-  installed afterwards. `None` MUST be the CLI as it comes, which is every skill it finds, and
-  MUST be what an agent nobody has been asked about is left as -- an empty tuple is a choice
-  and says none of them.
+- What skills an agent carries MUST NOT be a setting of it. A skill installed on this machine
+  is its CLI's own -- installed the way that CLI installs one, switched off the way that CLI
+  switches one off -- and humanize MUST NOT rewrite, override or disable any of them. What a
+  flow brings MUST be mounted onto the sessions it opens instead, which is `hmz.flows.skills`.
 - An anchored turn MUST be run by spawning `AnchorConfig.command(argv)`, never by calling
   coganchor in this process: a turn is pumped from threads of its own, which a supervisor that
   forks the agent and takes the process's signal handling cannot be given.
@@ -116,22 +114,16 @@ class Skill:
 
 def skills(backend: str, where: Path | str | None = None) -> list[Skill]:
     """The skills one backend would load here, the way that backend finds them."""
-
-
-def leaving(
-    backend: str, wanted: Iterable[str] | None, where: Path | str | None = None
-) -> list[str]:
-    """The skills to switch off, for an agent that is to have the ones it was given."""
 ```
 
 - Nothing MUST be asked of the CLI: starting one costs seconds a prompt does not have, so the
   skills MUST be found where that CLI looks for them -- which is written down in
   `hmz.backends` and read from here. A skill MUST be named as the CLI names it: what its
   front matter says, or the directory it is in where it says nothing.
-- Here rather than beside whatever offers them, because both halves need the same list: an
-  interface asking which skills an agent is to have, and the driver that then has to tell the
-  backend. `leaving` MUST be that second half -- an agent says what it has and every backend is
-  told what it has not, and only looking says which those are.
+- This MUST be a reading and nothing else. Whatever shows the list -- an interface, a command
+  line -- MUST show it as the CLI's own and MUST offer no way of switching one off: what a
+  person installed is not something a flow is entitled to rewrite, and a list adjusted here
+  while the CLI's own list said otherwise would be two answers to one question.
 
 ## `base.py`
 
@@ -483,9 +475,7 @@ class DummySession(CommandSessionBase): ...
 - A backend told where to work MUST be told the directory the anchor puts it in, which is the
   workspace itself unless the mirror was put somewhere else, and this one when it is not
   anchored at all.
-- An agent told which skills to have MUST have the rest of them switched off through whatever
-  the backend takes for it -- a flag of the command line, an override of the server it is
-  driven through -- and MUST NOT be given them by writing the CLI's own settings: two agents of
-  one flow may be loaded differently, and neither is a reason to change what the person who
-  started the flow has installed. A backend with no way of being told MUST offer none, rather
-  than a list nothing acts on.
+- A driver MUST NOT switch a skill of its CLI on or off, and MUST NOT write the CLI's own
+  settings to do it: what the person who started the flow has installed is theirs. The skills
+  a flow brings MUST reach a session by being mounted where that backend reads them, which is
+  `hmz.flows.skills` and `Profile.mounts`.

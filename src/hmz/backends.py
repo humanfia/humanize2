@@ -150,6 +150,11 @@ class Profile:
         it goes on reading it wherever `home_var` has moved its own home to.
       works: The same, under the workspace rather than under either home: a skill kept beside
         the project it is for. A backend may read more than one such directory.
+      mounts: Which of those directories a flow's own skills are mounted into for the length
+        of a session -- written as the directory rather than as a glob, since this is the one
+        that is written to rather than read. Empty for a backend that reads none, whose
+        skills are all its own installed ones: a flow that brings skills brings that backend
+        none, which is a turn run without them rather than a run that will not start.
       efforts: How hard this backend can be asked to think, hardest first, in its own wording.
         The whole ladder it has words for; a model of it takes some of them, and which ones is
         the backend's to say when it is asked what it runs.
@@ -186,6 +191,7 @@ class Profile:
     skills: tuple[str, ...] = ()
     shared: tuple[str, ...] = ()
     works: tuple[str, ...] = ()
+    mounts: str = ""
     beyond: tuple[str, ...] = ()
     swarms: bool = False
     creds: tuple[str, ...] = ()
@@ -307,6 +313,10 @@ PROFILES = (
         # reach for, as `Skill(<name>)`.
         skills=("skills/*/SKILL.md",),
         works=(".claude/skills/*/SKILL.md",),
+        # Where a flow's own skills go for the length of a session: the directory Claude
+        # reads a project's skills out of, which is the one place a skill can be given to it
+        # without touching what the person at this machine has installed.
+        mounts=".claude/skills",
         # Two files, and the second of them is the one people forget: the session lives in
         # `.credentials.json`, and the account it belongs to -- with the API key a run was
         # approved for beside it -- lives in `.claude.json`, which sits outside the home
@@ -453,6 +463,9 @@ PROFILES = (
         skills=("skills/*/SKILL.md",),
         shared=(".agents/skills/*/SKILL.md",),
         works=(".agents/skills/*/SKILL.md", ".codex/skills/*/SKILL.md"),
+        # The shared one of its two, being the directory more than one of these CLIs has
+        # agreed to read: a flow's skill mounted there is one whichever of them is driving.
+        mounts=".agents/skills",
         # One file, whichever way it was signed into: the subscription's tokens and an API
         # key land in the same place, under the mode that says which of them is in force.
         creds=("auth.json",),
@@ -558,9 +571,10 @@ PROFILES = (
         # the others beside it are the plan, the rewind points and what it was told.
         logs=("sessions/*/{ident}/updates.jsonl",),
         efforts=_GROK,
-        # No skills named: Grok Build finds them in its own home, in the shared `.agents` and
-        # in the project, but offers no way of choosing between them for one run -- which of
-        # them are off is a line in its config file. A list nothing acts on is a list that lies.
+        # No skills listed to be shown: Grok Build finds them in its own home, in the shared
+        # `.agents` and in the project, and none of that is humanize's to list twice. It does
+        # read the shared directory, so a flow's own skills reach it there.
+        mounts=".agents/skills",
         #
         # Two files: the accounts it has signed into, keyed by the way each was signed in, and
         # the tokens its MCP servers handed back, which are somebody else's and kept apart.
@@ -724,9 +738,9 @@ PROFILES = (
         # directory the work was done in.
         logs=("projects/*/chats/{ident}.jsonl",),
         efforts=_QWEN,
-        # No skills named: it reads them from its own home, from the shared `.agents` and from
-        # the project, and has no flag that says which to load -- `settings.json` is where
-        # that is said, and a list nothing acts on is a list that lies.
+        # The same: it reads its own home, the shared `.agents` and the project, so a flow's
+        # skills reach it through the shared directory.
+        mounts=".agents/skills",
         #
         # What its own sign-in leaves behind, and the lock two of its processes rotate the
         # token under. Everything else it runs as is a variable.

@@ -31,7 +31,7 @@ Python file below here to see which declare a flow — a guess, and far too slow
 keystrokes.
 
 ```
-/flow ./flows/mine.py
+/flow ./flows/mine
 ```
 
 Nothing else completes either. Model ids are chosen on the `/agents` sheet, where the list is

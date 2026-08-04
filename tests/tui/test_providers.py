@@ -363,7 +363,7 @@ async def test_the_account_an_agent_runs_as_is_the_first_thing_asked_about_it(
         # And on the line above the prompt, beside what it runs.
         assert "deepseek" in str(app.query_one("#above", Static).content)
 
-    chosen = Runs("claude/claude-opus-5:high", "", None, "", "deepseek")
+    chosen = Runs("claude/claude-opus-5:high", "", "", "deepseek")
     assert app._models == [chosen]
     assert app.settings.agents(app._flow_named) == [chosen]
     assert reads(("builder",), [chosen]) == [
@@ -429,7 +429,7 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
     made = providers.find("claude", "mine")
     assert made is not None
     assert dict(made.env) == {"ANTHROPIC_API_KEY": "not-a-key"}
-    assert app._models == [Runs("claude/claude-opus-5:high", "", None, "", "mine")]
+    assert app._models == [Runs("claude/claude-opus-5:high", "", "", "mine")]
     # The backends installed here are asked as the interface opens, and an account as it
     # lands: an account is made in order to run turns as, and which models those turns may
     # name is the account's rather than this machine's.
@@ -663,9 +663,14 @@ async def test_correcting_what_one_holds_is_held_until_the_menu_is_saved() -> No
 
 
 @pytest.mark.timeout(60)
-async def test_marking_one_as_a_fallback_is_held_until_the_menu_is_saved() -> None:
-    """It is a property of the account: what goes down is what needs somewhere else to run."""
+async def test_where_one_falls_back_to_is_chosen_and_held_until_the_menu_is_saved() -> (
+    None
+):
+    """A name rather than a mark: each account names the next, so a turn walks a chain."""
+    from hmz.tui.pick import Falls
+
     providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "k"})
+    providers.add("codex", "spare", way="key", env={"OPENAI_API_KEY": "s"})
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"/providers")
@@ -676,17 +681,67 @@ async def test_marking_one_as_a_fallback_is_held_until_the_menu_is_saved() -> No
         )
 
         await driver.press("f")
-        await driver.pause()
-        held = providers.find("codex", "work")
+        await until(lambda: isinstance(app.screen, Falls), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        # The end of the line first, and then that CLI's own other accounts -- never itself.
+        assert [str(one.id) for one in listing.options] == ["=", "=work"]
+
+        await driver.press("down", "enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        held = providers.find("codex", "spare")
         assert held is not None
         assert not held.fallback  # said, and held until the menu is saved
 
         await keeps(app, driver)
         await until(lambda: not isinstance(app.screen, Providers), driver)
 
-    marked = providers.find("codex", "work")
-    assert marked is not None
-    assert marked.fallback
+    chained = providers.find("codex", "spare")
+    assert chained is not None
+    assert chained.fallback == "work"
+
+
+@pytest.mark.timeout(60)
+async def test_how_one_is_tried_again_is_stepped_and_held_until_the_menu_is_saved() -> (
+    None
+):
+    """A gateway that answered 503 is the same call away from working, so it gets a try."""
+    from hmz.tui.pick import Retries
+
+    providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "k"})
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        await driver.press("t")
+        await until(lambda: isinstance(app.screen, Retries), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        assert [str(one.id) for one in listing.options] == ["=tries", "=policy", "=for"]
+
+        await driver.press("right")  # one try beyond the first
+        await driver.press("down", "right")  # and the wait after it stepped on one,
+        # which from the exponential backoff every one of these services documents is the
+        # next of the ones everybody uses.
+        await driver.pause()
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        held = providers.find("codex", "work")
+        assert held is not None
+        assert held.retries == 0  # said, and held until the menu is saved
+
+        await keeps(app, driver)
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    tried = providers.find("codex", "work")
+    assert tried is not None
+    assert tried.retries == 1
+    assert tried.policy == "fibonacci"
 
 
 @pytest.mark.timeout(60)
@@ -735,7 +790,7 @@ def test_an_agent_is_made_as_the_account_it_was_given() -> None:
 
     _account()
     app = Humanize()
-    app._models = [Runs("claude/m:high", "", None, "", "deepseek")]
+    app._models = [Runs("claude/m:high", "", "", "deepseek")]
     made = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
 
     (agent,) = app._as_they_were_set_up([made])
@@ -757,7 +812,7 @@ async def test_an_agent_told_to_run_as_nobody_is_a_line_to_correct(
     """An agent that cannot find its account must not quietly run as whoever started it."""
     app = Humanize()
     async with app.run_test() as driver:
-        app._models = [Runs("claude/claude-opus-5:max", "", None, "", "nonesuch")]
+        app._models = [Runs("claude/claude-opus-5:max", "", "", "nonesuch")]
         await driver.press(*"go")
         await driver.press("enter")
         await until(lambda: "nonesuch" in _transcript(app), driver)
@@ -771,16 +826,16 @@ async def test_an_agent_told_to_run_as_nobody_is_a_line_to_correct(
 
 
 def test_what_an_agent_runs_as_is_kept_and_read_back(tmp_path: Path) -> None:
-    """As the anchor and the skills are: written only where there is an account to write."""
+    """As the anchor is: written only where there is an account to write."""
     kept = Settings(tmp_path)
     kept.remember(
         "rlar",
         ("actor", "reviewer"),
-        [Runs("claude/m:high", "", None, "", "deepseek"), Runs("codex/n:low")],
+        [Runs("claude/m:high", "", "", "deepseek"), Runs("codex/n:low")],
     )
 
     assert Settings(tmp_path).agents("rlar") == [
-        Runs("claude/m:high", "", None, "", "deepseek"),
+        Runs("claude/m:high", "", "", "deepseek"),
         Runs("codex/n:low"),
     ]
     held = Settings(tmp_path)._read()

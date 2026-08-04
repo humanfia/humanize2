@@ -1,12 +1,12 @@
 """Where flows come from, when they come from somewhere else.
 
-A flowverse is a git repository with a `flows/` directory in it: `.py` files, one flow apiece
-or several where a file says so, and whatever they import beside them under names that start
-with an underscore. It is cloned into `~/.humanize/flowverses/<name>/`, and every flow in it is
-offered under that name. Only that directory is read, so a repository is free to be a
-repository around it -- a README, a pyproject, a test suite -- without any of it being taken
-for a flow and run to find out. `builtin` is the one that has no repository around it, being
-the package's own, and is read where it stands.
+A flowverse is a git repository with a `flows/` directory in it: one directory per flow, each
+with the `__init__.py` that is the flow, whatever it imports beside it and the `skills/` it
+brings. It is cloned into `~/.humanize/flowverses/<name>/`, and every flow in it is offered
+under that name. Only that directory is read, so a repository is free to be a repository
+around it -- a README, a pyproject, a test suite -- without any of it being taken for a flow
+and run to find out. `builtin` is the one that has no repository around it, being the
+package's own, and is read where it stands.
 
 Two are always there. `builtin` is the handful humanize itself ships -- one agent talking, and
 the two shapes a loop over one agent takes -- and cannot be added or taken away because it is
@@ -35,9 +35,11 @@ __all__ = [
     "OFFICIAL",
     "Flowverse",
     "add",
+    "clone",
     "fetch",
     "flowverses",
     "holds",
+    "refresh",
     "remove",
     "under",
 ]
@@ -98,8 +100,8 @@ def under() -> Path:
 def holds(one: Flowverse) -> Path:
     """The directory one flowverse's flows are read from, and the one place that is worked out.
 
-    The `flows/` inside it, except for the flows humanize ships: those are a directory of `.py`
-    files in the package with no repository around them -- no README, no pyproject, no test
+    The `flows/` inside it, except for the flows humanize ships: those are a directory of
+    flows in the package with no repository around them -- no README, no pyproject, no test
     suite to be kept out of the way -- and so are read where they stand.
 
     Args:
@@ -213,7 +215,7 @@ def add(url: str, name: str = "") -> Flowverse:
     if at.exists():
         raise ValueError(f"there is already a flowverse called {called!r}")
     at.parent.mkdir(parents=True, exist_ok=True)
-    _clone(said, at)
+    clone(said, at)
     return Flowverse(
         name=called, url=_url(at), at=at, fetched=_cloned(at), fixed=called == OFFICIAL
     )
@@ -246,13 +248,9 @@ def fetch(name: str) -> Flowverse:
         )
     if not one.fetched:
         one.at.parent.mkdir(parents=True, exist_ok=True)
-        _clone(one.url, one.at)
+        clone(one.url, one.at)
     else:
-        # Fetched and reset rather than pulled: a flowverse is a copy of somebody else's
-        # repository, not a branch of your own, and a merge nobody asked for is a fetch that
-        # fails the next time it is run.
-        _git("-C", str(one.at), "fetch", "--depth", "1", "origin", "HEAD")
-        _git("-C", str(one.at), "reset", "--hard", "FETCH_HEAD")
+        refresh(one.at)
     return Flowverse(
         name=one.name,
         url=one.url,
@@ -289,28 +287,42 @@ def remove(name: str) -> bool:
 
 
 def flows(one: Flowverse) -> list[str]:
-    """The flow files in one flowverse, by the name each is offered under.
+    """The flows in one flowverse, by the name each is offered under.
 
     Args:
       one: The flowverse.
 
     Returns:
-      One name per file in the directory it holds them in, alphabetically. A file whose name
-      starts with an underscore is not a flow but something the flows beside it import, and is
-      not among them. Nothing at all where there is no such directory: a repository somebody
-      added that keeps its flows somewhere else holds none of them, which is what the list says.
+      One name per flow in the directory it holds them in, alphabetically -- a directory with
+      an `__init__.py` in it, or a single `.py` file, both of which are a module. A directory
+      without an entry point is what the flows beside it import rather than a flow, and
+      neither is a name that starts with an underscore. Nothing at all where there is no such
+      directory: a repository somebody added that keeps its flows somewhere else holds none of
+      them, which is what the list says.
     """
-    at = holds(one)
-    if not at.is_dir():
-        return []
-    return sorted(
-        path.name.removesuffix(".py")
-        for path in at.glob("*.py")
-        if not path.name.startswith("_") and path.is_file()
-    )
+    from . import offered
+
+    return offered(holds(one))
 
 
-def _clone(url: str, at: Path) -> None:
+def refresh(at: Path) -> None:
+    """Takes what a fetched repository says now, whatever is in the clone of it.
+
+    Fetched and reset rather than pulled: what humanize keeps is a copy of somebody else's
+    repository, not a branch of your own, and a merge nobody asked for is a fetch that fails
+    the next time it is run.
+
+    Args:
+      at: The clone.
+
+    Raises:
+      OSError: If git is not there, or the fetch failed. What git said is attached.
+    """
+    _git("-C", str(at), "fetch", "--depth", "1", "origin", "HEAD")
+    _git("-C", str(at), "reset", "--hard", "FETCH_HEAD")
+
+
+def clone(url: str, at: Path) -> None:
     """Clones a repository, and leaves nothing behind where it could not.
 
     git tidies up after its own failures, but not after being killed: a clone called off for
