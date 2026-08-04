@@ -315,8 +315,8 @@ hmz agents list -q
 ```
 
 Whose agents they are is not a question here: these are agents kept under a name, not the
-agents of a flow. Which agent drives which flow is remembered per workspace — that is `hmz -f
-<flow> -a <agent>`, or the second page of `/flow`.
+agents of a flow. Which agent drives which flow is remembered per workspace — that is
+`hmz -f <flow> -a <agent>`, or the second page of `/flow`.
 
 ## `hmz providers`
 
