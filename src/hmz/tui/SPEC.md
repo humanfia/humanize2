@@ -219,9 +219,13 @@ adjusted rather than chosen.
   a page MUST apply nothing: what is read on the second page is what the first is holding, and
   a menu that applied each page as it was left would be one where walking out changed things
   nobody confirmed.
-- Esc on a menu holding changes MUST ask whether to save them, and MUST offer to stay. Esc on
-  one holding none MUST just leave: a walk in to look and out again is not a question anybody
-  wants asked of them.
+- Esc on a menu holding changes MUST ask whether to save them, and esc on that question MUST
+  be the way back to the menu. Esc on a menu holding none MUST just leave: a walk in to look
+  and out again is not a question anybody wants asked of them.
+- That question MUST be drawn as a box in the middle of the screen, over the menu it is about
+  rather than instead of it: a sheet is a question somebody walked to, and this is one that
+  arrived. It MUST be the two answers there are -- save, or throw away -- and MUST NOT make a
+  row of going back, that being what esc already is on every sheet there is.
 - What runs an external command MUST NOT be held: making an account and signing one in own the
   terminal while they run, and something that has already happened is not a draft.
 

@@ -20,7 +20,7 @@ from textual.widgets import Label, OptionList
 
 from hmz.backends import Model
 from hmz.tui import Humanize
-from hmz.tui.pick import Agent, Anchors, Catalogue, Clis, Flows, Runs
+from hmz.tui.pick import Agent, Anchors, Catalogue, Clis, Confirms, Flows, Runs
 from hmz.tui.settings import Settings
 
 from .test_app import drops, into_agent, keeps, onto, opens, rows, until
@@ -346,6 +346,33 @@ async def test_nothing_is_applied_until_the_menu_is_saved_on_the_way_out(
 
     assert app._flow_named == "remote"
     assert app._models == [Runs("claude/claude-opus-5:high")]
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
+async def test_the_question_on_the_way_out_is_two_answers_and_esc(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    flows: Path,
+) -> None:
+    """Going back to the menu is what esc is everywhere else, so it is not a row as well."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _open(app, driver, "remote")
+        await onto(app, driver, "effort")
+        await driver.press("left")
+        await driver.pause()
+
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Confirms), driver)
+        sheet = app.screen
+        assert isinstance(sheet, Confirms)
+        assert sheet.query_one("#choices", OptionList).option_count == 2
+
+        # And esc off it is the sheet again, holding what it was holding.
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+
+        assert "high" in _value(app, "effort")
 
 
 @pytest.mark.timeout(60)

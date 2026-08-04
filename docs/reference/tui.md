@@ -317,11 +317,14 @@ of them:
   a modifier held down.
 - **Typing does not search.** Every letter is a key, so a search is asked for with **s** and
   left with **esc**, which clears what was typed. While one is running the letters go into it.
-- **Nothing lands until you save on the way out.** Esc asks, and offers to keep editing. A menu
-  you only looked at asks nothing.
+- **Nothing lands until you save on the way out.** Esc asks — a box in the middle of the
+  screen, over the menu rather than instead of it, with the two answers there are: save and
+  close, or discard and close. Esc on the box is the way back to the menu. A menu you only
+  looked at asks nothing.
 
 A menu of several pages shows their titles across the top, and **tab** / **shift+tab** turn
-between them. A page that cannot be opened right now is still a title, struck through.
+between them. A page that cannot be opened right now is still a title, struck through. A page
+made of several lists names them under the titles, and `←` / `→` step between those.
 
 ## Choosing a flow
 

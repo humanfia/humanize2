@@ -342,6 +342,26 @@ OptionList { border: none; background: $background; scrollbar-size: 0 0; padding
 """
 
 
+#: The one question that is not a sheet: a box in the middle of the screen, over the menu it
+#: is about rather than instead of it. A sheet is walked to and fills the width it is drawn
+#: in; this arrives, says one thing, and is answered in a keypress -- so it is drawn as the
+#: thing every terminal draws that as, which is a bordered box with the question in it. The
+#: parts a sheet has and this has no use for are taken away rather than left blank.
+_POPUP = """
+Confirms { align: center middle; background: transparent; }
+#sheet { width: 66; max-width: 100%; height: auto; padding: 1 2; border: round $primary;
+         background: $background; }
+#rule { display: none; }
+#tuning { display: none; }
+#asked { padding: 0; text-style: bold; color: $primary; }
+#about { padding: 0 0 1 0; color: $text-muted; width: 1fr; }
+OptionList { border: none; background: $background; scrollbar-size: 0 0; padding: 0; }
+#choices > .option-list--option-highlighted {
+    background: $background; color: $foreground; text-style: none; }
+#keys { padding: 1 0 0 0; color: $text-muted; width: 1fr; }
+"""
+
+
 #: What a menu's own keys are, said at the bottom of every sheet that has tabs.
 _TURNS = "tab/shift+tab to switch"
 
@@ -3181,22 +3201,55 @@ class Confirms(Picks):
 
     A menu applies nothing until it is left, so leaving one is the moment the changes in it
     either land or do not. Asked rather than assumed either way: what was changed took typing
-    to change, and throwing it away silently is worse than one more list.
+    to change, and throwing it away silently is worse than one more question.
+
+    Drawn as a box in the middle of the screen rather than as a sheet, because it is not one:
+    a sheet is a question somebody walked to, and this is one that arrived over the menu they
+    were walking out of. Two answers, since the third -- going back to the menu -- is what esc
+    already is everywhere else, and an answer that is also a key is a row that says the key is
+    not there.
     """
 
+    CSS = _POPUP
+
     asked = "Save what was changed?"
-    about = (
-        "Nothing in this menu has been applied yet. Saving writes it down and closes; "
-        "discarding closes and leaves everything as it was."
-    )
+    about = "Nothing in this menu has been applied yet."
 
     def rows(self) -> list[tuple[str, str, str]]:
-        """The three things there are to do about a menu holding changes."""
+        """The two things there are to do about a menu holding changes."""
         return [
             (_KEEP, "save and close", "write it down and apply it"),
             (_DROP, "discard and close", "leave everything as it was"),
-            ("", "keep editing", "go back to the menu"),
         ]
+
+    def check_action(
+        self,
+        action: str,
+        parameters: tuple[object, ...],
+    ) -> bool | None:
+        """Whether one of the keys is live, which a question of two answers narrows.
+
+        Args:
+          action: What the key would do.
+          parameters: What it would do it with.
+
+        Returns:
+          Whether to run it. Never the search: two rows are read rather than narrowed, and a
+          box in the middle of the screen has no room to say what was typed into one.
+        """
+        return action != "search" and super().check_action(action, parameters)
+
+    def _fill(self) -> None:
+        """Puts the two answers up, and says what esc is here.
+
+        Esc is the third answer -- back to the menu, changing nothing -- so it says so. Every
+        other sheet leaves on it, and one that said `cancel` over a menu holding changes would
+        read as the one thing it is not.
+        """
+        super()._fill()
+        self.query_one("#keys", Label).update(
+            "Enter to choose · Esc to go back to the menu"
+        )
 
 
 class Fitted(NamedTuple):
