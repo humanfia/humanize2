@@ -35,9 +35,15 @@ def _humanize_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     answered a question in, which is what humanize reads as a first start -- so without this
     the suite would put the question to a machine nobody is sitting at, and a crash a test
     made on purpose would be filed as a crash.
+
+    The mirrors coganchor has been pointed at are recorded outside the mirror itself, and so
+    outlive the temporary directory a test made one in: a suite writing those into the cache
+    of whoever ran it leaves one per test there forever, and reads one back as soon as pytest
+    hands out a temporary path some run of nine days ago had already used.
     """
     monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize-home"))
     monkeypatch.setenv("HUMANIZE_SENTRY", "off")
+    monkeypatch.setenv("HUMANIZE_SHADOWS", str(tmp_path / "shadows"))
 
 
 @pytest.fixture(autouse=True)

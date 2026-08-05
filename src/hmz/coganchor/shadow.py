@@ -45,6 +45,12 @@ log = logging.getLogger(__name__)
 #: must not see coganchor's own bookkeeping.
 REGISTRY_DIR = "~/.cache/humanize/shadows"
 
+#: What points that somewhere else for one process and everything it starts. For a machine
+#: that keeps its caches elsewhere, and for a test suite: these records outlive the mirrors
+#: they are about, so a suite writing them into somebody's own cache is a suite that leaves
+#: thousands of them there and then reads one back as a mirror it never made.
+SHADOWS = "HUMANIZE_SHADOWS"
+
 _FETCH_SUFFIX = ".humanize-fetch"
 
 #: Bound on symlink chasing, matching the kernel's own ``ELOOP`` limit.
@@ -450,4 +456,5 @@ def _recorded_target(record: str) -> str | None:
 
 def _registry_entry(path: str) -> str:
     digest = hashlib.sha256(os.path.abspath(path).encode()).hexdigest()[:16]
-    return os.path.join(os.path.expanduser(REGISTRY_DIR), f"{digest}.json")
+    where = os.environ.get(SHADOWS) or REGISTRY_DIR
+    return os.path.join(os.path.expanduser(where), f"{digest}.json")
