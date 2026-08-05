@@ -8,7 +8,7 @@ also learn to read two conversations on one screen.
 interesting, but one is enough — two agents of the same CLI are still two agents.
 :::
 
-## Step 1 — fetch the official flowverse
+## Step 1 — find the official flowverse
 
 The interesting flows are not in the package. They are in a
 [flowverse](/features/flowverses) — a git repository of flows — and `official` is listed from the
@@ -20,8 +20,11 @@ In `hmz`:
 /flow
 ```
 
-Walk down to the `official` heading. If it has nothing under it, press **r** to
-fetch it. It keeps drawing while it clones, and says underneath what became of it.
+The flows are read a place at a time, one list apiece, and **←** **→** step between the places.
+Step across to `official`. Opening the menu fetches whatever has never been fetched — this one,
+the first time — off the interface's own loop: it keeps drawing while it clones, and says under
+the list what became of it. Fetching a place again, adding one and taking one away are
+`/flowverses`, a menu of its own.
 
 ::: danger Adding a flowverse is trusting that repository with this machine
 A flow is Python, and listing what a flowverse holds **runs the entry point of every flow in its
@@ -48,17 +51,20 @@ the task is finished — which is what ends the run.
 
 ## Step 3 — set up each agent
 
-Choosing the flow walks you straight into `/agents`, one agent at a time, **by the name the flow
-calls it**. Each agent is three steps:
+Choosing the flow lands you on the **Agents** page of `/flow`, which lists what it drives **by
+the name the flow calls each**. Enter opens one, and everything that agent is is a row of the one
+sheet:
 
-1. **Which CLI, and which account.** The CLI row, then the account row; `as local` is the first
-   row. (Accounts are [providers](/features/providers) — [tutorial 16](/guide/tutorial-providers).)
-2. **Which model, and at what effort.** Type a few letters to narrow. **←/→** adjusts the effort.
-3. **Where it works** — only for an agent the flow says may be pointed at a machine. `rlar` does
-   not, so this step does not exist here.
+1. **Which CLI, and which account.** The `cli` row, then the `provider` row; `as local` is the
+   first of the accounts. (Accounts are [providers](/features/providers) —
+   [tutorial 16](/guide/tutorial-providers).)
+2. **Which model, and at what effort.** `model` opens a list — **s** narrows it — and `effort` is
+   stepped where it stands with **←/→**.
+3. **Where it works** — a `where` row only for an agent the flow says may be pointed at a machine.
+   `rlar` does not, so there is no such row here.
 
-**esc is always the step before**, and off the first step of the first agent it leaves the walk
-entirely, changing nothing.
+**esc closes the sheet**, asking about anything you changed and handing it back to the page, which
+is still holding it: nothing is written down until the menu itself is saved.
 
 Give the reviewer a different CLI if you have one. Give it the same one if you do not — two agents
 at one configuration are still two agents, and that is the point.
@@ -148,7 +154,8 @@ hours into a loop, with a turn's work already behind it.
 ## What you now know
 
 - A flow names its agents, and everything talks about them by those names.
-- `/agents` is three steps per agent, and esc is always the step before.
+- The Agents page of `/flow` is one sheet per agent, and esc off it asks before it hands anything
+  back.
 - **tab** reads another conversation; a line goes to the one you are reading.
 - `-a` is positional: one per agent, in the flow's own order.
 

@@ -16,13 +16,20 @@ hmz trace collect
 ```
 
 ```console
-.humanize/20260809T014455Z.trace.json: 3 sessions, 412 slices
+~/.humanize/cycles/-home-you-code-myproject/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
 ```
 
-The name is the UTC moment it was collected, so collecting twice keeps both traces rather than
-writing over the first.
+The file, then which run it is a trace of, then what is in it. A trace lands **with that run** —
+in `traces/` inside the run's own directory, where the record of what happened and the links to
+its sessions already are — rather than in whatever directory you were standing in. Which run that
+is, without a `--cycle` saying otherwise, is the last one of this workspace.
 
-![hmz trace collect writing a trace, and finding nothing inside a one-minute window](/demo/collect.gif)
+The name is the UTC moment it was collected, so collecting twice keeps both traces rather than
+writing over the first. `--output` writes it somewhere of your own instead, which is what to
+reach for when the trace is going into an issue or a CI artifact.
+
+![hmz trace collect three times: the last run of this directory, one named with --cycle, and one
+sent elsewhere with --output](/demo/collect.gif)
 
 ::: details `0 sessions, 0 slices`
 Three usual reasons: you are in a different directory from the one the run happened in; the
@@ -67,51 +74,81 @@ Things worth looking for on your first trace:
   designed. If they overlap, it is not.
 - **Two hundred short tracks on one process.** A Ralph loop, one session per turn.
 
+The first two of those are guesses until the run is **profiled**. A directory can ask for the
+programs its runs start to be sampled into the same trace — a process per program, a track per
+thread — and then the long slice has the `pytest` that made it drawn beside it, at the same
+scale. It is the `profile` row on the second page of `/settings`, and a trace of a profiled run
+counts them: `3 sessions, 412 slices, 61 programs`. See
+[Tracing](/features/tracing#profiling-a-run).
+
 ## Step 4 — why your two agents are named
 
 The backends log a session under an id and **never say whose it was**. So by default an agent in
 a trace is one configuration — a backend at a model at an effort — and an actor and a reviewer at
 the same model would read as one agent.
 
-Every run of a flow writes a **cycle** that fixes this:
+Every run of a flow writes a **cycle** that fixes this. One run is one directory:
 
 ```sh
-ls ~/.humanize/cycles/*/
+run=$(ls -dt ~/.humanize/cycles/*/*/ | head -1)   # the one that just finished
+ls "$run"
 ```
 
 ```console
-20260809T014455Z-a4a089.jsonl
+cycle.jsonl  sessions  traces
 ```
 
+`traces/` is there because of step 1. `state.json` joins them for a flow that says it can be
+picked up again, and `profile.jsonl` for a run that was profiled.
+
+![one run's directory, the session it opened by name, the link to the log the backend itself wrote,
+and the state its flow left behind](/demo/run.gif)
+
+`cycle.jsonl` is what happened, a line at a time:
+
 ```sh
-head -3 ~/.humanize/cycles/*/20260809T014455Z-a4a089.jsonl
+head -3 "$run"cycle.jsonl
 ```
 
 ```console
-{"event":"began","at":"...","flow":"official/rlar","task":"...","agents":[{"agent":"actor",...}]}
-{"event":"opened","at":"...","agent":"actor","backend":"claude","session":"0a1b2c3d-..."}
+{"event":"began","at":"...","flow":"official/rlar","task":"...","workspace":"...","resumable":false,"agents":[{"agent":"actor",...}]}
+{"event":"opened","at":"...","agent":"actor","backend":"claude","provider":"local","session":"0a1b2c3d-...","name":"actor-claude@local-0a1b2c3d-...","where":"sessions/actor-claude@local-0a1b2c3d-..."}
 {"event":"ended","at":"...","how":"done"}
 ```
 
-`hmz trace collect` reads the last cycle in the workspace, which is why `rlar` traces as `actor` and
+`hmz trace collect` reads the run it is tracing, which is why `rlar` traces as `actor` and
 `reviewer` without being told anything.
+
+Under `sessions/` is a directory per session, named the way the `opened` line names it — whose
+session it was, what took its turns, which account they ran as and what the backend called it —
+holding a link to each file that backend logged it to. Links for reading: humanize itself reads
+and writes every log where the backend keeps it.
 
 Note `how`: `done`, `failed`, or `stopped`. A run you ended with esc is written down as one you
 ended.
 
+`/cycles` is the same list at the prompt: every run of this directory, newest first. Enter on one
+offers to collect a trace of it and to say where it is — and, where its flow says a run can be
+picked up, to carry that one on.
+
 ## Step 5 — narrow it
 
 ```sh
+hmz trace collect --cycle 20260809T0144              # one run of this workspace, by name
 hmz trace collect --start "3 days ago"               # recent history only
 hmz trace collect --end "yesterday 18:00"
 hmz trace collect --session 0a1b2c3d                 # one session, wherever it ran
 hmz trace collect ~/code/other                       # another workspace
-hmz trace collect --output /tmp/before.json
+hmz trace collect --output /tmp/before.json          # somewhere of your own
 ```
 
 - Naming **sessions alone** collects them wherever they were recorded.
 - Adding a **workspace** keeps only the named sessions recorded there.
 - Naming **neither** collects the current directory.
+
+`--cycle` takes a run's directory name or a leading part of it, and settles which run the trace is
+**of**: where it is written, and whose agents its processes are named after. What is read is still
+the workspace's sessions, so cut those down with `--session`, `--start` and `--end`.
 
 A session is named by its whole id, by the key the trace shows it under, or by a leading part of
 either — and the sub-agents it started come with it.
@@ -130,6 +167,10 @@ hmz trace collect
 It reads the backends' own home directories, so yesterday's session is a trace away. That is also
 why a trace is not a second copy of anything: humanize keeps the ids, and the backend keeps the
 words.
+
+In a directory no flow has ever run in there is no run to put the trace with, so it goes where
+that directory's runs would be kept — `~/.humanize/cycles/<workspace>/` — and the line names no
+run.
 
 ## Step 7 — from Python
 
@@ -156,7 +197,8 @@ every handover, and what each model has cost.
 ## What you now know
 
 - `hmz trace collect` needs nothing set up and works on any session the backends logged.
-- A cycle is what turns "a configuration" into "the reviewer".
+- A trace lands with the run it is a trace of, and `--output` is how it goes anywhere else.
+- A cycle is a directory, and it is what turns "a configuration" into "the reviewer".
 - Perfetto is the viewer; the slices carry the prompts and the tool output.
 
 ## Next

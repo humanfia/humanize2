@@ -60,7 +60,8 @@ whose agents work where it does.
 
 The only kind of place that may be pointed at a machine. *Which* machine is not the flow's
 business — it is settled by whoever chose the agent, as a `machine=` on its config or on the
-interface's `/agents` sheet — and it may be either of the two answers below. A `Remote` place
+`where` row of the interface's own sheet for that agent — and it may be either of the two
+answers below. A `Remote` place
 that nobody pointed anywhere runs here, like any other.
 
 `Remote` is the class itself, written beside the type. It takes no arguments and carries nothing:

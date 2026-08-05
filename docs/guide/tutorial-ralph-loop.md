@@ -57,8 +57,8 @@ In `hmz`:
 /flow
 ```
 
-The flows appear, a tab per place they come from — **←** and **→** walk between them. Type to
-narrow by name. Take `ralph_loop` with enter.
+The flows appear a place at a time, one list apiece — **←** and **→** step between the places.
+Press **s** to narrow by name. Take `ralph_loop` with enter.
 
 Or say it outright:
 
@@ -76,6 +76,9 @@ leaving without choosing changes nothing.
 | `chat` | 1 + you | one session; every line you type is a turn of it. What the interface opens on. |
 | `ralph_loop` | 1 | a fresh session every turn |
 | `stateful_ralph` | 1 | one session, re-sent the task every turn |
+
+Both loops say they [can be picked up](/features/resuming), and what they keep is which round
+they are on — so starting one again in this directory says round 41 rather than round 1.
 :::
 
 ## Step 3 — start it
@@ -136,13 +139,19 @@ The loop never ends by itself; it is a `while True`. Note what that means for th
 stop raises `Stopped` inside it, and `suppress=True` deliberately **does not** catch that —
 otherwise the loop would carry on past a stop and never end. See [Stopping](/features/stopping).
 
+Stopping is not losing your place. `ralph_loop` says it [can be picked up](/features/resuming),
+and what it keeps is which round it is on: start it here again and it goes on from the round it
+reached. That run is a run of its own, with its own sessions and its own record — `/cycles` is
+where both of them are.
+
 ## Try this
 
 **Hold the conversation instead of dropping it.** `/flow stateful_ralph`, same task. Compare how
 often it re-reads files it has already read.
 
-**Move the effort.** On `/agents`, second step, **←/→**. A Ralph loop of `low` turns is a
-different animal from one of `max` turns — see [Efforts](/features/efforts).
+**Move the effort.** The Agents page of `/flow`, the agent, the `effort` row, **←/→**. A Ralph
+loop of `low` turns is a different animal from one of `max` turns — see
+[Efforts](/features/efforts).
 
 **Make it read-only.** `/flow` → Agents → the agent → `permission` → **→** to `read-only`. Now it can look at the
 repository and change nothing, which is how you use a loop to *review* rather than to build.

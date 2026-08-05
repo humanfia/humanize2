@@ -37,7 +37,8 @@ hmz exec -f twice -a claude/claude-opus-4-8:high "add a --dry-run flag to calc.p
 
 It is offered in the interface too — `/flow` lists the flows in `.humanize/flows` here, in
 `~/.humanize/flows`, the ones humanize ships, and everything in every
-[flowverse](/features/flowverses) fetched here, a tab apiece.
+[flowverse](/features/flowverses) fetched here, a place apiece with **←** and **→** stepping
+between them.
 
 ## The contract, in three rules
 

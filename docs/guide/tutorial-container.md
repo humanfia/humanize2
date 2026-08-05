@@ -60,9 +60,9 @@ hmz exec -f tested -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:high "get th
 The container is **brought up on the tester's first turn**, not when the agent is constructed —
 so a flow that configures more agents than it drives pulls no image for the ones it does not.
 
-At the prompt, `/agents` reads it back on the model step as `◉ in a container of python:3.12`, and
-asks no third question: the image is the flow's, and nothing can point that agent anywhere else —
-including you.
+At the prompt, the agents page of `/flow` reads it back on that agent's `where` row as `in a
+container of python:3.12`, with `the flow settled this` beside it: the image is the flow's, and
+nothing can point that agent anywhere else — including you.
 
 ## Step 3 — watch it come and go
 
@@ -163,11 +163,24 @@ trajectories are not found by workspace:
 hmz trace collect --session 0a1b2c3d
 ```
 
-The session ids are in the [cycle](/features/tracing#what-a-run-writes-down):
+The run itself is still written down here — a [cycle](/features/tracing#what-a-run-writes-down)
+belongs to the directory the flow ran in, and it is a directory of its own with a `sessions/` in
+it. Each of those is named for whose session it was, what took its turns, which account they ran
+as and what the backend called it:
 
 ```sh
-tail -n +1 ~/.humanize/cycles/*/*.jsonl | grep opened
+run=$(ls -dt ~/.humanize/cycles/*/*/ | head -1)   # the run that just finished
+ls "$run"sessions
 ```
+
+```console
+builder-claude@local-5f6e7d8c-1a2b-3c4d-5e6f-708192a3b4c5
+tester-codex@local-0a1b2c3d-1a2b-3c4d-5e6f-708192a3b4c5
+```
+
+The id is the end of the name, and a leading part of it is enough — so the line above collects
+the tester's, which is the session that worked in the container. At the prompt the same thing is
+`/cycles`: enter on the run, then **where it is**.
 
 ## What you now know
 

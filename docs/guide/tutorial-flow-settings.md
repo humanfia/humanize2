@@ -65,9 +65,9 @@ A setting that is **written** carries a caret under the cursor, where the next l
 one that is **stepped** does not — otherwise a blank setting would read as one nothing can be
 typed into.
 
-`/flow` walks through this between choosing the flow and choosing its agents, which is the only
-place it can: only the flow just chosen says what there is to set. `/agents` never does — the two
-are halves of one question, and each asks only its own.
+`/flow` walks through this between choosing the flow and landing on its agents page, which is the
+only place it can: only the flow just chosen says what there is to set. The agents page never does
+— the two are halves of one question, and each asks only its own.
 
 ## Step 3 — set it from a file
 

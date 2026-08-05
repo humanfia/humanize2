@@ -26,6 +26,10 @@ name is the UTC moment it was collected, so collecting twice keeps both traces r
 writing over the first; `--output` puts it somewhere else, its directory created if it is not
 there.
 
+What it prints is that path, then the name of the run it is a trace of, then the counts. A run
+that was [profiled](#profiling-a-run) has a third of them — `2 sessions, 17 slices, 3 programs`
+— and a trace of sessions alone stops at the slices.
+
 The same thing is a row of `/cycles` in the interface: pick the run, press enter, and collect
 it there.
 
@@ -34,25 +38,31 @@ Full syntax in the [CLI reference](/reference/cli.md#hmz-trace).
 ## Reading the trace
 
 ```
-process   agent          builder · claude-opus-4-8 · high
-  track     session ──▶ ▓▓▓ ▓ ▓▓▓▓▓▓ ▓▓  ▓▓▓▓▓  ▓ ▓▓▓▓▓▓▓▓▓▓
-  track     sub-agent ─▶      ▓▓▓▓▓▓▓▓▓▓▓
-process   agent          reviewer · claude-opus-4-8 · high
-  track     session ──▶            ▓▓▓▓        ▓▓▓▓        ▓▓▓▓
+process   agent          builder · 4 sessions
+  track     main ──────────────▶ ▓▓▓ ▓ ▓▓▓▓▓▓ ▓▓  ▓▓▓▓▓  ▓ ▓▓▓▓
+  track     subagent · explore ▶      ▓▓▓▓▓▓▓▓▓▓▓
+process   agent          reviewer · 2 sessions
+  track     main ──────────────▶            ▓▓▓▓        ▓▓▓▓
 ```
 
 | In the trace | Is |
 | --- | --- |
-| a **process** | one [agent](/guide/concepts.md#agent) and everything it drove — or, for a [profiled](#profiling-a-run) run, one program it ran |
-| a **track** | one sub-agent of that agent, named after what kind it was — or one thread of that program. Sessions of one agent that never run at the same time share a track; root sessions and sub-agents stay apart. |
+| a **process** | one [agent](/guide/concepts.md#agent) and everything it drove, called `<agent> · <n> sessions` — or, for a [profiled](#profiling-a-run) run, one program it ran, called `<program> · <pid>` |
+| a **track** | one row of that agent's sessions: `main` for the ones somebody started, `subagent` for what a turn reached for. Sessions of one agent that never run at the same time share a track; root sessions and sub-agents stay apart. Or one thread of that program. |
 | a **slice** | one action — a tool call, a message, or waiting for reasoning |
+
+A row of sub-agents that were all started as the same kind is named after that kind —
+`subagent · explore` rather than five names run together — and a sub-agent that started one of
+its own is `subagent 2`. A second row at the same depth is `#2` after the name, and actions
+that do overlap inside a row spill into lanes of their own, `~2` after it.
 
 Click a slice and its arguments are there: the prompt, the reasoning, the tool input, the tool
 output. As much as the backend wrote down.
 
 The document's `otherData` says what was asked for and what was collected — the workspace, the
 sessions named, the agents and backends found, how many sessions, slices and tracks there are,
-and the first and last moment in it.
+and the first and last moment in it. A profiled run adds `programs`, how many of them were
+drawn; a trace of sessions alone does not carry the key at all.
 
 ## What counts as one agent
 
@@ -97,14 +107,23 @@ as it goes — a run that died is a run whose cycle still says what it got to.
 
 | `event` | Written | Carries |
 | --- | --- | --- |
-| `began` | when the flow starts | `flow`, `task`, `workspace`, whether the flow is `resumable`, which run it was `picked_up` from, and one entry per agent with its `agent` id, `backend`, `model`, `effort`, `permission`, `provider`, `goals` and whether it was the `person` at the prompt |
+| `began` | when the flow starts | `flow`, `task`, `workspace`, whether the flow is `resumable`, the run it was `picked_up` from where there was one, and one entry per agent with its `agent` id, `backend`, `model`, `effort`, `permission`, `provider`, `goals` and whether it was the `person` at the prompt |
 | `opened` | each time an agent opens a session | `agent`, `backend`, `provider`, `session`, the `name` the run gives it and `where` its links are |
 | `ended` | when the flow stops | `how`: `done`, `failed`, or `stopped` |
 
 `sessions/<session>/` is a link per file that session was logged to, named for whose session it
 was, what took its turns, which account they ran as and what the backend called it —
-`builder-claude@work-0a1b2c3d`. They are there to be read: humanize itself reads and writes
-every log where the backend keeps it.
+`builder-claude@work-0a1b2c3d`, and `@local` where the turns ran as the account this machine is
+already signed into rather than one humanize keeps. They are there to be read: humanize itself
+reads and writes every log where the backend keeps it.
+
+![One run's sessions/ directory: a directory per session, named for its agent, CLI and account,
+holding a symlink to the log Claude Code itself is writing](/demo/run-linked.png)
+
+The links are made when the session opens and made again when the run ends, since a backend
+goes on writing a log after the turn that opened it and a sub-agent's transcript appears
+whenever that sub-agent ran. A filesystem that will not make one is a run without links rather
+than a run that stops.
 
 **It is not a transcript.** The backend's own log is the turn-by-turn record, and a cycle is not
 a second copy of it. What is kept here is the shape of the run — enough to gather a trace
@@ -113,6 +132,16 @@ afterwards out of the ids alone.
 A cycle covers one run. It closes when the flow finishes, fails or is interrupted, and a closed
 cycle is never reopened: running the flow again is another run, with sessions of its own, and so
 another cycle.
+
+That is what `state.json`, `resumable` and `picked_up` are for. A flow that says
+`@flow(resumable=True)` takes a state dict as its last argument, and what it writes there is
+`state.json` in the cycle of the run that wrote it, keyed by the name the flow was run under.
+Running that flow again here carries on from the last run of it that left anything — into a
+cycle of its own, whose `began` line says which run it was `picked_up` from, so a week of stops
+and starts reads as the week it was. `/cycles` picks a named run up: enter on a row offers
+*carry on from here*, which is asked of the flow rather than of the run, a flow being a file
+that may have been rewritten since. See [Picking a run up](/features/resuming) and
+[a flow that can be picked up](/reference/flows#a-flow-that-can-be-picked-up).
 
 An agent stopped by hand makes the run `stopped` rather than `failed`, whatever the turn under
 way made of it — so a run you ended is written down as one you ended.
@@ -132,20 +161,20 @@ the process. So a workspace may ask for its runs to be **profiled** as well as t
 second page of `/settings`:
 
 ```
-profile   on   profile the programs a run here starts, into its own trace
+3. profile          on   profile the programs a run here starts
 ```
 
 While the flow runs, the programs underneath it are sampled — what each was, what started it,
 and how long it took — into `profile.jsonl` in that run's own cycle. Collecting the run puts
 them in the same document as its sessions, drawn the same way: a process is a program and a
-track is one of its threads, exactly as a process is an agent and a track is one of its
-sub-agents.
+track is one of its threads, exactly as a process is an agent and a track is a row of that
+agent's sessions.
 
 That is the point of one document rather than two. An agent's timeline and a profiler's
 timeline at one scale means *what was this run doing at 09:41* has one answer:
 
 ```
-process   agent          builder · claude-opus-4-8 · high
+process   agent          builder · 4 sessions
   track     main ──────▶ ▓▓▓ ▓ ▓▓▓▓▓▓ ▓▓  ▓▓▓▓▓  ▓ ▓▓▓▓▓▓▓▓▓▓
 process   program        pytest · 41207
   track     main ──────▶       ▓▓▓▓▓▓▓▓▓▓
@@ -182,7 +211,7 @@ A workspace and a set of sessions narrow the trace together:
 ```sh
 hmz trace collect                                    # this workspace, all of its history
 hmz trace collect ~/code/other                       # another workspace
-hmz trace collect --cycle 20260809T0144              # one run of this workspace, by name
+hmz trace collect --cycle 20260809T0144              # filed with that run, and named by it
 hmz trace collect --session 0a1b2c3d,5f6e            # two sessions, wherever they ran
 hmz trace collect ~/code/other --session 0a1b2c3d    # that session, only if it ran there
 hmz trace collect --start "3 days ago"               # recent history only
@@ -198,6 +227,15 @@ either — and the sub-agents it started come with it.
 
 `--start` and `--end` take anything [dateparser](https://dateparser.readthedocs.io/) understands
 and cut records outside the range. A time that cannot be read is a usage error.
+
+`--cycle` narrows nothing. It takes a run's directory name or a leading part of it and settles
+which run the trace is **of**: which agent each session is grouped under, whose `profile.jsonl`
+is drawn beside them, and which `traces/` it is written into. What is read is still the
+workspace's whole history, so cut that with `--session`, `--start` and `--end`. Without a
+`--cycle` the run is the last one of the workspace; for a workspace nothing has been run in
+there is no cycle at all, and the trace goes to `~/.humanize/cycles/<workspace>/`, where that
+workspace's runs would be kept. `--output` wins over either. A name no run of the workspace
+begins with is a usage error, as is a `--cycle` for a workspace with no runs.
 
 **A flow that ran on a [machine of its own](/reference/machines.md) worked in a mirror rather than in this
 directory**, so its trajectories are found by `--session` rather than by workspace.

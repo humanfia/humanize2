@@ -115,8 +115,9 @@ class Agents(NamedTuple):
     reviewer: AgentBase                     # here, and nowhere else
 ```
 
-At the prompt, that is the third step of `/agents` — offered only for a `Remote` place, listing
-the containers running and the hosts in your `~/.ssh/config`, with anything else typed.
+At the prompt, that is the `where` row of the agent's own sheet on the agents page of `/flow` —
+a row only for a `Remote` place, listing the containers running and the hosts in your
+`~/.ssh/config`, with anything else typed.
 
 ## A session works in a directory the target names
 

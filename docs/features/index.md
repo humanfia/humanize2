@@ -47,6 +47,7 @@ command line and from Python, and what it will not do.
 | --- | --- |
 | [Flowverses](/features/flowverses) | A git repository of flows, offered by name. |
 | [Tracing](/features/tracing) | The whole run as one timeline you can open in Perfetto. |
+| [Picking a run up](/features/resuming) | A loop stopped on Thursday, carried on from where it stopped. |
 
 ---
 

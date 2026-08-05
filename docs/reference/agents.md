@@ -63,8 +63,8 @@ hmz providers falls-back claude/key gateway
 ```
 
 so a subscription that runs out falls to a key, and a key that is refused falls to a gateway.
-`/providers`, cursor on the account, then **f** asks the same thing, and **t** asks how it is
-tried again.
+`/providers`, cursor on the account, then **enter**: *falls back to* asks the same thing, and
+*how it is tried again* asks the other.
 
 **An agent with no account has a chain too.** The account this machine is already signed into
 is an account here as well — `claude/`, a backend and no name at all — so it is where the
@@ -100,9 +100,11 @@ go of as the agent moves and the next turn opens one as whoever the agent now is
 
 Any coding agent that speaks the [Agent Client Protocol](https://agentclientprotocol.com) can
 be driven from here without humanize knowing anything else about it. Add one in the interface:
-`/providers`, then **c**, and give the command that starts it — `my-agent --acp`, `grok agent
-stdio`, `qwen --acp`. It is written down under humanize's own home, so it is a backend from the
-next prompt on, in this workspace and every other, and `-a my-agent/...` names it.
+`/providers`, then **a**, then *a CLI of your own*, which is the last row of the backends a new
+account may be for — the row for somebody who has got that far and cannot find their agent in
+the list. Give the command that starts it — `my-agent --acp`, `grok agent stdio`, `qwen --acp`.
+It is written down under humanize's own home, so it is a backend from the next prompt on, in
+this workspace and every other, and `-a my-agent/...` names it.
 
 humanize spawns that command and speaks JSON-RPC to it over its own stdin and stdout:
 `session/new` opens the conversation, `session/prompt` takes each turn, and what the agent says
@@ -873,8 +875,8 @@ and Codex both run that moment; the rest have nothing to hang it on.
 **A skill installed on this machine is its CLI's own.** humanize does not switch one off, does
 not write the CLI's settings, and has no per-agent list of them: what you installed is what
 every agent of that CLI carries, installed and switched off where that CLI keeps them. The
-list is readable — the [`/agents` sheet](/reference/tui.md#what-each-agent-carries) shows what
-an agent will be carrying — and that is all it is:
+list is readable — the [`skills` row](/reference/tui.md#what-each-agent-carries) of the sheet an
+agent is set up on shows what it will be carrying — and that is all it is:
 
 ```python
 from hmz.agents.skills import skills

@@ -326,6 +326,10 @@ true of all of them:
   close, or discard and close. Esc on the box is the way back to the menu. A menu you only
   looked at asks nothing.
 
+`/cycles` and `/flowverses` are lists of the same kind, and the first two are true of them as
+well. The third is not: neither holds a draft of anything, so what is asked for there happens
+as it is asked for and esc asks nothing on the way out.
+
 A menu of several pages shows their titles across the top, and **tab** / **shift+tab** turn
 between them. A page that cannot be opened right now is still a title, struck through. A page
 made of several lists names them under the titles, and `←` / `→` step between those.
@@ -353,27 +357,23 @@ that place's flows and nothing else.
   2. ralph_loop              Ralph loop (flowbench: ralph_loop) — a fresh session every…
   3. stateful_ralph          Stateful ralph (flowbench: stateful_ralph) — one session, re-…
 
-  Enter to choose · f copies it here · a adds a flowverse · r fetches one · d twice takes
-  one away · Esc to close · s to search
+  Enter to choose · f copies it here · Esc to close · s to search
 ```
 
 | Key | |
 | --- | --- |
 | `←` `→` | Read the place before or after this one, wrapping round. |
 | `f` | Copy the flow under the cursor into `.humanize/flows/`, whole — what it imports and the skills it brings — to change. Your own are looked in first, so from then on that name means your copy. |
-| `a` | Add a flowverse: a URL or an `owner/repo`, and a name to keep it under. |
-| `r` | Fetch the place being read again, or for the first time. |
-| `d` `d` | Take an added one away, flows and all. `builtin` and `official` are always here. |
 
-The page opens on the place the flow in force came from, and a fetch leaves you reading what
-it brought. **A flowverse that has never been fetched is fetched as the menu opens** — which
-in practice is `official`, the one every flow that is not in the package is in — in the
-background, without moving what you are reading, and once per opening however it goes. The
-flowverse keys are here rather than in a menu of their own because this is the
-moment you find out that the flow you want is in a flowverse you have not added, or that the
-one you have is out of date. A fetch runs off the interface's own loop — it keeps drawing
-while it clones — and what became of it is said under the list rather than thrown at you. A
-flowverse with nothing in it says so where its flows would be, and `r` fetches it from there.
+The page opens on the place the flow in force came from. **A flowverse that has never been
+fetched is fetched as the menu opens** — which in practice is `official`, the one every flow
+that is not in the package is in — in the background, once per opening however it goes, and
+without moving what you are reading: this is the place nobody fetched being fetched because
+its flows are wanted, not somebody asking to be taken to it. It runs off the interface's own
+loop — the menu keeps drawing while it clones — and what became of it is said under the list
+rather than thrown at you. A place with nothing in it says so where its flows would be, and
+one that has never been fetched says which menu fetches it: adding a place, fetching one again
+and taking one away are [`/flowverses`](#where-flows-come-from).
 
 Choosing a flow reads back what that flow was last set up with here, asks
 [what the flow itself takes](#setting-a-flow-up) where it takes anything, and lands on the
@@ -388,10 +388,47 @@ the one thing that cannot be swapped under a flow already holding that agent, an
 The same places are on the command line as [`hmz flowverses`](/reference/cli.md#hmz-flowverses), for a
 machine being set up or a script.
 
-Typing narrows by name. What each flow says about itself is beside its name, and is not
-searched: a subsequence of a sentence matches nearly everything. A search narrows the strip
-to the places it found something in and steps to one of them, so what you type finds a flow
-without your having to remember which flowverse it was in.
+**s** starts a search, and what is typed into it narrows by name. What each flow says about
+itself is beside its name, and is not searched: a subsequence of a sentence matches nearly
+everything. A search narrows the strip to the places it found something in and steps to one of
+them, so what you type finds a flow without your having to remember which flowverse it was in.
+
+## Where flows come from
+
+`/flowverses` is the places themselves — a git repository with a `flows/` directory apiece,
+cloned under humanize's home and offered under the name it is kept there. A place that has
+never been fetched is listed all the same, with its URL and `not fetched yet` beside it: what
+there is to run is not the same question as what has been downloaded.
+
+![The /flowverses list: builtin, which holds the flows humanize ships, and official, a GitHub
+URL marked as not fetched yet](/demo/flowverses.png)
+
+| Key | |
+| --- | --- |
+| **enter** | What that flowverse holds: one row per flow, with the line it says about itself. Reading them means importing them, so it is asked of the one you opened rather than of all of them at once. |
+| **a** | Add one: a URL or an `owner/repo`, and a name to keep it under. |
+| **r** | Fetch the one under the cursor again, or for the first time. `builtin` came with humanize and says there is nothing to fetch. |
+| **d** **d** | Take an added one away, flows and all. `builtin` and `official` are always here, and say so. |
+
+Its own menu rather than three more keys on `/flow`, because they are about something else:
+adding a repository, fetching one again and taking one away are done to the list of places,
+while the page they were on is asking which flow to run — and a sheet that asks one question
+with three keys about another is a sheet asking two.
+
+**What happens here happens as it is asked for** rather than when the menu is saved: each of
+these runs git, and something that has already been cloned is not a draft. A clone runs off
+the interface's own loop, so the menu keeps drawing while it fetches, and what came of it is
+said under the list and again in the transcript on the way out. Nothing here is refused while
+a flow is running: a place fetched now is one the next run may reach for, and none of it
+touches the flow that is going.
+
+`/flow` kept the two keys that are about flows rather than about places: `←` and `→`, which
+step between these same places because that is which list of flows is being read, and `f`,
+which copies the flow under the cursor into this project.
+
+Typing `/flow` and pressing enter still sends `/flow`. A command that has been written out
+whole is [offered](#completion) nothing at all, so `/flowverses` is never left standing under
+the cursor with enter meaning it.
 
 ## What each agent is
 
@@ -567,6 +604,59 @@ CLI's own, and what a person installed is not something a flow is entitled to re
 What a run adds to that is [the skills the flow brings](/reference/flows.md#the-skills-a-flow-brings),
 mounted onto every session its agents open and taken away again after.
 
+## The runs that have already happened
+
+`/cycles` is every run of a flow in this directory, newest first. A run writes itself down as
+it happens — which flow, on what, by which agents, and every session each of them opened —
+and this is what reads it back:
+
+![The /cycles list: two runs, each with when it began, the flow that ran, what it was asked to
+do and how many sessions it opened, the newer one marked "can be picked up"](/demo/cycles.png)
+
+A row is when the run began and the flow that ran; beside it, what that flow was asked to do,
+how many sessions it opened, and `can be picked up` for a run whose flow said it was
+resumable. How it went is there only where it went some way other than finishing — stopped,
+failed, or left unfinished by a machine that went away under it — since a list of runs is
+mostly runs that finished, and a column saying so of nearly all of them is a column taking the
+room the others need. Newest first, because what somebody who opens this came to look at is
+the run that has just happened. **s** searches the flow, what it was asked to do, and the name
+the run is written under.
+
+The list is read rather than chosen from, so **enter** opens what there is to do with the run
+under the cursor:
+
+![The menu under one run: carry on from here, collect a trace, and where it is, each with a
+line saying what it does](/demo/cycle-does.png)
+
+| Row | What it does |
+| --- | --- |
+| **carry on from here** | Runs that run's own flow again, on what that run left behind — which a flow that says it [can be picked up](/reference/flows.md#a-flow-that-can-be-picked-up) is handed. |
+| **collect a trace** | Gathers its sessions — and the programs it ran, for a [profiled](/reference/tracing.md#profiling-a-run) run — into `traces/` inside the run itself, rather than into whatever directory you are standing in. Where it went and what is in it are said under the list, and again in the transcript. |
+| **where it is** | The directory the run is written in, sessions and all, said under the list. |
+
+**Carrying on is offered where the flow says so now**, rather than where the run said so then.
+The mark on the row is what that run wrote down as it ran; opening the menu asks the flow
+itself, since a flow is a file that may have been rewritten since — and one that will not load
+at all is one there is nothing to carry on from. Where it is not offered the row is not there
+and the reason is said under the two that are. Collecting a trace is offered for every run,
+whatever its flow says: a run that cannot be continued is still a run to read.
+
+What is carried on is the run rather than what the interface happens to be set up on — the
+flow, its agents and what they were asked to do all come off the record of that run, an agent
+swapped under it being a different run wearing its name. And it is a run of its own: a
+[cycle](/reference/tracing.md#cycles) is never reopened, so carrying one on writes a new one
+that says which run it came from.
+
+**Reading is not refused while a flow is running. Carrying one on is.** What has already
+happened does not change under you, so the list is worth having open mid-run — but a run
+picked up is a flow started, and there is one going. It is said under the list rather than by
+shutting the menu, since the question the menu is asking is still worth answering: `a flow is
+running; esc stops it before another can be picked up`.
+
+A directory nothing has ever been run in says so under the empty list. The same trace is
+[`hmz trace collect`](/reference/cli.md#hmz-trace-collect) on a command line, with `--cycle` to
+name which run.
+
 ## The accounts themselves
 
 `/providers` is all of them, under a heading per CLI, with the way each was made by and the
@@ -583,6 +673,9 @@ variables it sets. Their names, never a value: this is drawn where somebody can 
      5. as local                  the CLI as this machine is already signed in
 ```
 
+![/providers: the accounts under a heading per CLI, enter opening what there is to do with one,
+and a asking which backend a new one is for](/demo/accounts.gif)
+
 | Key | What it does |
 | --- | --- |
 | **enter** | Opens what there is to do with the one under the cursor: correct what it holds, sign it in again, say what it falls back to, say how a failed turn under it is tried again |
@@ -590,14 +683,18 @@ variables it sets. Their names, never a value: this is drawn where somebody can 
 | **d** **d** | Takes it away, credentials and all |
 | **esc** | Closes the menu, asking about anything it is holding |
 
+![What enter opens on one account: correct what it holds, sign it in again, what it falls back
+to, and how it is tried again](/demo/account-does.png)
+
 Four questions about one account are a menu rather than four letters to read off the bottom of
 the screen — while **enter**, which every list already means, was doing one of them.
 
 The last row under each CLI is the account this machine is already signed into — the CLI as
 you run it, which is what an agent nobody gave an account runs as, and where that agent's
 chain begins. Where it falls back to and how it is tried again are what it takes; correcting
-it and signing it in are not offered at all, and **d** says why there is nothing to do, since
-humanize did not make that account and keeps no credentials for it.
+it and signing it in are not offered at all, and the menu says why under the two rows that are
+left. **d** says the same thing: humanize did not make that account and keeps no credentials
+for it.
 
 Taking one away, saying where it falls back to, saying how it is tried again and correcting
 what one holds are **held until the menu is saved**. Making one and signing one in are not: both own the terminal while they run,

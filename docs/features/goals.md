@@ -96,8 +96,8 @@ $ hmz exec -f pursuing -a pi/openai-codex/gpt-5.5:high "fix the build"
 hmz exec: error: pursuing: worker is run under a goal, which pi has no feature for
 ```
 
-The interface's `/agents` sheet then offers only the CLIs that have one, so it cannot be chosen
-wrong there at all.
+The agents page of `/flow` then offers only the CLIs that have one, so it cannot be chosen wrong
+there at all.
 
 ## A goal by hand: refusing `STOP`
 

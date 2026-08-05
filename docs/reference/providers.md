@@ -190,7 +190,7 @@ being what takes the form.
 ```
 hmz providers list [<cli>]
 hmz providers ways <cli>
-hmz providers add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login]
+hmz providers add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] [--also <cli>,...]
 hmz providers login <cli>/<name> [-s VAR=VALUE]...
 hmz providers show <cli>/[<name>]
 hmz providers falls-back <cli>/[<name>] [<name>]
@@ -210,9 +210,9 @@ nothing to make, sign in or take away.
 | --- | --- |
 | `list` | What providers there are, or one backend's. The line is the name, the way it was made by, and the variables it sets. |
 | `ways` | How that backend can be signed into: each way, what it asks for, and what it runs. |
-| `add` | Makes one. `-w` chooses the way — the backend's first when nothing says otherwise, which is `login` for the CLIs that sign in and `key` for `dsh` — and `-s` answers one of its questions on the line rather than being asked. Then it runs the way's own command, unless `--no-login` says only to write it down. |
+| `add` | Makes one. `-w` chooses the way — the backend's first when nothing says otherwise, which is `login` for the CLIs that sign in and `key` for `dsh` — and `-s` answers one of its questions on the line rather than being asked. Then it runs the way's own command, unless `--no-login` says only to write it down. `--also` writes the same account down for the backends it names, comma separated, or for every one it could be run as with `all`. |
 | `login` | Signs an existing one in again, by the way it was made with. For a way that has nothing to run, `add` it again instead. |
-| `show` | What one holds: the way, when it was made, where it is kept, what it falls back to, how a failed turn under it is tried again, the **names** of the variables it sets, and which paths a turn under it is given instead of which. |
+| `show` | What one holds: the way, when it was made, where it is kept, what it falls back to, how a failed turn under it is tried again, the **names** of the variables it sets, which paths a turn under it is given instead of which, and an `also runs` line per [other backend](#one-account-several-clis) that could be run as it. |
 | `falls-back` | Says which account of that CLI a turn carries on under when this one fails, or — with nothing after it — that this one is the end of the line. |
 | `retry` | Says how a failed turn under it is tried again before the chain moves on: `-n` how many times over, `-p` which wait, `-t` the longest the whole of it may go on for. |
 | `remove` | Takes it away, credentials and all. |
@@ -259,13 +259,18 @@ $ hmz providers remove claude/deepseek
 claude/deepseek is gone, credentials and all
 ```
 
+![hmz providers show on a gateway account: the way, when it was made, where it is kept, what it
+falls back to, how it is tried again, the two variables it sets by name, and the three paths a
+turn under it is answered with](/demo/providers-show.png)
+
 Making a provider that is already there replaces what it holds and leaves its credentials alone:
 a key corrected is not a reason to sign in again.
 
 In the interface, `/providers` walks the same list, with the account this machine is signed
 into last under each CLI's heading. **a** makes one and **d** twice takes it away; **enter**
 opens what else can be done to the one under the cursor — correct what it holds, sign it in
-again, say what it falls back to, say how a failed turn under it is tried again.
+again, say what it falls back to, say how a failed turn under it is tried again. The screens
+themselves are [TUI › The accounts themselves](/reference/tui#the-accounts-themselves).
 
 ## One account, several CLIs
 
@@ -284,6 +289,12 @@ claude/work is written down at ~/.humanize/providers/claude/work
 pi/work is written down at ~/.humanize/providers/pi/work
 opencode/work is written down at ~/.humanize/providers/opencode/work
 mimo/work is written down at ~/.humanize/providers/mimo/work
+
+$ hmz providers show claude/work
+…
+also runs   pi
+also runs   opencode
+also runs   mimo
 ```
 
 `--also` takes the backends by name, comma separated, or `all` for every one that could be run
@@ -292,9 +303,24 @@ Claude subscription token lands on pi as `ANTHROPIC_OAUTH_TOKEN` — and **over 
 there**, which is what makes this a way of rotating a key everywhere at once rather than in
 four places.
 
+`show` ends with an `also runs` line per backend this account could be run as, which is what it
+could be copied to rather than what it has been copied to: a backend already holding a copy
+reads the same as one holding none. The copies themselves are in `list`, under that same name.
+
 In the interface it is a question rather than a flag: making an account that several backends
 could be run as asks which of them to write it down for, with the ones installed here already
-ticked. Correcting one asks the same, and holds it with the correction until the menu is saved.
+ticked. Correcting one asks the same, of the account as corrected, and holds it with the
+correction until the menu is saved — so what a correction reaches is the backends ticked in that
+question, which start as the ones installed here rather than as the ones a copy is already on.
+
+![/providers, a, claude, key: an account named and its key typed as bullets, then the question
+of which other backends to write it down for](/demo/alike.gif)
+
+The copies are accounts of their own from there on, listed under their own backend's heading
+and under the name the account they came from has:
+
+![the /providers list afterwards: shared under claude, opencode and pi, each saying which
+variable it sets](/demo/alike-copied.png)
 
 What travels is variables. An account that is a subscription signed into is the CLI's own
 credential store in that CLI's own format, and nothing else reads it — so it is copyable

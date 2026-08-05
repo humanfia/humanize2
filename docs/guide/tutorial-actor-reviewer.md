@@ -35,7 +35,7 @@ def run(agents: Agents, task: str) -> None:
 
 The names are not decoration. Everything that has to talk about an agent uses them:
 
-- `/agents` asks what **the reviewer** runs, rather than what agent 2 of 2 runs.
+- The agents page of `/flow` asks what **the reviewer** runs, rather than what agent 2 of 2 runs.
 - The line above the prompt says `reviewer · claude/claude-opus-4-8:high`.
 - A [trace](/features/tracing) groups that agent's sessions under `reviewer`.
 - What each was set to run is [remembered per role](/features/settings), so a flow that grows an
@@ -151,7 +151,7 @@ $ hmz exec -f pair -a kimi/kimi-code/k3:high -a pi/openai-codex/gpt-5.5:high "fi
 hmz exec: error: pair: builder has to run PermissionRequest, which kimi does not
 ```
 
-And the interface's `/agents` then offers only the CLIs that would work for that place, so it
+And the agents page of `/flow` then offers only the CLIs that would work for that place, so it
 cannot be chosen wrong there at all.
 
 ## Three variations worth trying

@@ -139,6 +139,7 @@ export default defineConfig({
           items: [
             { text: 'Flowverses', link: '/features/flowverses' },
             { text: 'Tracing', link: '/features/tracing' },
+            { text: 'Picking a run up', link: '/features/resuming' },
           ],
         },
       ],

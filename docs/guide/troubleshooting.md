@@ -34,9 +34,9 @@ not a flowverse's is taken as a path. See
 
 ### `the official flowverse has not been fetched yet`
 
-The name is right and the download has not happened. Open `/flow`, which fetches it as it
-opens; `r` on it fetches it again, and `hmz flowverses fetch official` does the same from a
-command line.
+The name is right and the download has not happened. Open `/flow`, which fetches whatever has
+never been fetched as it opens; `r` on it in `/flowverses` fetches it again, and
+`hmz flowverses fetch official` does the same from a command line.
 
 ### `nothing in it is marked @flow(), and it holds …`
 
@@ -240,7 +240,8 @@ Nothing matched. In order of likelihood:
 ### Two agents show up as one
 
 They ran at the same configuration and nothing said they were two. `hmz trace collect` reads that
-from the last [cycle](/reference/tracing.md#cycles) in the workspace; driving agents by hand, pass
+off the run it is a trace of, which is the last [cycle](/reference/tracing.md#cycles) of the
+workspace unless `--cycle` names another; driving agents by hand, pass
 `agents={a.id: a.opened for a in …}`. See
 [what counts as one agent](/reference/tracing.md#what-counts-as-one-agent).
 

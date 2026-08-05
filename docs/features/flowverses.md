@@ -62,18 +62,29 @@ repository you have just cloned is never run until you ask what is in it. See
 
 `/flowverses` is the places themselves:
 
+![/flowverses: the places flows come from, and what one of them holds](/demo/flowverses.gif)
+
 | Key | |
 | --- | --- |
-| **enter** | What that flowverse holds, read from the clone — which means importing its flows, so it is asked of the one you opened |
-| **a** | Add one: a URL or an `owner/repo`, and a name to keep it under |
+| **enter** | What that flowverse holds — which means importing its flows, so it is asked of the one you open rather than of the whole list |
+| **a** | Add one: a URL or an `owner/repo`, and a name to keep it under — blank for the repository's own |
 | **r** | Fetch the one under the cursor again, or for the first time |
 | **d** **d** | Take an added one away, flows and all |
+
+What one holds is a reading rather than a menu — each flow's name and the line it says about
+itself. Which of them to run is `/flow`'s question, where every place's flows are:
+
+![what builtin holds: chat, ralph_loop and stateful_ralph, each with the line its flow says about
+itself](/demo/flowverse-holds.png)
+
+One that has never been fetched has nothing to read yet, and says so — and that **r** fetches
+it — rather than reading as a place with nothing in it.
 
 `/flow` is where the flows are, and it steps between the same places:
 
 | Key | |
 | --- | --- |
-| **←** **→** | Step between the places flows come from, a list apiece — every flowverse, then `local` and `user` |
+| **←** **→** | Step between the places flows come from, a list apiece — every flowverse, then `local` and `user` where either holds anything |
 | **f** | Copy the flow under the cursor into `.humanize/flows/`, to change |
 
 A flow whose file will not import is still listed, under the name it would have had and with
@@ -91,6 +102,10 @@ interface's own loop — it keeps drawing while it clones — and what became of
 the list rather than thrown at you. Opening `/flow` fetches whatever has never been fetched,
 in the background and without moving what you are reading, so **r** is for fetching one
 *again*.
+
+Typing `/flow` and pressing enter still sends `/flow`. A command that has been written out
+whole is offered nothing to finish it with, so `/flowverses` never sits under a cursor waiting
+to be taken by the enter that meant to send the shorter one.
 
 ## Where a name is looked for
 
@@ -151,7 +166,7 @@ my-flowverse/
 └── README.md
 ```
 
-Add it with **a** in `/flow`, or clone it into `~/.humanize/flowverses/<name>/` yourself.
+Add it with **a** in `/flowverses`, or clone it into `~/.humanize/flowverses/<name>/` yourself.
 There is a [tutorial](/guide/tutorial-flowverse).
 
 ::: danger Adding one is trusting that repository with this machine

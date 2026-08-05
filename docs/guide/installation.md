@@ -101,9 +101,10 @@ configuration sources:
 the saved key and any `llm-deepseek.baseURL` in `$DSH_HOME/settings.yaml`, then its environment
 layers. `$DSH_HOME` defaults to `~/.dsh`.
 
-To keep a separate key in humanize's provider store instead, choose `dsh` on the `cli` row and press **a** on the `provider` row,
-choose `key`, and enter an account name and the key. The same account can be made from a
-terminal; this command asks for the key without putting it in the command itself:
+To keep a separate key in humanize's provider store instead, choose `dsh` on the `cli` row, press
+enter on the `provider` row and **a** in the list of accounts, choose `key`, and enter an account
+name and the key. The same account can be made from a terminal; this command asks for the key
+without putting it in the command itself:
 
 ```sh
 hmz providers add dsh/deepseek -w key
@@ -144,12 +145,12 @@ Nothing is written until something needs it.
 
 | Path | |
 | --- | --- |
-| `~/.humanize/cycles/` | one file per run: the flow, the agents, every session opened |
+| `~/.humanize/cycles/` | one directory per run: the flow, the agents, every session opened, and the [trace](/features/tracing) gathered of it afterwards |
 | `~/.humanize/settings.yaml` | what each project was last set up to run |
 | `~/.humanize/history.jsonl` | what has been typed at the prompt |
 | `~/.humanize/flowverses/` | the [flowverses](/features/flowverses) fetched here |
 | `~/.humanize/providers/` | the [accounts](/features/providers), `0600` in a `0700` directory |
-| `.humanize/` in a project | traces, exported transcripts, and this project's own flows |
+| `.humanize/` in a project | exported transcripts, and this project's own flows |
 
 `HUMANIZE_HOME` moves the first five somewhere else. The full list is in the
 [CLI reference](/reference/cli#files).

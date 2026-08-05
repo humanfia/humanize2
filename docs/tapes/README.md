@@ -1,8 +1,8 @@
 # The terminal demos
 
-The GIFs under `docs/public/demo/` are rendered from the `.tape` scripts here by
+The GIFs and stills under `docs/public/demo/` are rendered from the `.tape` scripts here by
 [VHS](https://github.com/charmbracelet/vhs), inside a container built by the `Dockerfile`
-beside them.
+beside them. A tape may `Screenshot` a moment worth its own still as well as writing its GIF.
 
 ```sh
 ./render.sh                 # every tape
@@ -22,10 +22,10 @@ That is the whole reason this is a container rather than a script you run on you
 | the workspace | `/work/demo`, built by `stage.py` |
 | the homes | `/root/.humanize` and `/root/.claude`, inside the container |
 | the backends | `standin/claude` and `standin/codex`, which run nothing and exit 1 |
-| the accounts | made with `--no-login`, at `gateway.example.invalid`, with `not-a-real-token` |
-| the transcript `hmz trace collect` reads | invented by `stage.py` |
+| the accounts | made with `--no-login`, or by a way that runs nothing, at `gateway.example.invalid`, with `not-a-real-token` and `not-a-real-key` |
+| the runs, and the transcripts `hmz trace collect` reads | invented by `stage.py` |
 
-**No tape takes a turn.** The interface demo opens, shows its own lists, and leaves.
+**No tape takes a turn.** The interface demos open, show their own lists, and leave.
 
 Look at what you rendered before you commit it.
 
@@ -46,7 +46,8 @@ Look at what you rendered before you commit it.
 450 KB. The clock is not bounded; the file is. What the current tapes are written against:
 
 - `Set Width 1000`, `Set Height` between 500 and 620;
-- `Set Framerate 20`, and `Set TypingSpeed` between 20ms and 50ms;
-- 8 to 20 seconds end to end, which those settings keep under 350 KB.
+- `Set Framerate` between 10 and 20 — the slower for a tape that is mostly a menu being read —
+  and `Set TypingSpeed` between 20ms and 50ms;
+- 8 to 20 seconds end to end, which those settings keep under 420 KB.
 
 A tape that has grown too large is usually one with too much `Sleep` in it.

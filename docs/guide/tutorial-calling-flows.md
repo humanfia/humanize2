@@ -141,7 +141,7 @@ hmz exec -f official/humanize1:gen-idea -a claude/claude-opus-5:max "add undo to
 hmz exec -f official/humanize1:gen-plan -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max ""
 ```
 
-Each declares its own agents and its own settings, so `/agents` asks two questions rather than
+Each declares its own agents and its own settings, so the agents page asks two questions rather than
 five and setting one up shows one phase's flags rather than three phases' at once. What passes between
 them is whatever they write — a file, usually.
 

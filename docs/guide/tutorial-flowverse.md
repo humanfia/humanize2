@@ -60,7 +60,7 @@ git push -u origin main
 In `hmz`:
 
 ```
-/flow
+/flowverses
 ```
 
 **a**. It asks for a URL or an `owner/repo`, and a name to keep it under if the repository's
@@ -74,9 +74,9 @@ yours
 It is cloned into `~/.humanize/flowverses/yours/`, and every flow in it is then offered as
 `yours/<flow>`.
 
-| Key in `/flow` | |
+| Key in `/flowverses` | |
 | --- | --- |
-| **←** **→** | walk the places flows come from, a tab apiece |
+| **enter** | what it holds — which means importing its flows, so it is asked one at a time |
 | **a** | add one |
 | **r** | fetch the one under the cursor again, or for the first time |
 | **d** **d** | take an added one away, flows and all |
@@ -89,6 +89,18 @@ Or without opening anything, which is how a machine being set up or a CI job wou
 hmz flowverses add you/my-flowverse yours
 hmz flowverses show yours
 ```
+
+![/flowverses: builtin and official, where each came from, and enter reading what one
+holds](/demo/flowverses.gif)
+
+The places and the flows are two questions, and they are two menus. `/flowverses` is the
+**places**: what there is, what one holds, and what can happen to one. `/flow` is **which flow
+to run** — its **←** **→** step between those same places, a list of flows apiece, and **f**
+copies the flow under the cursor into this project to change. So what a flowverse holds is
+something you read rather than choose from: each flow's name, and the line it says about itself.
+
+![What builtin holds: each flow's name and the first line of its
+docstring](/demo/flowverse-holds.png)
 
 ## Step 4 — run one
 
@@ -114,9 +126,9 @@ That is the reason to publish two small flows rather than one large one.
 
 ## Step 6 — keep it up to date
 
-**r** in `/flow` fetches the flowverse under the cursor again. It runs off the interface's own loop — the
-screen keeps drawing while it clones — and what became of it is said under the list rather than
-thrown at you.
+**r** in `/flowverses` fetches the flowverse under the cursor again. It runs off the interface's
+own loop — the screen keeps drawing while it clones — and what became of it is said under the
+list rather than thrown at you.
 
 `hmz flowverses fetch yours` is the same fetch, which is the one a cron job or a build step
 would run.
@@ -162,7 +174,9 @@ Run that in the repository's own CI and a flow that stopped loading is a red bui
 
 - A flowverse is a git repository with a `flows/` directory: one directory per flow, or a
   single `.py` for one that brings nothing; `_`-prefixed names ignored.
-- **a** / **r** / **d d** in `/flow` add, fetch and remove.
+- **a** / **r** / **d d** in `/flowverses` add, fetch and remove; enter says what one holds.
+- `/flowverses` is the places, `/flow` is which flow to run, and `/flow`'s arrows step between
+  the same places.
 - `<flowverse>/<flow>` is the unshadowable spelling, and `calls` takes it too.
 - Import-time side effects run for anyone who lists your flowverse.
 

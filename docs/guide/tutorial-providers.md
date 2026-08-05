@@ -106,22 +106,24 @@ A CLI is never spelled with an `@` in it, so the two are told apart wherever an 
 
 ## Step 6 — the same at the prompt
 
-`/agents`, **first step**. A tab per CLI that is installed, and under it that CLI's own accounts —
-an account belongs to one backend, since what signs in to Claude Code is not what signs in to
-codex:
+The agents page of `/flow`, the agent, then its `provider` row — under the `cli` row, because an
+account belongs to one backend and what signs in to Claude Code is not what signs in to codex. It
+opens on that CLI's own:
 
 ```
-   claude · codex · kimi · mimo · opencode · pi   ←/→ to switch
+   Select the account its turns run as
 
-   ❯ 1. as local                  ✔ signed in as you signed it in
+   ❯ 1. as local                  signed in as you signed it in
      2. deepseek                  gateway · ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL
      3. work                      login
+
+   a to make one · Enter to choose · Esc to cancel · s to search
 ```
 
-`as local` is what every agent ran as before there were any accounts.
+`as local` — always the first row — is what every agent ran as before there were any accounts.
 
 **a makes one without leaving the question** — the same walk `/providers` runs, minus the
-question this tab has already answered — and comes back with the new account chosen.
+question the `cli` row has already answered — and comes back with the new account chosen.
 
 ## Step 7 — the models are the account's
 

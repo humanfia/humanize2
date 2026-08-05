@@ -39,13 +39,13 @@ dsh web
 ```
 
 You can run `npx @deepseek-ai/dsh web` instead of installing the launcher globally. Open
-**Settings -> Models**, enter the DeepSeek API key, and save. After reopening `hmz`, type
-the agents page of `/flow`, switch a CLI to `dsh`, and leave its account on `as local`;
-humanize then uses the credentials and
-base URL already saved by dsh.
+**Settings -> Models**, enter the DeepSeek API key, and save. After reopening `hmz`, open the
+agents page of `/flow`, switch a CLI to `dsh`, and leave its account on `as local`; humanize then
+uses the credentials and base URL already saved by dsh.
 
-Alternatively, choose `dsh` on the `cli` row and press **a** on the `provider` row, choose `key`, and enter an account name and
-the key. Or set it only for the process that starts humanize:
+Alternatively, choose `dsh` on the `cli` row, press enter on the `provider` row and **a** in the
+list of accounts, choose `key`, and enter an account name and the key. Or set it only for the
+process that starts humanize:
 
 ```sh
 export DEEPSEEK_API_KEY=sk-…
@@ -143,9 +143,11 @@ Then say what you want done. It will keep going until you stop it with esc — t
 Ralph loop *is*. `/status` shows who is working, who handed to whom, and what it has cost.
 
 humanize ships three — `chat`, `ralph_loop` and `stateful_ralph` — and offers the rest from
-[a flowverse](/reference/flows.md#flowverses), which is a git repository of flows. `official` is there from
-the start: press left and right in `/flow` to walk between the places flows come from, and
-`r` on one to fetch it. Every flow is described in [Flows](/reference/flows.md#the-flows-humanize-ships).
+[a flowverse](/reference/flows.md#flowverses), which is a git repository of flows. `official` is
+there from the start: the flows are read a place at a time, and **←** and **→** in `/flow` step
+between the places they come from. Opening the menu fetches whatever has never been fetched, and
+adding a place, fetching one again and taking one away are `/flowverses`, a menu of its own. Every
+flow is described in [Flows](/reference/flows.md#the-flows-humanize-ships).
 
 ## 4. Run one without the interface
 
@@ -214,13 +216,19 @@ hmz trace collect
 ```
 
 ```console
-.humanize/20260809T014455Z.trace.json: 3 sessions, 412 slices
+~/.humanize/cycles/-home-you-code-myproject/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
 ```
 
+The file, then which run it is a trace of, then what is in it. Every run of a flow is a directory
+under `~/.humanize/cycles/`, and the trace goes into that run's own `traces/` beside the record of
+what happened — `--output` puts it somewhere else, which is what to use when it is going into an
+issue or a CI artifact. `/cycles` at the prompt lists the runs of this directory and collects a
+trace of the one you pick.
+
 Open that file in [ui.perfetto.dev](https://ui.perfetto.dev) (drag it in) or `chrome://tracing`.
-Each agent is a process, each session a track, and each slice one thing the agent did — with
-the prompt, the reasoning, the tool input and the tool output attached to it. It is the only
-view of a long run that fits on a screen.
+Each agent is a process, each row of its sessions a track, and each slice one thing the agent
+did — with the prompt, the reasoning, the tool input and the tool output attached to it. It is
+the only view of a long run that fits on a screen.
 
 ## Write a flow of your own
 
@@ -252,7 +260,8 @@ hmz exec -f twice -a claude/claude-opus-4-8:high "add a --dry-run flag"
 
 It is offered in the interface too — `/flow` lists the flows in `.humanize/flows` here, in
 `~/.humanize/flows`, the ones humanize ships, and everything in every
-[flowverse](/reference/flows.md#flowverses) fetched here, a tab apiece.
+[flowverse](/reference/flows.md#flowverses) fetched here, a place apiece with the arrows stepping
+between them. **f** copies the flow under the cursor into this project, to change it there.
 
 ## Where to go next
 

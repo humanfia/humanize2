@@ -41,7 +41,7 @@ features:
     link: /features/remote-execution
     linkText: Remote execution
   - title: The whole run as a timeline
-    details: Every run is written down as it happens. Collect it into a Chrome trace and open it in Perfetto — one process per agent, one track per session, one slice per thing it did.
+    details: Every run is written down as it happens. Collect it into a Chrome trace and open it in Perfetto — one process per agent, one track per row of its sessions, one slice per thing it did.
     link: /features/tracing
     linkText: Tracing
 ---

@@ -132,13 +132,13 @@ jobs:
 
       - name: Collect the trace
         if: always()
-        run: hmz trace collect
+        run: hmz trace collect --output trace.json
 
       - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: trace
-          path: .humanize/*.trace.json
+          path: trace.json
 
       - uses: peter-evans/create-pull-request@v7
         with:
@@ -152,14 +152,20 @@ jobs:
 `hmz trace collect` with `if: always()` is the point of the whole exercise: whatever the run did —
 finished, failed, or hit the timeout — the trace is on the artifacts.
 
-Download it and drag it into [ui.perfetto.dev](https://ui.perfetto.dev). One process per agent,
-one track per session, one slice per thing it did, with the prompts and the tool output attached.
-See [tutorial 5](/guide/tutorial-trace).
+`--output` is what puts it there. Left alone, a trace goes with the run it is a trace of:
+`traces/` inside `~/.humanize/cycles/<workspace>/<run>/`, which is outside the checkout and named
+after a run the YAML has never heard of. `--output` is for the other case — a trace as a file to
+hand to somebody — and a job uploading an artifact is exactly that.
 
-The [cycle](/features/tracing#what-a-run-writes-down) says how it ended:
+Download it and drag it into [ui.perfetto.dev](https://ui.perfetto.dev). One process per agent,
+one track per row of its sessions, one slice per thing it did, with the prompts and the tool
+output attached. See [tutorial 5](/guide/tutorial-trace).
+
+The [cycle](/features/tracing#what-a-run-writes-down) says how it ended. A run is a directory, and
+its record is `cycle.jsonl` inside it:
 
 ```sh
-tail -1 ~/.humanize/cycles/*/*.jsonl
+tail -1 ~/.humanize/cycles/*/*/cycle.jsonl
 ```
 
 ```console
@@ -232,7 +238,8 @@ workspace. See [tutorial 17](/guide/tutorial-container).
 
 - Bound the run three ways, and let the job timeout be the fourth.
 - A provider made with `-s` is how a CLI signs in with nobody at a terminal.
-- `hmz trace collect` with `if: always()` turns a failed run into something you can read.
+- `hmz trace collect --output` with `if: always()` turns a failed run into an artifact you can
+  read.
 - Everything knowable up front is checked up front, which is what makes a scheduled run safe to
   leave alone.
 

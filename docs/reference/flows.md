@@ -74,6 +74,10 @@ under its directory's own name, and `@flow(name="…")` is one of the rest, run 
 A flow may also name [skills](#the-skills-a-flow-brings) that live in somebody else's
 repository, and everything it brings is mounted onto every session its agents open.
 
+And a flow may say it [can be picked up](#a-flow-that-can-be-picked-up) where the last run of it
+left off: `@flow(resumable=True)` is handed a dict as its last argument, holding whatever it
+wrote there last time.
+
 ## A flow that waits for more than one thing
 
 A loop that has more than one turn going at a time has to be able to wait for several things at
@@ -153,7 +157,7 @@ def run(agents: Agents, task: str) -> None:
 The names are not only for the flow's own readability. Everything that has to talk about an
 agent uses them:
 
-- `/agents` in the interface asks what *the reviewer* runs, rather than what agent 2 of 2 runs.
+- The agents page of `/flow` asks what *the reviewer* runs, rather than what agent 2 of 2 runs.
 - The line above the prompt says `reviewer · claude/claude-opus-4-8:high`.
 - A [trace](/reference/tracing.md) groups that agent's sessions under `reviewer`.
 - What each agent was set to run is [remembered per role](/reference/tui.md#what-it-remembers), so a flow
@@ -227,6 +231,85 @@ class the run is handed. What is carried across is the fields, which `Runner` re
 the model the flow has just declared. A flow handed a config of another model is refused
 before its first turn, as a flow handed the wrong number of agents is.
 
+## A flow that can be picked up
+
+A loop meant to run for a week is a loop that will be stopped and started: a machine goes down,
+somebody presses esc, a turn takes the process with it. So a flow may say it can be picked up
+where the last run of it left off, and one that does takes a dict as its last argument — after
+the config, for a flow that takes one — holding whatever it wrote there last time.
+
+```python
+"""One pass per file, however often it is stopped."""
+
+from pathlib import Path
+from typing import Any
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+
+@flow(resumable=True)
+def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:
+    (agent,) = agents
+    left = state.get("left") or sorted(str(one) for one in Path("src").rglob("*.py"))
+    while left:
+        agent(f"{task}\n\nThis file: {left[0]}", suppress=True)
+        left = left[1:]
+        state["left"] = left      # writing it into the state is what saves it
+```
+
+**It is not a second copy of the transcript.** The backends keep that, and the run's
+[cycle](/reference/tracing.md#cycles) already says which sessions it opened. What belongs here is
+the handful of things the loop itself is keeping track of — which round it is on, which files it
+has been through, what it has decided so far — which is the part of a run nothing else knows.
+
+**It lives in the run's own cycle**, as `state.json`, under the name the flow was run as. A flow
+that [called another](#a-flow-that-calls-another-flow) is two flows and each keeps its own, side
+by side in that one file: neither writes the other's, and each is picked up as itself.
+
+**It is saved as the flow writes it.** Setting a key, removing one, `update`, `setdefault` —
+each of them writes the file again, because a run worth picking up is one that was stopped or
+killed rather than one that ended tidily, and state written only at the end is state a stopped
+run has none of. Something written *inside* a value it holds — a list appended to, a dict of its
+own written into — is a change no mapping can see, and is saved when the run ends.
+
+Keep to what JSON holds. Anything else is written as its `str`, so a `Path` put in comes back
+out a string; and a value that cannot be written at all leaves the last save standing rather
+than ending the run, since a loop that died because it could not write down where it had got to
+would be worse than one carrying on from a round ago.
+
+**Running the flow again is what picks it up.** There is no flag for it: `hmz exec -f weekly`
+twice in one directory is one loop carried on, from the last run of it here that left anything —
+a run that wrote nothing is nothing to pick up, so what carries on is the run before it. In the
+interface, `/cycles` marks the runs whose flow said so, and enter on one offers *carry on from
+here* where the flow still says it, which runs that run's own flow on that run's own agents with
+what it was asked to do. From Python it is an argument:
+
+```python
+Runner("weekly", agents, resume=cycle).run("go through the tests")
+```
+
+**A run that was picked up is a run of its own.** A cycle is never reopened, so what carries on
+is written into a cycle of its own whose `began` line says which run it was `picked_up` from —
+and a week of stops and starts reads as the week it was rather than as one enormous run.
+
+Whether a flow can be picked up at all is asked of the flow rather than of the run, since a flow
+may have been rewritten since it last ran:
+
+```python
+from hmz.cycle import resumed, state
+from hmz.runner import resumes
+
+resumes("weekly")            # what the flow says now, read by running it
+at = resumed("weekly")       # the run its next run would pick up, or None
+if at is not None:
+    state(at, "weekly")      # what that run left there
+```
+
+A flow that says nothing is run from the top every time, which is what every flow was before
+this, and a run pointed at a cycle to pick up ignores it, having nowhere to put what is there.
+One that says it can be picked up and takes no such argument is handed one it has no place for,
+and says so at the first call rather than starting over in silence.
+
 ## Asking for an agent that can do something
 
 Not every backend runs every [moment](/reference/agents.md#hooks). A flow that hangs a hook on one only
@@ -272,7 +355,7 @@ $ hmz exec -f pursuing -a pi/openai-codex/gpt-5.5:high "fix the build"
 hmz exec: error: pursuing: worker is run under a goal, which pi has no feature for
 ```
 
-and the interface's `/agents` offers only the CLIs that would work for that place, so it cannot
+and the agents page of `/flow` offers only the CLIs that would work for that place, so it cannot
 be chosen wrong there at all.
 
 ## Where each agent works
@@ -314,7 +397,7 @@ onbox: tester works in a container of this flow's own, so there is nothing to po
 
 `hmz exec` prints either as `hmz exec: error: …` and runs nothing; the interface shows it as a red
 line and starts nothing. No `-a` spells a machine, so what runs into these is an agent
-[built in Python](#building-the-agents-yourself) or one moved on the interface's `/agents` sheet.
+[built in Python](#building-the-agents-yourself) or one moved on the interface's `where` row.
 
 A place may say more than one thing — `Annotated[AgentBase, Moment.STOP, Remote]` is a place that
 must run that moment *and* may be moved. Several arguments, read one by one, in any order.
@@ -432,7 +515,7 @@ The name is what you write in the mark and nothing else — a name written down 
 run should not change under whoever renames the function. `@flow(about="…")` says what it does
 where flows are listed, which is otherwise the first line of its docstring.
 
-Each of them declares its own agents and its own settings, so `/agents` asks two questions
+Each of them declares its own agents and its own settings, so the agents page asks two questions
 rather than five and setting one up shows one phase's flags rather than three phases' at once. What
 passes between them is whatever they write — a file, usually.
 
@@ -622,10 +705,16 @@ Two are always there:
 `official` is listed before it has been fetched — what there is to run is not the same question
 as what has been downloaded — and neither of the two can be taken away.
 
-In the [interface](/reference/tui.md), `/flow` is where they live: left and right walk the places flows
-come from, `a` adds one, `r` fetches the one under the cursor again, `f` copies the flow under
-the cursor into `.humanize/flows/` to change, and `d` twice takes an added one away. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
-repository's own name is not the one you want.
+In the [interface](/reference/tui.md), `/flowverses` is where they live: `a` adds one, `r` fetches
+the one under the cursor again, `d` twice takes an added one away, and enter says what one
+holds. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
+repository's own name is not the one you want. `/flow` keeps the two keys that are about flows
+rather than about places: left and right, which walk these same places because that is which
+list of flows is being read, and `f`, which copies the flow under the cursor into this project.
+
+A flow is Python, and reading one means running it — so listing what a flowverse holds runs the
+entry point of every flow in its `flows/`. Adding one is trusting that repository with this
+machine, exactly as installing a package is.
 
 [`hmz flowverses`](/reference/cli.md#hmz-flowverses) is the same, said as arguments, for a machine
 being set up or a script: `list`, `show`, `add`, `fetch`, `remove`.
@@ -636,10 +725,6 @@ hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "
 
 A flow from a flowverse that has not been fetched says so rather than saying there is no such
 file: the name is right, the download has not happened.
-
-A flow is Python, and reading one means running it — so listing what a flowverse holds runs
-the entry point of every flow in its `flows/`. Adding one is trusting that repository with this
-machine, exactly as installing a package is.
 
 Editing a flowverse's own copy does not keep: it is somebody else's repository, and fetching it
 again takes what that repository says now. `f` on a flow copies it into `.humanize/flows/`,
@@ -655,6 +740,12 @@ own docstring.
 | `chat` | 1 + you | One agent, one session, and every line typed between turns is a turn of it. Talking to a coding agent with no loop around it. This is what the interface opens on. |
 | `ralph_loop` | 1 | A fresh session every turn, so nothing carries over: the agent starts from the task and the repository each time. |
 | `stateful_ralph` | 1 | One session, held for the whole run, re-sent the task every turn. |
+
+Both loops [can be picked up](#a-flow-that-can-be-picked-up), and what they keep is `rounds`:
+one left going for days is one that will be stopped, so running it again goes on from the round
+it reached rather than back at one. Nothing else carries — a session is opened rather than
+reopened, so `stateful_ralph` started again is a conversation of its own. `chat` keeps nothing:
+what was said is the conversation, and the backend logged it.
 
 Their source is the best documentation of this API there is — `src/hmz/flows/builtin/` in
 a checkout, or wherever `pip` put it.
@@ -675,6 +766,18 @@ flowbench's loops, written against this API.
 | `official/humanize1:gen-idea` | `drafter` | Opens a loose idea into a repo-grounded draft. |
 | `official/humanize1:gen-plan` | `planner`, `analyst` | Turns that draft into a plan both sides have converged on. |
 | `official/humanize1:rlcr` | `builder`, `reviewer` | Builds the plan under review until nothing is left to say. Run it in a git repository. |
+
+Every one of them but the two drafting phases [can be picked up](#a-flow-that-can-be-picked-up),
+each keeping the little it honestly can. The three Ralphs keep the round they reached, as
+`rounds`; `fixed_juice_ralph` keeps the rung its governor settled at as well, since a loop
+started again at the top of the ladder walks back down to it a paid turn at a time.
+`flame_chase` keeps whose turn is next, two turns in a row being the one thing a pair taking
+turns must not do. `rlar` keeps the review the actor is owed, word for word, which is the one
+thing a restart would otherwise throw away — and keeps nothing at all where the reviewer agreed,
+a run that is over being nothing to carry on. `humanize1:rlcr` keeps which `.humanize/rlcr/`
+directory the loop is in and reads `state.md` back as it stands, rather than stamping a new
+directory beside a week of rounds. `gen-idea` and `gen-plan` keep nothing: each writes one file,
+and running one again is meant to write another.
 
 `humanize1` is [PolyArch/humanize](https://github.com/PolyArch/humanize), and its three commands
 are [three flows in one file](#several-flows-in-one-file) — set up on their own agents, run one

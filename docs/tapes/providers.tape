@@ -23,11 +23,15 @@ Type "hmz providers ways claude | head -12" Enter
 Sleep 3500ms
 
 Type "hmz providers add claude/example -w gateway --no-login -s ANTHROPIC_BASE_URL=https://gateway.example.invalid -s ANTHROPIC_AUTH_TOKEN=not-a-real-token" Enter
-Sleep 2s
+Sleep 2500ms
 
 Type "hmz providers list" Enter
 Sleep 2s
 
-# The names of the variables it sets, never their values.
+# The names of the variables it sets, never their values. A gateway of one's own is nobody
+# else's to run as, so this one says no other backend could be; `alike.tape` is the account
+# that several could.
 Type "hmz providers show claude/example" Enter
 Sleep 4s
+Screenshot "/out/providers-show.png"
+Sleep 600ms

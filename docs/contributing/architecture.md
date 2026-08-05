@@ -36,9 +36,9 @@ a target and could be lifted out whole, so it has a name of its own.
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
 | `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |
 | `flows/` | What a flow is called, which of the ones it holds was asked for, the skills it brings, and where flowverses are fetched to. `builtin/` beside it is the three humanize ships. | `flow`, `found`, `find`, `held`, `fork`, `brought`, `flowverses`, `add`, `fetch` |
-| `cycle.py` | The run journal. Written by `runner`, read by `tracing` and `cli`. | `Cycle`, `cycles`, `opened` |
+| `cycle.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Cycle`, `cycles`, `read`, `opened`, `state`, `resumed` |
 | `runner.py` | Loading a flow, checking its arity and what it asks of each agent, naming them, running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. | `Runner`, `drives`, `wanted`, `Place`, `flow_and_agents`, `NotAFlow` |
-| `tracing/` | Reading the backends' logs back and rendering a Chrome trace. | `collect` |
+| `tracing/` | Reading the backends' logs back — and, for a profiled run, sampling the programs its agents start — and rendering both as one Chrome trace. | `collect`, `profile.Profiler` |
 | `tui/` | The terminal interface. | `Humanize` |
 | `cli/` | The one command line, over layers that have none of their own. | `main`, `COMMANDS` |
 
@@ -65,7 +65,8 @@ tracing/
 ├── collector.py  what to gather, and naming each session's agent
 ├── session.py    the model every reader produces
 ├── chrome.py     the Chrome trace rendering
-└── readers/      claude.py codex.py kimi.py — one log format apiece
+├── profile.py    the sampler a profiled run's programs are read off the process tree by
+└── readers/      claude.py codex.py dsh.py kimi.py — one log format apiece
 ```
 
 ## The dependency graph

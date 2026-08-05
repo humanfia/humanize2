@@ -139,24 +139,29 @@ needs neither, cloned into `~/.humanize/flowverses/<name>/` and offered as `<nam
 Two are always there: `builtin`, the handful in the package, and `official`, which is where the
 rest of the flows humanize offers come from — listed whether or not it has been fetched, because
 what there is to run is not the same question as what has been downloaded. Add as many more as
-you like; `/flow` is where they are added, fetched and taken away.
+you like; `/flowverses` is where they are added, fetched and taken away, and `/flow`'s arrows
+step between them because that is which list of flows is being read.
 
 See [Flows › Flowverses](/reference/flows.md#flowverses).
 
 ## Cycle
 
-**One run of one flow, written down as it happens.**
+**One run of one flow, written down as it happens — and one directory.**
 
 It opens when the flow starts and closes when the flow stops — finished, failed, or
-interrupted. It records the flow, the agents, and the backend's id for every session each of
-them opened. It does *not* record what the sessions said: the backend's own log is the
+interrupted, and never reopened. Its `cycle.jsonl` records the flow, the agents, and the
+backend's id for every session each of them opened; beside it are a link per file each session
+was logged to, whatever a flow that [can be picked up](/features/resuming) left behind, the
+programs a [profiled](/features/tracing#profiling-a-run) run started, and the traces gathered of
+it afterwards. It does *not* record what the sessions said: the backend's own log is the
 turn-by-turn record, and a cycle is not a second copy of it.
 
 It exists because the backends log a session under an id and never say whose it was. Without
 the cycle, two agents at one configuration are indistinguishable afterwards. With it, a
 [trace](#trace) can say `builder` and `reviewer`.
 
-Cycles live under `~/.humanize/cycles/`. See [Tracing](/reference/tracing.md#cycles).
+Cycles live under `~/.humanize/cycles/<workspace>/`, one directory apiece. See
+[Tracing](/reference/tracing.md#cycles).
 
 ## Machine
 
@@ -193,9 +198,9 @@ neither able to read the other's. See [Providers](/reference/providers.md).
 **Everything a run left behind, as one timeline.**
 
 `hmz trace collect` reads the backends' own transcripts, names each session by the agent that opened
-it (using the cycle), and writes a Chrome JSON trace. Load it in
-[ui.perfetto.dev](https://ui.perfetto.dev): each agent is a process, each session a track, each
-slice one thing the agent did.
+it (using the cycle), and writes a Chrome JSON trace into the cycle of the run it is a trace of.
+Load it in [ui.perfetto.dev](https://ui.perfetto.dev): each agent is a process, each row of that
+agent's sessions a track, each slice one thing the agent did.
 
 It works on sessions no flow ever drove, too — a trace of yesterday's `claude` session is
 `hmz trace collect` away. See [Tracing](/reference/tracing.md).

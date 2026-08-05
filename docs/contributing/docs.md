@@ -29,8 +29,8 @@ docs/
 ├── features/                 one page per feature
 ├── reference/                CLI, TUI, and the Python API
 ├── contributing/             this
-├── public/                   served at the site root: logo.svg, tui.svg, demo/*.gif
-└── tapes/                    the VHS scripts the demo GIFs are rendered from
+├── public/                   served at the site root: logo.svg, tui.svg, demo/*.gif, demo/*.png
+└── tapes/                    the VHS scripts the demos are rendered from
 ```
 
 **Guide** is for reading through, **Features** for "how do I use X", **Reference** for looking
@@ -38,7 +38,7 @@ something up. A page that is two of those is two pages.
 
 ## Writing a page
 
-- Links are written from the site root, with the extension: `/features/afk`. VitePress checks
+- Links are written from the site root, without the extension: `/features/afk`. VitePress checks
   them at build time.
 - Assets in `public/` are referenced from the root without `public`: `![…](/tui.svg)`.
 - Do not add a `## Table of Contents`. The right-hand outline is generated.
@@ -70,11 +70,13 @@ Concretely:
 - The prompt is VHS's own `>`. No user, no host, no path in it.
 - Every tape starts `cd /work/demo`, and the only homes that appear are the container's
   `/root/.humanize` and `/root/.claude`.
-- No provider is ever signed in: `hmz providers add` is only ever recorded with `--no-login`, and
-  the values are obviously invalid — `gateway.example.invalid`, `not-a-real-token`.
+- No provider is ever signed in: `hmz providers add` is only ever recorded with `--no-login`, an
+  account made in the interface is only ever made by a way that runs nothing, and the values are
+  obviously invalid — `gateway.example.invalid`, `not-a-real-token`, `not-a-real-key`.
 - No turn is ever run. `/opt/standin/claude` and `/opt/standin/codex` exist so that humanize
   offers those backends; both exit 1 if anything actually calls them.
-- What the [`collect`](/features/tracing) demo reads is a transcript `stage.py` invented.
+- What the [`collect`](/features/tracing) demo reads, and the runs `/cycles` lists, are what
+  `stage.py` invented.
 
 If you add a tape, look at the rendered GIF before committing it. Frame by frame is worth it:
 
@@ -88,8 +90,9 @@ docker run --rm -v "$PWD/docs/public/demo:/out" -v /tmp/frames:/frames \
 Keep them small — `check-added-large-files` refuses anything over 500 KB, `render.sh` refuses
 anything over 450 KB, and a doc page with a two-megabyte GIF on it is a doc page nobody waits
 for. It is the file that is bounded rather than the clock: what the current tapes are written
-against is `Width 1000`, `Height` between 500 and 620, `Framerate 20`, and the
-`Set TypingSpeed`/`Sleep` values already in them — which run 8 to 20 seconds end to end.
+against is `Width 1000`, `Height` between 500 and 620, `Framerate` between 10 and 20 — the
+slower for a tape that is mostly a menu being read — and the `Set TypingSpeed`/`Sleep` values
+already in them, which run 8 to 20 seconds end to end.
 
 ## The deploy
 

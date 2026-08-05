@@ -259,9 +259,9 @@ hmz flowverses fetch <name>
 hmz flowverses remove <name>
 ```
 
-The same places the interface's [`/flow`](/reference/tui.md) walks a tab at a time — a machine being set
-up, a CI job that runs somebody else's flow, or a line in a script is not always a moment you
-are sitting in the interface. Naming no command at all lists them.
+The same places the interface's [`/flowverses`](/reference/tui.md#where-flows-come-from) is the
+list of — a machine being set up, a CI job that runs somebody else's flow, or a line in a script
+is not always a moment you are sitting in the interface. Naming no command at all lists them.
 
 | Command | |
 | --- | --- |
@@ -340,6 +340,7 @@ the CLI's own. See [Providers](/reference/providers.md).
 hmz providers list [<cli>]
 hmz providers ways <cli>
 hmz providers add <cli>/<name> [-w|--way <way>] [-s|--set VAR=VALUE]... [--no-login]
+                               [--also <cli>[,<cli>...]]
 hmz providers login <cli>/<name> [-s|--set VAR=VALUE]...
 hmz providers show <cli>/[<name>]
 hmz providers falls-back <cli>/[<name>] [<name>]
@@ -356,9 +357,9 @@ at all lists them.
 | --- | --- |
 | `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, the variables it sets, and — where either is set — what it falls back to and how a failed turn under it is tried again. The account this machine is signed into is listed as `<cli>/  as local` wherever it has one of those. A `<cli>` no backend answers to exits 1 rather than listing everybody's. |
 | `ways <cli>` | How that backend can be signed into: each way, what it asks for, and what it runs. |
-| `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first — `login` for the CLIs that sign in, `key` for `dsh`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. |
+| `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first — `login` for the CLIs that sign in, `key` for `dsh`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. `--also` writes the same account down for the backends it names, comma separated, under the same name and over one already there — or `all` for [every one it could be run as](/reference/providers.md#one-account-several-clis). A line that did not ask says it could have. |
 | `login <cli>/<name>` | Signs an existing one in again, by the way it was made with, and asks it again what it runs. Takes the same `-s`. |
-| `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, what it falls back to, how it is tried again, the names of the variables it sets, and which paths a turn under it is given instead of which. |
+| `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, what it falls back to, how it is tried again, the names of the variables it sets, which paths a turn under it is given instead of which, and an `also runs` line per [other backend](/reference/providers.md#one-account-several-clis) that could be run as it. |
 | `falls-back <cli>/<name> [<name>]` | Says which account of that CLI a turn carries on under when this one fails, or, with nothing after it, that this one is the end of the line. Each account naming the next is what makes a chain. |
 | `retry <cli>/<name>` | Says how a failed turn under it is tried again before the chain moves on: `-n` how many times over, `-p` how long to wait between tries (`none`, `constant`, `linear`, `exponential`, `exponential-jitter`, `fibonacci`), `-t` the longest the whole of it may go on for. Nothing is retried by default. |
 | `remove <cli>/<name>` | Takes it away, credentials and all. |
@@ -377,6 +378,7 @@ what they are.
 ```sh
 hmz providers add claude/anthropic -w login
 hmz providers add claude/deepseek -w gateway -s ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+hmz providers add claude/shared -w key --also pi,opencode      # or --also all
 hmz providers ways codex
 hmz providers falls-back claude/anthropic deepseek
 hmz providers retry claude/anthropic -n 3 -p exponential-jitter -t 120

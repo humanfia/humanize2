@@ -44,7 +44,8 @@ no completion for a task, because a task is prose.
 
 ## Searching, on a sheet
 
-The lists a sheet puts up — flows, models, skills, accounts — narrow as you type instead:
+The lists a sheet puts up — flows, models, skills, accounts — are narrowed with **s** instead,
+every other letter on a sheet being a key of its own:
 
 - **Flows** narrow by name. What each says about itself is beside its name and is *not* searched:
   a subsequence of a sentence matches nearly everything.

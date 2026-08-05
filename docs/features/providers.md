@@ -101,7 +101,7 @@ Full table, with what each way asks for, in
 ```sh
 hmz providers list [<cli>]           # what there is
 hmz providers ways <cli>             # how that backend can be signed into
-hmz providers add <cli>/<name>       # make one: -w <way>, -s VAR=VALUE, --no-login
+hmz providers add <cli>/<name>       # make one: -w <way>, -s VAR=VALUE, --no-login, --also
 hmz providers login <cli>/<name>     # sign an existing one in again
 hmz providers show <cli>/<name>      # what it holds — never what the values are
 hmz providers falls-back <cli>/<name> [<name>]   # which account a failed turn carries on under
@@ -137,14 +137,96 @@ sets:
 
 | Key | |
 | --- | --- |
-| **enter** or **a** | Make one: which CLI, then how to sign in, then what that way asks |
-| **l** | Sign the one under the cursor in again |
-| **f** | Say which account a turn under this one carries on under when it fails |
-| **t** | Say how a failed turn under it is tried again: how many tries, which wait, how long |
+| **enter** | What there is to do with the account under the cursor |
+| **a** | Make one: which CLI, then how to sign in, then what that way asks |
 | **d** **d** | Take it away, credentials and all |
+
+Enter opens a menu of four rather than a letter apiece on the list — `l`, `f` and `t` were three
+keys to be read off the bottom of the screen while enter, which every list already means, did one
+of the four:
+
+| | |
+| --- | --- |
+| **correct what it holds** | the answers its way in was made with, asked again |
+| **sign in again** | its own way in, run again; it owns the terminal while it does |
+| **falls back to** | which account a turn carries on under when this one fails |
+| **how it is tried again** | how many tries, which wait, and how long in all |
+
+![what enter opens on claude/gateway: correct what it holds, sign it in again, what it falls back
+to and how it is tried again, under a line saying which of them wait for the menu to be
+saved](/demo/account-does.png)
+
+Making an account and signing one in happen as they are asked for, because a login owns the
+terminal while its browser or its device code has it and something that has already happened is
+not a draft. The other three — correcting one, saying where it falls back to, saying how it is
+tried again — are held with the removals until the menu is saved, as on every other menu.
+
+The account this machine is already signed into — `as local`, last under each CLI — is offered
+only the bottom two, and the line under them says why rather than leaving two rows that do
+nothing: humanize did not make that account and keeps no credentials for it, so there is nothing
+to correct and nothing to sign in.
+
+**a** asks which CLI first, because a backend's ways in are its own and the second question is
+only answerable once the first has been. The last row of that list is not a backend at all:
+[a CLI of your own](/reference/agents#a-cli-of-your-own) that speaks ACP, a backend from there on
+in this project and every other. Somebody who cannot find their agent in the list finds that out
+while answering the question *which CLI*, which is where it is answered.
+
+![the backends a new account may be for, each with its ways in, and "a CLI of your own" last on the
+list](/demo/account-backends.png)
 
 Nothing here is refused while a flow is running. An agent reads the account it was configured
 with **once**, so one made or taken away now is one the next run sees.
+
+## One account, several CLIs
+
+A vendor's credential is the vendor's rather than the CLI's. An Anthropic key is an Anthropic key
+whether Claude Code, pi, opencode or mimocode is holding it, and a subscription token is one under
+whatever name each of them reads it under — `CLAUDE_CODE_OAUTH_TOKEN` on Claude Code,
+`ANTHROPIC_OAUTH_TOKEN` on pi. So an account made for one backend is often an account several
+others could be run as, and making the same key four times by hand is four places to correct when
+it is rotated.
+
+Which is why it is asked at the moment the account exists: making one that others could be run as
+asks which of them to write it down for as well, with the backends installed here already ticked
+and the rest listed and off — an account is worth writing down before the CLI that will use it is
+on this machine. Correcting one asks the same question again, of the account as corrected.
+
+![the question after claude/shared is made: pi, opencode and mimo, each marked not installed here
+yet and each switched off](/demo/alike.png)
+
+A copy is written down **under the same name** and **over one already there**, spelled as that
+backend reads it. What it reads as there is that backend's own way where one asks for exactly
+those variables and variables of your own where it has none, so `claude/shared` made by `key` is
+`pi/shared` and `opencode/shared` made by `env` — the same key under three names.
+
+So a rotated key is a key rotated in several places at once: the new key is typed once, into the
+account it was first made on, and the question after it writes it over the copies that are
+**ticked**. What is ticked is the backends **installed here** — it is the same question as when
+the account was made, asked of the account as corrected, and it does not read which backends
+already hold a copy. A copy on a CLI that is not on this machine is therefore one still holding
+the old key unless somebody turns its row on, and nothing marks it as one: what each row says of
+its backend is whether it is installed here.
+
+Which is worth a look before a rotation is trusted, a copy left behind being an account that is
+still there and still works. `hmz providers list` is where the copies are — the same name under
+another backend — and ticking one is what writes the new key over it.
+
+**What travels is variables.** An account that is a subscription signed into travels nowhere: it
+is the CLI's own credential store in that CLI's own format, and nothing else can read it. Neither
+does one holding a credential the other backend has no name for — every variable has to land
+somewhere, or that backend is not offered the account at all.
+
+On a command line it is a flag on `add`, and `show` says what else an account could run:
+
+```sh
+hmz providers add claude/shared -w key --also pi,opencode   # or --also all
+hmz providers show claude/shared                            # `also runs` names the rest
+```
+
+A line that did not ask for it is told it could have, which is how anyone finds out this exists.
+Full detail in
+[Providers › One account, several CLIs](/reference/providers#one-account-several-clis).
 
 ## Failing loudly
 

@@ -144,9 +144,10 @@ def run(agents: Agents, task: str) -> None:
                 suppress=True)
 ```
 
-Then point the builder somewhere. At the prompt that is the **third step** of `/agents`, offered
-only for a `Remote` place. It lists what this machine can see — each container running, each host
-in your `~/.ssh/config` — and anything else is typed:
+Then point the builder somewhere. At the prompt that is the **`where` row** of the builder's own
+sheet, on the agents page of `/flow`, and it is a row only for a `Remote` place. It lists what
+this machine can see — each container running, each host in your `~/.ssh/config` — and anything
+else is typed:
 
 | Typed | Where the work goes |
 | --- | --- |
