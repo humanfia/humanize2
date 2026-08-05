@@ -357,3 +357,72 @@ def test_every_level_of_the_store_is_this_users_own(
     for one in (at, at.parent, at.parent.parent, at / "home", at / "user"):
         assert one.stat().st_mode & 0o777 == 0o700, one
     assert (at / "provider.json").stat().st_mode & 0o777 == 0o600
+
+
+def test_two_writing_at_once_do_not_take_each_others_files_away(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One `hmz` saving in a menu while another points a chain from a script.
+
+    Both write the same account, and each writes beside it and moves it into place. Beside it
+    under one fixed name, the second finds its own half-written file already moved away --
+    `FileNotFoundError` out of something whose whole job was to be atomic.
+    """
+    import threading
+
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "held"))
+    store.add("claude", "mine", env={"ANTHROPIC_API_KEY": "not-a-key"})
+    store.add("claude", "spare", env={"ANTHROPIC_API_KEY": "not-a-key-either"})
+    went: list[BaseException] = []
+
+    def writes(policy: str) -> None:
+        try:
+            for _ in range(40):
+                store.retrying("claude", "mine", 2, policy, 0.0)
+                store.points("claude", "mine", "spare")
+        except BaseException as up:  # noqa: BLE001 -- the thread's, to be raised on the main one
+            went.append(up)
+
+    both = [
+        threading.Thread(target=writes, args=(one,)) for one in ("constant", "linear")
+    ]
+    for one in both:
+        one.start()
+    for one in both:
+        one.join()
+
+    assert went == []
+    found = store.find("claude", "mine")
+    assert (
+        found is not None
+    )  # and what is on disk is one whole account, not half of two
+    assert found.fallback == "spare"
+    assert found.policy in ("constant", "linear")
+    # And nothing is left lying beside it: every write took its own file with it.
+    assert sorted(one.name for one in found.at.iterdir()) == [
+        "home",
+        "provider.json",
+        "user",
+    ]
+
+
+@pytest.mark.parametrize("said", ["1e400", "Infinity", "NaN", '"lots"', "-4"])
+def test_a_count_written_by_hand_is_read_past_rather_than_losing_the_account(
+    said: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A file edited by somebody is a file to read past: `int(inf)` is an OverflowError.
+
+    Neither an `OSError` nor a `ValueError`, so nothing that guards these reads would catch
+    it, and one hand-edited file would take out every account of that backend.
+    """
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "held"))
+    provider = store.add("claude", "mine", env={"ANTHROPIC_API_KEY": "not-a-key"})
+    held = json.loads((provider.at / "provider.json").read_text())
+    held["retries"] = json.loads(said)
+    (provider.at / "provider.json").write_text(json.dumps(held))
+
+    found = store.find("claude", "mine")
+
+    assert found is not None
+    assert found.retries == 0
+    assert [one.name for one in store.providers("claude")] == ["mine"]

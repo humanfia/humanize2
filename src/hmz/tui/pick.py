@@ -5348,10 +5348,25 @@ class Providers(Drafts[list[str]]):
         from hmz import providers
 
         told = list(self._told)
+        # Taken away first, and then everything that is left: a chain pointed at an account
+        # that is going in the same save is a chain that goes nowhere, and one written before
+        # the removal would be written and then quietly left dangling.
+        for taken in sorted(self._gone):
+            cli, _, name = taken.partition("/")
+            try:
+                gone = providers.remove(cli, name)
+            except ValueError as why:  # a name nothing could ever have been kept under
+                told.append(f"hmz: {escape(str(why))}")
+                continue
+            told.append(
+                f"[dim]{escape(taken)} is gone, credentials and all[/dim]"
+                if gone
+                else f"hmz: no provider {escape(taken)}"
+            )
         for one in self._found:
             named = self._named(one)
             if named in self._gone:
-                continue  # taken away below, so there is nothing to correct or mark on it
+                continue  # gone above, so there is nothing to correct or point anywhere
             if (answers := self._edits.get(named)) is not None:
                 try:
                     providers.add(one.cli, one.name, one.way, answers)
@@ -5382,18 +5397,6 @@ class Providers(Drafts[list[str]]):
                         if tried[0]
                         else f"[dim]{escape(named)} is tried once[/dim]"
                     )
-        for named in sorted(self._gone):
-            cli, _, name = named.partition("/")
-            try:
-                gone = providers.remove(cli, name)
-            except ValueError as why:  # a name nothing could ever have been kept under
-                told.append(f"hmz: {escape(str(why))}")
-                continue
-            told.append(
-                f"[dim]{escape(named)} is gone, credentials and all[/dim]"
-                if gone
-                else f"hmz: no provider {escape(named)}"
-            )
         self.dismiss(told)
 
     def leaving(self) -> None:

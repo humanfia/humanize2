@@ -112,6 +112,20 @@ def test_only_one_backends_providers_are_listed_when_one_is_named(
     assert "codex/mine" not in shown
 
 
+def test_listing_a_backend_that_is_not_one_says_so_rather_than_listing_everybody(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A name nothing answers to reads as "all of them", so a typo would report the wrong one."""
+    assert run(*MINE) == 0
+    capsys.readouterr()
+
+    assert run("list", "nosuchcli") == 1
+
+    said = capsys.readouterr()
+    assert "no such coding agent" in said.err
+    assert "claude/mine" not in said.out
+
+
 def test_a_question_with_an_answer_that_is_usually_right_is_not_asked() -> None:
     """`bedrock` needs a profile and takes a region; only one of them is anybody's to say."""
     assert run("add", "claude/aws", "-w", "bedrock", "-s", "AWS_PROFILE=work") == 0

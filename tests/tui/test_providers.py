@@ -702,6 +702,52 @@ async def test_where_one_falls_back_to_is_chosen_and_held_until_the_menu_is_save
 
 
 @pytest.mark.timeout(60)
+async def test_a_chain_pointed_at_an_account_the_same_save_takes_away_goes_nowhere() -> (
+    None
+):
+    """Both are held until the menu is saved, so one save can hold a chain and its end.
+
+    The account being taken away is still on disk while the sheet is open, so it is still
+    offered -- and `points` would write a chain at something that is about to stop existing.
+    """
+    from hmz.tui.pick import Falls
+
+    providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "k"})
+    providers.add("codex", "spare", way="key", env={"OPENAI_API_KEY": "s"})
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        assert [str(one.id) for one in listing.options if one.id][:2] == [
+            "=codex/spare",
+            "=codex/work",
+        ]
+
+        await driver.press(
+            "d", "d"
+        )  # `spare`, marked to be taken away when this is saved
+        await driver.press("down")  # onto `work`
+        await driver.press("f")
+        await until(lambda: isinstance(app.screen, Falls), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await driver.press("down", "enter")  # at `spare`, which is on its way out
+        await until(lambda: isinstance(app.screen, Providers), driver)
+
+        await keeps(app, driver)
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    assert providers.find("codex", "spare") is None
+    left = providers.find("codex", "work")
+    assert left is not None
+    assert left.fallback == ""  # rather than a chain at an account that is not there
+
+
+@pytest.mark.timeout(60)
 async def test_how_one_is_tried_again_is_stepped_and_held_until_the_menu_is_saved() -> (
     None
 ):

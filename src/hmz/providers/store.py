@@ -17,6 +17,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -438,9 +439,8 @@ def _write(provider: Provider) -> None:
     if not provider.name:
         at = alone(provider.cli)
         _kept(at.parent)
-        beside = at.parent / f".{at.name}.new"
         _writes(
-            beside,
+            at,
             json.dumps(
                 {
                     "fallback": provider.fallback,
@@ -452,30 +452,38 @@ def _write(provider: Provider) -> None:
             )
             + "\n",
         )
-        beside.replace(at)
         return
     at = provider.at
     _kept(at)
-    beside = at / f".{_HELD}.new"
-    _writes(beside, json.dumps(provider.held(), indent=2) + "\n")
-    beside.replace(at / _HELD)
+    _writes(at / _HELD, json.dumps(provider.held(), indent=2) + "\n")
 
 
 def _writes(at: Path, said: str) -> None:
-    """Writes one of these files, kept to its owner alone from the moment it exists.
+    """Writes one of these files whole, kept to its owner alone from the moment it exists.
 
     Args:
-      at: The file, which is the one then moved into place.
+      at: The file to end up with.
       said: What to put in it.
 
     Note:
-      Made `0600` before anything is in it rather than chmodded after: what an account holds
-      is a key, a token or an endpoint somebody pays for, and a file that was readable for the
-      moment between being written and being chmodded was readable.
+      Written beside and then moved into place, so that a file read while it is being written
+      is the old one or the new one and never half of each -- and beside it under a name
+      nothing else will pick, because two `hmz` at once (a menu saving while a script points
+      a chain) writing one fixed `.new` is one of them finding its own file already moved
+      away. `mkstemp` is `0600` from the moment the file exists, which is what these hold: a
+      key, a token, or an endpoint somebody pays for. A file that was readable for the moment
+      between being written and being chmodded was readable.
     """
-    at.touch(mode=0o600, exist_ok=True)
-    at.chmod(0o600)
-    at.write_text(said, encoding="utf-8")
+    handle, beside = tempfile.mkstemp(
+        dir=at.parent, prefix=f".{at.name}.", suffix=".new"
+    )
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as writing:
+            writing.write(said)
+        Path(beside).replace(at)
+    except OSError:
+        Path(beside).unlink(missing_ok=True)
+        raise
 
 
 def add(
@@ -508,6 +516,10 @@ def add(
     at = where(cli, name)
     profile = backends.named(cli)
     assert profile is not None  # noqa: S101 -- `where` has already refused anything else
+    # What it does when it fails is not part of what it was made with: an account corrected --
+    # a key retyped, a gateway moved -- is the same account, and the chain and the tries
+    # somebody wrote against it are theirs rather than this line's to forget.
+    already = find(profile.name, name)
     provider = Provider(
         cli=profile.name,
         name=name,
@@ -515,19 +527,19 @@ def add(
         env=dict(env or {}),
         args=tuple(args),
         made=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        fallback=already.fallback if already is not None else "",
+        retries=already.retries if already is not None else 0,
+        policy=already.policy if already is not None else retry.DEFAULT,
+        timeout=already.timeout if already is not None else 0.0,
     )
     # The directory before the file: a login run under this provider writes into it, and
     # 0700 is what every one of these CLIs keeps its own credential directory at. A level at
     # a time, because `mkdir` gives the mode to the last of them and leaves the rest at
     # whatever the umask says -- and what is being made here is a directory of credentials.
     _kept(at)
-    held = at / _HELD
-    # Written whole and then moved into place, so that a provider read while it is being
-    # written is either the old one or the new one and never half of each.
-    beside = at / f".{_HELD}.new"
-    # It holds keys, and keys are not for the rest of the machine.
-    _writes(beside, json.dumps(provider.held(), indent=2) + "\n")
-    beside.replace(held)
+    # Whole and then moved into place, and kept to its owner: it holds keys, and keys are not
+    # for the rest of the machine.
+    _writes(at / _HELD, json.dumps(provider.held(), indent=2) + "\n")
     ready(provider)
     return provider
 
@@ -647,7 +659,13 @@ def _counted(said: Any) -> float:
     """
     if not isinstance(said, (int, float)) or isinstance(said, bool):
         return 0.0
-    return max(float(said), 0.0)
+    held = float(said)
+    # A file written by hand may hold `.inf` or `.nan`, both of which YAML and JSON will
+    # happily give back and neither of which is a count: an account is read past rather than
+    # taken down by one.
+    if held != held or held in (float("inf"), float("-inf")):  # noqa: PLR0124 -- NaN is not NaN
+        return 0.0
+    return max(held, 0.0)
 
 
 def _directories(at: Path) -> list[Path]:

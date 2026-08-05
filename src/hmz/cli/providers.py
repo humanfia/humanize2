@@ -254,8 +254,15 @@ def _also(cli: str) -> list[Provider]:
 
 def _list(cli: str) -> int:
     """Prints every provider there is, or one backend's."""
+    from hmz import backends
     from hmz import providers as held
 
+    if cli and backends.named(cli) is None:
+        # Said rather than answered with everybody's: a name no backend answers to reads as
+        # "all of them" everywhere below, so a typo would report another backend's account
+        # and its chain as though they were this one's.
+        print(f"hmz: {cli}: no such coding agent", file=sys.stderr)
+        return 1
     found = held.providers(cli)
     # And the account this machine is signed into, wherever it says something about itself:
     # a chain or a set of tries in force is a thing to see, and it is an account here too.
@@ -367,6 +374,11 @@ def _add(cli: str, name: str, way: str, given: list[str], *, login: bool) -> int
         answers = _asking(chosen, answers)
     except EOFError:
         print("hmz: nothing to read the answers from", file=sys.stderr)
+        return 1
+    except ValueError as why:
+        # A line typed at the prompt that is not `NAME=VALUE`, which is a line to correct
+        # and not a traceback: the same answer as the same mistake made on the command line.
+        print(f"hmz: {why}", file=sys.stderr)
         return 1
     try:
         provider = signing.make(cli, name, chosen, answers)

@@ -29,6 +29,11 @@ BASE = 1.0
 #: long, and a wait longer than the turn it is waiting for is a run that looks hung.
 CEILING = 60.0
 
+#: How far a backoff is worked out before the answer is the ceiling anyway. Doubling a second
+#: passes a minute at the seventh, and Fibonacci at the eleventh; anything past this is a
+#: number to stop computing rather than one to compute.
+_CLIMBED = 64
+
 
 @dataclass(frozen=True, slots=True)
 class Policy:
@@ -86,6 +91,9 @@ def waits(policy: str, attempt: int, base: float = BASE) -> float:
     over = max(attempt - 1, 0)  # how many waits have already been taken
     if not over:
         return 0.0
+    # Held to where the ceiling has long since been reached: `2 ** 4000` is a number Python
+    # is happy to build and `float` will not take, and a retry count is somebody's to set.
+    over = min(over, _CLIMBED)
     if policy == "none":
         return 0.0
     if policy == "constant":
