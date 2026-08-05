@@ -480,7 +480,10 @@ was wrong is refused at `calls`.
 
 **It brings its own skills.** The called flow's `skills/`, and the repositories it declared,
 are [mounted](#the-skills-a-flow-brings) onto the sessions its agents open while it runs — and
-the agents are handed back carrying the calling flow's own when it returns.
+the agents are handed back carrying the calling flow's own when it returns, however it returns.
+A call refused — for settings the flow does not take, for an agent that cannot run a moment it
+declares, for a place run under a goal filled by an agent that has none — is a call that never
+happened, and leaves the agents exactly as it found them.
 
 **A flow that takes [settings of its own](#settings-of-the-flow-s-own) takes them here too**,
 as a third argument — an instance of that flow's model, or the fields to build one from:
@@ -521,7 +524,9 @@ Nearest wins, so a flow of your own may stand in for one of humanize's by taking
 flow menu is for: it copies the flow under the cursor into `.humanize/flows/`, whole, and from
 then on that name means your copy. In Python that is `hmz.flows.fork(name, into=None)`, which
 copies a directory flow with its `skills/` and a single-file flow as a file, and refuses a name
-you already have a copy of rather than writing over it.
+you already have a copy of — in either shape, since a directory would otherwise take a
+single-file flow's name without touching the file it is in — rather than writing over it. A
+copy that fails partway leaves nothing behind, so the name is free to try again.
 
 What a flow is **called** is another question. The ones humanize ships are called by a bare
 name; a flowverse's are called `<flowverse>/<flow>`, which is the one spelling nothing can stand
@@ -545,7 +550,9 @@ first. A directory whose name starts with `_` is not a flow.
 **A flow imports what travels with it.** While one is read, its own directory and the directory
 the flows are in are both on `sys.path`, and only while: `import _prompts` reaches the module
 beside the flow, and `import _shared` reaches what a flowverse keeps beside all of them. What a
-flow imports is not something the rest of the process can.
+flow imports is not something the rest of the process can — and is forgotten as the flow is
+done with, so two flows that each keep a `_prompts` beside them each read their own, and one
+rewritten between two runs is read again rather than remembered.
 
 ```sh
 mkdir -p .humanize/flows && cp -r my_loop .humanize/flows/
@@ -584,7 +591,17 @@ read off the one that was asked for.
 **A repository that cannot be fetched stops the run before its first turn.** `hmz exec` exits
 2 with what git said, and the interface says it where the flow was started — a flow that works
 by a skill it has not got is not a flow to start and find out about an hour in. One that was
-fetched before and cannot be reached now runs on the copy already here.
+fetched before and cannot be reached now runs on the copy already here. A `#name` the
+repository does not hold stops it the same way, and says what the repository does hold.
+
+**A flow that is one file brings no `skills/` of its own, and may still name a repository.**
+What is beside such a flow is the other flows; what it declares is fetched and mounted as any
+other flow's is.
+
+**A name is one skill.** Where something of that name is already where the mount goes — the
+project's own, or another flow's mounted by a session that is still running — the flow's is
+left where it is and the session reads what is there. A flow called by another flow does not
+change what the flow that called it is working by.
 
 ## Flowverses
 

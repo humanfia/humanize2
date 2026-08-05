@@ -69,7 +69,12 @@ the next time a run asks for it, so a skill somebody else maintains is one that 
 
 A project's own skill of that name wins — a flow does not write over what the project keeps —
 and two sessions of one flow working in one directory share the mount until the last of them
-is done with it.
+is done with it. A flow called by another flow is the same rule: whatever is already there
+under that name is what both of them read.
+
+They are mounted into the workspace on this machine. An agent [whose turns land
+elsewhere](/features/remote-execution) is given them where that machine reads this directory —
+a container handed this workspace is — and otherwise works with the skills its CLI installs.
 
 ## At the prompt
 

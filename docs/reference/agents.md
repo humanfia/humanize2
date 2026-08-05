@@ -882,6 +882,9 @@ a project's own skills for as long as the session lives, and taken away again af
 | `agy`, `dsh`, `kimi`, `mimo`, `opencode`, `pi` | — none: they carry what their CLI installs |
 
 A project's own skill of that name wins: a flow does not write over what the project keeps.
+They go into the workspace on this machine, so an agent [whose turns land
+elsewhere](#where-the-turns-land) is given them only where that machine reads this directory —
+a container that was handed this workspace does; one across a network keeps its own.
 
 ## Where the turns land
 

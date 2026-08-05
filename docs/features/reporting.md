@@ -42,8 +42,13 @@ and nothing on a CI box should start uploading because nobody was there to say n
 
 - **Nothing you typed.** No task, no prompt, no line at the prompt.
 - **Nothing an agent said.** No transcript, no session log, no tool output.
-- **No file, no path outside humanize itself, and no directory name.** A home directory is
-  replaced wherever one appears, including inside an exception's own message.
+- **No file, no path outside humanize itself, and no directory name.** A frame of a stack is
+  named by where it is under humanize, or under whatever humanize is installed beside —
+  `hmz/agents/base.py`, `textual/app.py`. A frame in anything else, a flow of yours among
+  them, keeps its line number and nothing else: no path, no file name, no module, no function.
+  A home directory is replaced wherever one appears, including inside an exception's own
+  message, and the command line a failed turn was run as — which for several of these backends
+  holds the prompt — is taken out of the one line Python writes for it.
 - **No key, no token, no credential** — not even the names of the variables an account sets.
 
 Three switches the Sentry quickstart turns on are off here, and the module says why where they

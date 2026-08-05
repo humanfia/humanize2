@@ -344,7 +344,7 @@ at all lists them.
 
 | Command | |
 | --- | --- |
-| `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, the variables it sets, and — where either is set — what it falls back to and how a failed turn under it is tried again. The account this machine is signed into is listed as `<cli>/  as local` wherever it has one of those. |
+| `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, the variables it sets, and — where either is set — what it falls back to and how a failed turn under it is tried again. The account this machine is signed into is listed as `<cli>/  as local` wherever it has one of those. A `<cli>` no backend answers to exits 1 rather than listing everybody's. |
 | `ways <cli>` | How that backend can be signed into: each way, what it asks for, and what it runs. |
 | `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first — `login` for the CLIs that sign in, `key` for `dsh`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. |
 | `login <cli>/<name>` | Signs an existing one in again, by the way it was made with, and asks it again what it runs. Takes the same `-s`. |
@@ -383,6 +383,7 @@ hmz providers remove claude/deepseek
 | `HUMANIZE_TOKEN` | `hmz anchor`, `hmz anchor serve` | Default for `--token`. |
 | `HUMANIZE_LOG` | `hmz anchor`, `hmz anchor serve` | Default for `--log-level`. |
 | `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/features/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
+| `HUMANIZE_SHADOWS` | `hmz anchor`, a container or a machine an agent works on | Where the mirrors coganchor has been pointed at are recorded. Defaults to `~/.cache/humanize/shadows`. |
 | `CLAUDE_CONFIG_DIR` | `hmz collect`, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
 | `CODEX_HOME` | same | Codex's home. Defaults to `~/.codex`. |
 | `DSH_HOME` | same | DeepSeek Harness's home. Defaults to `~/.dsh`. |
@@ -424,7 +425,7 @@ A backend home that does not exist is skipped rather than being an error.
 | `.humanize/<datetime>.trace.json` | `hmz collect` | The trace. Relative to the current directory, not to the workspace named. |
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
 | `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** | A [flowverse](/features/flowverses.md), cloned. Every flow in it is offered as `<name>/<flow>`. |
-| `~/.humanize/skills/<owner>-<repo>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows.md#the-skills-a-flow-brings), cloned. Fetched again the next time a run asks for it. |
+| `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows.md#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |
 | `.humanize/flows/*/` | you | This project's own flows. |
 | `~/.humanize/flows/*/` | you | Your flows, in every project. |
 
