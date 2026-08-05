@@ -1,6 +1,6 @@
 """``hmz flowverses`` -- where flows come from, from a command line.
 
-The same directories the interface's `/flow` walks a tab at a time, said as arguments instead:
+The same directories the interface's `/flowverses` keeps, said as arguments instead:
 what places there are, what one of them holds, and the three things that can happen to a
 flowverse -- added, fetched again, taken away.
 

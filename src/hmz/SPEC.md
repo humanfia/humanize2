@@ -265,9 +265,12 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
   again when the run ends, which is when a sub-agent's transcript is finally there.
 - What a flow that says it can be picked up again left behind MUST be kept here too, under
   the flow that left it: a flow that called another is two flows, and neither writes the
-  other's. It MUST be saved as the flow writes it rather than when the run ends -- a run
-  worth picking up is one that was stopped or killed, and state saved only at the end is
-  state such a run has none of -- and MUST be saved again when the run ends, since something
+  other's. A flow that emptied what it had written MUST be where the search for something to
+  pick up stops rather than a run to look past: clearing it says the next run starts clean,
+  and answering that with the state of the run before would be answering the opposite. It
+  MUST be saved as the flow writes it rather than when the run ends -- a run worth picking up
+  is one that was stopped or killed, and state saved only at the end is state such a run has
+  none of -- and MUST be saved again when the run ends, since something
   written inside a value it holds is a change no mapping can see.
 - Nothing about keeping it MUST be able to stop a run: a value no JSON has a shape for, a
   directory that has gone, a file somebody wrote by hand as something else. State is what a
@@ -437,13 +440,13 @@ programs they ran where the run was profiled -- into a Chrome JSON trace for vis
 Args:
 
 - `<workspace>`: The path to the workspace directory to generate traces for. If not provided, the current working directory is used, unless sessions are named.
-- `--cycle <cycle>`: Which run to trace, by the name of its directory or a leading part of it. If not provided, the last run of the workspace. A name no run of it answers to MUST be a line to correct.
+- `--cycle <cycle>`: Which run the trace is filed with and named by, by the name of its directory or a leading part of it. If not provided, the last run of the workspace. That run says which agent opened which session, and its directory is where the trace lands; what goes into the trace is still every session of the workspace unless `--session`, `--start` or `--end` cut it down, since a directory holds sessions no flow ever drove and a trace is worth having of those too. A name no run of it answers to MUST be a line to correct.
 - `--session <session>[,<session>]...`: The sessions to generate traces for, comma separated and repeatable. A session is named by its whole id, by the key the trace shows it under, or by a leading part of either, and the sub-agents it started are collected with it. If not provided, every session of the workspace is included. Named sessions are collected wherever they were recorded, and are cut down to the workspace when one is provided.
 - `--output <output>`: The path to the output file where the aggregated trace will be saved. Its directory is created if it does not exist. If not provided, the trace is saved as `traces/<datetime>.trace.json` inside the run it is a trace of -- where `<datetime>` is the UTC moment it was collected, so that collecting twice keeps both -- and, for a workspace that has run nothing, in the directory that workspace's runs would be kept in. A trace of a run belongs with the run: the sessions it points at and the state it left are already there, and a trace written into whatever directory somebody was standing in is one they have to keep track of themselves. A file named outright still wins, a trace being also a thing to attach to an issue.
 - `--start <start>`: The start time for filtering the session logs, in any wording dateparser understands. If not provided, up to earliest logs are included.
 - `--end <end>`: The end time for filtering the session logs, in any wording dateparser understands. If not provided, up to latest logs are included.
 
-Prints the output path, which run it is a trace of, and the number of sessions and slices it
+Prints the output path, which run it is filed with, and the number of sessions and slices it
 holds -- and the number of programs, for a run that was profiled.
 
 Environment Variables:
@@ -459,7 +462,7 @@ hmz flowverses [list [-q] | show <name> | add <url> [<name>] | fetch <name> | re
 Where flows come from: what places there are, what one of them holds, and the three things
 that can happen to a flowverse -- added, fetched again, taken away.
 
-- It MUST be the same store the interface's own `/flow` walks a tab at a time, for the reason
+- It MUST be the same store the interface's own `/flowverses` keeps, for the reason
   `hmz providers` is the same store as `/providers`: one place a thing is kept is one place it
   is kept, whichever way somebody reached it. What it added MUST be findable by `-f` at once.
 - A flow MUST be listed under the name it is offered by, which is the one `-f` takes, and that

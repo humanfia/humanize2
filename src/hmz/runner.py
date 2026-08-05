@@ -747,8 +747,8 @@ def _unfetched(named: str) -> str:
     for verse in flowverses():
         if verse.name == whose and rest and not verse.fetched:
             return (
-                f"the {whose} flowverse has not been fetched yet -- open /flow and press "
-                "r on it"
+                f"the {whose} flowverse has not been fetched yet -- open /flowverses and "
+                "press r on it"
             )
     return "no flow to read: a flow is a directory with an __init__.py in it"
 

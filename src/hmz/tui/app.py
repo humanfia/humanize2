@@ -2,8 +2,8 @@
 
 Laid out the way Claude Code is, and no wider: a transcript the width of the terminal, an
 editor under it between two rules, and a status line under that. Nothing sits beside them --
-how the run is going is on `/status`, `/flow` chooses the loop, and `/agents` sets what each
-of the flow's agents runs.
+how the run is going is on `/status`, and `/flow` both chooses the loop and, a page along,
+sets what each of its agents runs.
 
 The transcript is one conversation rather than every agent's at once. A flow drives several
 agents and each of them holds as many conversations as it likes, so tab and shift+tab attach
@@ -97,10 +97,10 @@ if TYPE_CHECKING:
 
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
-#: runs on is an agent apiece rather than one model, so its `/models` is `/agents` -- which
-#: asks three things of each agent the flow drives. `hmz anchor` is not here: it is not a thing
-#: to do to a flow that is running, and it is a command line of its own. What a run left behind
-#: is `/cycles`, which is where the runs of this directory are.
+#: runs on is an agent apiece rather than one model, so its `/models` is the page along from
+#: it -- `/agents` being the ones saved to be imported there. `hmz anchor` is not here: it is
+#: not a thing to do to a flow that is running, and it is a command line of its own. What a
+#: run left behind is `/cycles`, which is where the runs of this directory are.
 _OWN = (
     "flow",
     "flowverses",
@@ -121,7 +121,7 @@ _OWN = (
 #: place -- so these are the nouns instead, which are the ones a flow is written in.
 _HELP = (
     "Say what to do, and the flow starts on it.",
-    "/flow chooses the loop, /agents what it drives.",
+    "/flow chooses the loop and what drives it.",
     "/providers holds the accounts they run as.",
 )
 

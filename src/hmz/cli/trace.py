@@ -49,8 +49,8 @@ def trace(argv: list[str]) -> int:
     )
     collecting.add_argument(
         "--cycle",
-        help="Which run to trace, by the name of its directory or a leading part of it, "
-        "defaults to the last run of the workspace.",
+        help="Which run the trace is filed with and named by, by the name of its directory "
+        "or a leading part of it, defaults to the last run of the workspace.",
     )
     collecting.add_argument(
         "--session",
