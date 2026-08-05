@@ -231,8 +231,9 @@ such file. Fetch it in the job, or vendor the flow into `.humanize/flows/`.
 git diff --quiet && { echo "nothing changed"; exit 0; }
 ```
 
-**A container-backed flow.** Its trajectories are in a mirror, so collect by `--session`, not by
-workspace. See [tutorial 17](/guide/tutorial-container).
+**A container-backed flow.** Its trajectories are in a mirror rather than in the checkout, and
+they still trace: the run wrote down the ids, and its trace is gathered by those. See
+[tutorial 17](/guide/tutorial-container).
 
 ## What you now know
 

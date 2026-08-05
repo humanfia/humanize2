@@ -631,7 +631,7 @@ line saying what it does](/demo/cycle-does.png)
 | Row | What it does |
 | --- | --- |
 | **carry on from here** | Runs that run's own flow again, on what that run left behind — which a flow that says it [can be picked up](/reference/flows.md#a-flow-that-can-be-picked-up) is handed. |
-| **collect a trace** | Gathers its sessions — and the programs it ran, for a [profiled](/reference/tracing.md#profiling-a-run) run — into `traces/` inside the run itself, rather than into whatever directory you are standing in. Where it went and what is in it are said under the list, and again in the transcript. |
+| **collect a trace** | Gathers **that run's** sessions — and the programs it ran, for a [profiled](/reference/tracing.md#profiling-a-run) run — into `traces/` inside the run itself, rather than into whatever directory you are standing in. That run's and no others: they are asked for by the ids it wrote down, so a directory run in fifty times has fifty traces and none of them holds another's work. Where it went and what is in it are said under the list, and again in the transcript. |
 | **where it is** | The directory the run is written in, sessions and all, said under the list. |
 
 **Carrying on is offered where the flow says so now**, rather than where the run said so then.
@@ -655,7 +655,9 @@ running; esc stops it before another can be picked up`.
 
 A directory nothing has ever been run in says so under the empty list. The same trace is
 [`hmz trace collect`](/reference/cli.md#hmz-trace-collect) on a command line, with `--cycle` to
-name which run.
+name which run. A trace of what a directory holds whoever opened it — a session no flow ever
+drove — is `--all` or `--session` there, and is not offered here at all: this is a list of runs,
+and a trace of none of them has nothing here to hang on.
 
 ## The accounts themselves
 

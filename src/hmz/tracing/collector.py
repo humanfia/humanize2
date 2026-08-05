@@ -85,7 +85,9 @@ def collect(
         sessions: Sessions to collect, as a comma separated string or an
             iterable of ids, defaults to every session. An id can be given
             whole or shortened the way its session slice shows it, and the
-            sub-agents a session started are collected with it.
+            sub-agents a session started are collected with it. An empty
+            iterable is no sessions rather than every session, which is what
+            a trace of a run that opened none holds.
         agents: What each agent of a flow opened, as the ids the backends gave
             those sessions, which is what an agent reports as its own name
             and its opened. Sessions nobody claims are read as the configuration
@@ -121,13 +123,20 @@ def collect(
 
     if isinstance(sessions, str):
         sessions = (sessions,)
-    listed = [name.strip() for value in sessions or () for name in value.split(",")]
-    if not all(listed):
+    # Sessions named at all is a filter, and no sessions named at all is a filter that keeps
+    # nothing -- which is what a trace of a run that opened none is. Only `None`, nothing
+    # said about sessions, is every session there is.
+    listed = (
+        None
+        if sessions is None
+        else [name.strip() for value in sessions for name in value.split(",")]
+    )
+    if listed is not None and not all(listed):
         raise ValueError("session id cannot be empty")
-    names = tuple(listed) or None
+    names = None if listed is None else tuple(listed)
     root = (
         None
-        if workspace is None and names
+        if workspace is None and names is not None
         # `abspath` rather than `Path.resolve`: sessions are matched against the path a
         # flow was run under, which is the name it was given rather than what it links to.
         else pathlib.Path(os.path.abspath(workspace or "."))  # noqa: PTH100

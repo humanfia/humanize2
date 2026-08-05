@@ -156,11 +156,12 @@ Now the tester is in a container *and* cannot write anything. See
 
 ## Step 7 — collecting a trace afterwards
 
-A flow that ran in a container worked in a **mirror** rather than in this directory, so its
-trajectories are not found by workspace:
+A flow that ran in a container worked in a **mirror** rather than in this directory, so the
+backend logged its turns under a path this project has never heard of. It makes no difference:
+the run wrote down the ids of the sessions it opened, and that is what its trace is gathered by.
 
 ```sh
-hmz trace collect --session 0a1b2c3d
+hmz trace collect
 ```
 
 The run itself is still written down here — a [cycle](/features/tracing#what-a-run-writes-down)

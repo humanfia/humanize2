@@ -6164,9 +6164,16 @@ def _how(ran: Ran) -> str:
 def collected(ran: Ran) -> tuple[Path, str]:
     """Gathers what one run left behind into a trace file, and says what is in it.
 
+    That run's own sessions and no others: a directory may have been run in a hundred times,
+    and a trace filed under one of those runs while holding the other ninety-nine is a trace
+    of nothing anybody asked about. They are asked for by the ids the run wrote down rather
+    than by directory, so a flow that worked in a machine's mirror is in its own trace too.
+
     Beside the run rather than in this directory: a cycle is what a run was, and the trace of
-    that run belongs with the sessions it points at and the state it left. A trace is also a
-    thing to attach to an issue, which is what `hmz trace collect --output` is for.
+    that run belongs with the sessions it points at and the state it left. A trace of what a
+    directory holds whoever opened it is `hmz trace collect --all`, and a trace to attach to
+    an issue is `--output`: both are a command line, there being no run here to hang either
+    on.
 
     Args:
       ran: The run.
@@ -6184,9 +6191,11 @@ def collected(ran: Ran) -> tuple[Path, str]:
     at.mkdir(parents=True, exist_ok=True)
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
     where = at / f"{stamp}.trace.json"
+    agents = opened(ran.at)
     document = collect(
-        ran.workspace or None,
-        agents=opened(ran.at) or None,
+        None,
+        sessions=[ident for ids in agents.values() for ident in ids],
+        agents=agents or None,
         output=where,
         profile=ran.at / PROFILE,
     )

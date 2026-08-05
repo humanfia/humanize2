@@ -1,9 +1,15 @@
 """`hmz trace collect` -- the command line shell around `tracing.collect`.
 
-Where a trace goes is the run it is a trace of: a cycle is a directory holding what happened,
-what each session was logged to and what the flow left behind, and the trace belongs beside
-those rather than in whatever directory somebody happened to be standing in. An output named
-outright still wins -- a trace is also a thing to attach to an issue.
+What a trace is of is a run: the sessions that run opened and no others, and it goes where
+that run is. A cycle is a directory holding what happened, what each session was logged to
+and what the flow left behind, and the trace belongs beside those rather than in whatever
+directory somebody happened to be standing in. An output named outright still wins -- a trace
+is also a thing to attach to an issue.
+
+What a directory holds whoever opened it is the other thing a trace can be of, and is asked
+for outright: `--all`, or the sessions named. It is a trace of no run, so it is filed beside
+the runs rather than inside one, and it is a command line and nothing else -- the interface's
+own list is a list of runs.
 """
 
 from __future__ import annotations
@@ -15,7 +21,14 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz import cli, tracing
-from tests.tracing.conftest import loaded
+from tests.tracing.conftest import (
+    CLAUDE_ELSEWHERE,
+    CLAUDE_SESSION,
+    CODEX_SUBTHREAD,
+    CODEX_THREAD,
+    keys,
+    loaded,
+)
 
 if TYPE_CHECKING:
     import pathlib
@@ -151,6 +164,155 @@ def test_a_named_run_is_the_one_traced(
     assert run("--cycle", first.path.name) == 0
 
     assert list((first.path / "traces").glob("*.trace.json"))
+
+
+def test_a_trace_of_a_run_holds_that_runs_own_sessions_and_no_others(
+    homes: None,
+    workspace: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A directory is run in over and over, and each of those runs is a run of its own.
+
+    What the trace of one holds is what that run opened -- which the run itself wrote down --
+    and not what the directory has seen since. A trace filed inside a run while holding the
+    work of the runs after it is a trace of nothing anybody asked about, and it is worst
+    exactly where it is most wanted: the long-running loop, read back a week later.
+    """
+    from hmz.cycle import Cycle
+
+    monkeypatch.chdir(workspace)
+    earlier = Cycle("rlar", [], "one")
+    earlier.write("opened", agent="actor", backend="codex", session=CODEX_THREAD)
+    now = Cycle("rlar", [], "two")
+    now.write("opened", agent="actor", backend="claude", session=CLAUDE_SESSION)
+
+    assert run() == 0
+
+    (written,) = (now.path / "traces").glob("*.trace.json")
+    held = keys(loaded(written))
+    assert held == {
+        f"claude:{CLAUDE_SESSION}",
+        f"claude:{CLAUDE_SESSION}:agent-abc12345",
+    }
+    assert "2 sessions" in capsys.readouterr().out
+
+
+def test_a_run_that_worked_somewhere_else_is_still_its_own_trace(
+    homes: None,
+    workspace: pathlib.Path,
+    elsewhere: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The sessions are asked for by id, which is the only thing that says whose they were.
+
+    A flow that ran on a machine of its own worked in a mirror of this directory, so the
+    backend logged its turns under a path this workspace has never heard of. The run wrote
+    the ids down all the same, and a trace gathered by those finds them -- which a trace
+    gathered by directory never could.
+    """
+    from hmz.cycle import Cycle
+
+    monkeypatch.chdir(workspace)
+    cycle = Cycle("rlar", [], "go")
+    cycle.write("opened", agent="actor", backend="claude", session=CLAUDE_ELSEWHERE)
+
+    assert run() == 0
+
+    (written,) = (cycle.path / "traces").glob("*.trace.json")
+    assert keys(loaded(written)) == {f"claude:{CLAUDE_ELSEWHERE}"}
+
+
+def test_a_run_that_opened_nothing_is_a_trace_of_nothing(
+    homes: None,
+    workspace: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A run that died before its first turn left no sessions, so its trace holds none.
+
+    The directory it ran in holds plenty. Reading those back as this run's would be the one
+    answer that is certainly wrong, and is the answer a session filter that reads "none" as
+    "all of them" gives.
+    """
+    from hmz.cycle import Cycle
+
+    monkeypatch.chdir(workspace)
+    cycle = Cycle("rlar", [], "go")
+
+    assert run() == 0
+
+    (written,) = (cycle.path / "traces").glob("*.trace.json")
+    assert loaded(written)["traceEvents"] == []
+    assert "0 sessions, 0 slices" in capsys.readouterr().out
+
+
+def test_every_session_of_a_directory_is_asked_for_outright(
+    homes: None,
+    workspace: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`--all` is the other thing a trace can be of: a directory, whoever opened its sessions.
+
+    Which is what reads back an afternoon at a coding agent that no flow ever drove. It is
+    not a trace of any run, so it does not go inside one -- it goes where that workspace's
+    runs are kept, beside them.
+    """
+    from hmz.cycle import Cycle, under
+
+    monkeypatch.chdir(workspace)
+    cycle = Cycle("rlar", [], "go")
+    cycle.write("opened", agent="actor", backend="claude", session=CLAUDE_SESSION)
+
+    assert run("--all") == 0
+
+    assert not list((cycle.path / "traces").glob("*.trace.json"))
+    (written,) = under(str(workspace)).glob("*.trace.json")
+    held = keys(loaded(written))
+    assert f"claude:{CLAUDE_SESSION}" in held
+    assert f"codex:{CODEX_THREAD}" in held  # which no run of this workspace ever opened
+
+
+def test_named_sessions_are_not_a_runs_trace_and_are_not_filed_as_one(
+    homes: None,
+    workspace: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sessions named outright are sessions, not a run: they belong beside the runs."""
+    from hmz.cycle import Cycle, under
+
+    monkeypatch.chdir(workspace)
+    cycle = Cycle("rlar", [], "go")
+    cycle.write("opened", agent="actor", backend="claude", session=CLAUDE_SESSION)
+
+    assert run("--session", CODEX_THREAD) == 0
+
+    assert not list((cycle.path / "traces").glob("*.trace.json"))
+    (written,) = under(str(workspace)).glob("*.trace.json")
+    assert keys(loaded(written)) == {
+        f"codex:{CODEX_THREAD}",
+        f"codex:{CODEX_SUBTHREAD}",
+    }
+
+
+@pytest.mark.parametrize("wider", [["--all"], ["--session", CODEX_THREAD]])
+def test_a_run_and_a_directory_are_two_traces_and_a_line_asks_for_one(
+    workspace: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    wider: list[str],
+) -> None:
+    """Naming a run and then naming something wider is a line asking for two things."""
+    from hmz.cycle import Cycle
+
+    monkeypatch.chdir(workspace)
+    cycle = Cycle("rlar", [], "go")
+
+    with pytest.raises(SystemExit) as failure:
+        run("--cycle", cycle.path.name, *wider)
+
+    assert failure.value.code == 2
+    assert "a trace of a run holds that run's own sessions" in capsys.readouterr().err
 
 
 def test_a_run_of_that_name_that_is_not_there_is_a_line_to_correct(

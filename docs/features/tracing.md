@@ -23,8 +23,8 @@ whatever directory you happened to be standing in. What it prints is that path, 
 is a trace of, then what went into it — and the programs as well, for a run that was
 [profiled](#profiling-a-run).
 
-![hmz trace collect writing into the last run's own directory: the path, the run it is of, and 2
-sessions, 17 slices, 3 programs](/demo/collect.png)
+![hmz trace collect writing into the last run's own directory: the path, the run it is of, and 1
+session, 10 slices, 3 programs](/demo/collect.png)
 
 In the interface the same thing is a row of
 [`/cycles`](/features/resuming#carrying-an-older-one-on): pick a run, press enter, collect it.
@@ -136,32 +136,41 @@ for cycle in cycles():                 # this workspace, oldest first
     print(cycle, opened(cycle))        # {"actor": ["0a1b…"], "reviewer": [...]}
 ```
 
-## Narrowing it
+## Which run, and what else there is to trace
 
 ```sh
-hmz trace collect                                    # this workspace, all of its history
-hmz trace collect ~/code/other                       # another workspace
-hmz trace collect --cycle 20260809T0144              # filed with that run, and named by it
-hmz trace collect --session 0a1b2c3d,5f6e            # two sessions, wherever they ran
-hmz trace collect ~/code/other --session 0a1b2c3d    # that session, only if it ran there
-hmz trace collect --start "3 days ago"               # recent history only
+hmz trace collect                                    # the last run of this workspace
+hmz trace collect ~/code/other                       # the last run of another workspace
+hmz trace collect --cycle 20260809T0144              # that run of it, by name
+hmz trace collect --start "3 days ago"               # and only what it did since
 hmz trace collect --end "yesterday 18:00" --output /tmp/before.json
 ```
 
-- Naming **sessions alone** collects them wherever they were recorded.
-- Adding a **workspace** keeps only the named sessions recorded there.
-- Naming **neither** collects the current working directory.
+A trace is **of a run**, and holds the sessions that run opened and no others — by the ids the
+run wrote down as it went. So a directory run in fifty times has fifty traces to collect and
+none of them holds another's work, and a run that opened nothing is a trace of nothing. Because
+it goes by id rather than by directory, a flow that ran on a
+[machine of its own](/features/remote-execution) is in its own trace too, though the backend
+logged it under a mirror this directory has never heard of.
+
+A directory also holds sessions no run of a flow ever opened — your own afternoon at a coding
+agent — and those are asked for outright:
+
+```sh
+hmz trace collect --all                              # every session of this workspace
+hmz trace collect --session 0a1b2c3d,5f6e            # two sessions, wherever they ran
+hmz trace collect ~/code/other --session 0a1b2c3d    # that session, only if it ran there
+```
+
+Neither is a trace of any run, so neither is filed inside one: they go beside that workspace's
+runs, in `~/.humanize/cycles/<workspace>/`. Asking for both at once — `--cycle` with `--all` or
+`--session` — is a usage error rather than one of them quietly winning, and neither is offered
+in the interface, `/cycles` being a list of runs with nothing to hang them on.
 
 A session is named by its whole id, by the key the trace shows it under, or by a leading part of
 either — and the sub-agents it started come with it. `--start` and `--end` take anything
-[dateparser](https://dateparser.readthedocs.io/) understands.
-
-`--cycle` takes a run's directory name or a leading part of it, and settles which run the trace
-is **of**: where it is written, whose agents its processes are named after, and whose profile is
-drawn beside them. What is read is still the workspace's sessions, so cut those with `--session`,
-`--start` and `--end`. Without a `--cycle` that is the last run of the workspace; for a workspace
-nothing has been run in, the trace goes where that workspace's runs would be kept. `--output`
-wins over both, a trace being also a thing to attach to an issue.
+[dateparser](https://dateparser.readthedocs.io/) understands, either way. `--output` wins over
+where any of these would otherwise land, a trace being also a thing to attach to an issue.
 
 The default output is named after the UTC moment it was collected, so collecting twice keeps both.
 

@@ -18,6 +18,10 @@ if TYPE_CHECKING:
 #: kind of sub-agent is named off the front of.
 _DOT = " · "
 
+#: How many session ids a trace says outright before it says how many there were instead.
+#: Every process of a trace carries this label, so it is read far more often than it is long.
+_NAMEABLE = 4
+
 _LANE_STRIDE = 100
 
 
@@ -55,7 +59,12 @@ def build(
     if workspace is not None:
         scope["workspace"] = str(workspace)
     if names:
-        scope["selected"] = ", ".join(names)
+        # A handful of ids is what somebody asked for, said back to them; a run's worth of
+        # them is a label nobody can read, and how many there were is the whole of what it
+        # would have told them anyway.
+        scope["selected"] = (
+            ", ".join(names) if len(names) <= _NAMEABLE else f"{len(names)} sessions"
+        )
     label = " · ".join(scope.values())
     live = [item for item in sessions if item.actions]
     ran = list(profiled or ())

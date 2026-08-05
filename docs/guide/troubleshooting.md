@@ -230,18 +230,21 @@ Nothing matched. In order of likelihood:
 
 1. **The backend's home is elsewhere.** Check `CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
    `KIMI_CODE_HOME`. A home that does not exist is skipped silently.
-2. **The workspace does not match.** Sessions are matched against the path the flow ran under,
-   as it was given rather than what it links to. Try `hmz trace collect --session <id>`, which looks
-   everywhere.
-3. **The run worked in a mirror.** A flow on a [machine of its own](/reference/machines.md) did not work in
-   this directory, so find it by `--session`.
-4. **The time window excludes it.** Drop `--start`/`--end`.
+2. **The run being traced opened nothing.** A trace is of a run and holds that run's own
+   sessions, so a run that died before its first turn is a trace of nothing. `/cycles` says how
+   many sessions each run opened; `--cycle` names another.
+3. **You are tracing the wrong directory.** Runs are kept per workspace, and without a
+   `<workspace>` the last run of *this* one is what is traced.
+4. **Nothing here was ever run by a flow.** Then there is no run to trace, and what you want is
+   `hmz trace collect --all` or `--session <id>`.
+5. **The time window excludes it.** Drop `--start`/`--end`.
 
 ### Two agents show up as one
 
 They ran at the same configuration and nothing said they were two. `hmz trace collect` reads that
 off the run it is a trace of, which is the last [cycle](/reference/tracing.md#cycles) of the
-workspace unless `--cycle` names another; driving agents by hand, pass
+workspace unless `--cycle` names another -- so a trace asked for by `--session` or `--all`, being
+of no run, has nothing to read it off. Driving agents by hand, pass
 `agents={a.id: a.opened for a in …}`. See
 [what counts as one agent](/reference/tracing.md#what-counts-as-one-agent).
 

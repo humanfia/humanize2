@@ -427,7 +427,7 @@ Args:
 ## `hmz trace`
 
 ```shell
-hmz trace collect [<workspace>] [--cycle <cycle>] [--session <session>[,<session>]...] [--output <output>] [--start <start>] [--end <end>]
+hmz trace collect [<workspace>] [--cycle <cycle> | --session <session>[,<session>]... | --all] [--output <output>] [--start <start>] [--end <end>]
 ```
 
 Collects and aggregates what a run left behind -- the agents' own trajectories, and the
@@ -436,17 +436,29 @@ programs they ran where the run was profiled -- into a Chrome JSON trace for vis
 - It MUST be a command with what there is to do to a trace under it rather than a verb at the
   top level: a `collect` says what happens to the thing without ever saying what the thing is.
 - A line naming no command under it MUST say which there are rather than doing one of them.
+- A trace of a run MUST hold the sessions that run opened and no others, asked for by the ids
+  the run wrote down rather than by the directory it ran in: a directory is run in over and
+  over, and a trace filed inside one run holding the work of the others is a trace of nothing
+  anybody asked about. By id and not by directory, so that a flow that worked in a machine's
+  mirror is in its own trace as well. A run that opened nothing MUST be a trace of nothing.
+- What a directory holds whoever opened it MUST also be collectable, since a session no flow
+  ever drove is still a session to read back, and it MUST be asked for outright -- `--all`,
+  or the sessions named. It is not a trace of any run and MUST NOT be written inside one, and
+  a line naming a run as well MUST be a line to correct rather than one of the two silently
+  winning. It MUST be here and not in the interface: `/cycles` is a list of runs, and a trace
+  of what is not one has nothing there to be reached from.
 
 Args:
 
 - `<workspace>`: The path to the workspace directory to generate traces for. If not provided, the current working directory is used, unless sessions are named.
-- `--cycle <cycle>`: Which run the trace is filed with and named by, by the name of its directory or a leading part of it. If not provided, the last run of the workspace. That run says which agent opened which session, and its directory is where the trace lands; what goes into the trace is still every session of the workspace unless `--session`, `--start` or `--end` cut it down, since a directory holds sessions no flow ever drove and a trace is worth having of those too. A name no run of it answers to MUST be a line to correct.
-- `--session <session>[,<session>]...`: The sessions to generate traces for, comma separated and repeatable. A session is named by its whole id, by the key the trace shows it under, or by a leading part of either, and the sub-agents it started are collected with it. If not provided, every session of the workspace is included. Named sessions are collected wherever they were recorded, and are cut down to the workspace when one is provided.
-- `--output <output>`: The path to the output file where the aggregated trace will be saved. Its directory is created if it does not exist. If not provided, the trace is saved as `traces/<datetime>.trace.json` inside the run it is a trace of -- where `<datetime>` is the UTC moment it was collected, so that collecting twice keeps both -- and, for a workspace that has run nothing, in the directory that workspace's runs would be kept in. A trace of a run belongs with the run: the sessions it points at and the state it left are already there, and a trace written into whatever directory somebody was standing in is one they have to keep track of themselves. A file named outright still wins, a trace being also a thing to attach to an issue.
+- `--cycle <cycle>`: Which run to trace, by the name of its directory or a leading part of it. If not provided, the last run of the workspace. That run says which sessions the trace holds and which agent opened each of them, its profile is drawn beside them, and its directory is where the trace lands. A name no run of it answers to MUST be a line to correct.
+- `--session <session>[,<session>]...`: Sessions to trace instead of a run, comma separated and repeatable. A session is named by its whole id, by the key the trace shows it under, or by a leading part of either, and the sub-agents it started are collected with it. Named sessions are collected wherever they were recorded, and are cut down to the workspace when one is provided.
+- `--all`: Every session of the workspace instead of a run, whichever run opened them and whether any did.
+- `--output <output>`: The path to the output file where the aggregated trace will be saved. Its directory is created if it does not exist. If not provided, the trace is saved as `traces/<datetime>.trace.json` inside the run it is a trace of -- where `<datetime>` is the UTC moment it was collected, so that collecting twice keeps both -- and, for a trace that is of no one run, in the directory that workspace's runs are kept in. A trace of a run belongs with the run: the sessions it points at and the state it left are already there, and a trace written into whatever directory somebody was standing in is one they have to keep track of themselves. A file named outright still wins, a trace being also a thing to attach to an issue.
 - `--start <start>`: The start time for filtering the session logs, in any wording dateparser understands. If not provided, up to earliest logs are included.
 - `--end <end>`: The end time for filtering the session logs, in any wording dateparser understands. If not provided, up to latest logs are included.
 
-Prints the output path, which run it is filed with, and the number of sessions and slices it
+Prints the output path, which run it is a trace of, and the number of sessions and slices it
 holds -- and the number of programs, for a run that was profiled.
 
 Environment Variables:

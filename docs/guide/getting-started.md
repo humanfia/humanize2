@@ -219,11 +219,12 @@ hmz trace collect
 ~/.humanize/cycles/-home-you-code-myproject/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
 ```
 
-The file, then which run it is a trace of, then what is in it. Every run of a flow is a directory
-under `~/.humanize/cycles/`, and the trace goes into that run's own `traces/` beside the record of
-what happened — `--output` puts it somewhere else, which is what to use when it is going into an
-issue or a CI artifact. `/cycles` at the prompt lists the runs of this directory and collects a
-trace of the one you pick.
+The file, then which run it is a trace of, then what is in it — that run's own sessions and no
+others. Every run of a flow is a directory under `~/.humanize/cycles/`, and the trace goes into
+that run's own `traces/` beside the record of what happened; `--output` puts it somewhere else,
+which is what to use when it is going into an issue or a CI artifact. `/cycles` at the prompt
+lists the runs of this directory and collects a trace of the one you pick. For a session no flow
+ever drove — an afternoon at `claude` on your own — `hmz trace collect --all`.
 
 Open that file in [ui.perfetto.dev](https://ui.perfetto.dev) (drag it in) or `chrome://tracing`.
 Each agent is a process, each row of its sessions a track, and each slice one thing the agent

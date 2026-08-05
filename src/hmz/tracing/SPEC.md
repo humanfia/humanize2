@@ -47,7 +47,7 @@ Carries out `hmz trace collect` and returns the trace as a document. The command
 Args:
 
 - `workspace`: Same as `<workspace>`.
-- `sessions`: Same as `--session`, as a comma separated string or as an iterable of ids.
+- `sessions`: Same as `--session`, as a comma separated string or as an iterable of ids. Nothing at all is every session of the workspace; an empty iterable is no session at all, which is what a trace of a run that opened none holds -- naming sessions is a filter, and naming none of them MUST NOT read as naming all of them.
 - `agents`: What each agent of a flow opened, as a mapping of the agent's name to the ids the backends gave the sessions it opened, which is what an agent reports as its `id` and its `opened`. The command line has no agents to name, so it never passes any.
 - `output`: Same as `--output`, except that no file is written if it is not provided.
 - `start`: Same as `--start`.
@@ -64,7 +64,7 @@ Workflow:
 For backend in [claude, codex, kimi]:
     Find the session logs asked for in the backend's home directory, including subagents' logs:
       - Of the workspace, if one is given or implied.
-      - Of the named sessions, if any are given.
+      - Of the named sessions, if any are given -- and of none, where the names are empty.
     Cut off records outside the specified time range (if provided).
 Name the agent every collected session ran on:
   - The agent that says it opened the session, if any was given.

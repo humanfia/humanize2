@@ -420,6 +420,11 @@ adjusted rather than chosen.
   directory on disk, and one marked since that run is one whose older runs can be picked up
   now, while one that no longer says so MUST say why there is nothing to carry on from rather
   than offering it. What the run recorded is what it was, not what can be done with it.
+- A trace gathered here MUST be a trace of that run: the sessions it opened and no others,
+  asked for by the ids it wrote down rather than by the directory it ran in. A trace of what
+  a directory holds whoever opened it MUST NOT be offered here at all -- this is a list of
+  runs, and a trace that is of none of them has nothing here to hang on; `hmz trace collect
+  --all` is where it is asked for.
 - Carrying a run on MUST run that run's own flow, on that run's own agents, with what it was
   asked to do -- what is being picked up is what ran, and an agent swapped under it would be
   a different run wearing its name. It MUST be a run of its own, saying which run it came

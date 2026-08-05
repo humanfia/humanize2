@@ -141,7 +141,7 @@ was profiled -- and writes them out as one Chrome JSON trace. Works whether or n
 them. See [Tracing](/reference/tracing.md).
 
 ```
-hmz trace collect [<workspace>] [--cycle <cycle>] [--session <session>[,<session>]...]
+hmz trace collect [<workspace>] [--cycle <cycle> | --session <session>[,<session>]... | --all]
                   [--output <output>] [--start <start>] [--end <end>]
 ```
 
@@ -149,19 +149,28 @@ hmz trace collect [<workspace>] [--cycle <cycle>] [--session <session>[,<session
 | --- | --- |
 | `<workspace>` | The directory to collect for. Defaults to this one, unless sessions are named. |
 | `--cycle <name>` | Which run to trace, by the name of its directory or a leading part of it. Defaults to the last run of the workspace. |
-| `--session <s>[,<s>...]` | Sessions to include, comma separated and repeatable. Defaults to every session of the workspace. |
-| `--output <path>` | Where to write. Defaults to `traces/<datetime>.trace.json` inside the run it is a trace of; the directory is created if it is not there. |
+| `--session <s>[,<s>...]` | Sessions to trace instead of a run, comma separated and repeatable. |
+| `--all` | Every session of the workspace instead of a run, whichever run opened them and whether any did. |
+| `--output <path>` | Where to write. Defaults to `traces/<datetime>.trace.json` inside the run it is a trace of, and beside that workspace's runs for a trace that is of none; the directory is created if it is not there. |
 | `--start <when>` | Earliest record to include, in any wording [dateparser](https://dateparser.readthedocs.io/) understands. |
 | `--end <when>` | Latest record to include, same wording. |
+
+A trace is of a run and holds the sessions that run opened and no others, asked for by the ids
+the run wrote down rather than by the directory it ran in -- so a run that worked in a
+[machine's](/reference/machines.md) mirror is in its own trace, and a run that opened nothing is a
+trace of nothing. `--session` and `--all` are the other thing a trace can be of: what a directory
+holds whoever opened it. Naming a run as well is a usage error, and neither is offered in the
+interface, `/cycles` being a list of runs.
 
 A session is named by its whole id, by the key the trace shows it under, or by a leading part of
 either, and the sub-agents it started come with it. Named sessions are collected wherever they
 were recorded, and are then cut down to the workspace when one is given.
 
 A trace goes with the run it is a trace of: a cycle already holds what happened, what each
-session was logged to and what the flow left behind. The default name is the UTC moment it was
-collected, so collecting twice keeps both traces rather than writing over the first -- and
-`--output` still wins, a trace being also a thing to attach to an issue.
+session was logged to and what the flow left behind. One that is of no run goes beside that
+workspace's runs instead. The default name is the UTC moment it was collected, so collecting
+twice keeps both traces rather than writing over the first -- and `--output` still wins, a trace
+being also a thing to attach to an issue.
 
 Prints the output path, which run it is a trace of, and what it holds:
 
@@ -175,7 +184,8 @@ $ hmz trace collect
 ```sh
 hmz trace collect                                    # the last run here
 hmz trace collect --cycle 20260809T0144              # a run of this workspace, by name
-hmz trace collect ~/code/other --start "3 days ago"  # another workspace, recent history only
+hmz trace collect ~/code/other --start "3 days ago"  # another workspace's last run, recent part
+hmz trace collect --all                              # every session here, run or no run
 hmz trace collect --session 0a1b2c3d,5f6e            # two sessions, wherever they ran
 hmz trace collect --end "yesterday 18:00" --output /tmp/before.json
 ```

@@ -91,10 +91,19 @@ def test_applies_the_time_window_to_named_sessions(claude_home: pathlib.Path) ->
     assert 0 < len(slices(window)) < len(slices(whole))
 
 
-def test_treats_no_named_session_as_every_session(
+def test_treats_no_named_session_as_no_session_at_all(
     homes: None, workspace: pathlib.Path
 ) -> None:
-    assert tracing.collect(workspace, sessions=[]) == tracing.collect(workspace)
+    """Naming sessions is a filter, and naming none of them is a filter that keeps nothing.
+
+    Which is what a trace of a run that opened no session holds. Every session there is is
+    what saying nothing about sessions means, and it is the only thing that means it -- an
+    empty list read as "all of them" is a run's trace quietly holding somebody else's work.
+    """
+    empty = tracing.collect(workspace, sessions=[])
+
+    assert empty["traceEvents"] == []
+    assert slices(tracing.collect(workspace))  # and the workspace does hold sessions
 
 
 def test_rejects_an_empty_session_id(homes: None) -> None:
@@ -108,7 +117,7 @@ def test_takes_the_sessions_from_any_iterable(
     drained: Iterator[str] = iter([])
 
     assert keys(tracing.collect(sessions=iter([CLAUDE_SESSION]))) == set(_CLAUDE)
-    assert tracing.collect(workspace, sessions=drained) == tracing.collect(workspace)
+    assert tracing.collect(workspace, sessions=drained)["traceEvents"] == []
 
 
 @pytest.mark.parametrize(

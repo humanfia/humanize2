@@ -265,6 +265,38 @@ async def test_a_trace_of_a_run_is_gathered_from_the_menu_under_it(
         assert str(written) in _transcript(app)
 
 
+def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The sessions that run opened, asked for by the ids the run itself wrote down.
+
+    A directory is run in over and over; a trace filed inside one run while holding the work
+    of every other is a trace of nothing anybody asked about. And by id rather than by
+    directory, so a flow that worked in a machine's mirror is in its own trace too. A trace
+    of the directory itself is `hmz trace collect --all`, which is a command line: there is
+    no run here to hang it on, and this list is a list of runs.
+    """
+    import unittest.mock
+
+    from hmz.cycle import Cycle, read
+    from hmz.tui.pick import collected
+
+    del workspace
+    cycle = Cycle("plain", [], "go")
+    cycle.write("opened", agent="actor", backend="claude", session="one")
+    cycle.write("opened", agent="reviewer", backend="claude", session="two")
+    collect = unittest.mock.Mock(return_value={"otherData": {}})
+    monkeypatch.setattr("hmz.tracing.collector.collect", collect)
+    ran = read(cycle.path)
+    assert ran is not None
+
+    collected(ran)
+
+    assert collect.call_args.args == (None,)
+    assert collect.call_args.kwargs["sessions"] == ["one", "two"]
+    assert collect.call_args.kwargs["agents"] == {"actor": ["one"], "reviewer": ["two"]}
+
+
 def _under(sheet: Cycles) -> str:
     """What is said under the list, which is where a collection reports itself."""
     from textual.widgets import Label

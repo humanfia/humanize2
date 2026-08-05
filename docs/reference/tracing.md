@@ -27,7 +27,7 @@ writing over the first; `--output` puts it somewhere else, its directory created
 there.
 
 What it prints is that path, then the name of the run it is a trace of, then the counts. A run
-that was [profiled](#profiling-a-run) has a third of them — `2 sessions, 17 slices, 3 programs`
+that was [profiled](#profiling-a-run) has a third of them — `1 session, 10 slices, 3 programs`
 — and a trace of sessions alone stops at the slices.
 
 The same thing is a row of `/cycles` in the interface: pick the run, press enter, and collect
@@ -204,41 +204,56 @@ A home that does not exist is skipped rather than being an error, so collecting 
 with only one backend installed works — and so is a backend humanize has no reader for, whose
 home being there changes nothing.
 
-## Narrowing what is collected
+## What one trace holds
 
-A workspace and a set of sessions narrow the trace together:
+**A trace is of a run**, and holds the sessions that run opened and no others:
 
 ```sh
-hmz trace collect                                    # this workspace, all of its history
-hmz trace collect ~/code/other                       # another workspace
-hmz trace collect --cycle 20260809T0144              # filed with that run, and named by it
+hmz trace collect                                    # the last run of this workspace
+hmz trace collect ~/code/other                       # the last run of another workspace
+hmz trace collect --cycle 20260809T0144              # that run of it, by name
+hmz trace collect --start "3 days ago"               # and only what it did since
+```
+
+The run wrote down which sessions its agents opened, and those ids are what the trace is
+gathered by — so a directory run in fifty times has fifty traces to collect and none of them
+holds another's work. A run that opened nothing is a trace of nothing rather than a trace of
+whatever else the directory has seen. Asked for by id and not by directory, which is why **a
+flow that ran on a [machine of its own](/reference/machines.md)** — working in a mirror, logged
+under a path this workspace has never heard of — is in its own trace all the same.
+
+`--cycle` takes a run's directory name or a leading part of it; without one the run is the last
+of the workspace. A name no run of the workspace begins with is a usage error.
+
+**Or of a directory**, whoever opened its sessions, which is how an afternoon at a coding agent
+that no flow ever drove is read back:
+
+```sh
+hmz trace collect --all                              # every session of this workspace
+hmz trace collect ~/code/other --all                 # every session of another
 hmz trace collect --session 0a1b2c3d,5f6e            # two sessions, wherever they ran
 hmz trace collect ~/code/other --session 0a1b2c3d    # that session, only if it ran there
-hmz trace collect --start "3 days ago"               # recent history only
-hmz trace collect --end "yesterday 18:00"
 ```
 
 - **Naming sessions alone** collects them wherever they were recorded.
 - **Adding a workspace** keeps only the named sessions recorded there.
-- **Naming neither** collects the current working directory.
+- **`--all`** collects the workspace, whichever run opened what is in it and whether any did.
 
 A session is named by its whole id, by the key the trace shows it under, or by a leading part of
 either — and the sub-agents it started come with it.
 
+Neither of these is a trace of any run, so neither is written inside one: they go to
+`~/.humanize/cycles/<workspace>/`, beside that workspace's runs. Asking for both at once —
+`--cycle` with `--session` or `--all` — is a usage error rather than one of them quietly
+winning. And neither is offered in the interface: `/cycles` is a list of runs, and a trace of
+what is not one has nothing there to be reached from.
+
+A workspace nothing has ever been run in has no run to trace, so a bare `hmz trace collect`
+there collects the directory itself.
+
 `--start` and `--end` take anything [dateparser](https://dateparser.readthedocs.io/) understands
-and cut records outside the range. A time that cannot be read is a usage error.
-
-`--cycle` narrows nothing. It takes a run's directory name or a leading part of it and settles
-which run the trace is **of**: which agent each session is grouped under, whose `profile.jsonl`
-is drawn beside them, and which `traces/` it is written into. What is read is still the
-workspace's whole history, so cut that with `--session`, `--start` and `--end`. Without a
-`--cycle` the run is the last one of the workspace; for a workspace nothing has been run in
-there is no cycle at all, and the trace goes to `~/.humanize/cycles/<workspace>/`, where that
-workspace's runs would be kept. `--output` wins over either. A name no run of the workspace
-begins with is a usage error, as is a `--cycle` for a workspace with no runs.
-
-**A flow that ran on a [machine of its own](/reference/machines.md) worked in a mirror rather than in this
-directory**, so its trajectories are found by `--session` rather than by workspace.
+and cut records outside the range, either way. A time that cannot be read is a usage error.
+`--output` wins over where any of these would otherwise land.
 
 ## From Python
 
@@ -246,7 +261,7 @@ directory**, so its trajectories are found by `--session` rather than by workspa
 from hmz.tracing import collect
 
 document = collect(
-    "~/code/myproject",
+    "~/code/myproject",             # or None, for sessions asked for by id alone
     sessions=["0a1b2c3d"],          # a string or an iterable of ids
     agents={"actor": [...]},        # what each agent opened
     output="trace.json",            # omit and nothing is written
@@ -258,6 +273,12 @@ document = collect(
 
 Returns the trace document. Writes a file only when `output` is given — which is the one thing
 the library does that the command line does not let you skip.
+
+`sessions` unset is every session of the workspace; an **empty** `sessions` is no session at
+all, which is what the trace of a run that opened none holds. Naming sessions is a filter, and
+naming none of them is not the same as naming all of them. Collecting a run's own trace is that
+call with the ids the cycle wrote down and no workspace — which is what `hmz trace collect` and
+`/cycles` both do.
 
 Raises `ValueError` if a time cannot be read or a named session is empty; the command line
 reports both as usage errors.
