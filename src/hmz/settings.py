@@ -27,6 +27,8 @@ copy rather than a link.
 
 from __future__ import annotations
 
+import os
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -53,6 +55,15 @@ class Settings:
         self._where = str(Path(workspace or Path.cwd()).resolve())
         self._file = home() / "settings.yaml"
         self._held = self._read()
+        #: What was in the file when this read it: which workspaces, and what every setting
+        #: beside them was. A write merges against this rather than against what it holds, so
+        #: that an instance which has been open all session cannot put back a setting somebody
+        #: has changed since -- and an absence, which is the one thing a merge cannot see for
+        #: itself, is told from a value another instance has written.
+        self._knew = frozenset(self._workspaces(self._held))
+        self._read_as = {
+            name: value for name, value in self._held.items() if name != "workspaces"
+        }
 
     @property
     def flow(self) -> str:
@@ -211,6 +222,12 @@ class Settings:
             workspaces[self._where] = {}
         return cast("dict[str, Any]", workspaces[self._where])
 
+    @staticmethod
+    def _workspaces(held: dict[str, Any]) -> dict[str, Any]:
+        """The workspaces one reading of the file holds, which is nothing where it holds none."""
+        found = held.get("workspaces")
+        return cast("dict[str, Any]", found) if isinstance(found, dict) else {}
+
     def _read(self) -> dict[str, Any]:
         """Everything the file holds, which is nothing at all when it cannot be read.
 
@@ -242,28 +259,41 @@ class Settings:
         """
         held = self._read()
         for name, value in self._held.items():
-            if name != "workspaces":
+            # Only what this instance has actually changed: one that read `enable_sentry` as
+            # true an hour ago and has been remembering flows ever since must not put that
+            # back over the no somebody answered in the meantime.
+            if name != "workspaces" and value != self._read_as.get(name):
                 held[name] = value
-        workspaces = held.get("workspaces")
-        if not isinstance(workspaces, dict):
-            workspaces = {}
-            held["workspaces"] = workspaces
-        mine = cast("dict[str, Any]", self._held.get("workspaces") or {})
-        cast("dict[str, Any]", workspaces).update(
-            {name: value for name, value in mine.items() if name == self._where}
-        )
-        # And a workspace this one has forgotten goes from the file too, which is the one
-        # thing a merge has to be told: it is an absence rather than a value.
-        if self._where not in mine:
-            cast("dict[str, Any]", workspaces).pop(self._where, None)
+        workspaces = self._workspaces(held)
+        held["workspaces"] = workspaces
+        mine = self._workspaces(self._held)
+        workspaces.update(mine)
+        # And what this one has forgotten goes from the file too, which is the one thing a
+        # merge cannot see for itself: an absence here is either a workspace this instance
+        # took away or one another instance has written since, and only what this instance
+        # read when it opened tells them apart.
+        for gone in self._knew - set(mine):
+            workspaces.pop(gone, None)
         self._held = held
+        self._knew = frozenset(workspaces)
+        self._read_as = {
+            name: value for name, value in held.items() if name != "workspaces"
+        }
         try:
             self._file.parent.mkdir(parents=True, exist_ok=True)
-            beside = self._file.parent / f".{self._file.name}.new"
-            beside.write_text(
-                yaml.safe_dump(held, sort_keys=False, allow_unicode=True),
-                encoding="utf-8",
+            said = yaml.safe_dump(held, sort_keys=False, allow_unicode=True)
+            # Beside it under a name nothing else will pick: two `hmz` running at once both
+            # write this file, and a fixed `.new` between them is one of them finding its own
+            # half-written file moved away underneath it.
+            handle, beside = tempfile.mkstemp(
+                dir=self._file.parent, prefix=f".{self._file.name}.", suffix=".new"
             )
-            beside.replace(self._file)
+            try:
+                with os.fdopen(handle, "w", encoding="utf-8") as writing:
+                    writing.write(said)
+                Path(beside).replace(self._file)
+            except OSError:
+                Path(beside).unlink(missing_ok=True)
+                raise
         except (OSError, yaml.YAMLError):
             return

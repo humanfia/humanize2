@@ -1885,7 +1885,13 @@ class Humanize(App[None]):
         # What is written down rather than what is happening: the environment may answer for
         # one run, and a menu that showed that would be a menu offering to change a thing it
         # cannot. The sheet says so under the list where the two differ.
-        written = self.settings.enable_sentry
+        #
+        # Read again rather than off the interface's own `Settings`, which was made when it
+        # opened: the first-start question writes through one of its own, so the long-lived
+        # one would show a machine that has just answered as one nobody has asked.
+        from hmz.settings import Settings
+
+        written = Settings().enable_sentry
         said = await self.push_screen_wait(
             Adjusts(
                 enable_sentry=written,
@@ -1909,7 +1915,10 @@ class Humanize(App[None]):
             not written again.
         """
         if said.enable_sentry is not None and said.enable_sentry != written:
-            self.settings.answers(enable_sentry=said.enable_sentry)
+            # Through the same road the first-start question takes, so that the answer is
+            # written down, what was read is forgotten, and reporting starts or stops now
+            # rather than at the next start.
+            telemetry.asked(enable_sentry=said.enable_sentry)
             self.show(
                 "[dim]humanize reports what goes wrong[/dim]"
                 if said.enable_sentry
@@ -2551,7 +2560,9 @@ class Humanize(App[None]):
           text: The word.
           because: What the backend said about it.
         """
-        telemetry.snag("line-refused", because=because)
+        # How long the refusal was and nothing of what it said: `because` is a backend's own
+        # stderr, which is the one thing a report may not carry.
+        telemetry.snag("line-refused", said=len(because))
         with self._saying:
             if (who, text) in self._given:
                 self._given.remove((who, text))

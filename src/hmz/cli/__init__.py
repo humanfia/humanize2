@@ -78,6 +78,9 @@ def _exec(argv: list[str]) -> int:
         raise SystemExit(2) from error
     try:
         runner.run(task)
+    except (KeyboardInterrupt, SystemExit):
+        # Somebody stopping a run is not a run that went wrong.
+        raise
     except BaseException as why:
         # Reported and then raised on exactly as it was: what a flow does when it fails is
         # the flow's business and the person at the terminal's, and this is only humanize

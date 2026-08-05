@@ -29,10 +29,13 @@ report is the layers' own to say, and each says it by handing over a callable --
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
+import sysconfig
 import threading
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,12 +43,14 @@ if TYPE_CHECKING:
 __all__ = [
     "SENT",
     "about",
+    "again",
     "asked",
     "crash",
     "enabled",
     "held",
     "snag",
     "start",
+    "stop",
 ]
 
 #: Where the reports go. humanize's own project, and the one thing here that is not a
@@ -87,6 +92,39 @@ _KEYS = re.compile(
 _CREDS = re.compile(r"(?<=//)[^/\s@]+(?=@)")
 _LONG = 500
 
+#: What a failed command says of itself, which is the whole command line. A turn is a command,
+#: and several of these backends are given the prompt as an argument of it -- so the one line
+#: Python writes for a `CalledProcessError` is the task, verbatim, in the middle of an error
+#: message. The status is what a report needs and the command is what it must not carry.
+_RAN = re.compile(r"Command\s+'.*?'\s+(?=returned|timed out|died)", re.DOTALL)
+
+#: The roots a report may name a file under: humanize's own package, and wherever Python keeps
+#: what is installed beside it. A frame under one of them is named by its path under that root,
+#: which is the whole of what a traceback needs and none of where this machine keeps things.
+#: Settled once, since a traceback has thirty frames and this is per frame.
+_ROOTS = tuple(
+    at
+    for at in dict.fromkeys(
+        [Path(__file__).resolve().parent.parent]
+        + [
+            Path(said).resolve()
+            for said in (
+                sysconfig.get_paths().get("purelib"),
+                sysconfig.get_paths().get("platlib"),
+                sysconfig.get_paths().get("stdlib"),
+            )
+            if said
+        ]
+    )
+)
+
+#: What a frame is named where humanize does not recognise the file it is in. A traceback runs
+#: through humanize, through what humanize is installed beside, and through whatever the person
+#: running it wrote -- and the last of those is a file in their project, under a name they
+#: chose, in a directory named after the work. The line it stopped at is worth having; the rest
+#: of it is theirs.
+_THEIRS = "<not humanize>"
+
 #: What is registered to be asked when a report is being made, and nothing else: a callable
 #: apiece, run at the moment of the report and never before. Under a lock, since a flow
 #: registers from whichever thread it is running on and a crash is reported from another.
@@ -98,9 +136,18 @@ _TELLING = threading.Lock()
 #: since what it holds is a thing that happens rather than a constant.
 _started: list[bool] = []
 
+#: What was written down about reporting, read once. The same shape and the same reason: this
+#: is asked wherever a report might be made, which includes every key that did nothing.
+_answered: list[bool | None] = []
+
 
 def enabled() -> bool | None:
     """Whether humanize reports its own failures, and None while nobody has been asked.
+
+    Read once and kept, since this is asked on paths that are hot: every key that does
+    nothing is a `snag`, and a settings file parsed per keystroke is a settings file parsed
+    per keystroke. What is written down is settled for the life of the process, which is
+    what :func:`asked` and the settings menu say when they change it.
 
     Returns:
       What the environment says for this process, else what was written down, else None --
@@ -113,13 +160,24 @@ def enabled() -> bool | None:
         return True
     if said in ("off", "0", "false", "no"):
         return False
-    from hmz.settings import Settings
+    if not _answered:
+        from hmz.settings import Settings
 
-    return Settings().enable_sentry
+        _answered.append(Settings().enable_sentry)
+    return _answered[0]
+
+
+def again() -> None:
+    """Forgets what was read, for whoever has just written it down."""
+    _answered.clear()
 
 
 def asked(*, enable_sentry: bool) -> None:
     """Writes down the answer, which is asked once and holds wherever humanize is run.
+
+    It also takes effect now. An answer of no from somebody who has been reporting all
+    session is somebody saying stop, and a reporter that went on until the next start would
+    be answering a question that was not asked.
 
     Args:
       enable_sentry: What was answered.
@@ -127,8 +185,11 @@ def asked(*, enable_sentry: bool) -> None:
     from hmz.settings import Settings
 
     Settings().answers(enable_sentry=enable_sentry)
+    again()
     if enable_sentry:
         start()
+    else:
+        stop()
 
 
 def start() -> bool:
@@ -183,6 +244,28 @@ def start() -> bool:
         return False
     _started.append(True)
     return True
+
+
+def stop() -> None:
+    """Stops reporting for the rest of this process, whatever was started earlier.
+
+    What is already on its way is left to go: a report of something that had already happened
+    is not something an answer given afterwards can recall. Everything after this is silent,
+    and `start()` would have to be asked again.
+    """
+    if not _started:
+        return
+    _started.clear()
+    try:
+        import sentry_sdk
+    except ImportError:  # pragma: no cover -- an install missing its own dependency
+        return
+    # Closed rather than left holding a transport: an SDK that is still initialised is one
+    # that would go on collecting whatever its integrations collect.
+    with contextlib.suppress(Exception):
+        sentry_sdk.get_client().close(timeout=1.0)
+    with contextlib.suppress(Exception):
+        sentry_sdk.init(dsn="")
 
 
 def about(name: str, said: Callable[[], object]) -> None:
@@ -276,12 +359,37 @@ def _attaches(scope: Any) -> None:
 
     for name, value in held().items():
         try:
-            written = yaml.safe_dump(value, sort_keys=False, allow_unicode=True)
+            written = yaml.safe_dump(
+                _plainly(value), sort_keys=False, allow_unicode=True
+            )
         except yaml.YAMLError:
             continue  # one that will not write is one left out of the report
-        scope.add_attachment(
-            bytes=_plainer(written).encode("utf-8"), filename=f"{name}.yaml"
-        )
+        scope.add_attachment(bytes=written.encode("utf-8"), filename=f"{name}.yaml")
+
+
+def _plainly(said: object) -> object:
+    """One thing to attach, with every string in it put through the scrubbing.
+
+    Value by value rather than over the document: a document scrubbed as one string is a
+    document that can be cut in half by the length limit, and half a YAML file is a file
+    nobody can read.
+
+    Args:
+      said: Whatever a layer answered with.
+
+    Returns:
+      The same, with the strings in it plainer.
+    """
+    if isinstance(said, str):
+        return _plainer(said)
+    if isinstance(said, dict):
+        return {
+            str(_plainer(str(name))): _plainly(value)
+            for name, value in cast("dict[object, object]", said).items()
+        }
+    if isinstance(said, (list, tuple)):
+        return [_plainly(one) for one in cast("list[object]", said)]
+    return said
 
 
 def _before_send(event: Any, hint: Any) -> Any:
@@ -311,12 +419,60 @@ def _before_send(event: Any, hint: Any) -> Any:
             frame.pop("pre_context", None)
             frame.pop("post_context", None)
             frame.pop("context_line", None)
-            frame["abs_path"] = _plainer(str(frame.get("abs_path") or ""))
+            _framed(frame)
         one["value"] = _plainer(str(one.get("value") or ""))
     # Breadcrumbs are whatever anything logged on the way here, which is not a thing anybody
     # answered a question about.
     event.pop("breadcrumbs", None)
     return event
+
+
+def _framed(frame: dict[str, Any]) -> None:
+    """One frame of a traceback, named the way a report may name it.
+
+    A frame in humanize or in something humanize is installed beside is named by where it is
+    under that root -- `hmz/agents/base.py`, `textual/app.py` -- which is what makes the report
+    worth reading and says nothing about the machine it came off. A frame in anything else is a
+    file of theirs: their flow, in their project, under names they chose. Its line number stays
+    and the rest of it goes, because a directory named after the work is exactly what the
+    promise above says humanize does not take.
+
+    Args:
+      frame: The frame, changed in place.
+    """
+    said = str(frame.get("abs_path") or frame.get("filename") or "")
+    where = _under(said)
+    if where is None:
+        frame["abs_path"] = frame["filename"] = _THEIRS
+        # The module and the function are named by whoever wrote the file, so they go with it.
+        frame.pop("module", None)
+        frame.pop("function", None)
+        return
+    frame["abs_path"] = frame["filename"] = where
+    if frame.get("module"):
+        frame["module"] = _plainer(str(frame["module"]))
+
+
+def _under(said: str) -> str | None:
+    """One file, as the path under whichever root humanize knows it by.
+
+    Args:
+      said: The file, as the SDK found it.
+
+    Returns:
+      Its path under that root -- so `hmz/telemetry.py` rather than wherever humanize is
+      installed -- or None for a file under no root humanize knows, which is somebody's own.
+    """
+    if not said:
+        return None
+    try:
+        at = Path(said).resolve()
+    except (OSError, ValueError):  # pragma: no cover -- a path the OS will not settle
+        return None
+    for root in _ROOTS:
+        if at.is_relative_to(root):
+            return at.relative_to(root).as_posix()
+    return None
 
 
 def _plainer(said: str) -> str:
@@ -329,6 +485,7 @@ def _plainer(said: str) -> str:
       It, with home directories, credentials in URLs and anything shaped like a key replaced
       -- and cut short, since a long string in a report is a file somebody pasted.
     """
+    said = _RAN.sub("A command ", said)
     said = _HOME.sub("~", said)
     said = _CREDS.sub("…", said)
     said = _KEYS.sub("…", said)

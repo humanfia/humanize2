@@ -21,8 +21,9 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def _unstarted(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Starts each test with nothing reporting, whatever the test before it started."""
+    """Starts each test with nothing reporting and nothing read, whatever the last one did."""
     monkeypatch.setattr(telemetry, "_started", [])
+    monkeypatch.setattr(telemetry, "_answered", [])
     monkeypatch.setattr(telemetry, "_ABOUT", {})
 
 
@@ -38,6 +39,48 @@ def test_nobody_has_been_asked_until_somebody_has(
     telemetry.asked(enable_sentry=False)
     assert telemetry.enabled() is False
     assert Settings().enable_sentry is False
+
+
+def test_the_answer_is_read_once_rather_than_per_report(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`snag` is asked on every key that did nothing; a file parsed per keystroke is not free."""
+    monkeypatch.delenv(telemetry.SAYS, raising=False)
+    Settings().answers(enable_sentry=False)
+    reads = 0
+    was = Settings.enable_sentry.fget
+    assert was is not None
+
+    def counted(self: Settings) -> bool | None:
+        nonlocal reads
+        reads += 1
+        return was(self)
+
+    monkeypatch.setattr(Settings, "enable_sentry", property(counted))
+    telemetry.again()
+
+    for _ in range(5):
+        telemetry.snag("dead-key")
+
+    assert reads == 1
+    # And what is written down afterwards is what is read from then on.
+    telemetry.asked(enable_sentry=True)
+    assert telemetry.enabled() is True
+
+
+def test_a_workspace_forgotten_is_forgotten_whichever_one_did_it(
+    tmp_path: Path,
+) -> None:
+    """A merge cannot see an absence: only what this instance read when it opened tells it."""
+    from hmz.kept import Runs
+
+    Settings(tmp_path / "one").remember("chat", ("a",), [Runs("claude/m:high")])
+    Settings(tmp_path / "other").remember("rlar", ("a",), [Runs("codex/n:low")])
+
+    assert Settings(tmp_path / "one").forget(str((tmp_path / "other").resolve()))
+
+    assert Settings(tmp_path / "other").flow == ""
+    assert Settings(tmp_path / "one").flow == "chat"  # and its own is untouched
 
 
 def test_the_environment_answers_for_one_process_without_writing_it_down(
@@ -96,6 +139,19 @@ def test_one_that_cannot_say_is_left_out_rather_than_taking_the_report_with_it()
 @pytest.mark.parametrize(
     ("said", "gone"),
     [
+        # A turn is a command, and several of these backends take the prompt as an argument
+        # of it -- so this one line of Python's is the whole of what somebody typed.
+        (
+            (
+                "Command '['grok', '--single=fix the acme billing bug']'"
+                " returned non-zero exit status 1."
+            ),
+            "acme",
+        ),
+        (
+            "Command '['claude', '-p', 'ship it']' timed out after 5 seconds",
+            "ship it",
+        ),
         ("/homes/someone/secret-project/x.py", "/homes/someone"),
         ("https://x-access-token:ghp_abcdefghijklmnop@github.com/org/repo", "ghp_"),
         ("the key is sk-ant-api03-abcdefghijklmnop and it works", "sk-ant-api03"),
@@ -107,6 +163,15 @@ def test_what_must_not_leave_a_machine_is_taken_out_of_whatever_carries_it(
 ) -> None:
     """Every string that reaches a report goes through this, however it got there."""
     assert gone not in telemetry._plainer(said)
+
+
+def test_a_failed_command_still_says_how_it_failed() -> None:
+    """What is taken out is the command; the status is the half a report is for."""
+    said = telemetry._plainer(
+        "Command '['grok', '--single=fix the bug']' returned non-zero exit status 137."
+    )
+
+    assert said == "A command returned non-zero exit status 137."
 
 
 def test_a_long_string_is_cut_short_because_it_is_a_file_somebody_pasted() -> None:
@@ -152,6 +217,76 @@ def test_no_frame_of_a_stack_carries_what_humanize_was_working_on() -> None:
     assert "pre_context" not in frame
     assert "/homes/someone" not in frame["abs_path"]
     assert "/homes/someone" not in one["value"]
+
+
+def test_a_frame_of_humanizes_own_is_named_by_where_it_is_in_humanize() -> None:
+    """Which is what makes the report readable, and says nothing about this machine."""
+    event: dict[str, Any] = {
+        "exception": {
+            "values": [
+                {
+                    "value": "no",
+                    "stacktrace": {
+                        "frames": [
+                            {
+                                "abs_path": telemetry.__file__,
+                                "filename": telemetry.__file__,
+                                "module": "hmz.telemetry",
+                                "function": "start",
+                                "lineno": 12,
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    }
+
+    held = telemetry._before_send(event, {})
+
+    assert held is not None
+    (frame,) = held["exception"]["values"][0]["stacktrace"]["frames"]
+    assert frame["abs_path"] == "hmz/telemetry.py"
+    assert frame["filename"] == "hmz/telemetry.py"
+    assert frame["function"] == "start"  # humanize's own names are humanize's to send
+    assert frame["lineno"] == 12
+
+
+def test_a_frame_of_somebody_elses_flow_carries_only_the_line_it_stopped_at(
+    tmp_path: Path,
+) -> None:
+    """A flow of theirs is a file in their project: its name is the name of their work."""
+    event: dict[str, Any] = {
+        "exception": {
+            "values": [
+                {
+                    "value": "no",
+                    "stacktrace": {
+                        "frames": [
+                            {
+                                "abs_path": str(
+                                    tmp_path / "acme-migration/flows/loop.py"
+                                ),
+                                "filename": "loop.py",
+                                "module": "acme_migration.loop",
+                                "function": "migrate_acme",
+                                "lineno": 12,
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    }
+
+    held = telemetry._before_send(event, {})
+
+    assert held is not None
+    (frame,) = held["exception"]["values"][0]["stacktrace"]["frames"]
+    assert frame["abs_path"] == frame["filename"] == telemetry._THEIRS
+    assert "module" not in frame
+    assert "function" not in frame
+    assert frame["lineno"] == 12  # and the one thing worth knowing is still there
 
 
 def test_the_line_that_started_this_run_is_not_sent(
