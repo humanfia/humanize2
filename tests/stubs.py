@@ -7,11 +7,13 @@ machines are three suites now, all of which drive a stand-in agent.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from hmz.agents import AgentBase, CommandSessionBase
 from hmz.coganchor import AnchorConfig
+from hmz.cycle import JOURNAL
 from hmz.flows import ENTRY
 from hmz.flows.skills import SKILLS
 
@@ -98,3 +100,21 @@ def written(
         (at / SKILLS / called).mkdir(parents=True, exist_ok=True)
         (at / SKILLS / called / "SKILL.md").write_text(said)
     return at
+
+
+def events(cycle: Path) -> list[dict[str, Any]]:
+    """Every line one cycle wrote, in the order it wrote them.
+
+    A cycle is a directory now -- the run's own record, and a link per session it opened --
+    so what four of these suites want is the record inside it.
+
+    Args:
+      cycle: The cycle's directory.
+
+    Returns:
+      One record per line.
+    """
+    return [
+        json.loads(line)
+        for line in (cycle / JOURNAL).read_text(encoding="utf-8").splitlines()
+    ]

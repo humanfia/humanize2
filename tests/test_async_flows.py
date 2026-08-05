@@ -18,7 +18,7 @@ from hmz.agents import AgentConfig, Stopped
 from hmz.cli import main
 from hmz.cycle import cycles, opened
 from hmz.runner import NotAFlow, Runner, configures, drives, wanted
-from tests.stubs import ShellAgent
+from tests.stubs import ShellAgent, events
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -289,7 +289,7 @@ def test_a_coroutine_flow_is_one_cycle_saying_what_each_agent_opened(
         "actor": ["acted-the task"],
         "reviewer": ["reviewed-the task"],
     }
-    assert json.loads(cycle.read_text().splitlines()[-1])["how"] == "done"
+    assert events(cycle)[-1]["how"] == "done"
 
 
 def test_what_a_coroutine_flow_raises_comes_out_of_the_run(
@@ -301,7 +301,7 @@ def test_what_a_coroutine_flow_raises_comes_out_of_the_run(
         Runner(_flow(tmp_path, FAILING), [ShellAgent(CONFIG)]).run("go")
 
     (cycle,) = cycles()
-    assert json.loads(cycle.read_text().splitlines()[-1])["how"] == "failed"
+    assert events(cycle)[-1]["how"] == "failed"
 
 
 def test_a_coroutine_flow_stopped_by_hand_is_written_down_as_stopped(
@@ -313,7 +313,7 @@ def test_a_coroutine_flow_stopped_by_hand_is_written_down_as_stopped(
         Runner(_flow(tmp_path, STOPPED), [ShellAgent(CONFIG)]).run("go")
 
     (cycle,) = cycles()
-    assert json.loads(cycle.read_text().splitlines()[-1])["how"] == "stopped"
+    assert events(cycle)[-1]["how"] == "stopped"
 
 
 async def test_a_coroutine_flow_started_from_a_loop_of_its_own_still_runs(

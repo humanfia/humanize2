@@ -1,22 +1,23 @@
 """One run of one flow, written down: which agents were driven, and what each of them opened.
 
 Nothing else knows that a session was part of a run. The backends log them one at a time, each
-under an id of its own, and say nothing about whose they were or what they were for -- so a
-trace of a run can only be gathered afterwards if the run itself wrote down what it opened.
+under an id of its own, and say nothing about whose they were, which account took their turns
+or what they were for -- so a trace of a run can only be gathered afterwards if the run itself
+wrote down what it opened, and a person can only find the logs of one if the run points at
+them.
 """
 
 from __future__ import annotations
 
-import json
 import subprocess
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from hmz.agents import AgentConfig, Stopped
-from hmz.cycle import cycles, opened
+from hmz.cycle import called, cycles, linked, opened, read, sessions
 from hmz.runner import Runner
-from tests.stubs import ShellAgent, written
+from tests.stubs import ShellAgent, events, written
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -35,10 +36,25 @@ def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
         agent.new()(f"echo session-{at}")
 """
 
+#: The same, for a flow that drives one agent.
+ONE = """
+from hmz.agents import AgentBase
+from hmz.flows import flow
 
-def _lines(cycle: Path) -> list[dict[str, object]]:
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    agents[0].new()("echo the-session")
+"""
+
+
+class ClaudeAgent(ShellAgent):
+    """A stand-in that answers to a backend humanize knows where the logs of."""
+
+
+def _lines(cycle: Path) -> list[dict[str, Any]]:
     """Every event of one cycle, in the order it was written."""
-    return [json.loads(line) for line in cycle.read_text().splitlines()]
+    return events(cycle)
 
 
 def test_a_run_is_one_cycle_and_says_what_it_opened(
@@ -66,6 +82,7 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
             "model": "m",
             "effort": "high",
             "permission": "bypass",
+            "provider": "",
         },
         {
             "agent": "reviewer",
@@ -73,6 +90,7 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
             "model": "m",
             "effort": "high",
             "permission": "bypass",
+            "provider": "",
         },
     ]
     assert [(said["agent"], said["session"]) for said in held] == [
@@ -164,3 +182,139 @@ def test_an_agent_driven_by_hand_is_not_a_run_of_anything(tmp_path: Path) -> Non
 
     assert agent.opened == ["alone"]
     assert cycles(tmp_path) == []
+
+
+def test_a_session_is_named_for_whose_it_is_what_ran_it_and_which_account(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The id alone says none of that, and a directory of ids is one nobody can read."""
+    monkeypatch.chdir(tmp_path)
+    written(tmp_path, "flow", ONE)
+
+    Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
+
+    (cycle,) = cycles()
+    (one,) = sessions(cycle)
+    assert one == (
+        "builder",
+        "claude",
+        "local",
+        "the-session",
+        "builder-claude@local-the-session",
+        one.at,
+    )
+    assert one.name == called("builder", "claude", "", "the-session")
+
+
+def test_a_session_says_which_account_took_its_turns(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two agents of one CLI are two accounts, and the backend's log says neither."""
+    from hmz import providers
+
+    monkeypatch.chdir(tmp_path)
+    written(tmp_path, "flow", ONE)
+    providers.add("claude", "work", "key", {"ANTHROPIC_API_KEY": "sk-nothing"})
+    agent = ClaudeAgent(
+        AgentConfig(model="m", effort="high", provider="work"), name="builder"
+    )
+
+    Runner(tmp_path / "flow", [agent]).run("go")
+
+    (cycle,) = cycles()
+    (one,) = sessions(cycle)
+    assert one.provider == "work"
+    assert one.name == "builder-claude@work-the-session"
+    # And what it was configured with is what the run says it was driven by.
+    ran = read(cycle)
+    assert ran is not None
+    assert ran.agents[0].provider == "work"
+    assert ran.agents[0].spec == "claude@work/m:high"
+
+
+def test_the_logs_of_a_session_are_linked_into_the_cycle_that_opened_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A link rather than a copy: humanize reads and writes the log where the backend keeps it."""
+    monkeypatch.chdir(tmp_path)
+    written(tmp_path, "flow", ONE)
+    where = tmp_path / "claude-home"
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(where))
+    log = where / "projects" / "-tmp-project" / "the-session.jsonl"
+    log.parent.mkdir(parents=True)
+    log.write_text('{"type":"user"}\n')
+
+    Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
+
+    (cycle,) = cycles()
+    (one,) = sessions(cycle)
+    link = cycle / "sessions" / one.name / "the-session.jsonl"
+    assert link.is_symlink()
+    assert link.resolve() == log.resolve()
+    assert linked(cycle) == {one.name: [str(log)]}
+
+
+def test_a_log_written_after_the_last_turn_is_linked_when_the_run_ends(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A sub-agent's transcript is written whenever that sub-agent ran, which is later."""
+    monkeypatch.chdir(tmp_path)
+    written(tmp_path, "flow", ONE)
+    where = tmp_path / "claude-home"
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(where))
+    under = where / "projects" / "-tmp-project"
+    under.mkdir(parents=True)
+    (under / "the-session.jsonl").write_text("{}\n")
+    late = under / "the-session" / "subagents" / "deep" / "explore.jsonl"
+    late.parent.mkdir(parents=True)
+    # Written after the session was opened, which is when a sub-agent's transcript is
+    # written: the flow stands in for the backend finishing what it was writing.
+    monkeypatch.setenv("LATE_LOG", str(late))
+    written(
+        tmp_path,
+        "flow",
+        "import os\n"
+        "from pathlib import Path\n\n"
+        "from hmz.agents import AgentBase\n"
+        "from hmz.flows import flow\n\n\n"
+        "@flow\n"
+        "def run(agents: tuple[AgentBase], task: str) -> None:\n"
+        '    agents[0].new()("echo the-session")\n'
+        '    Path(os.environ["LATE_LOG"]).write_text("{}\\n")\n',
+    )
+
+    Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
+
+    (cycle,) = cycles()
+    (one,) = sessions(cycle)
+    assert sorted(p.name for p in (cycle / "sessions" / one.name).iterdir()) == [
+        "explore.jsonl",
+        "the-session.jsonl",
+    ]
+
+
+def test_a_cycle_reads_back_as_what_was_run_and_how_it_went(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Which is what a listing of them shows, and what one of them can be picked up from."""
+    monkeypatch.chdir(tmp_path)
+    written(tmp_path, "flow", ONE)
+
+    Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
+
+    (cycle,) = cycles()
+    ran = read(cycle)
+    assert ran is not None
+    assert (ran.flow, ran.task, ran.how) == (str(tmp_path / "flow"), "go", "done")
+    assert ran.workspace == str(tmp_path.resolve())
+    assert ran.name == cycle.name
+    assert not ran.resumable
+    assert [one.agent for one in ran.agents] == ["builder"]
+    assert [one.ident for one in ran.sessions] == ["the-session"]
+
+
+def test_a_directory_that_holds_no_run_is_not_one(tmp_path: Path) -> None:
+    """A cycle is what this wrote; anything else under there is somebody else's directory."""
+    (tmp_path / "not-a-cycle").mkdir()
+
+    assert read(tmp_path / "not-a-cycle") is None

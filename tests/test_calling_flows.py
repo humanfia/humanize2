@@ -8,16 +8,15 @@ happens, since a flow is a Python file and nothing can ask it what it is doing.
 
 from __future__ import annotations
 
-import json
-import pathlib
 from typing import TYPE_CHECKING
 
 import pytest
 
 from hmz.agents import AgentConfig
 from hmz.agents.skills import Loaded
+from hmz.cycle import cycles
 from hmz.runner import NotAFlow, Runner, calls, running
-from tests.stubs import ShellAgent, written
+from tests.stubs import ShellAgent, events, written
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -257,11 +256,8 @@ def test_the_run_writes_down_the_flow_it_called(flows: Path) -> None:
     """A cycle is what a run was, and a flow that called another is part of what it was."""
     Runner("outer", [ShellAgent(CONFIG)]).run("do it")
 
-    import os
-
-    cycles = sorted(pathlib.Path(os.environ["HUMANIZE_HOME"]).rglob("*.jsonl"))
-    said = [json.loads(line) for line in cycles[-1].read_text().splitlines()]
-    called = [one for one in said if one["event"] in ("called", "returned")]
+    (cycle,) = cycles()
+    called = [one for one in events(cycle) if one["event"] in ("called", "returned")]
 
     assert [one["event"] for one in called] == ["called", "returned"]
     assert called[0]["flow"] == "inner"

@@ -235,6 +235,23 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
 
 - One cycle MUST be one run. It opens when the flow starts and closes when the flow stops,
   however it stops -- finished, failed, or interrupted. A closed cycle MUST NOT be reopened.
+- One cycle MUST be one directory, holding the run's own record and a directory per session
+  it opened. A run is more than a list of events now -- what its sessions were logged to, and
+  what a flow that can be picked up again left behind -- and all of it is one run's.
+- A session MUST be written down as whose it was, what took its turns, which account those
+  turns ran as and what the backend called it. The backend's own log says only the last of
+  those: two agents at one configuration are one agent to anything reading the logs alone,
+  and two accounts of one CLI are one account.
+- A session MUST also be given a name of its own, which MUST hold the agent, the CLI, the
+  account and the backend's id, and MUST be one directory name. An id alone says nothing
+  about whose session it was, and a directory of forty of them is one nobody can read.
+- Each session's own logs MUST be pointed at from inside the cycle, under that name, by a
+  link apiece. A link rather than a copy, and for reading rather than for running: humanize
+  MUST go on reading and writing every log where the backend keeps it, so that nothing here
+  can be the reason one is written twice or read from the wrong place. A filesystem that
+  refuses a link, a backend humanize knows no logs of, and a log written after the session
+  was opened MUST each leave the run as it was -- the last of them by the links being made
+  again when the run ends, which is when a sub-agent's transcript is finally there.
 
 ## `runner.py`
 

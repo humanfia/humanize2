@@ -35,6 +35,7 @@ from hmz.tui.pick import (
     Signing,
     Ways,
 )
+from tests.stubs import events as recorded
 from tests.stubs import written
 
 if TYPE_CHECKING:
@@ -720,7 +721,7 @@ async def test_escape_stops_the_flow_and_not_just_the_turn(workspace: Path) -> N
         assert "stopping the flow" in _transcript(app)
         # And the run is over with it: a cycle is one run of one flow, and esc ends one.
         (cycle,) = cycles(workspace)
-        assert json.loads(cycle.read_text().splitlines()[-1]) == {
+        assert recorded(cycle)[-1] == {
             "event": "ended",
             "at": unittest.mock.ANY,
             "how": "stopped",
@@ -1283,7 +1284,7 @@ async def test_a_flow_waiting_to_be_told_something_can_still_be_stopped(
 
         # And the run is written down as stopped rather than as one that finished.
         (cycle,) = cycles(talking)
-        assert json.loads(cycle.read_text().splitlines()[-1]) == {
+        assert recorded(cycle)[-1] == {
             "event": "ended",
             "at": unittest.mock.ANY,
             "how": "stopped",

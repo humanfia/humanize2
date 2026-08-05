@@ -51,7 +51,11 @@ ALLOWED: dict[str, set[str]] = {
     "hmz.backends": set(),
     "hmz.coganchor": set(),
     "hmz.coganchor.serve": {"hmz.coganchor", "hmz.coganchor.proto"},
-    "hmz.cycle": {"hmz.agents"},
+    # A run writes down which sessions its agents opened, and points a link at each of the
+    # logs the backend is writing them to. Where those logs are is a fact about the CLI, and
+    # `backends` is the leaf those are written down in: it names nothing, so this widens the
+    # DAG without bending it.
+    "hmz.cycle": {"hmz.agents", "hmz.backends"},
     # A flow drives agents, and one that has to know where its own agent keeps its tasks
     # is reading a fact rather than a log: `backends` is the leaf that exists so a fact of
     # that kind is written once, and it names nothing, so this widens the DAG without
