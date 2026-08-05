@@ -37,6 +37,14 @@ class ClaudeAgent(ShellAgent):
     """
 
 
+class CodexAgent(ShellAgent):
+    """A stand-in named for Codex, which reads the shared project skill directory."""
+
+
+class KimiAgent(ShellAgent):
+    """A stand-in named for Kimi, which reads the shared project skill directory."""
+
+
 #: A flow that does what it is told, in a session of its own: what the turn is is the shell
 #: line the test hands it, so a test can have it look at what was mounted beside it.
 DOES = '''"""Does the one thing it is told."""
@@ -222,6 +230,32 @@ def test_a_session_is_given_them_where_its_backend_reads_a_projects_own(
     assert "does a thing" in (tmp_path / "read.txt").read_text()
     # Mounted rather than installed: what the flow brought is not left on the machine.
     assert not (tmp_path / ".claude").exists()
+
+
+@pytest.mark.parametrize("agent_type", [CodexAgent, KimiAgent])
+def test_a_shared_skill_backend_is_given_flow_skills_in_the_project_directory(
+    agent_type: type[ShellAgent],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Codex and Kimi discover flow skills from the shared project directory."""
+    monkeypatch.chdir(tmp_path)
+    written(
+        tmp_path / ".humanize/flows",
+        "mine",
+        DOES,
+        {"note-taking": skill("note-taking")},
+    )
+
+    Runner("mine", [agent_type(CONFIG)]).run(
+        "ls .agents/skills > listed.txt; "
+        "cat .agents/skills/note-taking/SKILL.md > read.txt"
+    )
+    gc.collect()
+
+    assert (tmp_path / "listed.txt").read_text().split() == ["note-taking"]
+    assert "does a thing" in (tmp_path / "read.txt").read_text()
+    assert not (tmp_path / ".agents").exists()
 
 
 def test_a_projects_own_skill_of_that_name_is_left_alone(

@@ -24,6 +24,7 @@ Where each CLI keeps them is written down in `hmz.backends`:
 | --- | --- | --- |
 | `claude` | `~/.claude/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` |
 | `codex` | `~/.codex/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | `.agents/skills/*/SKILL.md`, `.codex/skills/*/SKILL.md` |
+| `kimi` | `~/.kimi-code/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | `.kimi-code/skills/*/SKILL.md`, `.agents/skills/*/SKILL.md` |
 
 Nothing is asked of the CLI to find out, which would mean starting it, and nothing is written:
 what a person has installed is not something a flow is entitled to rewrite, and a list that
@@ -64,8 +65,8 @@ the next time a run asks for it, so a skill somebody else maintains is one that 
 | Backend | Where |
 | --- | --- |
 | `claude` | `.claude/skills/` in the workspace |
-| `codex`, `grok`, `qwen` | `.agents/skills/`, the directory more than one of these agreed to read |
-| `agy`, `dsh`, `kimi`, `mimo`, `opencode`, `pi` | — none: they carry what their CLI installs |
+| `codex`, `grok`, `kimi`, `qwen` | `.agents/skills/`, the directory more than one of these agreed to read |
+| `agy`, `dsh`, `mimo`, `opencode`, `pi` | — none: they carry what their CLI installs |
 
 A project's own skill of that name wins — a flow does not write over what the project keeps —
 and two sessions of one flow working in one directory share the mount until the last of them

@@ -86,9 +86,28 @@ def test_codex_is_read_from_all_four_places_it_looks(
     ]
 
 
-def test_a_backend_that_keeps_none_here_finds_none(homes: Path) -> None:
-    """Kimi's daemon reads no directory of them, so there is nothing here to show."""
-    assert skills("kimi") == []
+def test_kimi_is_read_from_its_own_and_shared_skill_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Kimi web discovers the same skill roots as an interactive Kimi session."""
+    _write(tmp_path / "kimi-home" / "skills", "its-own")
+    _write(tmp_path / "home" / ".agents" / "skills", "shared")
+    _write(tmp_path / "project" / ".kimi-code" / "skills", "project-kimi")
+    _write(tmp_path / "project" / ".agents" / "skills", "project-agents")
+    monkeypatch.setenv("KIMI_CODE_HOME", str(tmp_path / "kimi-home"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path / "project")
+
+    assert [one.name for one in skills("kimi")] == [
+        "its-own",
+        "shared",
+        "project-kimi",
+        "project-agents",
+    ]
+
+
+def test_an_unknown_backend_finds_no_skills(homes: Path) -> None:
+    """A backend Humanize does not know has nowhere to discover a skill from."""
     assert skills("not-a-cli") == []
 
 
@@ -106,11 +125,14 @@ def test_a_skill_with_no_front_matter_is_the_directory_it_is_in(homes: Path) -> 
     "hmz.tui.app.installed",
     return_value={"kimi": (Model("kimi-code/k3", ("max",)),)},
 )
-async def test_a_cli_that_keeps_none_says_that_rather_than_none_installed(
+async def test_a_cli_with_no_installed_skills_says_so(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
     homes: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Blaming the machine for what the backend does not do would be the wrong sentence."""
+    """A supported skill directory with no entries is empty rather than unsupported."""
+    monkeypatch.setenv("KIMI_CODE_HOME", str(homes / "kimi-home"))
+    monkeypatch.setattr(Path, "home", lambda: homes / "home")
     app = Humanize()
     async with app.run_test() as driver:
         await into_flows(app, driver)
@@ -119,7 +141,7 @@ async def test_a_cli_that_keeps_none_says_that_rather_than_none_installed(
         await until(lambda: isinstance(app.screen, Skills), driver)
         said = str(app.screen.query_one("#tuning", Label).content)
 
-        assert "kimi keeps no skills of its own here" in said
+        assert "kimi has none installed here" in said
 
 
 @pytest.mark.timeout(60)

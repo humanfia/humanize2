@@ -647,9 +647,14 @@ PROFILES = (
         # Every model Kimi runs takes a turn as a fleet as well as as one agent: `swarmmax`
         # and `max` are the same thinking at two widths.
         swarms=True,
-        # None named: `--skills-dir` is a flag of the command line, and a session here is a
-        # thread on `kimi web`, which takes none. A skill Kimi finds is a skill it loads, so
-        # there is nothing here to be offered a choice about.
+        # Kimi Code discovers both its own and the shared skill directories without a command
+        # line flag, including for sessions served by `kimi web`. The shared project directory
+        # is also where a flow can mount one skill for Claude, Codex or Kimi without installing
+        # it into any of their homes.
+        skills=("skills/*/SKILL.md",),
+        shared=(".agents/skills/*/SKILL.md",),
+        works=(".kimi-code/skills/*/SKILL.md", ".agents/skills/*/SKILL.md"),
+        mounts=".agents/skills",
         #
         # A directory apiece: kimi keeps one file per endpoint it has signed into, named
         # after that endpoint, and a lock beside it that two of its processes rotate a
