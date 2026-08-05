@@ -415,9 +415,11 @@ adjusted rather than chosen.
   under the cursor rather than doing any of it, since what there is depends on that run. A
   flow that says it can be picked up MUST offer carrying on from where it stopped; every run,
   whatever its flow says, MUST offer the things that can be done to a run that is over.
-- Whether a run can be picked up MUST be asked of its flow rather than read off the run: a
-  flow is a directory on disk and may have been rewritten since, and one that no longer says
-  so MUST say why there is nothing to carry on from rather than offering it.
+- Whether a run can be picked up MUST be asked of its flow rather than read off the run,
+  wherever it is said -- the mark on the row and the row in the menu alike: a flow is a
+  directory on disk, and one marked since that run is one whose older runs can be picked up
+  now, while one that no longer says so MUST say why there is nothing to carry on from rather
+  than offering it. What the run recorded is what it was, not what can be done with it.
 - Carrying a run on MUST run that run's own flow, on that run's own agents, with what it was
   asked to do -- what is being picked up is what ran, and an agent swapped under it would be
   a different run wearing its name. It MUST be a run of its own, saying which run it came

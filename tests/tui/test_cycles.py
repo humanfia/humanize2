@@ -270,3 +270,37 @@ def _under(sheet: Cycles) -> str:
     from textual.widgets import Label
 
     return str(sheet.query_one("#tuning", Label).content)
+
+
+@pytest.mark.timeout(60)
+async def test_a_run_of_a_flow_marked_since_can_be_picked_up_too(
+    workspace: Path,
+) -> None:
+    """What can be done with a run is what its flow says now, not what the run recorded.
+
+    A flow is a directory on disk: one marked resumable after a run of it is one whose older
+    runs can be carried on, and the run's own record is what it was rather than what there is
+    to do with it today.
+    """
+    _ran("plain", "go")
+    (cycle,) = cycles(workspace)
+    from hmz.cycle import read
+
+    ran = read(cycle)
+    assert ran is not None
+    assert not ran.resumable  # it was not, when it ran
+
+    # And now it is: the same flow, marked, and taking what it is handed.
+    written(workspace / ".humanize/flows", "plain", COUNTS)
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _open(app, driver)
+        assert "can be picked up" in str(
+            app.screen.query_one("#choices", OptionList).get_option_at_index(0).prompt
+        )
+
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Does), driver)
+
+        assert rows(app) == ["carry-on", "collect", "where"]

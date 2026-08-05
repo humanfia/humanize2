@@ -4025,17 +4025,17 @@ class Adjusts(Drafts[Adjusted]):
                 (
                     _RUNS,
                     self._flow or "nothing yet",
-                    f"the flow it opens on, set up with {self._agents} agents",
+                    f"the flow it opens on, set up with {_many(self._agents, 'agent')}",
                 ),
                 (
                     _PROFILES,
                     _YES if self._profile else _NO,
-                    "profile the programs a run here starts, into its own trace",
+                    "profile the programs a run here starts",
                 ),
                 (
                     _FORGET,
                     _YES if self._forget else _NO,
-                    f"forget what is remembered here, across {self._flows} flows",
+                    f"forget what is remembered here, across {_many(self._flows, 'flow')}",
                 ),
             ]
         return [
@@ -5356,7 +5356,7 @@ class Account(Picks):
             (
                 _TRIED,
                 "how it is tried again",
-                "how many tries, which wait, and how long the whole may go on for",
+                "how many tries, which wait, and how long in all",
             ),
         ]
         if not self._name:
@@ -5370,7 +5370,7 @@ class Account(Picks):
             (
                 _SIGNS_IN,
                 "sign in again",
-                "run its own way in again, which owns the terminal while it does",
+                "run its own way in again; it owns the terminal while it does",
             ),
             *held,
         ]
@@ -5587,12 +5587,13 @@ class Providers(Drafts[list[str]]):
         Returns:
           The line to say under the list. humanize did not make that account and keeps no
           credentials for it -- it is the CLI as whoever is at this machine runs it -- so the
-          only things to say about it are where it falls back to and how it is tried again.
+          only things to say about it are where it falls back to and how it is tried again,
+          which is what enter offers on it.
         """
         telemetry.snag("key-does-nothing", sheet="Providers", doing=doing)
         return (
             f"there is nothing to {doing}: this is {escape(cli)} as this machine is already "
-            "signed in. f and t are what it takes"
+            "signed in. Enter says what it does take"
         )
 
     @work
@@ -6038,6 +6039,20 @@ class Doing(NamedTuple):
     said: tuple[str, ...] = ()
 
 
+def _many(count: int, thing: str) -> str:
+    """How many of something there were, said as English says it.
+
+    Args:
+      count: How many.
+      thing: What they are, in the singular.
+
+    Returns:
+      The two words -- `1 session`, `3 sessions` -- since a sheet is prose and `1 sessions`
+      is a sheet that reads as a template somebody forgot to finish.
+    """
+    return f"{count} {thing}" if count == 1 else f"{count} {thing}s"
+
+
 def _asked_for(task: str) -> str:
     """What a run was asked to do, as much of it as a row has room for.
 
@@ -6087,8 +6102,9 @@ class Does(Picks):
         self._resumable = resumable
         self.asked = f"{_when(ran.began)}{_DOT}{ran.flow}"
         self.about = (
-            f"What to do with this run. It {_how(ran)}, driving {len(ran.agents)} agents "
-            f"through {len(ran.sessions)} sessions."
+            f"What to do with this run. It {_how(ran)}, driving "
+            f"{_many(len(ran.agents), 'agent')} through "
+            f"{_many(len(ran.sessions), 'session')}."
         )
 
     def rows(self) -> list[tuple[str, str, str]]:
@@ -6241,11 +6257,20 @@ class Cycles(Sheet[Doing]):
         self.query_one("#choices", OptionList).focus()
 
     def _about(self, ran: Ran) -> str:
-        """What a row says about one run: what it was asked to do, how it went, and its size."""
+        """What a row says about one run: what it was asked to do, how it went, and its size.
+
+        How it went only where it went some other way than finishing: a list of runs is
+        mostly runs that finished, and a column saying so of nearly all of them is a column
+        that says nothing while taking the room the ones that did not need.
+        """
         said = _asked_for(ran.task) if ran.task else "no task"
-        sessions = f"{len(ran.sessions)} sessions"
-        held = f"{said}{_DOT}{_how(ran)}{_DOT}{sessions}"
-        return f"{held}{_DOT}can be picked up" if ran.resumable else held
+        held = f"{said}{_DOT}{_many(len(ran.sessions), 'session')}"
+        if ran.how != "done":
+            held += f"{_DOT}{_how(ran)}"
+        # Asked of the flow rather than read off the run, for the reason the menu asks it of
+        # the flow: a flow is a directory on disk, and one marked resumable since that run is
+        # one whose older runs can be picked up now.
+        return f"{held}{_DOT}can be picked up" if self._picks_up(ran.flow) else held
 
     def _fill(self) -> None:
         """Puts the runs up, marked where the cursor is."""
@@ -6260,7 +6285,7 @@ class Cycles(Sheet[Doing]):
                 self._row(
                     seen,
                     f"{_when(one.began)}{_DOT}{one.flow}",
-                    self._about(one),
+                    _briefly(self._about(one), self.size.width),
                     here=one.name == self._was,
                     inforce=False,
                 ),
@@ -6373,7 +6398,7 @@ class Cycles(Sheet[Doing]):
             self.app,  # pyright: ignore[reportUnknownMemberType]
         )
         said = await showing.push_screen_wait(
-            Does(ran, resumable=ran.resumable and self._picks_up(ran.flow))
+            Does(ran, resumable=self._picks_up(ran.flow))
         )
         if said is None:
             return  # walked out of it, which does nothing to the run

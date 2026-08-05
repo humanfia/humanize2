@@ -282,3 +282,40 @@ def test_asking_a_flow_that_is_not_one_whether_it_resumes_says_it_is_not_one(
     del tmp_path
     with pytest.raises(NotAFlow):
         resumes("no_such_flow_anywhere")
+
+
+def test_a_flow_that_emptied_its_state_starts_the_next_run_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Clearing it says the next run starts clean, and is not the same as never writing.
+
+    A run that wrote nothing at all is nothing to pick up and the search goes past it. A run
+    that wrote and then emptied what it had written is a run that finished with nothing to
+    hand on -- and handing the next one the state of the run before that would be answering
+    the opposite of what it said.
+    """
+    monkeypatch.chdir(tmp_path)
+    flow = written(
+        tmp_path,
+        "clears",
+        '"""Counts, and clears what it kept when it is told to stop counting."""\n\n'
+        "from typing import Any\n\n"
+        "from hmz.agents import AgentBase\n"
+        "from hmz.flows import flow\n\n\n"
+        "@flow(resumable=True)\n"
+        "def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:\n"
+        '    if task == "done":\n'
+        "        state.clear()\n"
+        "        return\n"
+        '    state["rounds"] = state.get("rounds", 0) + 1\n',
+    )
+
+    Runner(flow, [ShellAgent(CONFIG)]).run("go")
+    Runner(flow, [ShellAgent(CONFIG)]).run("go")
+    assert state(cycles()[-1]) == {"rounds": 2}
+
+    Runner(flow, [ShellAgent(CONFIG)]).run("done")  # which empties it
+    Runner(flow, [ShellAgent(CONFIG)]).run("go")
+
+    # From nothing, rather than from the two rounds two runs ago.
+    assert state(cycles()[-1]) == {"rounds": 1}

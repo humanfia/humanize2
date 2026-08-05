@@ -179,8 +179,9 @@ class Ran(NamedTuple):
       how: How it stopped -- done, failed or stopped -- and "" while it has not.
       agents: What drove it, in the order the flow takes them.
       sessions: Every session it opened, oldest first.
-      resumable: Whether the flow it ran says it can be picked up again, which is what makes
-        the state it left behind something to run the flow on rather than something to read.
+      resumable: Whether the flow said it could be picked up again when this run happened.
+        Whether it says so now is asked of the flow: this is what the run recorded, which is
+        what it was rather than what can be done with it today.
     """
 
     at: Path
@@ -455,14 +456,16 @@ def resumed(flow: str, workspace: Path | str | None = None) -> Path | None:
       workspace: Where it runs, defaulting to this directory.
 
     Returns:
-      The cycle, or None where the flow has not run here or left nothing behind. A run that
-      wrote nothing is nothing to pick up: what it would be picked up as is the state a run
-      before it left, which is the run that has something to say. Found by what the state
-      holds rather than by what the run was of, so that a flow which was called by another
-      is picked up too -- it wrote under its own name, which is where it is looked for.
+      The cycle, or None where the flow has not run here. A run that wrote nothing at all is
+      nothing to pick up and the search goes past it; a run that wrote and then emptied what
+      it had written is not the same thing, and is where the search stops -- a flow that
+      cleared its state said the next run starts clean, and answering that by handing it the
+      state of the run before would be answering the opposite. Found by what the state holds
+      rather than by what the run was of, so that a flow which was called by another is
+      picked up too -- it wrote under its own name, which is where it is looked for.
     """
     for cycle in reversed(cycles(workspace)):
-        if _kept(cycle).get(flow):
+        if flow in _kept(cycle):
             return cycle
     return None
 
