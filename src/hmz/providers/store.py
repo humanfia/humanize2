@@ -36,10 +36,12 @@ __all__ = [
     "add",
     "alone",
     "chain",
+    "copies",
     "find",
     "points",
     "providers",
     "retrying",
+    "serves",
     "ways",
     "where",
 ]
@@ -266,6 +268,84 @@ def providers(cli: str = "") -> list[Provider]:
             and (provider := _read(whose.name, named)) is not None
         )
     return held
+
+
+def serves(one: Provider) -> tuple[str, ...]:
+    """Which other backends this account could be run as.
+
+    A vendor's credential is the vendor's rather than the CLI's: an Anthropic key is an
+    Anthropic key whether Claude Code, pi, opencode or mimocode is holding it, and a
+    subscription token is one under whatever name each of them reads it under. So an account
+    made for one backend is often an account several others could be run as -- which is worth
+    saying at the moment it is made, since making the same key four times by hand is four
+    places to correct it when it is rotated.
+
+    Args:
+      one: The account.
+
+    Returns:
+      The other backends, in the order humanize lists them. Nothing at all for an account
+      that cannot travel: a subscription signed into writes the CLI's own credential store,
+      in that CLI's own format, and nothing else reads it.
+    """
+    return tuple(
+        profile.name
+        for profile in backends.profiles()
+        if profile.name != backends.named(one.cli).name  # pyright: ignore[reportOptionalMemberAccess]
+        and backends.serves(one.env, profile.name) is not None
+    )
+
+
+def copies(one: Provider, cli: str, name: str = "") -> Provider:
+    """Writes one account down for another backend, under the same name.
+
+    Written over where there is already one of that name for that backend, which is what
+    makes this a way of correcting several at once: a key rotated is a key rotated everywhere
+    it was copied to, said once.
+
+    Args:
+      one: The account to copy.
+      cli: The backend to copy it to, by any name it answers to.
+      name: What to call it there, defaulting to what it is called here.
+
+    Returns:
+      The account as it is now written down for that backend.
+
+    Raises:
+      ValueError: If that backend could not be run as this account at all, or the name is not
+        one an account may be kept under.
+      OSError: If it cannot be written.
+    """
+    held = backends.serves(one.env, cli)
+    if held is None:
+        raise ValueError(
+            f"{one.cli}/{one.name} is not an account {cli} could be run as"
+        )
+    return add(cli, name or one.name, _as_made(cli, held), held)
+
+
+def _as_made(cli: str, env: Mapping[str, str]) -> str:
+    """What to say a copied account was made by, on the backend it was copied to.
+
+    Args:
+      cli: The backend it is being written down for.
+      env: What a turn under it is run with, under that backend's own names.
+
+    Returns:
+      The name of that backend's own way that asks for exactly these, so that a copied
+      Anthropic key reads as the key way rather than as something nobody recognises -- and
+      variables of your own where it has no such way, which is what these are then.
+    """
+    wanted = set(env)
+    for way in ways(cli):
+        if way.argv:
+            continue  # a way with a command of its own is a login, and this is not one
+        asked = {one.env for one in way.asks if one.keep} | {
+            name for name, _ in way.sets
+        }
+        if asked == wanted:
+            return way.name
+    return ENV.name
 
 
 def find(cli: str, name: str) -> Provider | None:

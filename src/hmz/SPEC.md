@@ -151,6 +151,12 @@ load.
 - The efforts MUST be written down, being that backend's own vocabulary rather than a
   catalogue of things that come and go. A rung the backend takes without documenting MUST be
   written down as one, since no listing of the backend's own will ever name it.
+- Which credentials are the same credential MUST be written down here too, one entry per
+  credential holding every name it goes by. A vendor's key is the vendor's rather than the
+  CLI's -- an Anthropic key is one whether Claude Code, pi, opencode or mimocode holds it --
+  and a CLI that named a vendor's credential after itself named the same thing. Which
+  backends read each of them MUST NOT be written down again: it is already written, as what
+  each backend's ways ask for and what it says it would take an account from.
 
 ## `models.py`
 

@@ -90,6 +90,19 @@ def retrying(
 - It MUST answer no swaps and no variables, so that a turn under it is the turn an agent with
   no account has always taken: nothing added to the environment, nothing taken out of it, no
   path answered by another and no supervisor at all.
+- An account MUST be able to say which other backends could be run as it, and MUST be
+  copyable to one. A vendor's credential is the vendor's rather than the CLI's, so an account
+  made for one backend is often an account several others could be run as -- and making the
+  same key four times by hand is four places to correct when it is rotated. Which backends
+  those are MUST be worked out from what each of them reads rather than written down again.
+- Such a copy MUST be written down under the same name and MUST write over one already there,
+  that being what makes it a way of correcting several at once. It MUST be spelled as the
+  backend it is copied to reads it, and MUST say it was made by that backend's own way where
+  one asks for exactly those and by variables of your own where none does.
+- An account that is not variables at all MUST be copyable nowhere: a subscription signed
+  into writes the CLI's own credential store, in that CLI's own format, and nothing else
+  reads it. So MUST one holding a credential the other backend has no name for -- every part
+  of an account has to travel, or the account does not.
 - Where a turn goes when an account fails MUST be said on the account rather than on the
   agent: it is the account that goes down, and whichever agent was running under one when it
   did is the agent that needs somewhere else to run. It MUST be the name of another account of

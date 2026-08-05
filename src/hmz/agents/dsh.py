@@ -25,7 +25,7 @@ import yaml
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event, Usage, say
+from .event import Event, Failed, Usage, say
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping
@@ -258,9 +258,7 @@ class DshSession(SessionBase):
             raise
         except Exception as why:
             self._shut()
-            refused = subprocess.CalledProcessError(
-                1, ["dsh", session_id], output=answer, stderr=str(why)
-            )
+            refused = Failed(1, ["dsh", session_id], output=answer, stderr=str(why))
             yield self._shows(Event(kind="failed", text=_diagnostic(refused)))
             raise refused from why
         finally:
@@ -299,9 +297,7 @@ class DshSession(SessionBase):
             return
         key = provider.env.get(_API_KEY_ENV, "")
         if provider.way != "key" or not key.strip():
-            raise subprocess.CalledProcessError(
-                1, ["dsh", session_id], output="", stderr=_KEY_REQUIRED
-            )
+            raise Failed(1, ["dsh", session_id], output="", stderr=_KEY_REQUIRED)
 
     def _running(self) -> _Harness:
         """Returns a runtime initialized for this session's current effort."""
@@ -642,7 +638,7 @@ def _failed(
     else:
         detail = error.get("message")
         why = str(detail) if isinstance(detail, str) and detail else json.dumps(held)
-    return subprocess.CalledProcessError(
+    return Failed(
         1,
         ["dsh", session_id],
         output=answer,

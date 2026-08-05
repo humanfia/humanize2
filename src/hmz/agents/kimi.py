@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event, Question, Usage, say
+from .event import Event, Failed, Question, Usage, say
 
 if TYPE_CHECKING:
     import os
@@ -129,7 +129,7 @@ class _AppServer:
                 self._token = listening[2]
                 break
         else:
-            raise subprocess.CalledProcessError(
+            raise Failed(
                 self._proc.wait(), argv, "", f"{argv[0]} stopped without listening"
             )
         # A pipe nobody drains stops the daemon writing to it, so the rest of the log is read
@@ -169,18 +169,16 @@ class _AppServer:
             with urllib.request.urlopen(request, timeout=_CALL_SECONDS) as response:  # noqa: S310
                 said: dict[str, Any] = json.load(response)
         except urllib.error.HTTPError as refused:
-            raise subprocess.CalledProcessError(
+            raise Failed(
                 refused.code, self._argv, "", refused.read().decode(errors="replace")
             ) from refused
         except OSError as unreachable:  # a daemon that died, or a call that timed out
-            raise subprocess.CalledProcessError(
-                1, self._argv, "", str(unreachable)
-            ) from unreachable
+            raise Failed(1, self._argv, "", str(unreachable)) from unreachable
         # A refusal arrives inside a 200: a word steered into a turn that has already ended
         # comes back as `{"code": 40402, "msg": ...}` with the status still OK. Read as an
         # answer, that is a word which never landed reading as one that did.
         if said.get("code"):
-            raise subprocess.CalledProcessError(
+            raise Failed(
                 1, self._argv, "", f"{path}: {said.get('msg') or said['code']}"
             )
         return said.get("data")

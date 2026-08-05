@@ -100,6 +100,13 @@ openai-codex  gpt-nine  272K     128K     yes       yes
 anthropic     opus-ten  200K     64K      yes       yes
 """
 
+#: What `agy models` prints: a slug and the name its own picker shows, two columns a line --
+#: and the slug carries the effort, since it lists a model at three efforts as three models.
+AGY = """gemini-nine-high	Gemini Nine (High)
+gemini-nine-low	Gemini Nine (Low)
+claude-sonnet-nine	Claude Sonnet Nine (Thinking)
+"""
+
 #: What `opencode models` prints, and what `mimo models` prints, which is the same list with
 #: the size of each written after it.
 OPENCODE = "opencode/big-pickle\nopencode/small-pickle\n"
@@ -159,6 +166,7 @@ def seen(at: Path, name: str) -> dict[str, object]:
         ("pi", PI, ["openai-codex/gpt-nine", "anthropic/opus-ten"]),
         ("opencode", OPENCODE, ["opencode/big-pickle", "opencode/small-pickle"]),
         ("mimo", MIMO, ["mimo/mimo-auto", "openai/gpt-nine"]),
+        ("agy", AGY, ["gemini-nine-high", "gemini-nine-low", "claude-sonnet-nine"]),
     ],
 )
 def test_every_backend_is_asked_the_way_that_backend_answers(
@@ -174,6 +182,36 @@ def test_every_backend_is_asked_the_way_that_backend_answers(
     found = models.ask(cli)
 
     assert [model.name for model in found] == wanted
+
+
+def test_an_antigravity_model_takes_the_effort_its_own_name_carries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """It lists one model at three efforts as three models, and refuses a fourth beside them.
+
+    `--model gemini-nine-high --effort low` is `conflicts with --effort=low`, and a model
+    whose name carries no effort is `--effort is not supported for model` -- so the effort is
+    chosen by choosing the model, and the catalogue is what says so.
+    """
+    stands_in(monkeypatch, tmp_path / "bin", "agy", AGY)
+
+    found = {one.name: one.efforts for one in models.ask("agy")}
+
+    assert found["gemini-nine-high"] == ("high",)
+    assert found["gemini-nine-low"] == ("low",)
+    # And one whose name carries none runs at its own level whatever it is asked for.
+    assert found["claude-sonnet-nine"] == named("agy").efforts  # pyright: ignore[reportOptionalMemberAccess]
+
+
+def test_grok_takes_the_efforts_it_says_it_takes() -> None:
+    """The ladder written down is the one its own refusal enumerates.
+
+    `unknown effort level 'max'; use one of: xhigh, high, medium, low` -- said before it does
+    anything else, so a rung it has not got is a turn that never starts.
+    """
+    held = named("grok")
+    assert held is not None
+    assert held.efforts == ("xhigh", "high", "medium", "low")
 
 
 def test_dsh_uses_the_official_adapter_catalogue_without_starting_a_cli(

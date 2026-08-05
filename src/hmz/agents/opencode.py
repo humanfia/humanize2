@@ -13,13 +13,12 @@ the command is called and which of its own variables it takes.
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, CommandSessionBase
 from .config import AgentConfig
-from .event import Event, Usage
+from .event import Event, Failed, Usage
 
 if TYPE_CHECKING:
     import os
@@ -256,9 +255,9 @@ class OpencodeSession(CommandSessionBase):
         """
         said, failed, spent = self._said, self._failed, self._spent
         if failed is not None:
-            raise subprocess.CalledProcessError(1, [type(self).command], said, failed)
+            raise Failed(1, [type(self).command], said, failed)
         if not transcript.strip():
-            raise subprocess.CalledProcessError(
+            raise Failed(
                 1, [type(self).command], "", f"{type(self).command} said nothing at all"
             )
         return Event(

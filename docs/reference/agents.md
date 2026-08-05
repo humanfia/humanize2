@@ -174,6 +174,20 @@ A turn that fails raises `subprocess.CalledProcessError` — whatever it was act
 through, so a flow catches turns rather than transports — and leaves the session unopened, so
 the next call retries the turn rather than resuming something that may not exist.
 
+It says **why**, which a bare `CalledProcessError` does not:
+
+```console
+Command '['mimo']' returned non-zero exit status 1. MiMo free API service has ended.
+    Sign in or configure a third-party API.
+```
+
+Most of what stops a turn is about the account rather than about humanize — a model this
+account may not name, a region a snapshot is not served in, a subscription that has lapsed, a
+key that is not there — and each of those is one sentence the CLI already writes. Both streams
+are said where they say different things, since a CLI may warn on one and fail on the other,
+and each is clipped: the sentence it failed with is worth having and the transcript it failed
+part way through is not.
+
 `suppress=True` turns a failed turn into an empty answer:
 
 ```python

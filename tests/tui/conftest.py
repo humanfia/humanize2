@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 import hmz.tui.app
+import hmz.tui.pick
 from hmz.tui.pick import Flows
 
 if TYPE_CHECKING:
@@ -35,6 +36,10 @@ def _elsewhere(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(hmz.tui.app, "installed", dict)
     monkeypatch.setattr(hmz.tui.app, "installable", dict)
+    # The sheets ask too -- which of the backends an account could also be run as are worth
+    # ticking is which of them are here -- and a suite that read the developer's own PATH
+    # would pass on their machine and fail on the next one.
+    monkeypatch.setattr(hmz.tui.pick, "installed", dict)
 
 
 @pytest.fixture(autouse=True)

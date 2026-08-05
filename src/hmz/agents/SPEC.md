@@ -345,7 +345,14 @@ class SessionBase(ABC):
   backend that cannot start in it.
 - MUST add a session to its agent's `opened` as it opens, and never for a turn that failed.
 - A turn that fails MUST raise `subprocess.CalledProcessError`, whatever it was run through, so
-  that a flow catches turns rather than transports.
+  that a flow catches turns rather than transports. What it says MUST include why: a
+  `CalledProcessError` says only `returned non-zero exit status 1` and keeps the reason in a
+  field nothing prints, and the reason is the whole of what is worth reading -- `that model is
+  not available for your account`, `the free service has ended`, `no credential`. Both streams
+  MUST be said where they say different things, a CLI that warns on one and fails on the other
+  being otherwise reported by the half that does not matter, and each MUST be clipped: the
+  sentence a turn failed with is worth having and the transcript it failed part way through is
+  not.
 - `pursue` MUST be the backend's own goal feature -- the one its `/goal` command reaches -- and
   MUST NOT fall back to asking for one in the prompt, which is a prompt and not a goal. It MUST
   raise `NotImplementedError` on a backend that has none, rather than running the objective as

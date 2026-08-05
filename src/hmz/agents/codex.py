@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event, Question, Usage, say
+from .event import Event, Failed, Question, Usage, say
 from .hooks import EVERYWHERE, Moment, Occasion
 
 if TYPE_CHECKING:
@@ -468,7 +468,7 @@ class _AppServer:
             finally:
                 running.turn = None
             if failed is not None:
-                raise subprocess.CalledProcessError(1, self._argv, said, failed)
+                raise Failed(1, self._argv, said, failed)
             # What the turn cost is the rise across it, charged to the model it ran on: the
             # server counts the thread, and a thread is every turn this session has taken.
             spent = sum((self._counted.get(thread) or Counter()).values()) - sum(
@@ -533,7 +533,7 @@ class _AppServer:
                 self._proc.stdin.write(json.dumps(message) + "\n")
                 self._proc.stdin.flush()
         except OSError as gone:
-            raise subprocess.CalledProcessError(1, self._argv, "", str(gone)) from gone
+            raise Failed(1, self._argv, "", str(gone)) from gone
 
     def _pump(self) -> None:
         """Reads the server's whole stream, teeing the agent's words to ours as they arrive."""
@@ -688,7 +688,7 @@ class _AppServer:
             return None
         if message is None:
             self._messages.put(None)  # so that every later read finds it stopped too
-            raise subprocess.CalledProcessError(
+            raise Failed(
                 self._proc.wait(), self._argv, "", "app server stopped mid-turn"
             )
         return message
@@ -707,9 +707,7 @@ class _AppServer:
           subprocess.CalledProcessError: If the server sent an error instead.
         """
         if (refused := message.get("error")) is not None:
-            raise subprocess.CalledProcessError(
-                1, self._argv, said, json.dumps(refused)
-            )
+            raise Failed(1, self._argv, said, json.dumps(refused))
         return message.get("result")
 
 

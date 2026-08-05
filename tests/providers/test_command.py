@@ -448,3 +448,68 @@ def test_the_machines_own_account_is_not_one_to_make_or_take_away(
             run(doing, "claude/")
         assert stopped.value.code == 2
         assert "is not CLI/NAME" in capsys.readouterr().err
+
+
+def test_an_account_several_backends_could_run_says_so_when_it_is_made(
+    house: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Said rather than done: a line that did not ask is how somebody finds out it is a thing."""
+    del house
+    assert run(*MINE, "--no-login") == 0
+
+    said = capsys.readouterr().out
+    assert "it could also run pi, opencode, mimo" in said
+    assert "--also" in said
+    assert providers.find("pi", "mine") is None  # said, and nothing written
+
+
+def test_one_line_writes_an_account_down_for_every_backend_that_could_run_it(
+    house: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """One configuration, several CLIs: which is what having the same key four times was."""
+    del house
+    assert run(*MINE, "--no-login", "--also", "all") == 0
+
+    for cli_name in ("pi", "opencode", "mimo"):
+        held = providers.find(cli_name, "mine")
+        assert held is not None
+        assert dict(held.env) == {"ANTHROPIC_API_KEY": KEY}
+    said = capsys.readouterr().out
+    assert KEY not in said  # never a value, wherever it is printed
+    assert "pi/mine is written down" in said
+
+
+def test_the_backends_to_write_it_down_for_may_be_named(
+    house: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    del house
+    assert run(*MINE, "--no-login", "--also", "opencode") == 0
+
+    assert providers.find("opencode", "mine") is not None
+    assert providers.find("pi", "mine") is None
+    assert capsys.readouterr().out.count("is written down") == 2
+
+
+def test_a_backend_that_could_not_run_it_is_a_line_to_correct(
+    house: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Rather than a copy skipped quietly: the line asked for something that cannot happen."""
+    del house
+    assert run(*MINE, "--no-login", "--also", "codex") == 1
+
+    assert "not an account codex could be run as" in capsys.readouterr().err
+    assert providers.find("codex", "mine") is None
+
+
+def test_what_else_an_account_could_run_is_shown_where_it_is_read(
+    house: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    del house
+    run(*MINE, "--no-login")
+    capsys.readouterr()
+
+    assert run("show", "claude/mine") == 0
+
+    said = capsys.readouterr().out
+    assert "also runs   pi" in said
+    assert "also runs   opencode" in said

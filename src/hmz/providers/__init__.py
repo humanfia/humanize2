@@ -27,6 +27,7 @@ from .store import (
     add,
     alone,
     chain,
+    copies,
     env_of,
     environ,
     filled,
@@ -36,6 +37,7 @@ from .store import (
     ready,
     remove,
     retrying,
+    serves,
     ways,
     where,
 )
@@ -47,6 +49,7 @@ __all__ = [
     "add",
     "alone",
     "chain",
+    "copies",
     "env_of",
     "environ",
     "filled",
@@ -57,6 +60,7 @@ __all__ = [
     "remove",
     "retry",
     "retrying",
+    "serves",
     "ways",
     "where",
 ]

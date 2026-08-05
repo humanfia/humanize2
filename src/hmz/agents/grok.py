@@ -13,13 +13,12 @@ a piped stdin as the prompt, and the two other ways it offers are a JSON literal
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, CommandSessionBase
 from .config import AgentConfig
-from .event import Event, Usage
+from .event import Event, Failed, Usage
 
 if TYPE_CHECKING:
     import os
@@ -195,11 +194,9 @@ class GrokBuildSession(CommandSessionBase):
         """
         said = "".join(self._said)
         if self._failed is not None:
-            raise subprocess.CalledProcessError(1, [_COMMAND], said, self._failed)
+            raise Failed(1, [_COMMAND], said, self._failed)
         if not transcript.strip():
-            raise subprocess.CalledProcessError(
-                1, [_COMMAND], "", f"{_COMMAND} said nothing at all"
-            )
+            raise Failed(1, [_COMMAND], "", f"{_COMMAND} said nothing at all")
         spent = int(self._costing.total)
         return Event(
             kind="result",

@@ -462,8 +462,10 @@ def _agy(profile: Profile, run: Callable[..., str]) -> list[Model]:
       run: What puts the question.
 
     Returns:
-      One per model it offers, at its own reasoning levels, which it says of itself rather
-      than of each model.
+      One per model it offers, each at the one effort its own name carries -- it lists
+      `gemini-3.7-flash-high`, `-medium` and `-low` as three models rather than as one model
+      at three efforts. A model whose name carries none is offered at the whole ladder, being
+      one that runs at its own level however hard it is asked to think.
     """
     found: list[Model] = []
     for line in run(["models"]).splitlines():
@@ -471,7 +473,13 @@ def _agy(profile: Profile, run: Callable[..., str]) -> list[Model]:
         # A line with nothing on it, and the line that says to sign in, are not models.
         if not columns or len(columns) < 2:  # noqa: PLR2004
             continue
-        found.append(Model(columns[0], profile.efforts, profile.swarms))
+        name = columns[0]
+        carried = next(
+            (rung for rung in profile.efforts if name.endswith(f"-{rung}")), ""
+        )
+        found.append(
+            Model(name, (carried,) if carried else profile.efforts, profile.swarms)
+        )
     return found
 
 

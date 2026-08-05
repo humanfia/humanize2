@@ -762,7 +762,9 @@ def test_agy_is_one_run_per_turn_resuming_the_conversation_it_opened(
 
     opened, again = stubs.calls()
     assert "--print" in opened.argv
-    assert opened.argv[opened.argv.index("--effort") + 1] == "high"
+    # And no `--effort`: how hard to think is part of the model here, and Antigravity
+    # refuses the flag beside every model it lists.
+    assert "--effort" not in opened.argv
     assert "--dangerously-skip-permissions" in opened.argv
     assert "--conversation" not in opened.argv
     assert again.argv[again.argv.index("--conversation") + 1] == session.id

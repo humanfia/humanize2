@@ -28,6 +28,7 @@ from hmz.tui.app import _HELP, _OWN, Editor, _where
 from hmz.tui.pick import (
     Accounts,
     Agent,
+    Alike,
     Catalogue,
     Clis,
     Confirms,
@@ -1694,6 +1695,12 @@ async def test_deepseek_has_only_api_key_login_after_switching_from_kimi(
         form.post_message(events.Paste("test-key\n"))
         await driver.pause()
         await driver.press("enter")
+
+        # A DeepSeek key is a DeepSeek key wherever it is held, so it is asked which other
+        # backends to write it down for as well. Not what this is about: esc copies it
+        # nowhere.
+        await until(lambda: isinstance(app.screen, Alike), driver)
+        await driver.press("escape")
 
         # Making one here is choosing it, so what comes back is the agent with it on.
         await until(lambda: isinstance(app.screen, Agent), driver)

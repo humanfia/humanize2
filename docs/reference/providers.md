@@ -267,6 +267,39 @@ into last under each CLI's heading. **a** makes one and **d** twice takes it awa
 opens what else can be done to the one under the cursor — correct what it holds, sign it in
 again, say what it falls back to, say how a failed turn under it is tried again.
 
+## One account, several CLIs
+
+A vendor's credential is the vendor's rather than the CLI's. An Anthropic key is an Anthropic
+key whether Claude Code, pi, opencode or mimocode is holding it, and a Claude subscription
+token is one under whatever name each of them reads it under — so an account made for one
+backend is often an account several others could be run as.
+
+```console
+$ hmz providers add claude/work -w key -s ANTHROPIC_API_KEY=sk-… --no-login
+claude/work is written down at ~/.humanize/providers/claude/work
+it could also run pi, opencode, mimo; `--also` writes it down for them
+
+$ hmz providers add claude/work -w key -s ANTHROPIC_API_KEY=sk-… --no-login --also all
+claude/work is written down at ~/.humanize/providers/claude/work
+pi/work is written down at ~/.humanize/providers/pi/work
+opencode/work is written down at ~/.humanize/providers/opencode/work
+mimo/work is written down at ~/.humanize/providers/mimo/work
+```
+
+`--also` takes the backends by name, comma separated, or `all` for every one that could be run
+as it. A copy is written down **under the same name**, spelled as that backend reads it — a
+Claude subscription token lands on pi as `ANTHROPIC_OAUTH_TOKEN` — and **over one already
+there**, which is what makes this a way of rotating a key everywhere at once rather than in
+four places.
+
+In the interface it is a question rather than a flag: making an account that several backends
+could be run as asks which of them to write it down for, with the ones installed here already
+ticked. Correcting one asks the same, and holds it with the correction until the menu is saved.
+
+What travels is variables. An account that is a subscription signed into is the CLI's own
+credential store in that CLI's own format, and nothing else reads it — so it is copyable
+nowhere, and neither is one holding a credential the other backend has no name for.
+
 ## When an account goes down
 
 An account says what happens when it is the one that fails, and both halves are written down

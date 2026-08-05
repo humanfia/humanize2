@@ -57,6 +57,24 @@ def _under(app: Humanize) -> str:
     return str(app.screen.query_one("#tuning", Label).content)
 
 
+async def _no_copies(app: Humanize, driver: Pilot[None]) -> None:
+    """Walks past the question of which other backends to write the new account down for.
+
+    An account several CLIs could be run as is asked about at the moment it is made, so every
+    walk that makes one of those goes through it. Escape copies it nowhere, which is what a
+    test about something else wants.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+    """
+    from hmz.tui.pick import Alike
+
+    await until(lambda: isinstance(app.screen, Alike), driver)
+    await driver.press("escape")
+    await until(lambda: not isinstance(app.screen, Alike), driver)
+
+
 async def _doing(app: Humanize, driver: Pilot[None], held: str) -> None:
     """Opens what there is to do with the account under the cursor, and picks one of them.
 
@@ -256,6 +274,7 @@ async def test_a_secret_is_never_drawn_back(signed_in: unittest.mock.MagicMock) 
         assert any("•" * len("sk-secret") in row for row in rows)
 
         await driver.press("enter")
+        await _no_copies(app, driver)
         await until(lambda: isinstance(app.screen, Providers), driver)
         await driver.press("escape")
         await until(lambda: not isinstance(app.screen, Providers), driver)
@@ -435,6 +454,7 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
         await driver.press("down")
         await driver.press(*"not-a-key")
         await driver.press("enter")
+        await _no_copies(app, driver)
 
         # Back to the agent, with the account made and given to it: making one here is
         # choosing it, so the row it was asked from is answered.
@@ -670,6 +690,7 @@ async def test_correcting_what_one_holds_is_held_until_the_menu_is_saved() -> No
 
         await driver.press(*"new")
         await driver.press("enter")
+        await _no_copies(app, driver)
         await until(lambda: isinstance(app.screen, Providers), driver)
         await until(
             lambda: "is corrected when this menu is saved" in _under(app), driver
@@ -1014,3 +1035,128 @@ async def test_a_cli_of_your_own_is_written_down_where_the_cli_is_asked_for() ->
         await until(lambda: not isinstance(app.screen, Providers), driver)
 
     assert backends.speaking()["my-agent"] == ("my-agent", "--acp")
+
+
+@pytest.mark.timeout(60)
+async def test_an_account_several_backends_could_run_asks_which_to_write_it_down_for() -> (
+    None
+):
+    """One configuration, several CLIs: an Anthropic key is an Anthropic key.
+
+    Asked at the moment the account exists, since making the same key four times by hand is
+    four places to correct when it is rotated.
+    """
+    from hmz.tui.pick import Alike
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+
+        await driver.press("a")
+        await until(lambda: isinstance(app.screen, Backends), driver)
+        await onto(app, driver, "claude")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Ways), driver)
+        await onto(app, driver, "key")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        await driver.press(*"shared")
+        await driver.press("down")
+        await driver.press(*"sk-shared")
+        await driver.press("enter")
+
+        # And then the question this is about: which of the others hold it too.
+        await until(lambda: isinstance(app.screen, Alike), driver)
+        assert rows(app) == ["pi", "opencode", "mimo"]
+        # Nothing is installed in this suite, so nothing starts switched on.
+        await onto(app, driver, "opencode")
+        await driver.press("right")
+        await driver.press("enter")
+
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(lambda: "runs opencode too" in _under(app), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    held = providers.find("opencode", "shared")
+    assert held is not None
+    assert dict(held.env) == {"ANTHROPIC_API_KEY": "sk-shared"}
+    # And only the one that was switched on.
+    assert providers.find("pi", "shared") is None
+
+
+@pytest.mark.timeout(60)
+async def test_correcting_one_corrects_the_copies_it_was_made_for() -> None:
+    """Which is the point of copying it: a key rotated is a key rotated everywhere, said once."""
+    from hmz.tui.pick import Alike
+
+    one = providers.add("claude", "shared", "key", {"ANTHROPIC_API_KEY": "old"})
+    providers.copies(one, "opencode")
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        await onto(app, driver, "claude/shared")
+
+        await _doing(app, driver, "corrects")
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        await driver.press(*"new")
+        await driver.press("enter")
+
+        await until(lambda: isinstance(app.screen, Alike), driver)
+        await onto(app, driver, "opencode")
+        await driver.press("space")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        # Held until the menu is saved, as every other correction is.
+        held = providers.find("opencode", "shared")
+        assert held is not None
+        assert dict(held.env) == {"ANTHROPIC_API_KEY": "old"}
+
+        await keeps(app, driver)
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    for cli_name in ("claude", "opencode"):
+        rotated = providers.find(cli_name, "shared")
+        assert rotated is not None
+        assert dict(rotated.env) == {"ANTHROPIC_API_KEY": "new"}
+
+
+@pytest.mark.timeout(60)
+async def test_an_account_that_travels_nowhere_is_not_asked_about() -> None:
+    """A sheet with nothing on it is not a question, so a subscription is never asked."""
+    from hmz.tui.pick import Alike
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("a")
+        await until(lambda: isinstance(app.screen, Backends), driver)
+        await onto(app, driver, "dsh")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Ways), driver)
+        await driver.press("enter")  # its one way: a key
+        await until(lambda: isinstance(app.screen, Signing), driver)
+        await driver.press(*"only")
+        await driver.press("down")
+        await driver.press(*"sk-only")
+        await driver.press("enter")
+
+        # DeepSeek's key is read by pi and opencode, so that one is asked about; a
+        # subscription is not. Walk out of it, which copies it nowhere.
+        await until(lambda: isinstance(app.screen, Alike), driver)
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    assert providers.find("dsh", "only") is not None
+    assert providers.find("pi", "only") is None

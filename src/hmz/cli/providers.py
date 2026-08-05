@@ -59,6 +59,13 @@ def providers(argv: list[str]) -> int:
         action="store_true",
         help="write it down without running the backend's own way in",
     )
+    making.add_argument(
+        "--also",
+        metavar="CLI[,CLI...]",
+        default="",
+        help="write the same account down for these backends too, under the same name, "
+        "over one already there; `all` for every backend it could be run as",
+    )
 
     again = doing.add_parser("login", help="sign an existing one in again")
     again.add_argument("provider", metavar="CLI/NAME")
@@ -148,7 +155,14 @@ def providers(argv: list[str]) -> int:
     if args.doing == "remove":
         return _remove(cli, name)
     if args.doing == "add":
-        return _add(cli, name, args.way, args.given, login=not args.no_login)
+        return _add(
+            cli,
+            name,
+            args.way,
+            args.given,
+            login=not args.no_login,
+            also=args.also,
+        )
     if args.doing == "falls-back":
         return _falls_back(cli, name, args.at)
     if args.doing == "retry":
@@ -330,7 +344,54 @@ def _show(cli: str, name: str) -> int:
         print(f"adds        {one}")
     for named, instead in provider.swaps():
         print(f"answers     {named} -> {instead}")
+    for backend in held.serves(provider):
+        # What else this account is: a vendor's credential is the vendor's, and an account
+        # that several backends could be run as is worth saying so about where it is read.
+        print(f"also runs   {backend}")
     return 0
+
+
+def _copies(provider: Provider, also: str) -> int:
+    """Writes one account down for the other backends it could be run as, where asked.
+
+    A vendor's credential is the vendor's rather than the CLI's, so an account made for one
+    backend is often an account several others could be run as -- and making the same key
+    four times by hand is four places to correct when it is rotated.
+
+    Args:
+      provider: The account just made.
+      also: What the line asked for: backends by name, comma separated, or `all` for every
+        one it could be run as, or "" for none.
+
+    Returns:
+      Zero, or one for a backend named that this account could not be run as -- which is a
+      line to correct rather than a copy to skip quietly.
+    """
+    from hmz import providers as held
+
+    among = held.serves(provider)
+    if not also:
+        if among:
+            # Said rather than done: a line that did not ask for it gets a line saying it
+            # could have, which is how somebody finds out this is a thing at all.
+            print(
+                f"it could also run {', '.join(among)}; `--also` writes it down for them"
+            )
+        return 0
+    wanted = among if also.strip() == "all" else _backends(also)
+    for backend in wanted:
+        try:
+            copied = held.copies(provider, backend)
+        except (ValueError, OSError) as why:
+            print(f"hmz: {why}", file=sys.stderr)
+            return 1
+        print(f"{copied.cli}/{copied.name} is written down at {copied.at}")
+    return 0
+
+
+def _backends(said: str) -> tuple[str, ...]:
+    """The backends one `--also` named, in the order they were named."""
+    return tuple(one.strip() for one in said.split(",") if one.strip())
 
 
 def _remove(cli: str, name: str) -> int:
@@ -349,7 +410,15 @@ def _remove(cli: str, name: str) -> int:
     return 0
 
 
-def _add(cli: str, name: str, way: str, given: list[str], *, login: bool) -> int:
+def _add(
+    cli: str,
+    name: str,
+    way: str,
+    given: list[str],
+    *,
+    login: bool,
+    also: str = "",
+) -> int:
     """Makes a provider, asking for whatever its way still needs, and signs it in."""
     from hmz import providers as held
     from hmz.providers import login as signing
@@ -386,6 +455,9 @@ def _add(cli: str, name: str, way: str, given: list[str], *, login: bool) -> int
         print(f"hmz: {why}", file=sys.stderr)
         return 1
     print(f"{provider.cli}/{provider.name} is written down at {provider.at}")
+    status = _copies(provider, also)
+    if status:
+        return status
     if not login:
         # A line that says not to run the backend's own way in is a line that says not to
         # start the backend: asking it what it runs would be starting it. What it runs is

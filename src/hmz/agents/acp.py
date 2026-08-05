@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event
+from .event import Event, Failed
 
 if TYPE_CHECKING:
     import os
@@ -284,10 +284,10 @@ class AcpSession(SessionBase):
             )
         except _Stopped as gone:
             link.stop()
-            raise subprocess.CalledProcessError(1, argv, "", str(gone)) from gone
+            raise Failed(1, argv, "", str(gone)) from gone
         except ValueError as refused:
             link.stop()
-            raise subprocess.CalledProcessError(1, argv, "", str(refused)) from refused
+            raise Failed(1, argv, "", str(refused)) from refused
         self._adopt(str(opened.get("sessionId") or ""))
         self._link = link
         return link
@@ -449,11 +449,11 @@ class AcpSession(SessionBase):
         except _Stopped as gone:
             link.stop()
             self._link = None
-            raise subprocess.CalledProcessError(
+            raise Failed(
                 1, list(cast("AcpAgent", self._agent).command), "".join(said), str(gone)
             ) from gone
         if isinstance(answered, Exception):
-            raise subprocess.CalledProcessError(
+            raise Failed(
                 1,
                 list(cast("AcpAgent", self._agent).command),
                 "".join(said),
@@ -461,7 +461,7 @@ class AcpSession(SessionBase):
             )
         why = str(cast("dict[str, Any]", answered).get("stopReason") or "")
         if why not in _ANSWERED:
-            raise subprocess.CalledProcessError(
+            raise Failed(
                 1,
                 list(cast("AcpAgent", self._agent).command),
                 "".join(said),

@@ -381,6 +381,15 @@ adjusted rather than chosen.
   NOT be offered for it, with the reason said where they would have been, and taking it away
   MUST say why there is nothing to do rather than doing nothing: humanize did not make that
   account and keeps no credentials for it.
+- An account several backends could be run as MUST be asked, at the moment it is made and at
+  the moment it is corrected, which of them to write it down for as well. It is one question
+  about one account rather than a walk of its own, so it MUST be one sheet of switches, and
+  the ones installed here MUST start on -- those are the ones an agent could be run on
+  tomorrow. An account that could run nothing else MUST NOT be asked about at all: a sheet
+  with nothing on it is not a question.
+- What is copied while an account is being corrected MUST be held until the menu is saved, as
+  the correction itself is: correcting one is usually a key being rotated, and the copies are
+  the other places that key is.
 - Where an account falls back to MUST be chosen from that CLI's own other accounts, and MUST
   offer the end of the line first: each account naming the next is what makes a chain, and an
   account cannot fall back to itself.

@@ -54,7 +54,7 @@ from hmz.backends import named
 from hmz.kept import Kept, Runs
 from hmz.telemetry import KEPT, SAYS, SENT
 
-from .discover import machines
+from .discover import installed, machines
 from .monitor import short, thousands
 from .selecting import Choices
 
@@ -78,6 +78,7 @@ __all__ = [
     "Account",
     "Accounts",
     "Agent",
+    "Alike",
     "Anchors",
     "Backends",
     "Catalogue",
@@ -855,8 +856,16 @@ def opens_on(
         if found:
             # Not the hardest effort, which is where the cursor starts: that is the one to
             # reach for, and this is the one to spend before anybody has asked for anything.
-            # `high` is an effort every model of every backend here takes.
-            return [Runs(f"{backend}/{found[0].name}:high", goals=goals)]
+            # `high` where the model takes it, which is nearly always -- and the least it
+            # does take otherwise, since a model that is offered at three efforts and run at
+            # a fourth is a turn its backend refuses before it starts.
+            one = found[0]
+            # And no effort at all for a model that takes none, which is what a backend
+            # whose models carry their own effort in their names says of the rest of them.
+            effort = "high" if "high" in one.efforts else ""
+            if not effort and one.efforts:
+                effort = one.efforts[-1]
+            return [Runs(f"{backend}/{one.name}:{effort}", goals=goals)]
     return []
 
 
@@ -3244,6 +3253,160 @@ def _installing(backend: str) -> str:
     return f"DeepSeek Harness is not installed; run: {command}; then reopen hmz"
 
 
+class Alike(Sheet[tuple[str, ...]]):
+    """Which other CLIs to write one account down for as well.
+
+    A vendor's credential is the vendor's rather than the CLI's: an Anthropic key is an
+    Anthropic key whether Claude Code, pi, opencode or mimocode is holding it. So an account
+    just made is often an account several other backends could be run as, and this is the
+    moment to say so -- making the same key four times by hand is four places to correct when
+    it is rotated.
+
+    A form of switches rather than a list to pick from: it asks about all of them at once.
+    The ones installed here start on, since those are the ones an agent could be run on
+    tomorrow; the rest are listed and off, an account being worth writing down before the CLI
+    that will use it is on this machine.
+    """
+
+    LETTERS: ClassVar = frozenset()
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        # Enter is the whole form rather than the row under the cursor, as it is on every
+        # other sheet here that is written into rather than picked from.
+        Binding("enter", "done", "done", priority=True),
+        Binding("space", "flip", "turn one on or off", priority=True),
+        Binding("left", "off", "off", priority=True),
+        Binding("right", "on", "on", priority=True),
+    ]
+
+    def __init__(self, one: Provider, among: Sequence[str]) -> None:
+        """Asks about one account.
+
+        Args:
+          one: The account that has just been made or corrected.
+          among: The other backends it could be run as, in the order to show them.
+        """
+        super().__init__()
+        self._one = one
+        self._among = list(among)
+        here = installed()
+        self._on = {cli for cli in self._among if cli in here}
+
+    def _ask(self) -> None:
+        """Says what this is, and puts the backends up."""
+        self.query_one("#asked", Label).update(
+            f"{self._one.cli}/{self._one.name} runs more than {self._one.cli}"
+        )
+        self.query_one("#about", Label).update(
+            "What this account holds is the vendor's rather than the CLI's, so these "
+            "backends could each be run as it. Copying it writes the same account down for "
+            "them under the same name, over one already there -- which is how a key rotated "
+            "is a key rotated everywhere at once."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _fill(self) -> None:
+        """Puts the backends up, each with its switch."""
+        listing = self.query_one("#choices", OptionList)
+        self._counting = len(str(max(len(self._among), 1)))
+        at = min(listing.highlighted or 0, max(len(self._among) - 1, 0))
+        here = installed()
+        listing.set_options(
+            Option(
+                self._row(
+                    seen,
+                    cli,
+                    "installed here" if cli in here else "not installed here yet",
+                    here=seen == at,
+                    inforce=False,
+                    box="[x]" if cli in self._on else "[ ]",
+                ),
+                id=f"={cli}",
+            )
+            for seen, cli in enumerate(self._among)
+        )
+        listing.highlighted = at if self._among else None
+        self._drawn = at
+        self.query_one("#tuning", Label).update("")
+        self.query_one("#keys", Label).update(
+            "Space or the arrows turn one on and off · Enter copies it to the ones on · "
+            "Esc copies it to none"
+        )
+
+    def action_flip(self) -> None:
+        """Turns the one under the cursor round."""
+        self._steps()
+
+    def action_on(self) -> None:
+        """Turns it on."""
+        self._steps(onto=True)
+
+    def action_off(self) -> None:
+        """Turns it off."""
+        self._steps(onto=False)
+
+    def _steps(self, *, onto: bool | None = None) -> None:
+        """Sets the switch under the cursor.
+
+        Args:
+          onto: What to set it to, or None to turn it round.
+        """
+        listing = self.query_one("#choices", OptionList)
+        at = listing.highlighted
+        if at is None or not 0 <= at < len(self._among):
+            return
+        cli = self._among[at]
+        wanted = (cli not in self._on) if onto is None else onto
+        if wanted:
+            self._on.add(cli)
+        else:
+            self._on.discard(cli)
+        self._fill()
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Answers with everything switched on, enter being the whole form.
+
+        Args:
+          event: What was chosen, which is unread: the row is not what this asks about.
+        """
+        del event
+        self.action_done()
+
+    def action_done(self) -> None:
+        """Answers with the backends to copy this account to, in the order they were shown."""
+        self.dismiss(tuple(cli for cli in self._among if cli in self._on))
+
+
+async def also(host: App[None], one: Provider) -> tuple[str, ...]:
+    """Asks which other backends to write one account down for, and writes it down for them.
+
+    Args:
+      host: The interface, which is what the sheet is pushed onto.
+      one: The account.
+
+    Returns:
+      What it was copied to, and nothing at all where it could run nothing else, where the
+      question was walked out of, or where every copy failed.
+    """
+    from hmz import providers
+
+    among = providers.serves(one)
+    if not among:
+        return ()
+    said = await host.push_screen_wait(Alike(one, among))
+    copied: list[str] = []
+    for cli in said or ():
+        try:
+            providers.copies(one, cli)
+        except (OSError, ValueError):
+            continue  # a backend that will not take it is one it is not copied to
+        copied.append(cli)
+    return tuple(copied)
+
+
 class Made(NamedTuple):
     """What making an account came to.
 
@@ -3258,6 +3421,8 @@ class Made(NamedTuple):
         landed. Zero for one that was never got as far as asking, and for one whose CLI would
         not say -- which is not an account that cannot be used, only one whose models have to
         be asked for again before there are any to choose from.
+      copied: The other backends this account was written down for as well, which is nothing
+        for one that could run nothing else and for one nobody asked to copy.
     """
 
     provider: Provider | None = None
@@ -3265,6 +3430,7 @@ class Made(NamedTuple):
     why: str = ""
     way_runs: bool = False
     runs: int = 0
+    copied: tuple[str, ...] = ()
 
 
 async def made(host: App[None], cli: str, *, whose: str = "") -> Made:
@@ -3308,7 +3474,13 @@ async def made(host: App[None], cli: str, *, whose: str = "") -> Made:
     except (ValueError, OSError) as why:  # a name or a directory that will not do
         return Made(why=str(why))
     if not way.argv:
-        return Made(provider=provider, runs=await asks(cli, provider.name))
+        return Made(
+            provider=provider,
+            runs=await asks(cli, provider.name),
+            # And, for an account several backends could be run as, which of them to write
+            # it down for too -- asked here because this is the moment it exists.
+            copied=await also(host, provider),
+        )
     # A login is a browser opened, a code read out, a token exchanged: it owns the screen
     # while it runs, and there is nothing for an interface to draw over it.
     with handed_over(host):
@@ -3320,6 +3492,7 @@ async def made(host: App[None], cli: str, *, whose: str = "") -> Made:
         # An account whose way in exited badly has nothing to say about what it runs, and
         # asking it would only be a second way of finding that out.
         runs=0 if status else await asks(cli, provider.name),
+        copied=() if status else await also(host, provider),
     )
 
 
@@ -4310,7 +4483,9 @@ class Agent(Drafts[Fitted]):
         Returns:
           The efforts, or the one this agent is already at for a model the CLI has not
           described -- an agent read back off a file names a model whose catalogue may not
-          have been fetched yet, and its effort is still the effort it runs at.
+          have been fetched yet, and its effort is still the effort it runs at. A model whose
+          own name carries its effort -- Antigravity lists `gemini-3.7-flash-low` -- says so
+          by offering that one and no other.
         """
         model = self._under_model()
         if model is not None and model.efforts:
@@ -5255,6 +5430,10 @@ class Providers(Drafts[list[str]]):
         self._tries: dict[str, tuple[int, str, float]] = {}
         #: What each corrected one is to hold, by `cli/name`.
         self._edits: dict[str, dict[str, str]] = {}
+        #: Which other backends each corrected one is to be written down for as well, by
+        #: `cli/name`: an account that several CLIs can be run as is corrected for all of
+        #: them at once, which is the point of having copied it in the first place.
+        self._alike: dict[str, tuple[str, ...]] = {}
         #: Which account the cursor is on, as `cli/name`: the headings between them are rows
         #: nothing can land on, so a row number is not an account.
         self._was = ""
@@ -5548,6 +5727,9 @@ class Providers(Drafts[list[str]]):
         Args:
           one: The account.
         """
+        from dataclasses import replace
+
+        from hmz import providers
         from hmz.providers import login as signing
 
         if not one.name:
@@ -5568,8 +5750,21 @@ class Providers(Drafts[list[str]]):
         )
         if signs is None:
             return  # walked out, which corrects nothing
-        self._edits[self._named(one)] = signs.answers
-        self._said = f"{escape(self._named(one))} is corrected when this menu is saved"
+        named = self._named(one)
+        self._edits[named] = signs.answers
+        # And which other backends are to hold what it now holds, asked of the account as it
+        # is being corrected rather than as it was: a key rotated is a key rotated everywhere
+        # it was copied to, which is what correcting one is usually for.
+        corrected = replace(one, env=signs.answers)
+        among = providers.serves(corrected)
+        self._alike.pop(named, None)
+        if among:
+            chosen = await showing.push_screen_wait(Alike(corrected, among))
+            if chosen:
+                self._alike[named] = tuple(chosen)
+        self._said = f"{escape(named)} is corrected when this menu is saved"
+        if self._alike.get(named):
+            self._said += f", for {escape(', '.join(self._alike[named]))} as well"
         self.changed()
         self._fill()
 
@@ -5620,7 +5815,14 @@ class Providers(Drafts[list[str]]):
             )
         elif outcome.status:
             self._told.append(f"hmz: signing it in exited {outcome.status}")
+        if outcome.copied:
+            self._told.append(
+                f"[dim]{escape(one.name)} is written down for "
+                f"{escape(', '.join(outcome.copied))} too[/dim]"
+            )
         self._said = self._landed(one, outcome.status, runs=outcome.runs)
+        if outcome.copied:
+            self._said += f"{_DOT}and runs {escape(', '.join(outcome.copied))} too"
         self._read()
         self._was = self._named(one)
         self._fill()
@@ -5758,11 +5960,20 @@ class Providers(Drafts[list[str]]):
                 continue  # gone above, so there is nothing to correct or point anywhere
             if (answers := self._edits.get(named)) is not None:
                 try:
-                    providers.add(one.cli, one.name, one.way, answers)
+                    corrected = providers.add(one.cli, one.name, one.way, answers)
                 except (OSError, ValueError) as why:
                     told.append(f"hmz: {escape(str(why))}")
                     continue
                 told.append(f"[dim]{escape(named)} is corrected[/dim]")
+                for cli in self._alike.get(named, ()):
+                    try:
+                        providers.copies(corrected, cli)
+                    except (OSError, ValueError) as why:
+                        told.append(f"hmz: {escape(str(why))}")
+                        continue
+                    told.append(
+                        f"[dim]{escape(cli)}/{escape(one.name)} is corrected with it[/dim]"
+                    )
             if (falls := self._chains.get(named)) is not None:
                 try:
                     providers.points(one.cli, one.name, falls)

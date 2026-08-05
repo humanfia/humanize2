@@ -24,19 +24,22 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 __all__ = [
+    "ALIKE",
     "PROFILES",
     "Asked",
     "Model",
     "Profile",
     "Way",
+    "alike",
     "forget",
     "named",
     "profiles",
     "read",
     "remember",
+    "serves",
     "speaking",
 ]
 
@@ -269,10 +272,11 @@ _PI = ("max", "xhigh", "high", "medium", "low", "minimal", "off")
 #: What the official DeepSeek adapter in DeepSeek Harness calls its reasoning levels.
 _DSH = ("max", "high", "off")
 
-#: What Grok Build calls its reasoning levels, hardest first. The canonical ladder it takes
-#: at `--effort`; a model of it advertises a menu of its own, which is some of these, and a
-#: level a model does not advertise is refused outright rather than ignored.
-_GROK = ("max", "xhigh", "high", "medium", "low", "minimal", "none")
+#: What Grok Build calls its reasoning levels, hardest first, which is what it says when it
+#: is given one it has not got: `unknown effort level; use one of: xhigh, high, medium, low`.
+#: Written as it enumerates them rather than as the fuller ladders beside it: a rung it
+#: refuses is a turn that never starts, and it refuses one before it does anything else.
+_GROK = ("xhigh", "high", "medium", "low")
 
 #: What Qwen Code calls its reasoning levels, hardest first. It has no flag for them -- they
 #: are a setting of its own `settings.json`, which is why a turn is pointed at one of ours.
@@ -1002,6 +1006,82 @@ def _speaks(name: str) -> Profile:
         logs=(),
         efforts=(_UNSAID,),
     )
+
+
+#: The credentials more than one of these backends runs on, and what each of them calls one.
+#: A vendor's key is the vendor's rather than the CLI's -- an Anthropic key is an Anthropic
+#: key whether Claude Code, pi, opencode or mimocode is holding it -- so an account made for
+#: one backend is an account the others could be run as too.
+#:
+#: One entry per credential, holding every name it goes by. Most go by one: the variable is
+#: the vendor's own and every CLI that reads it reads it under that name. The ones with two
+#: are where a CLI named a vendor's credential after itself.
+#:
+#: Which backends actually read each of them is not written here: it is already written, as
+#: what each backend's ways ask for and what it says it would take an account from. This is
+#: only the sameness -- that `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_OAUTH_TOKEN` are one
+#: subscription under two names.
+ALIKE: tuple[tuple[str, ...], ...] = (
+    ("ANTHROPIC_API_KEY",),
+    ("ANTHROPIC_AUTH_TOKEN",),
+    ("ANTHROPIC_BASE_URL",),
+    ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN"),
+    ("DEEPSEEK_API_KEY",),
+    ("DEEPSEEK_BASE_URL",),
+    ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+    ("MOONSHOT_API_KEY", "KIMI_API_KEY"),
+    ("OPENAI_API_KEY",),
+    ("OPENAI_BASE_URL", "OPENAI_API_BASE"),
+    ("XAI_API_KEY", "GROK_CODE_XAI_API_KEY"),
+)
+
+
+def alike(variable: str) -> tuple[str, ...]:
+    """Every name one credential goes by, across the backends that read it.
+
+    Args:
+      variable: What one of them calls it.
+
+    Returns:
+      All of its names, that one included, and just that one for a credential nothing else
+      has a name for.
+    """
+    for held in ALIKE:
+        if variable in held:
+            return held
+    return (variable,)
+
+
+def serves(env: Mapping[str, str], backend: str) -> dict[str, str] | None:
+    """What one account would be, spelled as another backend reads it.
+
+    A vendor's key is the vendor's: an account made as an Anthropic key is an account pi,
+    opencode and mimocode could each be run as, under whatever each of them calls it. What
+    cannot travel is an account that is not variables at all -- a subscription signed into
+    writes the CLI's own credential store, in that CLI's own format, and nothing else reads
+    it.
+
+    Args:
+      env: What a turn under the account is run with.
+      backend: The backend it would be copied to, by any name it answers to.
+
+    Returns:
+      The same account under the names that backend reads, or None where it could not be run
+      as that backend at all -- because the backend is not one humanize drives, because the
+      account holds nothing but files, or because one of the things it holds is a credential
+      that backend has no name for.
+    """
+    profile = named(backend)
+    if profile is None or not env:
+        return None
+    reads = profile.accounts()
+    held: dict[str, str] = {}
+    for variable, value in env.items():
+        under = next((one for one in alike(variable) if one in reads), "")
+        if not under:
+            return None
+        held[under] = value
+    return held
 
 
 def named(backend: str) -> Profile | None:

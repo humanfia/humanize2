@@ -23,7 +23,7 @@ from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import IO, TYPE_CHECKING, Any, ClassVar, Protocol, overload
 
-from .event import Event, Question, Stopped, Usage, say
+from .event import Event, Failed, Question, Stopped, Usage, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
 from .skills import Loaded, mount, unmount
 
@@ -1370,7 +1370,7 @@ class CommandSessionBase(SessionBase):
 
             stdout = "".join(out)
             if status != 0:
-                raise subprocess.CalledProcessError(status, argv, stdout, "".join(err))
+                raise Failed(status, argv, stdout, "".join(err))
             answered = self._result(stdout)
             if self._id is None:
                 # Separated, so that a stdout without a trailing newline cannot glue the first
@@ -1474,9 +1474,7 @@ class StreamSessionBase(SessionBase):
                 # The process was up a moment ago and is not now. A turn that could not even
                 # be said is a failed turn, and it says so the way every other one does --
                 # so that a flow catches turns rather than transports.
-                raise subprocess.CalledProcessError(
-                    proc.poll() or 1, argv, "", str(gone)
-                ) from gone
+                raise Failed(proc.poll() or 1, argv, "", str(gone)) from gone
             said = ""
             spent: Counter[str] = Counter()
             costing = Usage()
@@ -1494,9 +1492,7 @@ class StreamSessionBase(SessionBase):
                             self._draining.join(timeout=5)
                         complained = "".join(self._complaints)
                         self._shut()
-                        raise subprocess.CalledProcessError(
-                            status, argv, event.text, complained
-                        )
+                        raise Failed(status, argv, event.text, complained)
                     if event.kind == "result":
                         said = event.text
                         # Every answer in the turn cost something, the ones to a word put in
@@ -1535,7 +1531,7 @@ class StreamSessionBase(SessionBase):
                     self._draining.join(timeout=5)
                 complained = "".join(self._complaints)
                 self._shut()
-                raise subprocess.CalledProcessError(status or 1, argv, said, complained)
+                raise Failed(status or 1, argv, said, complained)
             if self._agent.anchor is not None:
                 # An anchored turn has to be over when it says it is: coganchor pushes what the
                 # agent wrote when the session ends, so a process held open past the turn would

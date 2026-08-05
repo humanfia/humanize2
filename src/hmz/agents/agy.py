@@ -13,13 +13,12 @@ is the whole of the lever, so the rungs below it are refused rather than quietly
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, CommandSessionBase
 from .config import AgentConfig
-from .event import Event, Usage
+from .event import Event, Failed, Usage
 
 if TYPE_CHECKING:
     import os
@@ -87,11 +86,14 @@ class AntigravityCLISession(CommandSessionBase):
             "stream-json",
             "--model",
             self._agent.config.model,
-            "--effort",
-            self.effort,
             # Nobody is there to answer it: a flow watches its agent rather than gating it.
             "--dangerously-skip-permissions",
         ]
+        # And no `--effort`: how hard to think is part of the model here. Antigravity lists
+        # `gemini-3.7-flash-high`, `-medium` and `-low` as three models, and refuses the flag
+        # beside every model it lists -- as `conflicts with --effort` where the name carries
+        # one that differs, and as `--effort is not supported for model` where the name
+        # carries none. The effort is chosen by choosing the model.
         if (schema := self._shaping) is not None:
             argv += ["--json-schema", json.dumps(schema.model_json_schema())]
         if self._id is not None:
@@ -200,11 +202,9 @@ class AntigravityCLISession(CommandSessionBase):
             as well as in its exit status.
         """
         if self._failed is not None:
-            raise subprocess.CalledProcessError(1, [_COMMAND], self._said, self._failed)
+            raise Failed(1, [_COMMAND], self._said, self._failed)
         if not transcript.strip():
-            raise subprocess.CalledProcessError(
-                1, [_COMMAND], "", f"{_COMMAND} said nothing at all"
-            )
+            raise Failed(1, [_COMMAND], "", f"{_COMMAND} said nothing at all")
         spent = int(self._costing.total)
         return Event(
             kind="result",
@@ -247,8 +247,10 @@ class AntigravityCLISession(CommandSessionBase):
 class AntigravityCLIAgentConfig(AgentConfig):
     """What Antigravity CLI is configured with: the common model and effort, and nothing else.
 
-    The model is written as `agy models` lists it, which is a slug of its own -- the effort is
-    part of some of them, and the one asked for here is asked for separately.
+    The model is written as `agy models` lists it, which is a slug of its own -- and the
+    effort is part of that slug, `gemini-3.7-flash-low` being that model at that effort. So
+    the effort here is what a model was chosen at rather than something the CLI is told: it
+    refuses the flag beside every model it lists.
     """
 
 
