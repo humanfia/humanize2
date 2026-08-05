@@ -83,7 +83,20 @@ async def run(agents: tuple[AgentBase], task: str) -> None:
     await calls("official/rlar")(agents, task)
 ```
 
-## Step 5 — a flow that talks to you
+## Step 5 — optionally pass wrapper skills through
+
+A called flow carries its own skills by default. A wrapper whose purpose is to add a reusable
+capability can explicitly keep its skills available inside the called flow:
+
+```python
+calls("official/rlar", inherit_skills=True)(agents, task)
+```
+
+The child wins a same-name skill, parent-only skills follow it, and the agents return carrying
+exactly what they had before the call. Keep the default isolation for reviewers and other flows
+that should not receive the caller's capabilities.
+
+## Step 6 — a flow that talks to you
 
 A flow that drives [the person](/features/human-agent) may be handed one fewer agent, since nobody
 chooses what the person runs. Hand over your own if you have one, so that what it asks reaches
@@ -100,7 +113,7 @@ def run(agents: Agents, task: str) -> None:
     calls("chat")((agents.assistant, agents.human), task)
 ```
 
-## Step 6 — see that both are running
+## Step 7 — see that both are running
 
 ```python
 from hmz.runner import running
@@ -155,6 +168,7 @@ where flows are listed, which is otherwise the first line of its docstring.
 
 - `calls(name)` takes what `-f` takes and is refused immediately for a name nothing answers to.
 - Hand a called flow the agents it declares; nothing is renamed.
+- Use `inherit_skills=True` only when a wrapper intentionally extends its child flow.
 - Settings pass as a third argument, checked against that flow's model.
 - `@flow(name="…")` puts three flows in one file.
 

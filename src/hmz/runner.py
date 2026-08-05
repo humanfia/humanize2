@@ -442,7 +442,41 @@ def _called(flow: str | os.PathLike[str]) -> str:
     return said.parent.name if said.name == ENTRY else said.stem
 
 
-def calls(flow: str | os.PathLike[str]) -> Flow:
+class _CalledSkills:
+    """Template for handing agents into a called flow and restoring them afterwards."""
+
+    def carry(self, flow: str, agents: Sequence[AgentBase]) -> list[tuple[Loaded, ...]]:
+        """Loads the called flow's skills under this policy, returning the prior state."""
+        before = [agent.loaded for agent in agents]
+        carries(flow, agents)
+        for agent, parent in zip(agents, before, strict=True):
+            agent.loads(self.combine(parent, agent.loaded))
+        return before
+
+    def combine(
+        self, parent: tuple[Loaded, ...], child: tuple[Loaded, ...]
+    ) -> tuple[Loaded, ...]:
+        """Chooses what the called flow carries; isolation is the default policy."""
+        del parent
+        return child
+
+
+class _InheritedCalledSkills(_CalledSkills):
+    """Carries a child's skills plus parent skills whose names the child did not replace."""
+
+    def combine(
+        self, parent: tuple[Loaded, ...], child: tuple[Loaded, ...]
+    ) -> tuple[Loaded, ...]:
+        """Merges child first so its version wins every same-name skill."""
+        child_names = {one.name for one in child}
+        return child + tuple(one for one in parent if one.name not in child_names)
+
+
+_ISOLATED_SKILLS = _CalledSkills()
+_INHERITED_SKILLS = _InheritedCalledSkills()
+
+
+def calls(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Flow:
     """One flow, ready for another flow to run: what it marked, found by name.
 
     A flow is a loop over agents, and a loop worth having is one another loop can reach for::
@@ -474,8 +508,15 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
     somebody first asked for it. That is what makes a loop that improves its own flow, or its
     own skills, a loop that then runs the improved one.
 
+    A called flow carries only its own skills by default. A wrapper flow may explicitly pass
+    its skills through with ``inherit_skills=True``. The called flow still owns the result:
+    its skill wins when parent and child use the same name, and the agents are restored to
+    exactly what the caller carried when the call returns or raises.
+
     Args:
       flow: The flow to call, by the name `-f` takes.
+      inherit_skills: Whether skills carried by the calling flow remain available inside the
+        called flow, after the called flow's own and only where their names do not collide.
 
     Returns:
       Something to call with the agents and the task.
@@ -488,6 +529,7 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
     """
     _read(flow)  # said now, so a name that is wrong is wrong where it was written
     named = str(flow)
+    skill_policy = _INHERITED_SKILLS if inherit_skills else _ISOLATED_SKILLS
 
     def calling(
         agents: Sequence[AgentBase],
@@ -513,8 +555,7 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
         # And the skills it works by, which are the flow's rather than the agents': a called
         # flow brings its own, mounted onto whatever sessions it opens, and hands the agents
         # back as it found them so that the flow which called it goes on carrying its own.
-        before = [agent.loaded for agent in driven]
-        carries(named, driven)
+        before = skill_policy.carry(named, driven)
         started = _entered(named, driven)
         _wrote(driven, "called", flow=named, task=task)
         try:

@@ -364,3 +364,111 @@ def test_a_called_flow_brings_its_own_skills_and_hands_the_agents_back(
     assert (flows / "carried.txt").read_text() == "over-notes|over-notes"
     assert [one.name for one in agent.loaded] == ["over-notes"]
     assert isinstance(agent.loaded[0], Loaded)
+
+
+def test_a_called_flow_can_explicitly_inherit_its_callers_skills(flows: Path) -> None:
+    """A wrapper can add a skill without copying the called flow's own bundle."""
+    card = "---\nname: {name}\ndescription: does a thing\n---\n\n{says}\n"
+    inner = '''"""Records everything it carries."""
+
+from pathlib import Path
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+    names = ",".join(one.name for one in agent.loaded)
+    shared = next(one for one in agent.loaded if one.name == "shared")
+    Path("inherited.txt").write_text(names + "|" + (shared.at / "SKILL.md").read_text())
+'''
+    written(
+        flows / ".humanize/flows",
+        "deep",
+        inner,
+        {
+            "deep-notes": card.format(name="deep-notes", says="Deep."),
+            "shared": card.format(name="shared", says="Child wins."),
+        },
+    )
+    written(
+        flows / ".humanize/flows",
+        "over",
+        '''"""Passes its skills into a called flow."""
+
+from pathlib import Path
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+from hmz.runner import calls
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    calls("deep", inherit_skills=True)(agents, task)
+    Path("restored.txt").write_text(",".join(one.name for one in agents[0].loaded))
+''',
+        {
+            "over-notes": card.format(name="over-notes", says="Over."),
+            "shared": card.format(name="shared", says="Parent loses."),
+        },
+    )
+    agent = ShellAgent(CONFIG)
+
+    Runner("over", [agent]).run("go")
+
+    inherited = (flows / "inherited.txt").read_text()
+    assert inherited.startswith("deep-notes,shared,over-notes|")
+    assert "Child wins." in inherited
+    assert "Parent loses." not in inherited
+    assert (flows / "restored.txt").read_text() == "over-notes,shared"
+    assert [one.name for one in agent.loaded] == ["over-notes", "shared"]
+
+
+def test_inherited_skills_are_restored_when_the_called_flow_raises(flows: Path) -> None:
+    """The template's cleanup applies to unsuccessful calls as well as returns."""
+    card = "---\nname: {name}\ndescription: does a thing\n---\n\nDo it.\n"
+    written(
+        flows / ".humanize/flows",
+        "bad",
+        '''"""Fails after receiving inherited skills."""
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    assert [one.name for one in agents[0].loaded] == ["child", "parent"]
+    raise RuntimeError("no")
+''',
+        {"child": card.format(name="child")},
+    )
+    written(
+        flows / ".humanize/flows",
+        "over",
+        '''"""Catches a failed inherited call and records its restored skills."""
+
+from pathlib import Path
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+from hmz.runner import calls
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    try:
+        calls("bad", inherit_skills=True)(agents, task)
+    except RuntimeError:
+        pass
+    Path("restored-after-error.txt").write_text(",".join(one.name for one in agents[0].loaded))
+''',
+        {"parent": card.format(name="parent")},
+    )
+
+    Runner("over", [ShellAgent(CONFIG)]).run("go")
+
+    assert (flows / "restored-after-error.txt").read_text() == "parent"

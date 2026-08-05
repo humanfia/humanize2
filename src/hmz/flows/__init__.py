@@ -101,12 +101,15 @@ class Flow:
         so is handed a dict as its last argument -- what it wrote there last time -- which is
         kept in the run's own cycle and read back into the run after it. A flow that says
         nothing is run from the top every time, which is what every flow was before this.
+      selectable: Whether people are offered this flow in lists and the flow picker. An
+        internal composition may set this false while remaining callable by name.
     """
 
     name: str = ""
     about: str = ""
     skills: tuple[str, ...] = ()
     resumable: bool = False
+    selectable: bool = True
 
 
 #: Where a decorated function keeps what it said about itself. On the function rather than in
@@ -126,6 +129,7 @@ def flow[**P, T](
     about: str = "",
     skills: Iterable[str] = (),
     resumable: bool = False,
+    selectable: bool = True,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 
@@ -137,6 +141,7 @@ def flow[**P, T](
     about: str = "",
     skills: Iterable[str] = (),
     resumable: bool = False,
+    selectable: bool = True,
 ) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]:
     """Marks a function as a flow. Nothing else is one.
 
@@ -174,6 +179,12 @@ def flow[**P, T](
     and saved as the flow writes it, so a run that was stopped or killed is one the next run
     picks up from rather than one whose week is gone.
 
+    A helper used only by another flow remains callable without cluttering the flow picker::
+
+        @flow(name="engine", selectable=False)
+        def engine(agents: tuple[AgentBase], task: str) -> None:
+            ...
+
     Args:
       call: The function, when the decorator is written with no arguments at all.
       name: What to call this one among the flows its directory holds, or "" for the one it
@@ -183,6 +194,8 @@ def flow[**P, T](
         optional `#<skill>`. What it keeps in its own `skills/` needs no declaring.
       resumable: Whether it takes the state of the last run of it, and is handed a dict to
         write the next run's into.
+      selectable: Whether to offer it in flow lists and the flow picker. False keeps an
+        internal composition callable by name without presenting it as a flow to start.
 
     Returns:
       The function, unchanged but for what it now says about itself: a flow is called the way
@@ -199,6 +212,7 @@ def flow[**P, T](
                 about=about or _first(said.__doc__),
                 skills=tuple(skills),
                 resumable=resumable,
+                selectable=selectable,
             ),
         )
         return said
@@ -310,7 +324,11 @@ def _flows_of(inside: dict[str, Any]) -> list[Flow]:
         # flow is documented as that flow, and its first line is what it does.
         if not marked.name and not marked.about:
             marked = Flow(
-                name="", about=_first(inside.get("__doc__")), skills=marked.skills
+                name="",
+                about=_first(inside.get("__doc__")),
+                skills=marked.skills,
+                resumable=marked.resumable,
+                selectable=marked.selectable,
             )
         said.append(marked)
     return [one for one in said if not one.name] + [one for one in said if one.name]
@@ -463,6 +481,7 @@ def _named(at: Path, called: str) -> list[tuple[str, str]]:
     return [
         (called if not one.name else f"{called}{_INSIDE}{one.name}", one.about)
         for one in _flows_of(inside)
+        if one.selectable
     ]
 
 

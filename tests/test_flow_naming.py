@@ -104,6 +104,26 @@ def twice(agents: tuple[AgentBase], task: str) -> None:
     agent.new()(task)
 '''
 
+#: A public composition and the internal engine it calls by name.
+AUXILIARY = '''"""One flow to choose and one implementation detail."""
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+    agent.new()(task)
+
+
+@flow(name="engine", selectable=False)
+def engine(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+    agent.new()(task)
+    agent.new()(task)
+'''
+
 #: A file with a `run` in it and nothing marked, which is what a flow used to be and is not.
 UNMARKED = '''"""A file that says nothing about which of its functions is a flow."""
 
@@ -185,6 +205,28 @@ def test_each_flow_in_a_file_is_offered_under_its_own_name(
         (".humanize/flows/three:gen-idea", "Opens a loose idea into a draft."),
         (".humanize/flows/three:build", "builds it, under review"),
     ]
+
+
+def test_an_auxiliary_flow_is_callable_but_not_offered(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A composition engine is an API for another flow, not a choice for a person."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    project = tmp_path / "project"
+    at = written(project / ".humanize/flows", "composed", AUXILIARY)
+    monkeypatch.chdir(project)
+
+    assert [(one.name, one.selectable) for one in held(at)] == [
+        ("", True),
+        ("engine", False),
+    ]
+    assert [one.name for one in found() if one.whose == "local"] == [
+        ".humanize/flows/composed"
+    ]
+    assert drives("composed:engine") == ("",)
+    agent = ShellAgent(CONFIG)
+    Runner("composed:engine", [agent]).run("echo internal")
+    assert len(agent.opened) == 2
 
 
 def test_which_one_was_asked_for_is_the_half_after_the_colon(tmp_path: Path) -> None:
