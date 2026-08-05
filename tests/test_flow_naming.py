@@ -321,3 +321,63 @@ def test_a_directory_wins_a_name_a_file_also_uses(
     assert [one.name for one in found() if one.whose == "local"] == [
         ".humanize/flows/both"
     ]
+
+
+#: A flow that reads what it does out of the module beside it, which is how a flow keeps a
+#: prompt, a schedule or a table of its own without putting it in the flow itself.
+BESIDE = '''"""Says what the module beside it says."""
+
+import beside
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+    agent(f"echo {beside.SAYS} > said.txt")
+'''
+
+
+def test_each_flow_reads_the_module_beside_it_rather_than_the_last_flows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every flow may have a `beside.py`, and one process may run several of them.
+
+    A module imported by its plain name is cached under that plain name, so the first flow
+    loaded would own it: the second flow's `import beside` would be answered with the first
+    one's, and drawing the menu -- which loads every flow there is -- would settle which.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    project = tmp_path / "project"
+    for name in ("alpha", "beta"):
+        at = written(project / ".humanize/flows", name, BESIDE)
+        (at / "beside.py").write_text(f'SAYS = "{name}"\n')
+    monkeypatch.chdir(project)
+
+    held(
+        str(project / ".humanize/flows/alpha")
+    )  # as the menu does, to say what they are
+    Runner("beta", [ShellAgent(CONFIG)]).run("")
+
+    assert (project / "said.txt").read_text().strip() == "beta"
+
+
+def test_a_module_beside_a_flow_rewritten_between_runs_is_read_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Which is what a flow that improves itself does: the prompt beside it is where it is."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    project = tmp_path / "project"
+    at = written(project / ".humanize/flows", "mine", BESIDE)
+    (at / "beside.py").write_text('SAYS = "first"\n')
+    monkeypatch.chdir(project)
+
+    Runner("mine", [ShellAgent(CONFIG)]).run("")
+    assert (project / "said.txt").read_text().strip() == "first"
+
+    (at / "beside.py").write_text('SAYS = "second"\n')
+    Runner("mine", [ShellAgent(CONFIG)]).run("")
+
+    assert (project / "said.txt").read_text().strip() == "second"

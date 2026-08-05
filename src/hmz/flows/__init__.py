@@ -209,6 +209,33 @@ def loaded(where_: str | os.PathLike[str]) -> dict[str, Any]:
         for one in (beside, among):
             with contextlib.suppress(ValueError):
                 sys.path.remove(one)
+        _forgotten(beside, among)
+
+
+def _forgotten(*under: str) -> None:
+    """Forgets what was imported from beside a flow, so nothing of it outlives the run.
+
+    A flow imports the module next to it by its plain name -- `import prompts` -- and every
+    flow may have one. Left in `sys.modules`, the first flow loaded in a process owns that name
+    for the life of it: the next flow's `import prompts` is answered with the last one's, and a
+    menu drawing the list of flows is enough to settle who won. Taken out, each run of a flow
+    reads what is beside that flow -- which is also what makes a flow edited between two runs
+    of it run as it is now, module beside it and all.
+
+    What is dropped is only what was loaded out of these directories, found by the file each
+    module says it came from. Nothing of humanize's own is: a flow kept inside humanize's own
+    tree would otherwise unload the package that is running it.
+
+    Args:
+      under: The directories, as absolute paths.
+    """
+    roots = tuple(one + os.sep for one in under)
+    for name, module in list(sys.modules.items()):
+        if name == __package__ or name.startswith("hmz"):
+            continue
+        at = getattr(module, "__file__", None)
+        if at and os.path.abspath(at).startswith(roots):
+            del sys.modules[name]
 
 
 def held(where_: str | os.PathLike[str]) -> list[Flow]:
@@ -519,8 +546,13 @@ def inside(named_: str) -> str:
 
 
 def _first(said: str | None) -> str:
-    """The first line of a docstring, which is what a flow says about itself in a list."""
-    return (said or "").strip().splitlines()[0].strip() if said else ""
+    """The first line of a docstring, which is what a flow says about itself in a list.
+
+    "" for a docstring that is blank, which is a docstring somebody left room in rather than
+    a flow to refuse: a flow says what it does or it does not.
+    """
+    lines = (said or "").strip().splitlines()
+    return lines[0].strip() if lines else ""
 
 
 def fork(named_: str, into: str | os.PathLike[str] | None = None) -> str:
@@ -548,6 +580,7 @@ def fork(named_: str, into: str | os.PathLike[str] | None = None) -> str:
         which is a copy to edit, run or take away rather than one to write over.
     """
     import shutil
+    import tempfile
 
     found_ = find(named_)
     if not os.path.isfile(found_):
@@ -557,15 +590,28 @@ def fork(named_: str, into: str | os.PathLike[str] | None = None) -> str:
     name = os.path.basename(beside) if whole else os.path.basename(found_)
     mine = os.path.expanduser(str(into) if into is not None else where[0][1])
     at_ = os.path.join(mine, name)
-    if os.path.exists(at_) or os.path.exists(at_.removesuffix(".py")):
+    # Both shapes of the name, whichever this one is: a flow is a directory or a file, the
+    # directory wins the name where there is one of each, and a copy that landed beside a
+    # flow of yours would take that flow's name away without touching the file it is in.
+    stem = at_.removesuffix(".py")
+    if os.path.exists(stem) or os.path.exists(stem + ".py"):
         raise ValueError(f"there is already a flow of your own at {at_}")
     os.makedirs(mine, exist_ok=True)
-    if whole:
-        # The whole directory: what a flow is made of travels with it, which is what makes a
-        # copy of one a flow rather than half of one.
-        shutil.copytree(beside, at_)
-    else:
-        # A flow that is one file is copied as one: a flow is a module, and this is the
-        # shape that module has.
-        shutil.copy2(found_, at_)
+    # Copied beside and then moved into place: a copy that fails partway -- a disk that filled,
+    # a file that could not be read -- would otherwise leave half a flow under the name, which
+    # is a flow that will not run, cannot be forked again, and hides the one it was copied from.
+    holding = tempfile.mkdtemp(dir=mine, prefix=f".{name}.")
+    try:
+        held = os.path.join(holding, name)
+        if whole:
+            # The whole directory: what a flow is made of travels with it, which is what makes
+            # a copy of one a flow rather than half of one.
+            shutil.copytree(beside, held)
+        else:
+            # A flow that is one file is copied as one: a flow is a module, and this is the
+            # shape that module has.
+            shutil.copy2(found_, held)
+        os.replace(held, at_)
+    finally:
+        shutil.rmtree(holding, ignore_errors=True)
     return at_

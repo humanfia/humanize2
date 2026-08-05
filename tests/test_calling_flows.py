@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import AgentConfig
+from hmz.agents.skills import Loaded
 from hmz.runner import NotAFlow, Runner, calls, running
 from tests.stubs import ShellAgent, written
 
@@ -189,6 +190,28 @@ def test_a_called_flow_is_set_up_the_way_a_run_of_it_is(flows: Path) -> None:
 
     with pytest.raises(NotAFlow, match="takes no config"):
         calls("inner")([ShellAgent(CONFIG)], "go", {"rounds": 9})
+
+
+def test_a_call_refused_leaves_the_caller_carrying_its_own_skills(flows: Path) -> None:
+    """A call that never happened must not leave the caller driving somebody else's skills.
+
+    A caller may catch the refusal -- to try another config, or to go on without that flow --
+    and every session it opens after that is its own flow's.
+    """
+    card = "---\nname: {name}\ndescription: does a thing\n---\n\nDo it.\n"
+    written(
+        flows / ".humanize/flows",
+        "deep",
+        INNER,
+        {"deep-notes": card.format(name="deep-notes")},
+    )
+    agent = ShellAgent(CONFIG)
+    agent.loads([Loaded("mine", flows)])
+
+    with pytest.raises(NotAFlow, match="takes no config"):
+        calls("deep")([agent], "go", {"rounds": 9})
+
+    assert [one.name for one in agent.loaded] == ["mine"]
 
 
 def test_a_flow_that_calls_one_written_as_a_coroutine_awaits_it(flows: Path) -> None:

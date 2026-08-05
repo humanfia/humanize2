@@ -362,6 +362,27 @@ async def test_a_flow_that_is_not_there_is_a_line_to_correct_and_not_the_end() -
         assert "nowhere.py" in _transcript(app)
 
 
+@pytest.mark.timeout(60)
+async def test_a_flow_that_fails_as_it_is_read_is_a_line_to_correct_and_not_the_end(
+    workspace: Path,
+) -> None:
+    """Reading a flow runs it, so a flow may fail before it has been asked to do anything.
+
+    One that opens a file beside it and does not find it raises where the line is read for
+    what its agents should default to -- which is a convenience, and not somewhere an
+    interface may die.
+    """
+    written(workspace, "broken", 'raise FileNotFoundError("no prompt.md beside me")\n')
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._flow_named, app._models = "broken", [Runs("claude/m:high")]
+        await driver.press(*"do it")
+        await driver.press("enter")
+        await until(lambda: "prompt.md" in _transcript(app), driver)
+
+        assert app.is_running  # still there to be typed at
+
+
 def test_only_the_flows_there_are_to_run_are_offered() -> None:
     """A flow anywhere else is a path typed out, not something found by walking the tree."""
     from hmz.flows import found

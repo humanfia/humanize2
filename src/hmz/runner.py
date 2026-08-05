@@ -80,6 +80,12 @@ class Running(NamedTuple):
 _RUNNING: list[tuple[Running, threading.Thread]] = []
 _TELLING = threading.Lock()
 
+#: The agents each of those is being driven with, for a report of something that went wrong
+#: while they were. Keyed by the record `_entered` made, so that it goes when the run does: a
+#: crash in the interface an hour after a flow ended must not be filed as a crash in that flow,
+#: and a flow that called another must not have the called one's agents put under its name.
+_DRIVEN: dict[int, Sequence[AgentBase]] = {}
+
 
 def running() -> tuple[Running, ...]:
     """Every flow running now, the one that was started first and whatever it called after it.
@@ -97,11 +103,12 @@ def running() -> tuple[Running, ...]:
         return tuple(flow for flow, _ in _RUNNING)
 
 
-def _entered(flow: str) -> Running:
+def _entered(flow: str, agents: Sequence[AgentBase] = ()) -> Running:
     """Writes down that a flow has started, for whatever is watching the run.
 
     Args:
       flow: What it was asked for as.
+      agents: What it is being driven with, for a report of a failure in it.
 
     Returns:
       The record, to be handed back when it ends.
@@ -109,6 +116,7 @@ def _entered(flow: str) -> Running:
     one = Running(flow, time.monotonic())
     with _TELLING:
         _RUNNING.append((one, threading.current_thread()))
+        _DRIVEN[id(one)] = agents
     return one
 
 
@@ -120,6 +128,7 @@ def _left(one: Running) -> None:
     """
     with _TELLING:
         _RUNNING[:] = [held for held in _RUNNING if held[0] is not one]
+        _DRIVEN.pop(id(one), None)
 
 
 class Place(NamedTuple):
@@ -336,13 +345,16 @@ def carries(flow: str | os.PathLike[str], agents: Sequence[AgentBase]) -> None:
     from hmz.flows.skills import brought
 
     where = directory(str(flow))
-    if not where:
-        return
     declared: tuple[str, ...] = ()
     with contextlib.suppress(Exception):
         # What the flow said where it was declared, which is read off the flow that was asked
         # for. A flow that will not load is left to the loading to report.
         declared = _declares(flow)
+    # A flow that is one file has no directory of its own and so brings no skills of its own
+    # -- but it may still name skills that live somewhere else, and those are as much what it
+    # works by as a directory flow's are.
+    if not where and not declared:
+        return
     try:
         loaded = brought(where, declared)
     except OSError as unreachable:
@@ -445,17 +457,20 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
         # runs now: a flow is a directory, and reading one is running its entry point.
         run, places, make, setting = _read(flow)
         driven = _handed(named, places, make, agents)
+        # Read back through the flow's own model, which is what refuses a config a flow does
+        # not take and one it takes another of -- and what puts the settings through its own
+        # validators at the moment it is about to run, exactly as a run of it does. Before the
+        # skills below, because a refusal here is a call that never happened: a caller that
+        # catches it -- to try another config, or to go on without this flow -- must not be
+        # left driving agents that are carrying the skills of a flow that never ran.
+        given = None if config is None else _set_up(named, setting, config)
+        settings = () if setting is None else (given,)
         # And the skills it works by, which are the flow's rather than the agents': a called
         # flow brings its own, mounted onto whatever sessions it opens, and hands the agents
         # back as it found them so that the flow which called it goes on carrying its own.
         before = [agent.loaded for agent in driven]
         carries(named, driven)
-        # Read back through the flow's own model, which is what refuses a config a flow does
-        # not take and one it takes another of -- and what puts the settings through its own
-        # validators at the moment it is about to run, exactly as a run of it does.
-        given = None if config is None else _set_up(named, setting, config)
-        settings = () if setting is None else (given,)
-        started = _entered(named)
+        started = _entered(named, driven)
         _wrote(driven, "called", flow=named, task=task)
         try:
             answered = run(driven, task, *settings)
@@ -560,6 +575,20 @@ def _handed(
             raise NotAFlow(
                 f"{flow}: {place.name or 'the agent'} has to run "
                 f"{', '.join(sorted(short))}, which {agent.backend} does not"
+            )
+        # The same as a run of this flow asks, and asked here for the same reason: a place
+        # run under a goal, filled by an agent that has no goal feature or has had it
+        # switched off, is a call that fails at its first `pursue` -- hours in, from inside
+        # the called flow, rather than where the call was written.
+        if place.goal and not type(agent).pursues:
+            raise NotAFlow(
+                f"{flow}: {place.name or 'the agent'} is run under a goal, which "
+                f"{agent.backend} has no feature for"
+            )
+        if place.goal and not agent.goals_enabled:
+            raise NotAFlow(
+                f"{flow}: {place.name or 'the agent'} is run under a goal, but goals "
+                "were switched off for it"
             )
         _lands(flow, agent, place)
     return make(driven)
@@ -1058,11 +1087,7 @@ class Runner:
         # Written down as running before it is: what a flow calls is written down the same
         # way, so that whatever is watching reads one list of what is running under what,
         # rather than a flow it was told about and a flow it was not.
-        started = _entered(self._flow)
-        # What a report of a failure in this run would carry: asked for only if one is ever
-        # made, and never otherwise. The flow and its agents by name, at what and as whom --
-        # never what any of them was told or said.
-        telemetry.about("flow", lambda: _about(self._flow, self._agents))
+        started = _entered(self._flow, self._agents)
         try:
             with Cycle(self._flow, self._agents, task) as cycle:
                 for agent in self._agents:
@@ -1082,43 +1107,58 @@ class Runner:
             _left(started)
 
 
-def _about(flow: str, agents: Sequence[AgentBase]) -> dict[str, Any]:
-    """What one run is, for a report of something that went wrong in it.
+def _about() -> dict[str, Any]:
+    """What is running now, for a report of something that went wrong while it was.
 
-    Names and never contents: which flow, how long it has been going, and for each agent the
-    backend it drives, the model at the effort, the account by the name it was made under,
-    what it may do, where its work lands and which skills the flow mounted onto it. What the
-    flow was told, what any agent said and what is in any file are not here and are not
-    reachable from what is.
-
-    Args:
-      flow: The flow, as it was named.
-      agents: The agents it is being driven with.
+    Read off what is running rather than off whichever run registered last: a flow that called
+    another is two runs, and a crash after both have ended belongs to neither. Names and never
+    contents -- which flow, how long it has been going, and for each of its agents the backend
+    it drives, the model at the effort, the account by the name it was made under, what it may
+    do, where its work lands and which skills the flow mounted onto it. What the flow was told,
+    what any agent said and what is in any file are not here and are not reachable from what is.
 
     Returns:
-      The description, as plain values something can write out as YAML.
+      The description, as plain values something can write out as YAML. The flow named at the
+      top is the one somebody started, which is the one a report is about; whatever it called
+      is under `running` beneath it.
     """
+    with _TELLING:
+        held = [
+            (one, _DRIVEN.get(id(one), ()))
+            for one, thread in _RUNNING
+            if thread.is_alive()
+        ]
     return {
-        "flow": flow,
+        "flow": held[0][0].flow if held else "",
         "running": [
-            {"flow": one.flow, "for": round(time.monotonic() - one.since)}
-            for one in running()
-        ],
-        "agents": [
             {
-                "called": one.id,
-                "cli": one.backend,
-                "model": one.config.model,
-                "effort": one.config.effort,
-                "account": one.config.provider or "as this machine is signed in",
-                "may": one.config.permission,
-                "goals": one.config.goals,
-                "works": "here" if one.config.machine is None else "elsewhere",
-                "skills": [each.name for each in one.loaded],
+                "flow": one.flow,
+                "for": round(time.monotonic() - one.since),
+                "agents": [
+                    {
+                        "called": each.id,
+                        "cli": each.backend,
+                        "model": each.config.model,
+                        "effort": each.config.effort,
+                        "account": each.config.provider
+                        or "as this machine is signed in",
+                        "may": each.config.permission,
+                        "goals": each.config.goals,
+                        "works": "here" if each.config.machine is None else "elsewhere",
+                        "skills": [loaded.name for loaded in each.loaded],
+                    }
+                    for each in agents
+                ],
             }
-            for one in agents
+            for one, agents in held
         ],
     }
+
+
+# What a report of a failure carries about the run it happened in: asked for only if one is
+# ever made, and never otherwise. Registered once, here, because what it answers is what is
+# running at the moment of the report rather than anything one run holds.
+telemetry.about("flow", _about)
 
 
 def read_agent(
@@ -1223,7 +1263,11 @@ def flow_and_agents(
     # report in its usual place; their agents use the ordinary on default in the meantime.
     try:
         places = wanted(args.flow)
-    except NotAFlow:
+    except Exception:  # noqa: BLE001 -- reading it is a convenience; running it is the report
+        # Anything at all, because a flow is a Python file and reading one runs it: a flow
+        # that opens a prompt beside it and does not find it raises whatever that raised, and
+        # a line read for its goal defaults must not be where that lands. `Runner` loads it
+        # again a moment later, in the one place that reports it as a line to correct.
         places = ()
     agents: list[AgentBase] = []
     for at, spec in enumerate(args.agents):
