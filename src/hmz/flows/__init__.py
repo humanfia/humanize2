@@ -97,11 +97,16 @@ class Flow:
         can clone with an optional `#<skill>` saying which of the ones in it is wanted. What
         the flow keeps in its own `skills/` is not among them: that is every flow in the
         directory's, and is found by looking rather than by being declared.
+      resumable: Whether it can be picked up where the last run of it left off. One that says
+        so is handed a dict as its last argument -- what it wrote there last time -- which is
+        kept in the run's own cycle and read back into the run after it. A flow that says
+        nothing is run from the top every time, which is what every flow was before this.
     """
 
     name: str = ""
     about: str = ""
     skills: tuple[str, ...] = ()
+    resumable: bool = False
 
 
 #: Where a decorated function keeps what it said about itself. On the function rather than in
@@ -116,7 +121,11 @@ def flow[**P, T](call: Callable[P, T], /) -> Callable[P, T]: ...
 
 @overload
 def flow[**P, T](
-    *, name: str = "", about: str = "", skills: Iterable[str] = ()
+    *,
+    name: str = "",
+    about: str = "",
+    skills: Iterable[str] = (),
+    resumable: bool = False,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 
@@ -127,6 +136,7 @@ def flow[**P, T](
     name: str = "",
     about: str = "",
     skills: Iterable[str] = (),
+    resumable: bool = False,
 ) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]:
     """Marks a function as a flow. Nothing else is one.
 
@@ -152,6 +162,18 @@ def flow[**P, T](
 
         @flow(skills=("https://github.com/humanfia/flowverse#deep-research",))
 
+    And a flow may say that it can be picked up where the last run of it left off, which is
+    what a loop that is meant to run for a week is::
+
+        @flow(resumable=True)
+        def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:
+            state["round"] = state.get("round", 0) + 1
+
+    Such a flow is handed a dict as its last argument -- after the config, for one that takes
+    a config -- holding whatever it wrote there last time. It is kept in the run's own cycle
+    and saved as the flow writes it, so a run that was stopped or killed is one the next run
+    picks up from rather than one whose week is gone.
+
     Args:
       call: The function, when the decorator is written with no arguments at all.
       name: What to call this one among the flows its directory holds, or "" for the one it
@@ -159,6 +181,8 @@ def flow[**P, T](
       about: One line saying what it does, defaulting to the first line of its docstring.
       skills: The skills it works by that are somewhere else, one git URL apiece with an
         optional `#<skill>`. What it keeps in its own `skills/` needs no declaring.
+      resumable: Whether it takes the state of the last run of it, and is handed a dict to
+        write the next run's into.
 
     Returns:
       The function, unchanged but for what it now says about itself: a flow is called the way
@@ -174,6 +198,7 @@ def flow[**P, T](
                 name=name,
                 about=about or _first(said.__doc__),
                 skills=tuple(skills),
+                resumable=resumable,
             ),
         )
         return said

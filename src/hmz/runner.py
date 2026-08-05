@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
     from .agents import AgentBase, Isolated, Moment, Remote
     from .agents.skills import Loaded
+    from .flows import Flow as Marked
 
 
 #: How many arguments a flow's entry point takes when it says it can be set up with
@@ -204,6 +205,42 @@ def configures(flow: str | os.PathLike[str]) -> type[BaseModel] | None:
     return _read(flow)[3]
 
 
+def resumes(flow: str | os.PathLike[str]) -> bool:
+    """Whether a flow says it can be picked up where the last run of it left off.
+
+    Which is a thing about the flow rather than about any run of it: a run wrote down what
+    the flow said when it ran, and the flow may have been rewritten since -- so whatever is
+    offering to pick a run up asks the flow as it is now.
+
+    Args:
+      flow: The Python file the flow is written in. It is run to be read.
+
+    Returns:
+      True for a flow marked `@flow(resumable=True)`, which is one handed the state of the
+      last run of it.
+
+    Raises:
+      NotAFlow: If the file is not there, or is not a flow.
+    """
+    return _read(flow)[4].resumable
+
+
+def _marked(run: Flow) -> Marked:
+    """What a flow said about itself where it was marked.
+
+    Args:
+      run: Its entry point, which is what carries the mark.
+
+    Returns:
+      The mark. Never None: only a marked function is a flow, so anything that got this far
+      has one -- and a flow whose mark cannot be read is read as one that said nothing.
+    """
+    from hmz.flows import Flow as Said
+
+    held = getattr(run, "__humanize_flow__", None)
+    return held if isinstance(held, Said) else Said()
+
+
 def wanted(flow: str | os.PathLike[str]) -> tuple[Place, ...]:
     """Every agent a flow needs chosen for it, and what each of them has to be able to do.
 
@@ -230,6 +267,7 @@ def _read(
     tuple[Place, ...],
     Callable[..., tuple[AgentBase, ...]],
     type[BaseModel] | None,
+    Marked,
 ]:
     """Loads a flow and reads what it says about the agents it drives.
 
@@ -238,8 +276,9 @@ def _read(
 
     Returns:
       Its entry point, one place per agent it drives, what to hand those agents over as --
-      the named tuple the flow declared, or a plain one where it declared that -- and the
-      model it can be set up with, or None where it takes no setting up.
+      the named tuple the flow declared, or a plain one where it declared that -- the model
+      it can be set up with, or None where it takes no setting up, and what the flow said
+      about itself where it was marked.
 
     Raises:
       NotAFlow: If the file is not there, is not a flow -- nothing in it marked `@flow()`, or
@@ -307,6 +346,7 @@ def _read(
             tuple(_place(at, kinds.get(at)) for at in fields),
             declared._make,
             _setting(run, hinted),
+            _marked(run),
         )
     # `tuple[AgentBase, ...]` is any number of them, which is no answer to the question.
     declares = get_args(declared)
@@ -321,6 +361,7 @@ def _read(
         tuple(_place("", kind) for kind in declares),
         tuple,
         _setting(run, hinted),
+        _marked(run),
     )
 
 
@@ -455,7 +496,7 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
     ) -> Awaitable[None] | None:
         # Read afresh, which is what makes a flow rewritten since the last call the flow that
         # runs now: a flow is a directory, and reading one is running its entry point.
-        run, places, make, setting = _read(flow)
+        run, places, make, setting, mark = _read(flow)
         driven = _handed(named, places, make, agents)
         # Read back through the flow's own model, which is what refuses a config a flow does
         # not take and one it takes another of -- and what puts the settings through its own
@@ -465,6 +506,10 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
         # left driving agents that are carrying the skills of a flow that never ran.
         given = None if config is None else _set_up(named, setting, config)
         settings = () if setting is None else (given,)
+        # And what it left behind last time, for a flow that says it can be picked up: kept
+        # under its own name in the cycle of the run that called it, since a flow that called
+        # another is two flows and neither writes the other's.
+        held = () if not mark.resumable else (_holding(driven, named),)
         # And the skills it works by, which are the flow's rather than the agents': a called
         # flow brings its own, mounted onto whatever sessions it opens, and hands the agents
         # back as it found them so that the flow which called it goes on carrying its own.
@@ -473,7 +518,7 @@ def calls(flow: str | os.PathLike[str]) -> Flow:
         started = _entered(named, driven)
         _wrote(driven, "called", flow=named, task=task)
         try:
-            answered = run(driven, task, *settings)
+            answered = run(driven, task, *settings, *held)
         except BaseException:
             _ended(driven, started, named, before)
             raise
@@ -615,6 +660,33 @@ def _wrote(driven: tuple[AgentBase, ...], event: str, **said: Any) -> None:
         if isinstance(agent.cycle, Cycle):
             agent.cycle.write(event, **said)
             return
+
+
+def _holding(driven: tuple[AgentBase, ...], named: str) -> dict[str, Any]:
+    """The dict a called flow that can be picked up writes what it wants back into.
+
+    Kept in the cycle of the run that called it, under the called flow's own name: a flow
+    that called another is two flows, each with its own to keep, and both of them part of one
+    run. A call from a flow that opened no cycle -- one run from a test, one called from
+    nothing -- is handed a dict that is nowhere, which is a flow that runs and leaves nothing
+    rather than a call that fails.
+
+    Args:
+      driven: The agents the called flow is being handed, which is what holds the cycle.
+      named: The called flow, as it was asked for.
+
+    Returns:
+      What it left behind last time, as something to write this time's into.
+    """
+    from .cycle import Cycle, resumed, state
+
+    for agent in driven:
+        if isinstance(agent.cycle, Cycle):
+            at = resumed(named, agent.cycle.workspace)
+            return agent.cycle.state(
+                named, state(at, named) if at is not None else None
+            )
+    return {}
 
 
 def _lands(flow: str | os.PathLike[str], agent: AgentBase, place: Place) -> None:
@@ -981,6 +1053,7 @@ class Runner:
         flow: str | os.PathLike[str],
         agents: Sequence[AgentBase],
         config: BaseModel | dict[str, Any] | None = None,
+        resume: str | os.PathLike[str] | None = None,
     ) -> None:
         """Loads the flow and holds the agents to drive it with.
 
@@ -992,6 +1065,11 @@ class Runner:
             the model :func:`configures` answers with, or the fields to build one from, which
             is what a YAML file of them reads as. None is a flow left as it comes, and is
             what a flow that takes no setting up is given either way.
+          resume: The cycle to pick up from, for a flow that says it can be picked up: the
+            state that run left behind is what this one is handed. None is the last run of
+            this flow here, which is what running a resumable flow again means -- a loop
+            meant to run for a week is one that carries on where it stopped. A flow that
+            says nothing about being resumable ignores this, having nowhere to put it.
 
         Raises:
           NotAFlow: If the flow is not there, is not a flow -- nothing in it marked
@@ -1003,8 +1081,9 @@ class Runner:
             reached.
         """
         from .agents import HumanAgent
+        from .cycle import resumed
 
-        run, places, make, setting = _read(flow)
+        run, places, make, setting, mark = _read(flow)
         if config is not None:
             config = _set_up(flow, setting, config)
         asked = [place for place in places if not place.person]
@@ -1054,6 +1133,15 @@ class Runner:
         self._flow = str(
             flow
         )  # as it was named, which is what a run of it is named after
+        #: Whether the flow says it can be picked up where the last run of it left off, and
+        #: which run that was. Asked here rather than when the run starts, so that a cycle
+        #: named at the prompt is one whoever named it hears about before anything runs.
+        self._resumable = mark.resumable
+        self._picked_up: Path | None = None
+        if self._resumable:
+            self._picked_up = (
+                Path(resume) if resume is not None else resumed(self._flow)
+            )
 
     @property
     def agents(self) -> tuple[AgentBase, ...]:
@@ -1082,22 +1170,41 @@ class Runner:
         """
         import inspect
 
-        from .cycle import Cycle
+        from .cycle import Cycle, state
 
         # Written down as running before it is: what a flow calls is written down the same
         # way, so that whatever is watching reads one list of what is running under what,
         # rather than a flow it was told about and a flow it was not.
         started = _entered(self._flow, self._agents)
+        picked_up = self._picked_up
         try:
-            with Cycle(self._flow, self._agents, task) as cycle:
+            with Cycle(
+                self._flow,
+                self._agents,
+                task,
+                resumable=self._resumable,
+                picked_up=picked_up.name if picked_up is not None else "",
+            ) as cycle:
                 for agent in self._agents:
                     agent.cycle = cycle
-                if self._setting is None:
-                    running_now = self._run(self._agents, task)
-                else:
-                    # As it was set up, or as it comes: a flow that takes a config takes None
-                    # for the run nobody set up, which is the default the flow declared.
-                    running_now = self._run(self._agents, task, self._config)
+                # As it was set up, or as it comes: a flow that takes a config takes None
+                # for the run nobody set up, which is the default the flow declared. And
+                # after it, for a flow that says it can be picked up, what the run it is
+                # being picked up from left behind -- which is a dict it writes into, kept
+                # in this run's own cycle as it writes.
+                said: list[Any] = [self._agents, task]
+                if self._setting is not None:
+                    said.append(self._config)
+                if self._resumable:
+                    said.append(
+                        cycle.state(
+                            self._flow,
+                            state(picked_up, self._flow)
+                            if picked_up is not None
+                            else None,
+                        )
+                    )
+                running_now = self._run(*said)
                 # Read off what the call answered rather than off the function: a flow is what
                 # it does when it is called, and one wrapped in something of its own -- a
                 # decorator that times its rounds -- is the same flow.

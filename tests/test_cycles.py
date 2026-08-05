@@ -83,6 +83,8 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
             "effort": "high",
             "permission": "bypass",
             "provider": "",
+            "goals": True,
+            "person": False,
         },
         {
             "agent": "reviewer",
@@ -91,6 +93,8 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
             "effort": "high",
             "permission": "bypass",
             "provider": "",
+            "goals": True,
+            "person": False,
         },
     ]
     assert [(said["agent"], said["session"]) for said in held] == [

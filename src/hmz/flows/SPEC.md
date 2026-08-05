@@ -46,6 +46,7 @@ class Flow:
     name: str = ""
     about: str = ""
     skills: tuple[str, ...] = ()
+    resumable: bool = False
 
 
 class Offer(NamedTuple):
@@ -61,6 +62,7 @@ def flow[**P, T](
     name: str = "",
     about: str = "",
     skills: Iterable[str] = (),
+    resumable: bool = False,
 ) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 
@@ -102,6 +104,11 @@ def about(named_: str) -> str: ...
   run -- a command line, a settings file, another flow asking for this one -- MUST NOT change
   under whoever renames the function. A file that marks two flows with one name MUST answer
   with the first of them, that being a file to correct rather than a choice to make at random.
+- A flow MAY say that it can be picked up where the last run of it left off, which is what a
+  loop meant to run for a week is: it is stopped and started, by a machine going down or by
+  somebody pressing esc. Such a flow MUST be handed a dict as its last argument, holding what
+  it wrote there last time -- so that what it is keeping track of is the flow's own handful of
+  things rather than a second copy of the transcript, which the backends already keep.
 - What a flow says about itself MUST be the first line of its docstring where the decorator was
   not told one, and for a file that is one flow MUST fall back to the file's own docstring: a
   file that is one flow is documented as that flow.

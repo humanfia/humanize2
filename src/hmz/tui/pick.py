@@ -67,6 +67,7 @@ if TYPE_CHECKING:
 
     from hmz.agents import AgentBase, Moment
     from hmz.backends import Model, Way
+    from hmz.cycle import Ran
     from hmz.flows import Flowverse, Offer
     from hmz.providers import Provider
     from hmz.runner import Place
@@ -83,6 +84,9 @@ __all__ = [
     "Clis",
     "Configures",
     "Confirms",
+    "Cycles",
+    "Does",
+    "Doing",
     "Drafts",
     "Fitted",
     "Flows",
@@ -100,6 +104,7 @@ __all__ = [
     "Status",
     "Ways",
     "called",
+    "carries_on",
     "config_of",
     "model_of",
     "opens_on",
@@ -5409,6 +5414,308 @@ class Providers(Drafts[list[str]]):
             self.dismiss(self._told or None)
             return
         self.asks_to_save()
+
+
+#: What can be done with a run that has already happened: pick it up where it stopped, for a
+#: flow that says it can be, and say where it is written down. The first is answered outside
+#: this module -- starting a flow is the interface's -- so it is named where it is read.
+carries_on, _WHERE_IT_IS = "carry-on", "where"
+
+#: How much of a task a row of the runs shows, before it is what a run is rather than a line.
+_ENOUGH_TASK = 60
+
+
+class Doing(NamedTuple):
+    """What somebody asked to have done with one run that has already happened.
+
+    Attributes:
+      cycle: The run, by the directory it is written in.
+      doing: What to do with it, which is what the menu under it answered.
+    """
+
+    cycle: Path
+    doing: str
+
+
+def _asked_for(task: str) -> str:
+    """What a run was asked to do, as much of it as a row has room for.
+
+    Args:
+      task: The whole of it, which is however long whoever started the run made it.
+
+    Returns:
+      Its first line's worth, on one line, cut with an ellipsis where it was cut.
+    """
+    said = " ".join(task.split())
+    return said if len(said) <= _ENOUGH_TASK else f"{said[: _ENOUGH_TASK - 1]}…"
+
+
+def _when(said: str) -> str:
+    """One of the moments a cycle writes down, as a row of a list says one.
+
+    Args:
+      said: The moment, as it was written -- `2026-08-16T03:04:05.123Z`.
+
+    Returns:
+      It, to the minute, and whatever was written where that is not what it is.
+    """
+    if len(said) < len("YYYY-MM-DDTHH:MM"):
+        return said
+    return said[:16].replace("T", " ")
+
+
+class Does(Picks):
+    """What to do with one run that has already happened.
+
+    Which is a second question rather than more keys on the first: a list of runs is a list
+    somebody is reading, and what there is to do with one of them depends on the one under
+    the cursor -- a flow that says it can be picked up is picked up, and one that says
+    nothing is a run to read rather than a run to continue.
+    """
+
+    def __init__(self, ran: Ran, *, resumable: bool) -> None:
+        """Asks about one run.
+
+        Args:
+          ran: The run, as it was written down.
+          resumable: Whether its flow says now that it can be picked up, which is asked of
+            the flow rather than of the run: a flow may have been rewritten since.
+        """
+        super().__init__()
+        self._ran = ran
+        self._resumable = resumable
+        self.asked = f"{_when(ran.began)}{_DOT}{ran.flow}"
+        self.about = (
+            f"What to do with this run. It {_how(ran)}, driving {len(ran.agents)} agents "
+            f"through {len(ran.sessions)} sessions."
+        )
+
+    def rows(self) -> list[tuple[str, str, str]]:
+        """Carrying on where it stopped, where that is a thing this flow can do, and reading."""
+        held: list[tuple[str, str, str]] = []
+        if self._resumable:
+            held.append(
+                (
+                    carries_on,
+                    "carry on from here",
+                    "run the flow again on what this run left behind",
+                )
+            )
+        held.append(
+            (
+                _WHERE_IT_IS,
+                "where it is",
+                "the directory this run is written in, sessions and all",
+            )
+        )
+        return held
+
+    def nothing(self) -> str:
+        """Why carrying on is not one of the things there are to do, where it is not."""
+        if self._resumable:
+            return ""
+        return (
+            f"{escape(self._ran.flow)} does not say it can be picked up, so there is "
+            "nothing to carry on from"
+        )
+
+
+def _how(ran: Ran) -> str:
+    """How one run ended, as a line about it reads.
+
+    Args:
+      ran: The run.
+
+    Returns:
+      What became of it, in words: a run with no end written down is one that was abandoned
+      where it stood -- the machine it was on went, or the interface came down under it.
+    """
+    return {
+        "done": "finished",
+        "failed": "failed",
+        "stopped": "was stopped",
+    }.get(ran.how, "was left unfinished")
+
+
+class Cycles(Sheet[Doing]):
+    """Every run of a flow in this directory, newest first, and what to do with one.
+
+    A run is written down as it happens -- which flow, on what, by which agents, and which
+    sessions each of them opened -- and until now nothing showed them. What they are for is
+    two things: reading one back afterwards, which is what the links to its sessions are, and
+    carrying one on, which is what a flow that says it can be picked up is for.
+
+    Read rather than chosen from, so enter opens what there is to do with the run under the
+    cursor rather than doing any of it.
+    """
+
+    LETTERS: ClassVar = frozenset({"search"})
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        Binding("s", "search", "search", priority=True),
+    ]
+
+    def __init__(self, workspace: Path | None = None, *, running: bool = False) -> None:
+        """Reads every run of this directory.
+
+        Args:
+          workspace: Which directory's, defaulting to this one.
+          running: Whether a flow is running now, which is what makes carrying one on a
+            thing to say no to rather than a thing to offer.
+        """
+        super().__init__()
+        from hmz.cycle import cycles, read
+
+        #: Newest first: what somebody opening this came to look at is the run that has just
+        #: happened, and a list of a hundred is one nobody scrolls to the end of.
+        self._ran = [
+            one
+            for one in (read(at) for at in reversed(cycles(workspace)))
+            if one is not None
+        ]
+        self._underway = running
+        #: Which run the cursor is on, by the directory it is written in: rows are narrowed
+        #: by a search, so a row number is not a run.
+        self._was = ""
+        #: What is worth saying under the list.
+        self._said = ""
+        #: Whether each flow says now that it can be picked up, by flow: reading one means
+        #: running its file, so it is asked once and only for the flows asked about.
+        self._resumes: dict[str, bool] = {}
+
+    def _ask(self) -> None:
+        """Says what these are, and puts them up."""
+        self.query_one("#asked", Label).update("Cycles")
+        self.query_one("#about", Label).update(
+            "Every run of a flow in this directory, newest first: what it was, how it went, "
+            "and how many sessions it opened. Enter says what there is to do with one."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _about(self, ran: Ran) -> str:
+        """What a row says about one run: what it was asked to do, how it went, and its size."""
+        said = _asked_for(ran.task) if ran.task else "no task"
+        sessions = f"{len(ran.sessions)} sessions"
+        held = f"{said}{_DOT}{_how(ran)}{_DOT}{sessions}"
+        return f"{held}{_DOT}can be picked up" if ran.resumable else held
+
+    def _fill(self) -> None:
+        """Puts the runs up, marked where the cursor is."""
+        listing = self.query_one("#choices", OptionList)
+        self._follows(listing)
+        shown = [one for one in self._ran if self.fits(one.flow, one.task, one.name)]
+        self._counting = len(str(max(len(shown), 1)))
+        if all(one.name != self._was for one in shown):
+            self._was = shown[0].name if shown else ""
+        listing.set_options(
+            Option(
+                self._row(
+                    seen,
+                    f"{_when(one.began)}{_DOT}{one.flow}",
+                    self._about(one),
+                    here=one.name == self._was,
+                    inforce=False,
+                ),
+                id=f"={one.name}",
+            )
+            for seen, one in enumerate(shown)
+        )
+        listing.highlighted = (
+            next((at for at, one in enumerate(shown) if one.name == self._was), 0)
+            if shown
+            else None
+        )
+        self._drawn = listing.highlighted
+        said = self._said or ("" if self._ran else self._nothing())
+        self.query_one("#tuning", Label).update(
+            f"[$text-muted]{said}[/]" if said else ""
+        )
+        self.query_one("#keys", Label).update(
+            f"Enter for what to do with one · Esc to close{self.searching()}"
+        )
+
+    def _nothing(self) -> str:
+        """What an empty list says, which is that nothing has been run here yet."""
+        return "no flow has been run in this directory yet"
+
+    def _follows(self, listing: OptionList) -> None:
+        """Takes which run the cursor is on off the list, by the directory it is written in."""
+        at = listing.highlighted
+        if at is not None and 0 <= at < listing.option_count:
+            named = str(listing.get_option_at_index(at).id or "").removeprefix("=")
+            if named:
+                self._was = named
+
+    def _under(self) -> Ran | None:
+        """The run the cursor is on, or None where the list has nothing in it."""
+        return next((one for one in self._ran if one.name == self._was), None)
+
+    def _picks_up(self, flow: str) -> bool:
+        """Whether one flow says now that it can be picked up.
+
+        Asked of the flow rather than of the run that recorded it: a flow is a directory on
+        disk and may have been rewritten since, and what can happen next is what it says now.
+        Asked once per flow, since reading one means running its file.
+
+        Args:
+          flow: The flow, as the run named it.
+
+        Returns:
+          Whether it is resumable, and False for one that will not load at all -- a flow that
+          cannot be read cannot be run, which is what carrying on would come to.
+        """
+        from hmz.runner import resumes
+
+        if flow not in self._resumes:
+            try:
+                self._resumes[flow] = resumes(flow)
+            except Exception:  # noqa: BLE001 -- a flow is a file, and reading one runs it
+                self._resumes[flow] = False
+        return self._resumes[flow]
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Opens what there is to do with the run under the cursor.
+
+        Args:
+          event: What was chosen.
+        """
+        named = str(event.option.id or "").removeprefix("=")
+        one = next((each for each in self._ran if each.name == named), None)
+        if one is not None:
+            self._doing(one)
+
+    @work
+    async def _doing(self, ran: Ran) -> None:
+        """Asks what to do with one run, and does it or answers with it.
+
+        Args:
+          ran: The run.
+        """
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        said = await showing.push_screen_wait(
+            Does(ran, resumable=ran.resumable and self._picks_up(ran.flow))
+        )
+        if said is None:
+            return  # walked out of it, which does nothing to the run
+        if said == _WHERE_IT_IS:
+            self._said = escape(str(ran.at))
+            self._fill()
+            return
+        if said == carries_on and self._underway:
+            # Said here rather than on the way out: the question this sheet is asking is
+            # still worth answering, and a flow is stopped with esc rather than from here.
+            self._said = (
+                "a flow is running; esc stops it before another can be picked up"
+            )
+            self._fill()
+            return
+        self.dismiss(Doing(ran.at, said))
 
 
 class Status(ModalScreen[None]):

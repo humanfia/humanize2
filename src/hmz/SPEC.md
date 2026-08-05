@@ -252,6 +252,19 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
   refuses a link, a backend humanize knows no logs of, and a log written after the session
   was opened MUST each leave the run as it was -- the last of them by the links being made
   again when the run ends, which is when a sub-agent's transcript is finally there.
+- What a flow that says it can be picked up again left behind MUST be kept here too, under
+  the flow that left it: a flow that called another is two flows, and neither writes the
+  other's. It MUST be saved as the flow writes it rather than when the run ends -- a run
+  worth picking up is one that was stopped or killed, and state saved only at the end is
+  state such a run has none of -- and MUST be saved again when the run ends, since something
+  written inside a value it holds is a change no mapping can see.
+- Nothing about keeping it MUST be able to stop a run: a value no JSON has a shape for, a
+  directory that has gone, a file somebody wrote by hand as something else. State is what a
+  flow may pick up, and a run that stopped because it could not save some is worse than one
+  that carries on without it.
+- Cycles MUST be named so that they sort in the order they were run, to the millisecond: what
+  a flow is picked up from is the last run of it, and two started inside one second would
+  otherwise be ordered at random.
 
 ## `runner.py`
 
@@ -330,6 +343,16 @@ class Runner:
   it ends, but only one that got the chance to: a flow abandoned where it stood -- an interface
   taken down under it -- would otherwise be reported as running for the life of the process,
   and everything that reads this would name a flow that is no longer there.
+- A flow that says it can be picked up MUST be handed a dict as its last argument -- after
+  the config, for a flow that takes one -- holding what the run it is being picked up from
+  left there. Which run that is MUST be the last run of that flow in this workspace unless
+  one is named, so that running a resumable flow again means carrying on: a loop meant to run
+  for a week is a loop that will be stopped and started. What it writes MUST be kept in the
+  cycle of the run doing the writing rather than in the one it was picked up from: a closed
+  cycle is not reopened, and a run is what that run did.
+- `resumes` MUST answer whether a flow says so now, read by running the flow rather than off
+  what a run of it recorded: a flow is a directory on disk, and what can happen next is what
+  it says today.
 - `flow_and_agents` MUST read the same `hmz exec` line the command takes, and MUST be here
   rather than in `cli`: the terminal interface starts a flow from that line and then keeps the
   agents, and a reader that lived in the command line would be one the interface reached up

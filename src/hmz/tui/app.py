@@ -68,6 +68,7 @@ from .pick import (
     Adjusted,
     Adjusts,
     Chosen,
+    Cycles,
     Flows,
     Held,
     Providers,
@@ -75,6 +76,7 @@ from .pick import (
     Runs,
     Saved,
     Status,
+    carries_on,
     config_of,
     opens_on,
     places_of,
@@ -102,6 +104,7 @@ _OWN = (
     "flow",
     "agents",
     "providers",
+    "cycles",
     "settings",
     "status",
     "clear",
@@ -1570,6 +1573,8 @@ class Humanize(App[None]):
             self.action_agents()
         elif name == "providers":
             self.action_providers()
+        elif name == "cycles":
+            self.action_cycles()
         elif name == "settings":
             self.action_settings()
         elif name == "status":
@@ -1930,6 +1935,66 @@ class Humanize(App[None]):
             )
 
     @work
+    async def action_cycles(self) -> None:
+        """Opens the runs of this directory, which is what `/cycles` is for.
+
+        Every run of a flow here, newest first: what it was, how it went, and what there is
+        to do with it. Read while a flow runs -- what has already happened does not change
+        under one -- but a run picked up is a flow started, so that half is refused while
+        one is going, on the sheet where it was asked for.
+        """
+        said = await self.push_screen_wait(Cycles(running=bool(self._agents)))
+        if said is None:
+            return
+        if said.doing == carries_on:
+            self._carries_on(said.cycle)
+
+    def _carries_on(self, cycle: Path) -> None:
+        """Runs the flow of one run again, on what that run left behind.
+
+        Which is a run of its own: a cycle is one run and is never reopened, so this is the
+        flow started again with the state of the run being picked up, writing into a cycle of
+        its own that says which one it came from.
+
+        The flow, its agents and what it was asked to do all come from the run rather than
+        from what the interface happens to be set up on: picking up a run means running what
+        ran, and an agent swapped under it would be a different run wearing its name.
+
+        Args:
+          cycle: The run to pick up, by the directory it is written in.
+        """
+        from hmz.cycle import read
+
+        ran = read(cycle)
+        if ran is None:
+            self.show(f"hmz: {escape(str(cycle))} is not a run", "red")
+            return
+        if self._mid_run("no picking a run up"):
+            return
+        # The person at the prompt is not one of the agents anybody chooses, so a flow that
+        # talks to one wrote down an agent nothing on a command line names -- and the run
+        # itself is what says which of them that was.
+        drove = [one for one in ran.agents if not one.person]
+        self._flow_named = ran.flow
+        self._models = [
+            Runs(
+                f"{one.backend}/{one.model}:{one.effort}",
+                permission=one.permission,
+                provider=one.provider,
+                goals=one.goals,
+            )
+            for one in drove
+        ]
+        self._wanted = self._places_of(ran.flow)
+        self._config = config_of(ran.flow, self.settings.config(ran.flow))
+        named = [part for runs in self._models for part in ("-a", runs.spec)]
+        self.show(
+            f"[dim]carrying on from {escape(ran.name)}: {escape(ran.flow)} on what that "
+            "run left behind[/dim]"
+        )
+        self._flow(["-f", ran.flow, *named, ran.task], resume=cycle)
+
+    @work
     async def action_providers(self) -> None:
         """Opens the accounts an agent may be run as, which is what `/providers` is for.
 
@@ -2113,11 +2178,14 @@ class Humanize(App[None]):
             )
         return moved
 
-    def _flow(self, argv: list[str]) -> None:
+    def _flow(self, argv: list[str], resume: Path | None = None) -> None:
         """Starts a flow, keeping its agents so that a typed line can reach one.
 
         Args:
           argv: The command line, as `hmz exec` takes it.
+          resume: The run to pick up from, for a flow that says it can be picked up, or None
+            for one starting from whatever the last run of it here left -- which is what
+            running a resumable flow again means.
         """
         from hmz.runner import Runner
 
@@ -2140,7 +2208,7 @@ class Humanize(App[None]):
             # through this interface like everything else. How the flow itself is set up
             # goes with them: it is a setting of the flow rather than of any agent, so it
             # is not on the line that says what each of them runs.
-            runner = Runner(path, chosen, self._config)
+            runner = Runner(path, chosen, self._config, resume=resume)
         except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
             self.show(f"hmz: {why}", "red")
             return

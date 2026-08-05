@@ -96,6 +96,9 @@ ALLOWED: dict[str, set[str]] = {
     "hmz.tui": {
         "hmz.agents",
         "hmz.backends",
+        # The runs of this directory, which `/cycles` lists and picks one up from. It names
+        # the agents and the facts about them, both of which are under the interface too.
+        "hmz.cycle",
         "hmz.flows",
         # The agents written down under a name, which `/agents` walks and `hmz agents` says
         # from a command line. It names nothing, so this widens the DAG without bending it.

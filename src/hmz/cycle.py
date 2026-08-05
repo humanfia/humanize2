@@ -18,11 +18,14 @@ One cycle is one run, and one directory::
 
     ~/.humanize/cycles/<workspace>/<when>-<which>/
         cycle.jsonl                     what happened, a line at a time
+        state.json                      what a flow that can be picked up again left behind
         sessions/<session>/…            a link per file the backend logged it to
 
 It opens when the flow starts and closes when the flow stops, however it stops -- finished,
 failed, or interrupted. A closed cycle is never reopened: running the flow again is another
-run, with sessions of its own, and so another cycle.
+run, with sessions of its own, and so another cycle -- which is what a flow that says it can
+be picked up again is picked up as. What it left behind is read out of the cycle it left it
+in and handed to the next run of it, which writes into a cycle of its own.
 """
 
 from __future__ import annotations
@@ -39,7 +42,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Self, cast
 from hmz import backends, home
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from .agents import AgentBase
 
@@ -47,16 +50,20 @@ __all__ = [
     "JOURNAL",
     "LOCAL",
     "SESSIONS",
+    "STATE",
     "Cycle",
     "Drove",
     "Ran",
     "Session",
+    "State",
     "called",
     "cycles",
     "linked",
     "opened",
     "read",
+    "resumed",
     "sessions",
+    "state",
     "where",
 ]
 
@@ -75,6 +82,9 @@ JOURNAL = "cycle.jsonl"
 #: Where the links to the sessions' own logs go, a directory per session.
 SESSIONS = "sessions"
 
+#: What a resumable flow left behind, kept beside the run it left it in.
+STATE = "state.json"
+
 #: What a session opened as the account this machine is already signed into is written under.
 #: A word rather than the empty string it is configured as: this goes in a directory name and
 #: in a listing, and both of those read better saying which account than saying nothing.
@@ -86,6 +96,11 @@ def _now() -> str:
     return (
         datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     )
+
+
+def _stamp() -> str:
+    """This moment, as a name that sorts the way the moments do: to the millisecond."""
+    return datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S.%f")[:-3] + "Z"
 
 
 class Session(NamedTuple):
@@ -120,6 +135,10 @@ class Drove(NamedTuple):
       effort: How hard it was asked to think.
       permission: What it was allowed to do without being asked.
       provider: The account it was configured to run as, or "" for this machine's own.
+      goals: Whether it was allowed to run under its backend's own goal feature.
+      person: Whether it was the person at the prompt, who is handed to a flow rather than
+        chosen -- so a run picked up again is picked up on the agents somebody chose, and
+        the person is handed over afresh by whatever is doing the picking up.
     """
 
     agent: str
@@ -128,6 +147,8 @@ class Drove(NamedTuple):
     effort: str
     permission: str = ""
     provider: str = ""
+    goals: bool = True
+    person: bool = False
 
     @property
     def spec(self) -> str:
@@ -292,6 +313,151 @@ def _link(at: Path, backend: str, ident: str) -> list[str]:
     return made
 
 
+class State(dict[str, Any]):
+    """What a resumable flow left behind, and what it is writing now.
+
+    A dict as far as the flow is concerned -- it is handed one, it writes into it, and the
+    next run of that flow is handed what it wrote. What it also is is a file in the cycle,
+    written as the flow writes: a flow worth picking up again is one that was stopped or
+    killed rather than one that ended tidily, and state saved only at the end is state a
+    stopped run does not have. Something written inside a value it holds -- a list appended
+    to, a dict of its own written into -- is a change no mapping can see, and is saved when
+    the run ends or when the flow says :meth:`save`.
+    """
+
+    def __init__(
+        self, at: Path, flow: str, held: Mapping[str, Any] | None = None
+    ) -> None:
+        """Holds what one flow left behind, against the cycle it is being written into.
+
+        Args:
+          at: The cycle's directory.
+          flow: Whose state this is, since a flow that called another is two flows and each
+            has its own to keep.
+          held: What was read back, or nothing for a run that is picking nothing up.
+        """
+        super().__init__(held or {})
+        self._at = at
+        self._flow = flow
+        self._writing = threading.Lock()
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        super().__setitem__(key, value)
+        self.save()
+
+    def __delitem__(self, key: str) -> None:
+        super().__delitem__(key)
+        self.save()
+
+    def update(self, *said: Any, **and_so: Any) -> None:
+        super().update(*said, **and_so)
+        self.save()
+
+    def setdefault(self, key: str, default: Any = None) -> Any:
+        held = super().setdefault(key, default)
+        self.save()
+        return held
+
+    def pop(self, *said: Any) -> Any:
+        held = super().pop(*said)
+        self.save()
+        return held
+
+    def popitem(self) -> tuple[str, Any]:
+        held = super().popitem()
+        self.save()
+        return held
+
+    def clear(self) -> None:
+        super().clear()
+        self.save()
+
+    def save(self) -> None:
+        """Writes what this flow is holding into the cycle, beside what the others hold.
+
+        Read again and merged rather than dumped over, for the reason the settings are: a
+        flow that called another is two flows writing one file, and a plain dump would put
+        back a file missing whatever the other had written. Whole and then moved into place,
+        so that one read while it is being written is the old one or the new one.
+
+        Anything that cannot be written -- a value no JSON has a shape for, a directory that
+        has gone -- leaves the run as it was: state is what a flow may pick up, and a run
+        that stopped because it could not save it would be worse than one that cannot.
+        """
+        with self._writing:
+            held = _kept(self._at)
+            held[self._flow] = dict(self)
+            try:
+                self._at.mkdir(parents=True, exist_ok=True)
+                said = json.dumps(held, ensure_ascii=False, default=str)
+                beside = self._at / f".{STATE}.new"
+                beside.write_text(said, encoding="utf-8")
+                beside.replace(self._at / STATE)
+            except (OSError, TypeError, ValueError):
+                return
+
+
+def _kept(cycle: Path) -> dict[str, Any]:
+    """What every flow of one cycle left behind, by the name each was run as.
+
+    Args:
+      cycle: The cycle's directory.
+
+    Returns:
+      One entry per flow that wrote anything, and nothing at all for a cycle that holds no
+      state, holds one nothing can read, or holds one written by hand as something else.
+    """
+    try:
+        said = json.loads((cycle / STATE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(said, dict):
+        return {}
+    return {
+        str(flow): cast("dict[str, Any]", one)
+        for flow, one in cast("dict[str, Any]", said).items()
+        if isinstance(one, dict)
+    }
+
+
+def state(cycle: Path, flow: str = "") -> dict[str, Any]:
+    """What a resumable flow left behind in one cycle.
+
+    Args:
+      cycle: The cycle's directory.
+      flow: Which flow's, as it was named when it ran, or "" for the one the cycle is a run
+        of -- which is the flow somebody picking the cycle up is picking up.
+
+    Returns:
+      What it wrote, and nothing at all where that flow wrote nothing.
+    """
+    held = _kept(cycle)
+    if flow:
+        return held.get(flow, {})
+    ran = read(cycle)
+    return held.get(ran.flow, {}) if ran is not None else {}
+
+
+def resumed(flow: str, workspace: Path | str | None = None) -> Path | None:
+    """The cycle one flow's next run picks up from, which is the last run of it here.
+
+    Args:
+      flow: The flow, as it is named when it is run.
+      workspace: Where it runs, defaulting to this directory.
+
+    Returns:
+      The cycle, or None where the flow has not run here or left nothing behind. A run that
+      wrote nothing is nothing to pick up: what it would be picked up as is the state a run
+      before it left, which is the run that has something to say. Found by what the state
+      holds rather than by what the run was of, so that a flow which was called by another
+      is picked up too -- it wrote under its own name, which is where it is looked for.
+    """
+    for cycle in reversed(cycles(workspace)):
+        if _kept(cycle).get(flow):
+            return cycle
+    return None
+
+
 class Cycle:
     """One run of one flow: the directory it is written to, and what has happened to it."""
 
@@ -301,6 +467,9 @@ class Cycle:
         agents: Sequence[AgentBase],
         task: str,
         workspace: Path | None = None,
+        *,
+        resumable: bool = False,
+        picked_up: str = "",
     ) -> None:
         """Opens a cycle, and writes down what it is a run of.
 
@@ -310,14 +479,23 @@ class Cycle:
           task: What they were asked to do.
           workspace: Where the run happens, defaulting to this directory. Cycles are kept
             under the workspace they ran in, since that is what anyone looking for one has.
+          resumable: Whether the flow says it can be picked up again, which is what makes
+            the state it leaves behind something to run it on rather than something to read.
+          picked_up: The cycle this run was picked up from, by name, or "" for one starting
+            from nothing.
         """
+        from .agents import HumanAgent
+
         self._at = (
             home()
             / "cycles"
             / _PLAIN.sub("-", str((workspace or Path.cwd()).resolve()))
             # The moment names it and six hex say which, since two flows may be started in
-            # one second and neither is the other's run.
-            / f"{datetime.datetime.now(datetime.UTC):%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:6]}"
+            # one millisecond and neither is the other's run. To the millisecond rather than
+            # to the second because these are read back in the order they sort in: which run
+            # a flow is picked up from is the last of them, and two started inside one second
+            # would otherwise be ordered by the hex, which is to say at random.
+            / f"{_stamp()}-{uuid.uuid4().hex[:6]}"
         )
         self._writing = (
             threading.Lock()
@@ -326,11 +504,18 @@ class Cycle:
         #: Every session this run has opened, by the name it was written down under, so that
         #: the links can be made again as the backends go on writing to them.
         self._sessions: dict[str, tuple[str, str]] = {}
+        #: What each resumable flow of this run is holding, so that a value written inside
+        #: one -- which no mapping can see -- is still saved when the run ends.
+        self._state: list[State] = []
+        self._flow = flow
+        self._where = (workspace or Path.cwd()).resolve()
         self.write(
             "began",
             flow=flow,
             task=task,
             workspace=str((workspace or Path.cwd()).resolve()),
+            resumable=resumable,
+            **({"picked_up": picked_up} if picked_up else {}),
             agents=[
                 {
                     "agent": agent.id,
@@ -342,6 +527,11 @@ class Cycle:
                     # running as: the account a turn fell back onto is written down against
                     # the session that ran there, which is where it happened.
                     "provider": agent.config.provider,
+                    "goals": agent.config.goals,
+                    # Asked as the run is written down rather than read back off a name:
+                    # what the person's backend is called is the agents' own business, and
+                    # what a run picked up again needs is which of its agents nobody chose.
+                    "person": isinstance(agent, HumanAgent),
                 }
                 for agent in agents
             ],
@@ -356,6 +546,27 @@ class Cycle:
     def journal(self) -> Path:
         """The file the run's own record is written to, a line per thing that happened."""
         return self._at / JOURNAL
+
+    @property
+    def workspace(self) -> Path:
+        """Where this run is happening, which is what its cycles are kept under."""
+        return self._where
+
+    def state(self, flow: str = "", held: Mapping[str, Any] | None = None) -> State:
+        """The dict a resumable flow of this run writes what it wants back into.
+
+        Args:
+          flow: Whose it is, as that flow was named, or "" for the flow this is a run of.
+            A flow that called another is two flows, and each keeps its own.
+          held: What it is picking up, or nothing for a run starting from nothing.
+
+        Returns:
+          The state, saved into this cycle as the flow writes it.
+        """
+        one = State(self._at, flow or self._flow, held)
+        with self._writing:
+            self._state.append(one)
+        return one
 
     def __enter__(self) -> Self:
         """Hands the cycle to whatever is running the flow inside it."""
@@ -377,6 +588,10 @@ class Cycle:
         # the session runs and finishes writing it after the last turn, and a sub-agent's
         # transcript appears whenever that sub-agent was started.
         self.links()
+        # And what each flow of this run is holding, which is where a value written inside
+        # something the state holds -- a list appended to -- is finally written down.
+        for one in list(self._state):
+            one.save()
         # An agent that was told to stop is a run that was stopped, whatever the turn under
         # way made of it: the process goes out from under that turn, and from inside one that
         # reads as a turn that could not finish.
@@ -572,6 +787,8 @@ def read(cycle: Path) -> Ran | None:
                 effort=str(said.get("effort") or ""),
                 permission=str(said.get("permission") or ""),
                 provider=str(said.get("provider") or ""),
+                goals=bool(said.get("goals", True)),
+                person=bool(said.get("person")),
             )
         )
     return Ran(
