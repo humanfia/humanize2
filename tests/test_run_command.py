@@ -132,14 +132,25 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     pass
 """
 
-#: The flows humanize ships, each of which shows the line that would start it.
+#: The flows humanize ships, each of which shows the line that would start it. A flow is a
+#: directory with an `__init__.py` in it or a file of its own, and these are looked for as
+#: both: a glob for one shape is a list that quietly empties the day a flow takes the other.
 PREBUILT = sorted(
-    path
-    for path in (Path(__file__).resolve().parents[1] / "src/hmz/flows/builtin").glob(
-        "*.py"
-    )
-    if not path.stem.startswith("_")
+    (
+        path if path.is_file() else path / "__init__.py"
+        for path in (
+            Path(__file__).resolve().parents[1] / "src/hmz/flows/builtin"
+        ).glob("*")
+        if not path.name.startswith("_")
+        and (path.suffix == ".py" or (path / "__init__.py").is_file())
+    ),
+    key=lambda path: path.parts,
 )
+
+
+def _named(flow: Path) -> str:
+    """What a shipped flow is called, which is its directory where the file is an init."""
+    return flow.parent.name if flow.name == "__init__.py" else flow.stem
 
 
 def _flow(tmp_path: Path, source: str) -> str:
@@ -583,7 +594,7 @@ def test_python_m_hmz_is_the_hmz_command(
     assert _seen(tmp_path)["task"] == "task"
 
 
-@pytest.mark.parametrize("flow", PREBUILT, ids=lambda flow: flow.name)
+@pytest.mark.parametrize("flow", PREBUILT, ids=_named)
 def test_every_example_runs_as_the_command_line_it_shows(
     flow: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
