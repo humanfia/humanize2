@@ -182,6 +182,22 @@ def test_a_session_spans_its_turns() -> None:
     )  # the id names the session, so it is read only as it opens
 
 
+def test_every_driven_agent_names_the_backend_it_is_registered_under() -> None:
+    """What an agent calls its backend is what its account, its skills and its cost are under.
+
+    Read off the class name, so a class whose name spells its product rather than its backend
+    -- `GrokBuildAgent` for `grok` -- would name a backend nothing answers to, and every one
+    of those lookups would quietly answer with nothing.
+    """
+    from hmz.agents import DRIVEN
+    from hmz.backends import named
+
+    for backend, (driver, config) in DRIVEN.items():
+        agent = driver(config(model="m", effort="high"))
+        assert agent.backend == backend, driver.__name__
+        assert named(agent.backend) is not None
+
+
 def test_an_agent_is_one_agent_apart_from_its_configuration() -> None:
     # The rlar shape: an actor and the reviewer reading its work, at one model and one effort.
     actor, reviewer = _EchoAgent(CONFIG), _EchoAgent(CONFIG)

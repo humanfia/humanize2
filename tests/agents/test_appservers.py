@@ -850,7 +850,7 @@ def test_codex_can_disable_goals_before_its_server_starts(
         ) -> None:
             del env
             started.append(argv)
-            self._agents: list[Any] = []
+            self._held: list[Any] = []
 
         def stop(self) -> None:
             """Nothing was started, so there is nothing to take down."""
@@ -876,7 +876,7 @@ def test_codex_refuses_to_disable_goals_after_its_server_starts(
             self, argv: list[str], env: Mapping[str, str] | None = None
         ) -> None:
             del argv, env
-            self._agents: list[Any] = []
+            self._held: list[Any] = []
 
         def stop(self) -> None:
             """Nothing was started, so there is nothing to take down."""

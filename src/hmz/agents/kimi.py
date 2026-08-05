@@ -637,8 +637,13 @@ class KimiCodeCLIAgent(AgentBase):
                     "--log-level",
                     "error",
                 ]
+                # Read before the environment is built out of it: a fallback landing
+                # between the two reads would name the account this server is *not* signed
+                # into, and a server that believes it is already elsewhere is one nothing ever
+                # starts again.
+                account = self.node().name
                 self._server = _AppServer(self.spawned(argv), self._environ())
-                self._server_as = self.node().name
+                self._server_as = account
                 # Held by the finalizer alone, which is what takes the daemon down: when the
                 # agent is collected, and at exit for one held to the end.
                 weakref.finalize(self, self._server.stop)

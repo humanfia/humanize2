@@ -410,6 +410,10 @@ class SessionBase(ABC):
         #: put in the workspace goes with it, so it is a finalizer rather than a line in
         #: `close`: a Ralph loop drops a session a turn and closes none of them.
         self._unmounting: Callable[[], None] | None = None
+        #: Whether a turn of this session is running now. Read by `close`, which is what a stop
+        #: reaches and so is called from another thread while a turn is under way: what the
+        #: turn is working by is not taken away underneath it.
+        self._working = False
         # A session drops itself from its agent when it is collected, so the agent neither holds
         # a flow's discarded sessions nor has to prune them while someone is reading them.
         agent._hold(self)
@@ -658,7 +662,17 @@ class SessionBase(ABC):
         # as much as the process is, and two threads calling one session are two turns one
         # after the other. A conversation is a sequence, however many are driving it.
         with self._lock:
-            yield from self._turning(prompt, schema=schema)
+            self._working = True
+            try:
+                yield from self._turning(prompt, schema=schema)
+            finally:
+                self._working = False
+                if self._ended:
+                    # Closed while this turn was running -- a stop does not wait for a turn,
+                    # and the turn's own process is still reading the skills it was given.
+                    # So what the session mounted goes now, which is the first moment nothing
+                    # is working by it.
+                    self._unmounted()
 
     def _turning(
         self, prompt: str, *, schema: type[BaseModel] | None = None
@@ -680,9 +694,14 @@ class SessionBase(ABC):
         held = self._agent.waiting() if self._agent.waiting is not None else []
         if held:
             prompt = "\n\n".join([prompt, *held])
+        # Before the moments rather than only on the first turn: a session closed and then
+        # spoken to again -- which is what a stopped flow that carries on does -- had what it
+        # was working by taken away when it closed, and a turn without the flow's skills is a
+        # turn asked to do what it no longer has the means to do. A no-op for a session that
+        # is holding them already, which is every turn but the first.
+        self._mounts()
         if not self._started:
             self._started = True
-            self._mounts()
             self._fire(Moment.SESSION_START, prompt=prompt)
         submitted = self._fire(Moment.USER_PROMPT_SUBMIT, prompt=prompt)
         if submitted.adds:
@@ -772,6 +791,8 @@ class SessionBase(ABC):
             tried.add(account.name)
             since = time.monotonic()
             for attempt in range(1, account.retries + 2):
+                if self._agent._stopped:
+                    raise Stopped(f"{self._agent.id} was stopped")
                 waiting = retry.waits(account.policy, attempt)
                 if attempt > 1:
                     # Checked before the wait rather than after it, so that a turn is never
@@ -795,6 +816,15 @@ class SessionBase(ABC):
                     last = failed
                 else:
                     return
+            if self._agent._stopped:
+                # Stopped while this turn was waiting to try again, or between accounts.
+                # A run ended by hand is ended, not carried on somewhere else.
+                raise Stopped(f"{self._agent.id} was stopped")
+            if self._agent.node().name != account.name:
+                # Another session of this agent moved it while this turn was running, and it
+                # moved it forwards. Taking the next step from where this turn thought it was
+                # would drag the agent back onto an account somebody has already left.
+                continue
             instead = next(
                 (one for one in providers.chain(account)[1:] if one.name not in tried),
                 None,
@@ -974,11 +1004,23 @@ class SessionBase(ABC):
             self._ended = True
             self._fire(Moment.SESSION_END)
         self._shut()
+        if not self._working:
+            # What the session mounted goes when the conversation does. Not while a turn is
+            # still running by it, though: this is called to stop an agent, and stopping one
+            # does not wait for the turn it is taking -- so a turn that is still reading those
+            # files would have them taken away underneath it. The turn itself lets go of them
+            # as it ends, which is the first moment nothing is using them.
+            self._unmounted()
+
+    def _unmounted(self) -> None:
+        """Takes away what this session mounted, once and whenever the last holder is done.
+
+        Calling the finalizer is what runs it, once, whichever gets there first: the close,
+        the end of a turn that outlived one, or collection for a session nobody closed.
+        """
         if self._unmounting is not None:
-            # What the session mounted goes when the conversation does rather than whenever
-            # it is collected. Calling it is what runs it, once, whichever half gets there
-            # first: this line, or the finalizer for a session nobody closed.
             self._unmounting()
+            self._unmounting = None
 
     def _shut(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
         """Lets go of whatever is holding this conversation open.
@@ -1062,12 +1104,20 @@ class SessionBase(ABC):
 
         Nothing at all for a flow that brings none, which is most of them, and for a backend
         that reads no such directory: those carry what their CLI installed and no more.
+
+        Note:
+          Into the directory on this machine, never an anchored agent's mirror of the target.
+          A mirror is the target's copy -- coganchor makes it hold what the target holds, and
+          sweeps away what only it has -- so a skill written into one is a skill deleted, and
+          a mirror created here before coganchor has taken it over is a mirror coganchor
+          refuses to take over at all, which would be every turn of the run failing. A
+          container given this workspace reads this directory and gets them; a machine across
+          a network keeps its own, and a flow that brings skills is a flow to run here.
         """
-        if not self._agent.loaded:
-            return
-        try:
-            workspace = self._workspace()
-        except ValueError:
+        if not self._agent.loaded or self._unmounting is not None:
+            return  # nothing to mount, or this session is holding them already
+        workspace = self.cwd
+        if not os.path.isdir(workspace):  # noqa: PTH112
             return  # a session that cannot say where it works is one that will not run
         mounted = mount(self._agent.backend, workspace, self._agent.loaded)
         if mounted.at:
@@ -1606,6 +1656,13 @@ class StreamSessionBase(SessionBase):
         if self._proc is not None and self._proc.poll() is None:
             return self._proc
         where = self._workspace()
+        # Which account this is being started as, read before the environment is built out of
+        # it rather than after the process is up: a fallback landing in between would name the
+        # account this process is *not* running as, and a session that believes it is already
+        # somewhere else is one that never starts again -- the wrong credentials for good.
+        # Read early, the same fallback makes it start again once for nothing, which is a
+        # turn's cost rather than a run's.
+        account = self._agent.node().name
         argv = self._agent.spawned(argv, self.cwd)
         started = subprocess.Popen(
             argv,
@@ -1625,7 +1682,7 @@ class StreamSessionBase(SessionBase):
         assert started.stderr is not None  # noqa: S101
         # Which account it was started as, so that an agent that falls back is an agent whose
         # next turn starts another process rather than speaking to this one.
-        self._as = self._agent.node().name
+        self._as = account
         with self._writing:
             # A new process owes nothing for what was said to the one before it. Left standing,
             # that count is an answer this session would wait for and never be given.
@@ -1919,14 +1976,21 @@ class AgentBase(ABC):
 
         Read off the class rather than written down twice: `ClaudeCodeAgent` drives `claude`,
         and an agent whose class says otherwise would be the one thing nobody could check.
+        Read back through the backend that answers to it, so that the name is one the rest of
+        humanize can look up -- `GrokBuildAgent` drives `grok`, which is what its accounts,
+        its skills and its cost are all kept under.
         """
-        return (
+        from hmz.backends import named
+
+        said = (
             type(self)
             .__name__.removesuffix("Agent")
             .removesuffix("CLI")
             .removesuffix("Code")
             .lower()
         )
+        profile = named(said)
+        return profile.name if profile is not None else said
 
     @property
     def opened(self) -> list[str]:

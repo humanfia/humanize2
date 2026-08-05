@@ -327,3 +327,51 @@ def test_a_chain_read_again_between_two_tries_is_walked_forwards(
 
     assert agent.provider is not None
     assert agent.provider.name == "spare"  # the end of what there was to try
+
+
+def test_a_turn_stopped_between_tries_is_stopped(accounts: None) -> None:
+    """A run ended by hand is ended, not carried on under the next account along.
+
+    Esc reaches an agent whose turn is in the wait between two tries, or between two
+    accounts, and neither is a moment to go on from.
+    """
+    import threading
+
+    from hmz.agents import Stopped
+
+    providers.retrying("shell", "main", 3, "constant", 0.0)
+    providers.points("shell", "main", "spare")
+    agent = _agent("main")
+    session = agent.new()
+    threading.Timer(0.3, agent.stop).start()
+
+    # The first try takes a second and fails; the stop lands while it is running, and the
+    # try after it is where the loop finds out.
+    with pytest.raises(Stopped):
+        session('sleep 1; echo "the account is down" >&2; exit 1')
+
+    assert agent.provider is not None
+    assert agent.provider.name == "main"  # it never moved
+
+
+def test_a_turn_does_not_drag_the_agent_back_onto_an_account_it_has_left(
+    accounts: None,
+) -> None:
+    """Two sessions of one agent fail at once, and the slower one must not undo the faster.
+
+    Its own view of the chain is a snapshot taken when its round began; by the time it comes
+    to move, the agent may already be further along than the step that snapshot names.
+    """
+    providers.points("shell", "main", "second")
+    providers.points("shell", "second", "spare")
+    agent = _agent("main")
+    spare = providers.find("shell", "spare")
+    assert spare is not None
+
+    # As though another session had walked the whole chain while this turn was running.
+    agent.fall_back(spare)
+    session = agent.new()
+
+    assert session(_FLAKY_AS_SCRIPT) == "spare"
+    assert agent.provider is not None
+    assert agent.provider.name == "spare"

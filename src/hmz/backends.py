@@ -563,7 +563,9 @@ PROFILES = (
     ),
     Profile(
         name="grok",
-        aliases=("grok", "grok-build"),
+        # `grokbuild` among them because that is what the class driving it is called, and an
+        # agent names its backend by its own class name.
+        aliases=("grok", "grok-build", "grokbuild"),
         home_var="GROK_HOME",
         home_dir=".grok",
         # A directory per session, under one per directory the work was done in: the id names

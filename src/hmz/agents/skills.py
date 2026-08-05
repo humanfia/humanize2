@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import contextlib
 import shutil
+import tempfile
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -176,12 +177,21 @@ class Mounted:
     at: tuple[Path, ...] = ()
 
 
-#: What has been mounted where, and by how many sessions at once. Two sessions of one flow
-#: working in one directory mount the same skills into the same place, and the first to end
-#: must not take them out from under the second -- so a mount is counted rather than owned,
-#: under a lock, since sessions open and close on whichever thread a flow is driving them from.
-_PLANTED: dict[Path, int] = {}
+#: What has been mounted where: the skill it was copied from, and how many sessions are
+#: holding it. Two sessions of one flow working in one directory mount the same skills into
+#: the same place, and the first to end must not take them out from under the second -- so a
+#: mount is counted rather than owned, under a lock, since sessions open and close on whichever
+#: thread a flow is driving them from. Where it came from is kept beside the count because two
+#: flows may each bring a `review`, and one of those is not the other.
+_PLANTED: dict[Path, tuple[Path, int]] = {}
 _PLANTING = threading.Lock()
+
+#: The directories that had to be made to hold a mount -- `.claude/`, and `skills/` inside it.
+#: They go when the last skill in them does, and only these: a `.claude/` the project already
+#: had is the project's own empty directory, and a session ending is not a reason for it to
+#: disappear. Held under the same lock, and beyond the mount that made it, because the session
+#: that made the directory is rarely the last one out of it.
+_MADE: set[Path] = set()
 
 
 def mount(backend: str, workspace: Path | str, loaded: Iterable[Loaded]) -> Mounted:
@@ -210,25 +220,81 @@ def mount(backend: str, workspace: Path | str, loaded: Iterable[Loaded]) -> Moun
     for one in loaded:
         at = into / one.name
         with _PLANTING:
-            if at in _PLANTED:
+            held = _PLANTED.get(at)
+            if held is not None:
+                whence, count = held
+                if whence != one.at:
+                    # Another flow's skill of the same name is mounted there and a session is
+                    # still working by it. A name is one skill to the CLI, so this one is left
+                    # where it is rather than written over: a flow called by another flow must
+                    # not change what the flow that called it is running with.
+                    _clashed()
+                    continue
                 # Another session of this flow is working here and mounted it already: the
                 # same skill from the same place, so it is shared rather than copied twice.
-                _PLANTED[at] += 1
+                _PLANTED[at] = (whence, count + 1)
                 planted.append(at)
                 continue
             if at.exists():
                 # Somebody's own skill of that name, which is theirs: a flow does not get to
                 # write over what the project keeps, and the CLI will load that one.
+                _clashed()
                 continue
-            try:
-                shutil.copytree(one.at, at)
-            except OSError:
+            # Which of the directories above it are about to be made, noted before making
+            # any: those are the ones a mount takes away again, and one that was already
+            # there was the project's before this session and is the project's after it.
+            making = [one for one in (into.parent, into) if not one.exists()]
+            if not _copied(one.at, at):
                 # A workspace that cannot be written is a skill the agent will not have,
                 # which is a turn that runs without it rather than a run that will not start.
                 continue
-            _PLANTED[at] = 1
+            _MADE.update(making)
+            _PLANTED[at] = (one.at, 1)
             planted.append(at)
     return Mounted(tuple(planted))
+
+
+def _copied(skill: Path, at: Path) -> bool:
+    """Copies one skill into place whole, or leaves nothing of it where it could not.
+
+    Beside it and then moved into place, because a copy that stops partway -- a disk that
+    filled, a file that could not be read -- would leave a directory that is not a skill where
+    a skill goes. Nothing here would ever remove it: it is not in the table of what was
+    planted, so from then on every session reads it as one the project owns and mounts its own
+    over it never.
+
+    Args:
+      skill: Where the skill is now.
+      at: Where it is to be.
+
+    Returns:
+      Whether it is there.
+    """
+    at.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        beside = Path(tempfile.mkdtemp(dir=at.parent, prefix=f".{at.name}."))
+    except OSError:
+        return False
+    try:
+        shutil.copytree(skill, beside, dirs_exist_ok=True)
+        beside.rename(at)
+    except OSError:
+        shutil.rmtree(beside, ignore_errors=True)
+        return False
+    return True
+
+
+def _clashed() -> None:
+    """Says that a skill a flow brought is not the skill of that name the session will read.
+
+    Not an error -- there is a skill of that name there and the turn runs with it -- and not
+    what whoever wrote the flow meant either, which is the half of the feedback a stack trace
+    never carries. That it happened is the whole of what is said: what the skill is called is
+    a word out of somebody's own flow, and those do not leave the machine.
+    """
+    from hmz import telemetry
+
+    telemetry.snag("skill-name-taken")
 
 
 def unmount(one: Mounted) -> None:
@@ -243,13 +309,25 @@ def unmount(one: Mounted) -> None:
             held = _PLANTED.get(at)
             if held is None:
                 continue
-            if held > 1:
-                _PLANTED[at] = held - 1
+            whence, count = held
+            if count > 1:
+                _PLANTED[at] = (whence, count - 1)
+                continue
+            shutil.rmtree(at, ignore_errors=True)
+            if at.exists():
+                # It would not go -- a file held open, a directory nobody may write. Kept in
+                # the table rather than forgotten: forgotten, the next session reads it as a
+                # skill the project owns and mounts nothing over it, forever.
+                _PLANTED[at] = (whence, 0)
                 continue
             del _PLANTED[at]
-            shutil.rmtree(at, ignore_errors=True)
-            # And what was made to hold them, where nothing else is in it: the mount takes
-            # its own directories with it, and what the project already had stays.
-            for empty in (at.parent, at.parent.parent):
-                with contextlib.suppress(OSError):
-                    empty.rmdir()
+    # And what humanize made to hold them, wherever nothing is left in it -- deepest first,
+    # since `skills/` is inside `.claude/`. Only what humanize made: one the project already
+    # had is the project's, empty or not.
+    with _PLANTING:
+        for empty in sorted(_MADE, reverse=True):
+            try:
+                empty.rmdir()
+            except OSError:
+                continue  # something is still in it, which is somebody's or another mount's
+            _MADE.discard(empty)

@@ -43,6 +43,10 @@ ALLOWED: dict[str, set[str]] = {
         # providers. They name nothing above themselves, so this widens the DAG without
         # bending it -- as `backends` does below.
         "hmz.providers",
+        # A skill a flow brought that a session will not read because something of that name
+        # is already there is noticed here and nowhere else. The reporter names nothing above
+        # itself, so this widens the DAG without bending it.
+        "hmz.telemetry",
     },
     "hmz.backends": set(),
     "hmz.coganchor": set(),

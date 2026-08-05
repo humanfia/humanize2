@@ -170,8 +170,11 @@ class _AppServer:
             it would have been asked for failing at the first one instead.
         """
         self._argv = argv
-        #: Whose turns run here, so that what is teed can be what nobody is watching.
-        self._agents: list[AgentBase] = []
+        #: Whose turns run here, so that what is teed can be what nobody is watching. Held
+        #: weakly: the agent holds the server, and the finalizer that takes the server down is
+        #: the agent's -- so a server holding its agent back would be an agent nothing could
+        #: collect, and a `codex app-server` nothing would ever reap.
+        self._held: list[weakref.ref[AgentBase]] = []
         self._proc = subprocess.Popen(
             argv,
             stdin=subprocess.PIPE,
@@ -199,6 +202,12 @@ class _AppServer:
         # says what drove it rather than what the layer driving it was once called.
         self.call("initialize", {"clientInfo": {"name": "humanize", "version": "0"}})
         self._write({"jsonrpc": "2.0", "method": "initialized", "params": {}})
+
+    @property
+    def _agents(self) -> list[AgentBase]:
+        """Whose turns run here, and still exist: an agent that has gone is not one to tell."""
+        held = [one() for one in self._held]
+        return [one for one in held if one is not None]
 
     def call(self, method: str, params: dict[str, Any]) -> Any:
         """Makes one call and reads until it is answered.
@@ -943,9 +952,14 @@ class CodexAgent(AgentBase):
                     # session belonging to the user.
                     argv += ["--disable", "goals"]
                 argv += ["--stdio"]
+                # Read before the environment is built out of it: a fallback landing
+                # between the two reads would name the account this server is *not* signed
+                # into, and a server that believes it is already elsewhere is one nothing ever
+                # starts again.
+                account = self.node().name
                 self._server = _AppServer(self.spawned(argv), self._environ())
-                self._server_as = self.node().name
-                self._server._agents.append(self)
+                self._server_as = account
+                self._server._held.append(weakref.ref(self))
                 # Held by the finalizer alone, which is what takes the server down: when the
                 # agent is collected, and at exit for one held to the end.
                 weakref.finalize(self, self._server.stop)
