@@ -60,30 +60,37 @@ repository you have just cloned is never run until you ask what is in it. See
 
 ### At the prompt
 
-`/flow` is where they live:
+`/flowverses` is the places themselves:
+
+| Key | |
+| --- | --- |
+| **enter** | What that flowverse holds, read from the clone — which means importing its flows, so it is asked of the one you opened |
+| **a** | Add one: a URL or an `owner/repo`, and a name to keep it under |
+| **r** | Fetch the one under the cursor again, or for the first time |
+| **d** **d** | Take an added one away, flows and all |
+
+`/flow` is where the flows are, and it steps between the same places:
 
 | Key | |
 | --- | --- |
 | **←** **→** | Step between the places flows come from, a list apiece — every flowverse, then `local` and `user` |
-| **a** | Add one: a URL or an `owner/repo`, and a name to keep it under |
-| **r** | Fetch the one being read again, or for the first time |
 | **f** | Copy the flow under the cursor into `.humanize/flows/`, to change |
-| **d** **d** | Take an added one away, flows and all |
 
 A flow whose file will not import is still listed, under the name it would have had and with
 nothing beside it: it is a flow somebody named, and saying so where it is chosen beats leaving
 it off the list and letting you wonder where it went.
 
-Those keys are there rather than in a menu of their own because that is the moment you find out
-that the flow you want is in a flowverse you have not added, that the one you have is out of
-date, or that the flow is *nearly* what you want -- which is what **f** is for. A flow is a
-directory, so the copy is the whole of it, skills and all, and it lands under the name it
-already had: yours are looked in first, so from then on that name means your copy. Editing a
-flowverse's own copy would not keep, since fetching it again takes what that repository says
-now. A fetch runs off the interface's own loop — it keeps drawing while it clones — and what
-became of it is said under the list rather than thrown at you. Opening the menu fetches
-whatever has never been fetched, in the background and without moving what you are reading, so
-`r` is for fetching one *again*.
+The two are apart because they are two questions. Which flow to run is the one `/flow` asks;
+what places there are, and what is in them, is about the list rather than about the row under
+the cursor. What stays on `/flow` is **f**, which is about the flow you are looking at: the
+moment you find out that it is *nearly* what you want. A flow is a directory, so the copy is
+the whole of it, skills and all, and it lands under the name it already had: yours are looked
+in first, so from then on that name means your copy. Editing a flowverse's own copy would not
+keep, since fetching it again takes what that repository says now. A fetch runs off the
+interface's own loop — it keeps drawing while it clones — and what became of it is said under
+the list rather than thrown at you. Opening `/flow` fetches whatever has never been fetched,
+in the background and without moving what you are reading, so **r** is for fetching one
+*again*.
 
 ## Where a name is looked for
 

@@ -79,7 +79,7 @@ running()                       # one Running(flow, since) apiece, oldest first
 ## Afterwards
 
 `/status` is the run in progress. Once it is over, the same shape — and far more of it — is
-[`hmz collect`](/features/tracing): one process per agent, one track per session, one slice per
+[`hmz trace collect`](/features/tracing): one process per agent, one track per sub-agent, one slice per
 thing the agent did.
 
 ## See also

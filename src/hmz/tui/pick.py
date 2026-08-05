@@ -3752,6 +3752,7 @@ _SENTRY = "reports"
 _SENT = "sent"
 _WORKSPACE = "workspace"
 _RUNS = "flow"
+_PROFILES = "profile"
 _FORGET = "forget"
 
 
@@ -3761,10 +3762,12 @@ class Adjusted(NamedTuple):
     Attributes:
       enable_sentry: Whether humanize reports its own failures from now on, or None where
         that was not touched.
+      profile: Whether a run in this directory is profiled as well as traced.
       forget: Whether to forget what this workspace was set up to run.
     """
 
     enable_sentry: bool | None = None
+    profile: bool = False
     forget: bool = False
 
 
@@ -3801,6 +3804,7 @@ class Adjusts(Drafts[Adjusted]):
         agents: int,
         flows: int,
         overridden: bool = False,
+        profile: bool = False,
     ) -> None:
         """Initializes the menu on what is remembered now.
 
@@ -3813,6 +3817,7 @@ class Adjusts(Drafts[Adjusted]):
           flows: How many flows this directory has been set up to run.
           overridden: Whether the environment is answering the reporting question for this
             run, so that a row saying one thing while humanize does another says so.
+          profile: Whether a run here is profiled as well as traced.
         """
         super().__init__()
         self._sentry = enable_sentry
@@ -3821,6 +3826,7 @@ class Adjusts(Drafts[Adjusted]):
         self._flow = flow
         self._agents = agents
         self._flows = flows
+        self._profile = profile
         self._forget = False
         self._said = (
             f"{SAYS} is set, so this run does the opposite of what this says"
@@ -3847,6 +3853,11 @@ class Adjusts(Drafts[Adjusted]):
                     _RUNS,
                     self._flow or "nothing yet",
                     f"the flow it opens on, set up with {self._agents} agents",
+                ),
+                (
+                    _PROFILES,
+                    _YES if self._profile else _NO,
+                    "profile the programs a run here starts, into its own trace",
                 ),
                 (
                     _FORGET,
@@ -3915,6 +3926,8 @@ class Adjusts(Drafts[Adjusted]):
         held = rows[at][0] if 0 <= at < len(rows) else ""
         if held == _SENTRY:
             self._sentry = not self._sentry
+        elif held == _PROFILES:
+            self._profile = not self._profile
         elif held == _FORGET:
             self._forget = not self._forget
         else:
@@ -3936,7 +3949,13 @@ class Adjusts(Drafts[Adjusted]):
 
     def applied(self) -> None:
         """Answers with what was changed, which is nothing where nothing was."""
-        self.dismiss(Adjusted(enable_sentry=self._sentry, forget=self._forget))
+        self.dismiss(
+            Adjusted(
+                enable_sentry=self._sentry,
+                profile=self._profile,
+                forget=self._forget,
+            )
+        )
 
 
 #: How much of a directory a row says: the last of it, which is what tells one project from
@@ -5782,9 +5801,10 @@ class Providers(Drafts[list[str]]):
 
 
 #: What can be done with a run that has already happened: pick it up where it stopped, for a
-#: flow that says it can be, and say where it is written down. The first is answered outside
-#: this module -- starting a flow is the interface's -- so it is named where it is read.
-carries_on, _WHERE_IT_IS = "carry-on", "where"
+#: flow that says it can be, gather what it left behind into a trace, and say where it is
+#: written down. The first is answered outside this module -- starting a flow is the
+#: interface's -- so it is named where it is read.
+carries_on, _COLLECTS, _WHERE_IT_IS = "carry-on", "collect", "where"
 
 #: How much of a task a row of the runs shows, before it is what a run is rather than a line.
 _ENOUGH_TASK = 60
@@ -5794,12 +5814,17 @@ class Doing(NamedTuple):
     """What somebody asked to have done with one run that has already happened.
 
     Attributes:
-      cycle: The run, by the directory it is written in.
-      doing: What to do with it, which is what the menu under it answered.
+      cycle: The run, by the directory it is written in, or None where this is only what the
+        sheet has to say on the way out.
+      doing: What to do with it, which is what the menu under it answered, and "" where the
+        sheet did it itself.
+      said: What happened while the sheet was open, for the transcript: a menu that gathered
+        a trace and said nothing afterwards is one nobody can read back.
     """
 
-    cycle: Path
-    doing: str
+    cycle: Path | None = None
+    doing: str = ""
+    said: tuple[str, ...] = ()
 
 
 def _asked_for(task: str) -> str:
@@ -5868,6 +5893,13 @@ class Does(Picks):
             )
         held.append(
             (
+                _COLLECTS,
+                "collect a trace",
+                "its sessions, and the programs it ran, as one trace to read",
+            )
+        )
+        held.append(
+            (
                 _WHERE_IT_IS,
                 "where it is",
                 "the directory this run is written in, sessions and all",
@@ -5900,6 +5932,42 @@ def _how(ran: Ran) -> str:
         "failed": "failed",
         "stopped": "was stopped",
     }.get(ran.how, "was left unfinished")
+
+
+def collected(ran: Ran) -> tuple[Path, str]:
+    """Gathers what one run left behind into a trace file, and says what is in it.
+
+    Beside the run rather than in this directory: a cycle is what a run was, and the trace of
+    that run belongs with the sessions it points at and the state it left. A trace is also a
+    thing to attach to an issue, which is what `hmz trace collect --output` is for.
+
+    Args:
+      ran: The run.
+
+    Returns:
+      Where the trace was written, and a line saying what it holds.
+    """
+    import datetime
+
+    from hmz.cycle import TRACES, opened
+    from hmz.tracing.collector import collect
+    from hmz.tracing.profile import PROFILE
+
+    at = ran.at / TRACES
+    at.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+    where = at / f"{stamp}.trace.json"
+    document = collect(
+        ran.workspace or None,
+        agents=opened(ran.at) or None,
+        output=where,
+        profile=ran.at / PROFILE,
+    )
+    said = document["otherData"]
+    held = f"{said.get('sessions', '0')} sessions, {said.get('slices', '0')} slices"
+    if said.get("programs"):
+        held += f", {said['programs']} programs"
+    return where, held
 
 
 class Cycles(Sheet[Doing]):
@@ -5948,6 +6016,8 @@ class Cycles(Sheet[Doing]):
         #: Whether each flow says now that it can be picked up, by flow: reading one means
         #: running its file, so it is asked once and only for the flows asked about.
         self._resumes: dict[str, bool] = {}
+        #: What is worth saying in the transcript once this sheet is done with.
+        self._told: list[str] = []
 
     def _ask(self) -> None:
         """Says what these are, and puts them up."""
@@ -6001,9 +6071,37 @@ class Cycles(Sheet[Doing]):
             f"Enter for what to do with one · Esc to close{self.searching()}"
         )
 
+    def leaving(self) -> None:
+        """Leaves, saying in the transcript whatever was gathered while this was open."""
+        self.dismiss(Doing(said=tuple(self._told)) if self._told else None)
+
     def _nothing(self) -> str:
         """What an empty list says, which is that nothing has been run here yet."""
         return "no flow has been run in this directory yet"
+
+    async def _collects(self, ran: Ran) -> None:
+        """Gathers what one run left behind into a trace, beside the run itself.
+
+        Off the event loop: reading a run's sessions back is every log every backend wrote
+        for it, which is seconds on a long run -- and an interface that stopped redrawing
+        while it ran would be one that looked as though it had gone away.
+
+        Args:
+          ran: The run.
+        """
+        import asyncio
+
+        self._said = f"collecting {escape(ran.name)}…"
+        self._fill()
+        try:
+            at, held = await asyncio.to_thread(collected, ran)
+        except (OSError, ValueError) as why:
+            self._said = escape(str(why))
+            self._fill()
+            return
+        self._said = f"{escape(str(at))}{_DOT}{escape(held)}"
+        self._told.append(f"[dim]{escape(str(at))} — {escape(held)}[/dim]")
+        self._fill()
 
     def _follows(self, listing: OptionList) -> None:
         """Takes which run the cursor is on off the list, by the directory it is written in."""
@@ -6072,6 +6170,9 @@ class Cycles(Sheet[Doing]):
             self._said = escape(str(ran.at))
             self._fill()
             return
+        if said == _COLLECTS:
+            await self._collects(ran)
+            return
         if said == carries_on and self._underway:
             # Said here rather than on the way out: the question this sheet is asking is
             # still worth answering, and a flow is stopped with esc rather than from here.
@@ -6080,7 +6181,7 @@ class Cycles(Sheet[Doing]):
             )
             self._fill()
             return
-        self.dismiss(Doing(ran.at, said))
+        self.dismiss(Doing(ran.at, said, tuple(self._told)))
 
 
 class Status(ModalScreen[None]):

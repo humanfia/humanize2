@@ -68,9 +68,10 @@ def test_draws_the_spawn_of_a_collected_sub_agent(codex_home: pathlib.Path) -> N
 
 
 def test_puts_a_lone_sub_agent_on_a_sub_agent_track(codex_home: pathlib.Path) -> None:
+    """And names the track after what that sub-agent was, which is what a track is."""
     document = tracing.collect(sessions=[CODEX_SUBTHREAD])
 
-    assert labels(document, "thread_name") == {"subagent"}
+    assert labels(document, "thread_name") == {"subagent · agents/scout.md"}
 
 
 def test_narrows_named_sessions_to_a_workspace(

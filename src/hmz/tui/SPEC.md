@@ -101,8 +101,10 @@ line, with what the flow is doing beside the transcript.
   line: an account outlives the flow that was set up with it, and the one place a person is
   asked anything is the one place a credential can be typed. It is the one thing said in both
   places, and the same store either way.
-- `hmz collect` and `hmz anchor` MUST NOT be commands here. Neither is a thing to do to a flow
-  that is running, and a command that only ever means one thing is a command line.
+- `hmz anchor` MUST NOT be a command here: it is not a thing to do to a flow that is running,
+  and a command that only ever means one thing is a command line. Gathering a trace MUST NOT
+  be one either -- it is a thing done to a run that has already happened, so it is one of the
+  things `/cycles` offers about the run under the cursor rather than a command of its own.
 - Setting the flow up MUST NOT be a command here either: it is asked as the flow is chosen, so
   a command for it would be a second way in to one sheet of one menu -- and one that has to
   say `that flow takes no setting up` for most of the flows there are.

@@ -132,7 +132,7 @@ jobs:
 
       - name: Collect the trace
         if: always()
-        run: hmz collect
+        run: hmz trace collect
 
       - uses: actions/upload-artifact@v5
         if: always()
@@ -149,7 +149,7 @@ jobs:
 
 ## Step 5 — read what happened
 
-`hmz collect` with `if: always()` is the point of the whole exercise: whatever the run did —
+`hmz trace collect` with `if: always()` is the point of the whole exercise: whatever the run did —
 finished, failed, or hit the timeout — the trace is on the artifacts.
 
 Download it and drag it into [ui.perfetto.dev](https://ui.perfetto.dev). One process per agent,
@@ -232,7 +232,7 @@ workspace. See [tutorial 17](/guide/tutorial-container).
 
 - Bound the run three ways, and let the job timeout be the fourth.
 - A provider made with `-s` is how a CLI signs in with nobody at a terminal.
-- `hmz collect` with `if: always()` turns a failed run into something you can read.
+- `hmz trace collect` with `if: always()` turns a failed run into something you can read.
 - Everything knowable up front is checked up front, which is what makes a scheduled run safe to
   leave alone.
 

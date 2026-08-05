@@ -192,13 +192,13 @@ neither able to read the other's. See [Providers](/reference/providers.md).
 
 **Everything a run left behind, as one timeline.**
 
-`hmz collect` reads the backends' own transcripts, names each session by the agent that opened
+`hmz trace collect` reads the backends' own transcripts, names each session by the agent that opened
 it (using the cycle), and writes a Chrome JSON trace. Load it in
 [ui.perfetto.dev](https://ui.perfetto.dev): each agent is a process, each session a track, each
 slice one thing the agent did.
 
 It works on sessions no flow ever drove, too — a trace of yesterday's `claude` session is
-`hmz collect` away. See [Tracing](/reference/tracing.md).
+`hmz trace collect` away. See [Tracing](/reference/tracing.md).
 
 ## How they fit
 

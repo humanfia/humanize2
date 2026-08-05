@@ -18,6 +18,7 @@ from .readers import claude, codex, dsh, kimi
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
+    from .profile import Process
     from .session import Session
 
 #: Which reader reads which backend's logs. Where those logs are, and in what order the
@@ -30,6 +31,32 @@ _READERS = {
 }
 
 
+def _profiled(
+    said: str | os.PathLike[str] | Iterable[Process] | None,
+    window: tuple[float, float],
+) -> list[Process]:
+    """The programs a run started, read back and cut down to the window asked for.
+
+    Args:
+        said: The profile a cycle holds, by path, or the records themselves,
+            or None for a trace of the sessions alone.
+        window: The times the trace was narrowed to.
+
+    Returns:
+        One per program that was running inside the window, and nothing at all
+        for a run that was not profiled.
+    """
+    if said is None:
+        return []
+    if isinstance(said, (str, os.PathLike)):
+        from .profile import read
+
+        held = read(said)
+    else:
+        held = list(said)
+    return [one for one in held if one.ended >= window[0] and one.began <= window[1]]
+
+
 def collect(
     workspace: str | os.PathLike[str] | None = None,
     *,
@@ -38,6 +65,7 @@ def collect(
     output: str | os.PathLike[str] | None = None,
     start: str | None = None,
     end: str | None = None,
+    profile: str | os.PathLike[str] | Iterable[Process] | None = None,
 ) -> dict[str, Any]:
     """Aggregates agent trajectories into a Chrome trace.
 
@@ -68,6 +96,11 @@ def collect(
         start: Earliest session time to include, in any wording dateparser
             understands, defaults to the earliest record.
         end: Latest session time to include, defaults to the latest record.
+        profile: The programs the run started while it ran, as the profile a
+            cycle holds or the records themselves. Each becomes a process of
+            the trace with a track per thread, beside the agents' own: a turn
+            is mostly other programs, and one timeline is what makes that
+            visible.
 
     Returns:
         The Chrome trace document, also written to output when one is given.
@@ -102,9 +135,9 @@ def collect(
 
     window = (bounds[0], bounds[1])
     collected: list[Session] = []
-    for profile in backends.PROFILES:
-        reader = _READERS.get(profile.name)
-        home = profile.directory()
+    for each in backends.PROFILES:
+        reader = _READERS.get(each.name)
+        home = each.directory()
         # Only the backends whose logs somebody has written a reader for: the rest keep their
         # sessions somewhere this cannot read -- rows of a database, a format nobody has taken
         # apart yet -- and a home directory being there is not a reason to fail the whole
@@ -128,7 +161,8 @@ def collect(
         )
         item.agent = " · ".join(str(part) for part in parts if part)
 
-    document = chrome.build(collected, root, names)
+    ran = list(_profiled(profile, window))
+    document = chrome.build(collected, root, names, ran)
     if output is not None:
         destination = pathlib.Path(output)
         destination.parent.mkdir(parents=True, exist_ok=True)

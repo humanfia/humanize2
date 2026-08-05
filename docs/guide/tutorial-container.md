@@ -160,7 +160,7 @@ A flow that ran in a container worked in a **mirror** rather than in this direct
 trajectories are not found by workspace:
 
 ```sh
-hmz collect --session 0a1b2c3d
+hmz trace collect --session 0a1b2c3d
 ```
 
 The session ids are in the [cycle](/features/tracing#what-a-run-writes-down):

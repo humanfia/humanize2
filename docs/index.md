@@ -73,7 +73,7 @@ hmz exec -f official/flame_chase \
 Then read the whole thing back:
 
 ```sh
-hmz collect
+hmz trace collect
 ```
 
 New here? [Getting started](/guide/getting-started) goes from nothing installed to a run you

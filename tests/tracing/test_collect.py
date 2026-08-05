@@ -166,10 +166,20 @@ def test_links_sub_agents_to_their_spawner(
 
 
 def test_names_tracks_after_their_role(homes: None, workspace: pathlib.Path) -> None:
+    """A process is an agent and a track is one of its sub-agents, named for what it was.
+
+    Which is what a track of five explorations reads as: `subagent · Explore` says what was
+    running on it, where `subagent #2` says only that it was the second row drawn.
+    """
     document = tracing.collect(workspace)
 
     tracks = {name.split(" ~")[0] for name in labels(document, "thread_name")}
-    assert tracks == {"main", "subagent"}
+    assert tracks == {
+        "main",
+        "subagent · Explore",
+        "subagent · agents/scout.md",
+        "subagent · explore",
+    }
 
 
 def test_gathers_a_configuration_and_its_sub_agents_into_one_agent(

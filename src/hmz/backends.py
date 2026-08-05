@@ -11,7 +11,7 @@ whatever account the turns run as. :mod:`hmz.models` asks the backend itself and
 says. The efforts are, because they are the backend's own vocabulary rather than a catalogue --
 `xhigh` means the same thing next release -- and a model narrows them to the ones it takes.
 
-Nothing is imported to read this, which is what lets `hmz collect` and the prompt's model list
+Nothing is imported to read this, which is what lets `hmz trace collect` and the model list
 have it without paying for the agents themselves. The code that acts on a fact lives where its
 purpose does: driving in :mod:`hmz.agents`, reading back in :mod:`hmz.tracing`.
 """

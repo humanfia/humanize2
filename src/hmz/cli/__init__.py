@@ -3,7 +3,7 @@
     hmz
     hmz -f humanize1 -c setup.yaml -a claude/MODEL:max ...
     hmz exec -f ralph_loop -a claude/MODEL:high "$(cat TASK.md)"
-    hmz collect
+    hmz trace collect
     hmz anchor --target ssh://build-box claude
 
 A command imports what it needs when it is the one asked for, and no earlier. Two things turn
@@ -90,18 +90,18 @@ def _exec(argv: list[str]) -> int:
     return 0
 
 
-def _collect(argv: list[str]) -> int:
-    """Writes the trajectories the agents left behind as one trace file.
+def _trace(argv: list[str]) -> int:
+    """Gathers what a run left behind into one trace file.
 
     Args:
       argv: What followed the command name.
 
     Returns:
-      Zero, once the trace has been written.
+      Zero, once the trace has been written, or two for a line to correct.
     """
-    from .collect import collect
+    from .trace import trace
 
-    return collect(argv)
+    return trace(argv)
 
 
 def _anchor(argv: list[str]) -> int:
@@ -295,9 +295,9 @@ def _tui(argv: list[str]) -> int:
 #: command for the terminal interface: naming nothing at all is how it opens.
 COMMANDS = {
     "exec": (_exec, "run an agent flow in this directory"),
-    "collect": (
-        _collect,
-        "aggregate the trajectories agents left behind into a Chrome trace",
+    "trace": (
+        _trace,
+        "what a run left behind, gathered into a trace to read",
     ),
     "anchor": (_anchor, "run an agent here that acts on another machine"),
     "flowverses": (_flowverses, "the places flows come from"),

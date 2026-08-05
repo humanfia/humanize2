@@ -23,7 +23,7 @@ WORK = pathlib.Path("/work/demo")
 HOME = pathlib.Path("/root/.humanize")
 
 #: Claude Code's home, inside this container. The trajectory below is written under it so
-#: that `hmz collect` has something real to read -- real in shape, invented in content.
+#: that `hmz trace collect` has something real to read -- real in shape, invented in content.
 CLAUDE = pathlib.Path("/root/.claude")
 
 #: The moment the invented trajectory happened, so a rendered GIF does not change every day.
@@ -114,7 +114,7 @@ def _project() -> None:
 
 
 def _trajectory() -> None:
-    """Writes one invented Claude transcript, so `hmz collect` has something to gather."""
+    """Writes one invented Claude transcript, so `hmz trace collect` has something to gather."""
     under = CLAUDE / "projects" / re.sub(r"[^a-zA-Z0-9]", "-", str(WORK))
     under.mkdir(parents=True, exist_ok=True)
     records = [

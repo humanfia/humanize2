@@ -1171,6 +1171,7 @@ class Runner:
         import inspect
 
         from .cycle import Cycle, state
+        from .settings import Settings
 
         # Written down as running before it is: what a flow calls is written down the same
         # way, so that whatever is watching reads one list of what is running under what,
@@ -1184,6 +1185,12 @@ class Runner:
                 task,
                 resumable=self._resumable,
                 picked_up=picked_up.name if picked_up is not None else "",
+                # Whether this workspace asked for its runs to be profiled as well as
+                # traced, which is a thing about the project being worked on: a repository
+                # whose tests take an hour is a different question from one whose take a
+                # minute. Read here rather than in the cycle, which is the run written down
+                # rather than the settings under it.
+                profile=Settings().profiling,
             ) as cycle:
                 for agent in self._agents:
                     agent.cycle = cycle

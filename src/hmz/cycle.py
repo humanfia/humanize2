@@ -19,7 +19,9 @@ One cycle is one run, and one directory::
     ~/.humanize/cycles/<workspace>/<when>-<which>/
         cycle.jsonl                     what happened, a line at a time
         state.json                      what a flow that can be picked up again left behind
+        profile.jsonl                   the programs it ran, for a run that was profiled
         sessions/<session>/…            a link per file the backend logged it to
+        traces/<when>.trace.json        what was gathered of it afterwards, to be read
 
 It opens when the flow starts and closes when the flow stops, however it stops -- finished,
 failed, or interrupted. A closed cycle is never reopened: running the flow again is another
@@ -45,12 +47,14 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from .agents import AgentBase
+    from .tracing.profile import Profiler
 
 __all__ = [
     "JOURNAL",
     "LOCAL",
     "SESSIONS",
     "STATE",
+    "TRACES",
     "Cycle",
     "Drove",
     "Ran",
@@ -64,6 +68,7 @@ __all__ = [
     "resumed",
     "sessions",
     "state",
+    "under",
     "where",
 ]
 
@@ -84,6 +89,10 @@ SESSIONS = "sessions"
 
 #: What a resumable flow left behind, kept beside the run it left it in.
 STATE = "state.json"
+
+#: Where the traces gathered of one run go, inside that run's own directory. A trace of a run
+#: belongs with the run: the sessions it points at and the state it left are already there.
+TRACES = "traces"
 
 #: What a session opened as the account this machine is already signed into is written under.
 #: A word rather than the empty string it is configured as: this goes in a directory name and
@@ -470,6 +479,7 @@ class Cycle:
         *,
         resumable: bool = False,
         picked_up: str = "",
+        profile: bool = False,
     ) -> None:
         """Opens a cycle, and writes down what it is a run of.
 
@@ -483,6 +493,9 @@ class Cycle:
             the state it leaves behind something to run it on rather than something to read.
           picked_up: The cycle this run was picked up from, by name, or "" for one starting
             from nothing.
+          profile: Whether to sample the programs the agents start while the run goes, so
+            that what a turn spent its minutes on is in the run's trace beside the turn. A
+            setting of the workspace, asked of it by whoever opens the cycle.
         """
         from .agents import HumanAgent
 
@@ -509,6 +522,9 @@ class Cycle:
         self._state: list[State] = []
         self._flow = flow
         self._where = (workspace or Path.cwd()).resolve()
+        #: The programs this run starts, sampled while it runs, or None for a run nobody
+        #: asked to profile -- which is every run until somebody says otherwise.
+        self._profiler = self._profiling() if profile else None
         self.write(
             "began",
             flow=flow,
@@ -552,6 +568,28 @@ class Cycle:
         """Where this run is happening, which is what its cycles are kept under."""
         return self._where
 
+    def _profiling(self) -> Profiler | None:
+        """The sampler this run is profiled by, started, or None where there is none.
+
+        Nothing here MUST be able to stop a run: a machine whose processes cannot be read is
+        a run with no profile rather than a run that will not start.
+
+        Returns:
+          The profiler, already running.
+        """
+        try:
+            from .tracing.profile import PROFILE, Profiler
+        except (
+            ImportError
+        ):  # pragma: no cover -- an install missing what it was built with
+            return None
+        one = Profiler(self._at / PROFILE)
+        try:
+            one.start()
+        except (OSError, RuntimeError):
+            return None
+        return one
+
     def state(self, flow: str = "", held: Mapping[str, Any] | None = None) -> State:
         """The dict a resumable flow of this run writes what it wants back into.
 
@@ -584,6 +622,10 @@ class Cycle:
         """
         from .agents import Stopped
 
+        # The sampler first, so that what it saw is written down before anything reads it,
+        # and so that a run which is over stops costing anything.
+        if self._profiler is not None:
+            self._profiler.stop()
         # The links again, now that the run is over: a backend writes a session's log while
         # the session runs and finishes writing it after the last turn, and a sub-agent's
         # transcript appears whenever that sub-agent was started.
@@ -662,6 +704,23 @@ class Cycle:
                 stream.write(json.dumps({"event": event, "at": _now(), **said}) + "\n")
 
 
+def under(workspace: Path | str | None = None) -> Path:
+    """Where the runs of one workspace are kept.
+
+    Args:
+      workspace: Which workspace, defaulting to this directory.
+
+    Returns:
+      The directory. It may not exist: a workspace nothing has been run in has none, and
+      whatever writes there is what makes it.
+    """
+    return (
+        home()
+        / "cycles"
+        / _PLAIN.sub("-", str(Path(workspace or Path.cwd()).resolve()))
+    )
+
+
 def cycles(workspace: Path | str | None = None) -> list[Path]:
     """The cycles run in one workspace, oldest first.
 
@@ -671,13 +730,10 @@ def cycles(workspace: Path | str | None = None) -> list[Path]:
     Returns:
       One directory per cycle, which is empty where nothing has been run.
     """
-    under = (
-        home()
-        / "cycles"
-        / _PLAIN.sub("-", str(Path(workspace or Path.cwd()).resolve()))
-    )
     try:
-        return sorted(one for one in under.iterdir() if (one / JOURNAL).is_file())
+        return sorted(
+            one for one in under(workspace).iterdir() if (one / JOURNAL).is_file()
+        )
     except OSError:
         return []
 

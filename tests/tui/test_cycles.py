@@ -151,7 +151,7 @@ async def test_a_run_of_a_flow_that_can_be_picked_up_says_so(workspace: Path) ->
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
 
-        assert rows(app) == ["carry-on", "where"]
+        assert rows(app) == ["carry-on", "collect", "where"]
 
 
 @pytest.mark.timeout(60)
@@ -167,7 +167,7 @@ async def test_a_run_of_a_flow_that_says_nothing_is_a_run_to_read(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
 
-        assert rows(app) == ["where"]
+        assert rows(app) == ["collect", "where"]
         assert "does not say it can be picked up" in str(
             app.screen.query_one("#tuning", Label).render()
         )
@@ -229,3 +229,44 @@ async def test_a_directory_nothing_has_been_run_in_says_so(workspace: Path) -> N
 
         assert rows(app) == []
         assert "no flow has been run" in str(sheet.query_one("#tuning", Label).render())
+
+
+@pytest.mark.timeout(90)
+async def test_a_trace_of_a_run_is_gathered_from_the_menu_under_it(
+    workspace: Path,
+) -> None:
+    """Every run has one to gather, whatever its flow says about being picked up.
+
+    And it lands beside the run rather than in this directory: a cycle already holds what
+    happened and what each session was logged to, and the trace is one of those.
+    """
+    from .test_app import _transcript
+
+    _ran("plain", "go")
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Does), driver)
+        await onto(app, driver, "collect")
+        await driver.press("enter")
+        await until(lambda: app.screen is sheet, driver)
+        await until(lambda: "sessions" in _under(sheet), driver)
+
+        (cycle,) = cycles(workspace)
+        (written,) = (cycle / "traces").glob("*.trace.json")
+        assert str(written) in _under(sheet)
+
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Cycles), driver)
+        # And said where it can be read back afterwards, rather than only under a list that
+        # has since been closed.
+        assert str(written) in _transcript(app)
+
+
+def _under(sheet: Cycles) -> str:
+    """What is said under the list, which is where a collection reports itself."""
+    from textual.widgets import Label
+
+    return str(sheet.query_one("#tuning", Label).content)

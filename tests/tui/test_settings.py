@@ -348,6 +348,7 @@ async def test_the_settings_menu_is_two_pages_and_turns_the_reporting_off(
         assert [str(one.id) for one in listing.options] == [
             "=workspace",
             "=flow",
+            "=profile",
             "=forget",
         ]
         assert "chat" in str(listing.get_option_at_index(1).prompt)
@@ -360,3 +361,41 @@ async def test_the_settings_menu_is_two_pages_and_turns_the_reporting_off(
 
     assert Settings(tmp_path).enable_sentry is False
     assert Settings(tmp_path).flow == "chat"  # and the second page was not touched
+
+
+@pytest.mark.timeout(60)
+async def test_whether_a_run_here_is_profiled_is_a_row_of_this_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A workspace's own: what a run costs in processes is a thing about the project.
+
+    Off unless somebody says otherwise, since it is a sampler running for as long as the flow
+    does -- and landing when the menu is saved, as everything on it does.
+    """
+    from hmz.tui import Humanize
+    from hmz.tui.pick import Adjusts, Confirms
+
+    monkeypatch.chdir(tmp_path)
+    assert not Settings(tmp_path).profiling
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/settings")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Adjusts), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+
+        await driver.press("tab")  # this directory
+        await driver.pause()
+        await driver.press("down", "down")  # onto profiling
+        await driver.press("right")
+        await driver.pause()
+        assert "on " in str(listing.get_option_at_index(2).prompt)
+
+        # Held until the menu is saved, exactly as everything else on it is.
+        assert not Settings(tmp_path).profiling
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Confirms), driver)
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Adjusts), driver)
+
+    assert Settings(tmp_path).profiling

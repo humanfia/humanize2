@@ -18,6 +18,7 @@ dependencies = [
     # A flow says what it can be configured with by declaring a model, and the menu that
     # asks is read off that model: the types, the bounds and the combinations a flow
     # refuses are all written once, where the flow declares them.
+    "psutil>=7.2.2",
     "pydantic>=2.9",
     "pyfiglet>=1.0",
     # dsh reads a project's `.env` the way its own CLI does, and reading one is somebody

@@ -12,7 +12,7 @@ Any of the runs from tutorials 1–4. This works on sessions no flow ever drove,
 In the project you have been running in:
 
 ```sh
-hmz collect
+hmz trace collect
 ```
 
 ```console
@@ -22,7 +22,7 @@ hmz collect
 The name is the UTC moment it was collected, so collecting twice keeps both traces rather than
 writing over the first.
 
-![hmz collect writing a trace, and finding nothing inside a one-minute window](/demo/collect.gif)
+![hmz trace collect writing a trace, and finding nothing inside a one-minute window](/demo/collect.gif)
 
 ::: details `0 sessions, 0 slices`
 Three usual reasons: you are in a different directory from the one the run happened in; the
@@ -93,7 +93,7 @@ head -3 ~/.humanize/cycles/*/20260809T014455Z-a4a089.jsonl
 {"event":"ended","at":"...","how":"done"}
 ```
 
-`hmz collect` reads the last cycle in the workspace, which is why `rlar` traces as `actor` and
+`hmz trace collect` reads the last cycle in the workspace, which is why `rlar` traces as `actor` and
 `reviewer` without being told anything.
 
 Note `how`: `done`, `failed`, or `stopped`. A run you ended with esc is written down as one you
@@ -102,11 +102,11 @@ ended.
 ## Step 5 — narrow it
 
 ```sh
-hmz collect --start "3 days ago"               # recent history only
-hmz collect --end "yesterday 18:00"
-hmz collect --session 0a1b2c3d                 # one session, wherever it ran
-hmz collect ~/code/other                       # another workspace
-hmz collect --output /tmp/before.json
+hmz trace collect --start "3 days ago"               # recent history only
+hmz trace collect --end "yesterday 18:00"
+hmz trace collect --session 0a1b2c3d                 # one session, wherever it ran
+hmz trace collect ~/code/other                       # another workspace
+hmz trace collect --output /tmp/before.json
 ```
 
 - Naming **sessions alone** collects them wherever they were recorded.
@@ -124,7 +124,7 @@ either — and the sub-agents it started come with it.
 This is the part people miss. Run `claude` on its own, then:
 
 ```sh
-hmz collect
+hmz trace collect
 ```
 
 It reads the backends' own home directories, so yesterday's session is a trace away. That is also
@@ -155,7 +155,7 @@ every handover, and what each model has cost.
 
 ## What you now know
 
-- `hmz collect` needs nothing set up and works on any session the backends logged.
+- `hmz trace collect` needs nothing set up and works on any session the backends logged.
 - A cycle is what turns "a configuration" into "the reviewer".
 - Perfetto is the viewer; the slices carry the prompts and the tool output.
 

@@ -98,9 +98,9 @@ if TYPE_CHECKING:
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
 #: runs on is an agent apiece rather than one model, so its `/models` is `/agents` -- which
-#: asks three things of each agent the flow drives. `hmz collect` and `hmz anchor` are not here:
-#: neither is a thing to do to a flow that is running, and both are a command line of their
-#: own.
+#: asks three things of each agent the flow drives. `hmz anchor` is not here: it is not a thing
+#: to do to a flow that is running, and it is a command line of its own. What a run left behind
+#: is `/cycles`, which is where the runs of this directory are.
 _OWN = (
     "flow",
     "flowverses",
@@ -1901,6 +1901,7 @@ class Humanize(App[None]):
         from hmz.settings import Settings
 
         written = Settings().enable_sentry
+        profiling = self.settings.profiling
         said = await self.push_screen_wait(
             Adjusts(
                 enable_sentry=written,
@@ -1909,19 +1910,27 @@ class Humanize(App[None]):
                 flow=self.settings.flow,
                 agents=len(self.settings.agents(self.settings.flow)),
                 flows=len(self.settings.flows()),
+                profile=profiling,
             )
         )
         if said is None:
             return
-        self._took_settings(said, written=written)
+        self._took_settings(said, written=written, profiling=profiling)
 
-    def _took_settings(self, said: Adjusted, *, written: bool | None = None) -> None:
+    def _took_settings(
+        self,
+        said: Adjusted,
+        *,
+        written: bool | None = None,
+        profiling: bool = False,
+    ) -> None:
         """Does what the settings menu was holding.
 
         Args:
           said: What it answered with.
           written: What was written down when it opened, so that a setting nobody moved is
             not written again.
+          profiling: Whether this directory was already being profiled, for the same reason.
         """
         if said.enable_sentry is not None and said.enable_sentry != written:
             # Through the same road the first-start question takes, so that the answer is
@@ -1932,6 +1941,14 @@ class Humanize(App[None]):
                 "[dim]humanize reports what goes wrong[/dim]"
                 if said.enable_sentry
                 else "[dim]humanize reports nothing[/dim]"
+            )
+        if said.profile != profiling:
+            self.settings.profiles(on=said.profile)
+            self.show(
+                "[dim]a run here profiles the programs it starts; /cycles collects the "
+                "trace[/dim]"
+                if said.profile
+                else "[dim]a run here is traced and not profiled[/dim]"
             )
         if said.forget and self.settings.forget():
             self.show(
@@ -1963,7 +1980,9 @@ class Humanize(App[None]):
         said = await self.push_screen_wait(Cycles(running=bool(self._agents)))
         if said is None:
             return
-        if said.doing == carries_on:
+        for one in said.said:
+            self.show(one)
+        if said.doing == carries_on and said.cycle is not None:
             self._carries_on(said.cycle)
 
     def _carries_on(self, cycle: Path) -> None:

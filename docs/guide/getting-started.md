@@ -210,7 +210,7 @@ Every run writes down what it was — the flow, the agents, and the id of every 
 opened. Turn that plus the backends' own transcripts into one timeline:
 
 ```sh
-hmz collect
+hmz trace collect
 ```
 
 ```console

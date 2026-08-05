@@ -7,8 +7,8 @@ else is a path, and a path is typed: looking for one would mean reading every Py
 here to see which declare a flow, which is a guess, and far too slow to make between
 keystrokes.
 
-`hmz collect` and `hmz anchor` are not offered. Neither is something to do to a flow while it
-runs, and both take a command line of their own.
+`hmz anchor` is not offered: it is not something to do to a flow while it runs, and it takes
+a command line of its own. What a run left behind is `/cycles`, which is where the runs are.
 """
 
 from __future__ import annotations

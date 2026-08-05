@@ -30,7 +30,7 @@ last `/clear` — so an export of a nine-hour run is the whole of it rather than
 The two-thousand-line bound is on what is kept to redraw a conversation you step back onto, not
 on what has already been written down the screen. For the tool input and output that never
 reached the screen, and for every agent's sessions rather than the ones that were read, use
-[`hmz collect`](/features/tracing).
+[`hmz trace collect`](/features/tracing).
 
 ## Copying instead
 
@@ -65,7 +65,7 @@ off.
 | --- | --- | --- |
 | `/export` | the screen: everything since it opened or was last cleared | `.humanize/<datetime>.session.md` |
 | the clipboard | whatever you dragged across | your machine's clipboard |
-| [`hmz collect`](/features/tracing) | every session of every agent, in full, with tool input and output | `.humanize/<datetime>.trace.json` |
+| [`hmz trace collect`](/features/tracing) | every session of every agent, in full, with tool input and output | `traces/<datetime>.trace.json`, in the run's own cycle |
 
 ## See also
 

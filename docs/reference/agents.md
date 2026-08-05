@@ -114,7 +114,7 @@ The protocol says nothing about which models an agent runs or how hard it can be
 think, so neither is offered: both rows read `as configured`, and the agent runs as whoever
 installed it set it up. It cannot be steered mid-turn either — every agent spells that
 extension its own way — and it has no goal feature, no permission rungs and no logs for
-`hmz collect` to read.
+`hmz trace collect` to read.
 
 `pi`, `opencode` and `mimo` name a model as `provider/id` — `openai-codex/gpt-5.5`,
 `opencode/big-pickle`, `xiaomi/mimo-v2.5` — because a model there belongs to the provider that
@@ -757,7 +757,7 @@ SDK exposes neither a per-session sandbox/approval control nor exact per-agent s
 another value is rejected before the runtime starts rather than silently ignored.
 
 opencode and mimocode keep a session in a database rather than in a log file, so there is
-nothing for `hmz collect` to gather and nothing for the interface to read a running cost out
+nothing for `hmz trace collect` to gather and nothing for the interface to read a running cost out
 of. What their turns cost still reaches a flow: each backend says it as the turn lands.
 
 A backend is driven through its command line where that can express what an agent is configured

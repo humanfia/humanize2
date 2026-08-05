@@ -17,7 +17,7 @@ A single conversation with a coding agent is a chat window. Most work is not tha
 | One agent building and another reading its work | A [two-agent flow](/guide/tutorial-actor-reviewer) |
 | Two hundred files fixed at once | A [fan-out](/guide/tutorial-async-flow) |
 | The same run twice, unattended, in CI | [`hmz exec`](/guide/tutorial-unattended) and [CI](/guide/tutorial-ci) |
-| To know what a nine-hour run actually did | [`hmz collect`](/guide/tutorial-trace) |
+| To know what a nine-hour run actually did | [`hmz trace collect`](/guide/tutorial-trace) |
 | One CLI driven as two accounts at once | [Providers](/guide/tutorial-providers) |
 | The work to land in a container, or on the build box | [Containers](/guide/tutorial-container), [remote execution](/guide/tutorial-remote) |
 

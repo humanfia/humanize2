@@ -51,6 +51,11 @@ class Settings:
     @property
     def enable_sentry(self) -> bool | None: ...
 
+    @property
+    def profiling(self) -> bool: ...
+
+    def profiles(self, *, on: bool) -> None: ...
+
     def agents(
         self, flow: str, goal_defaults: Sequence[bool] | None = None
     ) -> list[Runs]: ...
@@ -410,23 +415,30 @@ Args:
   agent has run. Whatever else a flow does as it is imported is the flow's own, and MUST fail
   as it would anywhere.
 
-## `hmz collect`
+## `hmz trace`
 
 ```shell
-hmz collect [<workspace>] [--session <session>[,<session>]...] [--output <output>] [--start <start>] [--end <end>]
+hmz trace collect [<workspace>] [--cycle <cycle>] [--session <session>[,<session>]...] [--output <output>] [--start <start>] [--end <end>]
 ```
 
-Collects and aggregates agent trajectories and generates Chrome JSON trace files for visualization.
+Collects and aggregates what a run left behind -- the agents' own trajectories, and the
+programs they ran where the run was profiled -- into a Chrome JSON trace for visualization.
+
+- It MUST be a command with what there is to do to a trace under it rather than a verb at the
+  top level: a `collect` says what happens to the thing without ever saying what the thing is.
+- A line naming no command under it MUST say which there are rather than doing one of them.
 
 Args:
 
 - `<workspace>`: The path to the workspace directory to generate traces for. If not provided, the current working directory is used, unless sessions are named.
+- `--cycle <cycle>`: Which run to trace, by the name of its directory or a leading part of it. If not provided, the last run of the workspace. A name no run of it answers to MUST be a line to correct.
 - `--session <session>[,<session>]...`: The sessions to generate traces for, comma separated and repeatable. A session is named by its whole id, by the key the trace shows it under, or by a leading part of either, and the sub-agents it started are collected with it. If not provided, every session of the workspace is included. Named sessions are collected wherever they were recorded, and are cut down to the workspace when one is provided.
-- `--output <output>`: The path to the output file where the aggregated trace will be saved. Its directory is created if it does not exist. If not provided, the trace is saved as `.humanize/<datetime>.trace.json` in the current working directory, where `<datetime>` is the UTC moment it was collected, so that collecting twice keeps both traces.
+- `--output <output>`: The path to the output file where the aggregated trace will be saved. Its directory is created if it does not exist. If not provided, the trace is saved as `traces/<datetime>.trace.json` inside the run it is a trace of -- where `<datetime>` is the UTC moment it was collected, so that collecting twice keeps both -- and, for a workspace that has run nothing, in the directory that workspace's runs would be kept in. A trace of a run belongs with the run: the sessions it points at and the state it left are already there, and a trace written into whatever directory somebody was standing in is one they have to keep track of themselves. A file named outright still wins, a trace being also a thing to attach to an issue.
 - `--start <start>`: The start time for filtering the session logs, in any wording dateparser understands. If not provided, up to earliest logs are included.
 - `--end <end>`: The end time for filtering the session logs, in any wording dateparser understands. If not provided, up to latest logs are included.
 
-Prints the output path with the number of sessions and slices it holds.
+Prints the output path, which run it is a trace of, and the number of sessions and slices it
+holds -- and the number of programs, for a run that was profiled.
 
 Environment Variables:
 

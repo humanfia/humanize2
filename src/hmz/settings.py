@@ -85,6 +85,26 @@ class Settings:
         said = self._held.get("enable_sentry")
         return said if isinstance(said, bool) else None
 
+    @property
+    def profiling(self) -> bool:
+        """Whether a run here profiles the programs its agents start, as well as tracing them.
+
+        A workspace's rather than this machine's: what a run costs in processes is a thing
+        about the project being worked on -- a repository whose tests take a minute is a
+        different question from one whose tests take an hour -- and off unless somebody says
+        otherwise, since it is a sampler running for as long as the flow does.
+        """
+        return bool(self._mine().get("profile"))
+
+    def profiles(self, *, on: bool) -> None:
+        """Writes down whether a run here is profiled as well as traced.
+
+        Args:
+          on: What was answered.
+        """
+        self._mine()["profile"] = on
+        self._write()
+
     def answers(self, *, enable_sentry: bool) -> None:
         """Writes down whether humanize reports its own failures.
 

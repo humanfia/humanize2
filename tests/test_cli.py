@@ -23,7 +23,7 @@ COMMANDS = [
     # And the two leaves that say whether humanize reports its own failures and where the
     # answer is kept: a command that cannot report a crash is a crash nobody hears about.
     ("exec", {"runner", "backends", "telemetry", "settings", "kept"}),
-    ("collect", set[str]()),
+    ("trace", set[str]()),
     ("anchor", {"coganchor"}),
     ("flowverses", set[str]()),
     ("agents", set[str]()),

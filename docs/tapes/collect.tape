@@ -17,11 +17,11 @@ Type "cd /work/demo && clear" Enter
 Show
 
 Sleep 500ms
-Type "hmz collect" Enter
+Type "hmz trace collect" Enter
 Sleep 3s
 
 Type "ls .humanize" Enter
 Sleep 2s
 
-Type "hmz collect --start '1 minute ago'" Enter
+Type "hmz trace collect --start '1 minute ago'" Enter
 Sleep 3s

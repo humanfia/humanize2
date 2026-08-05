@@ -6,10 +6,17 @@ import datetime
 import math
 from typing import TYPE_CHECKING, Any
 
+from .profile import Thread as _Thread
 from .session import Action, Session, summarize
 
 if TYPE_CHECKING:
     import pathlib
+
+    from .profile import Process
+
+#: What a reader of these logs joins the halves of a name with, which is what a track of one
+#: kind of sub-agent is named off the front of.
+_DOT = " · "
 
 _LANE_STRIDE = 100
 
@@ -18,19 +25,28 @@ def build(
     sessions: list[Session],
     workspace: pathlib.Path | None,
     names: tuple[str, ...] | None,
+    profiled: list[Process] | None = None,
 ) -> dict[str, Any]:
     """Renders sessions as a Chrome JSON trace with one process per agent.
 
-    Sessions of the same agent that never run at the same time share a track, so
-    a loop of one-shot sessions and a burst of short lived sub-agents both read
-    as one dense band instead of a staircase of near empty rows. Root sessions
-    and sub-agents are kept on separate tracks, and actions that do overlap
-    spill into extra lanes.
+    One process is one agent and everything it drove; one track is one of that
+    agent's sub-agents. Sessions of the same agent that never run at the same
+    time share a track, so a loop of one-shot sessions and a burst of short
+    lived sub-agents both read as one dense band instead of a staircase of near
+    empty rows. Root sessions and sub-agents are kept on separate tracks, and
+    actions that do overlap spill into extra lanes.
+
+    A profiled run brings the programs its agents started, and they are drawn
+    the same way: one process per program, one track per thread of it. Which is
+    the point of putting them in one document -- an agent's turn is mostly
+    other programs, and on one timeline the question of what a run was doing at
+    a given moment has one answer rather than two.
 
     Args:
         sessions: Sessions collected from every agent.
         workspace: Workspace the sessions were collected for, if any.
         names: Session ids the collection was narrowed to, if any.
+        profiled: Programs the run started while it ran, if it was profiled.
 
     Returns:
         A Chrome trace document ready to be serialized as JSON.
@@ -42,7 +58,8 @@ def build(
         scope["selected"] = ", ".join(names)
     label = " · ".join(scope.values())
     live = [item for item in sessions if item.actions]
-    if not live:
+    ran = list(profiled or ())
+    if not live and not ran:
         return {"traceEvents": [], "displayTimeUnit": "ms", "otherData": scope}
     spans = {
         item.key: (
@@ -101,13 +118,7 @@ def build(
         for ordinal, row in enumerate(rows):
             depth = shape[ordinal][0]
             rank = sum(1 for level, _ in shape[:ordinal] if level == depth) + 1
-            stem = (
-                "main"
-                if depth == 0
-                else "subagent"
-                if depth == 1
-                else f"subagent {depth}"
-            )
+            stem = _stem(depth, row)
             entries: list[tuple[Session, Action]] = []
             for item in row:
                 start, finish = spans[item.key]
@@ -150,20 +161,107 @@ def build(
             }
         )
 
+    _programs(events, ran, len(order) + 1, label)
+    began = [start for start, _ in spans.values()] + [one.began for one in ran]
+    over = [finish for _, finish in spans.values()] + [one.ended for one in ran]
+    held = {
+        **scope,
+        "agents": ", ".join(sorted({item.agent for item in live})),
+        "backends": ", ".join(sorted({item.backend for item in live})),
+        "sessions": str(len(live)),
+        "slices": str(sum(len(item.actions) for item in live)),
+        "tracks": str(sum(1 for event in events if event["name"] == "thread_name")),
+        "start": _stamp(min(began)),
+        "end": _stamp(max(over)),
+    }
+    if ran:
+        # Said only where there is a profile: an `otherData` that reported nought programs
+        # on every trace would be one more thing to read past on the traces that are only
+        # ever sessions.
+        held["programs"] = str(len(ran))
     return {
         "traceEvents": events,
         "displayTimeUnit": "ms",
-        "otherData": {
-            **scope,
-            "agents": ", ".join(sorted({item.agent for item in live})),
-            "backends": ", ".join(sorted({item.backend for item in live})),
-            "sessions": str(len(live)),
-            "slices": str(sum(len(item.actions) for item in live)),
-            "tracks": str(sum(1 for event in events if event["name"] == "thread_name")),
-            "start": _stamp(min(start for start, _ in spans.values())),
-            "end": _stamp(max(finish for _, finish in spans.values())),
-        },
+        "otherData": held,
     }
+
+
+def _programs(
+    events: list[dict[str, Any]], ran: list[Process], first: int, label: str
+) -> None:
+    """Draws the programs a profiled run started, the way the agents themselves are drawn.
+
+    One process apiece and one track per thread, which is the same shape as one agent and
+    its sub-agents -- that is the whole point of one document: a turn is mostly other
+    programs, and a timeline with the turns on it and not what they ran is a timeline that
+    stops exactly where the time went.
+
+    Args:
+        events: What has been drawn so far, appended to.
+        ran: The programs, oldest first.
+        first: The first process id to give them, after the agents' own.
+        label: What every process of this trace is labelled with.
+    """
+    for pid, one in enumerate(sorted(ran, key=lambda one: (one.began, one.pid)), first):
+        events.append(_meta(pid, 0, "process_name", {"name": one.label}))
+        events.append(_meta(pid, 0, "process_sort_index", {"sort_index": pid}))
+        events.append(_meta(pid, 0, "process_labels", {"labels": label}))
+        threads = one.threads or (_Thread(one.pid, one.began, one.ended, 0.0),)
+        for at, thread in enumerate(threads):
+            tid = (at + 1) * _LANE_STRIDE
+            # The thread that ran `main` is the one the process is named after; the rest are
+            # its own, and are named as the operating system names them.
+            named = "main" if thread.tid == one.pid else f"thread {thread.tid}"
+            events.append(_meta(pid, tid, "thread_name", {"name": named}))
+            events.append(_meta(pid, tid, "thread_sort_index", {"sort_index": tid}))
+            events.append(
+                {
+                    "ph": "X",
+                    "pid": pid,
+                    "tid": tid,
+                    "cat": "process",
+                    "name": one.label if named == "main" else named,
+                    "ts": round(thread.began * 1e6),
+                    "dur": max(round((thread.ended - thread.began) * 1e6), 1),
+                    "args": {
+                        "pid": one.pid,
+                        "ppid": one.ppid,
+                        "argv": " ".join(one.argv),
+                        "cpu": round(thread.cpu, 3),
+                        "at": _stamp(thread.began),
+                    },
+                }
+            )
+
+
+def _stem(depth: int, row: list[Session]) -> str:
+    """What one track of an agent's process is called.
+
+    A track is a sub-agent, so it is named after the sub-agent it holds: the backends say
+    what kind each was -- what a Claude sub-agent was started as, what a Codex thread is for
+    -- and a row of five explorations reads better as `subagent · explore` than as
+    `subagent #2`. The agent's own sessions are `main`, being the conversations somebody
+    started rather than anything a turn reached for.
+
+    Args:
+        depth: How far under a root session this row is.
+        row: The sessions packed into it.
+
+    Returns:
+        The name, without the number that tells two rows of one kind apart.
+    """
+    if depth == 0:
+        return "main"
+    stem = "subagent" if depth == 1 else f"subagent {depth}"
+    # What kind of sub-agent rather than which one: a label says what it was started as and
+    # then what that one was for, and a track is the first half of that -- five explorations
+    # are one track called `explore` rather than five names run together.
+    kinds = {
+        item.label.split(_DOT)[0].strip()
+        for item in row
+        if item.label and item.label != "main"
+    }
+    return f"{stem} · {kinds.pop()}" if len(kinds) == 1 else stem
 
 
 def _render(

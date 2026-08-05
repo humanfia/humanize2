@@ -23,7 +23,7 @@ That is the whole reason this is a container rather than a script you run on you
 | the homes | `/root/.humanize` and `/root/.claude`, inside the container |
 | the backends | `standin/claude` and `standin/codex`, which run nothing and exit 1 |
 | the accounts | made with `--no-login`, at `gateway.example.invalid`, with `not-a-real-token` |
-| the transcript `hmz collect` reads | invented by `stage.py` |
+| the transcript `hmz trace collect` reads | invented by `stage.py` |
 
 **No tape takes a turn.** The interface demo opens, shows its own lists, and leaves.
 

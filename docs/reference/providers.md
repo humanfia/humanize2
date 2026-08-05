@@ -263,9 +263,9 @@ Making a provider that is already there replaces what it holds and leaves its cr
 a key corrected is not a reason to sign in again.
 
 In the interface, `/providers` walks the same list, with the account this machine is signed
-into last under each CLI's heading. Six things can happen to one there: **a** makes one,
-**enter** corrects what it holds, **l** signs it in again, **f** says what it falls back to,
-**t** says how a failed turn under it is tried again, and **d** twice takes it away.
+into last under each CLI's heading. **a** makes one and **d** twice takes it away; **enter**
+opens what else can be done to the one under the cursor — correct what it holds, sign it in
+again, say what it falls back to, say how a failed turn under it is tried again.
 
 ## When an account goes down
 

@@ -129,21 +129,28 @@ hmz exec -f official/humanize1:rlcr -c setup.yaml -a claude/claude-opus-5:max \
 
 Nobody is at a prompt, so an agent that stops to ask is told nobody answered and carries on.
 
-## `hmz collect`
+## `hmz trace`
 
-Reads the trajectories the coding agents recorded and writes them out as one Chrome JSON trace.
-Works whether or not a flow drove them. See [Tracing](/reference/tracing.md).
+What a run left behind, gathered into something that can be read. One command with what there
+is to do to a trace under it: `collect` is what there is today.
+
+### `hmz trace collect`
+
+Reads the trajectories the coding agents recorded -- and the programs they ran, where the run
+was profiled -- and writes them out as one Chrome JSON trace. Works whether or not a flow drove
+them. See [Tracing](/reference/tracing.md).
 
 ```
-hmz collect [<workspace>] [--session <session>[,<session>]...]
-            [--output <output>] [--start <start>] [--end <end>]
+hmz trace collect [<workspace>] [--cycle <cycle>] [--session <session>[,<session>]...]
+                  [--output <output>] [--start <start>] [--end <end>]
 ```
 
 | Argument | |
 | --- | --- |
 | `<workspace>` | The directory to collect for. Defaults to this one, unless sessions are named. |
+| `--cycle <name>` | Which run to trace, by the name of its directory or a leading part of it. Defaults to the last run of the workspace. |
 | `--session <s>[,<s>...]` | Sessions to include, comma separated and repeatable. Defaults to every session of the workspace. |
-| `--output <path>` | Where to write. Defaults to `.humanize/<datetime>.trace.json`; the directory is created if it is not there. |
+| `--output <path>` | Where to write. Defaults to `traces/<datetime>.trace.json` inside the run it is a trace of; the directory is created if it is not there. |
 | `--start <when>` | Earliest record to include, in any wording [dateparser](https://dateparser.readthedocs.io/) understands. |
 | `--end <when>` | Latest record to include, same wording. |
 
@@ -151,23 +158,26 @@ A session is named by its whole id, by the key the trace shows it under, or by a
 either, and the sub-agents it started come with it. Named sessions are collected wherever they
 were recorded, and are then cut down to the workspace when one is given.
 
-The default output is named after the UTC moment it was collected, so collecting twice keeps
-both traces rather than writing over the first.
+A trace goes with the run it is a trace of: a cycle already holds what happened, what each
+session was logged to and what the flow left behind. The default name is the UTC moment it was
+collected, so collecting twice keeps both traces rather than writing over the first -- and
+`--output` still wins, a trace being also a thing to attach to an issue.
 
-Prints the output path with the number of sessions and slices it holds:
+Prints the output path, which run it is a trace of, and what it holds:
 
 ```console
-$ hmz collect
-.humanize/20260809T014455Z.trace.json: 3 sessions, 412 slices
+$ hmz trace collect
+~/.humanize/cycles/-home-you-code/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
 ```
 
 ### Examples
 
 ```sh
-hmz collect                                    # this workspace, all of its history
-hmz collect ~/code/other --start "3 days ago"  # another workspace, recent history only
-hmz collect --session 0a1b2c3d,5f6e            # two sessions, wherever they ran
-hmz collect --end "yesterday 18:00" --output /tmp/before.json
+hmz trace collect                                    # the last run here
+hmz trace collect --cycle 20260809T0144              # a run of this workspace, by name
+hmz trace collect ~/code/other --start "3 days ago"  # another workspace, recent history only
+hmz trace collect --session 0a1b2c3d,5f6e            # two sessions, wherever they ran
+hmz trace collect --end "yesterday 18:00" --output /tmp/before.json
 ```
 
 ## `hmz anchor`
@@ -384,7 +394,7 @@ hmz providers remove claude/deepseek
 | `HUMANIZE_LOG` | `hmz anchor`, `hmz anchor serve` | Default for `--log-level`. |
 | `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/features/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
 | `HUMANIZE_SHADOWS` | `hmz anchor`, a container or a machine an agent works on | Where the mirrors coganchor has been pointed at are recorded. Defaults to `~/.cache/humanize/shadows`. |
-| `CLAUDE_CONFIG_DIR` | `hmz collect`, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
+| `CLAUDE_CONFIG_DIR` | `hmz trace collect`, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
 | `CODEX_HOME` | same | Codex's home. Defaults to `~/.codex`. |
 | `DSH_HOME` | same | DeepSeek Harness's home. Defaults to `~/.dsh`. |
 | `GROK_HOME` | the model list, the cost readout | Grok Build's home. Defaults to `~/.grok`. |
@@ -412,19 +422,22 @@ A backend home that does not exist is skipped rather than being an error.
 
 | Path | Written by | |
 | --- | --- | --- |
-| `~/.humanize/cycles/<workspace>/<datetime>-<hex>.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened, how it ended. See [Cycles](/reference/tracing.md#cycles). |
+| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/cycle.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened and as which account, how it ended. See [Cycles](/reference/tracing.md#cycles). |
+| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/sessions/<session>/` | the same | A link per file each session was logged to, for reading a run back. humanize reads and writes the logs where the backend keeps them. |
+| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/state.json` | a [resumable](/reference/flows.md) flow | What that flow left behind, which the next run of it picks up. |
+| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/profile.jsonl` | a run of a workspace that asked to be profiled | The programs the run started, sampled while it ran. |
+| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/traces/<datetime>.trace.json` | `hmz trace collect`, `/cycles` | The trace of that run. |
 | `~/.humanize/providers/<cli>/<name>/provider.json` | `hmz providers add` | What a [provider](/reference/providers.md) was made by, and what a turn under it runs with. `0600`, in a directory at `0700`. |
 | `~/.humanize/providers/<cli>/<name>/{home,user}/...` | the CLI's own login | That provider's credentials, at the names the CLI keeps its own under. |
 | `~/.humanize/providers/<cli>/<name>/models.json` | `hmz providers add`, **r** | What that CLI said it runs as that account. Goes when the account does. |
-| `~/.humanize/local/<cli>.json` | `hmz providers falls-back`, `retry`, **f**, **t** | What the account this machine is signed into does when it fails: where it falls back to, and how a turn under it is tried again. |
-| `~/.humanize/acp.json` | **c** in `/providers` | The CLIs of your own that speak the [Agent Client Protocol](/reference/agents#a-cli-of-your-own), as `{name: [argv…]}`. A backend from the moment it is written. |
+| `~/.humanize/local/<cli>.json` | `hmz providers falls-back`, `retry`, and what enter opens in `/providers` | What the account this machine is signed into does when it fails: where it falls back to, and how a turn under it is tried again. |
+| `~/.humanize/acp.json` | a CLI of your own, added where `/providers` asks which CLI | The CLIs of your own that speak the [Agent Client Protocol](/reference/agents#a-cli-of-your-own), as `{name: [argv…]}`. A backend from the moment it is written. |
 | `~/.humanize/models/<cli>.json` | the TUI, **r** | The same, for the CLI as you already run it. |
-| `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run, and the settings that are not a workspace's — `enable_sentry`, the answer to the [reporting](/features/reporting) question. |
+| `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run and whether its runs are profiled, and the settings that are not a workspace's — `enable_sentry`, the answer to the [reporting](/features/reporting) question. |
 | `~/.humanize/agents.yaml` | `hmz agents`, `/agents` | The agents written down under a name, to be reached for from any flow. |
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
-| `.humanize/<datetime>.trace.json` | `hmz collect` | The trace. Relative to the current directory, not to the workspace named. |
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
-| `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** | A [flowverse](/features/flowverses.md), cloned. Every flow in it is offered as `<name>/<flow>`. |
+| `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** in `/flowverses` | A [flowverse](/features/flowverses.md), cloned. Every flow in it is offered as `<name>/<flow>`. |
 | `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows.md#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |
 | `.humanize/flows/*/` | you | This project's own flows. |
 | `~/.humanize/flows/*/` | you | Your flows, in every project. |
@@ -449,7 +462,7 @@ in [Architecture](/contributing/architecture.md).
 
 ```python
 from hmz.runner import Runner          # hmz exec
-from hmz.tracing import collect        # hmz collect
+from hmz.tracing import collect        # hmz trace collect
 from hmz.coganchor import connect      # hmz anchor
 from hmz.coganchor import check        # hmz anchor --check
 from hmz import providers              # hmz providers
@@ -457,7 +470,7 @@ from hmz.flows import verses           # hmz flowverses
 ```
 
 - `Runner(flow, agents).run(task)` — [Flows](/reference/flows.md)
-- `collect(workspace, *, sessions=…, agents=…, output=…, start=…, end=…)` — [Tracing](/reference/tracing.md)
+- `collect(workspace, *, sessions=…, agents=…, output=…, start=…, end=…, profile=…)` — [Tracing](/reference/tracing.md)
 - `connect(command, config)` / `check(config)` — [Remote execution](/reference/remote-execution.md)
 - `providers.providers(cli)` / `providers.find(cli, name)` / `providers.remove(cli, name)` —
   [Providers](/reference/providers.md)

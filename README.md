@@ -89,7 +89,7 @@ DEEPSEEK_API_KEY=sk-… hmz exec -f ralph_loop \
 To collect what a run left behind, and open it in [ui.perfetto.dev](https://ui.perfetto.dev):
 
 ```sh
-hmz collect
+hmz trace collect
 ```
 
 [Getting started](https://docs.humanfia.ai/guide/getting-started) goes from here to a

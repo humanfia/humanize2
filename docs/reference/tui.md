@@ -133,8 +133,10 @@ list appears under the editor with a line about each.
 | Command | Takes | What it does |
 | --- | --- | --- |
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Nothing lands until you save on the way out. |
+| `/flowverses` | | [Where flows come from](/features/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
-| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, corrected, signed in again, pointed at what it falls back to, taken away. |
+| `/cycles` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/features/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
+| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
 | `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
@@ -146,7 +148,7 @@ list appears under the editor with a line about each.
 `/details` and `/afk` flip when given nothing, and take `on` or `off` when you want to say
 which.
 
-**`hmz collect` and `hmz anchor` are deliberately not here.** Neither is a thing to do to a
+**`hmz anchor` is deliberately not here.** It is not a thing to do to a
 flow that is running, and a command that only ever means one thing is a command line.
 
 ## Reading one conversation
@@ -583,19 +585,19 @@ variables it sets. Their names, never a value: this is drawn where somebody can 
 
 | Key | What it does |
 | --- | --- |
-| **enter** | Corrects what the one under the cursor holds, by the way it was made with |
-| **a** | Makes one: which CLI, then how to sign in, then what that way asks |
-| **l** | Signs the one under the cursor in again, by the way it was made with |
-| **f** | Says which account a turn under this one carries on under when it fails |
-| **t** | Says how a failed turn under it is tried again: how many tries, which wait, how long |
+| **enter** | Opens what there is to do with the one under the cursor: correct what it holds, sign it in again, say what it falls back to, say how a failed turn under it is tried again |
+| **a** | Makes one: which CLI, then how to sign in, then what that way asks. The list of CLIs is also where a CLI of your own that speaks ACP is written down |
 | **d** **d** | Takes it away, credentials and all |
-| **c** | Adds a CLI of your own that speaks ACP, for accounts to be made against |
 | **esc** | Closes the menu, asking about anything it is holding |
+
+Four questions about one account are a menu rather than four letters to read off the bottom of
+the screen — while **enter**, which every list already means, was doing one of them.
 
 The last row under each CLI is the account this machine is already signed into — the CLI as
 you run it, which is what an agent nobody gave an account runs as, and where that agent's
-chain begins. **f** and **t** are what it takes; **enter**, **l** and **d** each say why there
-is nothing to do, since humanize did not make that account and keeps no credentials for it.
+chain begins. Where it falls back to and how it is tried again are what it takes; correcting
+it and signing it in are not offered at all, and **d** says why there is nothing to do, since
+humanize did not make that account and keeps no credentials for it.
 
 Taking one away, saying where it falls back to, saying how it is tried again and correcting
 what one holds are **held until the menu is saved**. Making one and signing one in are not: both own the terminal while they run,

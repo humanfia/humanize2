@@ -144,8 +144,9 @@ Same cause, from a `/flow` that named a path.
 
 ### `no such command: /foo`
 
-Type `/` to see the list. `hmz collect` and `hmz anchor` are deliberately not commands here:
-neither is a thing to do to a flow that is running.
+Type `/` to see the list. `hmz anchor` is deliberately not a command here: it is not a thing to
+do to a flow that is running. What a run left behind is `/cycles`, where the runs of this
+directory are and where one of them is collected into a trace.
 
 ### A line I typed did not reach the agent
 
@@ -230,7 +231,7 @@ Nothing matched. In order of likelihood:
 1. **The backend's home is elsewhere.** Check `CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
    `KIMI_CODE_HOME`. A home that does not exist is skipped silently.
 2. **The workspace does not match.** Sessions are matched against the path the flow ran under,
-   as it was given rather than what it links to. Try `hmz collect --session <id>`, which looks
+   as it was given rather than what it links to. Try `hmz trace collect --session <id>`, which looks
    everywhere.
 3. **The run worked in a mirror.** A flow on a [machine of its own](/reference/machines.md) did not work in
    this directory, so find it by `--session`.
@@ -238,7 +239,7 @@ Nothing matched. In order of likelihood:
 
 ### Two agents show up as one
 
-They ran at the same configuration and nothing said they were two. `hmz collect` reads that
+They ran at the same configuration and nothing said they were two. `hmz trace collect` reads that
 from the last [cycle](/reference/tracing.md#cycles) in the workspace; driving agents by hand, pass
 `agents={a.id: a.opened for a in …}`. See
 [what counts as one agent](/reference/tracing.md#what-counts-as-one-agent).

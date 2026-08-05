@@ -54,8 +54,9 @@ ALLOWED: dict[str, set[str]] = {
     # A run writes down which sessions its agents opened, and points a link at each of the
     # logs the backend is writing them to. Where those logs are is a fact about the CLI, and
     # `backends` is the leaf those are written down in: it names nothing, so this widens the
-    # DAG without bending it.
-    "hmz.cycle": {"hmz.agents", "hmz.backends"},
+    # DAG without bending it. And a run that is being profiled samples the programs its
+    # agents start, which is `tracing`: what a run left behind, read back.
+    "hmz.cycle": {"hmz.agents", "hmz.backends", "hmz.tracing"},
     # A flow drives agents, and one that has to know where its own agent keeps its tasks
     # is reading a fact rather than a log: `backends` is the leaf that exists so a fact of
     # that kind is written once, and it names nothing, so this widens the DAG without
@@ -84,6 +85,9 @@ ALLOWED: dict[str, set[str]] = {
         "hmz.backends",
         "hmz.cycle",
         "hmz.flows",
+        # Whether a run here is profiled as well as traced, which is a workspace's own
+        # setting. A leaf, like the agents kept under a name beside it.
+        "hmz.settings",
         # What a run is, said where a report of a failure in one can reach it. The reporter
         # names nothing above itself, so this widens the DAG without bending it.
         "hmz.telemetry",
@@ -100,6 +104,9 @@ ALLOWED: dict[str, set[str]] = {
         # the agents and the facts about them, both of which are under the interface too.
         "hmz.cycle",
         "hmz.flows",
+        # What a run left behind, gathered into a trace from the sheet the runs are read on.
+        # It names the facts about the backends and nothing above itself.
+        "hmz.tracing",
         # The agents written down under a name, which `/agents` walks and `hmz agents` says
         # from a command line. It names nothing, so this widens the DAG without bending it.
         "hmz.kept",

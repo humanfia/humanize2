@@ -100,7 +100,7 @@ the handover graph beside it.
 
 opencode and mimocode keep a session in a database rather than in a log file, so there is nothing
 for the interface to read a running cost out of and nothing for
-[`hmz collect`](/features/tracing) to gather.
+[`hmz trace collect`](/features/tracing) to gather.
 
 What their turns cost still reaches a flow: each says it as the turn lands.
 
