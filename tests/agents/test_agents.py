@@ -504,6 +504,9 @@ def test_a_backend_without_a_goal_feature_says_so() -> None:
 
 
 #: A `claude` that answers with the error it is: `subtype` still reads "success", so the
+#: What a turn held to a shape answers with, which is the object and nothing else.
+SHAPED = '{"capital":"Bern","landlocked":true}'
+
 #: `is_error` flag is the whole of what says a turn did not land.
 REFUSING = (
     "import json, sys\n"
@@ -596,6 +599,36 @@ def test_claude_does_not_accept_an_unfinished_result(
     assert len(events) == 1
     assert events[0].kind == "failed"
     assert because in events[0].text
+
+
+def test_a_turn_held_to_a_shape_ends_on_the_tool_that_answered_it() -> None:
+    """Which reads as an unfinished turn everywhere else, and is how a shaped turn ends.
+
+    The last thing the model does is call `StructuredOutput`, so the result says
+    `stop_reason: tool_use` -- and says the object beside it, which is the answer.
+    """
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+    ).new()
+
+    events = list(
+        session._read(
+            json.dumps(
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": False,
+                    "terminal_reason": "completed",
+                    "stop_reason": "tool_use",
+                    "result": SHAPED,
+                    "structured_output": {"capital": "Bern", "landlocked": True},
+                }
+            )
+        )
+    )
+
+    assert [one.kind for one in events] == ["result"]
+    assert events[0].text == SHAPED
 
 
 def test_claude_accepts_a_completed_result() -> None:

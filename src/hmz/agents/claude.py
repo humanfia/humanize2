@@ -95,15 +95,22 @@ def _about(called: dict[str, Any]) -> str:
 
 
 def _result_failure(said: dict[str, Any]) -> str | None:
-    """Explains why a Claude result did not finish its turn, or says that it did."""
+    """Explains why a Claude result did not finish its turn, or says that it did.
+
+    A turn held to a shape ends the one way that otherwise reads as unfinished: the last
+    thing the model did was call `StructuredOutput`, so the result says `stop_reason:
+    tool_use` -- and says the object beside it, which is the answer. So a result carrying
+    one is a turn that finished, however it stopped.
+    """
     reason: str | None = None
+    shaped = said.get("structured_output") is not None
     if said.get("is_error"):
         reason = "the turn failed"
     elif (subtype := said.get("subtype")) not in (None, "success"):
         reason = f"Claude ended the turn with {subtype}"
     elif (terminal := said.get("terminal_reason")) not in (None, "completed"):
         reason = f"Claude ended the turn with {terminal}"
-    elif (stopped := said.get("stop_reason")) in _UNFINISHED:
+    elif not shaped and (stopped := said.get("stop_reason")) in _UNFINISHED:
         reason = f"Claude stopped with {stopped} before completing the turn"
     if reason is None:
         return None
