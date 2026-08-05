@@ -22,6 +22,7 @@ from hmz.kept import Runs
 from hmz.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import (
+    Account,
     Accounts,
     Agent,
     Backends,
@@ -36,6 +37,7 @@ from .test_app import (
     into_agent,
     into_flows,
     keeps,
+    onto,
     opens,
     rows,
     until,
@@ -44,6 +46,8 @@ from .test_app import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from textual.pilot import Pilot
+
 #: What one installed CLI looks like, for the tests that walk the agents sheet.
 CLAUDE = {"claude": (Model("claude-opus-5", ("max", "high")),)}
 
@@ -51,6 +55,27 @@ CLAUDE = {"claude": (Model("claude-opus-5", ("max", "high")),)}
 def _under(app: Humanize) -> str:
     """What is said under the list, which is where a menu reports itself."""
     return str(app.screen.query_one("#tuning", Label).content)
+
+
+async def _doing(app: Humanize, driver: Pilot[None], held: str) -> None:
+    """Opens what there is to do with the account under the cursor, and picks one of them.
+
+    Which is what enter on an account is now: four questions about it -- correct it, sign it
+    in again, where it falls back to, how it is tried again -- rather than four letter keys
+    on the list of accounts.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+      held: Which of them, by the id its row is put up under.
+    """
+    await driver.press("enter")
+    await until(lambda: isinstance(app.screen, Account), driver)
+    await until(
+        lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+    )
+    await onto(app, driver, held)
+    await driver.press("enter")
 
 
 def _kept(cli: str, name: str = "") -> tuple[Model, ...]:
@@ -579,7 +604,7 @@ async def test_an_account_is_signed_in_again_by_the_way_it_was_made_with(
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
 
-        await driver.press("l")
+        await _doing(app, driver, "signs-in")
         await until(lambda: signed_in.call_count == 1, driver)
         await until(lambda: isinstance(app.screen, Providers), driver)
         await driver.press("escape")
@@ -605,7 +630,7 @@ async def test_signing_in_again_asks_only_what_is_not_written_down(
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
 
-        await driver.press("l")
+        await _doing(app, driver, "signs-in")
         await until(lambda: isinstance(app.screen, Signing), driver)
         form = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(form.options), driver)
@@ -624,7 +649,7 @@ async def test_signing_in_again_asks_only_what_is_not_written_down(
 
 @pytest.mark.timeout(60)
 async def test_correcting_what_one_holds_is_held_until_the_menu_is_saved() -> None:
-    """Enter on an account is the way in it was made by, asked again with what it holds."""
+    """Correcting one is the way in it was made by, asked again with what it holds."""
     providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "old"})
     app = Humanize()
     async with app.run_test() as driver:
@@ -635,7 +660,7 @@ async def test_correcting_what_one_holds_is_held_until_the_menu_is_saved() -> No
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
 
-        await driver.press("enter")
+        await _doing(app, driver, "corrects")
         await until(lambda: isinstance(app.screen, Signing), driver)
         form = app.screen.query_one("#choices", OptionList)
         # Only what the way asks, and a secret starts blank: it is on its way into a
@@ -680,7 +705,7 @@ async def test_where_one_falls_back_to_is_chosen_and_held_until_the_menu_is_save
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
 
-        await driver.press("f")
+        await _doing(app, driver, "falls")
         await until(lambda: isinstance(app.screen, Falls), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
@@ -730,7 +755,7 @@ async def test_a_chain_pointed_at_an_account_the_same_save_takes_away_goes_nowhe
             "d", "d"
         )  # `spare`, marked to be taken away when this is saved
         await driver.press("down")  # onto `work`
-        await driver.press("f")
+        await _doing(app, driver, "falls")
         await until(lambda: isinstance(app.screen, Falls), driver)
         await until(
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
@@ -764,7 +789,7 @@ async def test_how_one_is_tried_again_is_stepped_and_held_until_the_menu_is_save
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
 
-        await driver.press("t")
+        await _doing(app, driver, "tried")
         await until(lambda: isinstance(app.screen, Retries), driver)
         listing = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
@@ -916,15 +941,29 @@ async def test_the_account_this_machine_is_signed_into_is_a_row_of_its_own() -> 
 
         await driver.press("down")  # onto it
         await driver.pause()
-        # There is nothing to correct, sign in or take away about it, and it says so.
-        for key in ("enter", "l", "d"):
-            await driver.press(key)
-            await driver.pause()
-            assert "there is nothing to" in _under(app)
-            assert isinstance(app.screen, Providers)
+        # There is nothing to take away about it, and pressing d says so.
+        await driver.press("d")
+        await driver.pause()
+        assert "there is nothing to" in _under(app)
+        assert isinstance(app.screen, Providers)
+
+        # Correcting it and signing it in are not offered at all, with the reason said where
+        # they would have been: humanize did not make that account and keeps nothing for it.
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Account), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        assert [
+            str(one.id or "").removeprefix("=")
+            for one in app.screen.query_one("#choices", OptionList).options
+        ] == ["falls", "tried"]
+        assert "keeps no credentials for it" in _under(app)
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Providers), driver)
 
         # What it does take is where it falls back to.
-        await driver.press("f")
+        await _doing(app, driver, "falls")
         await until(lambda: isinstance(app.screen, Falls), driver)
         rows = app.screen.query_one("#choices", OptionList)
         await until(lambda: bool(rows.options), driver)
@@ -938,3 +977,40 @@ async def test_the_account_this_machine_is_signed_into_is_a_row_of_its_own() -> 
     held = providers.find("codex", providers.LOCAL)
     assert held is not None
     assert held.fallback == "work"
+
+
+@pytest.mark.timeout(60)
+async def test_a_cli_of_your_own_is_written_down_where_the_cli_is_asked_for() -> None:
+    """Which is the moment somebody finds out their agent is not one humanize drives.
+
+    A row of the list of backends rather than a key on the list of accounts: the question it
+    answers is `which CLI`, and that is the sheet asking it.
+    """
+    from hmz import backends
+    from hmz.tui.pick import Speaks
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+
+        await driver.press("a")
+        await until(lambda: isinstance(app.screen, Backends), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+        # Last, after every backend humanize drives.
+        assert rows(app)[-1].endswith("speaks")
+        await onto(app, driver, rows(app)[-1])
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Speaks), driver)
+
+        await driver.press(*"my-agent --acp")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        assert "is a backend from here on" in _under(app)
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Providers), driver)
+
+    assert backends.speaking()["my-agent"] == ("my-agent", "--acp")

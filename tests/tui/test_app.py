@@ -433,7 +433,7 @@ async def test_a_half_typed_command_is_offered_the_rest_of_itself() -> None:
         # The name is what is taken; what is shown is the name and what it is for.
         assert [
             str(offers.get_option_at_index(i).id) for i in range(offers.option_count)
-        ] == ["/flow"]
+        ] == ["/flow", "/flowverses"]
         assert "Switch flow" in str(offers.get_option_at_index(0).prompt)
 
         await driver.press("tab")

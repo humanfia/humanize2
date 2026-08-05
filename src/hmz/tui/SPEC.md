@@ -267,15 +267,11 @@ adjusted rather than chosen.
   key to press about it is a step nobody would choose to take. It MUST NOT hold the menu up,
   MUST NOT move what is being read, and MUST be tried once per opening however it goes -- a
   machine with no network says so once rather than on every keystroke.
-- Adding a flowverse, fetching one again and taking one away MUST be keys of this same page,
-  and MUST be about the place being read rather than the row under the cursor -- a flowverse
-  that has not been fetched is a list with no rows to be on, and fetching it is exactly what
-  somebody looking at it came to do. This is the moment somebody finds out that the flow they
-  want is in one they have not added, or that the one they have is out of date, and sending
-  them elsewhere to fix it would lose the question they came here to answer. What became of a
-  fetch MUST be said under the list rather than raised at whoever opened the menu, a fetch
-  MUST NOT stop the interface redrawing while it runs, and what was fetched MUST be what is
-  read once it is here.
+- Adding a flowverse, fetching one again and taking one away MUST NOT be keys of this page.
+  They are things done to the list of places rather than to the flow under the cursor, and a
+  sheet that asks `which flow` with three keys on it about something else is a sheet asking
+  two questions. `/flowverses` is where they are, and stepping between the places stays here:
+  that is about which list of flows is being read.
 - Setting the flow itself up MUST be asked as the flow is chosen, between the flow and its
   agents, rather than being a key or a page of its own: a flow that takes settings is chosen
   in order to be run with settings, and that is the one moment somebody is thinking about the
@@ -331,6 +327,25 @@ adjusted rather than chosen.
   so under the list rather than offer a switch. A CLI that keeps none anywhere MUST say that,
   rather than that none are installed.
 
+### Where flows come from
+
+- `/flowverses` MUST list every place there is, saying where each came from and which have
+  not been fetched, and MUST be the four things there are to do with one: what it holds, one
+  added, one fetched again, one taken away. It MUST be the same store `/flow` reads the flows
+  out of and the same one `hmz flowverses` walks -- one place a thing is kept is one place it
+  is kept, whichever way somebody reached it.
+- Enter MUST say what one holds, which MUST be read only of the flowverse it was asked of: a
+  flow is read by running it, so what a place holds is the one question about it with no cheap
+  answer. `a` MUST add one; `r` MUST fetch one again; `d` twice MUST take one away.
+- Nothing here MUST be held until the menu is saved: each of these runs git, and something
+  that has already been cloned is not a draft. What became of one MUST be said under the list
+  rather than raised at whoever opened it, and MUST NOT stop the interface redrawing while it
+  runs.
+- Where a flowverse came from MUST be shown with whatever was signed into the URL taken out,
+  for the reason `hmz flowverses` shows it that way: a private one is added as
+  `https://x-access-token:$TOKEN@...`, git keeps that verbatim, and a token on a screen is a
+  token in a photograph. It MUST be taken out in one place, which both ways of showing it ask.
+
 ### The agents kept under a name
 
 - The agents menu MUST list the agents written down under a name, and MUST NOT be the agents of
@@ -347,14 +362,23 @@ adjusted rather than chosen.
 
 - The accounts menu MUST list every account there is under a heading per CLI, and MUST be read
   rather than chosen from: which account an agent runs as is asked where that agent is set up.
-  Enter MUST correct what one holds; `a` MUST make one; `d` twice MUST take one away; and
-  signing one in again, saying which account this one falls back to and saying how a failed
-  turn under it is tried again MUST be keys of the same page.
+  `a` MUST make one and `d` twice MUST take one away.
+- What else can be done to one account -- correcting what it holds, signing it in again,
+  saying which account it falls back to, saying how a failed turn under it is tried again --
+  MUST be a menu opened with enter on the account it is about, rather than a letter apiece on
+  the list. Four questions about one row is a menu; four letters that have to be read off the
+  bottom of the screen are four keys nobody presses, while enter -- which every list already
+  means -- did one of them.
+- Writing down a CLI of your own MUST be a row of the list of backends a new account is for,
+  rather than a key of the accounts menu: it answers `which CLI`, which is the question that
+  sheet is asking, and it is reached at the moment somebody finds out that the agent they
+  want is not one humanize drives.
 - The account this machine is already signed into MUST be a row too, under each CLI that has
   an account of its own and after the ones somebody made: it is what an agent nobody gave an
-  account runs as, and where that agent's chain begins. Correcting it, signing it in and
-  taking it away MUST each say why there is nothing to do rather than doing nothing: humanize
-  did not make that account and keeps no credentials for it.
+  account runs as, and where that agent's chain begins. Correcting it and signing it in MUST
+  NOT be offered for it, with the reason said where they would have been, and taking it away
+  MUST say why there is nothing to do rather than doing nothing: humanize did not make that
+  account and keeps no credentials for it.
 - Where an account falls back to MUST be chosen from that CLI's own other accounts, and MUST
   offer the end of the line first: each account naming the next is what makes a chain, and an
   account cannot fall back to itself.
@@ -470,6 +494,9 @@ What the editor offers to finish, which is the only way anything is chosen.
   that there is one way to say a thing and it is the way it is written down.
 - An offer MUST be the whole of what the word becomes, so that taking one replaces what was
   typed rather than being appended to it.
+- A command that has been written out MUST be offered nothing: enter over an open list takes
+  what is under the cursor rather than sending the line, so a command that is the start of a
+  longer one -- `/flow`, beside `/flowverses` -- would otherwise be one nobody could send.
 - Finding the flows MUST NOT cost the interface its responsiveness: it reads every Python
   file below this directory, which is far too slow to repeat between keystrokes.
 

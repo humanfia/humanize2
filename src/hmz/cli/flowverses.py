@@ -158,7 +158,7 @@ def _fetch(name: str) -> int:
     except (ValueError, OSError) as why:
         print(f"hmz: {why}", file=sys.stderr)
         return 1
-    print(f"{one.name} is fetched from {_plain(one.url)}")
+    print(f"{one.name} is fetched from {store.plain(one.url)}")
     return _ask(one)
 
 
@@ -212,33 +212,13 @@ def _from(one: Flowverse) -> str:
     Returns:
       The URL with anything secret in it taken out, or a phrase for the two that have none.
     """
-    from hmz.flows.verses import BUILTIN
+    from hmz.flows.verses import BUILTIN, plain
 
     if one.name == BUILTIN:
         return _PACKAGE
-    return _plain(one.url) if one.url else _NOWHERE
-
-
-def _plain(url: str) -> str:
-    """One URL with whatever was signed into it taken out.
-
-    A flowverse is cloned from wherever somebody said, and a private one in CI is normally
-    said as `https://x-access-token:$TOKEN@github.com/org/flows` -- which git writes into the
-    clone's config verbatim and would be read back out of it here. This line is printed every
-    time the flowverses are listed, and a token printed once is a token in a scrollback and in
-    the log of every job that ran it. The sibling `hmz providers` never prints a secret; nor
-    does this.
-
-    Args:
-      url: Where it was fetched from, as its clone records it.
-
-    Returns:
-      The same URL with any user and password between `//` and `@` replaced, and the URL
-      untouched where there is none -- which is nearly always.
-    """
-    import re
-
-    return re.sub(r"(?<=//)[^/@]+@", "***@", url, count=1)
+    # Scrubbed where a flowverse is scrubbed, which is beside the flowverses: this line is
+    # printed every time they are listed, and the interface prints the same one.
+    return plain(one.url) if one.url else _NOWHERE
 
 
 #: What is printed where the other flowverses print where they were fetched from. The flows

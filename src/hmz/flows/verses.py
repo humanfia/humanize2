@@ -39,6 +39,7 @@ __all__ = [
     "fetch",
     "flowverses",
     "holds",
+    "plain",
     "refresh",
     "remove",
     "under",
@@ -303,6 +304,28 @@ def flows(one: Flowverse) -> list[str]:
     from . import offered
 
     return offered(holds(one))
+
+
+def plain(url: str) -> str:
+    """One URL with whatever was signed into it taken out.
+
+    A flowverse is cloned from wherever somebody said, and a private one in CI is normally
+    said as `https://x-access-token:$TOKEN@github.com/org/flows` -- which git writes into the
+    clone's config verbatim and is read back out of it here. Where a flowverse came from is
+    shown every time they are listed, at a prompt and on a command line both, so a token
+    printed once is a token in a scrollback and in the log of every job that ran it.
+
+    Here rather than beside either of the two things that print it: one place a thing is
+    scrubbed is one place it is scrubbed, whichever way somebody reached it.
+
+    Args:
+      url: Where it was fetched from, as its clone records it.
+
+    Returns:
+      The same URL with any user and password between `//` and `@` replaced, and the URL
+      untouched where there is none -- which is nearly always.
+    """
+    return re.sub(r"(?<=//)[^/@]+@", "***@", url, count=1)
 
 
 def refresh(at: Path) -> None:

@@ -1,10 +1,10 @@
-"""Choosing a flow out of the places flows come from, and adding a place to the list.
+"""Choosing a flow out of the places flows come from.
 
 The flows are read a place at a time -- humanize's own, its repository of the rest, whatever
 else has been added, and then this project's and yours -- so what is checked here is that the
-arrows step between those places, that the list holds the one being read and nothing else,
-and that the three things that can happen to a flowverse happen from the same page the flow
-is chosen at.
+arrows step between those places, and that the list holds the one being read and nothing else.
+What can happen to a flowverse is `/flowverses` and is checked beside it: this page is about
+which flow to run.
 
 Driven headlessly, as every test of the interface is, so what is checked is where a keystroke
 lands rather than how it is drawn.
@@ -21,10 +21,10 @@ import pytest
 from textual.widgets import Label, OptionList
 
 from hmz.backends import Model
-from hmz.flows import OFFICIAL, flowverses
+from hmz.flows import OFFICIAL
 from hmz.flows import verses as store
 from hmz.tui import Humanize
-from hmz.tui.pick import Agent, Configures, Fetches, Flows
+from hmz.tui.pick import Agent, Configures, Flows
 from tests.stubs import written
 
 from .test_app import into_agent, onto, until
@@ -268,149 +268,6 @@ async def test_what_was_never_fetched_is_fetched_as_the_menu_opens(
 
         await _steps(app, driver, OFFICIAL)
         await until(lambda: _rows(sheet) == ["official/loop"], driver)
-
-
-@pytest.mark.timeout(60)
-async def test_one_is_fetched_from_the_sheet_it_would_be_chosen_at(
-    theirs: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Somebody who finds out here that it is not downloaded fixes that here."""
-    monkeypatch.setattr(store, "OFFICIAL_URL", str(theirs))
-    app = Humanize()
-    async with app.run_test() as driver:
-        await _open(app, driver)
-        sheet = await _steps(app, driver, OFFICIAL)
-        assert _rows(sheet) == []
-
-        await driver.press("r")
-        await until(lambda: _rows(sheet) == ["official/loop"], driver)
-
-        assert store.named(OFFICIAL) is not None
-        assert "has not been fetched" not in _under(sheet)
-
-
-@pytest.mark.timeout(60)
-async def test_a_fetch_that_failed_is_said_under_the_list(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Rather than raised at whoever opened the sheet, which would lose the sheet."""
-    monkeypatch.setattr(store, "OFFICIAL_URL", str(tmp_path / "nowhere"))
-    app = Humanize()
-    async with app.run_test() as driver:
-        await _open(app, driver)
-        sheet = await _steps(app, driver, OFFICIAL)
-
-        await driver.press("r")
-        await until(lambda: "does not exist" in _under(sheet), driver)
-
-        assert isinstance(app.screen, Flows)  # still here, still asking
-        assert store.named(OFFICIAL) is not None  # and still offered, still unfetched
-
-
-@pytest.mark.timeout(60)
-async def test_there_is_nothing_to_fetch_for_the_ones_in_the_package() -> None:
-    """The flows humanize ships are in the package: a fetch is not what would change them."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        sheet = await _open(app, driver)
-
-        await driver.press("r")
-        await until(lambda: "nothing to fetch" in _under(sheet), driver)
-
-
-@pytest.mark.timeout(60)
-async def test_one_is_added_from_the_same_sheet(theirs: Path) -> None:
-    """A repository typed in, cloned, and its flows offered under the name it is kept under."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        sheet = await _open(app, driver)
-
-        await driver.press("a")
-        await until(lambda: isinstance(app.screen, Fetches), driver)
-        await driver.press(*str(theirs))
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Flows), driver)
-
-        # Fetched, read where it landed, and the cursor on the first flow it brought.
-        await until(lambda: _rows(sheet, "theirs") == ["theirs/loop"], driver)
-        assert sheet._where == "theirs"
-        assert [one.name for one in flowverses()][-1] == "theirs"
-
-
-@pytest.mark.timeout(60)
-async def test_a_flowverse_with_no_repository_named_is_refused_where_it_was_typed() -> (
-    None
-):
-    app = Humanize()
-    async with app.run_test() as driver:
-        await _open(app, driver)
-        await driver.press("a")
-        await until(lambda: isinstance(app.screen, Fetches), driver)
-        sheet = app.screen
-
-        await driver.press("enter")
-        await driver.pause()
-
-        assert isinstance(app.screen, Fetches)  # still asking, rather than gone
-        assert "none was named" in str(sheet.query_one("#tuning", Label).content)
-
-
-@pytest.mark.timeout(60)
-async def test_a_name_that_is_not_one_is_refused_before_anything_is_cloned() -> None:
-    """A flowverse is a directory under humanize's home, and a name that climbs out is not one."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        await _open(app, driver)
-        await driver.press("a")
-        await until(lambda: isinstance(app.screen, Fetches), driver)
-        sheet = app.screen
-
-        await driver.press(*"somewhere")
-        await driver.press("down")
-        await driver.press(*"../..")
-        await driver.press("enter")
-        await driver.pause()
-
-        assert isinstance(app.screen, Fetches)
-        assert "not a flowverse name" in str(sheet.query_one("#tuning", Label).content)
-
-
-@pytest.mark.timeout(60)
-async def test_one_that_was_added_may_be_taken_away_from_here(theirs: Path) -> None:
-    store.add(str(theirs))
-    app = Humanize()
-    async with app.run_test() as driver:
-        await _open(app, driver)
-        sheet = await _steps(app, driver, "theirs")
-        assert _rows(sheet) == ["theirs/loop"]
-
-        # Twice, since it cannot be undone: the first press says what the second one does.
-        await driver.press("d")
-        await until(lambda: "press d again" in _under(sheet), driver)
-        assert [one.name for one in flowverses()] == ["builtin", OFFICIAL, "theirs"]
-
-        await driver.press("d")
-        await driver.pause()
-
-        assert [one.name for one in flowverses()] == ["builtin", OFFICIAL]
-        assert "no longer here" in _under(sheet)
-        # And back on the place the flow in force came from, that one having gone.
-        assert sheet._where == "builtin"
-
-
-@pytest.mark.timeout(60)
-async def test_neither_of_humanize_s_own_may_be_taken_away() -> None:
-    """One is the package and one is where the rest come from: both are always in the list."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        sheet = await _open(app, driver)
-
-        await driver.press("d")
-        await driver.press("d")
-        await driver.pause()
-
-        assert "always here" in _under(sheet)
-        assert _rows(sheet, "builtin") == ["chat", "ralph_loop", "stateful_ralph"]
 
 
 @pytest.mark.timeout(60)

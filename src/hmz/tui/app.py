@@ -70,6 +70,7 @@ from .pick import (
     Chosen,
     Cycles,
     Flows,
+    Flowverses,
     Held,
     Providers,
     Reports,
@@ -102,6 +103,7 @@ if TYPE_CHECKING:
 #: own.
 _OWN = (
     "flow",
+    "flowverses",
     "agents",
     "providers",
     "cycles",
@@ -1575,6 +1577,8 @@ class Humanize(App[None]):
             self.action_providers()
         elif name == "cycles":
             self.action_cycles()
+        elif name == "flowverses":
+            self.action_flowverses()
         elif name == "settings":
             self.action_settings()
         elif name == "status":
@@ -1933,6 +1937,19 @@ class Humanize(App[None]):
             self.show(
                 "[dim]what was remembered about this directory is forgotten[/dim]"
             )
+
+    @work
+    async def action_flowverses(self) -> None:
+        """Opens the places flows come from, which is what `/flowverses` is for.
+
+        Not which flow to run -- that is `/flow`, where the arrows step between these places
+        and the list holds the one being read. This is the other question: what places there
+        are, what one of them holds, and the three things that can happen to one. Not refused
+        while a flow runs: a flowverse fetched now is a flowverse the next run may reach for,
+        and nothing here touches the flow that is going.
+        """
+        for one in await self.push_screen_wait(Flowverses()) or ():
+            self.show(one)
 
     @work
     async def action_cycles(self) -> None:

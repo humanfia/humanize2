@@ -18,8 +18,10 @@ __all__ = ["about", "hinted", "offered"]
 #: What each command does, shown beside its name.
 _ABOUT = {
     "flow": "Switch flow",
+    "flowverses": "Manage the places flows come from",
     "agents": "Set what each agent runs",
     "providers": "Manage the accounts agents run as",
+    "cycles": "The runs of this directory, and what to do with one",
     "settings": "What humanize remembers, here and everywhere",
     "status": "Show how the run is going",
     "clear": "Clear the screen",
@@ -77,15 +79,19 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
     Returns:
       Everything the last word could become, in full, so that taking one replaces what was
       typed rather than being appended to it, and in alphabetical order -- the only order a
-      list of commands has that a reader can predict. Never the word itself: a word that is
-      already what it would become is finished, and enter over an open list takes what is
-      under the cursor rather than sending the line.
+      list of commands has that a reader can predict. Never the word itself, and nothing at
+      all for a word that is already a command: a command that has been written out is
+      finished, and enter over an open list takes what is under the cursor rather than
+      sending the line -- so `/flow`, with `/flowverses` beside it in the list, would be a
+      command nobody could send.
     """
     if not typed.startswith("/"):
         return []
     words = typed.split(" ")
     tail = words[-1]
     if len(words) == 1:  # still naming the command
+        if tail.removeprefix("/") in commands:
+            return []
         offers = sorted(f"/{name}" for name in commands if name in _ABOUT)
     # The flow is the one thing `/flow` takes, so it is offered while that word is the one
     # being typed and not after it: a line that already names a flow is a finished line.

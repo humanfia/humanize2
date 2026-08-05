@@ -167,6 +167,9 @@ def remove(name: str) -> bool: ...
 def flows(one: Flowverse) -> list[str]: ...
 
 
+def plain(url: str) -> str: ...
+
+
 def clone(url: str, at: Path) -> None: ...
 
 
@@ -205,6 +208,10 @@ def refresh(at: Path) -> None: ...
   is killed rather than allowed to fail, what it had written by then MUST be taken away here:
   git tidies up after its own failures and cannot tidy up after being killed, and a name held
   by a flowverse that is not there is a name that cannot be used again.
+- Where a flowverse came from MUST be scrubbed of whatever was signed into it in one place,
+  which everything that shows one asks: a private flowverse is added as
+  `https://x-access-token:$TOKEN@...`, git keeps that verbatim, and it is shown by a command
+  line and at a prompt both. Two places doing it is one place to forget.
 - Where a flowverse came from MUST be read without interpolation. A `%` in a URL is ordinary --
   a percent-encoded password, or a path with one in it -- and reading it as the start of a
   substitution would raise where every listing of the flowverses passes.

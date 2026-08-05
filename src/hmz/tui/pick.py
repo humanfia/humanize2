@@ -75,6 +75,7 @@ if TYPE_CHECKING:
     from .monitor import Monitor
 
 __all__ = [
+    "Account",
     "Accounts",
     "Agent",
     "Anchors",
@@ -90,7 +91,9 @@ __all__ = [
     "Drafts",
     "Fitted",
     "Flows",
+    "Flowverses",
     "Held",
+    "Holds",
     "Imports",
     "Names",
     "Picks",
@@ -999,10 +1002,9 @@ class Flows(Drafts[Chosen]):
     this project's flows and yours -- with the left and right arrows stepping between the
     places and the list holding only the one being read. All of them run together under
     headings was one list nobody could see the end of, and one where walking to a flow meant
-    walking past every flow that came before it. The three things that can happen to a
-    flowverse are keys of this page, and are about the place being read: this is the moment
-    somebody finds out that the flow they want is in one they have not added, or that the one
-    they have is out of date.
+    walking past every flow that came before it. Stepping between the places is about which
+    list of flows is being read; what can happen to a flowverse is `/flowverses`, which is a
+    question about the places rather than about which flow to run.
 
     Choosing a flow asks what that flow itself takes, where it takes anything, and then turns
     to what will drive it. A key that set the flow up was a key nobody pressed: a flow with
@@ -1014,7 +1016,7 @@ class Flows(Drafts[Chosen]):
     """
 
     TABS: ClassVar = ("Flow", "Agents")
-    LETTERS: ClassVar = frozenset({"search", "adding", "refresh", "drop", "fork"})
+    LETTERS: ClassVar = frozenset({"search", "fork"})
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
@@ -1030,9 +1032,6 @@ class Flows(Drafts[Chosen]):
         # Letters rather than chords, and priority so they are the keys rather than the
         # search: a search is asked for, and while one is running these fall through to it.
         Binding("s", "search", "search", priority=True),
-        Binding("a", "adding", "add a flowverse", priority=True),
-        Binding("r", "refresh", "fetch it again", priority=True),
-        Binding("d", "drop", "take it away", priority=True),
         Binding("f", "fork", "copy it here to change", priority=True),
     ]
 
@@ -1207,7 +1206,7 @@ class Flows(Drafts[Chosen]):
                 fetch(named)
                 return named
 
-            await self._fetches(name, fetching, reading=False)
+            await self._fetches(name, fetching)
 
     def _turned(self) -> None:
         """Puts the cursor back on the flow being read when the flows page opens again."""
@@ -1326,15 +1325,6 @@ class Flows(Drafts[Chosen]):
 
         return next((one for one in flowverses() if one.name == named), None)
 
-    def _whose(self) -> str:
-        """Which place the keys of this page are about, which is the one being read.
-
-        The place rather than whatever row the cursor happens to be on: a flowverse with
-        nothing in it is a list with no rows to be on, and fetching it is exactly what
-        somebody looking at it came to do.
-        """
-        return self._where
-
     def action_before(self) -> None:
         """Reads the place before this one."""
         self._steps(-1)
@@ -1410,15 +1400,14 @@ class Flows(Drafts[Chosen]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            "Enter to choose · f copies it here · a adds a flowverse · r fetches one · "
-            f"d twice takes one away · Esc to close{self.searching()}"
+            f"Enter to choose · f copies it here · Esc to close{self.searching()}"
         )
 
     def _empty(self, whose: str) -> str:
         """What a place with no flows in it says on the row where its flows would be."""
         verse = self._verse(whose)
         if verse is not None and not verse.fetched:
-            return "not fetched yet; r fetches it"
+            return "not fetched yet; /flowverses fetches it"
         return "nothing in it yet"
 
     def _nothing(self) -> str:
@@ -1497,49 +1486,6 @@ class Flows(Drafts[Chosen]):
         self._said = ""
         self._turn_page(1)
 
-    @work
-    async def action_adding(self) -> None:
-        """Adds a flowverse without leaving the question it was going to be chosen from."""
-        if self._tab != _FLOW_PAGE:
-            return
-        showing = cast(
-            "App[None]",
-            self.app,  # pyright: ignore[reportUnknownMemberType]
-        )
-        said = await showing.push_screen_wait(Fetches())
-        if said is None:
-            return
-        url, name = said
-        await self._fetches(name or url, lambda: _added(url, name))
-
-    @work
-    async def action_refresh(self) -> None:
-        """Fetches the flowverse under the cursor again, or for the first time."""
-        from hmz.flows.verses import fetch
-
-        if self._tab != _FLOW_PAGE:
-            return
-        verse = self._verse(self._whose())
-        if verse is None:
-            self._said = (
-                f"{escape(self._whose())} is a directory of your own, not a fetch"
-            )
-            self._fill()
-            return
-        if not verse.url:
-            self._said = (
-                f"{escape(verse.name)} came with humanize; there is nothing to fetch"
-            )
-            self._fill()
-            return
-        name = verse.name
-
-        def fetching() -> str:
-            fetch(name)
-            return name
-
-        await self._fetches(name, fetching)
-
     def action_fork(self) -> None:
         """Copies the flow under the cursor into this project's own, to be changed.
 
@@ -1576,48 +1522,17 @@ class Flows(Drafts[Chosen]):
         )
         self._fill()
 
-    def action_drop(self) -> None:
-        """Takes the flowverse being read away, flows and all, once d is pressed twice."""
-        from hmz.flows.verses import remove
-
-        if self._tab != _FLOW_PAGE:
-            return
-        whose = self._whose()
-        verse = self._verse(whose)
-        if verse is None:
-            return  # a directory of your own is not one of these to take away
-        if not self._armed(whose):
-            self._said = f"press d again to take {escape(whose)} away, flows and all"
-            self._fill()
-            return
-        try:
-            remove(verse.name)
-        except (OSError, ValueError) as why:
-            self._said = escape(str(why))
-            self._fill()
-            return
-        # The place that was being read has gone, so the page reads whichever place the flow
-        # in force came from, exactly as it did when it opened.
-        self._offers, self._where, self._was = None, "", ""
-        self._said = f"{escape(verse.name)} is no longer here"
-        self._fill()
-
-    async def _fetches(
-        self, named: str, doing: Callable[[], str], *, reading: bool = True
-    ) -> None:
+    async def _fetches(self, named: str, doing: Callable[[], str]) -> None:
         """Runs one git fetch off the event loop, and shows the list it left behind.
 
-        Off the loop because a clone is seconds of network: an interface that stopped
-        redrawing while it ran would be one that looked as though it had gone away.
+        Off the loop because a clone is seconds of network: a menu that stopped redrawing
+        while it ran would be one that looked as though it had gone away. What is being read
+        is left where it is: this is the flowverse nobody has fetched being fetched because
+        its flows are wanted, rather than somebody asking to be taken to it.
 
         Args:
-          named: What is being fetched, said under the list while it runs. What is being
-            fetched rather than what is being read: they are the same for the key that
-            fetches one and different for every other way of getting here.
+          named: What is being fetched, said under the list while it runs.
           doing: What to do, answering with the flowverse it left behind.
-          reading: Whether to read what was fetched afterwards. What somebody asked for is
-            what they want to see; what was fetched because it never had been is not
-            something to move anybody off the list they opened the menu on.
         """
         import asyncio
 
@@ -1626,7 +1541,7 @@ class Flows(Drafts[Chosen]):
         self._fetching, self._said = named or "it", ""
         self._fill()
         try:
-            name = await asyncio.to_thread(doing)
+            await asyncio.to_thread(doing)
         except (OSError, ValueError) as why:
             # Said under the list rather than raised at whoever opened the menu: the question
             # this page is asking is still worth answering.
@@ -1635,12 +1550,6 @@ class Flows(Drafts[Chosen]):
             self._fill()
             return
         self._fetching, self._offers = "", None
-        # Reading what was just fetched, on the first flow it brought: that list is what
-        # somebody who fetched it fetched it to see, and one that was added is not a place
-        # anybody has stepped to yet.
-        first = next((one for one in self._all() if one.whose == name), None)
-        if reading and first is not None:
-            self._where, self._was = name, f"{name}{_HALVES}{first.name}"
         self._fill()
 
     @on(OptionList.OptionSelected)
@@ -1736,6 +1645,337 @@ def _added(url: str, name: str) -> str:
     from hmz.flows.verses import add
 
     return add(url, name).name
+
+
+def _came_from(one: Flowverse) -> str:
+    """Where a flowverse came from, as a row may show it.
+
+    Asked of which flowverse it is rather than of whether its URL is empty: an empty URL
+    means both `the package's own` and `a directory whose origin could not be read`, and
+    answering the second with the first would put humanize's name on somebody else's flows.
+
+    Args:
+      one: The flowverse.
+
+    Returns:
+      The URL with whatever was signed into it taken out -- a private one is added as
+      `https://x-access-token:$TOKEN@...`, and this is drawn where somebody can read it --
+      or a phrase for the two that came from nowhere.
+    """
+    from hmz.flows.verses import BUILTIN, plain
+
+    if one.name == BUILTIN:
+        return "the flows humanize ships"
+    return plain(one.url) if one.url else "not a clone of anything"
+
+
+class Holds(Sheet[None]):
+    """What one flowverse holds, which is read rather than chosen from.
+
+    A reading and not a menu: which flow to run is asked on `/flow`, where the flows of every
+    place are walked. This is the other question -- what is in this one -- and it is the one
+    question about a flowverse that costs something to answer, since what a file holds is not
+    a fact its name carries: reading a flow means running it.
+    """
+
+    LETTERS: ClassVar = frozenset({"search"})
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        Binding("s", "search", "search", priority=True),
+    ]
+
+    def __init__(self, one: Flowverse) -> None:
+        """Reads one flowverse's flows.
+
+        Args:
+          one: The flowverse.
+        """
+        super().__init__()
+        self._verse = one
+        self._offers: list[Offer] | None = None
+
+    def _ask(self) -> None:
+        """Says which flowverse this is, and puts its flows up."""
+        self.query_one("#asked", Label).update(self._verse.name)
+        self.query_one("#about", Label).update(
+            f"What this flowverse holds, read from {escape(_came_from(self._verse))}. "
+            "Which of them to run is asked on /flow, where every place's flows are."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _flows(self) -> list[Offer]:
+        """The flows it holds, read once: reading one means running its entry point."""
+        from hmz.flows import offers
+
+        if self._offers is None:
+            try:
+                self._offers = offers(self._verse)
+            except OSError:
+                self._offers = []
+        return self._offers
+
+    def _fill(self) -> None:
+        """Puts the flows up, each with the line it says about itself."""
+        listing = self.query_one("#choices", OptionList)
+        shown = [one for one in self._flows() if self.fits(one.name, one.about)]
+        self._counting = len(str(max(len(shown), 1)))
+        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
+        listing.set_options(
+            Option(
+                self._row(
+                    seen,
+                    one.name,
+                    _briefly(one.about, self.size.width),
+                    here=seen == at,
+                    inforce=False,
+                ),
+                id=f"={one.name}",
+            )
+            for seen, one in enumerate(shown)
+        )
+        listing.highlighted = at if shown else None
+        self._drawn = listing.highlighted
+        said = "" if shown else self._nothing()
+        self.query_one("#tuning", Label).update(
+            f"[$text-muted]{said}[/]" if said else ""
+        )
+        self.query_one("#keys", Label).update(f"Esc to close{self.searching()}")
+
+    def _nothing(self) -> str:
+        """Why there is nothing in it, which is not always the same reason."""
+        if not self._verse.fetched:
+            return "not fetched yet; r fetches it"
+        if self._typed:
+            return "no flow of that name in it"
+        return "nothing in it: a flowverse keeps its flows in flows/"
+
+
+class Flowverses(Sheet[list[str]]):
+    """The places flows come from: what there is, what one holds, and what can happen to one.
+
+    Its own menu rather than keys on the one a flow is chosen at. Adding a repository,
+    fetching one again and taking one away are things done to the list of places rather than
+    to the flow under the cursor, and a sheet that asks `which flow` with three keys on it
+    about something else is a sheet asking two questions. `/flow` still steps between the
+    places with the arrows, that being about which list of flows is being read.
+
+    What happens here happens as it is asked for rather than being held until the menu is
+    saved: each of these runs git, and something that has already been cloned is not a draft.
+    """
+
+    LETTERS: ClassVar = frozenset({"search", "adding", "refresh", "drop"})
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        Binding("s", "search", "search", priority=True),
+        Binding("a", "adding", "add one", priority=True),
+        Binding("r", "refresh", "fetch it again", priority=True),
+        Binding("d", "drop", "take it away", priority=True),
+    ]
+
+    def __init__(self) -> None:
+        """Reads every flowverse there is."""
+        super().__init__()
+        self._found: list[Flowverse] = []
+        #: Which one the cursor is on, by name: a search narrows the rows, so a row number is
+        #: not a flowverse.
+        self._was = ""
+        #: What became of the last thing that happened, said under the list.
+        self._said = ""
+        #: What is being fetched now, so that a second fetch is not started over it.
+        self._fetching = ""
+        #: What is worth saying in the transcript once this menu is done with.
+        self._told: list[str] = []
+
+    def _ask(self) -> None:
+        """Says what these are, and puts them up."""
+        self.query_one("#asked", Label).update("Flowverses")
+        self.query_one("#about", Label).update(
+            "Where flows come from: a git repository with a flows/ directory apiece, cloned "
+            "under humanize's home and offered under the name it is kept there. Enter says "
+            "what one holds. What happens here happens as it is asked for."
+        )
+        self._read()
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _read(self) -> None:
+        """Reads the flowverses off the disk, which is what the rows are drawn from."""
+        from hmz.flows import flowverses
+
+        self._found = flowverses()
+
+    def _about(self, one: Flowverse) -> str:
+        """What a row says about one flowverse: where it came from, and whether it is here."""
+        said = _came_from(one)
+        if not one.fetched:
+            return f"{said}{_DOT}not fetched yet"
+        return said
+
+    def _fill(self) -> None:
+        """Puts the flowverses up, marked where the cursor is."""
+        listing = self.query_one("#choices", OptionList)
+        self._follows(listing)
+        shown = [one for one in self._found if self.fits(one.name, one.url)]
+        self._counting = len(str(max(len(shown), 1)))
+        if all(one.name != self._was for one in shown):
+            self._was = shown[0].name if shown else ""
+        listing.set_options(
+            Option(
+                self._row(
+                    seen,
+                    one.name,
+                    self._about(one),
+                    here=one.name == self._was,
+                    inforce=False,
+                ),
+                id=f"={one.name}",
+            )
+            for seen, one in enumerate(shown)
+        )
+        listing.highlighted = (
+            next((at for at, one in enumerate(shown) if one.name == self._was), 0)
+            if shown
+            else None
+        )
+        self._drawn = listing.highlighted
+        said = f"fetching {escape(self._fetching)}…" if self._fetching else self._said
+        self.query_one("#tuning", Label).update(
+            f"[$text-muted]{said}[/]" if said else ""
+        )
+        self.query_one("#keys", Label).update(
+            "Enter says what one holds · a adds one · r fetches one again · "
+            f"d twice takes one away · Esc to close{self.searching()}"
+        )
+
+    def _follows(self, listing: OptionList) -> None:
+        """Takes which flowverse the cursor is on off the list, by name."""
+        at = listing.highlighted
+        if at is not None and 0 <= at < listing.option_count:
+            named = str(listing.get_option_at_index(at).id or "").removeprefix("=")
+            if named:
+                self._was = named
+
+    def _under(self) -> Flowverse | None:
+        """The flowverse the cursor is on, or None where the list has nothing in it."""
+        return next((one for one in self._found if one.name == self._was), None)
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Opens what the flowverse under the cursor holds.
+
+        Args:
+          event: What was chosen.
+        """
+        named = str(event.option.id or "").removeprefix("=")
+        one = next((each for each in self._found if each.name == named), None)
+        if one is not None:
+            self._holds(one)
+
+    @work
+    async def _holds(self, one: Flowverse) -> None:
+        """Reads what one flowverse holds, which means running each flow in it."""
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        await showing.push_screen_wait(Holds(one))
+        self._fill()
+
+    @work
+    async def action_adding(self) -> None:
+        """Asks where a flowverse is and what to call it here, and clones it."""
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        said = await showing.push_screen_wait(Fetches())
+        if said is None:
+            return
+        url, name = said
+        await self._fetches(name or url, lambda: _added(url, name))
+
+    @work
+    async def action_refresh(self) -> None:
+        """Fetches the flowverse under the cursor again, or for the first time."""
+        from hmz.flows.verses import fetch
+
+        one = self._under()
+        if one is None:
+            return
+        if not one.url:
+            self._said = (
+                f"{escape(one.name)} came with humanize; there is nothing to fetch"
+            )
+            self._fill()
+            return
+        name = one.name
+
+        def fetching() -> str:
+            fetch(name)
+            return name
+
+        await self._fetches(name, fetching)
+
+    def action_drop(self) -> None:
+        """Takes the flowverse under the cursor away, flows and all, once d is twice."""
+        from hmz.flows.verses import remove
+
+        one = self._under()
+        if one is None:
+            return
+        if not self._armed(one.name):
+            self._said = f"press d again to take {escape(one.name)} away, flows and all"
+            self._fill()
+            return
+        try:
+            remove(one.name)
+        except (OSError, ValueError) as why:
+            self._said = escape(str(why))
+            self._fill()
+            return
+        self._said = f"{escape(one.name)} is no longer here"
+        self._told.append(f"[dim]{escape(one.name)} is no longer here[/dim]")
+        self._was = ""
+        self._read()
+        self._fill()
+
+    async def _fetches(self, named: str, doing: Callable[[], str]) -> None:
+        """Runs one git fetch off the event loop, and shows the list it left behind.
+
+        Off the loop because a clone is seconds of network: an interface that stopped
+        redrawing while it ran would be one that looked as though it had gone away.
+
+        Args:
+          named: What is being fetched, said under the list while it runs.
+          doing: What to do, answering with the flowverse it left behind.
+        """
+        import asyncio
+
+        if self._fetching:
+            return
+        self._fetching, self._said = named or "it", ""
+        self._fill()
+        try:
+            name = await asyncio.to_thread(doing)
+        except (OSError, ValueError) as why:
+            # Said under the list rather than raised at whoever opened the menu: the question
+            # this page is asking is still worth answering.
+            self._said, self._fetching = escape(str(why)), ""
+            self._fill()
+            return
+        self._fetching = ""
+        self._said = f"{escape(name)} is fetched"
+        self._told.append(f"[dim]{escape(name)} is fetched[/dim]")
+        self._read()
+        self._was = name
+        self._fill()
+
+    def leaving(self) -> None:
+        """Leaves, saying in the transcript whatever happened while this was open."""
+        self.dismiss(self._told or None)
 
 
 def _written(
@@ -3129,12 +3369,21 @@ def handed_over(host: App[None]) -> Generator[None]:
         yield
 
 
+#: The row on the list of backends that is not a backend: a CLI of your own, driven over the
+#: Agent Client Protocol. Written down here because this is the moment somebody finds out
+#: that the agent they want to run is not one humanize drives -- which is a question about
+#: which CLI, and so belongs on the sheet that asks which CLI.
+_SPEAKS = "\x00speaks"
+
+
 class Backends(Picks):
     """Which coding agent a new account is for.
 
     Every backend humanize drives rather than the ones installed here: an account is
     credentials, and credentials are worth writing down before the CLI that will use them is
-    on this machine.
+    on this machine. And, last, the one row here that is not an account at all: a CLI of your
+    own that speaks ACP, which is what somebody who has got this far and cannot find their
+    agent in the list came to say.
     """
 
     asked = "Select which coding agent this account is for"
@@ -3155,6 +3404,12 @@ class Backends(Picks):
                 ", ".join(way.name for way in ways(profile.name)),
             )
             for profile in profiles()
+        ] + [
+            (
+                _SPEAKS,
+                "a CLI of your own",
+                "one that speaks ACP, written down as a backend from here on",
+            )
         ]
 
 
@@ -4864,13 +5119,88 @@ class Saved(Drafts[list[str]]):
         )
 
 
+#: What can be done to one account, which is what enter opens rather than what a row of
+#: letter keys does. Each of these is a question about the account under the cursor, and a
+#: menu of four is a menu; four keys nobody can see are four keys nobody presses.
+_CORRECTS, _SIGNS_IN, _FALLS_BACK, _TRIED = "corrects", "signs-in", "falls", "tried"
+
+
+class Account(Picks):
+    """What to do with one account: correct it, sign it in again, chain it, retry it.
+
+    Its own menu rather than a letter apiece on the list of accounts. They are four questions
+    about the account under the cursor, and a sheet whose keys are `l`, `f` and `t` is a sheet
+    whose keys have to be learned from a line at the bottom of it -- while enter, which every
+    list already means, was doing one of the four.
+    """
+
+    def __init__(self, cli: str, name: str) -> None:
+        """Asks about one account.
+
+        Args:
+          cli: The backend it belongs to.
+          name: What it is called, or "" for the account this machine is already signed into.
+        """
+        super().__init__()
+        self._cli = cli
+        self._name = name
+        self.asked = f"{cli}/{name}" if name else f"{cli}, as this machine is signed in"
+        self.about = (
+            "What to do with this account. Correcting it, saying where it falls back to and "
+            "saying how it is tried again land when the accounts menu is saved; signing in "
+            "happens as it is asked for."
+        )
+
+    def rows(self) -> list[tuple[str, str, str]]:
+        """The four, less the two there is nothing to do for this machine's own account."""
+        held = [
+            (
+                _FALLS_BACK,
+                "falls back to",
+                "which account a turn carries on under when this one fails",
+            ),
+            (
+                _TRIED,
+                "how it is tried again",
+                "how many tries, which wait, and how long the whole may go on for",
+            ),
+        ]
+        if not self._name:
+            return held
+        return [
+            (
+                _CORRECTS,
+                "correct what it holds",
+                "the answers its way in was made with, asked again",
+            ),
+            (
+                _SIGNS_IN,
+                "sign in again",
+                "run its own way in again, which owns the terminal while it does",
+            ),
+            *held,
+        ]
+
+    def nothing(self) -> str:
+        """Why two of them are not here, for the account humanize did not make."""
+        if self._name:
+            return ""
+        return (
+            f"this is {escape(self._cli)} as this machine is already signed in: humanize "
+            "keeps no credentials for it, so there is nothing to correct or sign in"
+        )
+
+
 class Providers(Drafts[list[str]]):
     """Every account there is to run an agent as, under a heading per CLI.
 
     Read rather than chosen from: which account an agent runs as is asked where that agent is
     set up, so nothing here is being picked for anything. What it is for is what can happen to
     one -- made, set up again, signed in again, marked as where a turn goes when another
-    account fails, taken away -- so those are the keys.
+    account fails, taken away -- and all but the first two of those are one menu, opened with
+    enter on the account they are about. A row of letter keys was a row of keys somebody had
+    to read off the bottom of the screen while enter, which every list already means, did one
+    of the four.
 
     What is written down without running anything is held until the menu is saved: taking one
     away, marking one as a fallback, correcting what one holds. What cannot be held is what
@@ -4882,9 +5212,7 @@ class Providers(Drafts[list[str]]):
     """
 
     TABS: ClassVar = ("Providers",)
-    LETTERS: ClassVar = frozenset(
-        {"search", "adding", "drop", "again", "fallback", "tries", "speaks"}
-    )
+    LETTERS: ClassVar = frozenset({"search", "adding", "drop"})
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
@@ -4893,11 +5221,6 @@ class Providers(Drafts[list[str]]):
         Binding("s", "search", "search", priority=True),
         Binding("a", "adding", "make one", priority=True),
         Binding("d", "drop", "take one away", priority=True),
-        Binding("l", "again", "sign in again", priority=True),
-        Binding("f", "fallback", "falls back to", priority=True),
-        Binding("t", "tries", "how it is tried again", priority=True),
-        # And the one thing here that is not an account: a CLI of your own to run them on.
-        Binding("c", "speaks", "add an ACP CLI", priority=True),
     ]
 
     def __init__(self) -> None:
@@ -4927,9 +5250,9 @@ class Providers(Drafts[list[str]]):
         self.query_one("#about", Label).update(
             "One named set of credentials per account, kept apart from the CLI's own and "
             "from each other's. An agent is given one where it is set up, and runs its turns "
-            "as that account. Taking one away, saying where it falls back to and saying how "
-            "it is tried again land when this menu is saved; making one and signing one in "
-            "happen as they are asked for."
+            "as that account. Enter opens what there is to do with one. Taking one away, "
+            "saying where it falls back to and saying how it is tried again land when this "
+            "menu is saved; making one and signing one in happen as they are asked for."
         )
         self._read()
         self._fill()
@@ -5033,8 +5356,7 @@ class Providers(Drafts[list[str]]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            "Enter to correct one · a makes one · l signs one in again · f falls back to · "
-            "t tried again · d twice takes one away · c adds an ACP CLI · "
+            "Enter for what to do with one · a makes one · d twice takes one away · "
             f"Esc to close{self.searching()}"
         )
 
@@ -5076,9 +5398,13 @@ class Providers(Drafts[list[str]]):
         )
 
     @work
-    async def action_fallback(self) -> None:
-        """Asks which account a turn under this one carries on under when it fails."""
-        one = self._under()
+    async def action_fallback(self, one: Provider | None = None) -> None:
+        """Asks which account a turn under this one carries on under when it fails.
+
+        Args:
+          one: The account, or None for the one the cursor is on.
+        """
+        one = one or self._under()
         if one is None:
             return
         named = self._named(one)
@@ -5100,9 +5426,13 @@ class Providers(Drafts[list[str]]):
         self._fill()
 
     @work
-    async def action_tries(self) -> None:
-        """Asks how a turn under the account under the cursor is tried again."""
-        one = self._under()
+    async def action_tries(self, one: Provider | None = None) -> None:
+        """Asks how a turn under one account is tried again.
+
+        Args:
+          one: The account, or None for the one the cursor is on.
+        """
+        one = one or self._under()
         if one is None:
             return
         named = self._named(one)
@@ -5156,7 +5486,7 @@ class Providers(Drafts[list[str]]):
 
     @on(OptionList.OptionSelected)
     def _took(self, event: OptionList.OptionSelected) -> None:
-        """Corrects what the account under the cursor holds.
+        """Opens what there is to do with the account under the cursor.
 
         Args:
           event: What was chosen.
@@ -5164,7 +5494,30 @@ class Providers(Drafts[list[str]]):
         named = str(event.option.id or "").removeprefix("=")
         one = next((each for each in self._found if self._named(each) == named), None)
         if one is not None:
+            self._doing(one)
+
+    @work
+    async def _doing(self, one: Provider) -> None:
+        """Asks what to do with one account, and does it.
+
+        Args:
+          one: The account.
+        """
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        said = await showing.push_screen_wait(Account(one.cli, one.name))
+        if said is None:
+            return  # walked out of it, which does nothing to the account
+        if said == _CORRECTS:
             self._corrects(one)
+        elif said == _SIGNS_IN:
+            self.action_again(one)
+        elif said == _FALLS_BACK:
+            self.action_fallback(one)
+        elif said == _TRIED:
+            self.action_tries(one)
 
     @work
     async def _corrects(self, one: Provider) -> None:
@@ -5209,6 +5562,11 @@ class Providers(Drafts[list[str]]):
         has been: a backend's ways in are its own. What comes of it has already happened by
         the time it lands -- a login owns the terminal while it runs -- so it is not one of
         the things this menu holds until it is saved.
+
+        The list of CLIs is also where a CLI of your own is written down: somebody who cannot
+        find their agent in it is somebody whose agent is not one humanize drives, and that
+        is a thing to say where the question was asked rather than on a key of the sheet
+        before it.
         """
         showing = cast(
             "App[None]",
@@ -5218,6 +5576,9 @@ class Providers(Drafts[list[str]]):
             cli = await showing.push_screen_wait(Backends())
             if cli is None:
                 return  # nothing before this to step back into
+            if cli == _SPEAKS:
+                await self._speaks()
+                return
             outcome = await made(showing, cli)
             # Walking out of the first question the walk itself asks is a step back into the
             # one asked here, since that is the step before it.
@@ -5266,11 +5627,15 @@ class Providers(Drafts[list[str]]):
         )
 
     @work
-    async def action_again(self) -> None:
-        """Runs one account's own way in again, asking for whatever it still needs."""
+    async def action_again(self, one: Provider | None = None) -> None:
+        """Runs one account's own way in again, asking for whatever it still needs.
+
+        Args:
+          one: The account, or None for the one the cursor is on.
+        """
         from hmz.providers import login as signing
 
-        one = self._under()
+        one = one or self._under()
         if one is None:
             return
         if not one.name:
@@ -5316,14 +5681,14 @@ class Providers(Drafts[list[str]]):
         )
         self._fill()
 
-    @work
-    async def action_speaks(self) -> None:
+    async def _speaks(self) -> None:
         """Asks for a CLI of your own that speaks ACP, and writes it down as a backend.
 
-        Here rather than anywhere else because this is the moment somebody finds out that the
-        agent they want to run is not one humanize drives. What is written down outlives the
-        run, so it is a backend from the next prompt on, in this workspace and every other --
-        which is why it is not one of the things this menu holds until it is saved.
+        Reached from the list of backends a new account is for, because that is the moment
+        somebody finds out that the agent they want to run is not one humanize drives. What
+        is written down outlives the run, so it is a backend from the next prompt on, in this
+        workspace and every other -- which is why it is not one of the things this menu holds
+        until it is saved.
         """
         from hmz import backends
 
