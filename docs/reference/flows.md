@@ -515,6 +515,17 @@ The name is what you write in the mark and nothing else — a name written down 
 run should not change under whoever renames the function. `@flow(about="…")` says what it does
 where flows are listed, which is otherwise the first line of its docstring.
 
+An implementation flow used only through `calls()` can stay out of those lists and the `/flow`
+picker without losing its name:
+
+```python
+@flow(name="engine", selectable=False)
+def engine(agents: Agents, task: str) -> None:
+    ...
+```
+
+It remains directly callable by `<flow>:engine`; `selectable=False` changes discovery only.
+
 Each of them declares its own agents and its own settings, so the agents page asks two questions
 rather than five and setting one up shows one phase's flags rather than three phases' at once. What
 passes between them is whatever they write — a file, usually.
@@ -567,6 +578,17 @@ the agents are handed back carrying the calling flow's own when it returns, howe
 A call refused — for settings the flow does not take, for an agent that cannot run a moment it
 declares, for a place run under a goal filled by an agent that has none — is a call that never
 happened, and leaves the agents exactly as it found them.
+
+A wrapper flow may deliberately keep its own skills available inside the called flow:
+
+```python
+calls("official/rlar", inherit_skills=True)(agents, task)
+```
+
+The called flow's skills come first and win any same-name collision. Parent-only skills are
+then appended, and the agents are restored to exactly what the wrapper carried when the call
+returns or raises. Without the flag, calls remain isolated; a reviewer or other child flow is
+not implicitly given its caller's capabilities.
 
 **A flow that takes [settings of its own](#settings-of-the-flow-s-own) takes them here too**,
 as a third argument — an instance of that flow's model, or the fields to build one from:
