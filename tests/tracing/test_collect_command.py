@@ -14,6 +14,7 @@ own list is a list of runs.
 
 from __future__ import annotations
 
+import itertools
 import re
 import unittest.mock
 from typing import TYPE_CHECKING
@@ -182,6 +183,13 @@ def test_a_trace_of_a_run_holds_that_runs_own_sessions_and_no_others(
     from hmz.cycle import Cycle
 
     monkeypatch.chdir(workspace)
+    # A millisecond apart, said rather than waited for. Cycles sort in the order they were
+    # run to the millisecond and no finer, and two of them opened in one -- which is what a
+    # test does and a person never would -- are ordered by the random tail of their names.
+    ticks = itertools.count(1)
+    monkeypatch.setattr(
+        "hmz.cycle._stamp", lambda: f"20260101T000000.{next(ticks):03d}Z"
+    )
     earlier = Cycle("rlar", [], "one")
     earlier.write("opened", agent="actor", backend="codex", session=CODEX_THREAD)
     now = Cycle("rlar", [], "two")
