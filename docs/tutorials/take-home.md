@@ -6,8 +6,8 @@ take-home and watch two agents take turns driving a kernel from 147,734 simulate
 past 1,790.
 
 ::: tip Before you start
-Finish the [Quickstart](/tutorials/quickstart). You need two backends logged in — this
-tutorial uses `claude` and `codex`, and any two will do, including the same one twice.
+Finish the [Quickstart](/tutorials/quickstart). You need two backends logged in — this tutorial
+uses `claude` and `codex`, and any two will do, including the same one twice.
 :::
 
 ## The shape of work this is for
@@ -109,14 +109,14 @@ Three parts of that prompt are doing real work.
 
 **The rules against cheating.** The repository's own Readme warns that none of the sub-1,300
 submissions on the first day were valid — in each case a model had edited the tests. An agent
-running unattended with permissions disabled will find that shortcut. Naming it, and naming
-the command that proves you did not take it, is cheaper than discovering it afterwards.
+running unattended with permissions disabled will find that shortcut. Naming it, and naming the
+command that proves you did not take it, is cheaper than discovering it afterwards.
 
 **Measure, change, measure.** Without it a turn can end believing it made things faster.
 
 **`NOTES.md`.** This is the part that makes an alternating loop worth more than one long
-session. Each turn starts from nothing, so anything worth carrying has to be written to a
-file. Ask for that explicitly and the agents build themselves a lab notebook.
+session. Each turn starts from nothing, so anything worth carrying has to be written to a file.
+Ask for that explicitly and the agents build themselves a lab notebook.
 
 ## Step 3 — start the loop
 
@@ -227,8 +227,8 @@ and which four turns after it were an expensive way of confirming the fifth.
 **Stop when the curve flattens.** Two turns in a row that measure the same is the signal.
 Ratchet it by editing `TASK.md` to name the new floor, and start again.
 
-**Change who is in the loop.** `flame_chase` takes any two agents. Two models that are wrong
-in different ways beat two copies of the stronger one, because each turn starts fresh and so
+**Change who is in the loop.** `flame_chase` takes any two agents. Two models that are wrong in
+different ways beat two copies of the stronger one, because each turn starts fresh and so
 inherits the other's blind spots rather than its own.
 
 **Raise the effort.** `:high` is deliberately not the hardest setting. `:max` costs more per

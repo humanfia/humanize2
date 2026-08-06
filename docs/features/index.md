@@ -22,8 +22,8 @@ entry or a CI job wants.
 ## At the prompt
 
 The interface is a transcript, an editor under it and a status line under that. The status
-line's right-hand end lists the keys that do something right now, which is the whole of what you
-have to remember.
+line's right-hand end lists the keys that do something right now, which is the whole of what
+you have to remember.
 
 **A line typed mid-turn goes into the turn.** Not after it. "Actually, use pathlib" arriving
 four minutes into a refactor reaches the agent that is doing the refactoring.
@@ -41,10 +41,9 @@ so far. [Guide](/guide/status)
 **Being away.** `/afk` decides what happens when an agent stops to ask you something: wait, or
 tell it nobody is there and let it carry on. [Guide](/guide/afk)
 
-**Everything you typed here before,** on ↑ and ↓, kept per project.
-[Guide](/guide/history) · **What a half-typed line could become,** under the editor.
-[Guide](/guide/completion) · **`/export`** writes the transcript out as it was written.
-[Guide](/guide/export)
+**Everything you typed here before,** on ↑ and ↓, kept per project. [Guide](/guide/history) ·
+**What a half-typed line could become,** under the editor. [Guide](/guide/completion) ·
+**`/export`** writes the transcript out as it was written. [Guide](/guide/export)
 
 **Reopening finds it as you left it.** The flow, the agents, the efforts and the accounts are
 remembered per project. [Guide](/guide/settings)
@@ -74,20 +73,19 @@ met, and until it does, a turn that would have ended starts another. [Guide](/gu
 the prompt or by the flow. [Guide](/guide/questions)
 
 **Answers in a shape.** A turn given a pydantic model answers with that model instead of prose,
-so a flow reads a field rather than searching a paragraph for a phrase.
-[Guide](/guide/shapes)
+so a flow reads a field rather than searching a paragraph for a phrase. [Guide](/guide/shapes)
 
 **Hooks.** Python callables hung on the moments of a turn — before a tool runs, when one asks
 permission, when the agent tries to stop. [Guide](/guide/hooks)
 
-**Cost and rate.** What has been spent, how fast the tokens are arriving, and how hard the model
-is currently thinking. [Guide](/guide/tally)
+**Cost and rate.** What has been spent, how fast the tokens are arriving, and how hard the
+model is currently thinking. [Guide](/guide/tally)
 
 **The person as an agent.** You, driven by a flow like any other agent, so a flow can ask a
 human the same way it asks a model. [Guide](/guide/human-agent)
 
-**Reporting.** humanize asks once whether to send crash reports to its developers, and says what
-one carries before you answer. [Guide](/guide/reporting)
+**Reporting.** humanize asks once whether to send crash reports to its developers, and says
+what one carries before you answer. [Guide](/guide/reporting)
 
 ## Where the work lands
 
@@ -105,9 +103,9 @@ stays here. [Guide](/guide/remote-execution)
 
 ## Flows
 
-A flow is a directory whose `__init__.py` holds a function marked `@flow`, taking the agents and
-the task. Everything else is ordinary Python — a loop, a `subprocess.run`, a file read between
-turns.
+A flow is a directory whose `__init__.py` holds a function marked `@flow`, taking the agents
+and the task. Everything else is ordinary Python — a loop, a `subprocess.run`, a file read
+between turns.
 
 **Writing one.** The shortest useful flow is about a dozen lines.
 [Guide](/guide/writing-a-flow) · **Loops.** Ralph, stateful ralph, actor-and-reviewer: the

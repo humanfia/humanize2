@@ -117,8 +117,8 @@ Type `/` on its own and every command appears under the editor with a line about
 takes the highlighted one.
 
 Underneath, humanize is running a **flow** called `chat` — a directory of Python that says
-which agents are driven, what each is asked, and when to stop. `chat` is the simplest one
-there is: one agent, one conversation, and every line you type is the next turn of it.
+which agents are driven, what each is asked, and when to stop. `chat` is the simplest one there
+is: one agent, one conversation, and every line you type is the next turn of it.
 
 Leave with `/exit`.
 
@@ -155,9 +155,14 @@ attempts:
 hmz exec -f ralph_loop -a dsh/deepseek-v4-flash:high "Fix the bug in calc.py."
 ```
 
+Everything the agent says streams past, and the flow prints one line of its own as each round
+opens:
+
 ```console
 round 1
+…
 round 2
+…
 ```
 
 ::: warning A Ralph loop does not stop on its own

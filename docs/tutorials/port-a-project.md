@@ -1,9 +1,10 @@
 # 3 · Port a project
 
-**An hour, mostly waiting.** You will use [`official/rlar`](https://github.com/humanfia/flowverse)
-to move a module of a real C# project to Python — one agent doing the work in a long
-conversation, a fresh reviewer reading what actually landed, and the loop ending when the
-reviewer says it is finished rather than when the worker says so.
+**An hour, mostly waiting.** You will use
+[`official/rlar`](https://github.com/humanfia/flowverse) to move a module of a real C# project
+to Python — one agent doing the work in a long conversation, a fresh reviewer reading what
+actually landed, and the loop ending when the reviewer says it is finished rather than when the
+worker says so.
 
 ::: tip Before you start
 Finish the [Quickstart](/tutorials/quickstart). This tutorial uses DeepSeek Harness, so an API
@@ -270,5 +271,5 @@ passes" to it changes what ends the run. See [Answers in a shape](/guide/shapes)
 
 ## Next
 
-Neither of the first two flows built anything from nothing. The third does:
-[Build a coding agent](/tutorials/build-an-agent).
+Neither of the first two flows built anything from nothing. The third does: [Build a coding
+agent](/tutorials/build-an-agent).

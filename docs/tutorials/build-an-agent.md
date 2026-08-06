@@ -230,6 +230,21 @@ against.
 
 ## Step 5 — see what it built
 
+Every round commits, so you can look at the work a round at a time:
+
+```sh
+git log --oneline
+```
+
+```console
+f835006 Round 1: close reviewer P1 contract gaps across the agent
+e21d3a7 Implement end-to-end flash_agent DeepSeek coding agent (Round 0)
+f0e8d2d init
+```
+
+That is round zero building the whole thing and round one closing what the reviewer marked
+`P1`. The numbers below are from that point; the loop was still going.
+
 ```sh
 wc -l flash_agent/*.py tests/*.py
 ```
@@ -254,6 +269,9 @@ python -m pytest -q
 ........................................................................ [100%]
 72 passed in 0.35s
 ```
+
+By the end of round one that was 118 tests, which is what a reviewer that will not say `done`
+does to a suite.
 
 Now use it. The whole point of this tutorial is that the thing at the end runs:
 
@@ -311,5 +329,5 @@ Nothing about the third phase requires the first two — it requires a plan.
 
 ## Next
 
-You have now run three flows somebody else wrote. Time to write one:
-[Build under test](/tutorials/flow-checked-build).
+You have now run three flows somebody else wrote. Time to write one: [Build under
+test](/tutorials/flow-checked-build).

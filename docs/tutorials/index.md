@@ -4,8 +4,8 @@ Six tutorials, in order. Each one is a whole piece of work, start to finish, wit
 written out. Follow them and you will have run humanize on real problems rather than on
 examples invented to be easy.
 
-Tutorials teach. When you want to look up how one feature works instead, the
-[guides](/guide/) have a page each.
+Tutorials teach. When you want to look up how one feature works instead, the [guides](/guide/)
+have a page each.
 
 ## Start here
 
