@@ -112,7 +112,7 @@ already in them, which run 8 to 20 seconds end to end.
 
 `.github/workflows/build-docs.yml` builds on every push and pull request that touches `docs/`, and
 deploys to GitHub Pages on a push to `main`. It is served at
-[docs.humanfia.ai](https://docs.humanfia.ai), which is a custom domain and so is the site's own
+[hmz.humanfia.ai](https://hmz.humanfia.ai), which is a custom domain and so is the site's own
 root: the config sets **no `base`**, and `docs/public/CNAME` is what keeps the domain on the
 artifact each deploy publishes. `humanfia.github.io/humanize2` redirects here.
 

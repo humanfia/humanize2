@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitepress'
 
-// Deployed to https://docs.humanfia.ai by .github/workflows/build-docs.yml, which is a
+// Deployed to https://hmz.humanfia.ai by .github/workflows/build-docs.yml, which is a
 // custom domain and so is the site's root: no base is prepended, and every internal link is
 // written from that root. The project page it was built for -- humanfia.github.io/humanize2
 // -- redirects here, so nothing is served under a subdirectory any more. A base left set to

@@ -14,22 +14,18 @@ before you point it at work you care about.
 
 ## What you need
 
-One of these two:
-
-- **A coding agent CLI already on your `PATH` and logged in** — `claude`, `codex`, `kimi`,
-  `qwen`, `grok`, `agy`, `pi`, `opencode` or `mimo`.
-- **A DeepSeek API key.** DeepSeek Harness ships inside humanize, so a key alone is enough and
-  nothing else needs installing.
-
-Plus Python 3.12 or newer. Check what you already have:
+Python 3.12 or newer, and **one coding agent CLI you have already logged into**. Any of these
+will do:
 
 ```sh
 command -v agy claude codex grok kimi pi qwen opencode mimo
 ```
 
-This tutorial uses DeepSeek Harness, because it needs no subscription. Every command works the
-same with any other backend — swap `dsh/deepseek-v4-flash:high` for
-`claude/claude-opus-4-8:high` and carry on.
+humanize drives the CLI you already have. It holds no API key and talks to no model provider
+itself, so whichever of those you use, you log in the way you already log in.
+
+If you have none of them, humanize also ships DeepSeek Harness, which needs a DeepSeek API key
+and nothing else installed. See [Installation](/guide/installation).
 
 ## Step 1 — install it
 
@@ -59,10 +55,39 @@ git add -A && git commit -qm "a calculator with a bug in it"
 
 `calc.py` subtracts where it should add. That bug is the work.
 
-Put your key where humanize will find it:
+Now name the agent you are going to use. An agent is written `cli/model:effort` — the CLI that
+runs the turn, the model it asks for, and how hard that model should think. Put yours in a
+shell variable, and every command below is one you can paste:
 
 ```sh
-export DEEPSEEK_API_KEY=sk-…
+AGENT=claude/claude-opus-4-8:high
+```
+
+Pick the row for the CLI you have:
+
+| CLI | Write it as |
+| --- | --- |
+| Claude Code | `claude/claude-opus-4-8:high` |
+| Codex | `codex/gpt-5.6-sol:high` |
+| Kimi Code | `kimi/kimi-code/k3:high` |
+| Qwen Code | `qwen/qwen3-coder-plus:high` |
+| Grok Build | `grok/grok-4.6:high` |
+| Antigravity CLI | `agy/gemini-3.7-flash-high:high` |
+| pi | `pi/openai-codex/gpt-5.6-luna:high` |
+| opencode | `opencode/opencode/big-pickle:high` |
+| mimocode | `mimo/mimo/mimo-auto:high` |
+| DeepSeek Harness | `dsh/deepseek-v4-flash:high`, with `export DEEPSEEK_API_KEY=sk-…` |
+
+Those are examples, not a fixed list. A model id is whatever that CLI shipped this week, and
+which ones you may name depends on the account you are logged in as — so `pi`, `opencode` and
+`mimo` write a model as `provider/id`, which is why their rows have an extra slash in them. To
+see what yours actually offers, open `/flow` in the interface and turn to its agents: humanize
+asks each CLI once and keeps the answer.
+
+If you get the id wrong, the backend says so on the first turn:
+
+```console
+[claude-code:unrecognized_model] {"model":"not-a-real-model","query_source":"sdk"}
 ```
 
 ## Step 3 — open the prompt
@@ -77,7 +102,7 @@ That is the only way into the terminal interface. There is no `hmz tui`.
 ┌──────────────────────────────────────────────────────────────────────┐
 │  the transcript: one conversation, a turn after another              │
 ├──────────────────────────────────────────────────────────────────────┤
-│              assistant · dsh/deepseek-v4-flash:high                  │  ← what you are talking to
+│              assistant · claude/claude-opus-4-8:high                 │  ← what you are talking to
 │ ❯ type here                                                          │  ← the editor
 ├──────────────────────────────────────────────────────────────────────┤
 │ ⠋ chat  ~/tmp/humanize-demo             enter say · / commands       │  ← the status line
@@ -127,7 +152,7 @@ Leave with `/exit`.
 Every flow also runs unattended:
 
 ```sh
-hmz exec -f chat -a dsh/deepseek-v4-flash:high "What does calc.py do?"
+hmz exec -f chat -a "$AGENT" "What does calc.py do?"
 ```
 
 Three things to know about that line:
@@ -152,7 +177,7 @@ from the task and the repository instead of from a context window full of its ow
 attempts:
 
 ```sh
-hmz exec -f ralph_loop -a dsh/deepseek-v4-flash:high "Fix the bug in calc.py."
+hmz exec -f ralph_loop -a "$AGENT" "Fix the bug in calc.py."
 ```
 
 Everything the agent says streams past, and the flow prints one line of its own as each round
