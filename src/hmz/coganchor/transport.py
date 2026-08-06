@@ -113,6 +113,9 @@ class Transport:
                 self.process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.process.kill()
+                # Reaped rather than left: a run that opens an anchor per agent would
+                # otherwise gather a zombie for each one that would not go quietly.
+                self.process.wait()
 
 
 def connect(target: Target, exports: list[str], token: str | None = None) -> Transport:

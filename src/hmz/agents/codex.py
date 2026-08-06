@@ -16,7 +16,9 @@ from __future__ import annotations
 import contextlib
 import itertools
 import json
+import os
 import queue
+import signal
 import subprocess
 import sys
 import threading
@@ -31,7 +33,6 @@ from .event import Event, Failed, Question, Usage, say
 from .hooks import EVERYWHERE, Moment, Occasion
 
 if TYPE_CHECKING:
-    import os
     from collections.abc import Callable, Iterator, Mapping
 
     from pydantic import BaseModel
@@ -175,6 +176,8 @@ class _AppServer:
         #: the agent's -- so a server holding its agent back would be an agent nothing could
         #: collect, and a `codex app-server` nothing would ever reap.
         self._held: list[weakref.ref[AgentBase]] = []
+        self._stopping = threading.Lock()
+        self._stopped = False
         self._proc = subprocess.Popen(
             argv,
             stdin=subprocess.PIPE,
@@ -184,6 +187,7 @@ class _AppServer:
             encoding="utf-8",
             errors="replace",
             env=dict(env) if env else None,
+            start_new_session=os.name != "nt",
         )
         self._pending = itertools.count(1)
         self._writing = threading.Lock()  # a line is written whole or not at all
@@ -511,12 +515,32 @@ class _AppServer:
         )
 
     def stop(self) -> None:
-        """Takes the server down, leaving the threads it held on disk."""
-        self._proc.terminate()
-        # Reaped rather than left: a flow that cycles through agents would otherwise gather a
-        # zombie for each one it let go of.
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            self._proc.wait(timeout=_STOP_SECONDS)
+        """Takes the server and its children down, leaving its threads on disk."""
+        with self._stopping:
+            if self._stopped:
+                return
+            self._stopped = True
+            if os.name == "nt":
+                if self._proc.poll() is None:
+                    self._proc.terminate()
+                    try:
+                        self._proc.wait(timeout=_STOP_SECONDS)
+                    except subprocess.TimeoutExpired:
+                        self._proc.kill()
+                # Reaped rather than left: a flow that cycles through agents would otherwise
+                # gather a zombie for each one it let go of.
+                self._proc.wait()
+                return
+
+            # Provider wrappers and Codex share this dedicated group. Taking down the group
+            # prevents a stopped flow from leaving either wrapper or server behind.
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(self._proc.pid, signal.SIGTERM)
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                self._proc.wait(timeout=_STOP_SECONDS)
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(self._proc.pid, signal.SIGKILL)
+            self._proc.wait()
 
     def _write(self, message: dict[str, Any]) -> None:
         """Puts one JSON-RPC message on the server's stdin.

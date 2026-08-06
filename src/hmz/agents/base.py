@@ -84,6 +84,23 @@ def _tee(
         said.put(None)
 
 
+def _reaped(proc: subprocess.Popen[str]) -> None:
+    """Ends a process and takes its exit status, so that neither is left behind.
+
+    Killed and then waited on, rather than killed: a process nobody waits on stays in the
+    table as a zombie until whoever started it exits, and a flow that opens a session per turn
+    would gather one per turn for as long as it runs. A process that has already ended is
+    waited on all the same, since that is what takes its status.
+
+    Args:
+      proc: The process to end, which may already have ended.
+    """
+    with contextlib.suppress(OSError):
+        proc.kill()
+    with contextlib.suppress(OSError):
+        proc.wait()
+
+
 #: What a turn is told when its backend has no way of being held to a shape. The schema is the
 #: whole of the instruction: it says the fields, their types and which of them are required,
 #: and a sentence restating any of that would be a second place for it to be wrong.
@@ -1696,7 +1713,7 @@ class StreamSessionBase(SessionBase):
         # The one before it is let go, or a long flow keeps every process it ever started.
         if self._reaper is not None:
             self._reaper.detach()
-        self._reaper = weakref.finalize(self, started.kill)
+        self._reaper = weakref.finalize(self, _reaped, started)
         return started
 
     def _restarted(self) -> None:
