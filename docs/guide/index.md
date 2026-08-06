@@ -1,48 +1,82 @@
-# What humanize is
+# Guides
 
-humanize runs **flows**: directories of Python that drive one or more coding agents in a loop, and write
-down everything they did so it can be read back afterwards.
+One page per thing humanize does, each answering "how do I use this?". Every guide opens with a
+worked example you can paste, then explains the rest.
 
-It does not talk to a model provider. It drives the coding agent CLI you already have — `claude`,
-`codex`, `kimi`, `pi`, `opencode`, `mimo` — logged in the way you already log in. There is no API
-key to give it and none for it to hold.
+These are for looking things up. If you have not used humanize before, the
+[tutorials](/tutorials/) teach it in order, starting with the
+[Quickstart](/tutorials/quickstart).
 
-## What it is for
+## Start here
 
-A single conversation with a coding agent is a chat window. Most work is not that shape:
-
-| You want | humanize's answer |
+| | |
 | --- | --- |
-| The agent to keep going until the job is done, starting fresh each time | A [Ralph loop](/guide/tutorial-ralph-loop) |
-| One agent building and another reading its work | A [two-agent flow](/guide/tutorial-actor-reviewer) |
-| Two hundred files fixed at once | A [fan-out](/guide/tutorial-async-flow) |
-| The same run twice, unattended, in CI | [`hmz exec`](/guide/tutorial-unattended) and [CI](/guide/tutorial-ci) |
-| To know what a nine-hour run actually did | [`hmz trace collect`](/guide/tutorial-trace) |
-| One CLI driven as two accounts at once | [Providers](/guide/tutorial-providers) |
-| The work to land in a container, or on the build box | [Containers](/guide/tutorial-container), [remote execution](/guide/tutorial-remote) |
+| [Installation](/guide/installation) | Python, a backend, and what each one needs |
+| [Concepts](/guide/concepts) | The ten words the rest of this uses |
+| [Security](/guide/security) | Read this before pointing an agent at a repository you care about |
+| [Troubleshooting](/guide/troubleshooting) | When it goes wrong |
 
-## Two ways in
+## At the prompt
 
-**A terminal interface.** `hmz` with nothing after it opens a transcript, an editor, and a status
-line. Pick a flow with `/flow`, say what you want done, and watch it. There is no `hmz tui`: one
-way in is one way in.
+| | |
+| --- | --- |
+| [Talking to a running turn](/guide/steering) | A line typed mid-turn goes *into* it, not after it |
+| [Many conversations at once](/guide/conversations) | One transcript, **tab** between the agents that are working |
+| [Showing the working](/guide/details) | `/details`: tool calls and thinking, or only what the agent says |
+| [The shape of a run](/guide/status) | `/status`: who is working, who handed to whom, what it cost |
+| [Being away](/guide/afk) | `/afk`: whether an agent may stop and ask you something |
+| [Completion](/guide/completion) | What a half-typed line could become, under the editor |
+| [History](/guide/history) | Everything typed here before, on ↑ and ↓ |
+| [Exporting a transcript](/guide/export) | `/export` writes what is on screen, as it was written |
+| [What a project remembers](/guide/settings) | Reopening finds it set up the way you left it |
+| [Stopping](/guide/stopping) | **esc** ends the flow; what that does to a turn |
 
-**A command line.** `hmz exec -f <flow> -a <agent> "<task>"` runs the same flows with nobody
-watching — which is what a script, a cron entry or a CI job wants.
+## Setting an agent up
 
-Both write the same [cycle](/guide/concepts#cycle), and both are read back the same way.
+| | |
+| --- | --- |
+| [Efforts](/guide/efforts) | How hard to think — and moving it while the flow runs |
+| [Permissions](/guide/permissions) | Four rungs, from `read-only` to `bypass` |
+| [Skills](/guide/skills) | What an agent carries: its CLI's own, and the ones the flow brings |
+| [Goals](/guide/goals) | The backend's own goal feature: it decides when it is done |
+| [Questions](/guide/questions) | An agent stopping mid-turn to ask its user something |
+| [Answers in a shape](/guide/shapes) | A turn that answers with a pydantic model instead of prose |
+| [Hooks](/guide/hooks) | Python callables hung on the moments of a turn |
+| [Cost and rate](/guide/tally) | What has been spent, how fast, and how hard it is thinking |
+| [The person as an agent](/guide/human-agent) | You, driven by a flow like any other agent |
+| [Reporting](/guide/reporting) | What humanize sends its developers, and how to say no |
 
-## What to read
+## Writing flows
 
-- **Never used it.** [Installation](/guide/installation) → [Getting started](/guide/getting-started)
-  → [Concepts](/guide/concepts).
-- **Want a feature.** [Features](/features/) has a page each — `/afk`, skills, goals, containers,
-  providers, tracing — and each says how to reach it from the prompt, the command line and Python.
-- **Automating something.** The [tutorials](/guide/tutorial-first-run) go from your first run to
-  publishing a flowverse, in order.
-- **Looking something up.** [CLI](/reference/cli) and [TUI](/reference/tui) are complete.
-- **Changing humanize itself.** [Architecture](/contributing/architecture).
+| | |
+| --- | --- |
+| [Writing a flow](/guide/writing-a-flow) | The dozen lines that make a directory a flow |
+| [Loops](/guide/loops) | Ralph, stateful ralph, and the shapes a loop takes |
+| [Settings of its own](/guide/flow-settings) | A pydantic model that becomes `/config` fields |
+| [Many turns at once](/guide/async-flows) | `async def run`, and awaiting several turns |
+| [A flow that calls a flow](/guide/calling-flows) | Composition, and whose agents the inner one gets |
+| [Testing a flow](/guide/testing-flows) | Checking the loop without spending a turn |
+| [Flowverses](/guide/flowverses) | A git repository of flows, offered by name |
 
-Before you point one at a repository you care about, read [Security](/guide/security). humanize
-runs every agent with permission prompts disabled, and there is no setting that turns them back
-on.
+## Where the work lands
+
+| | |
+| --- | --- |
+| [Providers](/guide/providers) | One CLI, two accounts, at the same time |
+| [Containers](/guide/containers) | A container of the agent's own, up on the first turn |
+| [Remote execution](/guide/remote-execution) | The agent here; its commands on the build box |
+| [Worktrees](/guide/worktrees) | One agent working in several directories at once |
+
+## Running it, and reading it back
+
+| | |
+| --- | --- |
+| [Unattended](/guide/unattended) | `hmz exec` from a script, with nobody watching |
+| [humanize in CI](/guide/ci) | The same flows on a build machine |
+| [Tracing](/guide/tracing) | The whole run as one timeline you can open in Perfetto |
+| [Picking a run up](/guide/resuming) | A loop stopped on Thursday, carried on from where it stopped |
+
+---
+
+Looking for the exhaustive list of flags and keys instead? [CLI](/reference/cli) and
+[TUI](/reference/tui).

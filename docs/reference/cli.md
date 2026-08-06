@@ -1,19 +1,19 @@
 # CLI reference
 
 Every command, flag, environment variable, exit status and file. For a walk through rather than
-a lookup, start at [Getting started](/guide/getting-started.md).
+a lookup, start at [Quickstart](/tutorials/quickstart).
 
 ```
 hmz [<command> [<args>...]]
 ```
 
-A line naming no command opens the [terminal interface](/reference/tui.md). A line naming something that
+A line naming no command opens the [terminal interface](/reference/tui). A line naming something that
 is not a command is a usage error listing the commands there are. Everything after the command
 name reaches that command untouched — `--help` included — so each answers for its own
 arguments.
 
 `python -m hmz` is the same command line, which is how a turn spawns itself under an
-[anchor](/reference/remote-execution.md).
+[anchor](/reference/remote-execution).
 
 ## `hmz`
 
@@ -25,7 +25,7 @@ hmz --help           # lists the commands
 
 There is no command that opens the interface. Naming nothing at all is how it opens.
 
-It opens on whatever this workspace was [last set up to run](/reference/tui.md#what-it-remembers) — or on
+It opens on whatever this workspace was [last set up to run](/reference/tui#what-it-remembers) — or on
 what the line says, for a run that is always the same run:
 
 ```
@@ -35,7 +35,7 @@ hmz -f|--flow <flow> [-c|--config <path>] [-a|--agent <spec>]...
 | Argument | |
 | --- | --- |
 | `-f`, `--flow <flow>[:<name>]` | The flow to open on. |
-| `-c`, `--config <path>` | A YAML file of what to set that flow up with, as [choosing the flow](/reference/tui.md#setting-a-flow-up) would have asked for it. Needs `-f`. |
+| `-c`, `--config <path>` | A YAML file of what to set that flow up with, as [choosing the flow](/reference/tui#setting-a-flow-up) would have asked for it. Needs `-f`. |
 | `-a`, `--agent <spec>` | What each of that flow's agents runs, in the order it takes them — as many as it drives. Needs `-f`. |
 
 Nothing is started: the interface opens ready, and the first thing you say is still what starts
@@ -49,7 +49,7 @@ hmz -f official/humanize1:rlcr -c setup.yaml
 
 ## `hmz exec`
 
-Runs a [flow](/reference/flows.md) in the current directory, on the agents it is given.
+Runs a [flow](/reference/flows) in the current directory, on the agents it is given.
 
 ```
 hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] <task>
@@ -57,8 +57,8 @@ hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] <task>
 
 | Argument | |
 | --- | --- |
-| `-f`, `--flow <flow>[:<name>]` | **Required.** The flow to drive: the name of one humanize ships, `<flowverse>/<flow>` for one a [flowverse](/reference/flows.md#flowverses) holds, or the path to a file — which is what a flow of your own is called. A file that holds [several flows](/reference/flows.md#several-flows-in-one-file) is said which, after a colon. See [where flows live](/reference/flows.md#where-flows-live). |
-| `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](/reference/flows.md#settings-of-the-flow-s-own). The flow's own model checks it before the first turn. |
+| `-f`, `--flow <flow>[:<name>]` | **Required.** The flow to drive: the name of one humanize ships, `<flowverse>/<flow>` for one a [flowverse](/reference/flows#flowverses) holds, or the path to a file — which is what a flow of your own is called. A file that holds [several flows](/reference/flows#several-flows-in-one-file) is said which, after a colon. See [where flows live](/reference/flows#where-flows-live). |
+| `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](/reference/flows#settings-of-the-flow-s-own). The flow's own model checks it before the first turn. |
 | `-a`, `--agent <spec>` | **Repeated once for each agent the flow drives**, in the order it takes them — so none at all for a flow whose only side is you, since nobody chooses what the person runs. |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
 
@@ -86,11 +86,11 @@ unambiguous short spelling go.
 - A model may hold slashes of its own — Kimi Code's are `kimi-code/k3`, and pi, opencode and
   mimocode name every model as `provider/id` — so the CLI is read from the front and the effort
   from after the last colon.
-- An `@` after the CLI names the [provider](/reference/providers.md) that agent's turns run as — the
+- An `@` after the CLI names the [provider](/reference/providers) that agent's turns run as — the
   account, not the model: `claude@deepseek`. Written out, it is `provider=`. A CLI is never
   spelled with an `@` in it, so the two are told apart wherever an agent is written. An agent
   that names none runs its CLI as you already run it.
-- `permission=` names [what that agent may do](/reference/agents.md#what-an-agent-may-do): `read-only`,
+- `permission=` names [what that agent may do](/reference/agents#what-an-agent-may-do): `read-only`,
   `workspace-write`, `auto` or `bypass`. It is available in the written-out form only and
   defaults to `bypass`. A misspelling is refused before any agent runs.
 
@@ -138,7 +138,7 @@ is to do to a trace under it: `collect` is what there is today.
 
 Reads the trajectories the coding agents recorded -- and the programs they ran, where the run
 was profiled -- and writes them out as one Chrome JSON trace. Works whether or not a flow drove
-them. See [Tracing](/reference/tracing.md).
+them. See [Tracing](/reference/tracing).
 
 ```
 hmz trace collect [<workspace>] [--cycle <cycle> | --session <session>[,<session>]... | --all]
@@ -157,7 +157,7 @@ hmz trace collect [<workspace>] [--cycle <cycle> | --session <session>[,<session
 
 A trace is of a run and holds the sessions that run opened and no others, asked for by the ids
 the run wrote down rather than by the directory it ran in -- so a run that worked in a
-[machine's](/reference/machines.md) mirror is in its own trace, and a run that opened nothing is a
+[machine's](/reference/machines) mirror is in its own trace, and a run that opened nothing is a
 trace of nothing. `--session` and `--all` are the other thing a trace can be of: what a directory
 holds whoever opened it. Naming a run as well is a usage error, and neither is offered in the
 interface, `/cycles` being a list of runs.
@@ -193,7 +193,7 @@ hmz trace collect --end "yesterday 18:00" --output /tmp/before.json
 ## `hmz anchor`
 
 Runs a coding agent on this machine whose work lands on another one. See
-[Remote execution](/reference/remote-execution.md).
+[Remote execution](/reference/remote-execution).
 
 ```
 hmz anchor [options] AGENT [ARGS...]
@@ -205,12 +205,12 @@ Everything after the agent's name is the agent's own.
 | --- | --- | --- |
 | `--target URL` | `$HUMANIZE_TARGET`, else `local` | `ssh://HOST`, `docker://CONTAINER`, `tcp://HOST:PORT`, or `local[:DIR]`. |
 | `--workspace PATH` | this directory | The project directory as it exists on the target. |
-| `--chdir PATH` | `--workspace` | Where inside that workspace the agent starts, as the target names it. What a [session opened at a directory](/reference/agents.md#the-directory-a-session-works-in) comes to: the agent is put in this machine's mirror of it. |
+| `--chdir PATH` | `--workspace` | Where inside that workspace the agent starts, as the target names it. What a [session opened at a directory](/reference/agents#the-directory-a-session-works-in) comes to: the agent is put in this machine's mirror of it. |
 | `--remote-path PATH` | `--workspace` | Where that workspace really lives on the target, if not at the same path. |
 | `--shadow PATH` | `--workspace` | The local mirror directory. Defaulting to the workspace path is what makes the paths the agent sees the target's own. |
 | `--local-path PATH` | — | Keep this path on this machine even when it is inside the workspace. Repeatable. |
 | `--local-exec PATH` | — | Run programs under this path here rather than on the target. Repeatable. |
-| `--redirect FROM=TO` | — | Answer this path with that one — the file it names, or everything under the directory it names — and keep what it is answered with local. What a turn under a [provider](/reference/providers.md) is given. Repeatable. |
+| `--redirect FROM=TO` | — | Answer this path with that one — the file it names, or everything under the directory it names — and keep what it is answered with local. What a turn under a [provider](/reference/providers) is given. Repeatable. |
 | `--private NAME` | — | Keep this variable out of what the agent's commands are run with on the target: a credential it was given to reach its model provider is its own. Repeatable. |
 | `--net {local,remote}` | `local` | Where the agent's *own* TCP connections go. Local keeps its model provider reachable. Commands it spawns always use the target's network. |
 | `--net-allow HOST[:PORT]` | — | With `--net remote`, keep connections to this host local. Repeatable. |
@@ -249,7 +249,7 @@ hmz anchor serve --export VIRTUAL[:REAL] (--stdio | --listen [HOST:]PORT) [--tok
 `--stdio` and `--listen` are mutually exclusive, and one is required.
 
 **Listening on anything but loopback without `--token` is refused.** An open port is equivalent
-to a shell on that machine — read [Security](/guide/security.md).
+to a shell on that machine — read [Security](/guide/security).
 
 ```sh
 hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
@@ -259,7 +259,7 @@ hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 
 Where flows come from: a git repository with a `flows/` directory apiece, cloned under
 humanize's home and offered under the name it is kept there. See
-[Flowverses](/features/flowverses.md).
+[Flowverses](/guide/flowverses).
 
 ```
 hmz flowverses list [-q|--quiet]
@@ -269,7 +269,7 @@ hmz flowverses fetch <name>
 hmz flowverses remove <name>
 ```
 
-The same places the interface's [`/flowverses`](/reference/tui.md#where-flows-come-from) is the
+The same places the interface's [`/flowverses`](/reference/tui#where-flows-come-from) is the
 list of — a machine being set up, a CI job that runs somebody else's flow, or a line in a script
 is not always a moment you are sitting in the interface. Naming no command at all lists them.
 
@@ -293,7 +293,7 @@ saying it holds nothing — `official` is listed from the start, and what there 
 the same question as what has been downloaded.
 
 **`show` is the line that reads them, and the only one.** What a file holds is not a fact its
-name carries — one file may hold [several flows](/reference/flows.md#several-flows-in-one-file), and the
+name carries — one file may hold [several flows](/reference/flows#several-flows-in-one-file), and the
 file beside them may hold none — so the only way to say what `-f` would take is to import them,
 as `/flow` does for the same question. `list`, `add` and `fetch` read nothing: a repository that
 has just been cloned off the internet is not one to import unasked, and asking which places
@@ -302,12 +302,12 @@ there are is not asking about any of them.
 So the name `show` prints is always a name `-f` takes — `official/humanize1:gen-plan`, not the
 `official/humanize1` its filename would suggest, and never a `conftest.py` that holds no flow at
 all. Adding one is still trusting that repository with this machine, exactly as installing a
-package is. See [Security](/guide/security.md).
+package is. See [Security](/guide/security).
 
 ## `hmz agents`
 
 The agents written down under a name, to be reached for from any flow. The same store
-[`/agents`](/reference/tui.md#agents-kept-under-a-name) keeps, said as arguments instead — for a machine
+[`/agents`](/reference/tui#agents-kept-under-a-name) keeps, said as arguments instead — for a machine
 being set up, a CI job, or anywhere the interface is not open.
 
 ```
@@ -344,7 +344,7 @@ agents of a flow. Which agent drives which flow is remembered per workspace — 
 ## `hmz providers`
 
 The accounts an agent may be run as: one named set of credentials per provider, kept apart from
-the CLI's own. See [Providers](/reference/providers.md).
+the CLI's own. See [Providers](/reference/providers).
 
 ```
 hmz providers list [<cli>]
@@ -367,9 +367,9 @@ at all lists them.
 | --- | --- |
 | `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, the variables it sets, and — where either is set — what it falls back to and how a failed turn under it is tried again. The account this machine is signed into is listed as `<cli>/  as local` wherever it has one of those. A `<cli>` no backend answers to exits 1 rather than listing everybody's. |
 | `ways <cli>` | How that backend can be signed into: each way, what it asks for, and what it runs. |
-| `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first — `login` for the CLIs that sign in, `key` for `dsh`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. `--also` writes the same account down for the backends it names, comma separated, under the same name and over one already there — or `all` for [every one it could be run as](/reference/providers.md#one-account-several-clis). A line that did not ask says it could have. |
+| `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first — `login` for the CLIs that sign in, `key` for `dsh`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. `--also` writes the same account down for the backends it names, comma separated, under the same name and over one already there — or `all` for [every one it could be run as](/reference/providers#one-account-several-clis). A line that did not ask says it could have. |
 | `login <cli>/<name>` | Signs an existing one in again, by the way it was made with, and asks it again what it runs. Takes the same `-s`. |
-| `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, what it falls back to, how it is tried again, the names of the variables it sets, which paths a turn under it is given instead of which, and an `also runs` line per [other backend](/reference/providers.md#one-account-several-clis) that could be run as it. |
+| `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, what it falls back to, how it is tried again, the names of the variables it sets, which paths a turn under it is given instead of which, and an `also runs` line per [other backend](/reference/providers#one-account-several-clis) that could be run as it. |
 | `falls-back <cli>/<name> [<name>]` | Says which account of that CLI a turn carries on under when this one fails, or, with nothing after it, that this one is the end of the line. Each account naming the next is what makes a chain. |
 | `retry <cli>/<name>` | Says how a failed turn under it is tried again before the chain moves on: `-n` how many times over, `-p` how long to wait between tries (`none`, `constant`, `linear`, `exponential`, `exponential-jitter`, `fibonacci`), `-t` the longest the whole of it may go on for. Nothing is retried by default. |
 | `remove <cli>/<name>` | Takes it away, credentials and all. |
@@ -404,7 +404,7 @@ hmz providers remove claude/deepseek
 | `HUMANIZE_TARGET` | `hmz anchor` | Default for `--target`. |
 | `HUMANIZE_TOKEN` | `hmz anchor`, `hmz anchor serve` | Default for `--token`. |
 | `HUMANIZE_LOG` | `hmz anchor`, `hmz anchor serve` | Default for `--log-level`. |
-| `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/features/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
+| `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/guide/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
 | `HUMANIZE_SHADOWS` | `hmz anchor`, a container or a machine an agent works on | Where the mirrors coganchor has been pointed at are recorded. Defaults to `~/.cache/humanize/shadows`. |
 | `CLAUDE_CONFIG_DIR` | `hmz trace collect`, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
 | `CODEX_HOME` | same | Codex's home. Defaults to `~/.codex`. |
@@ -434,23 +434,23 @@ A backend home that does not exist is skipped rather than being an error.
 
 | Path | Written by | |
 | --- | --- | --- |
-| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/cycle.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened and as which account, how it ended. See [Cycles](/reference/tracing.md#cycles). |
+| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/cycle.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened and as which account, how it ended. See [Cycles](/reference/tracing#cycles). |
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>/sessions/<session>/` | the same | A link per file each session was logged to, for reading a run back. humanize reads and writes the logs where the backend keeps them. |
-| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/state.json` | a [resumable](/reference/flows.md) flow | What that flow left behind, which the next run of it picks up. |
+| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/state.json` | a [resumable](/reference/flows) flow | What that flow left behind, which the next run of it picks up. |
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>/profile.jsonl` | a run of a workspace that asked to be profiled | The programs the run started, sampled while it ran. |
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>/traces/<datetime>.trace.json` | `hmz trace collect`, `/cycles` | The trace of that run. |
-| `~/.humanize/providers/<cli>/<name>/provider.json` | `hmz providers add` | What a [provider](/reference/providers.md) was made by, and what a turn under it runs with. `0600`, in a directory at `0700`. |
+| `~/.humanize/providers/<cli>/<name>/provider.json` | `hmz providers add` | What a [provider](/reference/providers) was made by, and what a turn under it runs with. `0600`, in a directory at `0700`. |
 | `~/.humanize/providers/<cli>/<name>/{home,user}/...` | the CLI's own login | That provider's credentials, at the names the CLI keeps its own under. |
 | `~/.humanize/providers/<cli>/<name>/models.json` | `hmz providers add`, **r** | What that CLI said it runs as that account. Goes when the account does. |
 | `~/.humanize/local/<cli>.json` | `hmz providers falls-back`, `retry`, and what enter opens in `/providers` | What the account this machine is signed into does when it fails: where it falls back to, and how a turn under it is tried again. |
 | `~/.humanize/acp.json` | a CLI of your own, added where `/providers` asks which CLI | The CLIs of your own that speak the [Agent Client Protocol](/reference/agents#a-cli-of-your-own), as `{name: [argv…]}`. A backend from the moment it is written. |
 | `~/.humanize/models/<cli>.json` | the TUI, **r** | The same, for the CLI as you already run it. |
-| `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run and whether its runs are profiled, and the settings that are not a workspace's — `enable_sentry`, the answer to the [reporting](/features/reporting) question. |
+| `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run and whether its runs are profiled, and the settings that are not a workspace's — `enable_sentry`, the answer to the [reporting](/guide/reporting) question. |
 | `~/.humanize/agents.yaml` | `hmz agents`, `/agents` | The agents written down under a name, to be reached for from any flow. |
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
-| `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** in `/flowverses` | A [flowverse](/features/flowverses.md), cloned. Every flow in it is offered as `<name>/<flow>`. |
-| `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows.md#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |
+| `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** in `/flowverses` | A [flowverse](/guide/flowverses), cloned. Every flow in it is offered as `<name>/<flow>`. |
+| `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |
 | `.humanize/flows/*/` | you | This project's own flows. |
 | `~/.humanize/flows/*/` | you | Your flows, in every project. |
 
@@ -470,7 +470,7 @@ into them.
 ## Python entry points
 
 Every command is a shell around a call you can make yourself. The layer each lives in is named
-in [Architecture](/contributing/architecture.md).
+in [Architecture](/contributing/architecture).
 
 ```python
 from hmz.runner import Runner          # hmz exec
@@ -481,10 +481,10 @@ from hmz import providers              # hmz providers
 from hmz.flows import verses           # hmz flowverses
 ```
 
-- `Runner(flow, agents).run(task)` — [Flows](/reference/flows.md)
-- `collect(workspace, *, sessions=…, agents=…, output=…, start=…, end=…, profile=…)` — [Tracing](/reference/tracing.md)
-- `connect(command, config)` / `check(config)` — [Remote execution](/reference/remote-execution.md)
+- `Runner(flow, agents).run(task)` — [Flows](/reference/flows)
+- `collect(workspace, *, sessions=…, agents=…, output=…, start=…, end=…, profile=…)` — [Tracing](/reference/tracing)
+- `connect(command, config)` / `check(config)` — [Remote execution](/reference/remote-execution)
 - `providers.providers(cli)` / `providers.find(cli, name)` / `providers.remove(cli, name)` —
-  [Providers](/reference/providers.md)
+  [Providers](/reference/providers)
 - `verses.flowverses()` / `verses.add(url, name)` / `verses.fetch(name)` / `verses.remove(name)` —
-  [Flowverses](/features/flowverses.md)
+  [Flowverses](/guide/flowverses)

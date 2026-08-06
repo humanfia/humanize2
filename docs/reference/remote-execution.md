@@ -46,7 +46,7 @@ export      /home/me/code/myproject -> /home/me/code/myproject
 workspace   /home/me/code/myproject (184 entries)
 ```
 
-Every flag is in the [CLI reference](/reference/cli.md#hmz-anchor).
+Every flag is in the [CLI reference](/reference/cli#hmz-anchor).
 
 ## Targets
 
@@ -102,8 +102,8 @@ Commands the agent spawns always use the target's network, whatever `--net` says
 
 ## Anchoring a flow
 
-Give an agent's config an anchored [machine](/reference/machines.md) and its turns land there, without any
-other change to the [flow](/reference/flows.md):
+Give an agent's config an anchored [machine](/reference/machines) and its turns land there, without any
+other change to the [flow](/reference/flows):
 
 ```python
 from hmz.agents import ClaudeCodeAgentConfig
@@ -172,7 +172,7 @@ status = connect(["claude", "--print"], config)   # the agent's own exit status
 `connect` returns once the agent has exited and everything it wrote has been pushed.
 
 `AnchorConfig` fields map one-to-one onto the flags in the
-[CLI reference](/reference/cli.md#hmz-anchor): `target`, `workspace`, `chdir`, `remote_path`,
+[CLI reference](/reference/cli#hmz-anchor): `target`, `workspace`, `chdir`, `remote_path`,
 `shadow`, `local_paths`, `local_execs`, `redirects`, `private`, `net`, `net_allow`, `token`,
 `force`.
 
@@ -224,4 +224,4 @@ Each of these is deliberate, and each looks like a defect if you meet it cold.
 and prefer `ssh://` or `docker://`, which need no open port at all.
 
 The full statement, including what running any agent under humanize means, is in
-[Security](/guide/security.md).
+[Security](/guide/security).

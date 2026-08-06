@@ -25,25 +25,39 @@ inbound links moving is a red build rather than a 404 somebody finds later.
 docs/
 ├── .vitepress/config.mts     nav, sidebars, everything
 ├── index.md                  the home page
-├── guide/                    start here, and the numbered tutorials
-├── features/                 one page per feature
+├── tutorials/                six, in order, each a whole piece of work
+├── guide/                    one page per feature, answering "how do I use this?"
+├── features/                 one page: what humanize does, described
 ├── reference/                CLI, TUI, and the Python API
 ├── contributing/             this
 ├── public/                   served at the site root: logo.svg, tui.svg, demo/*.gif, demo/*.png
 └── tapes/                    the VHS scripts the demos are rendered from
 ```
 
-**Guide** is for reading through, **Features** for "how do I use X", **Reference** for looking
-something up. A page that is two of those is two pages.
+Four kinds of page, and a page that is two of them is two pages.
+
+| | | |
+| --- | --- | --- |
+| **Tutorials** | learning | Taken in order, start to finish, with every command written out. A reader following one is not choosing anything; they are being led. Six of them, and adding a seventh means arguing that one of the six should go. |
+| **Guides** | doing | "How do I use X?" One feature each. Opens with a `## Try it` section short enough to paste, then explains the rest. A reader here has a job and knows what they want. |
+| **Features** | understanding | One page, describing what there is. Nothing here explains how; every entry points at a guide. |
+| **Reference** | looking up | Complete and dry. Every flag, key, argument and return. A reader here already knows what they are looking for. |
+
+That split is the [Diátaxis](https://diataxis.fr/) one, and the reason the docs were
+reorganised: everything used to be in **Guide**, which made a reader with a job read a tutorial
+and a reader learning read a feature page.
 
 ## Writing a page
 
-- Links are written from the site root, without the extension: `/features/afk`. VitePress checks
+- Links are written from the site root, without the extension: `/guide/afk`. VitePress checks
   them at build time.
 - Assets in `public/` are referenced from the root without `public`: `![…](/tui.svg)`.
 - Do not add a `## Table of Contents`. The right-hand outline is generated.
 - The first `#` heading is the page title.
-- Wrap prose at 100 columns, as the rest of the repository does.
+- Wrap prose at 95 columns, as the rest of the repository does.
+- A guide opens with two or three sentences under the title saying what the feature is and when
+  you would reach for it, then a `## Try it`. A tutorial opens with how long it takes and what
+  the reader will have at the end.
 
 Adding a page means adding it to `sidebar` in `.vitepress/config.mts`; it will not appear
 otherwise.
@@ -75,7 +89,7 @@ Concretely:
   obviously invalid — `gateway.example.invalid`, `not-a-real-token`, `not-a-real-key`.
 - No turn is ever run. `/opt/standin/claude` and `/opt/standin/codex` exist so that humanize
   offers those backends; both exit 1 if anything actually calls them.
-- What the [`collect`](/features/tracing) demo reads, and the runs `/cycles` lists, are what
+- What the [`collect`](/guide/tracing) demo reads, and the runs `/cycles` lists, are what
   `stage.py` invented.
 
 If you add a tape, look at the rendered GIF before committing it. Frame by frame is worth it:

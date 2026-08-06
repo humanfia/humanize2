@@ -1,7 +1,7 @@
 # Machines
 
 Where an agent's turns land. One setting on the agent's config, with three answers — and, for an
-agent a [flow](/reference/flows.md) drives, the flow says whether it may be given any answer but the first.
+agent a [flow](/reference/flows) drives, the flow says whether it may be given any answer but the first.
 
 The agent process always stays on **this** machine, whichever answer you give — keeping its
 credentials, its state directory and its link to its model provider. What moves is the project
@@ -26,11 +26,11 @@ one answer to that.
 
 ## Which agents may be moved at all
 
-Whether that question may be asked of a given agent is the **[flow's](/reference/flows.md)** to say, and not
+Whether that question may be asked of a given agent is the **[flow's](/reference/flows)** to say, and not
 a setting anybody may reach for. A flow is written for one shape of work, and one whose agents
 read this project cannot have one of them reading somebody else's. So a flow declares it beside
 each agent it drives, exactly as it declares [the moments that agent must
-run](/reference/flows.md#asking-for-an-agent-that-can-do-something):
+run](/reference/flows#asking-for-an-agent-that-can-do-something):
 
 ```python
 from typing import Annotated, NamedTuple
@@ -76,7 +76,7 @@ prompt, not the command line. The flow names the image, and the rest follows fro
   path is the same path on both sides and the work outlives the container;
 - the agent goes on running **here**, with its own credentials and its own trajectory — what is
   isolated is the tools and the libraries a command finds, not the work;
-- the work reaches the container through [coganchor](/reference/remote-execution.md), as a `docker://`
+- the work reaches the container through [coganchor](/reference/remote-execution), as a `docker://`
   target, which is the road every other machine's work takes too;
 - it comes up on the agent's first turn and goes when the agent does, as
   [any of them does](#when-the-machine-comes-up-and-when-it-goes).
@@ -124,7 +124,7 @@ machine = AnchoredConfig(
 
 `AnchorConfig` is where every detail lives — the target, the workspace as the target has it,
 what to keep local, where the agent's own network connections go. All of it, and what does and
-does not cross, is in [Remote execution](/reference/remote-execution.md).
+does not cross, is in [Remote execution](/reference/remote-execution).
 
 Nothing is brought up and nothing is taken down: the machine is somebody else's, and all this
 says is that the agent's turns land there rather than here.
@@ -153,7 +153,7 @@ The container:
 
 - runs as your uid and gid, so files it writes are yours;
 - has `HOME=/tmp`, away from the workspace, so what a command caches is not the project's;
-- is reached as a `docker://` [target](/reference/remote-execution.md#targets), and needs no port and no
+- is reached as a `docker://` [target](/reference/remote-execution#targets), and needs no port and no
   secret;
 - is labelled `humanize=<your uid>`.
 
@@ -205,7 +205,7 @@ The same for every kind:
 different toolchain and a different filesystem, and mounts your workspace into it. It does not
 stop the agent editing that workspace, and an `hmz anchor` export bounds which files a request
 may name but does not confine the commands that request can run. Read
-[Security](/guide/security.md).
+[Security](/guide/security).
 
 ## Writing a machine of your own
 

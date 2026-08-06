@@ -175,14 +175,14 @@ table in `agents/__init__.py`, which `runner.py` and the interface both read. Su
 `StreamSessionBase` if it is one long-lived process spoken to a line at a time —
 `agents/SPEC.md` says which and why.
 
-**A machine.** Two classes in `machines/`, per [Machines](/reference/machines.md#writing-a-machine-of-your-own).
+**A machine.** Two classes in `machines/`, per [Machines](/reference/machines#writing-a-machine-of-your-own).
 
 **A command.** A module under `cli/` if it takes a parser of its own, a thin wrapper in
 `cli/__init__.py`, and an entry in `COMMANDS`. Import your layer *inside* the function, not at
 the top of the module.
 
 **A flow.** Just a directory: one in `flows/builtin/` for one humanize ships, one in a
-[flowverse](/reference/flows.md#flowverses)'s own `flows/` for one it offers, one in
+[flowverse](/reference/flows#flowverses)'s own `flows/` for one it offers, one in
 `.humanize/flows/` for one of your own. Its `__init__.py` is the flow, whatever it imports
 lives beside it, and its `skills/` is what it brings. They are content and import nothing of
 humanize but `hmz.agents` — and `hmz.flows.flow`, where one holds several.

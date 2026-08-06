@@ -100,13 +100,13 @@ async def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
 
 Nothing about starting it changes: `hmz exec -f …` and the interface run a coroutine flow the
 same way they run any other, on a loop of the flow's own, and the run is over when `run`
-returns. The count of its agents, the settings it declares, the [cycle](/reference/tracing.md#cycles) it is
+returns. The count of its agents, the settings it declares, the [cycle](/reference/tracing#cycles) it is
 written down as and the way it is [stopped](#stopping) are all exactly as they are for a flow
 that is a plain function.
 
 Every call that runs a turn has an awaited twin — `agent.aturn`, `session.aturn`,
 `agent.apursue` — and `agent.abatch` runs a whole fan-out of them. See
-[Agents › Awaiting a turn](/reference/agents.md#awaiting-a-turn).
+[Agents › Awaiting a turn](/reference/agents#awaiting-a-turn).
 
 ```python
 @flow
@@ -159,8 +159,8 @@ agent uses them:
 
 - The agents page of `/flow` asks what *the reviewer* runs, rather than what agent 2 of 2 runs.
 - The line above the prompt says `reviewer · claude/claude-opus-4-8:high`.
-- A [trace](/reference/tracing.md) groups that agent's sessions under `reviewer`.
-- What each agent was set to run is [remembered per role](/reference/tui.md#what-it-remembers), so a flow
+- A [trace](/reference/tracing) groups that agent's sessions under `reviewer`.
+- What each agent was set to run is [remembered per role](/reference/tui#what-it-remembers), so a flow
   that grows an agent in the middle does not hand the reviewer's model to the builder.
 
 An agent that was named where it was made keeps that name; one that was not takes the name the
@@ -196,8 +196,8 @@ refuses is what the flow will not run.
 
 - The sheet the interface puts up as a flow is chosen is that model with a cursor on it: `/flow`
   asks it between choosing the flow and choosing its agents. See [TUI › Setting a flow
-  up](/reference/tui.md#setting-a-flow-up).
-- What you set is [remembered per flow](/reference/tui.md#what-it-remembers), so a flow of twenty
+  up](/reference/tui#setting-a-flow-up).
+- What you set is [remembered per flow](/reference/tui#what-it-remembers), so a flow of twenty
   settings is not one to answer again every morning.
 - `None` means nobody set it up, and is what the flow gets from `hmz exec`. Fall back to the
   model's own defaults, as above, and the flow runs the same either way.
@@ -258,7 +258,7 @@ def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:
 ```
 
 **It is not a second copy of the transcript.** The backends keep that, and the run's
-[cycle](/reference/tracing.md#cycles) already says which sessions it opened. What belongs here is
+[cycle](/reference/tracing#cycles) already says which sessions it opened. What belongs here is
 the handful of things the loop itself is keeping track of — which round it is on, which files it
 has been through, what it has decided so far — which is the part of a run nothing else knows.
 
@@ -312,7 +312,7 @@ and says so at the first call rather than starting over in silence.
 
 ## Asking for an agent that can do something
 
-Not every backend runs every [moment](/reference/agents.md#hooks). A flow that hangs a hook on one only
+Not every backend runs every [moment](/reference/agents#hooks). A flow that hangs a hook on one only
 some of them run says so where it declares the place, by writing the moment beside the type:
 
 ```python
@@ -380,7 +380,7 @@ class Agents(NamedTuple):
 | --- | --- |
 | *(nothing)* | this machine, and it **cannot** be pointed anywhere else |
 | `Remote` | wherever whoever chose the agent pointed it — the only kind of place that may be pointed at all — and here where nobody did |
-| `Isolated("<image>")` | a [container of that image](/reference/machines.md#isolated-python-3-12), which nobody configures and nobody is asked about |
+| `Isolated("<image>")` | a [container of that image](/reference/machines#isolated-python-3-12), which nobody configures and nobody is asked about |
 
 **This is a change.** A machine used to be a setting of the agent that anything could reach, so
 any agent of any flow could be pointed anywhere. It is still a setting of the agent — that is how
@@ -414,7 +414,7 @@ wanted("official/rlar")   # one Place per agent somebody has to choose:
 `where` is `None`, the `Remote` class itself, or the `Isolated` the flow wrote — which is how
 whatever chooses the agents knows which of them it may offer a machine for. What each answer
 comes to, and what a container of the flow's own actually is, is in
-[Machines](/reference/machines.md#which-agents-may-be-moved-at-all).
+[Machines](/reference/machines#which-agents-may-be-moved-at-all).
 
 ## Hooks in a flow
 
@@ -439,7 +439,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
             agent(task, suppress=True)
 ```
 
-Everything a hook can do is in [Agents › Hooks](/reference/agents.md#hooks). Two things worth saying here:
+Everything a hook can do is in [Agents › Hooks](/reference/agents#hooks). Two things worth saying here:
 
 - Hooks are on the **agent**, not the session, so one covers every session that agent opens —
   including the fresh one a Ralph loop makes each turn.
@@ -480,9 +480,9 @@ hmz exec -f <flow> -a <cli>/<model>:<effort> [-a ...] <task>
 ```
 
 One `-a` for each agent the flow drives, in the order it takes them. Full syntax in the
-[CLI reference](/reference/cli.md#hmz-exec).
+[CLI reference](/reference/cli#hmz-exec).
 
-In the [interface](/reference/tui.md), `/flow` picks one by name — tab and shift+tab are for stepping
+In the [interface](/reference/tui), `/flow` picks one by name — tab and shift+tab are for stepping
 between the agents of the flow that is running.
 Picking one while a flow runs is refused: esc stops it first, since a flow drives the agents it
 was handed and must not have them swapped underneath it.
@@ -611,7 +611,7 @@ async def run(agents: tuple[AgentBase], task: str) -> None:
 
 **What is running is both of them.** `hmz.runner.running()` reports the flow that was started
 and whatever it called, innermost last; the interface names them on its status line and on
-`/status`, and the [cycle](/reference/tracing.md) records each call and each return. A flow that called
+`/status`, and the [cycle](/reference/tracing) records each call and each return. A flow that called
 another does not read as the flow somebody chose.
 
 ## Where flows live
@@ -645,7 +645,7 @@ in for; a flow of yours is called by its path, short enough to read:
 | `~/.humanize/flows/chat` | yours, in every project |
 
 So yours is listed beside humanize's rather than instead of it, `-f` takes either, and what
-each was [set up to run](/reference/tui.md#what-it-remembers) is remembered apart — a flow of yours cannot
+each was [set up to run](/reference/tui#what-it-remembers) is remembered apart — a flow of yours cannot
 quietly inherit the agents or the settings of the one it shares a name with.
 
 Anything with a slash in it is a path, taken as given: a flow's directory, or a `.py` file to
@@ -727,7 +727,7 @@ Two are always there:
 `official` is listed before it has been fetched — what there is to run is not the same question
 as what has been downloaded — and neither of the two can be taken away.
 
-In the [interface](/reference/tui.md), `/flowverses` is where they live: `a` adds one, `r` fetches
+In the [interface](/reference/tui), `/flowverses` is where they live: `a` adds one, `r` fetches
 the one under the cursor again, `d` twice takes an added one away, and enter says what one
 holds. Adding one takes a URL or an `owner/repo`, and a name to keep it under if the
 repository's own name is not the one you want. `/flow` keeps the two keys that are about flows
@@ -738,7 +738,7 @@ A flow is Python, and reading one means running it — so listing what a flowver
 entry point of every flow in its `flows/`. Adding one is trusting that repository with this
 machine, exactly as installing a package is.
 
-[`hmz flowverses`](/reference/cli.md#hmz-flowverses) is the same, said as arguments, for a machine
+[`hmz flowverses`](/reference/cli#hmz-flowverses) is the same, said as arguments, for a machine
 being set up or a script: `list`, `show`, `add`, `fetch`, `remove`.
 
 ```sh
@@ -780,9 +780,9 @@ flowbench's loops, written against this API.
 
 | Flow | Agents | What it does |
 | --- | --- | --- |
-| `official/fixed_juice_ralph` | 1 | Ralph with a governor on it: it [moves the effort](/reference/agents.md#moving-the-effort-while-it-runs) a rung a round to hold the agent to `juice` output tokens per turn of the model. |
+| `official/fixed_juice_ralph` | 1 | Ralph with a governor on it: it [moves the effort](/reference/agents#moving-the-effort-while-it-runs) a rung a round to hold the agent to `juice` output tokens per turn of the model. |
 | `official/continue_loop` | 1 | Sends the task once, then keeps nudging `continue`. Until a turn lands the task is sent again — `continue` on its own would open a session that never saw it. |
-| `official/goal` | 1 | Ralph, with the task set as the agent's [own goal](/reference/agents.md#goals). The loop only starts it over when it stopped without having met it. |
+| `official/goal` | 1 | Ralph, with the task set as the agent's [own goal](/reference/agents#goals). The loop only starts it over when it stopped without having met it. |
 | `official/flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. |
 | `official/rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. The review *is* the actor's next prompt, word for word, and the reviewer is also the one that says the task is finished — which is what ends the run. |
 | `official/humanize1:gen-idea` | `drafter` | Opens a loose idea into a repo-grounded draft. |
@@ -816,7 +816,7 @@ the builder has to be a backend that runs it.
 It writes what the plugin writes, where the plugin writes it: `.humanize/rlcr/<timestamp>/`
 with `state.md`, `goal-tracker.md`, and a prompt, summary, contract and review per round.
 
-Read [Security](/guide/security.md) before starting any of them.
+Read [Security](/guide/security) before starting any of them.
 
 ## Patterns
 
@@ -869,7 +869,7 @@ trace reads the actor's session and the reviewer's rounds as two.
 ### Asking a question rather than setting an agent to work
 
 A loop that has to decide something — is this finished, does this plan belong to this
-repository — asks for the [shape of the answer](/reference/agents.md#answering-in-a-shape) and reads a
+repository — asks for the [shape of the answer](/reference/agents#answering-in-a-shape) and reads a
 field, rather than looking for a word at the end of a paragraph:
 
 ```python
@@ -894,7 +894,7 @@ The same call to [the person](#the-person-at-the-prompt) is a questionnaire: the
 question per field rather than shown a schema, and the model is built out of what they typed.
 So a flow settles what only a person can settle in the model it is going to run on —
 `agents.human(asked, schema=Settled, suppress=True)`. See
-[Agents](/reference/agents.md#asking-them-for-a-shape-which-is-a-questionnaire).
+[Agents](/reference/agents#asking-them-for-a-shape-which-is-a-questionnaire).
 
 ### Catching turns without wrapping every line
 
@@ -929,9 +929,9 @@ if head() == before:
 ## Building the agents yourself
 
 `-a` reaches four of an agent's settings: the CLI, the model, the effort, and — after an `@` —
-the [provider](/reference/providers.md) whose account it runs as. A name, [where the work
-lands](/reference/machines.md) and
-[what it may do](/reference/agents.md#what-an-agent-may-do) are settings of the *agent* that no `-a` spells,
+the [provider](/reference/providers) whose account it runs as. A name, [where the work
+lands](/reference/machines) and
+[what it may do](/reference/agents#what-an-agent-may-do) are settings of the *agent* that no `-a` spells,
 so a flow that needs one is handed agents built in Python — and a machine only where the flow's
 own place for that agent [said `Remote`](#where-each-agent-works):
 
@@ -949,7 +949,7 @@ Runner("official/rlar", agents).run("fix the build")
 ```
 
 `Runner` takes the same flow names and paths `-f` does, checks the count the same way, and
-writes the same [cycle](/reference/tracing.md#cycles). See [Agents](/reference/agents.md) for what those objects can
+writes the same [cycle](/reference/tracing#cycles). See [Agents](/reference/agents) for what those objects can
 do.
 
 ## Stopping
@@ -965,7 +965,7 @@ outside:
 Every agent is told to take no further turn. The turn under way is closed out, and the next
 call into that agent raises `Stopped` — which `suppress=True` deliberately does not catch,
 because a loop that carried on past it would never end. Let it propagate; the
-[cycle](/reference/tracing.md#cycles) then records the run as stopped by hand rather than as one that
+[cycle](/reference/tracing#cycles) then records the run as stopped by hand rather than as one that
 finished.
 
 What the turn was doing is left where it got to. A stop that waited for a turn would not read

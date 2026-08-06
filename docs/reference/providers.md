@@ -13,7 +13,7 @@ A coding agent CLI signs in once. Claude Code keeps its account under `~/.claude
 `claude` started on this machine is whoever is signed in there — so a flow that wants two of
 them on two accounts has two accounts wanting one directory.
 
-A provider is the second directory. [flame_chase](/reference/flows.md#the-official-flowverse) hands
+A provider is the second directory. [flame_chase](/reference/flows#the-official-flowverse) hands
 the same task to two agents in turn; here both are Claude Code — one on the Anthropic
 subscription running Opus, one on a DeepSeek endpoint running DeepSeek's own model:
 
@@ -50,8 +50,8 @@ The files keep the names the CLI gave them, because it is the CLI that writes th
 for a provider is the CLI's own login, with those paths pointed here.
 
 **Only the credential files are kept here.** Sessions, settings and skills stay in the CLI's own
-home, which is why a turn under a provider still shows up in a [trace](/reference/tracing.md), still counts
-towards the [cost readout](/reference/agents.md#what-it-has-cost-and-how-fast), and still has the skills you
+home, which is why a turn under a provider still shows up in a [trace](/reference/tracing), still counts
+towards the [cost readout](/reference/agents#what-it-has-cost-and-how-fast), and still has the skills you
 installed.
 
 What each backend keeps an account in, and so what a provider of it holds:
@@ -74,7 +74,7 @@ account of it is variables and nothing to redirect.
 Each follows the variable that moves that CLI's home — `CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
 `GROK_HOME`, `KIMI_CODE_HOME`, `PI_CODING_AGENT_DIR`, `QWEN_HOME`, `XDG_DATA_HOME`. Antigravity
 is the exception, reading no variable of its own. See
-[Environment variables](/reference/cli.md#environment-variables).
+[Environment variables](/reference/cli#environment-variables).
 
 ## The ways in
 
@@ -376,7 +376,7 @@ providers.alone("claude")                   # where what is said about the machi
 
 ## Choosing one for an agent
 
-It is a setting of the [agent](/reference/agents.md), because it is the agent that signs in.
+It is a setting of the [agent](/reference/agents), because it is the agent that signs in.
 
 In Python, by name:
 
@@ -394,7 +394,7 @@ hmz exec -f ralph_loop -a cli=claude,model=claude-opus-5,effort=max,provider=dee
 In the interface it is the `provider` row of the sheet an agent is set up on — which
 CLI, and which of its accounts — because an account belongs to a backend and everything after it
 is about how that backend runs. See [TUI › What each agent
-is](/reference/tui.md#what-each-agent-is).
+is](/reference/tui#what-each-agent-is).
 
 **`a` on that row makes one there and then**, so finding out you have no account for this
 CLI is not a reason to leave the question: it asks how to sign in and what that way needs, hands
@@ -421,7 +421,7 @@ Both happen whichever way the provider was made, so an agent on a gateway never 
 your CLI is signed into either.
 
 The paths are answered by a seccomp-filtered ptrace supervisor — the technique
-[`hmz anchor`](/reference/remote-execution.md) runs a whole session under, here handling only the handful of
+[`hmz anchor`](/reference/remote-execution) runs a whole session under, here handling only the handful of
 syscalls that name one of those files. Everything else the agent does is untouched and runs at
 native speed, and the agent is told none of it. That supervisor is a process humanize spawns
 for itself: a supervisor forks the program it watches, and a flow pumping turns from threads
@@ -430,7 +430,7 @@ of its own has no signal handling to lend one.
 ## Requirements and limits
 
 - **Linux on x86-64**, as running an agent under an anchor needs. There is nothing to install.
-- **A turn that is also [anchored](/reference/machines.md) is supervised once, not twice.** A process has
+- **A turn that is also [anchored](/reference/machines) is supervised once, not twice.** A process has
   one tracer, so the anchor is told which paths to answer and answers them itself.
 - **Only the paths listed [above](#where-the-credentials-are-kept) are answered.** A CLI that
   keeps a credential somewhere else keeps it where it always did.
@@ -442,7 +442,7 @@ of its own has no signal handling to lend one.
   real one: a turn taken as the wrong account is worse than a turn that did not run. So is a turn
   that could not be supervised at all, which is refused rather than run unsupervised.
 - **A 32-bit process below the agent is not intercepted**, as it is not under an
-  [anchor](/reference/remote-execution.md): the filter passes another architecture's syscalls through
+  [anchor](/reference/remote-execution): the filter passes another architecture's syscalls through
   untouched. Every one of these CLIs is 64-bit.
 
 ## What a turn under one is run without
@@ -475,7 +475,7 @@ and never their values; a secret answered at the terminal is not echoed. One giv
 in your shell's history, so leave it to be asked for.
 
 **The credentials stay on this machine.** An agent runs here however its
-[machine](/reference/machines.md) is configured, so a provider's files do not cross to a target — what
+[machine](/reference/machines) is configured, so a provider's files do not cross to a target — what
 crosses is the work. Neither do its variables: everything an agent exports is otherwise
 inherited by every command it runs there, so a provider's are named as the agent's own and
 dropped on the way over.

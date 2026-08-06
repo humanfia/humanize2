@@ -92,13 +92,20 @@ To collect what a run left behind, and open it in [ui.perfetto.dev](https://ui.p
 hmz trace collect
 ```
 
-[Getting started](https://docs.humanfia.ai/guide/getting-started) goes from here to a
-run you can read back.
+[Quickstart](https://docs.humanfia.ai/tutorials/quickstart) goes from here to a run you can
+read back, in fifteen minutes.
 
 ## Documentation
 
-**[docs.humanfia.ai](https://docs.humanfia.ai/)** — tutorials, a page per
-feature, and the complete CLI, TUI and Python reference. Its source is under [docs/](docs/).
+**[docs.humanfia.ai](https://docs.humanfia.ai/)**, in four parts. Its source is under
+[docs/](docs/).
+
+- **[Tutorials](https://docs.humanfia.ai/tutorials/)** — six, in order. A quickstart, three real
+  pieces of work run end to end, and two flows written from scratch.
+- **[Guides](https://docs.humanfia.ai/guide/)** — a page per feature, each answering "how do I
+  use this?" and opening with something you can paste.
+- **[Features](https://docs.humanfia.ai/features/)** — what humanize does, described in one page.
+- **[Reference](https://docs.humanfia.ai/reference/cli)** — the complete CLI, TUI and Python API.
 
 ## Maintainers
 

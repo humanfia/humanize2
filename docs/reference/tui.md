@@ -3,7 +3,7 @@
 `hmz` with no command opens the terminal interface. There is no command that opens it too: one
 way in is one way in.
 
-It is a coding agent's own terminal with a [flow](/guide/concepts.md#flow) underneath instead of one
+It is a coding agent's own terminal with a [flow](/guide/concepts#flow) underneath instead of one
 agent — a transcript, a multi-line editor under it, and a status line under that.
 
 ## The screen
@@ -33,7 +33,7 @@ between them, is [below](#reading-one-conversation).
 
 **Above the editor**, one line per agent the flow drives: the name the flow calls it, then what
 it runs as `cli/model:effort`, then the machine its turns land on where that is not this one,
-[what it may do](/features/permissions) where that is not the ordinary rung, the
+[what it may do](/guide/permissions) where that is not the ordinary rung, the
 [account](#which-cli-and-which-account) it runs as where that is not this machine's own, and
 finally the conversations it has open — `2 of 5` on the agent holding the one you are reading,
 the count alone on the others, and `unread` against one holding a conversation that has said
@@ -44,7 +44,7 @@ only, so a flow that has stopped reads as stopped.
 **The status line, left:** what is running, if anything is — whose turn it is and how long it
 has been going. Between two turns it names the flow and how long the run has been going, since
 a flow that sleeps off a round, commits, and reads what the last turn wrote has not stopped. A
-flow that [called another flow](/reference/flows.md#a-flow-that-calls-another-flow) names both, innermost
+flow that [called another flow](/reference/flows#a-flow-that-calls-another-flow) names both, innermost
 last: `chat ▸ official/rlar`. A
 flow that has run out of things to do until you say something says `waiting for you`. With
 nothing running at all, it names the flow that is set up to run and the directory it would run
@@ -133,9 +133,9 @@ list appears under the editor with a line about each.
 | Command | Takes | What it does |
 | --- | --- | --- |
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Nothing lands until you save on the way out. |
-| `/flowverses` | | [Where flows come from](/features/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
+| `/flowverses` | | [Where flows come from](/guide/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
-| `/cycles` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/features/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
+| `/cycles` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/guide/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
@@ -199,7 +199,7 @@ the next. Where that agent has none left, whatever is nearest to where it was.
 
 What is kept is bounded, a flow being a thing that runs for days: the last eight conversations,
 and the last two thousand lines of each. Older lines and older conversations are gone from the
-screen, not from the [trace](/reference/tracing.md) — that is what a trace is for.
+screen, not from the [trace](/reference/tracing) — that is what a trace is for.
 
 ## Talking to a running flow
 
@@ -264,7 +264,7 @@ How far "into the turn" it gets depends on the backend:
 | **pi** | A steer on the run it is making, taken into it rather than answered after it. |
 | **opencode**, **mimocode** | Nothing: a run per turn has ended by the time there is anything to say to it. |
 
-An [anchored](/reference/remote-execution.md) Claude ends its process with each turn so that its work
+An [anchored](/reference/remote-execution) Claude ends its process with each turn so that its work
 reaches the target before the turn says it landed — so it hears you between turns rather than
 during one. An anchored Codex keeps one app server for the life of the agent and can be steered
 throughout, at the cost of that same guarantee.
@@ -290,7 +290,7 @@ in a list under the editor:
 - `/` offers the commands, each with a line about what it does and what it takes after its
   name.
 - `/flow ` offers the flows there are — the ones humanize ships, the ones every
-  [flowverse](/reference/flows.md#flowverses) fetched here holds, and the ones under `.humanize/flows`
+  [flowverse](/reference/flows#flowverses) fetched here holds, and the ones under `.humanize/flows`
   here or in your home directory.
 
 An offer is the whole of what the word becomes, so taking one replaces what was typed rather
@@ -338,7 +338,7 @@ made of several lists names them under the titles, and `←` / `→` step betwee
 
 `/flow` opens on two pages — **Flow** and **Agents** — and the first of them puts up the flows
 of one place at a time, with `←` and `→` stepping between the places: every
-[flowverse](/reference/flows.md#flowverses) — `builtin`, which is the package's own, `official`, which is
+[flowverse](/reference/flows#flowverses) — `builtin`, which is the package's own, `official`, which is
 where the rest come from, and whatever else has been added — and then `local`, this project's
 flows under `.humanize/flows`, and `user`, yours under `~/.humanize/flows`, each where there
 are any. The strip above the list is the places, with the one being read marked; the list is
@@ -385,7 +385,7 @@ account or allowed too much is something you find out halfway through a run. Wha
 reaches the agents that are running, each of them from its next turn on. A CLI you changed is
 the one thing that cannot be swapped under a flow already holding that agent, and says so.
 
-The same places are on the command line as [`hmz flowverses`](/reference/cli.md#hmz-flowverses), for a
+The same places are on the command line as [`hmz flowverses`](/reference/cli#hmz-flowverses), for a
 machine being set up or a script.
 
 **s** starts a search, and what is typed into it narrows by name. What each flow says about
@@ -476,7 +476,7 @@ holding it: nothing is written down until the menu itself is saved.
 
 ## Which CLI, and which account
 
-Two rows, in that order, because an [account](/reference/providers.md) is one backend's — what signs in
+Two rows, in that order, because an [account](/reference/providers) is one backend's — what signs in
 to Claude Code is not what signs in to codex. The CLIs are the ones **installed here**, less any
 the flow ruled out by needing a moment or a goal feature that backend has not got — plus any
 supported backend that is only a `pip install` away, which is listed so that it can be found
@@ -545,7 +545,7 @@ what it may do — none of which is a thing about the flow that happens to be dr
 | `d` `d` | Take one away. |
 
 They live in `~/.humanize/agents.yaml`, and land there when the menu is saved. The same store
-is on the command line as [`hmz agents`](/reference/cli.md#hmz-agents), for a machine being set up or a
+is on the command line as [`hmz agents`](/reference/cli#hmz-agents), for a machine being set up or a
 CI job.
 
 **A flow imports a copy.** The `import` row of a flow's agent copies everything the saved one
@@ -577,7 +577,7 @@ entry in your `~/.ssh/config` — and anything else is a target you type after *
 An agent the flow says may move but that nobody has pointed anywhere still works here: the row
 is offered, not forced. The agent itself runs here whatever you choose — its credentials, its
 state directory and its link to its model provider stay put. What moves is the project it reads
-and the commands it runs. See [Remote execution](/reference/remote-execution.md).
+and the commands it runs. See [Remote execution](/reference/remote-execution).
 
 Two agents of one flow may work on two machines, since it is a setting of the agent. A target
 that cannot be read, and an agent pointed somewhere by a flow that does not say it may be, are
@@ -601,7 +601,7 @@ and the line each describes itself with — and nothing is asked of the CLI, whi
 starting it. **Nothing here changes any of them.** A skill installed on this machine is that
 CLI's own, and what a person installed is not something a flow is entitled to rewrite.
 
-What a run adds to that is [the skills the flow brings](/reference/flows.md#the-skills-a-flow-brings),
+What a run adds to that is [the skills the flow brings](/reference/flows#the-skills-a-flow-brings),
 mounted onto every session its agents open and taken away again after.
 
 ## The runs that have already happened
@@ -630,8 +630,8 @@ line saying what it does](/demo/cycle-does.png)
 
 | Row | What it does |
 | --- | --- |
-| **carry on from here** | Runs that run's own flow again, on what that run left behind — which a flow that says it [can be picked up](/reference/flows.md#a-flow-that-can-be-picked-up) is handed. |
-| **collect a trace** | Gathers **that run's** sessions — and the programs it ran, for a [profiled](/reference/tracing.md#profiling-a-run) run — into `traces/` inside the run itself, rather than into whatever directory you are standing in. That run's and no others: they are asked for by the ids it wrote down, so a directory run in fifty times has fifty traces and none of them holds another's work. Where it went and what is in it are said under the list, and again in the transcript. |
+| **carry on from here** | Runs that run's own flow again, on what that run left behind — which a flow that says it [can be picked up](/reference/flows#a-flow-that-can-be-picked-up) is handed. |
+| **collect a trace** | Gathers **that run's** sessions — and the programs it ran, for a [profiled](/reference/tracing#profiling-a-run) run — into `traces/` inside the run itself, rather than into whatever directory you are standing in. That run's and no others: they are asked for by the ids it wrote down, so a directory run in fifty times has fifty traces and none of them holds another's work. Where it went and what is in it are said under the list, and again in the transcript. |
 | **where it is** | The directory the run is written in, sessions and all, said under the list. |
 
 **Carrying on is offered where the flow says so now**, rather than where the run said so then.
@@ -644,7 +644,7 @@ whatever its flow says: a run that cannot be continued is still a run to read.
 What is carried on is the run rather than what the interface happens to be set up on — the
 flow, its agents and what they were asked to do all come off the record of that run, an agent
 swapped under it being a different run wearing its name. And it is a run of its own: a
-[cycle](/reference/tracing.md#cycles) is never reopened, so carrying one on writes a new one
+[cycle](/reference/tracing#cycles) is never reopened, so carrying one on writes a new one
 that says which run it came from.
 
 **Reading is not refused while a flow is running. Carrying one on is.** What has already
@@ -654,7 +654,7 @@ shutting the menu, since the question the menu is asking is still worth answerin
 running; esc stops it before another can be picked up`.
 
 A directory nothing has ever been run in says so under the empty list. The same trace is
-[`hmz trace collect`](/reference/cli.md#hmz-trace-collect) on a command line, with `--cycle` to
+[`hmz trace collect`](/reference/cli#hmz-trace-collect) on a command line, with `--cycle` to
 name which run. A trace of what a directory holds whoever opened it — a session no flow ever
 drove — is `--all` or `--session` there, and is not offered here at all: this is a list of runs,
 and a trace of none of them has nothing here to hang on.
@@ -703,7 +703,7 @@ what one holds are **held until the menu is saved**. Making one and signing one 
 and something that has already happened is not a draft.
 
 Making one is three questions rather than one form, because each is only answerable once the one
-before it has been: a backend's [ways in](/reference/providers.md#the-ways-in) are its own, and what a way
+before it has been: a backend's [ways in](/reference/providers#the-ways-in) are its own, and what a way
 asks is the way's. A secret is drawn as bullets and never shown back — it is on its way into a
 credential store, which is also why correcting an account starts its secrets blank: you type one
 again or you leave it as it was.
@@ -719,7 +719,7 @@ The retry sheet answers in rungs rather than in numbers: the tries step through 
 8, 13 and 21, and the time the retrying is given through *as long as it takes*, 30s, 1m, 5m,
 15m and 1h. A text box for an integer is a text box to validate.
 
-The same accounts are on the command line as [`hmz providers`](/reference/providers.md#hmz-providers).
+The same accounts are on the command line as [`hmz providers`](/reference/providers#hmz-providers).
 
 ## What humanize remembers
 
@@ -736,7 +736,7 @@ rather than two halves of one:
 ```
 
 **Everywhere** is what is true of this machine wherever humanize is run from: whether it
-[reports what goes wrong](/features/reporting), and — on enter — the list of what a report
+[reports what goes wrong](/guide/reporting), and — on enter — the list of what a report
 carries and what it never does, said under the rows. The row shows what is **written down**: an
 environment that is answering for this run says so under the list rather than being drawn as
 the setting, since a menu cannot change it.
@@ -751,7 +751,7 @@ confirmed.
 ## Setting a flow up
 
 Some flows take settings of their own — `humanize1` takes twenty-three. A flow says so by
-[declaring a model](/reference/flows.md#settings-of-the-flow-s-own), and the sheet is that model with a
+[declaring a model](/reference/flows#settings-of-the-flow-s-own), and the sheet is that model with a
 cursor on it: one row per setting, its name, what it is set to, and the line the flow declared
 it with.
 
@@ -787,7 +787,7 @@ it lands on the Agents page — and what it answers is held with the rest of tha
 menu is saved: setting a flow up is a thing about the flow rather than about what runs it. A
 flow that takes no settings is not asked, so the walk is the same either way. There is no
 command for it: choosing the flow again is how you answer it again. `hmz -f <flow> -c
-<setup.yaml>` opens the interface already set up. See [CLI › hmz](/reference/cli.md#hmz).
+<setup.yaml>` opens the interface already set up. See [CLI › hmz](/reference/cli#hmz).
 
 Nothing in the interface knows what any of the settings mean. The types say how a value moves,
 and the flow's own model says which combinations it will not take — so a flow that refuses
@@ -811,7 +811,7 @@ is one it starts over from rather than one that quietly comes back.
 
 It lives in `~/.humanize/settings.yaml`. The agents you saved under a name live beside it in
 `~/.humanize/agents.yaml`, which is neither a workspace's nor a flow's. See
-[CLI reference](/reference/cli.md#files).
+[CLI reference](/reference/cli#files).
 
 ## Colours
 

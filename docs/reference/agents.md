@@ -1,7 +1,7 @@
 # Agents
 
 Driving a coding agent from Python. An agent is settings; a
-[session](/guide/concepts.md#session) is memory. Which of the two a [flow](/reference/flows.md) holds decides what
+[session](/guide/concepts#session) is memory. Which of the two a [flow](/reference/flows) holds decides what
 it remembers.
 
 Everything here is importable from `hmz.agents`.
@@ -142,7 +142,7 @@ preview; humanize supports `deepseek-harness-sdk>=0.1.0rc6,<0.2`.
 
 A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land),
 [what it may do](#what-an-agent-may-do), [which account it runs as](#which-account-it-runs-as),
-whether [goals](/features/goals) are available to it, and nothing else — the
+whether [goals](/guide/goals) are available to it, and nothing else — the
 [skills it carries](#the-skills-an-agent-carries) are not among them, being its CLI's own and
 its flow's. It is frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
@@ -257,9 +257,9 @@ said = await asyncio.gather(*(one.aturn(task) for one in held))
 
 `cwd=` on a batch is one directory for all of its turns; a batch *across* directories is the
 gather above. Either way the agent is one agent: one set of settings, one id, one
-[trace](/reference/tracing.md) — what differs is where each conversation is rooted.
+[trace](/reference/tracing) — what differs is where each conversation is rooted.
 
-For an agent whose turns land on [another machine](/reference/machines.md), the directory is **that
+For an agent whose turns land on [another machine](/reference/machines), the directory is **that
 machine's** path, and it must be inside the workspace the anchor names. humanize puts the agent
 in this machine's mirror of it and tells the anchor to run the work in the directory itself, so a
 flow says where the work happens in the only names the far end has.
@@ -277,7 +277,7 @@ which is a flow to correct rather than a backend that failed to start.
 ## Awaiting a turn
 
 Every call that runs a turn has a twin that is awaited, for a flow written as
-[`async def run`](/reference/flows.md#a-flow-that-waits-for-more-than-one-thing):
+[`async def run`](/reference/flows#a-flow-that-waits-for-more-than-one-thing):
 
 ```python
 await agent.aturn(task)                  # agent(task), in a session of its own
@@ -503,7 +503,7 @@ no such turn.
 
 A flow says which moments it needs where it declares the agents it drives, and is refused before
 its first turn if it was given one that cannot run them — see
-[Flows](/reference/flows.md#asking-for-an-agent-that-can-do-something).
+[Flows](/reference/flows#asking-for-an-agent-that-can-do-something).
 
 ## Questions
 
@@ -554,7 +554,7 @@ not carry on past this.
 ## Names, and what a run left behind
 
 Two agents at one model and one effort are still two agents — an actor and the reviewer that
-reads its work. `id` is what tells them apart, and what a [trace](/reference/tracing.md) groups their
+reads its work. `id` is what tells them apart, and what a [trace](/reference/tracing) groups their
 sessions under:
 
 ```python
@@ -576,9 +576,9 @@ from hmz.tracing import collect
 collect(agents={a.id: a.opened for a in (actor, reviewer)})
 ```
 
-A [flow](/reference/flows.md#how-many-agents-and-what-they-are-for) that declares its agents as a
+A [flow](/reference/flows#how-many-agents-and-what-they-are-for) that declares its agents as a
 `NamedTuple` names them for you, and a run started through `Runner` writes all of this into its
-[cycle](/reference/tracing.md#cycles) — so this is only needed for agents built and driven by hand.
+[cycle](/reference/tracing#cycles) — so this is only needed for agents built and driven by hand.
 
 ## The person as an agent
 
@@ -596,7 +596,7 @@ the `begins`/`ends` that say whose turn it is — counting them would put the pe
 of who handed to whom and spin a clock at them while they thought.
 
 In a flow, declare one among the agents and it is handed over like the rest — see
-[Flows](/reference/flows.md#the-person-at-the-prompt). Nobody is asked what it runs, so it is not one of
+[Flows](/reference/flows#the-person-at-the-prompt). Nobody is asked what it runs, so it is not one of
 the agents `-a` names.
 
 ### Asking them for a shape, which is a questionnaire
@@ -745,7 +745,7 @@ moves a turn at a time rather than a request at a time.
 many. That average is what an effort moves: a model asked to think harder writes more in each
 answer and takes longer over it. So it is the number to steer by when what is being held is
 how hard the thing is thinking rather than how fast a bill is running up, and it is what
-[`fixed_juice_ralph`](/reference/flows.md#the-official-flowverse) governs on. A window with no
+[`fixed_juice_ralph`](/reference/flows#the-official-flowverse) governs on. A window with no
 turn in it reads as `0.0`: nothing to go on, which a flow tells apart from a turn that said
 nothing.
 
@@ -875,7 +875,7 @@ and Codex both run that moment; the rest have nothing to hang it on.
 **A skill installed on this machine is its CLI's own.** humanize does not switch one off, does
 not write the CLI's settings, and has no per-agent list of them: what you installed is what
 every agent of that CLI carries, installed and switched off where that CLI keeps them. The
-list is readable — the [`skills` row](/reference/tui.md#what-each-agent-carries) of the sheet an
+list is readable — the [`skills` row](/reference/tui#what-each-agent-carries) of the sheet an
 agent is set up on shows what it will be carrying — and that is all it is:
 
 ```python
@@ -887,7 +887,7 @@ agent.loaded       # the skills the flow driving it brings, mounted onto every s
 agent.loads(...)   # what the runner calls to say so; a flow does not call this itself
 ```
 
-What humanize *does* add is [the skills a flow brings](/reference/flows.md#the-skills-a-flow-brings).
+What humanize *does* add is [the skills a flow brings](/reference/flows#the-skills-a-flow-brings).
 Those are mounted onto every session the flow's agents open — copied where that backend reads
 a project's own skills for as long as the session lives, and taken away again after:
 
@@ -914,17 +914,17 @@ ClaudeCodeAgentConfig(model=…, effort=…, machine=DockerConfig(image="python:
 
 `agent.anchor` is where its turns land, and brings the machine up the first time it is asked
 for — which is the first turn. Constructing an agent pulls no image and starts no container.
-See [Machines](/reference/machines.md).
+See [Machines](/reference/machines).
 
 **Which agents may be given one at all is the flow's to say.** An agent handed to a flow whose
 place for it says nothing is refused before its first turn, because a flow is written for one
-shape of work — see [Flows › Where each agent works](/reference/flows.md#where-each-agent-works). Setting a
+shape of work — see [Flows › Where each agent works](/reference/flows#where-each-agent-works). Setting a
 `machine` here is what fills a place the flow declared `Remote`; a place it declared `Isolated`
 is settled by the flow itself and takes no `machine` from anyone.
 
 ## Which account it runs as
 
-A config's `provider` names one of the [providers](/reference/providers.md) made for its CLI. `""` — the
+A config's `provider` names one of the [providers](/reference/providers) made for its CLI. `""` — the
 default — is the CLI as you already run it, signed in the way you already signed in.
 
 ```python

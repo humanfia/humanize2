@@ -3,7 +3,7 @@
 A long run is thousands of tool calls across several agents. `hmz trace collect` turns what they
 left behind into one timeline you can actually look at.
 
-It works whether or not a [flow](/reference/flows.md) drove them — a trace of yesterday's `claude` session
+It works whether or not a [flow](/reference/flows) drove them — a trace of yesterday's `claude` session
 is one command away.
 
 ## Collecting
@@ -33,7 +33,7 @@ that was [profiled](#profiling-a-run) has a third of them — `1 session, 10 sli
 The same thing is a row of `/cycles` in the interface: pick the run, press enter, and collect
 it there.
 
-Full syntax in the [CLI reference](/reference/cli.md#hmz-trace).
+Full syntax in the [CLI reference](/reference/cli#hmz-trace).
 
 ## Reading the trace
 
@@ -47,7 +47,7 @@ process   agent          reviewer · 2 sessions
 
 | In the trace | Is |
 | --- | --- |
-| a **process** | one [agent](/guide/concepts.md#agent) and everything it drove, called `<agent> · <n> sessions` — or, for a [profiled](#profiling-a-run) run, one program it ran, called `<program> · <pid>` |
+| a **process** | one [agent](/guide/concepts#agent) and everything it drove, called `<agent> · <n> sessions` — or, for a [profiled](#profiling-a-run) run, one program it ran, called `<program> · <pid>` |
 | a **track** | one row of that agent's sessions: `main` for the ones somebody started, `subagent` for what a turn reached for. Sessions of one agent that never run at the same time share a track; root sessions and sub-agents stay apart. Or one thread of that program. |
 | a **slice** | one action — a tool call, a message, or waiting for reasoning |
 
@@ -140,7 +140,7 @@ Running that flow again here carries on from the last run of it that left anythi
 cycle of its own, whose `began` line says which run it was `picked_up` from, so a week of stops
 and starts reads as the week it was. `/cycles` picks a named run up: enter on a row offers
 *carry on from here*, which is asked of the flow rather than of the run, a flow being a file
-that may have been rewritten since. See [Picking a run up](/features/resuming) and
+that may have been rewritten since. See [Picking a run up](/guide/resuming) and
 [a flow that can be picked up](/reference/flows#a-flow-that-can-be-picked-up).
 
 An agent stopped by hand makes the run `stopped` rather than `failed`, whatever the turn under
@@ -219,7 +219,7 @@ The run wrote down which sessions its agents opened, and those ids are what the 
 gathered by — so a directory run in fifty times has fifty traces to collect and none of them
 holds another's work. A run that opened nothing is a trace of nothing rather than a trace of
 whatever else the directory has seen. Asked for by id and not by directory, which is why **a
-flow that ran on a [machine of its own](/reference/machines.md)** — working in a mirror, logged
+flow that ran on a [machine of its own](/reference/machines)** — working in a mirror, logged
 under a path this workspace has never heard of — is in its own trace all the same.
 
 `--cycle` takes a run's directory name or a leading part of it; without one the run is the last
@@ -291,4 +291,4 @@ model has cost with the rate it is costing it at.
 
 That is read from the turns going past and from the logs the backends write as they go — never
 by asking the flow, which is a Python file that may branch any way it likes. See
-[TUI](/reference/tui.md#the-screen).
+[TUI](/reference/tui#the-screen).

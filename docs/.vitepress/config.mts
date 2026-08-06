@@ -20,8 +20,12 @@ export default defineConfig({
   themeConfig: {
     logo: '/logo.svg',
 
+    // Four sections, and the split between the first two is the one readers asked for:
+    // tutorials teach a whole piece of work end to end, guides answer "how do I use this one
+    // feature", features describe what there is, and reference spells all of it out.
     nav: [
-      { text: 'Guide', link: '/guide/getting-started', activeMatch: '/guide/' },
+      { text: 'Tutorials', link: '/tutorials/', activeMatch: '/tutorials/' },
+      { text: 'Guides', link: '/guide/', activeMatch: '/guide/' },
       { text: 'Features', link: '/features/', activeMatch: '/features/' },
       { text: 'Reference', link: '/reference/cli', activeMatch: '/reference/' },
       {
@@ -32,115 +36,115 @@ export default defineConfig({
     ],
 
     sidebar: {
+      '/tutorials/': [
+        {
+          text: 'Tutorials',
+          items: [
+            { text: 'All six', link: '/tutorials/' },
+            { text: '1 · Quickstart', link: '/tutorials/quickstart' },
+          ],
+        },
+        {
+          text: 'Three pieces of real work',
+          collapsed: false,
+          items: [
+            { text: '2 · Beat a benchmark', link: '/tutorials/take-home' },
+            { text: '3 · Port a project', link: '/tutorials/port-a-project' },
+            { text: '4 · Build a coding agent', link: '/tutorials/build-an-agent' },
+          ],
+        },
+        {
+          text: 'Writing flows of your own',
+          collapsed: false,
+          items: [
+            { text: '5 · Build under test', link: '/tutorials/flow-checked-build' },
+            { text: '6 · Four agents on a maths problem', link: '/tutorials/flow-prove' },
+          ],
+        },
+      ],
+
       '/guide/': [
         {
           text: 'Start here',
           items: [
-            { text: 'What humanize is', link: '/guide/' },
+            { text: 'All the guides', link: '/guide/' },
             { text: 'Installation', link: '/guide/installation' },
-            { text: 'Getting started', link: '/guide/getting-started' },
             { text: 'Concepts', link: '/guide/concepts' },
             { text: 'Security', link: '/guide/security' },
+            { text: 'Troubleshooting', link: '/guide/troubleshooting' },
           ],
-        },
-        {
-          text: 'Tutorials · at the prompt',
-          collapsed: false,
-          items: [
-            { text: '1 · Your first run', link: '/guide/tutorial-first-run' },
-            { text: '2 · Put a loop under it', link: '/guide/tutorial-ralph-loop' },
-            { text: '3 · Two agents at once', link: '/guide/tutorial-two-agents' },
-            { text: '4 · Run it unattended', link: '/guide/tutorial-unattended' },
-            { text: '5 · Read the run back', link: '/guide/tutorial-trace' },
-          ],
-        },
-        {
-          text: 'Tutorials · writing flows',
-          collapsed: false,
-          items: [
-            { text: '6 · Write your first flow', link: '/guide/tutorial-first-flow' },
-            { text: '7 · Actor and reviewer', link: '/guide/tutorial-actor-reviewer' },
-            { text: '8 · Settings of its own', link: '/guide/tutorial-flow-settings' },
-            { text: '9 · Many turns at once', link: '/guide/tutorial-async-flow' },
-            { text: '10 · A flow that calls a flow', link: '/guide/tutorial-calling-flows' },
-            { text: '11 · Hooks', link: '/guide/tutorial-hooks' },
-            { text: '12 · Asking a person', link: '/guide/tutorial-questions' },
-            { text: '13 · Answers in a shape', link: '/guide/tutorial-shapes' },
-            { text: '14 · Testing a flow', link: '/guide/tutorial-testing-flows' },
-            { text: '15 · Publish a flowverse', link: '/guide/tutorial-flowverse' },
-          ],
-        },
-        {
-          text: 'Tutorials · where work lands',
-          collapsed: false,
-          items: [
-            { text: '16 · Two accounts of one CLI', link: '/guide/tutorial-providers' },
-            { text: '17 · A container of its own', link: '/guide/tutorial-container' },
-            { text: '18 · Another machine', link: '/guide/tutorial-remote' },
-            { text: '19 · humanize in CI', link: '/guide/tutorial-ci' },
-          ],
-        },
-        {
-          text: 'When it goes wrong',
-          items: [{ text: 'Troubleshooting', link: '/guide/troubleshooting' }],
-        },
-      ],
-
-      '/features/': [
-        {
-          text: 'Features',
-          items: [{ text: 'All of them', link: '/features/' }],
         },
         {
           text: 'At the prompt',
           collapsed: false,
           items: [
-            { text: 'Being away (/afk)', link: '/features/afk' },
-            { text: 'Showing the working (/details)', link: '/features/details' },
-            { text: 'The shape of a run (/status)', link: '/features/status' },
-            { text: 'Talking to a running turn', link: '/features/steering' },
-            { text: 'Many conversations at once', link: '/features/conversations' },
-            { text: 'Completion', link: '/features/completion' },
-            { text: 'History', link: '/features/history' },
-            { text: 'Exporting a transcript', link: '/features/export' },
-            { text: 'What a project remembers', link: '/features/settings' },
-            { text: 'Stopping', link: '/features/stopping' },
+            { text: 'Talking to a running turn', link: '/guide/steering' },
+            { text: 'Many conversations at once', link: '/guide/conversations' },
+            { text: 'Showing the working (/details)', link: '/guide/details' },
+            { text: 'The shape of a run (/status)', link: '/guide/status' },
+            { text: 'Being away (/afk)', link: '/guide/afk' },
+            { text: 'Completion', link: '/guide/completion' },
+            { text: 'History', link: '/guide/history' },
+            { text: 'Exporting a transcript', link: '/guide/export' },
+            { text: 'What a project remembers', link: '/guide/settings' },
+            { text: 'Stopping', link: '/guide/stopping' },
           ],
         },
         {
-          text: 'What an agent is',
+          text: 'Setting an agent up',
           collapsed: false,
           items: [
-            { text: 'Efforts', link: '/features/efforts' },
-            { text: 'Permissions', link: '/features/permissions' },
-            { text: 'Skills', link: '/features/skills' },
-            { text: 'Reporting', link: '/features/reporting' },
-            { text: 'Goals', link: '/features/goals' },
-            { text: 'Questions', link: '/features/questions' },
-            { text: 'Answers in a shape', link: '/features/shapes' },
-            { text: 'Hooks', link: '/features/hooks' },
-            { text: 'Cost and rate', link: '/features/tally' },
-            { text: 'The person as an agent', link: '/features/human-agent' },
+            { text: 'Efforts', link: '/guide/efforts' },
+            { text: 'Permissions', link: '/guide/permissions' },
+            { text: 'Skills', link: '/guide/skills' },
+            { text: 'Goals', link: '/guide/goals' },
+            { text: 'Questions', link: '/guide/questions' },
+            { text: 'Answers in a shape', link: '/guide/shapes' },
+            { text: 'Hooks', link: '/guide/hooks' },
+            { text: 'Cost and rate', link: '/guide/tally' },
+            { text: 'The person as an agent', link: '/guide/human-agent' },
+            { text: 'Reporting', link: '/guide/reporting' },
+          ],
+        },
+        {
+          text: 'Writing flows',
+          collapsed: false,
+          items: [
+            { text: 'Writing a flow', link: '/guide/writing-a-flow' },
+            { text: 'Loops', link: '/guide/loops' },
+            { text: 'Settings of its own', link: '/guide/flow-settings' },
+            { text: 'Many turns at once', link: '/guide/async-flows' },
+            { text: 'A flow that calls a flow', link: '/guide/calling-flows' },
+            { text: 'Testing a flow', link: '/guide/testing-flows' },
+            { text: 'Flowverses', link: '/guide/flowverses' },
           ],
         },
         {
           text: 'Where the work lands',
           collapsed: false,
           items: [
-            { text: 'Providers', link: '/features/providers' },
-            { text: 'Containers', link: '/features/containers' },
-            { text: 'Remote execution', link: '/features/remote-execution' },
-            { text: 'Worktrees', link: '/features/worktrees' },
+            { text: 'Providers', link: '/guide/providers' },
+            { text: 'Containers', link: '/guide/containers' },
+            { text: 'Remote execution', link: '/guide/remote-execution' },
+            { text: 'Worktrees', link: '/guide/worktrees' },
           ],
         },
         {
-          text: 'What a run leaves behind',
+          text: 'Running it, and reading it back',
           collapsed: false,
           items: [
-            { text: 'Flowverses', link: '/features/flowverses' },
-            { text: 'Tracing', link: '/features/tracing' },
-            { text: 'Picking a run up', link: '/features/resuming' },
+            { text: 'Run it unattended', link: '/guide/unattended' },
+            { text: 'humanize in CI', link: '/guide/ci' },
+            { text: 'Tracing', link: '/guide/tracing' },
+            { text: 'Picking a run up', link: '/guide/resuming' },
           ],
+        },
+      ],
+
+      '/features/': [
+        {
+          text: 'Features',
+          items: [{ text: 'What humanize does', link: '/features/' }],
         },
       ],
 
