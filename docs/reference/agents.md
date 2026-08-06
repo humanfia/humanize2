@@ -894,8 +894,8 @@ a project's own skills for as long as the session lives, and taken away again af
 | Backend | Where a flow's skills are mounted |
 | --- | --- |
 | `claude` | `.claude/skills/` in the workspace |
-| `codex`, `grok`, `qwen` | `.agents/skills/`, the directory more than one of these agreed to read |
-| `agy`, `dsh`, `kimi`, `mimo`, `opencode`, `pi` | — none: they carry what their CLI installs |
+| `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen` | `.agents/skills/`, the directory more than one of these agreed to read |
+| `agy`, `dsh`, `pi` | — none: none of them reads such a directory the way humanize drives it |
 
 A project's own skill of that name wins: a flow does not write over what the project keeps.
 They go into the workspace on this machine, so an agent [whose turns land

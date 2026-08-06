@@ -45,6 +45,26 @@ class KimiAgent(ShellAgent):
     """A stand-in named for Kimi, which reads the shared project skill directory."""
 
 
+class GrokBuildAgent(ShellAgent):
+    """A stand-in named for Grok Build, which reads the shared project skill directory."""
+
+
+class QwenCodeAgent(ShellAgent):
+    """A stand-in named for Qwen Code, which reads the shared project skill directory."""
+
+
+class OpencodeAgent(ShellAgent):
+    """A stand-in named for opencode, which reads the shared project skill directory."""
+
+
+class MimoCodeAgent(ShellAgent):
+    """A stand-in named for mimocode, which reads the shared project skill directory."""
+
+
+class PiAgent(ShellAgent):
+    """A stand-in named for pi, whose project directories are read only once approved."""
+
+
 #: A flow that does what it is told, in a session of its own: what the turn is is the shell
 #: line the test hands it, so a test can have it look at what was mounted beside it.
 DOES = '''"""Does the one thing it is told."""
@@ -232,13 +252,23 @@ def test_a_session_is_given_them_where_its_backend_reads_a_projects_own(
     assert not (tmp_path / ".claude").exists()
 
 
-@pytest.mark.parametrize("agent_type", [CodexAgent, KimiAgent])
+@pytest.mark.parametrize(
+    "agent_type",
+    [
+        CodexAgent,
+        KimiAgent,
+        GrokBuildAgent,
+        QwenCodeAgent,
+        OpencodeAgent,
+        MimoCodeAgent,
+    ],
+)
 def test_a_shared_skill_backend_is_given_flow_skills_in_the_project_directory(
     agent_type: type[ShellAgent],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Codex and Kimi discover flow skills from the shared project directory."""
+    """Every backend that reads the shared project directory is given the flow's skills."""
     monkeypatch.chdir(tmp_path)
     written(
         tmp_path / ".humanize/flows",
@@ -255,6 +285,30 @@ def test_a_shared_skill_backend_is_given_flow_skills_in_the_project_directory(
 
     assert (tmp_path / "listed.txt").read_text().split() == ["note-taking"]
     assert "does a thing" in (tmp_path / "read.txt").read_text()
+    assert not (tmp_path / ".agents").exists()
+
+
+def test_a_backend_that_would_not_read_them_there_is_given_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A mount is a fact about the CLI, so a backend that reads no such directory gets none.
+
+    pi is the case: it reads `.agents/skills` under the workspace, but only for a project it
+    has been told to trust, which a driven turn never is. Copying a flow's skills there would
+    leave a directory in somebody's project that no turn of that flow would ever read.
+    """
+    monkeypatch.chdir(tmp_path)
+    written(
+        tmp_path / ".humanize/flows",
+        "mine",
+        DOES,
+        {"note-taking": skill("note-taking")},
+    )
+
+    Runner("mine", [PiAgent(CONFIG)]).run("ls -a > listed.txt")
+    gc.collect()
+
+    assert ".agents" not in (tmp_path / "listed.txt").read_text().split()
     assert not (tmp_path / ".agents").exists()
 
 

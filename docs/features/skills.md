@@ -22,9 +22,21 @@ Where each CLI keeps them is written down in `hmz.backends`:
 
 | Backend | Yours | This project's |
 | --- | --- | --- |
+| `agy` | `~/.gemini/antigravity-cli/skills/*/SKILL.md` | — a printed turn opens no project |
 | `claude` | `~/.claude/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` |
 | `codex` | `~/.codex/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | `.agents/skills/*/SKILL.md`, `.codex/skills/*/SKILL.md` |
+| `grok` | `~/.grok/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md`, `~/.claude/…`, `~/.cursor/…` | `.grok/skills/*/SKILL.md`, `.agents/…`, `.claude/…`, `.cursor/…` |
 | `kimi` | `~/.kimi-code/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | `.kimi-code/skills/*/SKILL.md`, `.agents/skills/*/SKILL.md` |
+| `mimo` | `~/.config/mimocode/skill(s)/*/SKILL.md`, `~/.agents/…`, `~/.claude/…`, `~/.codex/…` | `.mimocode/skill(s)/*/SKILL.md`, `.agents/…`, `.claude/…`, `.codex/…` |
+| `opencode` | `~/.config/opencode/skill(s)/*/SKILL.md`, `~/.agents/…`, `~/.claude/…` | `.opencode/skill(s)/*/SKILL.md`, `.agents/…`, `.claude/…` |
+| `pi` | `~/.pi/agent/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | — read only for a project you approved |
+| `qwen` | `~/.qwen/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | `.qwen/skills/*/SKILL.md`, `.agents/skills/*/SKILL.md` |
+
+Each backend's own home moves where that backend's variable moves it — `CODEX_HOME`,
+`KIMI_CODE_HOME`, `GROK_HOME` and the rest — and opencode and mimocode keep their skills
+beside their configuration rather than their data, so theirs move with `XDG_CONFIG_HOME`.
+`dsh` keeps none: its command line reads skill directories, and the SDK humanize drives
+does not.
 
 Nothing is asked of the CLI to find out, which would mean starting it, and nothing is written:
 what a person has installed is not something a flow is entitled to rewrite, and a list that
@@ -65,8 +77,13 @@ the next time a run asks for it, so a skill somebody else maintains is one that 
 | Backend | Where |
 | --- | --- |
 | `claude` | `.claude/skills/` in the workspace |
-| `codex`, `grok`, `kimi`, `qwen` | `.agents/skills/`, the directory more than one of these agreed to read |
-| `agy`, `dsh`, `mimo`, `opencode`, `pi` | — none: they carry what their CLI installs |
+| `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen` | `.agents/skills/`, the directory more than one of these agreed to read |
+| `agy`, `dsh`, `pi` | — none: they carry what their CLI installs, and nothing else |
+
+The three that are given none read no such directory the way humanize drives them: `dsh`'s
+SDK reads none at all, `agy` is run as `--print` and opens no project to read one from, and
+`pi` reads the workspace's only for a project somebody has approved. A skill copied there
+would be one no turn of that flow would ever load, which is worse than none.
 
 A project's own skill of that name wins — a flow does not write over what the project keeps —
 and two sessions of one flow working in one directory share the mount until the last of them

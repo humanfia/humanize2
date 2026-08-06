@@ -151,6 +151,12 @@ class Profile:
       shared: The same, under the user's own home rather than under the backend's: `.agents`
         is the directory more than one of these has agreed to read, and a backend that reads
         it goes on reading it wherever `home_var` has moved its own home to.
+      config: The same, under the directory every program keeps its configuration in --
+        whatever `XDG_CONFIG_HOME` names, or `~/.config` where nothing has moved it. Each
+        glob carries the backend's own directory under it, as `shared`'s carry `.agents`.
+        Empty for a backend that keeps its skills beside its data, which is most of them:
+        this is for opencode and mimocode, whose sessions and credentials are under the data
+        home and whose skills are not, so that one `home_var` cannot name both.
       works: The same, under the workspace rather than under either home: a skill kept beside
         the project it is for. A backend may read more than one such directory.
       mounts: Which of those directories a flow's own skills are mounted into for the length
@@ -193,6 +199,7 @@ class Profile:
     home_in: str = ""
     skills: tuple[str, ...] = ()
     shared: tuple[str, ...] = ()
+    config: tuple[str, ...] = ()
     works: tuple[str, ...] = ()
     mounts: str = ""
     beyond: tuple[str, ...] = ()
@@ -209,6 +216,20 @@ class Profile:
         """
         moved = os.environ.get(self.home_var)
         return Path(moved) / self.home_in if moved else Path.home() / self.home_dir
+
+    @staticmethod
+    def configuration() -> Path:
+        """The directory programs keep their configuration in, wherever it has been moved to.
+
+        Not this backend's own: `XDG_CONFIG_HOME` is the one variable every program that
+        follows it shares, so what belongs to a backend is the directory under it, which
+        `config` names as part of each glob.
+
+        Returns:
+          That directory. It may not exist, and a backend keeping nothing there never looks.
+        """
+        moved = os.environ.get("XDG_CONFIG_HOME")
+        return Path(moved) if moved else Path.home() / ".config"
 
     def accounts(self) -> frozenset[str]:
         """Every variable this backend would take an account from, whoever set it.
@@ -417,6 +438,12 @@ PROFILES = (
         # so there is no log to read a run's cost out of as it is spent, and none to gather.
         logs=(),
         efforts=_AGY,
+        # One place: the `skills/` of its own home, which is the global customization root it
+        # loads whatever else it is doing. Its other root is `.agents` under the workspace,
+        # and that one is not listed -- a turn is run as `--print`, which opens no project,
+        # and a skill left there is a skill such a turn never sees. So nothing is mounted for
+        # it either: what reads as a skill this agent has is a skill this agent has.
+        skills=("skills/*/SKILL.md",),
         # What a sign-in leaves behind where there is no keyring to put it in -- a session on
         # a machine with no desktop, which is where a flow runs. The keyring is the first
         # choice and is not a path.
@@ -556,6 +583,10 @@ PROFILES = (
         # tally can read complete rows as they land.
         logs=("sessions/*/{ident}/session.jsonl",),
         efforts=_DSH,
+        # None, and not for want of looking: the `dsh` command line reads `.dsh/skills` and
+        # `.agents/skills`, but that is its web profile's own harness. What humanize drives is
+        # the Python SDK, which carries no skills at all -- so a list here would be of skills
+        # nothing in this session would ever load.
         ambient=("DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL"),
         ways=(
             Way(
@@ -577,9 +608,24 @@ PROFILES = (
         # the others beside it are the plan, the rewind points and what it was told.
         logs=("sessions/*/{ident}/updates.jsonl",),
         efforts=_GROK,
-        # No skills listed to be shown: Grok Build finds them in its own home, in the shared
-        # `.agents` and in the project, and none of that is humanize's to list twice. It does
-        # read the shared directory, so a flow's own skills reach it there.
+        # Eight places, which is what `grok inspect` answers with: its own home and the
+        # shared one under yours, both of the directories a project may keep them in, and
+        # the two other harnesses' directories it reads for compatibility -- at both tiers,
+        # and on by default, as its own `Harness Compatibility` says.
+        skills=("skills/*/SKILL.md",),
+        shared=(
+            ".agents/skills/*/SKILL.md",
+            ".claude/skills/*/SKILL.md",
+            ".cursor/skills/*/SKILL.md",
+        ),
+        works=(
+            ".grok/skills/*/SKILL.md",
+            ".agents/skills/*/SKILL.md",
+            ".claude/skills/*/SKILL.md",
+            ".cursor/skills/*/SKILL.md",
+        ),
+        # The shared one of the four, being the directory more than one of these CLIs has
+        # agreed to read: a skill mounted there is a skill Codex and Kimi read too.
         mounts=".agents/skills",
         #
         # Two files: the accounts it has signed into, keyed by the way each was signed in, and
@@ -706,9 +752,14 @@ PROFILES = (
         # session whichever workspace it was opened in.
         logs=("sessions/*/*{ident}.jsonl",),
         efforts=_PI,
-        # None named: pi is told which skills to load rather than which to leave, by the path
-        # of each, and it finds none of its own to be left out of that -- there is no
-        # directory it reads them from, so there is nothing here to offer a choice about.
+        # Two places, and both are yours: the `skills/` of its own home, and the shared one
+        # under yours. Nothing under the workspace, though pi reads `.pi/skills` and
+        # `.agents/skills` there too -- those are gated on the project having been trusted,
+        # which is `--approve` and a person to press it, and a turn driven here is neither.
+        # So a flow's skills are not mounted for pi: they would be copied into a directory
+        # the session is not permitted to read, which is a mount that quietly does nothing.
+        skills=("skills/*/SKILL.md",),
+        shared=(".agents/skills/*/SKILL.md",),
         #
         # One file holding every provider it has been signed into, and the lock its own
         # processes serialize a refresh under.
@@ -749,8 +800,14 @@ PROFILES = (
         # directory the work was done in.
         logs=("projects/*/chats/{ident}.jsonl",),
         efforts=_QWEN,
-        # The same: it reads its own home, the shared `.agents` and the project, so a flow's
-        # skills reach it through the shared directory.
+        # Four places: its own home and the shared one under yours, and both of the
+        # directories a project may keep them in -- `.qwen` and `.agents`, which is the pair
+        # its own loader is written in terms of. The ones it ships with itself are not among
+        # them: those are the CLI's, not a person's to add to or switch off.
+        skills=("skills/*/SKILL.md",),
+        shared=(".agents/skills/*/SKILL.md",),
+        works=(".qwen/skills/*/SKILL.md", ".agents/skills/*/SKILL.md"),
+        # The shared one of its two, so a flow's skills reach it there.
         mounts=".agents/skills",
         #
         # What its own sign-in leaves behind, and the lock two of its processes rotate the
@@ -801,6 +858,22 @@ PROFILES = (
         # read a run's cost out of as it is spent, and none to gather afterwards.
         logs=(),
         efforts=_VARIANTS,
+        # Its own are under the configuration home rather than the data home this backend is
+        # otherwise kept under -- `~/.config/opencode`, where its `opencode.json` is, not
+        # `~/.local/share/opencode`, where its sessions and its logins are. Singular and
+        # plural both: it reads `skill/` and `skills/` wherever it reads either.
+        config=("opencode/skills/*/SKILL.md", "opencode/skill/*/SKILL.md"),
+        # And the two it auto-loads from outside its own directories, which it calls external
+        # skills: another harness's, and the shared one.
+        shared=(".agents/skills/*/SKILL.md", ".claude/skills/*/SKILL.md"),
+        works=(
+            ".opencode/skills/*/SKILL.md",
+            ".opencode/skill/*/SKILL.md",
+            ".agents/skills/*/SKILL.md",
+            ".claude/skills/*/SKILL.md",
+        ),
+        # The shared one of its three, as for the others that read it.
+        mounts=".agents/skills",
         # One file per kind of thing signed into: the providers in one, the servers a session
         # reaches out to in the other.
         creds=("auth.json", "mcp-auth.json"),
@@ -851,6 +924,24 @@ PROFILES = (
         home_dir=".local/share/mimocode",
         logs=(),
         efforts=_VARIANTS,
+        # The same arrangement as opencode, which it is a fork of, and one directory more:
+        # it reads Codex's as well as Claude Code's. The ones it ships under its own data
+        # home -- its builtins, and the bundle its compose flows work by -- are not listed:
+        # those came with the CLI rather than from whoever is running it.
+        config=("mimocode/skills/*/SKILL.md", "mimocode/skill/*/SKILL.md"),
+        shared=(
+            ".agents/skills/*/SKILL.md",
+            ".claude/skills/*/SKILL.md",
+            ".codex/skills/*/SKILL.md",
+        ),
+        works=(
+            ".mimocode/skills/*/SKILL.md",
+            ".mimocode/skill/*/SKILL.md",
+            ".agents/skills/*/SKILL.md",
+            ".claude/skills/*/SKILL.md",
+            ".codex/skills/*/SKILL.md",
+        ),
+        mounts=".agents/skills",
         creds=("auth.json", "mcp-auth.json"),
         ambient=(
             "ANTHROPIC_API_KEY",

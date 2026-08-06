@@ -95,6 +95,9 @@ def skills(backend: str, where: Path | str | None = None) -> list[Skill]:
     seen: set[str] = set()
     for root, globs, whose in (
         (profile.directory(), profile.skills, "yours"),
+        # The backend's own too, for one that keeps them under the directory every program
+        # keeps its configuration in rather than beside its sessions.
+        (profile.configuration(), profile.config, "yours"),
         # Under your own home rather than the backend's, and so not moved by whatever moves
         # that: `.agents` is the directory more than one of these has agreed to read.
         (Path.home(), profile.shared, "yours"),

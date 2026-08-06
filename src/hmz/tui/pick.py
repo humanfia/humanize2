@@ -2346,7 +2346,9 @@ class Skills(Sheet[None]):
           and none is installed, that there are none here yet.
         """
         profile = named(self._backend)
-        if profile is None or not (profile.skills or profile.shared or profile.works):
+        if profile is None or not (
+            profile.skills or profile.shared or profile.config or profile.works
+        ):
             return f"{escape(self._backend)} keeps no skills of its own here"
         if not self._skills():
             return (

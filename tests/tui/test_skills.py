@@ -106,6 +106,140 @@ def test_kimi_is_read_from_its_own_and_shared_skill_directories(
     ]
 
 
+def test_grok_is_read_from_its_own_shared_and_compatible_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Everything `grok inspect` lists, at both the tiers it lists them at.
+
+    Its own home and the shared one under yours, and the two other harnesses' directories it
+    reads for compatibility -- which are on unless somebody turned them off.
+    """
+    _write(tmp_path / "grok-home" / "skills", "its-own")
+    _write(tmp_path / "home" / ".agents" / "skills", "shared")
+    _write(tmp_path / "home" / ".claude" / "skills", "claude-compat")
+    _write(tmp_path / "home" / ".cursor" / "skills", "cursor-compat")
+    _write(tmp_path / "project" / ".grok" / "skills", "project-grok")
+    _write(tmp_path / "project" / ".agents" / "skills", "project-agents")
+    monkeypatch.setenv("GROK_HOME", str(tmp_path / "grok-home"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path / "project")
+
+    assert [one.name for one in skills("grok")] == [
+        "its-own",
+        "shared",
+        "claude-compat",
+        "cursor-compat",
+        "project-grok",
+        "project-agents",
+    ]
+
+
+def test_qwen_is_read_from_its_own_and_shared_skill_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`.qwen` and `.agents`, which is the pair its own loader is written in terms of."""
+    _write(tmp_path / "qwen-home" / "skills", "its-own")
+    _write(tmp_path / "home" / ".agents" / "skills", "shared")
+    _write(tmp_path / "project" / ".qwen" / "skills", "project-qwen")
+    _write(tmp_path / "project" / ".agents" / "skills", "project-agents")
+    monkeypatch.setenv("QWEN_HOME", str(tmp_path / "qwen-home"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path / "project")
+
+    assert [one.name for one in skills("qwen")] == [
+        "its-own",
+        "shared",
+        "project-qwen",
+        "project-agents",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("backend", "under"), [("opencode", "opencode"), ("mimo", "mimocode")]
+)
+def test_a_backend_keeping_its_skills_by_its_configuration_is_read_there(
+    backend: str, under: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Opencode and mimocode keep skills beside their configuration rather than their data.
+
+    Their sessions and their logins are under the data home; a skill is not. So the one that
+    is read is the one `XDG_CONFIG_HOME` names, and moving that moves the skills with it.
+    """
+    _write(tmp_path / "config" / under / "skills", "its-own")
+    _write(tmp_path / "config" / under / "skill", "its-own-singular")
+    _write(tmp_path / "home" / ".agents" / "skills", "shared")
+    _write(tmp_path / "home" / ".claude" / "skills", "claude-compat")
+    _write(tmp_path / "project" / f".{under}" / "skills", "project-its-own")
+    _write(tmp_path / "project" / ".agents" / "skills", "project-agents")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path / "project")
+
+    assert [one.name for one in skills(backend)] == [
+        "its-own",
+        "its-own-singular",
+        "shared",
+        "claude-compat",
+        "project-its-own",
+        "project-agents",
+    ]
+
+
+def test_a_configuration_home_defaults_to_the_one_under_yours(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`~/.config` is where it is when nothing has moved it, which is the usual case."""
+    _write(tmp_path / "home" / ".config" / "opencode" / "skills", "its-own")
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path)
+
+    assert [one.name for one in skills("opencode")] == ["its-own"]
+
+
+def test_pi_is_read_from_the_two_it_loads_without_being_approved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Its own home and the shared one, and nothing under the workspace.
+
+    pi reads `.pi/skills` and `.agents/skills` there too, but only once the project has been
+    trusted -- which is `--approve` and somebody to press it, and a driven turn is neither.
+    """
+    _write(tmp_path / "pi-home" / "skills", "its-own")
+    _write(tmp_path / "home" / ".agents" / "skills", "shared")
+    _write(tmp_path / "project" / ".pi" / "skills", "untrusted")
+    _write(tmp_path / "project" / ".agents" / "skills", "untrusted-shared")
+    monkeypatch.setenv("PI_CODING_AGENT_DIR", str(tmp_path / "pi-home"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path / "project")
+
+    assert [one.name for one in skills("pi")] == ["its-own", "shared"]
+
+
+def test_agy_is_read_from_the_root_a_printed_turn_loads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Its own home, and not the workspace: `--print` opens no project to read one from."""
+    _write(tmp_path / "home" / ".gemini" / "antigravity-cli" / "skills", "its-own")
+    _write(tmp_path / "project" / ".agents" / "skills", "unopened")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path / "project")
+
+    assert [one.name for one in skills("agy")] == ["its-own"]
+
+
+def test_a_backend_whose_sdk_carries_none_finds_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The `dsh` command line reads skill directories; the SDK humanize drives does not."""
+    _write(tmp_path / "project" / ".dsh" / "skills", "unread")
+    _write(tmp_path / "project" / ".agents" / "skills", "unread-shared")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path / "project")
+
+    assert skills("dsh") == []
+
+
 def test_an_unknown_backend_finds_no_skills(homes: Path) -> None:
     """A backend Humanize does not know has nowhere to discover a skill from."""
     assert skills("not-a-cli") == []
