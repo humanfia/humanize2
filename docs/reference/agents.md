@@ -144,9 +144,29 @@ A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land)
 [what it may do](#what-an-agent-may-do), [which account it runs as](#which-account-it-runs-as),
 whether [goals](/guide/goals) are available to it, and nothing else — the
 [skills it carries](#the-skills-an-agent-carries) are not among them, being its CLI's own and
-its flow's. It is frozen,
+its flow's. Codex also takes `overrides`, the app-server `-c` keys that are not already one
+of those fields. It is frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
 would silently split one conversation across two models.
+
+```python
+from hmz.agents import CodexAgent, CodexAgentConfig
+
+agent = CodexAgent(
+    CodexAgentConfig(
+        model="gpt-5.6-sol",
+        effort="max",
+        overrides=(
+            ("model_context_window", "1000000"),
+            ("model_auto_compact_token_limit", "900000"),
+        ),
+    )
+)
+```
+
+On a command line the same settings are that agent's `config.KEY=VALUE`, not a flag of
+`hmz exec`. Only `model_context_window` and `model_auto_compact_token_limit` are taken. The
+user's `~/.codex/config.toml` is left as it was.
 
 An agent takes an optional `name=`:
 

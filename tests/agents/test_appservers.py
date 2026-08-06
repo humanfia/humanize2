@@ -866,6 +866,74 @@ def test_codex_can_disable_goals_before_its_server_starts(
         agent.new().pursue("the suite passes", suppress=True)
 
 
+def test_codex_passes_allowlisted_overrides_to_its_app_server(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A window asked for on this agent is this server's `-c`, not the user's config.toml."""
+    started: list[list[str]] = []
+
+    class _Recording:
+        def __init__(
+            self, argv: list[str], env: Mapping[str, str] | None = None
+        ) -> None:
+            del env
+            started.append(argv)
+            self._held: list[Any] = []
+
+        def stop(self) -> None:
+            """Nothing was started, so there is nothing to take down."""
+
+    monkeypatch.setattr(appservers, "_AppServer", _Recording)
+    agent = CodexAgent(
+        CodexAgentConfig(
+            model="gpt-5.6-sol",
+            effort="high",
+            overrides=(
+                ("model_context_window", "1000000"),
+                ("model_auto_compact_token_limit", "900000"),
+            ),
+        )
+    )
+
+    assert agent.server is not None
+    assert started == [
+        [
+            "codex",
+            "app-server",
+            "--stdio",
+            "-c",
+            "model_context_window=1000000",
+            "-c",
+            "model_auto_compact_token_limit=900000",
+        ]
+    ]
+
+
+def test_codex_refuses_an_override_that_is_already_a_setting_of_the_agent() -> None:
+    """model, effort and permission have one place; a second would be two answers."""
+    with pytest.raises(ValueError, match="not a Codex override"):
+        CodexAgentConfig(
+            model="gpt-5.6-sol",
+            effort="high",
+            overrides=(("model", "gpt-5.6-sol"),),
+        )
+    with pytest.raises(ValueError, match="positive integer"):
+        CodexAgentConfig(
+            model="gpt-5.6-sol",
+            effort="high",
+            overrides=(("model_context_window", "1m"),),
+        )
+    with pytest.raises(ValueError, match="below model_context_window"):
+        CodexAgentConfig(
+            model="gpt-5.6-sol",
+            effort="high",
+            overrides=(
+                ("model_context_window", "1000000"),
+                ("model_auto_compact_token_limit", "1000000"),
+            ),
+        )
+
+
 def test_codex_refuses_to_disable_goals_after_its_server_starts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

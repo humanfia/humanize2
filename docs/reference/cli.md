@@ -70,6 +70,7 @@ cli=claude,model=claude-opus-4-8,effort=high
 claude@deepseek/claude-opus-4-8:high
 cli=claude,model=claude-opus-4-8,effort=high,provider=deepseek
 cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only
+cli=codex,model=gpt-5.6-sol,effort=max,config.model_context_window=1000000,config.model_auto_compact_token_limit=900000
 ```
 
 The first two spellings mean the same thing. The written-out form exists because a model or an
@@ -93,6 +94,9 @@ unambiguous short spelling go.
 - `permission=` names [what that agent may do](/reference/agents#what-an-agent-may-do): `read-only`,
   `workspace-write`, `auto` or `bypass`. It is available in the written-out form only and
   defaults to `bypass`. A misspelling is refused before any agent runs.
+- `config.KEY=VALUE` names a Codex app-server `-c` override for **that agent**. Only
+  `model_context_window` and `model_auto_compact_token_limit` are taken, both as a positive
+  integer, and only on `cli=codex`. This is not `hmz exec -c`, which is the flow's YAML.
 
 **One `-a` is one agent.** A list inside a single `-a` is not split into several. Two agents of
 one spelling are two agents, which is what makes a flow of an actor and a reviewer at one

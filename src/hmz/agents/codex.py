@@ -33,9 +33,14 @@ from .event import Event, Failed, Question, Usage, say
 from .hooks import EVERYWHERE, Moment, Occasion
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator, Mapping
+    from collections.abc import Callable, Iterator, Mapping, Sequence
 
     from pydantic import BaseModel
+
+#: `-c` keys this driver may take. They are process configuration of the app server, and
+#: none of them is already a field of AgentConfig -- model, effort and permission are asked
+#: elsewhere, and a second place for them would be two answers.
+_OVERRIDE_KEYS = frozenset({"model_context_window", "model_auto_compact_token_limit"})
 
 #: What the server calls a turn stopping to ask its user something. Every other request it
 #: makes of a client is an approval, which an unattended flow does not stop for.
@@ -735,9 +740,61 @@ class _AppServer:
         return message.get("result")
 
 
+def _overrides(given: Sequence[tuple[str, str]]) -> tuple[tuple[str, str], ...]:
+    """The app-server `-c` pairs, or a reason they cannot be taken.
+
+    Args:
+      given: What was asked for, as ``(key, value)`` in the order it was written.
+
+    Returns:
+      The same pairs, stripped, in that order.
+
+    Raises:
+      ValueError: If a key is not one of :data:`_OVERRIDE_KEYS`, is repeated, is not a
+        positive integer, or the compact limit is not below the context window.
+    """
+    held: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for key, value in given:
+        name, said = key.strip(), value.strip()
+        if name not in _OVERRIDE_KEYS:
+            raise ValueError(
+                f"{name} is not a Codex override; expected "
+                f"{', '.join(sorted(_OVERRIDE_KEYS))}"
+            )
+        if name in seen:
+            raise ValueError(f"{name} was given twice")
+        if not said.isdigit() or int(said) < 1:
+            raise ValueError(f"{name} must be a positive integer, not {value!r}")
+        seen.add(name)
+        held.append((name, said))
+    window = next(
+        (int(said) for name, said in held if name == "model_context_window"), None
+    )
+    compact = next(
+        (int(said) for name, said in held if name == "model_auto_compact_token_limit"),
+        None,
+    )
+    if window is not None and compact is not None and compact >= window:
+        raise ValueError(
+            "model_auto_compact_token_limit must be below model_context_window"
+        )
+    return tuple(held)
+
+
 @dataclass(frozen=True, kw_only=True)
 class CodexAgentConfig(AgentConfig):
-    """What Codex is configured with: the common model and effort, and nothing else."""
+    """What Codex is configured with: the common model and effort, and its app-server `-c`.
+
+    `overrides` is only the keys Codex treats as process configuration and that
+    :class:`AgentConfig` does not already name. They are this agent's, so two Codex agents
+    of one flow may take different windows, and neither writes the user's `config.toml`.
+    """
+
+    overrides: tuple[tuple[str, str], ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "overrides", _overrides(self.overrides))
 
 
 class CodexSession(SessionBase):
@@ -974,6 +1031,11 @@ class CodexAgent(AgentBase):
                     # session belonging to the user.
                     argv += ["--disable", "goals"]
                 argv += ["--stdio"]
+                for key, value in getattr(self.config, "overrides", ()):
+                    # The same `-c` Codex's own client takes, scoped to this server: a
+                    # window asked for here is this agent's, and the user's config.toml is
+                    # left exactly as it was.
+                    argv += ["-c", f"{key}={value}"]
                 # Read before the environment is built out of it: a fallback landing
                 # between the two reads would name the account this server is *not* signed
                 # into, and a server that believes it is already elsewhere is one nothing ever

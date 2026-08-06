@@ -92,10 +92,10 @@ An `-a` is missing a part. All three are required:
 The CLI is read from the front and the effort from after the **last** colon. A model with
 slashes in it, such as `kimi/kimi-code/k3:high`, is fine.
 
-### `bad agent '…': foo is not cli, model, effort, provider or permission`
+### `bad agent '…': foo is not cli, model, effort, provider, permission or config.KEY`
 
-The written-out form has a key that is not one of the five it takes: `cli`, `model`, `effort`,
-`provider` and `permission`.
+The written-out form has a key that is not one of the five every backend takes — `cli`,
+`model`, `effort`, `provider` and `permission` — or a `config.KEY` Codex override.
 
 ### `bad agent '…': permission must be one of read-only, workspace-write, auto, bypass, not '…'`
 

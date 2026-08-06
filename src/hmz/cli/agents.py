@@ -151,7 +151,14 @@ def _add(
         print("hmz: an agent is written down under a name", file=sys.stderr)
         return 1
     try:
-        profile, model, effort, provider, permission = read(spec)
+        profile, model, effort, provider, permission, overrides = read(spec)
+        if overrides:
+            print(
+                "hmz: config.KEY is a setting of the agent on the line that runs it, "
+                "not of one written down under a name",
+                file=sys.stderr,
+            )
+            return 1
     except ValueError as why:
         print(f"hmz: {spec}: {why}", file=sys.stderr)
         return 1
