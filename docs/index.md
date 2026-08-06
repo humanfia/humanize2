@@ -4,7 +4,7 @@ layout: home
 hero:
   name: humanize
   text: Orchestrate, execute, and observe agent flows
-  tagline: Drive the coding agent CLIs you already have — one flow, many agents, one timeline you can read afterwards.
+  tagline: One flow, ten coding agents, and a timeline of everything they did.
   image:
     src: /logo.svg
     alt: humanize
@@ -13,79 +13,92 @@ hero:
       text: Quickstart
       link: /tutorials/quickstart
     - theme: alt
-      text: Tutorials
-      link: /tutorials/
+      text: See it running
+      link: '#gallery'
     - theme: alt
-      text: View on GitHub
+      text: GitHub
       link: https://github.com/humanfia/humanize2
-
-features:
-  - title: One flow, many agents
-    details: A flow is a directory of Python that says what each agent is asked, in what order, and when to stop, and carries the skills it works by. Ship it, run it by name, fork one, or run one of the flows humanize already offers.
-    link: /tutorials/flow-checked-build
-    linkText: Write one
-  - title: Ten coding agents, one interface
-    details: claude, codex, dsh, agy, grok, kimi, qwen, pi, opencode and mimo, driven through the CLI you already log into — and any other that speaks the Agent Client Protocol. humanize holds no API key and talks to no model provider itself.
-    link: /guide/concepts
-    linkText: How it fits
-  - title: A prompt you can watch
-    details: A transcript per conversation, tab to step between the agents that are working, and a line typed mid-turn that goes into the turn rather than after it.
-    link: /guide/steering
-    linkText: Talk to a running turn
-  - title: Two accounts of one CLI
-    details: An agent may name the account it runs as, so one flow drives one CLI as a subscription and somebody else's endpoint at the same time.
-    link: /guide/providers
-    linkText: Providers
-  - title: Somewhere other than here
-    details: Give an agent a container of its own, or moor it to an ssh host so its commands land there while the process stays on this machine.
-    link: /guide/remote-execution
-    linkText: Remote execution
-  - title: The whole run as a timeline
-    details: Every run is written down as it happens. Collect it into a Chrome trace and open it in Perfetto — one process per agent, one track per row of its sessions, one slice per thing it did.
-    link: /guide/tracing
-    linkText: Tracing
 ---
 
-## Install it
+<HmzInstall />
 
-```sh
-pip install git+https://github.com/humanfia/humanize2.git
-```
+<section class="hmz-section">
+  <header>
+    <p class="hmz-eyebrow">a run, as it happens</p>
+    <h2>One flow, <em>many agents</em>, one trace</h2>
+    <p>Every turn's tool calls land on the timeline as they are made. Hover a lane; change how many agents are on it.</p>
+  </header>
+  <HmzOrchestra />
+</section>
 
-## Run something
+<section class="hmz-section">
+  <header>
+    <p class="hmz-eyebrow">features</p>
+    <h2>What it does, <em>one picture each</em></h2>
+  </header>
+  <HmzFeatures />
+  <p class="hmz-note">
+    All of it, described in one page: <a href="/features/">Features</a>.
+  </p>
+</section>
 
-```sh
-hmz
-```
+<section class="hmz-section">
+  <header>
+    <p class="hmz-eyebrow">the deep end</p>
+    <h2>The agent runs here. Its <em>syscalls</em> land there.</h2>
+    <p>A seccomp-filtered ptrace supervisor decides every call one at a time. No plugin, no configuration, no cooperation — the agent is told none of it.</p>
+  </header>
+  <HmzAnchor />
+  <p class="hmz-note">
+    Full detail in <a href="/guide/remote-execution">Remote execution</a>, and what you are
+    deliberately not entitled to in <a href="/reference/remote-execution">its reference</a>.
+  </p>
+</section>
 
-![Opening the humanize interface, typing / to see the commands, and picking a flow](/demo/tui.gif)
+<section class="hmz-section">
+  <header>
+    <p class="hmz-eyebrow">architecture</p>
+    <h2>Twelve layers, <em>one direction</em></h2>
+    <p>Everything points downward and nothing points both ways — a rule a test enforces rather than a diagram that hopes.</p>
+  </header>
+  <HmzStack />
+  <p class="hmz-note">
+    The whole tree, the rules and the exemptions:
+    <a href="/contributing/architecture">Architecture</a>.
+  </p>
+</section>
 
-<small>Recorded against a stand-in coding agent, in a container of its own — see
-[Working on these docs](/contributing/docs#the-terminal-demos).</small>
+<section id="gallery" class="hmz-section">
+  <header>
+    <p class="hmz-eyebrow">gallery</p>
+    <h2>The real thing, <em>recorded</em></h2>
+    <p>Hover to play, click to open.</p>
+  </header>
+  <HmzGallery />
+  <p class="hmz-note">
+    Recorded against a stand-in coding agent, in a container of its own — see
+    <a href="/contributing/docs#the-terminal-demos">Working on these docs</a>.
+  </p>
+</section>
 
-Or without the interface, over the agents you name, one `-a` apiece:
-
-```sh
-hmz exec -f official/flame_chase \
-    -a claude/claude-opus-4-8:high -a codex/gpt-5.6-sol:high "fix the build"
-```
-
-Then read the whole thing back:
-
-```sh
-hmz trace collect
-```
-
-## Where to start
-
-- **Never used it.** [Quickstart](/tutorials/quickstart) goes from nothing installed to a run
-  you can open in Perfetto, in fifteen minutes.
-- **Want to see it do real work.** The [tutorials](/tutorials/) take three real problems from
-  start to finish — a benchmark, a port, and building a coding agent from an idea.
-- **Want one feature.** The [guides](/guide/) have a page each, and each opens with something
-  you can paste.
-- **Looking something up.** [CLI](/reference/cli) and [TUI](/reference/tui) are complete.
-
-Before you point one at a repository you care about, read [Security](/guide/security). humanize
-runs every agent with permission prompts disabled, and there is no setting that turns them back
-on.
+<section class="hmz-section">
+  <div class="hmz-paths">
+    <a href="/tutorials/quickstart">
+      <strong>Never used it</strong>
+      <span>Nothing installed to a run you can open in Perfetto, in fifteen minutes.</span>
+    </a>
+    <a href="/guide/">
+      <strong>One feature</strong>
+      <span>A page each, opening with something you can paste.</span>
+    </a>
+    <a href="/reference/cli">
+      <strong>Looking it up</strong>
+      <span>Every command, key, flag and Python call.</span>
+    </a>
+  </div>
+  <p class="hmz-warn">
+    humanize runs every agent with permission prompts disabled, and nothing turns them back on.
+    Read <a href="/guide/security">Security</a> before pointing one at a repository you care
+    about.
+  </p>
+</section>

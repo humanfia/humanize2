@@ -24,6 +24,7 @@ inbound links moving is a red build rather than a 404 somebody finds later.
 ```
 docs/
 ├── .vitepress/config.mts     nav, sidebars, everything
+├── .vitepress/theme/         the palette, and the diagrams the home page is made of
 ├── index.md                  the home page
 ├── tutorials/                six, in order, each a whole piece of work
 ├── guide/                    one page per feature, answering "how do I use this?"
@@ -61,6 +62,37 @@ and a reader learning read a feature page.
 
 Adding a page means adding it to `sidebar` in `.vitepress/config.mts`; it will not appear
 otherwise.
+
+## The home page
+
+`index.md` is a frontmatter hero, one line of install, and five drawings. It explains nothing:
+a reader who wants to know how to use something is one click from a tutorial, a guide or the
+reference, and every one of those is a better page for it than a front page is.
+
+```
+.vitepress/theme/
+├── index.ts                  registers the components; the rest is VitePress's default theme
+├── style.css                 the palette, the hero, and the shell every section is drawn in
+└── components/
+    ├── HmzInstall.vue        the one line, and a button that copies it
+    ├── HmzOrchestra.vue      a run simulated lane by lane, landing on a trace strip
+    ├── HmzFeatures.vue       eight features, one small drawing each
+    ├── HmzAnchor.vue         pick a syscall, watch which side of the anchor answers it
+    ├── HmzStack.vue          the layers, and what each is allowed to name
+    └── HmzGallery.vue        the recorded demos, played on hover and opened on click
+```
+
+Three things they are held to:
+
+- **A drawing says what the code does.** `HmzAnchor` routes each call the way
+  `coganchor/SPEC.md` says it is routed; `HmzStack`'s edges are the `ALLOWED` table in
+  `tests/test_layering.py`; every agent on `HmzOrchestra` is spelled the way `hmz exec -a`
+  would take it. A diagram that drifts from those is a diagram that lies to a reader.
+- **`HmzOrchestra` is a simulation and is not dressed up as a recording.** The gallery below it
+  is what the real thing looks like.
+- **Motion is optional.** Every diagram reads `prefers-reduced-motion` and holds still at
+  something worth looking at; the simulated run also stops while it is scrolled off screen.
+  Nothing is said only by a moving thing.
 
 ## The terminal demos
 

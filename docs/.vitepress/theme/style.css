@@ -1,0 +1,244 @@
+/* The palette comes from the logo -- #608ab1 -- rather than from VitePress's default green,
+   so the chevron, the buttons, the links and every diagram on the home page are one colour
+   family. Each diagram then adds one accent of its own from the pair below. */
+
+:root {
+  --vp-c-brand-1: #2a6ea6;
+  --vp-c-brand-2: #3d84bd;
+  --vp-c-brand-3: #608ab1;
+  --vp-c-brand-soft: rgba(96, 138, 177, 0.16);
+
+  --hmz-accent: #14b8a6;
+  --hmz-accent-2: #a855f7;
+  --hmz-warm: #e0803a;
+
+  /* The lane colours every diagram identifies an agent by: one per lane, in this order. */
+  --hmz-lane-1: #4a90d9;
+  --hmz-lane-2: #14b8a6;
+  --hmz-lane-3: #a855f7;
+  --hmz-lane-4: #e0803a;
+  --hmz-lane-5: #d94a6a;
+  --hmz-lane-6: #8b93a7;
+
+  --hmz-grid: rgba(96, 138, 177, 0.16);
+  --hmz-panel-bg: var(--vp-c-bg-soft);
+  --hmz-panel-border: var(--vp-c-divider);
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    110deg,
+    #608ab1 0%,
+    #2a9d8f 45%,
+    #7c6cf0 100%
+  );
+  --vp-home-hero-image-background-image: linear-gradient(-45deg, #608ab1 30%, #14b8a6 70%);
+  --vp-home-hero-image-filter: blur(52px);
+}
+
+.dark {
+  --vp-c-brand-1: #8cb8de;
+  --vp-c-brand-2: #6f9fcb;
+  --vp-c-brand-3: #4f7ba3;
+  --vp-c-brand-soft: rgba(140, 184, 222, 0.16);
+
+  --hmz-accent: #2dd4bf;
+  --hmz-accent-2: #c084fc;
+  --hmz-warm: #f0a05a;
+
+  --hmz-lane-1: #6aa9e9;
+  --hmz-lane-2: #2dd4bf;
+  --hmz-lane-3: #c084fc;
+  --hmz-lane-4: #f0a05a;
+  --hmz-lane-5: #f2708c;
+  --hmz-lane-6: #9aa3b8;
+
+  --hmz-grid: rgba(140, 184, 222, 0.14);
+  --vp-home-hero-image-filter: blur(64px);
+}
+
+/* The hero sits on a slow-drifting field so the first screenful is moving before anything
+   is scrolled. It is drawn behind everything and takes no clicks. */
+.VPHome {
+  position: relative;
+  isolation: isolate;
+  padding-bottom: 96px;
+}
+
+.VPHome::before {
+  content: '';
+  position: absolute;
+  inset: -10% -20% auto -20%;
+  height: 720px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 46% at 22% 18%, rgba(96, 138, 177, 0.28), transparent 70%),
+    radial-gradient(34% 42% at 78% 12%, rgba(20, 184, 166, 0.22), transparent 70%),
+    radial-gradient(30% 38% at 55% 46%, rgba(124, 108, 240, 0.18), transparent 72%);
+  animation: hmz-drift 24s ease-in-out infinite alternate;
+}
+
+@keyframes hmz-drift {
+  from {
+    transform: translate3d(-2%, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(3%, 3%, 0) scale(1.08);
+  }
+}
+
+.VPHome .VPHero .name {
+  font-size: clamp(48px, 9vw, 84px);
+  letter-spacing: -0.02em;
+}
+
+/* The glow behind the chevron is smaller than the chevron, so the mark stays legible on it. */
+.VPHome .VPHero .image-bg {
+  width: 240px;
+  height: 240px;
+  opacity: 0.75;
+}
+
+.VPHome .VPHero .tagline {
+  max-width: 34rem;
+}
+
+/* Every home-page section is one of these: an eyebrow, a title, a diagram, and at most one
+   line of prose. Prose belongs in the guides. */
+.hmz-section {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 64px 24px 0;
+}
+
+.hmz-section > header {
+  margin-bottom: 26px;
+}
+
+.hmz-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--vp-c-brand-1);
+}
+
+.hmz-eyebrow::before {
+  content: '';
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.hmz-section h2 {
+  margin: 10px 0 0;
+  border: 0;
+  padding: 0;
+  font-size: clamp(26px, 3.4vw, 38px);
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.hmz-section h2 em {
+  font-style: normal;
+  background: linear-gradient(100deg, var(--vp-c-brand-1), var(--hmz-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hmz-section > header p {
+  margin: 10px 0 0;
+  max-width: 46rem;
+  color: var(--vp-c-text-2);
+  line-height: 1.6;
+}
+
+.hmz-panel {
+  border: 1px solid var(--hmz-panel-border);
+  border-radius: 16px;
+  background: var(--hmz-panel-bg);
+  overflow: hidden;
+}
+
+.hmz-note {
+  margin: 14px 2px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--vp-c-text-3);
+}
+
+/* The last strip: three ways in, and the one warning that belongs on a front page. */
+.hmz-paths {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.hmz-paths a {
+  display: block;
+  padding: 18px 20px;
+  border: 1px solid var(--hmz-panel-border);
+  border-radius: 14px;
+  background: var(--hmz-panel-bg);
+  text-decoration: none;
+  transition: border-color 0.25s, transform 0.25s;
+}
+
+.hmz-paths a:hover {
+  border-color: var(--vp-c-brand-1);
+  transform: translateY(-2px);
+}
+
+.hmz-paths strong {
+  display: block;
+  font-size: 15px;
+  color: var(--vp-c-brand-1);
+}
+
+.hmz-paths span {
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--vp-c-text-3);
+}
+
+.hmz-warn {
+  margin: 20px 0 0;
+  padding: 14px 18px;
+  border: 1px solid var(--vp-c-warning-soft);
+  border-left: 3px solid var(--vp-c-warning-1);
+  border-radius: 10px;
+  background: var(--vp-c-warning-soft);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--vp-c-text-2);
+}
+
+.hmz-warn a,
+.hmz-note a {
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+}
+
+@media (max-width: 640px) {
+  .hmz-section {
+    padding: 48px 20px 0;
+  }
+
+  .hmz-paths {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .VPHome::before {
+    animation: none;
+  }
+}
