@@ -16,7 +16,9 @@ from __future__ import annotations
 import collections
 import contextlib
 import json
+import os
 import re
+import signal
 import subprocess
 import sys
 import threading
@@ -33,7 +35,6 @@ from .config import AgentConfig
 from .event import Event, Failed, Question, Usage, say
 
 if TYPE_CHECKING:
-    import os
     from collections.abc import Iterator, Mapping
 
     from pydantic import BaseModel
@@ -112,6 +113,8 @@ class _AppServer:
             is the turn that starts it that has nowhere to run.
         """
         self._argv = argv
+        self._stopping = threading.Lock()
+        self._stopped = False
         self._proc = subprocess.Popen(
             argv,
             # Its log is nobody's to read; what is wanted from it is the one line below.
@@ -121,6 +124,7 @@ class _AppServer:
             encoding="utf-8",
             errors="replace",
             env=dict(env) if env else None,
+            start_new_session=os.name != "nt",
         )
         assert self._proc.stdout is not None  # noqa: S101
         for line in self._proc.stdout:
@@ -184,12 +188,30 @@ class _AppServer:
         return said.get("data")
 
     def stop(self) -> None:
-        """Takes the daemon down, leaving the sessions it held on disk."""
-        self._proc.terminate()
-        # Reaped rather than left: a flow that cycles through agents would otherwise gather a
-        # zombie for each one it let go of.
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            self._proc.wait(timeout=_STOP_SECONDS)
+        """Takes the daemon and its children down, leaving its sessions on disk."""
+        with self._stopping:
+            if self._stopped:
+                return
+            self._stopped = True
+            if os.name == "nt":
+                if self._proc.poll() is None:
+                    self._proc.terminate()
+                    try:
+                        self._proc.wait(timeout=_STOP_SECONDS)
+                    except subprocess.TimeoutExpired:
+                        self._proc.kill()
+                self._proc.wait()
+                return
+
+            # Provider wrappers and Kimi share this dedicated group. Taking down the group
+            # prevents a stopped flow from leaving either wrapper or daemon behind.
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(self._proc.pid, signal.SIGTERM)
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                self._proc.wait(timeout=_STOP_SECONDS)
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(self._proc.pid, signal.SIGKILL)
+            self._proc.wait()
 
 
 @dataclass(frozen=True, kw_only=True)
