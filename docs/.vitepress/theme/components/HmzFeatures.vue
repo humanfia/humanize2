@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Eight things humanize does, one drawing each. The words are the label on the drawing;
-// the guide behind each card is where the explanation lives.
+// the feature page behind each card is where the explanation lives.
 </script>
 
 <template>
   <div class="grid">
-    <a class="card" href="/guide/concepts">
+    <a class="card" href="/features/backends">
       <svg class="viz fan" viewBox="0 0 200 88" aria-hidden="true">
         <path d="M 46 44 C 90 44 100 14 152 14" />
         <path d="M 46 44 C 90 44 100 34 152 34" />
@@ -23,7 +23,7 @@
       <p>claude · codex · dsh · agy · grok · kimi · qwen · pi · opencode · mimo</p>
     </a>
 
-    <a class="card" href="/guide/steering">
+    <a class="card" href="/features/steering">
       <svg class="viz steer" viewBox="0 0 200 88" aria-hidden="true">
         <rect class="track" x="24" y="26" width="152" height="16" rx="8" />
         <rect class="fill" x="24" y="26" width="14" height="16" rx="8" />
@@ -35,7 +35,7 @@
       <p>Not queued behind it. It reaches the agent that is working.</p>
     </a>
 
-    <a class="card" href="/guide/tracing">
+    <a class="card" href="/features/tracing">
       <svg class="viz trace" viewBox="0 0 200 88" aria-hidden="true">
         <g class="slices">
           <rect x="20" y="16" width="42" height="12" rx="3" />
@@ -54,7 +54,7 @@
       <p><code>hmz trace collect</code> — then open it in Perfetto.</p>
     </a>
 
-    <a class="card" href="/guide/remote-execution">
+    <a class="card" href="/features/anchor">
       <svg class="viz away" viewBox="0 0 200 88" aria-hidden="true">
         <rect class="box" x="16" y="26" width="62" height="36" rx="8" />
         <rect class="box there" x="122" y="26" width="62" height="36" rx="8" />
@@ -67,7 +67,7 @@
       <p>An ssh host or a container of its own. The agent is told nothing.</p>
     </a>
 
-    <a class="card" href="/guide/shapes">
+    <a class="card" href="/features/shapes">
       <svg class="viz shape" viewBox="0 0 200 88" aria-hidden="true">
         <g class="prose">
           <rect x="22" y="22" width="104" height="8" rx="4" />
@@ -88,7 +88,7 @@
       <p>A pydantic model in, a field out — no paragraph to parse.</p>
     </a>
 
-    <a class="card" href="/guide/providers">
+    <a class="card" href="/features/accounts">
       <svg class="viz accounts" viewBox="0 0 200 88" aria-hidden="true">
         <rect class="cli" x="70" y="32" width="60" height="24" rx="7" />
         <text x="100" y="48">claude</text>
@@ -105,7 +105,7 @@
       <p>Your subscription and somebody else's endpoint, in one run.</p>
     </a>
 
-    <a class="card" href="/guide/resuming">
+    <a class="card" href="/features/resuming">
       <svg class="viz resume" viewBox="0 0 200 88" aria-hidden="true">
         <rect class="seg" x="20" y="38" width="62" height="12" rx="6" />
         <rect class="seg gap" x="90" y="38" width="18" height="12" rx="6" />
@@ -116,7 +116,7 @@
       <p>A loop stopped on Thursday carries on from its own record.</p>
     </a>
 
-    <a class="card" href="/guide/human-agent">
+    <a class="card" href="/features/human">
       <svg class="viz human" viewBox="0 0 200 88" aria-hidden="true">
         <g class="row">
           <rect x="20" y="18" width="120" height="10" rx="5" />

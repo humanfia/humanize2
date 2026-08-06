@@ -56,6 +56,26 @@
   --vp-home-hero-image-filter: blur(64px);
 }
 
+/* A feature page is a diagram with prose around it, so its column is wider than a prose column
+   would be -- a timeline squeezed into 688px is a timeline nobody can read. The prose inside it
+   is held to its own measure, so only the diagrams and the tables take the extra room.
+   `pageClass: hmz-feature` in each page's front matter is what turns this on. */
+.Layout.hmz-feature .VPDoc.has-aside .content-container {
+  max-width: 940px;
+}
+
+.Layout.hmz-feature .vp-doc > div > p,
+.Layout.hmz-feature .vp-doc > div > ul,
+.Layout.hmz-feature .vp-doc > div > ol,
+.Layout.hmz-feature .vp-doc > div > blockquote,
+.Layout.hmz-feature .vp-doc > div > .custom-block {
+  max-width: 46rem;
+}
+
+.Layout.hmz-feature .vp-doc > div > .hmz-panel {
+  margin: 22px 0 28px;
+}
+
 /* The hero sits on a slow-drifting field so the first screenful is moving before anything
    is scrolled. It is drawn behind everything and takes no clicks. */
 .VPHome {
@@ -173,10 +193,10 @@
   color: var(--vp-c-text-3);
 }
 
-/* The last strip: three ways in, and the one warning that belongs on a front page. */
+/* The last strip: four ways in, and the one warning that belongs on a front page. */
 .hmz-paths {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -225,6 +245,12 @@
 .hmz-note a {
   font-weight: 600;
   color: var(--vp-c-brand-1);
+}
+
+@media (max-width: 900px) {
+  .hmz-paths {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {

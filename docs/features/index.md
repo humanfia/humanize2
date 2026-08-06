@@ -1,154 +1,59 @@
+---
+pageClass: hmz-feature
+---
+
 # Features
 
-What humanize does, described in one page. Every entry links to a [guide](/guide/) that shows
-you how to use it, and to the [reference](/reference/cli) that spells it out completely.
-
-If you have not run it yet, start with the [Quickstart](/tutorials/quickstart) instead.
-
-## The idea
-
 humanize runs **flows**: directories of Python that drive one or more coding agents in a loop
-and write down everything they did.
+and write down everything they did. It does not talk to a model provider — it drives the coding
+agent CLI you already have, logged in the way you already log in.
 
-It does not talk to a model provider. It drives the coding agent CLI you already have — nine of
-them, plus anything that speaks the Agent Client Protocol — logged in the way you already log
-in. There is no API key for it to hold. The one exception is DeepSeek Harness, which ships
-inside humanize and does take a key, because it has no subscription login to use instead.
+These pages are what there is and how it works. Nothing here is a command to type: the
+[tutorials](/tutorials/) teach it in order, and the [guides](/guide/) answer "how do I use
+this?".
 
-Two ways in, and they run the same flows and leave the same records behind. `hmz` opens a
-terminal interface. `hmz exec` runs a flow with nobody watching, which is what a script, a cron
-entry or a CI job wants.
+<HmzMap />
 
-## At the prompt
+## The deep end
 
-The interface is a transcript, an editor under it and a status line under that. The status
-line's right-hand end lists the keys that do something right now, which is the whole of what
-you have to remember.
-
-**A line typed mid-turn goes into the turn.** Not after it. "Actually, use pathlib" arriving
-four minutes into a refactor reaches the agent that is doing the refactoring.
-[Guide](/guide/steering)
-
-**One transcript, several conversations.** A flow driving four agents is four conversations,
-and **tab** steps between the ones that are working. [Guide](/guide/conversations)
-
-**Showing the working.** `/details` toggles between every tool call and thought, or only what
-the agent says. It changes the screen and nothing about the run. [Guide](/guide/details)
-
-**The shape of a run.** `/status` says who is working, who handed to whom, and what it has cost
-so far. [Guide](/guide/status)
-
-**Being away.** `/afk` decides what happens when an agent stops to ask you something: wait, or
-tell it nobody is there and let it carry on. [Guide](/guide/afk)
-
-**Everything you typed here before,** on ↑ and ↓, kept per project. [Guide](/guide/history) ·
-**What a half-typed line could become,** under the editor. [Guide](/guide/completion) ·
-**`/export`** writes the transcript out as it was written. [Guide](/guide/export)
-
-**Reopening finds it as you left it.** The flow, the agents, the efforts and the accounts are
-remembered per project. [Guide](/guide/settings)
-
-**esc stops the flow** — the whole flow, not just the turn. **ctrl+c** takes back something
-smaller. [Guide](/guide/stopping)
-
-## What an agent is
-
-An agent is a CLI, a model, an effort and an account, written `cli/model:effort`.
-
-**Efforts.** How hard to think: `off`, `low`, `medium`, `high`, `max`, mapped onto whatever
-each backend calls the same idea. A flow can move an agent's effort between turns.
-[Guide](/guide/efforts)
-
-**Permissions.** Four rungs from `read-only` to `bypass`. The default is `bypass`, and there is
-no setting that turns permission prompts back on. [Guide](/guide/permissions)
-
-**Skills.** Two kinds: the ones that CLI has installed, which humanize reads and never changes,
-and the ones a flow carries in its own `skills/` and mounts onto every session it opens.
-[Guide](/guide/skills)
-
-**Goals.** The backend's own goal feature — the agent decides for itself when the objective is
-met, and until it does, a turn that would have ended starts another. [Guide](/guide/goals)
-
-**Questions.** An agent stopping mid-turn to ask its user something, answered by whoever is at
-the prompt or by the flow. [Guide](/guide/questions)
-
-**Answers in a shape.** A turn given a pydantic model answers with that model instead of prose,
-so a flow reads a field rather than searching a paragraph for a phrase. [Guide](/guide/shapes)
-
-**Hooks.** Python callables hung on the moments of a turn — before a tool runs, when one asks
-permission, when the agent tries to stop. [Guide](/guide/hooks)
-
-**Cost and rate.** What has been spent, how fast the tokens are arriving, and how hard the
-model is currently thinking. [Guide](/guide/tally)
-
-**The person as an agent.** You, driven by a flow like any other agent, so a flow can ask a
-human the same way it asks a model. [Guide](/guide/human-agent)
-
-**Reporting.** humanize asks once whether to send crash reports to its developers, and says
-what one carries before you answer. [Guide](/guide/reporting)
-
-## Where the work lands
-
-**Providers.** An agent may name the account it runs as, so one flow can drive one CLI as your
-subscription and as somebody else's endpoint at the same time. [Guide](/guide/providers)
-
-**Containers.** Give an agent a container of its own, brought up on its first turn and taken
-down with it. [Guide](/guide/containers)
-
-**Remote execution.** Moor an agent to an ssh host so its commands land there while the process
-stays here. [Guide](/guide/remote-execution)
-
-**Worktrees.** One agent working in several directories at once, one session per directory.
-[Guide](/guide/worktrees)
-
-## Flows
-
-A flow is a directory whose `__init__.py` holds a function marked `@flow`, taking the agents
-and the task. Everything else is ordinary Python — a loop, a `subprocess.run`, a file read
-between turns.
-
-**Writing one.** The shortest useful flow is about a dozen lines.
-[Guide](/guide/writing-a-flow) · **Loops.** Ralph, stateful ralph, actor-and-reviewer: the
-shapes a loop over one or two agents takes. [Guide](/guide/loops)
-
-**Settings of its own.** A third argument annotated with a pydantic model becomes fields on
-`/config` and lines in a `-c setup.yaml`. [Guide](/guide/flow-settings)
-
-**Many turns at once.** Write `async def run` and a flow can have as many turns going as it
-likes. [Guide](/guide/async-flows)
-
-**A flow that calls a flow.** Composition, with the inner flow's agents supplied by the outer
-one. [Guide](/guide/calling-flows)
-
-**Testing one.** Without spending a turn. [Guide](/guide/testing-flows)
-
-**Flowverses.** A git repository with a `flows/` directory in it, offered under its own name.
-`official` is there from the start. [Guide](/guide/flowverses)
-
-## What a run leaves behind
-
-**Cycles.** Every run of a flow is a directory under `~/.humanize/cycles/`, holding what the
-run was and what happened in it.
-
-**Tracing.** `hmz trace collect` turns a run plus the backends' own transcripts into a Chrome
-trace: one process per agent, one track per row of its sessions, one slice per thing it did.
-Open it in Perfetto. [Guide](/guide/tracing)
-
-**Picking a run up.** A loop stopped on Thursday — by esc, or by a machine going down — carried
-on from where it stopped. [Guide](/guide/resuming)
-
-**Unattended.** The same flows from a script. [Guide](/guide/unattended) · **In CI.**
-[Guide](/guide/ci)
-
-## Where the detail is
+The five that are worth reading even if you never install it.
 
 | | |
 | --- | --- |
-| [CLI](/reference/cli) | Every command and flag |
-| [TUI](/reference/tui) | Every key and `/command` |
-| [Flows](/reference/flows) | The `@flow` contract, settings, composition, flowverses |
-| [Agents](/reference/agents) | Turns, sessions, hooks, shapes, efforts, permissions, skills, and what each backend can do |
-| [Machines](/reference/machines) | Containers, worktrees, where a session works |
-| [Providers](/reference/providers) | Accounts, and adding a CLI of your own |
-| [Remote execution](/reference/remote-execution) | `hmz anchor`, and what lands where |
-| [Tracing](/reference/tracing) | Cycles, the trace format, what a slice carries |
+| [The anchor](/features/anchor) | The agent runs here. Every syscall it makes is decided one at a time — replayed on another machine, or answered on this one. It is told none of it. |
+| [Two accounts of one CLI](/features/accounts) | A CLI signs in once. humanize runs it as an account it was never signed into, by answering the paths it opens with other paths. |
+| [One timeline](/features/tracing) | Every agent, every sub-agent and every program those turns ran, on one clock, in one document you open in Perfetto. |
+| [A line typed mid-turn](/features/steering) | It goes *into* the turn that is running. Not queued behind it, and never quietly counted as said. |
+| [Answers in a shape](/features/shapes) | A turn given a pydantic model answers with that model. The model is the whole of the question, and the answer is read back through it. |
+
+## The shape of a run
+
+| | |
+| --- | --- |
+| [Ten CLIs, one agent](/features/backends) | Ten coding agents and anything speaking the Agent Client Protocol, each driven through whatever it actually offers. |
+| [A flow is Python](/features/flows) | A loop, a subprocess call, a file read between turns. The agents are its arguments, and the shapes a loop takes are few. |
+| [Many turns at once](/features/concurrency) | Turns are sequential only inside one session. Two hundred conversations are two hundred turns. |
+| [Picked up where it stopped](/features/resuming) | A loop meant to run for a week is a loop that will be stopped. What it was keeping track of survives; the conversation does not. |
+
+## Who is at the other end
+
+| | |
+| --- | --- |
+| [It decides when it is done](/features/goals) | The backend's own goal feature: a turn that would have ended starts another, until the model says the objective is met. |
+| [The moments of a turn](/features/hooks) | Seven points a turn passes through, and Python callables hung on them — and taken down again while it runs. |
+| [You, as one of the agents](/features/human) | A flow puts a decision to a person the way it puts one to a model, in the same shape, with the same branch for an answer that never came. |
+
+## And the rest
+
+Everything above is one page because it is unusual. The ordinary parts of humanize have a guide
+apiece and no page here: [efforts](/guide/efforts) and [permissions](/guide/permissions),
+[skills](/guide/skills) and [questions](/guide/questions), [containers](/guide/containers) and
+[worktrees](/guide/worktrees), [cost and rate](/guide/tally), [flowverses](/guide/flowverses),
+[history](/guide/history), [completion](/guide/completion) and [what a project
+remembers](/guide/settings).
+
+::: warning Before you point one at a repository you care about
+humanize runs every agent with permission prompts disabled, and nothing turns them back on. A
+flow is a directory of Python, and reading one means running it. Read
+[Security](/guide/security).
+:::

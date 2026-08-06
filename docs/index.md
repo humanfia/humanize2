@@ -38,7 +38,7 @@ hero:
   </header>
   <HmzFeatures />
   <p class="hmz-note">
-    All of it, described in one page: <a href="/features/">Features</a>.
+    A page each, drawn rather than described: <a href="/features/">Features</a>.
   </p>
 </section>
 
@@ -50,8 +50,8 @@ hero:
   </header>
   <HmzAnchor />
   <p class="hmz-note">
-    Full detail in <a href="/guide/remote-execution">Remote execution</a>, and what you are
-    deliberately not entitled to in <a href="/reference/remote-execution">its reference</a>.
+    How it works, syscall by syscall: <a href="/features/anchor">The anchor</a>. What you are
+    deliberately not entitled to: <a href="/reference/remote-execution">its reference</a>.
   </p>
 </section>
 
@@ -83,6 +83,10 @@ hero:
 
 <section class="hmz-section">
   <div class="hmz-paths">
+    <a href="/features/">
+      <strong>What there is</strong>
+      <span>A page and a diagram each, for what it does and how it works.</span>
+    </a>
     <a href="/tutorials/quickstart">
       <strong>Never used it</strong>
       <span>Nothing installed to a run you can open in Perfetto, in fifteen minutes.</span>

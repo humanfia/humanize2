@@ -26,9 +26,9 @@ docs/
 ├── .vitepress/config.mts     nav, sidebars, everything
 ├── .vitepress/theme/         the palette, and the diagrams the home page is made of
 ├── index.md                  the home page
+├── features/                 one page per feature, each built on a diagram you can push
 ├── tutorials/                six, in order, each a whole piece of work
 ├── guide/                    one page per feature, answering "how do I use this?"
-├── features/                 one page: what humanize does, described
 ├── reference/                CLI, TUI, and the Python API
 ├── contributing/             this
 ├── public/                   served at the site root: logo.svg, tui.svg, demo/*.gif, demo/*.png
@@ -39,9 +39,9 @@ Four kinds of page, and a page that is two of them is two pages.
 
 | | | |
 | --- | --- | --- |
+| **Features** | understanding | One page per feature, built around a diagram the reader can push. What it is and why it works the way it does. **No commands and no code**: a reader who wants to run it is one click from the guide, which every page ends by naming. |
 | **Tutorials** | learning | Taken in order, start to finish, with every command written out. A reader following one is not choosing anything; they are being led. Six of them, and adding a seventh means arguing that one of the six should go. |
 | **Guides** | doing | "How do I use X?" One feature each. Opens with a `## Try it` section short enough to paste, then explains the rest. A reader here has a job and knows what they want. |
-| **Features** | understanding | One page, describing what there is. Nothing here explains how; every entry points at a guide. |
 | **Reference** | looking up | Complete and dry. Every flag, key, argument and return. A reader here already knows what they are looking for. |
 
 That split is the [Diátaxis](https://diataxis.fr/) one, and the reason the docs were
@@ -82,16 +82,42 @@ reference, and every one of those is a better page for it than a front page is.
     └── HmzGallery.vue        the recorded demos, played on hover and opened on click
 ```
 
-Three things they are held to:
+## The feature pages
 
-- **A drawing says what the code does.** `HmzAnchor` routes each call the way
-  `coganchor/SPEC.md` says it is routed; `HmzStack`'s edges are the `ALLOWED` table in
-  `tests/test_layering.py`; every agent on `HmzOrchestra` is spelled the way `hmz exec -a`
-  would take it. A diagram that drifts from those is a diagram that lies to a reader.
-- **`HmzOrchestra` is a simulation and is not dressed up as a recording.** The gallery below it
-  is what the real thing looks like.
+One page, one diagram, one component, registered in the same `index.ts`:
+
+```
+HmzMap.vue          features/            the six stages, and every page hung off one
+HmzSyscalls.vue     features/anchor      a call, the seccomp verdict, and where it lands
+HmzAccounts.vue     features/accounts    the path swap, then the chain and its waits
+HmzTimeline.vue     features/tracing     a trace, with the programs and the clock as switches
+HmzSteer.vue        features/steering    type a line into a running turn, or queue behind it
+HmzShape.vue        features/shapes      a model, how a backend is held to it, what comes back
+HmzBackends.vue     features/backends    eleven backends against what a flow may ask for
+HmzLoops.vue        features/flows       the shapes a loop takes, stepped through
+HmzTurns.vue        features/concurrency twelve prompts, scheduled across n conversations
+HmzResume.vue       features/resuming    pull the plug, then run it again
+HmzGoal.vue         features/goals       the model deciding, beside your code deciding
+HmzMoments.vue      features/hooks       hang a hook, run the turn, read what it said
+HmzPerson.vue       features/human       a questionnaire built out of a pydantic model
+```
+
+Four things they are all held to:
+
+- **A drawing says what the code does.** `HmzAnchor` and `HmzSyscalls` route each call the way
+  `coganchor/SPEC.md` and `coganchor/linux/seccomp.py` route it; `HmzStack`'s edges are the
+  `ALLOWED` table in `tests/test_layering.py`; `HmzBackends` is `hmz/backends.py` and which
+  session base each agent class derives from; `HmzAccounts`' waits are the formulas in
+  `providers/retry.py`; every agent on `HmzOrchestra` is spelled the way `hmz exec -a` would
+  take it. A diagram that drifts from those is a diagram that lies to a reader.
+- **A simulation is not dressed up as a recording.** `HmzOrchestra` and the feature diagrams are
+  drawn; the gallery on the home page is what the real thing looks like.
+- **Interaction is the argument.** The switch on `HmzTimeline` exists because the clock
+  correction is hard to believe in prose, and the one on `HmzTurns` because "two turns on one
+  session are sequential" is a rule people read past. A control that does not settle a question
+  should not be there.
 - **Motion is optional.** Every diagram reads `prefers-reduced-motion` and holds still at
-  something worth looking at; the simulated run also stops while it is scrolled off screen.
+  something worth looking at; the animated ones also stop while they are scrolled off screen.
   Nothing is said only by a moving thing.
 
 ## The terminal demos

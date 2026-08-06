@@ -20,13 +20,14 @@ export default defineConfig({
   themeConfig: {
     logo: '/logo.svg',
 
-    // Four sections, and the split between the first two is the one readers asked for:
-    // tutorials teach a whole piece of work end to end, guides answer "how do I use this one
-    // feature", features describe what there is, and reference spells all of it out.
+    // Four sections, and features come first: what there is, drawn rather than described, is
+    // what somebody who has never run this wants before anything else. Then tutorials, which
+    // teach a whole piece of work end to end; guides, which answer "how do I use this one
+    // feature"; and reference, which spells all of it out.
     nav: [
+      { text: 'Features', link: '/features/', activeMatch: '/features/' },
       { text: 'Tutorials', link: '/tutorials/', activeMatch: '/tutorials/' },
       { text: 'Guides', link: '/guide/', activeMatch: '/guide/' },
-      { text: 'Features', link: '/features/', activeMatch: '/features/' },
       { text: 'Reference', link: '/reference/cli', activeMatch: '/reference/' },
       {
         text: 'Contributing',
@@ -36,6 +37,45 @@ export default defineConfig({
     ],
 
     sidebar: {
+      // One page per feature, each built around a diagram you can push. The first group is
+      // the one to send somebody who wants to know what is unusual about this.
+      '/features/': [
+        {
+          text: 'Features',
+          items: [{ text: 'All of them', link: '/features/' }],
+        },
+        {
+          text: 'The deep end',
+          collapsed: false,
+          items: [
+            { text: 'The anchor', link: '/features/anchor' },
+            { text: 'Two accounts of one CLI', link: '/features/accounts' },
+            { text: 'One timeline', link: '/features/tracing' },
+            { text: 'A line typed mid-turn', link: '/features/steering' },
+            { text: 'Answers in a shape', link: '/features/shapes' },
+          ],
+        },
+        {
+          text: 'The shape of a run',
+          collapsed: false,
+          items: [
+            { text: 'Ten CLIs, one agent', link: '/features/backends' },
+            { text: 'A flow is Python', link: '/features/flows' },
+            { text: 'Many turns at once', link: '/features/concurrency' },
+            { text: 'Picked up where it stopped', link: '/features/resuming' },
+          ],
+        },
+        {
+          text: 'Who is at the other end',
+          collapsed: false,
+          items: [
+            { text: 'It decides when it is done', link: '/features/goals' },
+            { text: 'The moments of a turn', link: '/features/hooks' },
+            { text: 'You, as one of the agents', link: '/features/human' },
+          ],
+        },
+      ],
+
       '/tutorials/': [
         {
           text: 'Tutorials',
@@ -138,13 +178,6 @@ export default defineConfig({
             { text: 'Tracing', link: '/guide/tracing' },
             { text: 'Picking a run up', link: '/guide/resuming' },
           ],
-        },
-      ],
-
-      '/features/': [
-        {
-          text: 'Features',
-          items: [{ text: 'What humanize does', link: '/features/' }],
         },
       ],
 
