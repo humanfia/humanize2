@@ -83,6 +83,23 @@ def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
     )
 """
 
+#: A flow proving that one backend-native command-line setting reaches the
+#: concrete Claude config rather than being treated as a Codex override.
+CLAUDE_NATIVE_CONFIG = """
+import json
+from pathlib import Path
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    Path(__file__).with_suffix(".json").write_text(
+        json.dumps(list(agents[0].config.allowed_tools))
+    )
+"""
+
 #: The same flow, declaring its agents as a named tuple: as many as there are places, and what
 #: each of them is for. It reaches them by name to prove it was handed the type it asked for.
 NAMED = """
@@ -263,6 +280,23 @@ def test_an_agent_may_be_given_a_permission_rung(
     )
 
     assert json.loads((tmp_path / "flow.json").read_text()) == [permission, "bypass"]
+
+
+def test_a_claude_agent_receives_its_native_allowed_tools_rule(
+    tmp_path: Path,
+) -> None:
+    flow = _flow(tmp_path, CLAUDE_NATIVE_CONFIG)
+    main(
+        [
+            "exec",
+            "-f",
+            flow,
+            "-a",
+            ("cli=claude,model=m,effort=high,config.allowed_tools=Bash(git diff *)"),
+            "task",
+        ]
+    )
+    assert json.loads((tmp_path / "flow.json").read_text()) == ["Bash(git diff *)"]
 
 
 def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(

@@ -1203,7 +1203,8 @@ def read(
         The CLI may name a provider after an `@`, as `claude@deepseek/MODEL:EFFORT`, which is
         the account that agent's turns run as; `provider=` says the same thing written out.
         The written-out form may also name the agent's permission rung as `permission=`, and
-        for Codex only, app-server `-c` overrides as `config.KEY=VALUE`.
+        backend-native settings as `config.KEY=VALUE`. Codex accepts app-server overrides;
+        Claude accepts one exact `allowed_tools` rule.
 
     Returns:
       The backend, the model, the effort, the provider -- which is "" for an agent that runs
@@ -1264,8 +1265,12 @@ def read(
             "cli=CLI,model=MODEL,effort=EFFORT[,provider=PROVIDER]"
             "[,permission=PERMISSION][,config.KEY=VALUE]"
         )
-    if overrides and profile.name != "codex":
-        raise ValueError("config.KEY is only for Codex")
+    if overrides and profile.name not in {"claude", "codex"}:
+        raise ValueError("config.KEY is only for Claude or Codex")
+    if profile.name == "claude" and any(
+        key != "allowed_tools" for key, _value in overrides
+    ):
+        raise ValueError("Claude config only accepts allowed_tools")
     return (
         profile,
         model.strip(),

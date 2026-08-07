@@ -149,7 +149,8 @@ A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land)
 whether [goals](/guide/goals) are available to it, and nothing else — the
 [skills it carries](#the-skills-an-agent-carries) are not among them, being its CLI's own and
 its flow's. Codex also takes `overrides`, the app-server `-c` keys that are not already one
-of those fields. It is frozen,
+of those fields. Claude takes `allowed_tools`, exact native `--allowedTools` rules for a
+bounded unattended flow. It is frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
 would silently split one conversation across two models.
 
@@ -171,6 +172,15 @@ agent = CodexAgent(
 On a command line the same settings are that agent's `config.KEY=VALUE`, not a flag of
 `hmz exec`. Only `model_context_window` and `model_auto_compact_token_limit` are taken. The
 user's `~/.codex/config.toml` is left as it was.
+
+Claude's exact native allow rule is configured the same way and is handed to
+`--allowedTools`; it does not widen the agent's permission rung:
+
+```sh
+hmz exec -f flow.py:run \
+    -a 'cli=claude,model=claude-opus-5,effort=max,permission=workspace-write,config.allowed_tools=Bash(git diff *)' \
+    task
+```
 
 An agent takes an optional `name=`:
 

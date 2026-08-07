@@ -101,7 +101,7 @@ def test_a_backend_nobody_has_heard_of_is_a_line_to_correct() -> None:
 
 
 def test_a_codex_agent_may_name_app_server_overrides() -> None:
-    """`config.KEY` is that agent's, and only Codex has an app server that takes `-c`."""
+    """`config.KEY` is that agent's, and Codex passes its pairs to app-server `-c`."""
     profile, _, _, _, _, overrides = backends.read(
         "cli=codex,model=gpt-5.6-sol,effort=high,"
         "config.model_context_window=1000000,"
@@ -112,7 +112,16 @@ def test_a_codex_agent_may_name_app_server_overrides() -> None:
         ("model_context_window", "1000000"),
         ("model_auto_compact_token_limit", "900000"),
     )
-    with pytest.raises(ValueError, match="only for Codex"):
+    with pytest.raises(ValueError, match="only accepts allowed_tools"):
         backends.read(
             "cli=claude,model=m,effort=high,config.model_context_window=1000000"
         )
+
+
+def test_a_claude_agent_may_name_one_native_allowed_tools_rule() -> None:
+    profile, _, _, _, _, overrides = backends.read(
+        "cli=claude,model=claude-opus-5,effort=max,"
+        "config.allowed_tools=Bash(git diff *)"
+    )
+    assert profile.name == "claude"
+    assert overrides == (("allowed_tools", "Bash(git diff *)"),)

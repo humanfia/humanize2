@@ -87,6 +87,29 @@ def test_an_agent_nobody_was_asked_about_is_allowed_everything() -> None:
     assert ClaudeCodeAgentConfig(model="m", effort="high").permission == "bypass"
 
 
+def test_claude_is_given_its_exact_native_allowed_tool_rules() -> None:
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(
+            model="m",
+            effort="high",
+            permission="workspace-write",
+            allowed_tools=("Bash(git diff *)",),
+        )
+    ).new()
+    argv = session._command()
+    assert argv.count("--allowedTools") == 1
+    assert argv[argv.index("--allowedTools") + 1] == "Bash(git diff *)"
+
+
+def test_claude_allowed_tool_rules_are_canonical() -> None:
+    with pytest.raises(ValueError, match="unique sorted"):
+        ClaudeCodeAgentConfig(
+            model="m",
+            effort="high",
+            allowed_tools=("Read", "Read"),
+        )
+
+
 @pytest.mark.parametrize(
     ("permission", "mode"),
     [("read-only", "plan"), ("workspace-write", "acceptEdits"), ("auto", "auto")],

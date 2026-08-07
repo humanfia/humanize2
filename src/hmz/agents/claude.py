@@ -33,6 +33,10 @@ _CONTINUATION_TOOLS = (
     "CronList",
 )
 
+_ALLOWED_TOOLS_MAX = 32
+
+_ALLOWED_TOOL_RULE_MAX_CHARS = 4096
+
 #: Reasons that leave an answer unfinished even when a broken intermediary labels the result
 #: `success`. Claude normally keeps its own agent loop going for these rather than returning
 #: them as the result of the whole turn.
@@ -125,7 +129,20 @@ def _result_failure(said: dict[str, Any]) -> str | None:
 
 @dataclass(frozen=True, kw_only=True)
 class ClaudeCodeAgentConfig(AgentConfig):
-    """What Claude Code is configured with: the common model and effort, and nothing else."""
+    """The common settings plus exact Claude-native tool allow rules."""
+
+    allowed_tools: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if (
+            len(self.allowed_tools) > _ALLOWED_TOOLS_MAX
+            or self.allowed_tools != tuple(sorted(set(self.allowed_tools)))
+            or any(
+                not rule or len(rule) > _ALLOWED_TOOL_RULE_MAX_CHARS or "," in rule
+                for rule in self.allowed_tools
+            )
+        ):
+            raise ValueError("allowed_tools must be unique sorted Claude tool rules")
 
 
 class ClaudeCodeSession(StreamSessionBase):
@@ -213,6 +230,9 @@ class ClaudeCodeSession(StreamSessionBase):
             # wakeup, anything on the scheduler. Everything else it may reach for is what its
             # permission rung says it may, exactly as before.
             argv += ["--disallowedTools", ",".join(_CONTINUATION_TOOLS)]
+        allowed_tools = getattr(self._agent.config, "allowed_tools", ())
+        if allowed_tools:
+            argv += ["--allowedTools", ",".join(allowed_tools)]
         return argv
 
     def _write(self, text: str, ticket: str = "") -> str:

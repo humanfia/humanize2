@@ -261,8 +261,8 @@ def read_agent(
       spec: The short or written-out form accepted by ``-a``.
 
     Returns:
-      The backend, model, effort, provider, optional permission rung, and Codex
-      ``config.KEY`` pairs.
+      The backend, model, effort, provider, optional permission rung, and
+      backend-native ``config.KEY`` pairs.
 
     Raises:
       ValueError: If the specification is malformed or names no permission rung there is.
@@ -323,7 +323,7 @@ def flow_and_agents(
         metavar="CLI/MODEL:EFFORT",
         help="one agent, repeated once for each the flow drives, in the order it takes "
         "them; also written cli=CLI,model=MODEL,effort=EFFORT with optional "
-        "permission=PERMISSION and, for Codex, config.KEY=VALUE. CLI is one of "
+        "permission=PERMISSION and backend-native config.KEY=VALUE. CLI is one of "
         f"{', '.join(sorted(one.name for one in backends.profiles()))}",
     )
     parser.add_argument(
@@ -375,8 +375,10 @@ def flow_and_agents(
         extra: dict[str, Any] = {}
         if permission is not None:
             extra["permission"] = permission
-        if overrides:
+        if overrides and profile.name == "codex":
             extra["overrides"] = overrides
+        elif overrides:
+            extra["allowed_tools"] = tuple(value for _key, value in overrides)
         try:
             configured = config(
                 model=model, effort=effort, provider=provider, goals=goals, **extra
