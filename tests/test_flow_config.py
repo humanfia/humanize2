@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from hmz.agents import AgentConfig
+from hmz.agents import AgentConfig, CodexAgentConfig
 from hmz.runner import (
     NotAFlow,
     Runner,
@@ -210,6 +210,30 @@ def test_the_exec_line_reads_the_config_it_names(tmp_path: Path) -> None:
     assert held == {"rounds": 7}
     assert len(agents) == 1
     assert task == "go"
+
+
+def test_the_exec_line_gives_a_codex_agent_its_own_overrides() -> None:
+    """`config.KEY` is that `-a`, not a flag of the process starting every agent."""
+    _, agents, _, _ = flow_and_agents(
+        [
+            "-f",
+            "flow",
+            "-a",
+            (
+                "cli=codex,model=gpt-5.6-sol,effort=high,"
+                "config.model_context_window=1000000,"
+                "config.model_auto_compact_token_limit=900000"
+            ),
+            "go",
+        ]
+    )
+
+    held = agents[0].config
+    assert isinstance(held, CodexAgentConfig)
+    assert held.overrides == (
+        ("model_context_window", "1000000"),
+        ("model_auto_compact_token_limit", "900000"),
+    )
 
 
 def test_the_exec_line_without_a_config_says_nothing_about_one(tmp_path: Path) -> None:

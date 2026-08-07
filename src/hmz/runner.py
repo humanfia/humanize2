@@ -1318,27 +1318,27 @@ telemetry.about("flow", _about)
 
 def read_agent(
     spec: str,
-) -> tuple[backends.Profile, str, str, str, str | None]:
+) -> tuple[backends.Profile, str, str, str, str | None, tuple[tuple[str, str], ...]]:
     """Reads and validates one command-line agent specification.
 
     Args:
       spec: The short or written-out form accepted by ``-a``.
 
     Returns:
-      The backend, model, effort, provider and optional permission rung.
+      The backend, model, effort, provider, optional permission rung, and Codex
+      ``config.KEY`` pairs.
 
     Raises:
       ValueError: If the specification is malformed or names no permission rung there is.
     """
     from .agents import PERMISSIONS
 
-    parsed = backends.read(spec)
-    permission = parsed[-1]
+    profile, model, effort, provider, permission, overrides = backends.read(spec)
     if permission is not None and permission not in PERMISSIONS:
         raise ValueError(
             f"permission must be one of {', '.join(PERMISSIONS)}, not {permission!r}"
         )
-    return parsed
+    return profile, model, effort, provider, permission, overrides
 
 
 def flow_and_agents(
@@ -1387,7 +1387,7 @@ def flow_and_agents(
         metavar="CLI/MODEL:EFFORT",
         help="one agent, repeated once for each the flow drives, in the order it takes "
         "them; also written cli=CLI,model=MODEL,effort=EFFORT with optional "
-        "permission=PERMISSION. CLI is one of "
+        "permission=PERMISSION and, for Codex, config.KEY=VALUE. CLI is one of "
         f"{', '.join(sorted(one.name for one in backends.profiles()))}",
     )
     parser.add_argument(
@@ -1427,24 +1427,24 @@ def flow_and_agents(
     agents: list[AgentBase] = []
     for at, spec in enumerate(args.agents):
         try:
-            profile, model, effort, provider, permission = read_agent(spec)
+            profile, model, effort, provider, permission, overrides = read_agent(spec)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
         agent, config = driver(profile.name)
         # Named rather than looked up: an account that is not there is caught by the agent
         # the first time it needs one, which says whose it was and what it was called.
         goals = places[at].goals_default if at < len(places) else True
-        configured = (
-            config(model=model, effort=effort, provider=provider, goals=goals)
-            if permission is None
-            else config(
-                model=model,
-                effort=effort,
-                provider=provider,
-                permission=permission,
-                goals=goals,
+        extra: dict[str, Any] = {}
+        if permission is not None:
+            extra["permission"] = permission
+        if overrides:
+            extra["overrides"] = overrides
+        try:
+            configured = config(
+                model=model, effort=effort, provider=provider, goals=goals, **extra
             )
-        )
+        except ValueError as bad:
+            parser.error(f"bad agent {spec!r}: {bad}")
         agents.append(agent(configured))
     return args.flow, agents, args.task, held
 

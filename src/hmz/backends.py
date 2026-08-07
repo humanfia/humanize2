@@ -1192,7 +1192,9 @@ def named(backend: str) -> Profile | None:
     return next((one for one in profiles() if backend in one.aliases), None)
 
 
-def read(spec: str) -> tuple[Profile, str, str, str, str | None]:
+def read(
+    spec: str,
+) -> tuple[Profile, str, str, str, str | None, tuple[tuple[str, str], ...]]:
     """Reads one `-a` into the backend to drive, what to drive it at, and as whom.
 
     Args:
@@ -1200,12 +1202,14 @@ def read(spec: str) -> tuple[Profile, str, str, str, str | None]:
         where a model or an effort holding the punctuation the short form separates on goes.
         The CLI may name a provider after an `@`, as `claude@deepseek/MODEL:EFFORT`, which is
         the account that agent's turns run as; `provider=` says the same thing written out.
-        The written-out form may also name the agent's permission rung as `permission=`.
+        The written-out form may also name the agent's permission rung as `permission=`, and
+        for Codex only, app-server `-c` overrides as `config.KEY=VALUE`.
 
     Returns:
       The backend, the model, the effort, the provider -- which is "" for an agent that runs
-      as whoever is at this machine already runs its CLI -- and the permission, which is None
-      for an agent that runs at the default rung.
+      as whoever is at this machine already runs its CLI -- the permission, which is None
+      for an agent that runs at the default rung, and the `config.KEY` pairs, which is ()
+      where none were named.
 
     Raises:
       ValueError: If it is neither spelling, or names no backend there is. What it says is
@@ -1213,6 +1217,7 @@ def read(spec: str) -> tuple[Profile, str, str, str, str | None]:
     """
     provider = ""
     permission: str | None = None
+    overrides: list[tuple[str, str]] = []
     if "=" in spec:
         given = {
             key.strip(): value.strip()
@@ -1225,9 +1230,17 @@ def read(spec: str) -> tuple[Profile, str, str, str, str | None]:
             given.pop("provider", ""),
             given.pop("permission", None),
         )
+        for key, value in list(given.items()):
+            if key.startswith("config."):
+                name = key.removeprefix("config.")
+                if not name:
+                    raise ValueError("expected config.KEY=VALUE")
+                overrides.append((name, value))
+                del given[key]
         if given:
             raise ValueError(
-                f"{', '.join(sorted(given))} is not cli, model, effort, provider or permission"
+                f"{', '.join(sorted(given))} is not cli, model, effort, provider, "
+                "permission or config.KEY"
             )
     else:
         # Read from both ends: a model may hold slashes of its own -- Kimi Code's and
@@ -1249,6 +1262,15 @@ def read(spec: str) -> tuple[Profile, str, str, str, str | None]:
         raise ValueError(
             "expected CLI[@PROVIDER]/MODEL:EFFORT or "
             "cli=CLI,model=MODEL,effort=EFFORT[,provider=PROVIDER]"
-            "[,permission=PERMISSION]"
+            "[,permission=PERMISSION][,config.KEY=VALUE]"
         )
-    return profile, model.strip(), effort.strip(), provider.strip(), permission
+    if overrides and profile.name != "codex":
+        raise ValueError("config.KEY is only for Codex")
+    return (
+        profile,
+        model.strip(),
+        effort.strip(),
+        provider.strip(),
+        permission,
+        tuple(overrides),
+    )

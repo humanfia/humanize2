@@ -116,6 +116,23 @@ def test_a_permission_no_rung_answers_to_is_refused(
     assert "permission must be one of" in capsys.readouterr().err
 
 
+def test_a_codex_override_is_not_written_down_under_a_name(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`config.KEY` is of the line that runs the agent; a saved name has nowhere to keep it."""
+    assert (
+        run(
+            "add",
+            "wide",
+            "cli=codex,model=gpt-5.6-sol,effort=high,config.model_context_window=1000000",
+        )
+        == 1
+    )
+
+    assert "not of one written down under a name" in capsys.readouterr().err
+    assert Templates().all() == []
+
+
 def test_one_is_taken_away_and_the_rest_are_left(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
