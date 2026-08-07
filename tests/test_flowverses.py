@@ -302,7 +302,7 @@ def test_a_flow_of_your_own_still_wins_a_bare_name(
 
 def test_a_flow_from_a_flowverse_runs_by_that_name(theirs: Path) -> None:
     """Which is the whole point of fetching one: `-f theirs/loop` is a flow to run."""
-    from hmz.runner import drives
+    from hmz.flows import drives
 
     store.add(str(theirs))
 
@@ -313,7 +313,7 @@ def test_a_flowverse_that_has_not_been_fetched_says_so_rather_than_that_there_is
     None
 ):
     """The name is right and the download has not happened, which is a different thing."""
-    from hmz.runner import NotAFlow, drives
+    from hmz.flows import NotAFlow, drives
 
     with pytest.raises(NotAFlow, match="has not been fetched yet"):
         drives(f"{OFFICIAL}/rlar")

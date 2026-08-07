@@ -16,6 +16,23 @@ its directory holds under the directory's own name; `@flow(name="draft")` is one
 holds, called `<flow>:draft` -- so that three phases of one thing live in one flow and are
 three things to run. What the function is called is the flow's own business: `run`, `main`,
 `draft_it`, all the same to a name that never mentions it.
+
+And this is the whole of what a flow imports::
+
+    from hmz.flows import Agent, Moment, flow
+
+    @flow
+    def run(agents: tuple[Agent, Agent], task: str) -> None:
+        ...
+
+One import rather than four, because a flow is written against one thing: what it drives, what
+it may ask of it, and what it is worth saying about a turn. Which of humanize's own modules any
+of that is written in is humanize's business -- a flow that named them would be a flow that
+breaks when one of them moves, and a flow is somebody else's repository. So :mod:`hmz.flows`
+gathers them: the interfaces in [agent.py](agent.py), the mark and the finding here, calling
+another flow in [driving.py](driving.py), and the vocabulary a turn is described in from
+:mod:`hmz.agents` -- the moments a hook hangs on, what a turn cost, what an agent is
+configured with -- passed straight through.
 """
 
 from __future__ import annotations
@@ -28,21 +45,98 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, overload
 
+from .agent import Agent, Person, Session
+from .driving import (
+    NotAFlow,
+    Place,
+    Running,
+    calls,
+    carries,
+    configures,
+    drives,
+    resumes,
+    running,
+    wanted,
+)
 from .verses import BUILTIN, FLOWS, OFFICIAL, Flowverse, flowverses, holds
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
+    from hmz import backends, home, models
+    from hmz.agents import (
+        EVERYWHERE,
+        PERMISSIONS,
+        SWARM,
+        WINDOW,
+        AgentConfig,
+        AgentDefaults,
+        Event,
+        Failed,
+        Goal,
+        Hook,
+        Hooks,
+        HumanAgent,
+        Hung,
+        Isolated,
+        Moment,
+        Occasion,
+        Question,
+        Remote,
+        Stopped,
+        Unhooked,
+        Usage,
+        Verdict,
+    )
+    from hmz.backends import Model, Profile
+
 __all__ = [
     "BUILTIN",
     "BUILTIN_AT",
     "ENTRY",
+    "EVERYWHERE",
     "FLOWS",
     "OFFICIAL",
+    "PERMISSIONS",
+    "SWARM",
+    "WINDOW",
+    "Agent",
+    "AgentConfig",
+    "AgentDefaults",
+    "Event",
+    "Failed",
     "Flow",
     "Flowverse",
+    "Goal",
+    "Hook",
+    "Hooks",
+    "HumanAgent",
+    "Hung",
+    "Isolated",
+    "Model",
+    "Moment",
+    "NotAFlow",
+    "Occasion",
     "Offer",
+    "Person",
+    "Place",
+    "Profile",
+    "Question",
+    "Remote",
+    "Running",
+    "Session",
+    "Stopped",
+    "Unhooked",
+    "Usage",
+    "Verdict",
+    "about",
     "at",
+    "backends",
+    "calls",
+    "carries",
+    "configures",
+    "drives",
+    "entry",
     "find",
     "flow",
     "flowverses",
@@ -50,11 +144,83 @@ __all__ = [
     "found",
     "held",
     "holds",
+    "home",
+    "inside",
     "loaded",
+    "models",
     "offered",
     "offers",
+    "resumes",
+    "running",
+    "wanted",
     "where",
 ]
+
+#: The two modules of humanize's own that a flow reaches through here whole: what each CLI
+#: is, and what each of them runs. A loop that turns the effort down when a model starts
+#: writing less asks the second of them what rungs there are, which is a question about a
+#: backend rather than about any agent -- so it is handed through as it stands rather than
+#: flattened into a name apiece.
+_MODULES = ("backends", "models")
+
+#: And the names a flow imports from here that are written down elsewhere: the vocabulary a
+#: turn is described in, and where humanize keeps what outlives a run.
+_ELSEWHERE = {
+    "AgentConfig": "hmz.agents",
+    "AgentDefaults": "hmz.agents",
+    "EVERYWHERE": "hmz.agents",
+    "Event": "hmz.agents",
+    "Failed": "hmz.agents",
+    "Goal": "hmz.agents",
+    "Hook": "hmz.agents",
+    "Hooks": "hmz.agents",
+    "HumanAgent": "hmz.agents",
+    "Hung": "hmz.agents",
+    "Isolated": "hmz.agents",
+    "Model": "hmz.backends",
+    "Moment": "hmz.agents",
+    "Occasion": "hmz.agents",
+    "PERMISSIONS": "hmz.agents",
+    "Profile": "hmz.backends",
+    "Question": "hmz.agents",
+    "Remote": "hmz.agents",
+    "SWARM": "hmz.agents",
+    "Stopped": "hmz.agents",
+    "Unhooked": "hmz.agents",
+    "Usage": "hmz.agents",
+    "Verdict": "hmz.agents",
+    "WINDOW": "hmz.agents",
+    "home": "hmz",
+}
+
+
+def __getattr__(name: str) -> object:
+    """Hands through what a flow imports from here that is written down elsewhere.
+
+    Fetched when it is asked for rather than imported at the top of this file, because this
+    module is also what a list of flows is drawn from and what `hmz exec --help` loads to say
+    what the line takes: importing it must not cost every coding agent driver there is. A flow
+    that actually names one of these is a flow about to be run, and pays for it then.
+
+    Args:
+      name: What was asked for.
+
+    Returns:
+      The same object the module it is written in holds, so that a flow and humanize itself
+      are talking about one thing -- `Moment.STOP` here is `Moment.STOP` there.
+
+    Raises:
+      AttributeError: If nothing here is called that, as for any other module.
+    """
+    from importlib import import_module
+
+    if name in _MODULES:
+        return import_module(f"hmz.{name}")
+    where_ = _ELSEWHERE.get(name)
+    if where_ is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(import_module(where_), name)
+
 
 #: Where the flows humanize itself ships are: a directory of them, rather than beside this
 #: file -- what is beside this file is how a flow is found, which is not one. They are the
@@ -148,7 +314,7 @@ def flow[**P, T](
     Written with no name, it is the flow its file holds under the file's own name::
 
         @flow
-        def run(agents: tuple[AgentBase], task: str) -> None:
+        def run(agents: tuple[Agent], task: str) -> None:
             ...
 
     is `ralph_loop`, in `ralph_loop/__init__.py`. Written with one, it is one of several that
@@ -171,7 +337,7 @@ def flow[**P, T](
     what a loop that is meant to run for a week is::
 
         @flow(resumable=True)
-        def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:
+        def run(agents: tuple[Agent], task: str, state: dict[str, Any]) -> None:
             state["round"] = state.get("round", 0) + 1
 
     Such a flow is handed a dict as its last argument -- after the config, for one that takes
@@ -182,7 +348,7 @@ def flow[**P, T](
     A helper used only by another flow remains callable without cluttering the flow picker::
 
         @flow(name="engine", selectable=False)
-        def engine(agents: tuple[AgentBase], task: str) -> None:
+        def engine(agents: tuple[Agent], task: str) -> None:
             ...
 
     Args:

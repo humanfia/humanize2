@@ -15,7 +15,8 @@ import pytest
 from hmz.agents import AgentConfig
 from hmz.agents.skills import Loaded
 from hmz.cycle import cycles
-from hmz.runner import NotAFlow, Runner, calls, running
+from hmz.flows import NotAFlow, calls, running
+from hmz.runner import Runner
 from tests.stubs import ShellAgent, events, written
 
 if TYPE_CHECKING:
@@ -46,7 +47,7 @@ from pathlib import Path
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.runner import calls, running
+from hmz.flows import calls, running
 
 
 @flow
@@ -97,7 +98,7 @@ def test_the_called_flow_is_running_while_it_runs(flows: Path) -> None:
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.runner import running\n\n\n"
+        "from hmz.flows import running\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
         '    Path("deep.txt").write_text(" > ".join(one.flow for one in running()))\n',
@@ -108,7 +109,7 @@ def test_the_called_flow_is_running_while_it_runs(flows: Path) -> None:
         '"""Calls the one that says."""\n\n'
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.runner import calls\n\n\n"
+        "from hmz.flows import calls\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
         '    calls("deep")(agents, task)\n',
@@ -223,7 +224,7 @@ def test_a_flow_that_calls_one_written_as_a_coroutine_awaits_it(flows: Path) -> 
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.runner import running\n\n\n"
+        "from hmz.flows import running\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
         "    await asyncio.sleep(0)\n"
@@ -236,7 +237,7 @@ def test_a_flow_that_calls_one_written_as_a_coroutine_awaits_it(flows: Path) -> 
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.runner import calls\n\n\n"
+        "from hmz.flows import calls\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
         '    await calls("slow")(agents, task)\n'
@@ -282,7 +283,7 @@ def test_a_flow_that_fails_is_no_longer_running(flows: Path) -> None:
         '"""Calls the one that raises, and lets it through."""\n\n'
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.runner import calls\n\n\n"
+        "from hmz.flows import calls\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
         '    calls("bad")(agents, task)\n',
@@ -309,7 +310,7 @@ def test_a_flow_rewritten_between_calls_is_the_one_that_runs_next(flows: Path) -
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.runner import calls\n\n\n"
+        "from hmz.flows import calls\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
         '    calling = calls("inner")\n'
@@ -346,7 +347,7 @@ def test_a_called_flow_brings_its_own_skills_and_hands_the_agents_back(
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.runner import calls\n\n\n"
+        "from hmz.flows import calls\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
         "    (agent,) = agents\n"
@@ -402,7 +403,7 @@ from pathlib import Path
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.runner import calls
+from hmz.flows import calls
 
 
 @flow
@@ -455,7 +456,7 @@ from pathlib import Path
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.runner import calls
+from hmz.flows import calls
 
 
 @flow

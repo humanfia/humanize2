@@ -17,15 +17,14 @@ it leaves behind is yours and everything else is the image's.
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Isolated
-from hmz.flows import flow
+from hmz.flows import Agent, Isolated, flow
 
 
 class Agents(NamedTuple):
     """The two this drives, and the two places they work."""
 
-    builder: AgentBase                                    # here, and nowhere else
-    tester: Annotated[AgentBase, Isolated("python:3.12")] # a container of the flow's own
+    builder: Agent                                    # here, and nowhere else
+    tester: Annotated[Agent, Isolated("python:3.12")]  # a container of the flow's own
 
 
 @flow
@@ -68,13 +67,13 @@ anything:
 ```python
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Isolated
+from hmz.flows import Agent, Isolated
 
 class Agents(NamedTuple):
     """The two this drives."""
 
-    tester: Annotated[AgentBase, Isolated("python:3.12")]   # a container of the flow's own
-    reviewer: AgentBase                                     # here, and nowhere else
+    tester: Annotated[Agent, Isolated("python:3.12")]  # a container of the flow's own
+    reviewer: Agent                                    # here, and nowhere else
 ```
 
 The image is the flow's, and the workspace is the directory the flow is running in. Nothing can
@@ -102,7 +101,7 @@ The image also needs whatever the agent is expected to reach for: an agent told 
 in an image with no pytest spends a turn discovering that. A good image is one you already
 build for CI.
 
-Where the flow says a place may be pointed anywhere (`Annotated[AgentBase, Remote]`), you can
+Where the flow says a place may be pointed anywhere (`Annotated[Agent, Remote]`), you can
 hand it a container instead:
 
 ```python

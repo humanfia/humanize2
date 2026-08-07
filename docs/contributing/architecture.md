@@ -32,12 +32,12 @@ a target and could be lifted out whole, so it has a name of its own.
 | --- | --- | --- |
 | `backends.py` | Names, aliases, efforts, home directories, log globs, credential paths, ways in and skill directories for all ten backends. Facts, not code — standard library only, and no model id anywhere in it. | `PROFILES`, `named()`, `profiles()`, `read()`, `remember()` |
 | `models.py` | What each backend runs, asked of that backend the way it offers being asked, and kept per account. Nothing here is a list: a CLI ships models without asking anybody. | `ask`, `offered`, `asked`, `where` |
-| `agents/` | What a flow is written against (`AgentBase`, `SessionBase`, `Event`, `Question`, `Moment`) and one driver per backend. | everything in `__init__` |
+| `agents/` | The drivers: one per backend, plus the vocabulary a turn is described in (`Event`, `Question`, `Moment`). `AgentBase` and `SessionBase` answer to the interface `flows/` declares, structurally — this layer never names a flow. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
 | `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |
-| `flows/` | What a flow is called, which of the ones it holds was asked for, the skills it brings, and where flowverses are fetched to. `builtin/` beside it is the three humanize ships. | `flow`, `found`, `find`, `held`, `fork`, `brought`, `flowverses`, `add`, `fetch` |
+| `flows/` | What a flow is: the interface it drives, the mark, what it says it drives, the skills it brings, calling one from another, and where flowverses are fetched to. The one import a flow writes — what it needs from another layer is handed through from here. `builtin/` beside it is the three humanize ships. | `Agent`, `Session`, `Person`, `flow`, `calls`, `drives`, `wanted`, `found`, `find`, `held`, `fork`, `flowverses` |
 | `cycle.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Cycle`, `cycles`, `read`, `opened`, `state`, `resumed` |
-| `runner.py` | Loading a flow, checking its arity and what it asks of each agent, naming them, running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. | `Runner`, `drives`, `wanted`, `Place`, `flow_and_agents`, `NotAFlow` |
+| `runner.py` | Handing a flow the agents it declared, naming them, and running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. What the flow says it drives is `flows/`'s to answer. | `Runner`, `flow_and_agents`, `read_agent`, `set_up_from` |
 | `tracing/` | Reading the backends' logs back — and, for a profiled run, sampling the programs its agents start — and rendering both as one Chrome trace. | `collect`, `profile.Profiler` |
 | `tui/` | The terminal interface. | `Humanize` |
 | `cli/` | The one command line, over layers that have none of their own. | `main`, `COMMANDS` |
@@ -51,6 +51,14 @@ agents/
 ├── base.py       AgentBase and SessionBase: two halves of one object, declared in one file
 ├── config.py     AgentConfig, anchored
 └── claude.py codex.py kimi.py pi.py opencode.py mimo.py human.py
+
+flows/
+├── agent.py      Agent, Session, Person — what a flow drives, as interfaces and nothing else
+├── driving.py    what a flow says it drives, read off its own entry point, and calls()
+├── __init__.py   the mark, finding one by name, and the one import a flow writes
+├── skills.py     the skills a flow brings, its own and the ones it named
+├── verses.py     where flows come from when they come from somewhere else
+└── builtin/      the three humanize ships
 
 coganchor/
 ├── anchor.py     AnchorConfig, connect, check — the front door

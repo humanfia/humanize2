@@ -57,7 +57,7 @@ already carried. `result.spent.total` is what `result.tokens` comes to.
 flow sleeps between rounds, commits and reads what the last turn wrote. That time is time the
 tokens were spent over, and it is the honest reading of what a run costs per hour.
 
-The window defaults to five minutes. That is `hmz.agents.WINDOW`, the same window the
+The window defaults to five minutes. That is `hmz.flows.WINDOW`, the same window the
 interface's readout uses. A run younger than the window is measured **over the run**, so a rate
 read a minute in is what that minute came to, not a fifth of it.
 

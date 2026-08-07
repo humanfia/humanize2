@@ -15,8 +15,7 @@ The gentlest hook does nothing but look. Make a flow that prints what its agent 
 # .humanize/flows/watched/__init__.py
 """A Ralph loop that says what its agent reached for."""
 
-from hmz.agents import AgentBase, Moment, Occasion, Verdict
-from hmz.flows import flow
+from hmz.flows import Agent, Moment, Occasion, Verdict, flow
 
 
 def seen(occasion: Occasion) -> Verdict | None:
@@ -25,7 +24,7 @@ def seen(occasion: Occasion) -> Verdict | None:
 
 
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     with agent.hooks.on(Moment.PRE_TOOL_USE, seen):
         for _ in range(5):
@@ -85,7 +84,7 @@ either added.
 A verdict can refuse a command:
 
 ```python
-from hmz.agents import Moment, Occasion, Verdict
+from hmz.flows import Moment, Occasion, Verdict
 
 def no_force_push(occasion: Occasion) -> Verdict | None:
     if "push --force" in occasion.about:
@@ -127,7 +126,7 @@ A refused `STOP` is one of three ways to keep an agent going:
 | | Decides it is done | Works on |
 | --- | --- | --- |
 | a `while` loop in the flow | your code, between turns | every backend |
-| a refused `STOP` hook | your code, inside the turn | every backend but `HumanAgent` |
+| a refused `STOP` hook | your code, inside the turn | every backend but `Person` |
 | [`agent.pursue`](/guide/goals) | the **model**, against the objective | Claude Code, Codex, DeepSeek Harness, Kimi |
 
 ## Not every backend runs every moment
@@ -142,7 +141,7 @@ hook where it is hung, rather than hanging one that quietly never fires.
 
 Claude Code and Codex ask before they use a tool and wait for the answer. Those are the two
 backends where a refusal reaches the agent. Kimi Code, pi, opencode and mimocode are driven
-unattended, which is what a flow watching its agent rather than gating it means. `HumanAgent`
+unattended, which is what a flow watching its agent rather than gating it means. `Person`
 runs none of the moments: a moment is a point in a turn of a model, and the person takes no
 such turn.
 
@@ -158,13 +157,13 @@ turn:
 ```python
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Moment
+from hmz.flows import Agent, Moment
 
 class Agents(NamedTuple):
     """The two this drives: one that is gated, and one that reads its work."""
 
-    builder: Annotated[AgentBase, Moment.PERMISSION_REQUEST]
-    reviewer: AgentBase
+    builder: Annotated[Agent, Moment.PERMISSION_REQUEST]
+    reviewer: Agent
 ```
 
 ```console

@@ -24,7 +24,7 @@ the context window is mostly a record of ideas that did not work.
 
 ```python
 @flow
-def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+def run(agents: tuple[Agent, Agent], task: str) -> None:
     while True:
         for agent in agents:
             agent(task, suppress=True)  # each agent reads the repository, not a history

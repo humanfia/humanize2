@@ -17,7 +17,8 @@ import pytest
 
 from hmz.agents import AgentConfig, Stopped
 from hmz.cycle import STATE, cycles, read, resumed, state
-from hmz.runner import NotAFlow, Runner, resumes
+from hmz.flows import NotAFlow, resumes
+from hmz.runner import Runner
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
@@ -225,7 +226,7 @@ def test_a_called_flow_keeps_its_own_state_under_its_own_name(
         "from typing import Any\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.runner import calls\n\n\n"
+        "from hmz.flows import calls\n\n\n"
         "@flow(resumable=True)\n"
         "def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:\n"
         '    state["outer"] = state.get("outer", 0) + 1\n'
@@ -243,7 +244,7 @@ def test_a_flow_called_outside_a_run_is_handed_a_dict_that_is_nowhere(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A call is a call: a flow with nowhere to keep its state runs and keeps none."""
-    from hmz.runner import calls
+    from hmz.flows import calls
 
     monkeypatch.chdir(tmp_path)
     where = tmp_path / ".humanize/flows"

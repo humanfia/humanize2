@@ -30,12 +30,11 @@ The `review` flow is a directory whose `__init__.py` holds the function marked `
 # flows/review/__init__.py
 """Review the current diff and write the findings to REVIEW.md."""
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     agent(f"Read the diff and write what is wrong to REVIEW.md.\n\n{task}", suppress=True)
 ```
@@ -213,7 +212,7 @@ with `_` is not a flow.
 another flow:
 
 ```python
-from hmz.runner import calls
+from hmz.flows import calls
 
 plan = calls("official/humanize1:gen-plan")
 plan(agents, f"plan this first: {task}")
@@ -273,7 +272,7 @@ list. See [Security](/guide/security).
 Check it in the repository's own CI before anybody else does:
 
 ```python
-from hmz.runner import drives, wanted
+from hmz.flows import drives, wanted
 
 drives("yours/review")     # loads it exactly as `-f` would
 wanted("yours/review")     # what somebody choosing the agents will be asked

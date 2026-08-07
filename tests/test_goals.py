@@ -27,7 +27,8 @@ from hmz.agents import (
     PiAgent,
     PiAgentConfig,
 )
-from hmz.runner import NotAFlow, Runner, flow_and_agents, wanted
+from hmz.flows import NotAFlow, wanted
+from hmz.runner import Runner, flow_and_agents
 
 if TYPE_CHECKING:
     from pathlib import Path

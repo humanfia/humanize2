@@ -25,6 +25,33 @@ one name, the directory wins.
 It is ordinary Python. There is no DSL, no graph to declare, no state machine — a flow may
 branch, sleep, read files, shell out, and give up, because it is just a function.
 
+## What a flow drives
+
+**`hmz.flows` is the only import a flow needs.** The interfaces, the mark, calling another
+flow, and everything a flow legitimately reaches for that humanize writes down elsewhere — the
+moments a hook hangs on, what a turn cost, what an agent is configured with, what each backend
+runs — all come from that one name:
+
+```python
+from hmz.flows import Agent, Moment, Person, Session, calls, flow
+```
+
+A flow that named `hmz.agents` for the type of what it drives would be a flow written against
+which CLI is behind it, and it would break the day humanize moved anything. It never has to.
+
+| Name | Is |
+| --- | --- |
+| `Agent` | A coding agent: a turn, a session, a goal, a batch, what it has cost, what is hung on the moments of its turns. What you annotate a place with. |
+| `Session` | One conversation with one agent, kept alive across turns. What `agent.new()` gives you. |
+| `Person` | The person at the prompt, driven as an agent. A place nobody is asked to fill — see [the person at the prompt](#the-person-at-the-prompt). |
+
+They are **interfaces**, not base classes. `hmz.agents.AgentBase` and `SessionBase` answer to
+them, and never name them back: a flow says what it drives, and a driver is written without
+ever hearing of a flow. Whatever a flow may ask of an agent is in the interface; how a turn is
+spelled to a CLI, where its logs go and how it falls back to another account are not, being how
+an agent is driven rather than what a flow drives. A test that stands in for a coding agent
+implements the driver instead — see [testing a flow](#testing-a-flow).
+
 ## The contract
 
 Three rules, and that is the whole of it.
@@ -36,25 +63,24 @@ you — the mark is what makes it a flow, not the name.
 from hmz.flows import flow
 
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     ...
 ```
 
 **2. The annotation on `agents` says how many the flow drives.** A fixed-length tuple, or a
-`NamedTuple` of them. `tuple[AgentBase, ...]` is any number, which is no answer to the
+`NamedTuple` of them. `tuple[Agent, ...]` is any number, which is no answer to the
 question, and is refused.
 
-**3. That annotation has to be readable at runtime.** Import `AgentBase` normally, not under
+**3. That annotation has to be readable at runtime.** Import `Agent` normally, not under
 `if TYPE_CHECKING` — a count nothing can read back is not one a command line can be held to.
 
 ```python
 """Two passes over the same task."""
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     session = agent.new()
     session(task)
@@ -86,11 +112,10 @@ once, so a flow may be written as a coroutine:
 ```python
 import asyncio
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 @flow
-async def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+async def run(agents: tuple[Agent, Agent], task: str) -> None:
     while True:
         acted, reviewed = await asyncio.gather(
             agents[0].aturn(task, suppress=True),
@@ -110,7 +135,7 @@ Every call that runs a turn has an awaited twin — `agent.aturn`, `session.atur
 
 ```python
 @flow
-async def run(agents: tuple[AgentBase], task: str) -> None:
+async def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     # One session per shard, all of them at once, answers in the order they were asked for.
     said = await agent.abatch([f"{task}\n\nShard {at} of 200." for at in range(200)])
@@ -140,13 +165,13 @@ A `NamedTuple` says what each agent is *for* as well as how many there are:
 ```python
 from typing import NamedTuple
 
-from hmz.agents import AgentBase
+from hmz.flows import Agent
 
 class Agents(NamedTuple):
     """The two this drives: one that works in a session, and one that arrives fresh."""
 
-    actor: AgentBase
-    reviewer: AgentBase
+    actor: Agent
+    reviewer: Agent
 
 @flow
 def run(agents: Agents, task: str) -> None:
@@ -176,7 +201,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from hmz.agents import AgentBase
+from hmz.flows import Agent
 
 class Config(BaseModel):
     """What this flow takes."""
@@ -185,7 +210,7 @@ class Config(BaseModel):
     mode: Literal["fast", "slow"] = Field(default="fast", description="which way")
 
 @flow
-def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> None:
+def run(agents: tuple[Agent], task: str, config: Config | None = None) -> None:
     setting = config or Config()
     ...
 ```
@@ -244,11 +269,10 @@ the config, for a flow that takes one — holding whatever it wrote there last t
 from pathlib import Path
 from typing import Any
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 @flow(resumable=True)
-def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:
+def run(agents: tuple[Agent], task: str, state: dict[str, Any]) -> None:
     (agent,) = agents
     left = state.get("left") or sorted(str(one) for one in Path("src").rglob("*.py"))
     while left:
@@ -297,7 +321,7 @@ may have been rewritten since it last ran:
 
 ```python
 from hmz.cycle import resumed, state
-from hmz.runner import resumes
+from hmz.flows import resumes
 
 resumes("weekly")            # what the flow says now, read by running it
 at = resumed("weekly")       # the run its next run would pick up, or None
@@ -318,16 +342,16 @@ some of them run says so where it declares the place, by writing the moment besi
 ```python
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Moment
+from hmz.flows import Agent, Moment
 
 class Agents(NamedTuple):
     """The two this drives: one that is gated, and one that reads its work."""
 
-    builder: Annotated[AgentBase, Moment.PERMISSION_REQUEST]
-    reviewer: AgentBase
+    builder: Annotated[Agent, Moment.PERMISSION_REQUEST]
+    reviewer: Agent
 ```
 
-`Annotated` is the whole of it: the type is still `AgentBase`, so the flow reads and type-checks
+`Annotated` is the whole of it: the type is still `Agent`, so the flow reads and type-checks
 exactly as it did, and what is written beside it is what the place asks of whoever fills it.
 Several moments are several arguments.
 
@@ -337,12 +361,12 @@ turn that would have ended starts another. Four backends have one (Claude Code, 
 so a flow built on it says so:
 
 ```python
-from hmz.agents import AgentBase, Goal
+from hmz.flows import Agent, Goal
 
 class Agents(NamedTuple):
     """The one it drives, which has to have a goal of its own."""
 
-    worker: Annotated[AgentBase, Goal]
+    worker: Annotated[Agent, Goal]
 ```
 
 Both are checked before the first turn, for the same reason the count is:
@@ -366,14 +390,14 @@ beside the type.
 ```python
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Isolated, Remote
+from hmz.flows import Agent, Isolated, Remote
 
 class Agents(NamedTuple):
     """The three this drives, and the three places they work."""
 
-    builder: Annotated[AgentBase, Remote]                  # may be pointed at a machine
-    tester: Annotated[AgentBase, Isolated("python:3.12")]  # a container of the flow's own
-    reviewer: AgentBase                                    # here, and nowhere else
+    builder: Annotated[Agent, Remote]                  # may be pointed at a machine
+    tester: Annotated[Agent, Isolated("python:3.12")]  # a container of the flow's own
+    reviewer: Agent                                    # here, and nowhere else
 ```
 
 | Beside the type | Where that agent works |
@@ -399,13 +423,13 @@ onbox: tester works in a container of this flow's own, so there is nothing to po
 line and starts nothing. No `-a` spells a machine, so what runs into these is an agent
 [built in Python](#building-the-agents-yourself) or one moved on the interface's `where` row.
 
-A place may say more than one thing — `Annotated[AgentBase, Moment.STOP, Remote]` is a place that
+A place may say more than one thing — `Annotated[Agent, Moment.STOP, Remote]` is a place that
 must run that moment *and* may be moved. Several arguments, read one by one, in any order.
 
 What the flow declared is readable without driving it:
 
 ```python
-from hmz.runner import wanted
+from hmz.flows import wanted
 
 wanted("official/rlar")   # one Place per agent somebody has to choose:
                           # .name, .moments, .goal, .where
@@ -424,9 +448,9 @@ is a Ralph loop that will not let a turn stop while the task file still says the
 ```python
 from pathlib import Path
 
-from hmz.agents import AgentBase, Moment, Occasion, Verdict
+from hmz.flows import Agent, Moment, Occasion, Verdict
 
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
 
     def unfinished(occasion: Occasion) -> Verdict | None:
@@ -447,16 +471,16 @@ Everything a hook can do is in [Agents › Hooks](/reference/agents#hooks). Two 
 
 ## The person at the prompt
 
-A place annotated `HumanAgent` is you, driven as an agent — which is what you are to a flow.
+A place annotated `Person` is you, driven as an agent — which is what you are to a flow.
 
 ```python
 from typing import NamedTuple
 
-from hmz.agents import AgentBase, HumanAgent
+from hmz.flows import Agent, Person
 
 class Chat(NamedTuple):
-    assistant: AgentBase
-    human: HumanAgent
+    assistant: Agent
+    human: Person
 
 def run(agents: Chat, task: str) -> None:
     conversation = agents.assistant.new()
@@ -468,7 +492,7 @@ def run(agents: Chat, task: str) -> None:
 
 Saying something to it is asking what to say next; what it answers with is what was typed.
 
-**Nobody is asked what the person runs**, so a `HumanAgent` is not one of the agents `-a` names
+**Nobody is asked what the person runs**, so a `Person` is not one of the agents `-a` names
 — the flow above is started with one `-a` and drives two. Run from a command line, where nobody
 is at a prompt, it answers with nothing, so the loop ends and the flow does the one thing it
 was given.
@@ -540,12 +564,10 @@ for it by the same name `-f` takes, and you are handed the flow itself to run wi
 you already have:
 
 ```python
-from hmz.agents import AgentBase
-from hmz.flows import flow
-from hmz.runner import calls
+from hmz.flows import Agent, calls, flow
 
 @flow
-def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+def run(agents: tuple[Agent, Agent], task: str) -> None:
     plan = calls("official/humanize1:gen-plan")
     plan(agents, f"plan this first: {task}")
     for _ in range(3):
@@ -605,11 +627,11 @@ awaited by whoever called it:
 
 ```python
 @flow
-async def run(agents: tuple[AgentBase], task: str) -> None:
+async def run(agents: tuple[Agent], task: str) -> None:
     await calls("official/rlar")(agents, task)
 ```
 
-**What is running is both of them.** `hmz.runner.running()` reports the flow that was started
+**What is running is both of them.** `hmz.flows.running()` reports the flow that was started
 and whatever it called, innermost last; the interface names them on its status line and on
 `/status`, and the [cycle](/reference/tracing) records each call and each return. A flow that called
 another does not read as the flow somebody chose.
@@ -999,7 +1021,7 @@ as a shell script, so a test spells out exactly what the agent it stands in for 
 To check only that a flow *loads* and declares what it should:
 
 ```python
-from hmz.runner import drives
+from hmz.flows import drives
 
 assert drives("my_loop") == ("actor", "reviewer")
 ```

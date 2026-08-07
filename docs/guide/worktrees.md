@@ -56,11 +56,10 @@ import asyncio
 import subprocess
 from pathlib import Path
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 @flow
-async def run(agents: tuple[AgentBase], task: str) -> None:
+async def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     trees = []
     for name in ("parser", "printer", "cli"):

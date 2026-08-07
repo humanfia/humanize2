@@ -14,8 +14,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 
 class Config(BaseModel):
@@ -26,7 +25,7 @@ class Config(BaseModel):
 
 
 @flow
-def run(agents: tuple[AgentBase], task: str, config: Config | None = None) -> None:
+def run(agents: tuple[Agent], task: str, config: Config | None = None) -> None:
     setting = config or Config()
     for _ in range(setting.rounds):
         ...

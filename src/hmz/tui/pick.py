@@ -68,9 +68,8 @@ if TYPE_CHECKING:
     from hmz.agents import AgentBase, Moment
     from hmz.backends import Model, Way
     from hmz.cycle import Ran
-    from hmz.flows import Flowverse, Offer
+    from hmz.flows import Flowverse, Offer, Place
     from hmz.providers import Provider
-    from hmz.runner import Place
 
     from .monitor import Monitor
 
@@ -881,7 +880,7 @@ def places_of(flow: str) -> tuple[Place, ...] | None:
       One place per agent it drives, and None where reading the flow raised at all -- which
       is a flow to report rather than a reason for a menu not to draw.
     """
-    from hmz.runner import wanted
+    from hmz.flows import wanted
 
     try:
         return wanted(flow)
@@ -899,7 +898,7 @@ def model_of(flow: str) -> type[BaseModel] | None:
       The model to ask with, or None for a flow that takes no setting up -- and for one that
       will not load, which is a flow to report where it is run rather than here.
     """
-    from hmz.runner import configures
+    from hmz.flows import configures
 
     try:
         return configures(flow)
@@ -2781,7 +2780,7 @@ def _flowing(started: str) -> list[str]:
       with how long it has been going; and just the one that is set up to run where nothing
       is running.
     """
-    from hmz.runner import running
+    from hmz.flows import running
 
     now = running()
     if not now:
@@ -6376,7 +6375,7 @@ class Cycles(Sheet[Doing]):
           Whether it is resumable, and False for one that will not load at all -- a flow that
           cannot be read cannot be run, which is what carrying on would come to.
         """
-        from hmz.runner import resumes
+        from hmz.flows import resumes
 
         if flow not in self._resumes:
             try:

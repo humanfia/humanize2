@@ -105,8 +105,8 @@ run the moment, it is refused before its first turn:
 
 ```python
 class Agents(NamedTuple):
-    builder: Annotated[AgentBase, Moment.PERMISSION_REQUEST]
-    reviewer: AgentBase
+    builder: Annotated[Agent, Moment.PERMISSION_REQUEST]
+    reviewer: Agent
 ```
 
 ## A worked pair

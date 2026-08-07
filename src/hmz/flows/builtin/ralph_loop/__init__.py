@@ -13,12 +13,11 @@ the repository whether or not it is the first.
 import time
 from typing import Any
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 
 @flow(resumable=True)
-def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:
+def run(agents: tuple[Agent], task: str, state: dict[str, Any]) -> None:
     (agent,) = agents
     while True:
         # Said before the turn rather than counted after it, so that a run watched from the

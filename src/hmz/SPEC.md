@@ -283,19 +283,18 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
 ## `runner.py`
 
 ```python
-class NotAFlow(ValueError): ...
-
-
-def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
-    """What the flow calls each agent it drives, in the order it takes them."""
-
-
-def flow_and_agents(argv: list[str]) -> tuple[str, list[AgentBase], str]:
-    """Reads an `hmz exec` line into a flow, the agents to drive it, and the task."""
-
-
 class Runner:
-    def __init__(self, flow: str | os.PathLike[str], agents: Sequence[AgentBase]): ...
+    def __init__(
+        self,
+        flow: str | os.PathLike[str],
+        agents: Sequence[AgentBase],
+        config: BaseModel | dict[str, Any] | None = None,
+        resume: str | os.PathLike[str] | None = None,
+    ): ...
+
+    @property
+    def agents(self) -> tuple[AgentBase, ...]:
+        """Every agent this drives, the person the flow talks to among them."""
 
     def run(self, task: str) -> None:
         """Runs the flow, until it returns.
@@ -303,60 +302,52 @@ class Runner:
         Args:
             task: What the flow is to have its agents do.
         """
+
+
+def read_agent(
+    spec: str,
+) -> tuple[Profile, str, str, str, str | None, tuple[tuple[str, str], ...]]:
+    """Reads and validates one command-line agent specification."""
+
+
+def flow_and_agents(
+    argv: list[str],
+) -> tuple[str, list[AgentBase], str, dict[str, Any] | None]:
+    """Reads an `hmz exec` line into a flow, the agents, the task, and the flow's setup."""
+
+
+def set_up_from(said: str | os.PathLike[str]) -> dict[str, Any]:
+    """Reads what a flow is to be set up with out of a file of it."""
 ```
 
-- A flow MUST be a Python file holding a function marked with `hmz.flows.flow` and taking
-  `(agents: tuple[...], task: str)`. Nothing else MUST be one: which of a file's functions is a
-  flow is the file's to say and not a name to guess at. That tuple MUST be of a fixed length,
-  which is how many agents the flow drives: it is the one thing about a flow a command line
-  running it cannot otherwise know. It MUST be readable where the flow runs rather than only
-  where a type checker looks, since a count nothing can read back is not one a command line can
-  be held to.
-- One file MAY hold several flows: the one marked `@flow` is the flow the file holds under its
-  own name, and each marked `@flow(name=...)` is addressed as `<flow>:<name>`. Which one was
-  asked for MUST be read before the name is resolved to a file, and a name no flow in the file
-  answers to MUST be reported as a usage error saying which ones it holds -- a file of three
-  asked for by its own name is a colon away from what was meant.
-- A flow that runs one of its agents under the backend's own goal feature MUST say so where it
-  declares the place, by writing `Goal` beside the type, and an agent whose backend has none
-  MUST be refused before the first turn -- for the reason a moment it cannot run is: a loop
-  built on `pursue` finds out in the middle of a turn otherwise, hours in. What each backend
-  has MUST be said on the agent rather than asked of it, so that whoever is choosing one can
-  offer only the ones that would work.
-- A `NamedTuple` of agents MUST be accepted in its place, and MUST additionally say what the
-  flow calls each of them. `drives` MUST report those names, so that whatever asks for the
-  agents asks for them by what they are for rather than by their place in a line; a plain
-  tuple MUST report a name apiece that is empty, having said nothing but how many.
-- `__init__` MUST load the flow and MUST raise `NotAFlow` unless the file is there and has
-  such an entry point, declaring as many agents as it was given, so that a flow started with
-  the wrong number of them fails before its first turn rather than partway through a loop.
+What starts a flow: the file it is in, the agents it takes, and the line naming both. What a
+flow is and what it says it drives is `hmz.flows`, which this asks -- so a flow itself MUST
+never have reason to name this module.
+
+- `__init__` MUST load the flow and MUST raise `hmz.flows.NotAFlow` unless the file is there
+  and has such an entry point, declaring as many agents as it was given, so that a flow started
+  with the wrong number of them fails before its first turn rather than partway through a loop.
+  The same MUST go for an agent that cannot run a moment the flow hangs a hook on, one run
+  under a goal whose backend has no such feature, one pointed at a machine the flow does not
+  send it to, and a config that is not what the flow asked for.
 - An agent that was not named where it was made MUST take the name the flow gives it, before
   anything is written down about the run: a name is what a trace groups an agent's sessions
   under, and `builder` says what a hex tail does not. One named already MUST keep that name.
+- The person at the prompt MUST be made here rather than given: nobody chooses what they run,
+  so nothing upstream of this was ever asked about them. `agents` MUST answer with them among
+  the rest, that being the one agent whatever started the flow could not have got any other way.
+- What the flow works by MUST be carried onto its agents before the first turn, since a
+  repository the flow named is fetched to get it: a run that cannot reach one MUST say so here
+  rather than an hour into a loop.
 - Whatever the flow itself raises as it is loaded MUST be left alone, so that a flow whose own
   setup fails is not answered with a command line to correct.
 - `run` MUST call the entry point with the agents as the tuple the flow declared -- the named
-  one where it named them -- in the order they were given, and the task.
-- `calls` MUST answer with one flow ready for another flow to run, found by the same name `-f`
-  takes: a flow is a loop over agents, and a loop worth having is one another loop can reach
-  for. A name nothing answers to MUST be refused where it is asked for rather than where the
-  answer is called, so that a flow which asks for another by the wrong name says so at once
-  rather than an hour into a loop. What it answers MUST be called the way the flow itself is --
-  the agents, the task, and the config for one that takes one -- and MUST answer with whatever
-  the flow answers with, so that a flow written as a coroutine is awaited by whoever called it.
-- A called flow MUST be handed the agents it declares, as the tuple it declared them as, and
-  MUST be handed one fewer where it talks to the person, whom nothing chooses. It MUST NOT
-  rename them: they belong to the run that was started, and a name changed under it would
-  change what has already been written down.
-- `running` MUST report every flow running now, the one that was started first and whatever it
-  called after it. Nothing else can say: a flow is a Python file that may branch any way it
-  likes, so what it is doing is only visible where it was started and where it asked for
-  another. A flow MUST leave that list however it ends, and a call MUST be written into the
-  cycle at both ends, a run being what it did as well as what it was started as.
-- What is running MUST be checked against the threads running it. A flow says it has ended as
-  it ends, but only one that got the chance to: a flow abandoned where it stood -- an interface
-  taken down under it -- would otherwise be reported as running for the life of the process,
-  and everything that reads this would name a flow that is no longer there.
+  one where it named them -- in the order they were given, and the task. A flow written as a
+  coroutine MUST be run to its return here too, on a loop of its own, so that whatever started
+  one is holding a run rather than a coroutine somebody has to remember to await.
+- The run MUST be written down as it happens, as a cycle: which agents were driven, at what,
+  and which sessions each of them opened. The run MUST be over the moment `run` returns,
+  however it returns.
 - A flow that says it can be picked up MUST be handed a dict as its last argument -- after
   the config, for a flow that takes one -- holding what the run it is being picked up from
   left there. Which run that is MUST be the last run of that flow in this workspace unless
@@ -364,13 +355,15 @@ class Runner:
   for a week is a loop that will be stopped and started. What it writes MUST be kept in the
   cycle of the run doing the writing rather than in the one it was picked up from: a closed
   cycle is not reopened, and a run is what that run did.
-- `resumes` MUST answer whether a flow says so now, read by running the flow rather than off
-  what a run of it recorded: a flow is a directory on disk, and what can happen next is what
-  it says today.
+- Whether a run here is profiled as well as traced MUST be read from this workspace's own
+  settings rather than from the cycle, which is the run written down rather than the settings
+  under it.
 - `flow_and_agents` MUST read the same `hmz exec` line the command takes, and MUST be here
   rather than in `cli`: the terminal interface starts a flow from that line and then keeps the
   agents, and a reader that lived in the command line would be one the interface reached up
-  into.
+  into. It MUST NOT load a flow to answer a `--help`, nor refuse a line for a flow it cannot
+  read: what a place suggests about goals is a convenience, and reporting the flow is
+  `Runner`'s one job.
 
 ## Commands
 

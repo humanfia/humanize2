@@ -14,13 +14,8 @@ import pytest
 from pydantic import BaseModel, Field
 
 from hmz.agents import AgentConfig, CodexAgentConfig
-from hmz.runner import (
-    NotAFlow,
-    Runner,
-    configures,
-    flow_and_agents,
-    set_up_from,
-)
+from hmz.flows import NotAFlow, configures
+from hmz.runner import Runner, flow_and_agents, set_up_from
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:

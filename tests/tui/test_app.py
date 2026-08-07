@@ -812,20 +812,20 @@ async def test_a_flow_between_two_turns_is_a_flow_that_is_running() -> None:
 @pytest.mark.timeout(60)
 async def test_a_flow_that_called_another_names_both_of_them() -> None:
     """A flow may reach for another and run it, and what is running is then both."""
-    from hmz.runner import _entered, _left
+    from hmz.flows.driving import entered, left
 
     app = Humanize()
     async with app.run_test() as driver:
         app._flow_named = "chat"
-        started = _entered("chat")
-        called = _entered("official/rlar")
+        started = entered("chat")
+        called = entered("official/rlar")
         try:
             app._draw()
             await driver.pause()
             status = str(app.query_one("#status", Static).content)
         finally:
-            _left(called)
-            _left(started)
+            left(called)
+            left(started)
 
         assert "chat ▸ official/rlar" in status
 

@@ -43,7 +43,7 @@ anyway.
 
 **Kimi Code's effort says how wide as well as how hard.** `max` is one agent; `swarmmax` is the
 same thinking at the width of a fleet of subagents. The prefix is exported as
-`hmz.agents.SWARM`.
+`hmz.flows.SWARM`, which is where a flow steering by it reads it.
 
 **pi's `off`** is the model asked not to think at all. It is an effort like any other here: the
 least of them, not the absence of a setting.

@@ -6,7 +6,7 @@ as an agent. Use questions whenever a run needs an answer only a person should g
 
 ## Try it
 
-A **`HumanAgent`** is the person at the prompt, declared among the agents. See [the person as
+A **`Person`** is the person at the prompt, declared among the agents. See [the person as
 an agent](/guide/human-agent).
 
 **Step 1.** Write a flow that pairs an assistant with one. It runs the assistant, then asks you
@@ -18,15 +18,14 @@ what to say next, and repeats.
 
 from typing import NamedTuple
 
-from hmz.agents import AgentBase, HumanAgent
-from hmz.flows import flow
+from hmz.flows import Agent, Person, flow
 
 
 class Agents(NamedTuple):
     """The agent, and whoever is at the prompt."""
 
-    assistant: AgentBase
-    human: HumanAgent
+    assistant: Agent
+    human: Person
 
 
 @flow
@@ -38,7 +37,7 @@ def run(agents: Agents, task: str) -> None:
         said = agents.human(answered)
 ```
 
-Saying something to a `HumanAgent` is asking what to say next; what it answers with is what you
+Saying something to a `Person` is asking what to say next; what it answers with is what you
 typed. This flow is [`chat`](/reference/flows#the-flows-humanize-ships), the flow the interface
 opens on.
 
@@ -49,7 +48,7 @@ hmz exec -f pairing -a claude/claude-opus-5:high "Read README.md and tell me wha
 ```
 
 One `-a`, and the flow drives two agents. Nobody is asked what the person runs, so a
-`HumanAgent` is not one of the agents `-a` names. On a command line nobody is at a prompt, so
+`Person` is not one of the agents `-a` names. On a command line nobody is at a prompt, so
 `agents.human(...)` answers with nothing. `said` is falsy, so the loop ends and the flow does
 the one thing it was given.
 

@@ -53,11 +53,11 @@ If your flow owns every continuation, you can suggest `off` for each agent it de
 ```python
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, AgentDefaults
+from hmz.flows import Agent, AgentDefaults
 
 class Agents(NamedTuple):
-    actor: Annotated[AgentBase, AgentDefaults(goals=False)]
-    reviewer: Annotated[AgentBase, AgentDefaults(goals=False)]
+    actor: Annotated[Agent, AgentDefaults(goals=False)]
+    reviewer: Annotated[Agent, AgentDefaults(goals=False)]
 ```
 
 The marker only supplies the model picker's initial value. The `goals` row switches the
@@ -90,12 +90,12 @@ turn, not an hour into a loop:
 ```python
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Goal
+from hmz.flows import Agent, Goal
 
 class Agents(NamedTuple):
     """The one it drives, which has to have a goal of its own."""
 
-    worker: Annotated[AgentBase, Goal]
+    worker: Annotated[Agent, Goal]
 ```
 
 ```console

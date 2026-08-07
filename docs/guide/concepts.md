@@ -105,7 +105,7 @@ order, and when to stop.
 
 ```python
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     while True:
         agent(task, suppress=True)
@@ -114,9 +114,9 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 The annotation on `agents` is load-bearing. Its length is how many agents the flow drives, and
 it is the one thing about a flow that the command line starting it cannot otherwise know.
 humanize checks it before the first turn rather than hours into a loop. A `NamedTuple` says
-what each agent is *for* as well as how many there are. An `Annotated[AgentBase, Moment.…]`
-says what that agent has to be able to do. An `Annotated[AgentBase, Remote]` or
-`Annotated[AgentBase, Isolated(…)]` says where that agent may work. All of it is checked at the
+what each agent is *for* as well as how many there are. An `Annotated[Agent, Moment.…]`
+says what that agent has to be able to do. An `Annotated[Agent, Remote]` or
+`Annotated[Agent, Isolated(…)]` says where that agent may work. All of it is checked at the
 same moment.
 
 A flow is ordinary Python and may branch any way it likes. Nothing asks it what it is doing.
@@ -178,7 +178,7 @@ Cycles live under `~/.humanize/cycles/<workspace>/`, one directory apiece. See
 
 It is one setting because it is one question. **Which agents it may be asked of is the flow's
 to say.** An agent whose annotation says nothing about a machine runs here and cannot be
-pointed anywhere. `Annotated[AgentBase, Remote]` is one that may be. `Annotated[AgentBase,
+pointed anywhere. `Annotated[Agent, Remote]` is one that may be. `Annotated[Agent,
 Isolated("python:3.12")]` is a container of the flow's own that nobody configures. See
 [Machines](/reference/machines).
 

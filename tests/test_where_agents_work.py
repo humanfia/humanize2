@@ -14,8 +14,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import AgentConfig, Isolated, Remote, anchored
+from hmz.flows import NotAFlow, wanted
 from hmz.machines import DockerConfig
-from hmz.runner import NotAFlow, Runner, wanted
+from hmz.runner import Runner
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:

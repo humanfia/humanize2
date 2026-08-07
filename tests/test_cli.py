@@ -22,7 +22,10 @@ from hmz import cli
 COMMANDS = [
     # And the two leaves that say whether humanize reports its own failures and where the
     # answer is kept: a command that cannot report a crash is a crash nobody hears about.
-    ("exec", {"runner", "backends", "telemetry", "settings", "kept"}),
+    # And what a flow is, which is where the refusal a line naming no flow is answered with
+    # is written. Naming it must not cost the drivers: what a flow imports from there that
+    # is written down elsewhere is fetched when a flow names it, not when the line is read.
+    ("exec", {"runner", "flows", "backends", "telemetry", "settings", "kept"}),
     ("trace", set[str]()),
     ("anchor", {"coganchor"}),
     ("flowverses", set[str]()),

@@ -1,14 +1,15 @@
 # The person as an agent
 
-**HumanAgent** is the person's side of a conversation inside a flow. Add one to a flow when it
-needs a human to answer, and it asks for input and returns what you type.
+**Person** is the person's side of a conversation inside a flow. Add one to a flow when it
+needs a human to answer, and it asks for input and returns what you type. `Person` is what a
+flow declares the place as; `HumanAgent` is what fills it.
 
 ## Try it
 
-Create a `HumanAgent` and say something to it:
+Create one and say something to it:
 
 ```python
-from hmz.agents import HumanAgent
+from hmz.flows import HumanAgent
 
 person = HumanAgent()                      # takes only an optional name=, defaulting to "human"
 person("Here is what I did. What next?")   # asks, and answers with what was typed
@@ -18,17 +19,16 @@ Saying something to it asks **what to say next**. It answers with whatever you t
 
 ## In a flow
 
-Declare a `HumanAgent` among the agents, and it is handed over like the rest:
+Declare a `Person` among the agents, and it is handed over like the rest:
 
 ```python
 from typing import NamedTuple
 
-from hmz.agents import AgentBase, HumanAgent
-from hmz.flows import flow
+from hmz.flows import Agent, Person, flow
 
 class Chat(NamedTuple):
-    assistant: AgentBase
-    human: HumanAgent
+    assistant: Agent
+    human: Person
 
 @flow
 def run(agents: Chat, task: str) -> None:
@@ -41,7 +41,7 @@ def run(agents: Chat, task: str) -> None:
 
 That is [`chat`](/reference/flows#the-flows-humanize-ships), the flow the interface opens on.
 
-A `HumanAgent` is not one of the agents you name with `-a`, because **nobody is asked what the
+A `Person` is not one of the agents you name with `-a`, because **nobody is asked what the
 person runs**. The flow above drives two agents, so you start it with one `-a`:
 
 ```sh
@@ -54,7 +54,7 @@ script.
 
 ## What it is not
 
-A `HumanAgent` is not a coding agent. It runs no model and spends nothing.
+A `Person` is not a coding agent. It runs no model and spends nothing.
 
 Its turns are **not bracketed** by the `begins`/`ends` events that say whose turn it is. If you
 counted them, you would put the person in the graph of who handed to whom. You would also spin

@@ -18,8 +18,9 @@ import pytest
 
 from hmz.agents import AgentConfig
 from hmz.agents.skills import Loaded
+from hmz.flows import NotAFlow
 from hmz.flows.skills import brought, cached
-from hmz.runner import NotAFlow, Runner
+from hmz.runner import Runner
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
@@ -104,7 +105,7 @@ CALLING = '''"""Holds a session open, then calls another flow."""
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.runner import calls
+from hmz.flows import calls
 
 
 @flow

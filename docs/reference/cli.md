@@ -482,7 +482,7 @@ from hmz.tracing import collect        # hmz trace collect
 from hmz.coganchor import connect      # hmz anchor
 from hmz.coganchor import check        # hmz anchor --check
 from hmz import providers              # hmz providers
-from hmz.flows import verses           # hmz flowverses
+from hmz.flows import verses
 ```
 
 - `Runner(flow, agents).run(task)` — [Flows](/reference/flows)

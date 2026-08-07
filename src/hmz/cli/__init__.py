@@ -62,7 +62,8 @@ def _exec(argv: list[str]) -> int:
       Zero, once the flow has returned.
     """
     from hmz import telemetry
-    from hmz.runner import NotAFlow, Runner, flow_and_agents
+    from hmz.flows import NotAFlow
+    from hmz.runner import Runner, flow_and_agents
 
     # If it has been answered yes, and never otherwise: a run with nobody at a terminal is a
     # run with nobody to ask, and silence is not an answer.
@@ -239,8 +240,9 @@ def _tui(argv: list[str]) -> int:
     # reaching the lazily imported interface below.
     _prepare_textual_terminal()
 
+    from hmz.flows import configures, wanted
     from hmz.kept import Runs
-    from hmz.runner import configures, read_agent, set_up_from, wanted
+    from hmz.runner import read_agent, set_up_from
     from hmz.tui import Humanize
 
     parser = _line()

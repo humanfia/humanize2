@@ -69,17 +69,17 @@ In `.humanize/flows/prove/__init__.py`:
 ```python
 from typing import NamedTuple
 
-from hmz.agents import AgentBase
+from hmz.flows import Agent
 from pydantic import BaseModel, Field
 
 
 class Agents(NamedTuple):
     """The four kinds this drives."""
 
-    reader: AgentBase
-    solver: AgentBase
-    checker: AgentBase
-    mender: AgentBase
+    reader: Agent
+    solver: Agent
+    checker: Agent
+    mender: Agent
 
 
 class Setup(BaseModel):
@@ -189,7 +189,7 @@ fail at all.
 ## Step 5 — make "sound" mean two people said so
 
 ```python
-async def sound(checker: AgentBase, asked: str) -> tuple[bool, Verdict | None]:
+async def sound(checker: Agent, asked: str) -> tuple[bool, Verdict | None]:
     """Two independent readings of one attempt, and whether both called it sound.
 
     Two sessions rather than two questions in one: a checker that has just said "sound" is

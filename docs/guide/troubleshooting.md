@@ -17,12 +17,12 @@ hmz exec -f rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "
 Ask a flow how many it wants without running it:
 
 ```python
-from hmz.runner import drives
+from hmz.flows import drives
 
 print(drives("official/rlar"))   # ('actor', 'reviewer')
 ```
 
-A `HumanAgent` place does **not** count. Nobody chooses what the person runs.
+A `Person` place does **not** count. Nobody chooses what the person runs.
 
 ### `<flow>: no flow to read: a flow is a directory with an __init__.py in it`
 
@@ -51,18 +51,18 @@ flow because it is called that. Mark it:
 from hmz.flows import flow
 
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     ...
 ```
 
 ### `a flow is a function marked @flow() taking (agents, task), whose agents are annotated …`
 
 The `agents` parameter is annotated with a type that does not say how many agents there are.
-`tuple[AgentBase, ...]` means any number, which is no answer.
+`tuple[Agent, ...]` means any number, which is no answer.
 
 ```python
-def run(agents: tuple[AgentBase], task: str) -> None:          # one agent
-def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:  # two
+def run(agents: tuple[Agent], task: str) -> None:          # one agent
+def run(agents: tuple[Agent, Agent], task: str) -> None:  # two
 def run(agents: Agents, task: str) -> None:                     # a NamedTuple of them
 ```
 
@@ -74,7 +74,7 @@ The annotation names something that exists only for a type checker:
 
 ```python
 if TYPE_CHECKING:                     # ← this is the problem
-    from hmz.agents import AgentBase
+    from hmz.flows import Agent
 ```
 
 Import it at runtime instead. The count has to be readable where the flow runs, not only where

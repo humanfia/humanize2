@@ -16,12 +16,11 @@ mkdir -p .humanize/flows/twice
 # .humanize/flows/twice/__init__.py
 """Two passes: do the work, then read it back and fix what is wrong."""
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     session = agent.new()
     session(task)
@@ -50,9 +49,9 @@ like. The `@flow` mark is what makes it a flow, not the name.
 a `NamedTuple` of them.
 
 ```python
-tuple[AgentBase]                 # one
-tuple[AgentBase, AgentBase]      # two
-tuple[AgentBase, ...]            # refused — that is not an answer
+tuple[Agent]             # one
+tuple[Agent, Agent]      # two
+tuple[Agent, ...]        # refused — that is not an answer
 ```
 
 The command line that starts the flow cannot know its length any other way, so humanize checks
@@ -63,7 +62,7 @@ $ hmz exec -f twice -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:high "…"
 hmz exec: error: twice: the flow drives 1 agents, 2 given
 ```
 
-**3. The annotation must be readable at runtime.** Import `AgentBase` normally, and **not**
+**3. The annotation must be readable at runtime.** Import `Agent` normally, and **not**
 under `if TYPE_CHECKING`. A count that nothing can read back is not one a command line can be
 held to.
 
@@ -72,10 +71,10 @@ held to.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:                      # [!code error]
-    from hmz.agents import AgentBase   # [!code error]
+    from hmz.flows import Agent   # [!code error]
 ```
 ```console
-hmz exec: error: twice: the flow's agents cannot be read here (name 'AgentBase' is not
+hmz exec: error: twice: the flow's agents cannot be read here (name 'Agent' is not
 defined) -- import what the annotation names at runtime, so the count it states can be checked
 ```
 :::
@@ -96,7 +95,7 @@ turn knows what the first one did. The flow you wrote holds a session. Change it
 
 ```python
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     agent(task)
     agent("Now review what you just did, and fix anything that is wrong.")
@@ -118,7 +117,7 @@ the run on the first hiccup.
 import time
 
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     while True:
         agent(task, suppress=True)     # "" if it failed, and the loop goes round again
@@ -142,7 +141,7 @@ def green() -> bool:
     return subprocess.run(["python", "-m", "pytest", "-q"], check=False).returncode == 0
 
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     for _ in range(20):
         agent(task, suppress=True)
@@ -179,7 +178,7 @@ by taking its name. A file whose name starts with `_` is not a flow.
 Check which agents the flow declares.
 
 ```python
-from hmz.runner import drives
+from hmz.flows import drives
 
 drives("twice")       # the names of the agents it declares
 ```

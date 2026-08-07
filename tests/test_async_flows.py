@@ -17,7 +17,8 @@ import pytest
 from hmz.agents import AgentConfig, Stopped
 from hmz.cli import main
 from hmz.cycle import cycles, opened
-from hmz.runner import NotAFlow, Runner, configures, drives, wanted
+from hmz.flows import NotAFlow, configures, drives, wanted
+from hmz.runner import Runner
 from tests.stubs import ShellAgent, events
 
 if TYPE_CHECKING:

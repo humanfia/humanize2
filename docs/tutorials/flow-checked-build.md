@@ -18,11 +18,10 @@ A flow is a directory with an `__init__.py` in it, and that file has one functio
 `@flow`:
 
 ```python
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 @flow
-def run(agents: tuple[AgentBase], task: str) -> None:
+def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     agent(task)
 ```
@@ -111,17 +110,17 @@ Open `.humanize/flows/checked_build/__init__.py` and start with the two agents:
 ```python
 from typing import NamedTuple
 
-from hmz.agents import AgentBase
+from hmz.flows import Agent
 
 
 class Agents(NamedTuple):
     """The two this drives: one that writes, and one that reads what it wrote."""
 
-    builder: AgentBase
-    reviewer: AgentBase
+    builder: Agent
+    reviewer: Agent
 ```
 
-You could have written `tuple[AgentBase, AgentBase]` and got the same count. A `NamedTuple`
+You could have written `tuple[Agent, Agent]` and got the same count. A `NamedTuple`
 buys you names, and the names are used everywhere something has to talk about one of these
 agents: the agents page of `/flow` asks what *the reviewer* runs rather than what agent 2 of 2
 runs, the line above the prompt says `reviewer · dsh/deepseek-v4-pro:high`, and a
@@ -246,8 +245,7 @@ flow's name.
 import subprocess
 from typing import NamedTuple
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 from pydantic import BaseModel, Field
 ```
 :::

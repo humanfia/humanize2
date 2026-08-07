@@ -16,12 +16,11 @@ To run more than one turn at a time, the loop has to wait for several things at 
 import asyncio
 from pathlib import Path
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 
 @flow
-async def run(agents: tuple[AgentBase], task: str) -> None:
+async def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     paths = sorted(str(p) for p in Path("src").rglob("*.py"))
     said = await agent.abatch([f"{task}\n\nThe file is {p}." for p in paths], at_once=8)
@@ -111,7 +110,7 @@ apiece**, and their turns going together.
 import subprocess
 
 @flow
-async def run(agents: tuple[AgentBase], task: str) -> None:
+async def run(agents: tuple[Agent], task: str) -> None:
     (agent,) = agents
     trees = []
     for name in ("parser", "printer", "cli"):

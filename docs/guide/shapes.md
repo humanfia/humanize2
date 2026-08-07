@@ -59,8 +59,7 @@ from typing import NamedTuple
 
 from pydantic import BaseModel, Field
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 REVIEW = """Read the repository and the current diff.
 Decide whether there is anything left to do or to fix."""
@@ -76,8 +75,8 @@ class Review(BaseModel):
 
 
 class Agents(NamedTuple):
-    actor: AgentBase
-    reviewer: AgentBase
+    actor: Agent
+    reviewer: Agent
 
 
 @flow
@@ -115,7 +114,7 @@ A backend is held to the shape in one of two ways:
 | **Codex** | the turn's `outputSchema` |
 | anything else — `dsh`, `kimi`, `pi`, `opencode`, `mimo` | asked in the prompt, and what it says is read back |
 
-`SessionBase.shapes` records which of the two a backend is. Either way the answer arrives as
+`Session.shapes` records which of the two a backend is. Either way the answer arrives as
 the model, or not at all.
 
 Claude's schema is an argument of the process rather than of the turn. Asking one session for a

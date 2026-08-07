@@ -5,14 +5,27 @@
 ```
 .
 ├── __init__.py
+├── agent.py
 ├── builtin
+├── driving.py
 ├── skills.py
 └── verses.py
 ```
 
-What a flow is called, where it is found, which of the ones it holds was asked for, and what
-it brings with it. Nothing here runs one: `hmz.runner` does that, and reads a name through
-this.
+What a flow is: what it drives, what it is called, where it is found, which of the ones it
+holds was asked for, what it brings with it, and what it takes for one flow to run another.
+Nothing here reads a command line and nothing here opens a cycle: `hmz.runner` does both, and
+asks this what the flow it was named says about itself.
+
+This MUST be the whole of what a flow imports. A flow is content -- somebody else's
+repository, forked and edited -- and one that named `hmz.agents` for the type of what it
+drives and `hmz.backends` for a fact about a CLI would be a flow that breaks whenever
+humanize moves either. So the one import a flow writes MUST be `hmz.flows`, and whatever a
+flow legitimately needs that is written down in another layer MUST be handed through from
+here rather than reached for. What is handed through MUST be fetched when a flow names it
+rather than imported with this module: this is also what a list of flows is drawn from and
+what `hmz exec --help` loads, neither of which MUST pay for every coding agent driver there
+is.
 
 A flow MUST be a module, and there MUST be two shapes of one: a directory with an
 `__init__.py` in it -- beside whatever it imports and a `skills/` of the skills it works by --
@@ -47,6 +60,7 @@ class Flow:
     about: str = ""
     skills: tuple[str, ...] = ()
     resumable: bool = False
+    selectable: bool = True
 
 
 class Offer(NamedTuple):
@@ -88,6 +102,9 @@ def inside(named_: str) -> str: ...
 
 
 def about(named_: str) -> str: ...
+
+
+def __getattr__(name: str) -> object: ...
 ```
 
 - A flow MUST be a function marked with `flow`, and nothing else MUST be one: a flow is read by
@@ -136,6 +153,200 @@ def about(named_: str) -> str: ...
   it too rather than building a name from a filename: a file may hold several flows and the file
   beside it none, so a name spelled out anywhere else is a name `-f` would refuse -- and two
   places deciding what a flow is called is two places to drift.
+- A flow MAY say it is not to be offered in a list of them. A flow reached only by another
+  flow -- one phase of a thing, an engine two flows share -- is a flow to call by name and not
+  a flow to start, and one that appeared in the picker would be a line nobody can act on.
+- This module MUST be everything a flow imports, which is the interfaces beside it, the mark,
+  the finding, the calling, and what is written down in another layer handed through: the
+  vocabulary a turn is described in, the facts about the CLIs and what each of them runs, and
+  where humanize keeps what outlives a run. What is handed through MUST be the same object the
+  layer it is written in holds, so that a flow and humanize are talking about one thing.
+- What is handed through MUST be fetched when it is asked for. Importing this module MUST cost
+  no more than reading a directory: a menu of flows is drawn from it, and a command line is
+  routed through it before it knows whether it names a flow at all.
+
+## `agent.py`
+
+```python
+class Session(Protocol): ...
+
+
+class Agent(Protocol): ...
+
+
+class Person(Agent, Protocol): ...
+```
+
+What a flow drives, written as interfaces and nothing else.
+
+- What a flow may ask of an agent MUST be written down here and MUST be the whole of what a
+  flow is written against. A flow that named the class behind it would be a flow written
+  against which CLI is being driven, how a turn is spelled to that CLI and where its logs go,
+  none of which is a flow's business and all of which moves.
+- It MUST hold what a flow asks of an agent, and what whoever hands an agent to a flow settles
+  on it: a turn, a session, a goal, a batch, what the run has cost, what is hung on the moments
+  of a turn, what the agent is configured with, the run it is part of, and where its turns
+  land. Nothing about starting a process, reading a stream or falling back to another account
+  MUST be here, being how an agent is driven rather than what a flow drives -- and nothing here
+  MUST be reachable only through the class, since a flow that called another hands over what it
+  was given and the called flow is handed the same thing.
+- The drivers MUST answer to it structurally, and `hmz.agents` MUST NOT import it. The arrow
+  points one way -- a flow names what it drives, and a driver is written without ever naming a
+  flow -- and a driver that inherited from this would be the layer below reaching up. That
+  they answer MUST be stated once, where a type checker reads it, so that a driver which stops
+  answering reads as a driver to correct rather than as a flow that fails on its first turn.
+- A flow MUST declare the places it drives with these, and what it writes beside one -- a
+  moment, a `Goal`, a `Remote`, an `Isolated`, an `AgentDefaults` -- MUST go on meaning what it
+  means. What is annotated is which interface, not which class.
+- `Person` MUST be what a flow declares for the person at the prompt, and the class that
+  answers to it MUST be read as the same place: a flow written before there was an interface
+  named the class, and it is the same place either way. The class itself MUST be reachable
+  too: a place is annotated with the interface, and a person is made rather than annotated.
+- What is true of a backend rather than of one agent -- which moments it runs, whether it has
+  a goal feature, whether it can be held to a shape -- MUST be declared on the class. It is
+  read off the class where a flow is checked against the agents it was given, before any of
+  them has been made, so anything answering to this MUST say it the same way, annotation and
+  all.
+
+## `driving.py`
+
+```python
+type Entry = Callable[..., Awaitable[None] | None]
+
+
+class NotAFlow(ValueError): ...
+
+
+class Place(NamedTuple):
+    name: str
+    person: bool
+    moments: frozenset[Moment]
+    where: type[Remote] | Remote | Isolated | None = None
+    goal: bool = False
+    goals_default: bool = True
+
+
+class Running(NamedTuple):
+    flow: str
+    since: float
+
+
+def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]: ...
+
+
+def wanted(flow: str | os.PathLike[str]) -> tuple[Place, ...]: ...
+
+
+def configures(flow: str | os.PathLike[str]) -> type[BaseModel] | None: ...
+
+
+def resumes(flow: str | os.PathLike[str]) -> bool: ...
+
+
+def carries(flow: str | os.PathLike[str], agents: Sequence[Agent]) -> None: ...
+
+
+def calls(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry: ...
+
+
+def running() -> tuple[Running, ...]: ...
+
+
+def declares(
+    flow: str | os.PathLike[str],
+) -> tuple[
+    Entry,
+    tuple[Place, ...],
+    Callable[..., tuple[Agent, ...]],
+    type[BaseModel] | None,
+    Flow,
+]: ...
+
+
+def set_up(
+    flow: str | os.PathLike[str],
+    setting: type[BaseModel] | None,
+    config: BaseModel | dict[str, Any],
+) -> BaseModel: ...
+
+
+def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None: ...
+
+
+def entered(flow: str, agents: Sequence[Agent] = ()) -> Running: ...
+
+
+def left(one: Running) -> None: ...
+```
+
+What a flow says it drives, read off its own entry point, and what it takes for one flow to
+run another. `hmz.runner` asks this and then opens a cycle around the answer.
+
+- A flow's entry point MUST take `(agents: tuple[...], task: str)`, and that tuple MUST be of
+  a fixed length: how many agents the flow drives is the one thing about a flow that a command
+  line running it cannot otherwise know. It MUST be readable where the flow runs rather than
+  only where a type checker looks, since a count nothing can read back is not one a command
+  line can be held to.
+- A `NamedTuple` of agents MUST be accepted in its place, and MUST additionally say what the
+  flow calls each of them. `drives` MUST report those names, so that whatever asks for the
+  agents asks for them by what they are for rather than by their place in a line; a plain tuple
+  MUST report a name apiece that is empty, having said nothing but how many.
+- A flow that runs one of its agents under the backend's own goal feature MUST say so where it
+  declares the place, by writing `Goal` beside the type, and an agent whose backend has none
+  MUST be refused before the first turn -- for the reason a moment it cannot run is: a loop
+  built on `pursue` finds out in the middle of a turn otherwise, hours in. What each backend
+  has MUST be said on the agent rather than asked of it, so that whoever is choosing one can
+  offer only the ones that would work.
+- Where an agent works MUST be the flow's to say rather than a setting anybody may reach for,
+  and MUST be settled here: a place that says nothing runs on this machine and MUST refuse an
+  agent pointed anywhere else.
+- Everything here MUST read the flow as it is now, by running it. A flow rewritten between two
+  readings -- by hand, or by an agent it is itself driving -- MUST be read as it is now, which
+  is what makes a run that improves its own flow a run that then drives the improved one.
+- Anything the flow itself raises as it is read MUST be left alone. `NotAFlow` MUST be for a
+  line to correct and nothing else, so that a flow whose own setup fails is not reported as a
+  command line to fix.
+- `calls` MUST answer with one flow ready for another flow to run, found by the same name `-f`
+  takes: a flow is a loop over agents, and a loop worth having is one another loop can reach
+  for. A name nothing answers to MUST be refused where it is asked for rather than where the
+  answer is called, so that a flow which asks for another by the wrong name says so at once
+  rather than an hour into a loop. What it answers MUST be called the way the flow itself is --
+  the agents, the task, and the config for one that takes one -- and MUST answer with whatever
+  the flow answers with, so that a flow written as a coroutine is awaited by whoever called it.
+- A called flow MUST be handed the agents it declares, as the tuple it declared them as, and
+  MUST be handed one fewer where it talks to the person, whom nothing chooses. It MUST NOT
+  rename them: they belong to the run that was started, and a name changed under it would
+  change what has already been written down.
+- A called flow MUST carry its own skills and no others, and the agents MUST be handed back
+  carrying what they carried before it: the skills are the flow's, and a flow that called
+  another goes on being driven by its own. A caller MAY say the ones it carries stay reachable,
+  and the called flow MUST still win a name they both use.
+- A called flow that says it can be picked up MUST be handed its own kept state, under its own
+  name, in the cycle of the run that called it: a flow that called another is two flows, each
+  with its own to keep, and both of them part of one run.
+- `running` MUST report every flow running now, the one that was started first and whatever it
+  called after it. Nothing else can say: a flow is a Python file that may branch any way it
+  likes, so what it is doing is only visible where it was started and where it asked for
+  another. A flow MUST leave that list however it ends, and a call MUST be written into the
+  cycle at both ends, a run being what it did as well as what it was started as.
+- What is running MUST be checked against the threads running it. A flow says it has ended as
+  it ends, but only one that got the chance to: a flow abandoned where it stood -- an interface
+  taken down under it -- would otherwise be reported as running for the life of the process,
+  and everything that reads this would name a flow that is no longer there.
+- What a report of a failure says about the run it happened in MUST be registered here, and
+  MUST be names and never contents: which flow, how long it has been going, and for each of its
+  agents what it drives and at what. What the flow was told, what any agent said and what is in
+  any file MUST NOT be there nor reachable from what is.
+- `resumes` MUST answer whether a flow says so now, read by running the flow rather than off
+  what a run of it recorded: a flow is a directory on disk, and what can happen next is what it
+  says today.
+- `configures` MUST answer with the model a flow says it can be set up with, which is the whole
+  of what may be asked: the fields, their types, what each is for and the combinations the flow
+  refuses are already written down in it, so whatever is starting a flow can put the questions
+  without knowing what any of them mean.
+- `set_up` MUST read a config back through the model this reading of the flow declared rather
+  than take one as it comes: a flow is loaded by running its file, so the class it declared last
+  time is a stranger to the class it declares this time, and what survives that is the fields.
 
 ## `verses.py`
 

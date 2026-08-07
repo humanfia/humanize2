@@ -560,9 +560,9 @@ read this project cannot have one of its agents reading somebody else's — so:
 
 | What the flow declared | What you are asked |
 | --- | --- |
-| `Annotated[AgentBase, Remote]` | a `where` row: which machine its work lands on |
-| `Annotated[AgentBase, Isolated("python:3.12")]` | nothing; the flow named the image, and the row reads `in a container of python:3.12` |
-| `AgentBase` | nothing; it works here, and there is no row |
+| `Annotated[Agent, Remote]` | a `where` row: which machine its work lands on |
+| `Annotated[Agent, Isolated("python:3.12")]` | nothing; the flow named the image, and the row reads `in a container of python:3.12` |
+| `Agent` | nothing; it works here, and there is no row |
 
 The sheet lists what this machine can see — each container that is running, each host with an
 entry in your `~/.ssh/config` — and anything else is a target you type after **s**:

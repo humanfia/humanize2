@@ -14,8 +14,20 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import AgentConfig
-from hmz.flows import ENTRY, about, find, flow, found, held, inside
-from hmz.runner import NotAFlow, Runner, configures, drives, wanted
+from hmz.flows import (
+    ENTRY,
+    NotAFlow,
+    about,
+    configures,
+    drives,
+    find,
+    flow,
+    found,
+    held,
+    inside,
+    wanted,
+)
+from hmz.runner import Runner
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:

@@ -18,15 +18,14 @@ starting this again is another conversation rather than the last one carried on.
 
 from typing import NamedTuple
 
-from hmz.agents import AgentBase, HumanAgent
-from hmz.flows import flow
+from hmz.flows import Agent, Person, flow
 
 
 class Chat(NamedTuple):
     """The two sides of a conversation."""
 
-    assistant: AgentBase
-    human: HumanAgent
+    assistant: Agent
+    human: Person
 
 
 @flow

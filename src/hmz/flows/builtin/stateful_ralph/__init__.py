@@ -12,12 +12,11 @@ round says round 41 when it is started again, and remembers nothing else about t
 import time
 from typing import Any
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
+from hmz.flows import Agent, flow
 
 
 @flow(resumable=True)
-def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:
+def run(agents: tuple[Agent], task: str, state: dict[str, Any]) -> None:
     (agent,) = agents
     session = agent.new()  # one session, held for as long as the flow runs
     while True:

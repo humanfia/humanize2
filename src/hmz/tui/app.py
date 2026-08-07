@@ -93,7 +93,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from hmz.agents import AgentBase, Event, Question, SessionBase
-    from hmz.runner import Place
+    from hmz.flows import Place
 
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
@@ -733,7 +733,7 @@ class Humanize(App[None]):
           will not load, since a name is a label on something that runs and not a reason for
           anything to stop.
         """
-        from hmz.runner import Place
+        from hmz.flows import Place
 
         # By the name it was chosen under, not by the file that name resolves to: a file may
         # hold several flows, and which of them was asked for is the half after the colon --
@@ -1392,7 +1392,7 @@ class Humanize(App[None]):
           The flows, innermost last, and the one that is set up to run where none is running --
           which is what this line says with nothing going on.
         """
-        from hmz.runner import running
+        from hmz.flows import running
 
         return " ▸ ".join(one.flow for one in running()) or self._flow_named
 

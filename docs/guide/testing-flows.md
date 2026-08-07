@@ -10,7 +10,7 @@ Start with the cheapest test there is. It catches the mistake everybody makes: a
 annotation that cannot be read at runtime.
 
 ```python
-from hmz.runner import drives, wanted
+from hmz.flows import drives, wanted
 
 
 def test_it_drives_two() -> None:
@@ -148,7 +148,7 @@ def test_fast_and_careful_do_not_go_together() -> None:
 A [hook](/guide/hooks) is a function from an `Occasion` to a `Verdict | None`. Call it.
 
 ```python
-from hmz.agents import Moment, Occasion
+from hmz.flows import Moment, Occasion
 
 
 def test_it_refuses_a_force_push() -> None:

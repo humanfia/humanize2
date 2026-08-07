@@ -136,8 +136,8 @@ spawns what an operator would have typed. Settings no session could run under ar
 they are *written*, so a flow that misspells a target hears about it as it configures its
 agents rather than hours into the loop.
 
-**The flow says which agents may be moved at all.** A place declared plain `AgentBase` works
-here and cannot be pointed anywhere. Only `Annotated[AgentBase, Remote]` may be:
+**The flow says which agents may be moved at all.** A place declared plain `Agent` works
+here and cannot be pointed anywhere. Only `Annotated[Agent, Remote]` may be:
 
 ```python
 # .humanize/flows/onbox/__init__.py
@@ -145,13 +145,12 @@ here and cannot be pointed anywhere. Only `Annotated[AgentBase, Remote]` may be:
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Remote
-from hmz.flows import flow
+from hmz.flows import Agent, Remote, flow
 
 
 class Agents(NamedTuple):
-    builder: Annotated[AgentBase, Remote]   # may be pointed at a machine
-    reviewer: AgentBase                     # here, and nowhere else
+    builder: Annotated[Agent, Remote]  # may be pointed at a machine
+    reviewer: Agent                    # here, and nowhere else
 
 
 @flow

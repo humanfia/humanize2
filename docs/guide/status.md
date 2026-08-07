@@ -73,7 +73,7 @@ for one in (actor, reviewer):
 Which flows are running, innermost last:
 
 ```python
-from hmz.runner import running
+from hmz.flows import running
 
 running()                       # one Running(flow, since) apiece, oldest first
 [one.flow for one in running()] # ["chat", "official/rlar"]

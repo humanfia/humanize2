@@ -55,11 +55,11 @@ def _nothing_running_yet() -> Iterator[None]:
     thread is still alive when the test lets go of it, so the next test would find that flow
     running and say so on its own status line.
     """
-    from hmz import runner
+    from hmz.flows import driving
 
-    runner._RUNNING.clear()
+    driving._RUNNING.clear()
     yield
-    runner._RUNNING.clear()
+    driving._RUNNING.clear()
 
 
 @pytest.fixture(autouse=True)

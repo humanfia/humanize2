@@ -191,6 +191,12 @@ class AgentBase(ABC):
         """Waits for the next thing to say to this agent, for a flow that is a conversation."""
 ```
 
+- What a flow may ask of an agent MUST be written down in `hmz.flows.agent` rather than read
+  off this class, and `AgentBase` and `SessionBase` MUST answer to it. Structurally, and this
+  layer MUST NOT import it: a flow names what it drives, and a driver is written without ever
+  naming a flow, so the arrow points one way and inheriting would turn it round. What is here
+  and not there is how an agent is driven rather than what a flow drives, and a public name
+  added here MUST be one or the other on purpose.
 - `id` MUST be the given name, or one no other agent answers to when no name is given, so that
   two agents of the same config are two agents. `rename` MUST take a name from a flow only for
   an agent that was not named where it was made: a name given is a name kept.

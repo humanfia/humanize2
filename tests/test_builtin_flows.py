@@ -18,8 +18,9 @@ import pytest
 
 from hmz.agents import AgentConfig, Stopped
 from hmz.cycle import STATE, cycles, state
+from hmz.flows import resumes
 from hmz.flows.builtin import ralph_loop, stateful_ralph
-from hmz.runner import Runner, resumes
+from hmz.runner import Runner
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:

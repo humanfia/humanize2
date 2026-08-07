@@ -13,13 +13,11 @@ agents you already have:
 # .humanize/flows/planned/__init__.py
 """Plan it with humanize1, then build it three rounds."""
 
-from hmz.agents import AgentBase
-from hmz.flows import flow
-from hmz.runner import calls
+from hmz.flows import Agent, calls, flow
 
 
 @flow
-def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+def run(agents: tuple[Agent, Agent], task: str) -> None:
     plan = calls("official/humanize1:gen-plan")
     plan(agents, f"plan this first: {task}")
     for _ in range(3):
@@ -47,7 +45,7 @@ calls("official/rlar")([builder, checker], task)     # arrives as Agents(actor=â
 To find out what a flow wants without driving it:
 
 ```python
-from hmz.runner import drives, wanted
+from hmz.flows import drives, wanted
 
 drives("official/rlar")     # ("actor", "reviewer")
 wanted("official/rlar")     # one Place per agent: .name, .moments, .goal, .where
@@ -76,7 +74,7 @@ by whoever called it:
 
 ```python
 @flow
-async def run(agents: tuple[AgentBase], task: str) -> None:
+async def run(agents: tuple[Agent], task: str) -> None:
     await calls("official/rlar")(agents, task)
 ```
 
@@ -101,8 +99,8 @@ whoever is at the prompt:
 
 ```python
 class Agents(NamedTuple):
-    assistant: AgentBase
-    human: HumanAgent
+    assistant: Agent
+    human: Person
 
 
 @flow
@@ -113,7 +111,7 @@ def run(agents: Agents, task: str) -> None:
 ## See that both are running
 
 ```python
-from hmz.runner import running
+from hmz.flows import running
 
 running()                       # one Running(flow, since) apiece, in the order they started
 [one.flow for one in running()] # ["planned", "official/humanize1:gen-plan"]

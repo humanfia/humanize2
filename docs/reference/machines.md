@@ -35,12 +35,12 @@ run](/reference/flows#asking-for-an-agent-that-can-do-something):
 ```python
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Isolated, Remote
+from hmz.flows import Agent, Isolated, Remote
 
 class Agents(NamedTuple):
-    builder: Annotated[AgentBase, Remote]                  # may be pointed at a machine
-    tester: Annotated[AgentBase, Isolated("python:3.12")]  # a container of the flow's own
-    reviewer: AgentBase                                    # here, and nowhere else
+    builder: Annotated[Agent, Remote]                  # may be pointed at a machine
+    tester: Annotated[Agent, Isolated("python:3.12")]  # a container of the flow's own
+    reviewer: Agent                                    # here, and nowhere else
 ```
 
 ### A place that says nothing

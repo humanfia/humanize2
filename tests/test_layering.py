@@ -2,10 +2,11 @@
 
 Two things nothing else can check. The layers keep the dependencies the merged projects had:
 `agents` names the machine its turns land on, so it reads `machines`, and a machine hands back
-an anchor, so `machines` reads `coganchor`. A flow is written against the agents it is handed
-and names nothing else; `runner` is what finds one by the name a command line gave it, and
-writes the run down as `cycle`. `tracing` reads the logs back afterwards and needs only where
-they are. Nothing points both ways, which is checked here too.
+an anchor, so `machines` reads `coganchor`. A flow is written against `flows` and names nothing
+else, which is what makes `flows` the layer that names the agents rather than the flow doing
+it; `runner` is what reads a command line into one and writes the run down as `cycle`.
+`tracing` reads the logs back afterwards and needs only where they are. Nothing points both
+ways, which is checked here too.
 
 And the target half runs on the target, which may be any architecture, while
 :mod:`hmz.coganchor.linux` picks a register map at import time and refuses anything but
@@ -57,11 +58,25 @@ ALLOWED: dict[str, set[str]] = {
     # DAG without bending it. And a run that is being profiled samples the programs its
     # agents start, which is `tracing`: what a run left behind, read back.
     "hmz.cycle": {"hmz.agents", "hmz.backends", "hmz.tracing"},
-    # A flow drives agents, and one that has to know where its own agent keeps its tasks
-    # is reading a fact rather than a log: `backends` is the leaf that exists so a fact of
-    # that kind is written once, and it names nothing, so this widens the DAG without
-    # bending it.
-    "hmz.flows": {"hmz.agents", "hmz.backends"},
+    # What a flow is written against, which is why it is also the one import a flow needs:
+    # the agents it drives, and the facts a loop steers by. A flow that has to know where
+    # its own agent keeps its tasks, or what models that account runs, is reading a fact
+    # rather than a log -- `backends` is the leaf those are written down in and `models` is
+    # what asks a CLI, and neither names anything above itself, so both widen the DAG
+    # without bending it. The run one flow makes when it calls another is written into the
+    # cycle of the run that called it, and a failure in any of them is reported by the one
+    # reporter every layer may reach for.
+    "hmz.flows": {
+        "hmz.agents",
+        "hmz.backends",
+        "hmz.cycle",
+        # Where a flow says one of its agents works, which is a container of the flow's own
+        # naming. It names only the anchor under it, so this widens the DAG without bending
+        # it.
+        "hmz.machines",
+        "hmz.models",
+        "hmz.telemetry",
+    },
     # What an agent is written down as, which is a shape and a file and nothing else: the
     # interface keeps them and a command line reads the same ones, so it sits under both.
     "hmz.kept": set(),
