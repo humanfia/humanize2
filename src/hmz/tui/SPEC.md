@@ -37,6 +37,11 @@ line, with what the flow is doing beside the transcript.
   CLI's own idea of what it runs; naming one here would be naming one that was right on the
   day it was written. The agent it opens on MUST NOT be at the hardest effort the model
   takes: that is the one to reach for, not the one to spend before it has been asked for.
+  DeepSeek Harness MUST participate in this implicit fallback only where its local account
+  resolves a nonempty API key from the same layers a turn uses. An installed DeepSeek Harness
+  with no such key MUST still be offered in the agent picker, where it can be selected and an
+  account configured, but MUST NOT become the implicit fallback. An explicit or remembered
+  choice of it MUST be left as chosen.
 - Every backend installed here that has never said what it runs MUST be asked as the
   interface opens, in the background and one at a time: before that there is nothing to
   offer at any sheet and nothing to open talking to. It MUST NOT hold the prompt up, and a

@@ -137,7 +137,9 @@ With nothing remembered, the interface opens on the
 installed here that has said what it runs, at the first model it named and at `high`. The first
 model is that CLI's own idea of what it runs by default. `high` is deliberately not the hardest
 setting. It is the one to reach for rather than the one to spend before anybody has asked for
-anything.
+anything. DeepSeek Harness is used as this implicit fallback only when its local account can
+resolve a nonempty API key. Without one it is still in the agent picker, where it can be selected
+and an account configured; an explicit or remembered DeepSeek choice is not replaced.
 
 ## See also
 

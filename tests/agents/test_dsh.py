@@ -167,6 +167,48 @@ def native_dsh_files(
     return home
 
 
+@pytest.mark.parametrize("key", [None, "", "   "])
+def test_native_readiness_requires_a_nonblank_api_key(
+    key: str | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if key is None:
+        monkeypatch.delenv("DEEPSEEK_API_KEY")
+    else:
+        monkeypatch.setenv("DEEPSEEK_API_KEY", key)
+
+    assert not dsh.native_ready(tmp_path)
+    assert Harness.made == []
+
+
+def test_native_readiness_accepts_an_ambient_api_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "ambient-key")
+
+    assert dsh.native_ready(tmp_path)
+    assert Harness.made == []
+
+
+def test_native_readiness_accepts_a_key_saved_by_dsh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("DEEPSEEK_API_KEY")
+    native_dsh_files(tmp_path, credentials="DEEPSEEK_API_KEY: saved-key\n")
+
+    assert dsh.native_ready(tmp_path)
+    assert Harness.made == []
+
+
+def test_native_readiness_treats_broken_configuration_as_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("DEEPSEEK_API_KEY")
+    native_dsh_files(tmp_path, settings="llm-deepseek: [not-a-mapping]\n")
+
+    assert not dsh.native_ready(tmp_path)
+    assert Harness.made == []
+
+
 def test_dsh_is_a_public_driven_agent() -> None:
     assert DRIVEN["dsh"] == (DshAgent, DshAgentConfig)
     assert DshAgent(configured()).backend == "dsh"

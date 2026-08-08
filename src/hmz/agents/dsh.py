@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-__all__ = ["DshAgent", "DshAgentConfig", "DshSession"]
+__all__ = ["DshAgent", "DshAgentConfig", "DshSession", "native_ready"]
 
 _EFFORTS = ("max", "high", "off")
 _EFFORT_ENV = "HMZ_DSH_EFFORT"
@@ -434,6 +434,23 @@ def _unique_mapping(
 _UniqueSafeLoader.add_constructor(
     yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _unique_mapping
 )
+
+
+def native_ready(where: str | os.PathLike[str]) -> bool:
+    """Whether dsh's local account can authenticate a turn in one workspace.
+
+    Args:
+      where: The workspace whose dotenv layer a local turn would read.
+
+    Returns:
+      Whether the same native configuration a turn uses resolves to a nonblank API key.
+      Invalid or unavailable configuration is not ready rather than an error at a prompt.
+    """
+    try:
+        environment = _native_dsh_environment(Path(where))
+    except (ModuleNotFoundError, ValueError):
+        return False
+    return bool(environment[_API_KEY_ENV].strip())
 
 
 def _native_dsh_environment(where: Path) -> dict[str, str]:

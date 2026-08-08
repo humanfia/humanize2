@@ -35,6 +35,12 @@ CLAUDE = {"claude": (Model("claude-nine", ("max", "high")),)}
 #: The same CLI, installed and never asked, which is every machine before the first asking.
 UNASKED: dict[str, tuple[Model, ...]] = {"claude": ()}
 
+#: The catalogue dsh brings with its SDK, before any local account has been configured.
+DSH_MODELS = (
+    Model("deepseek-v4-flash", ("max", "high", "off")),
+    Model("deepseek-v4-pro", ("max", "high", "off")),
+)
+
 #: A flow of one agent that works where the flow is, so the walk is two steps rather than
 #: three and the second is the one this is about.
 HERE = '''
@@ -341,6 +347,43 @@ async def test_a_backend_that_has_never_been_asked_is_asked_as_the_interface_ope
     app = Humanize()
     async with app.run_test() as driver:
         await until(lambda: asked == ["claude"], driver)
+
+
+@pytest.mark.timeout(60)
+async def test_an_unconfigured_advisory_backend_does_not_outrun_model_discovery(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A bundled catalogue is not evidence that its local account can take a turn."""
+    import hmz.models
+    import hmz.tui.app
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setenv("DSH_HOME", str(tmp_path / "dsh-home"))
+    asked: list[str] = []
+
+    def here() -> dict[str, tuple[Model, ...]]:
+        return {
+            "claude": CLAUDE["claude"] if "claude" in asked else (),
+            "codex": (),
+            "dsh": DSH_MODELS,
+        }
+
+    def note(cli: str, provider: str = "", seconds: float = 0.0) -> tuple[Model, ...]:
+        del provider, seconds
+        asked.append(cli)
+        return CLAUDE["claude"] if cli == "claude" else ()
+
+    monkeypatch.setattr(hmz.tui.app, "installed", here)
+    monkeypatch.setattr(hmz.models, "ask", note)
+
+    app = Humanize()
+    assert app._models == []
+
+    async with app.run_test() as driver:
+        await until(lambda: app._models == [Runs("claude/claude-nine:high")], driver)
+        await until(lambda: asked == ["claude", "codex", "dsh"], driver)
+
+    assert asked[0] == "claude"
 
 
 @pytest.mark.timeout(60)
