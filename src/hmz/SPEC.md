@@ -246,9 +246,28 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
 
 - One cycle MUST be one run. It opens when the flow starts and closes when the flow stops,
   however it stops -- finished, failed, or interrupted. A closed cycle MUST NOT be reopened.
-- One cycle MUST be one directory, holding the run's own record and a directory per session
-  it opened. A run is more than a list of events now -- what its sessions were logged to, and
-  what a flow that can be picked up again left behind -- and all of it is one run's.
+- One cycle MUST be one directory, holding the run's own record, a record per flow the run
+  called, and a directory per session any of them opened. A run is more than a list of events
+  now -- what its sessions were logged to, what it called, and what a flow that can be picked
+  up again left behind -- and all of it is one run's.
+- A flow the run called MUST be written down in a record of its own, in that same directory,
+  and that record MUST be named for the flow and for that call of it. A flow that called
+  another is two flows, and each of them opened sessions, kept its own state and may have
+  called a third; a flow called twice is two runs of it, and one record for both would say
+  neither. It MUST NOT be another cycle: a called flow is part of the run that called it.
+- A call MUST be written into the record of whatever called it at both ends, and both ends
+  MUST say which record the call was written to. Pairing by the order the lines are in is not
+  enough: a flow written as a coroutine may have two calls going at once, and their ends
+  interleave.
+- A called flow's own record MUST hold what a run's record holds -- what it opened, what it
+  called in turn, and how it ended -- and MUST say which record called it, so that a run reads
+  back as the shape it ran in rather than as one flat list nothing can be attributed to. How
+  it ended MUST be how the call ended: a call that raised inside a run that carried on is a
+  call that failed and a run that did not.
+- What a cycle opened MUST be read across every record it holds, and each session MUST say
+  which flow opened it. One run is one run however many flows it took to run it: a trace of it
+  is gathered from what the whole run opened, and which flow a session was opened inside is
+  what a record of its own is for.
 - A session MUST be written down as whose it was, what took its turns, which account those
   turns ran as and what the backend called it. The backend's own log says only the last of
   those: two agents at one configuration are one agent to anything reading the logs alone,
