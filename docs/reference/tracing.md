@@ -92,6 +92,7 @@ Every run of a flow is one **cycle**, written as it happens, and a cycle is a di
 ```
 ~/.humanize/cycles/<workspace>/<datetime>-<hex>/
     cycle.jsonl                     what happened, a line at a time
+    cycle.<flow>_<hex>.jsonl        the same, for one flow the run called
     state.json                      what a flow that can be picked up again left behind
     profile.jsonl                   the programs it ran, for a run that was profiled
     sessions/<session>/…            a link per file the backend logged that session to
@@ -109,6 +110,8 @@ as it goes — a run that died is a run whose cycle still says what it got to.
 | --- | --- | --- |
 | `began` | when the flow starts | `flow`, `task`, `workspace`, whether the flow is `resumable`, the run it was `picked_up` from where there was one, and one entry per agent with its `agent` id, `backend`, `model`, `effort`, `permission`, `provider`, `goals` and whether it was the `person` at the prompt |
 | `opened` | each time an agent opens a session | `agent`, `backend`, `provider`, `session`, the `name` the run gives it and `where` its links are |
+| `called` | when the flow calls another flow | `flow`, `task`, and the `cycle` — the record that call was written to |
+| `returned` | when that call returns, however it ended | `flow` and the same `cycle` |
 | `ended` | when the flow stops | `how`: `done`, `failed`, or `stopped` |
 
 `sessions/<session>/` is a link per file that session was logged to, named for whose session it
@@ -152,6 +155,24 @@ from hmz.cycle import cycles, opened
 for cycle in cycles():                 # this workspace, oldest first
     print(cycle, opened(cycle))        # {"actor": ["0a1b…", "5f6e…"], "reviewer": [...]}
 ```
+
+## Records of called flows
+
+A flow may [call another](/reference/flows#a-flow-that-calls-another-flow), and a called flow
+opens sessions, keeps state and calls flows of its own. So every call gets a record of its own
+beside the run's — `cycle.inner_0a1b2c.jsonl` for a call of `inner` — and the record of
+whatever called it says `called` and `returned` with the filename in `cycle`. Named for this
+call rather than for the flow: one flow called twice is two runs of it, each with its own
+sessions.
+
+A record of a called flow holds the same events as the run's own. Its `began` also carries
+`under`, the record that called it, so a flow that called a flow that called a flow reads back
+as the shape it ran in. Its `ended` says how *the call* ended — a call that raised is `failed`
+inside a run that may still be `done`.
+
+It is still one run and still one directory: a called flow is part of the run that called it,
+not another run. `hmz.cycle.sessions` reads every record, so every session of a run is one list
+however many flows it took, each saying which `flow` opened it.
 
 ## Profiling a run
 

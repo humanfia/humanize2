@@ -18,10 +18,16 @@ One cycle is one run, and one directory::
 
     ~/.humanize/cycles/<workspace>/<when>-<which>/
         cycle.jsonl                     what happened, a line at a time
+        cycle.<flow>_<which>.jsonl      the same, for one flow the run called
         state.json                      what a flow that can be picked up again left behind
         profile.jsonl                   the programs it ran, for a run that was profiled
         sessions/<session>/…            a link per file the backend logged it to
         traces/<when>.trace.json        what was gathered of it afterwards, to be read
+
+A flow may call another, and a called flow opens sessions and keeps state exactly as the flow
+that called it does. So each call gets a record of its own beside the run's own, and the
+record of whatever called it says what it called and which file to read it in. Still one run
+and still one directory: a called flow is part of the run that called it, not another run.
 
 It opens when the flow starts and closes when the flow stops, however it stops -- finished,
 failed, or interrupted. A closed cycle is never reopened: running the flow again is another
@@ -32,6 +38,7 @@ in and handed to the next run of it, which writes into a cycle of its own.
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import json
 import re
@@ -52,19 +59,24 @@ if TYPE_CHECKING:
 __all__ = [
     "JOURNAL",
     "LOCAL",
+    "RECORD",
+    "RECORDS",
     "SESSIONS",
     "STATE",
     "TRACES",
+    "Called",
     "Cycle",
     "Drove",
     "Ran",
     "Session",
     "State",
+    "Sub",
     "called",
     "cycles",
     "linked",
     "opened",
     "read",
+    "records",
     "resumed",
     "sessions",
     "state",
@@ -83,6 +95,15 @@ _LEGIBLE = re.compile(r"[^A-Za-z0-9._@-]+")
 
 #: The file a cycle's own record is written to, inside the cycle's directory.
 JOURNAL = "cycle.jsonl"
+
+#: What the record of a flow another flow called is called, beside the run's own: which
+#: flow it is of, and an id of that call rather than of the flow -- a flow called twice is
+#: two records, since it is two runs of it and each opened its own sessions.
+RECORD = "cycle.{flow}_{ident}.jsonl"
+
+#: Every such record of one cycle, as a glob over its directory. It does not match the
+#: run's own, which is the record of the flow nothing called.
+RECORDS = "cycle.*.jsonl"
 
 #: Where the links to the sessions' own logs go, a directory per session.
 SESSIONS = "sessions"
@@ -124,6 +145,8 @@ class Session(NamedTuple):
       name: What the run calls it -- which agent, which CLI, which account and which session,
         in one name -- and the directory its links are under.
       at: When it was opened.
+      flow: The flow it was opened inside, as that flow was asked for: the run's own, or one
+        the run called. "" for a session written down before a run said.
     """
 
     agent: str
@@ -132,6 +155,7 @@ class Session(NamedTuple):
     ident: str
     name: str
     at: str = ""
+    flow: str = ""
 
 
 class Drove(NamedTuple):
@@ -166,6 +190,25 @@ class Drove(NamedTuple):
         return f"{cli}/{self.model}:{self.effort}"
 
 
+class Called(NamedTuple):
+    """One flow a run called, as the run that called it wrote it down.
+
+    Attributes:
+      flow: The flow, as it was asked for.
+      task: What it was called with.
+      record: The file inside the cycle it was written to, which is where its own sessions
+        are and where whatever it called in turn is written down.
+      began: When it was called.
+      ended: When it returned, or "" for a call that never did -- a run killed under it.
+    """
+
+    flow: str
+    task: str
+    record: str
+    began: str = ""
+    ended: str = ""
+
+
 class Ran(NamedTuple):
     """What one cycle was, read back off its own record.
 
@@ -178,7 +221,10 @@ class Ran(NamedTuple):
       ended: When it stopped, or "" for one still running or abandoned where it stood.
       how: How it stopped -- done, failed or stopped -- and "" while it has not.
       agents: What drove it, in the order the flow takes them.
-      sessions: Every session it opened, oldest first.
+      sessions: Every session it opened, oldest first, the ones opened inside a flow it
+        called among them -- one run is one run, however many flows it took to run it.
+      called: Every flow this run called, in the order it called them. What each of those
+        called in turn is written in its own record rather than here.
       resumable: Whether the flow said it could be picked up again when this run happened.
         Whether it says so now is asked of the flow: this is what the run recorded, which is
         what it was rather than what can be done with it today.
@@ -193,6 +239,7 @@ class Ran(NamedTuple):
     how: str = ""
     agents: tuple[Drove, ...] = ()
     sessions: tuple[Session, ...] = ()
+    called: tuple[Called, ...] = ()
     resumable: bool = False
 
     @property
@@ -229,6 +276,20 @@ def called(agent: str, backend: str, provider: str, ident: str) -> str:
         _LEGIBLE.sub("-", part).strip("-") for part in parts
     )
     return f"{agent_at}-{cli}@{account}-{said}"
+
+
+def _record(flow: str, ident: str) -> str:
+    """What the record of one called flow is called, inside the cycle that called it.
+
+    Args:
+      flow: The flow, as it was asked for -- which may be a path, and is flattened the way
+        everything else humanize writes a name into a filename is.
+      ident: What tells this call of it from the next one.
+
+    Returns:
+      The filename, beside the run's own record.
+    """
+    return RECORD.format(flow=_LEGIBLE.sub("-", flow).strip("-") or "flow", ident=ident)
 
 
 def _provider(agent: AgentBase) -> str:
@@ -470,6 +531,38 @@ def resumed(flow: str, workspace: Path | str | None = None) -> Path | None:
     return None
 
 
+def _drove(agents: Sequence[AgentBase]) -> list[dict[str, Any]]:
+    """What each agent of a run is, for the line a record opens with.
+
+    Args:
+      agents: The agents, in the order the flow takes them.
+
+    Returns:
+      One entry apiece, saying what it drives and at what.
+    """
+    from .agents import HumanAgent
+
+    return [
+        {
+            "agent": agent.id,
+            "backend": agent.backend,
+            "model": agent.config.model,
+            "effort": agent.config.effort,
+            "permission": agent.config.permission,
+            # What it was configured with rather than what a turn of it ends up running as:
+            # the account a turn fell back onto is written down against the session that ran
+            # there, which is where it happened.
+            "provider": agent.config.provider,
+            "goals": agent.config.goals,
+            # Asked as the run is written down rather than read back off a name: what the
+            # person's backend is called is the agents' own business, and what a run picked
+            # up again needs is which of its agents nobody chose.
+            "person": isinstance(agent, HumanAgent),
+        }
+        for agent in agents
+    ]
+
+
 class Cycle:
     """One run of one flow: the directory it is written to, and what has happened to it."""
 
@@ -500,9 +593,7 @@ class Cycle:
             that what a turn spent its minutes on is in the run's trace beside the turn. A
             setting of the workspace, asked of it by whoever opens the cycle.
         """
-        from .agents import HumanAgent
-
-        self._at = (
+        self._begin(
             home()
             / "cycles"
             / _PLAIN.sub("-", str((workspace or Path.cwd()).resolve()))
@@ -511,8 +602,48 @@ class Cycle:
             # to the second because these are read back in the order they sort in: which run
             # a flow is picked up from is the last of them, and two started inside one second
             # would otherwise be ordered by the hex, which is to say at random.
-            / f"{_stamp()}-{uuid.uuid4().hex[:6]}"
+            / f"{_stamp()}-{uuid.uuid4().hex[:6]}",
+            JOURNAL,
+            (workspace or Path.cwd()).resolve(),
+            flow,
+            agents,
         )
+        #: The programs this run starts, sampled while it runs, or None for a run nobody
+        #: asked to profile -- which is every run until somebody says otherwise.
+        self._profiler = self._profiling() if profile else None
+        self.write(
+            "began",
+            flow=flow,
+            task=task,
+            workspace=str(self._where),
+            resumable=resumable,
+            **({"picked_up": picked_up} if picked_up else {}),
+            agents=_drove(agents),
+        )
+
+    def _begin(
+        self,
+        at: Path,
+        journal: str,
+        workspace: Path,
+        flow: str,
+        agents: Sequence[AgentBase],
+    ) -> None:
+        """Settles what is written down, and where.
+
+        Shared with the record of a flow this one called, which is the same thing written
+        into a file of its own beside this one: a called flow opens sessions and keeps state
+        exactly as the flow that called it does, and neither writes the other's.
+
+        Args:
+          at: The cycle's directory.
+          journal: The file inside it these lines go to.
+          workspace: Where the run is happening.
+          flow: The flow this is a record of, as it was named.
+          agents: The agents it is being run with, in the order it takes them.
+        """
+        self._at = at
+        self._journal = journal
         self._writing = (
             threading.Lock()
         )  # sessions open on whichever thread a turn runs on
@@ -524,37 +655,8 @@ class Cycle:
         #: one -- which no mapping can see -- is still saved when the run ends.
         self._state: list[State] = []
         self._flow = flow
-        self._where = (workspace or Path.cwd()).resolve()
-        #: The programs this run starts, sampled while it runs, or None for a run nobody
-        #: asked to profile -- which is every run until somebody says otherwise.
-        self._profiler = self._profiling() if profile else None
-        self.write(
-            "began",
-            flow=flow,
-            task=task,
-            workspace=str((workspace or Path.cwd()).resolve()),
-            resumable=resumable,
-            **({"picked_up": picked_up} if picked_up else {}),
-            agents=[
-                {
-                    "agent": agent.id,
-                    "backend": agent.backend,
-                    "model": agent.config.model,
-                    "effort": agent.config.effort,
-                    "permission": agent.config.permission,
-                    # What it was configured with rather than what a turn of it ends up
-                    # running as: the account a turn fell back onto is written down against
-                    # the session that ran there, which is where it happened.
-                    "provider": agent.config.provider,
-                    "goals": agent.config.goals,
-                    # Asked as the run is written down rather than read back off a name:
-                    # what the person's backend is called is the agents' own business, and
-                    # what a run picked up again needs is which of its agents nobody chose.
-                    "person": isinstance(agent, HumanAgent),
-                }
-                for agent in agents
-            ],
-        )
+        self._where = workspace
+        self._profiler: Profiler | None = None
 
     @property
     def path(self) -> Path:
@@ -563,8 +665,13 @@ class Cycle:
 
     @property
     def journal(self) -> Path:
-        """The file the run's own record is written to, a line per thing that happened."""
-        return self._at / JOURNAL
+        """The file this record is written to, a line per thing that happened to it."""
+        return self._at / self._journal
+
+    @property
+    def record(self) -> str:
+        """What that file is called inside the cycle, which is what a call refers to."""
+        return self._journal
 
     @property
     def workspace(self) -> Path:
@@ -623,6 +730,19 @@ class Cycle:
           why: The exception itself, unread.
           traceback: Where it was raised, unread.
         """
+        self._close(kind)
+        for agent in self._agents:
+            agent.cycle = None
+
+    def _close(self, kind: type[BaseException] | None) -> None:
+        """Writes down that what this is a record of has ended, and how it ended.
+
+        Shared with the record of a flow this one called, which ends when the call returns
+        rather than when the run does: a record closes once and for all either way.
+
+        Args:
+          kind: What was raised out of it, if anything.
+        """
         from .agents import Stopped
 
         # The sampler first, so that what it saw is written down before anything reads it,
@@ -647,8 +767,37 @@ class Cycle:
             "ended",
             how="stopped" if stopped else "failed" if kind is not None else "done",
         )
-        for agent in self._agents:
-            agent.cycle = None
+
+    def called(
+        self,
+        flow: str,
+        agents: Sequence[AgentBase],
+        task: str,
+        *,
+        resumable: bool = False,
+    ) -> Sub:
+        """Opens the record of a flow this one called, beside this one's own.
+
+        A flow that called another is two flows, and each of them opened sessions, kept its
+        own state and may have called a third. So each gets a record of its own -- one file
+        per call, in the directory of the run that started it -- and this one is left saying
+        what it called, when, and which file to read it in. One run, written down as the
+        shape it actually ran in rather than as one flat list nothing can be attributed to.
+
+        Args:
+          flow: The flow being called, as it was asked for.
+          agents: The agents it was handed, in the order it takes them.
+          task: What it was called with.
+          resumable: Whether it says it can be picked up again.
+
+        Returns:
+          The record, to be written to while the call runs and ended when it returns.
+        """
+        # Named for the flow and for this call of it: a flow called twice in one run is two
+        # runs of it, each with its own sessions, and one file for both would say neither.
+        record = _record(flow, uuid.uuid4().hex[:6])
+        self.write("called", flow=flow, task=task, cycle=record)
+        return Sub(self, record, flow, agents, task, resumable=resumable)
 
     def opened(self, agent: AgentBase, session: str) -> None:
         """Writes down a session one of the agents has just opened.
@@ -703,8 +852,66 @@ class Cycle:
         """
         with self._writing:
             self._at.mkdir(parents=True, exist_ok=True)
-            with (self._at / JOURNAL).open("a", encoding="utf-8") as stream:
+            with (self._at / self._journal).open("a", encoding="utf-8") as stream:
                 stream.write(json.dumps({"event": event, "at": _now(), **said}) + "\n")
+
+
+class Sub(Cycle):
+    """One flow another flow called, written down in a record of its own.
+
+    Everything a run writes down, a flow the run called writes down too: the sessions it
+    opened, what it kept, and whatever it called in turn. What it does not have is a
+    directory: it is part of the run that called it, so its record sits beside that run's own
+    in the same cycle, and its sessions link into the same `sessions/`.
+
+    It ends when the call returns rather than when the run does, and says so at both ends --
+    here, and in the record of whatever called it. Closed by :meth:`ended` rather than as a
+    block, since what ends a call is the flow returning and the agents are the run's own
+    afterwards.
+    """
+
+    def __init__(
+        self,
+        under: Cycle,
+        record: str,
+        flow: str,
+        agents: Sequence[AgentBase],
+        task: str,
+        *,
+        resumable: bool = False,
+    ) -> None:
+        """Opens the record, and writes down what it is a record of.
+
+        Args:
+          under: What called it, which is where the call itself is written down.
+          record: What this record is called, inside the cycle they share.
+          flow: The flow being called, as it was asked for.
+          agents: The agents it was handed, in the order it takes them.
+          task: What it was called with.
+          resumable: Whether it says it can be picked up again.
+        """
+        self._under = under
+        self._begin(under.path, record, under.workspace, flow, agents)
+        self.write(
+            "began",
+            flow=flow,
+            task=task,
+            workspace=str(under.workspace),
+            resumable=resumable,
+            # Which record called this one, so that a flow that called a flow that called a
+            # flow reads back as what it was rather than as three things one run did.
+            under=under.record,
+            agents=_drove(agents),
+        )
+
+    def ended(self, kind: type[BaseException] | None = None) -> None:
+        """Closes this record, and writes the call's other end where the call was written.
+
+        Args:
+          kind: What was raised out of the called flow, if anything.
+        """
+        self._close(kind)
+        self._under.write("returned", flow=self._flow, cycle=self._journal)
 
 
 def under(workspace: Path | str | None = None) -> Path:
@@ -767,11 +974,33 @@ def _events(cycle: Path) -> list[dict[str, Any]]:
     return held
 
 
+def records(cycle: Path) -> list[Path]:
+    """Every record one cycle holds: the run's own, and one per flow the run called.
+
+    Args:
+      cycle: The cycle's directory.
+
+    Returns:
+      The files, the run's own first and the rest by name. Not the order they were opened
+      in: a name says which flow before it says which call of it, and what happened in what
+      order is what the lines themselves say.
+    """
+    at = cycle / JOURNAL
+    held = [at] if at.is_file() else []
+    # A directory that went while it was being read is the records that were read, the way
+    # a record that cannot be read at all is a cycle with nothing in it.
+    with contextlib.suppress(OSError):
+        held += sorted(one for one in cycle.glob(RECORDS) if one.is_file())
+    return held
+
+
 def opened(cycle: Path) -> dict[str, list[str]]:
     """What each agent of one cycle opened, as the ids the backends gave those sessions.
 
     Which is what a trace is gathered by: the backends log a session under an id and never
-    say whose it was, so the run has to say it instead.
+    say whose it was, so the run has to say it instead. Every record of the cycle, since a
+    session opened inside a flow the run called is one of the run's own -- what a trace of it
+    is is what the whole run did.
 
     Args:
       cycle: The cycle to read.
@@ -780,42 +1009,64 @@ def opened(cycle: Path) -> dict[str, list[str]]:
       One entry per agent that opened anything, oldest session first.
     """
     held: dict[str, list[str]] = {}
-    for said in _events(cycle):
-        if said.get("event") == "opened" and said.get("session"):
-            held.setdefault(str(said.get("agent")), []).append(str(said["session"]))
+    for one in sessions(cycle):
+        held.setdefault(one.agent, []).append(one.ident)
     return held
 
 
 def sessions(cycle: Path) -> list[Session]:
     """Every session one cycle opened, oldest first.
 
+    Read across every record it holds, and each session says which flow opened it: one run
+    is one run, however many flows it took to run it, and which of them a session was opened
+    inside is what a record of its own is for.
+
     Args:
       cycle: The cycle to read.
 
     Returns:
-      One apiece, saying whose it was, what took its turns, which account they ran as and
-      what the run calls it.
+      One apiece, saying whose it was, what took its turns, which account they ran as, what
+      the run calls it and which flow it was opened in.
     """
     held: list[Session] = []
-    for said in _events(cycle):
-        if said.get("event") != "opened" or not said.get("session"):
-            continue
-        agent, backend = str(said.get("agent") or ""), str(said.get("backend") or "")
-        ident = str(said["session"])
-        provider = str(said.get("provider") or LOCAL)
-        held.append(
-            Session(
-                agent=agent,
-                backend=backend,
-                provider=provider,
-                ident=ident,
-                # Worked out where an older cycle did not write one down: a name is what this
-                # session is called, and a cycle written before it had one still has sessions.
-                name=str(said.get("name") or called(agent, backend, provider, ident)),
-                at=str(said.get("at") or ""),
-            )
+    for at in records(cycle):
+        events = _events(at)
+        flow = next(
+            (
+                str(one.get("flow") or "")
+                for one in events
+                if one.get("event") == "began"
+            ),
+            "",
         )
-    return held
+        for said in events:
+            if said.get("event") != "opened" or not said.get("session"):
+                continue
+            agent, backend = (
+                str(said.get("agent") or ""),
+                str(said.get("backend") or ""),
+            )
+            ident = str(said["session"])
+            provider = str(said.get("provider") or LOCAL)
+            held.append(
+                Session(
+                    agent=agent,
+                    backend=backend,
+                    provider=provider,
+                    ident=ident,
+                    # Worked out where an older cycle did not write one down: a name is what
+                    # this session is called, and a cycle written before it had one still
+                    # has sessions.
+                    name=str(
+                        said.get("name") or called(agent, backend, provider, ident)
+                    ),
+                    at=str(said.get("at") or ""),
+                    flow=flow,
+                )
+            )
+    # By when each was opened rather than by which record it is in: the records are one run,
+    # and a run happened in one order.
+    return sorted(held, key=lambda one: one.at)
 
 
 def read(cycle: Path) -> Ran | None:
@@ -860,8 +1111,59 @@ def read(cycle: Path) -> Ran | None:
         how=str(ended.get("how") or "") if ended else "",
         agents=tuple(agents),
         sessions=tuple(sessions(cycle)),
+        called=tuple(_calls(events)),
         resumable=bool(began.get("resumable")),
     )
+
+
+def _calls(events: Sequence[dict[str, Any]]) -> list[Called]:
+    """Every flow one record says it called, in the order it called them.
+
+    Paired by the record each call was written to rather than by the order the lines are in:
+    a flow written as a coroutine may have two calls going at once, and their two ends
+    interleave. A run written before calls had records of their own says only which flow, and
+    is paired by taking a return for the last call of that flow still open -- which is what
+    nesting is, and the best a record that says no more can be read as.
+
+    Args:
+      events: The lines of one record.
+
+    Returns:
+      One apiece. A call with no end is a call that never returned -- a run killed under it
+      -- and is one of them all the same.
+    """
+    held: list[Called] = []
+    where: dict[str, int] = {}
+    for said in events:
+        record, flow = str(said.get("cycle") or ""), str(said.get("flow") or "")
+        if said.get("event") == "called":
+            # Kept by the record and not by the flow: one flow called twice is two calls,
+            # and each wrote to a file of its own.
+            where[record] = len(held)
+            held.append(
+                Called(
+                    flow=flow,
+                    task=str(said.get("task") or ""),
+                    record=record,
+                    began=str(said.get("at") or ""),
+                )
+            )
+        elif said.get("event") == "returned":
+            at = (
+                where.get(record)
+                if record
+                else next(
+                    (
+                        which
+                        for which, one in reversed(list(enumerate(held)))
+                        if one.flow == flow and not one.ended
+                    ),
+                    None,
+                )
+            )
+            if at is not None:
+                held[at] = held[at]._replace(ended=str(said.get("at") or ""))
+    return held
 
 
 def where(cycle: Path, session: Session) -> Path:

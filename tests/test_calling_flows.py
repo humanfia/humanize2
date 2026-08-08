@@ -14,7 +14,7 @@ import pytest
 
 from hmz.agents import AgentConfig
 from hmz.agents.skills import Loaded
-from hmz.cycle import cycles
+from hmz.cycle import JOURNAL, cycles, read, records, sessions
 from hmz.flows import NotAFlow, calls, running
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, events, written
@@ -58,14 +58,60 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 '''
 
 
+#: One that calls the same flow twice, since two calls of one flow are two runs of it.
+TWICE = '''"""The one that calls the same flow twice."""
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+from hmz.flows import calls
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    calls("inner")(agents, "once")
+    calls("inner")(agents, "again")
+'''
+
+#: One that calls the one in the middle, so that the run is three flows deep.
+NESTS = '''"""The one at the top."""
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+from hmz.flows import calls
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    calls("deeper")(agents, "mid")
+'''
+
+#: One that opens a session of its own and then calls a flow that opens one too.
+DEEPER = '''"""The one in the middle."""
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+from hmz.flows import calls
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+    agent.new()("echo middle")
+    calls("inner")(agents, "deep")
+'''
+
+
 @pytest.fixture(autouse=True)
 def flows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A project with two flows of its own in it, and a home nothing else has written to."""
+    """A project with flows of its own that call each other, and a home nothing wrote to."""
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     where = tmp_path / "project"
     (where / ".humanize/flows").mkdir(parents=True)
     written(where / ".humanize/flows", "inner", INNER)
     written(where / ".humanize/flows", "outer", OUTER)
+    written(where / ".humanize/flows", "twice", TWICE)
+    written(where / ".humanize/flows", "deeper", DEEPER)
+    written(where / ".humanize/flows", "nests", NESTS)
     monkeypatch.chdir(where)
     return where
 
@@ -263,6 +309,146 @@ def test_the_run_writes_down_the_flow_it_called(flows: Path) -> None:
     assert [one["event"] for one in called] == ["called", "returned"]
     assert called[0]["flow"] == "inner"
     assert called[0]["task"] == "inner: do it"
+
+
+def test_a_called_flow_is_written_down_in_a_record_of_its_own(flows: Path) -> None:
+    """A flow that called another is two flows, and each of them is a flow that ran."""
+    Runner("outer", [ShellAgent(CONFIG)]).run("do it")
+
+    (cycle,) = cycles()
+    ran = read(cycle)
+    assert ran is not None
+    (call,) = ran.called
+
+    assert (call.flow, call.task) == ("inner", "inner: do it")
+    # Named for the flow and for this call of it, and beside the record of the run itself.
+    assert call.record.startswith("cycle.inner_")
+    assert call.record.endswith(".jsonl")
+    assert records(cycle) == [cycle / JOURNAL, cycle / call.record]
+    assert call.began
+    assert call.ended
+    # And it says what it was a run of, under the record that called it.
+    began, *_, ended = events(cycle / call.record)
+    assert (began["event"], began["flow"], began["task"]) == (
+        "began",
+        "inner",
+        "inner: do it",
+    )
+    assert began["under"] == JOURNAL
+    assert (ended["event"], ended["how"]) == ("ended", "done")
+
+
+def test_what_a_called_flow_opened_is_written_where_it_ran(flows: Path) -> None:
+    """A session opened inside a called flow is that flow's, and a run has to say which."""
+    Runner("outer", [ShellAgent(CONFIG)]).run("do it")
+
+    (cycle,) = cycles()
+    ran = read(cycle)
+    assert ran is not None
+    (call,) = ran.called
+
+    # Nothing of the called flow's own in the run's record but the call itself.
+    assert [one["event"] for one in events(cycle)] == [
+        "began",
+        "called",
+        "returned",
+        "ended",
+    ]
+    assert [one["event"] for one in events(cycle / call.record)] == [
+        "began",
+        "opened",
+        "ended",
+    ]
+    # And the run is still every session it opened, each saying which flow opened it.
+    (one,) = sessions(cycle)
+    assert (one.ident, one.flow) == ("inner: do it", "inner")
+
+
+def test_a_flow_called_twice_is_written_down_twice(flows: Path) -> None:
+    """Two calls of one flow are two runs of it, each with sessions of its own."""
+    Runner("twice", [ShellAgent(CONFIG)]).run("go")
+
+    (cycle,) = cycles()
+    ran = read(cycle)
+    assert ran is not None
+    once, again = ran.called
+
+    assert (once.flow, once.task) == ("inner", "once")
+    assert (again.flow, again.task) == ("inner", "again")
+    assert once.record != again.record
+    assert sorted(one.name for one in records(cycle)) == sorted(
+        [JOURNAL, once.record, again.record]
+    )
+    assert [one.ident for one in sessions(cycle)] == ["once", "again"]
+
+
+def test_a_flow_a_called_flow_called_is_written_down_under_it(flows: Path) -> None:
+    """A run is the shape it ran in: what called what, and not one flat list of it all."""
+    Runner("nests", [ShellAgent(CONFIG)]).run("go")
+
+    (cycle,) = cycles()
+    ran = read(cycle)
+    assert ran is not None
+
+    # The run called `deeper` and nothing else: what `deeper` called is `deeper`'s to say.
+    assert [one.flow for one in ran.called] == ["deeper"]
+    (deeper,) = ran.called
+    (deep,) = [one for one in events(cycle / deeper.record) if one["event"] == "called"]
+    assert deep["flow"] == "inner"
+    assert events(cycle / str(deep["cycle"]))[0]["under"] == deeper.record
+    # And every session of the run is still the run's, each under the flow that opened it.
+    assert [(one.ident, one.flow) for one in sessions(cycle)] == [
+        ("middle", "deeper"),
+        ("deep", "inner"),
+    ]
+
+
+def test_a_call_that_raised_says_so_where_it_was_written(flows: Path) -> None:
+    """A record closes saying how what it is a record of ended, a call as much as a run."""
+    written(
+        flows / ".humanize/flows",
+        "bad",
+        '''"""Raises."""
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    raise RuntimeError("no")
+''',
+    )
+    written(
+        flows / ".humanize/flows",
+        "catches",
+        '''"""Calls the one that raises, and carries on."""
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+from hmz.flows import calls
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    try:
+        calls("bad")(agents, task)
+    except RuntimeError:
+        pass
+''',
+    )
+
+    Runner("catches", [ShellAgent(CONFIG)]).run("go")
+
+    (cycle,) = cycles()
+    ran = read(cycle)
+    assert ran is not None
+    (call,) = ran.called
+
+    assert ran.how == "done"  # the run went on: what failed was the flow it called
+    assert call.ended
+    last = events(cycle / call.record)[-1]
+    assert (last["event"], last["how"]) == ("ended", "failed")
 
 
 def test_a_flow_that_fails_is_no_longer_running(flows: Path) -> None:

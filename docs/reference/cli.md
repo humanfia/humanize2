@@ -439,6 +439,7 @@ A backend home that does not exist is skipped rather than being an error.
 | Path | Written by | |
 | --- | --- | --- |
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>/cycle.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened and as which account, how it ended. See [Cycles](/reference/tracing#cycles). |
+| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/cycle.<flow>_<hex>.jsonl` | the same, per flow that run [called](/reference/flows#a-flow-that-calls-another-flow) | What that call was, written the same way: a called flow opens sessions and calls flows of its own. The run's own record says which file each call is in. |
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>/sessions/<session>/` | the same | A link per file each session was logged to, for reading a run back. humanize reads and writes the logs where the backend keeps them. |
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>/state.json` | a [resumable](/reference/flows) flow | What that flow left behind, which the next run of it picks up. |
 | `~/.humanize/cycles/<workspace>/<datetime>-<hex>/profile.jsonl` | a run of a workspace that asked to be profiled | The programs the run started, sampled while it ran. |

@@ -9,10 +9,12 @@ a hook on, is refused where it was written down rather than hours into a loop.
 
 And a loop worth having is one another loop can reach for, which is :func:`calls`: a flow
 found by the same name `-f` takes, handed the agents the calling flow was given, carrying its
-own skills and its own kept state, and written down as running under whatever called it.
+own skills and its own kept state, and written down -- in a record of its own, beside the
+record of the run that called it -- as running under whatever called it.
 
 Nothing here reads a command line and nothing here opens a cycle: :mod:`hmz.runner` does both,
-and asks this what the flow it was named says about itself.
+and asks this what the flow it was named says about itself. A call asks the cycle already open
+for a record to be written into, which is not a second cycle: it is part of the one run.
 """
 
 from __future__ import annotations
@@ -41,8 +43,10 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from hmz.agents import Isolated, Moment, Remote
+    from hmz.agents import AgentBase, Isolated, Moment, Remote
+    from hmz.agents.base import Journal
     from hmz.agents.skills import Loaded
+    from hmz.cycle import Sub
 
     from . import Flow as Marked
     from .agent import Agent
@@ -160,6 +164,21 @@ def left(one: Running) -> None:
     with _TELLING:
         _RUNNING[:] = [held for held in _RUNNING if held[0] is not one]
         _DRIVEN.pop(id(one), None)
+
+
+class Writing(NamedTuple):
+    """Where one called flow is being written down, and what its agents wrote to before it.
+
+    Attributes:
+      record: The record opened for the call, or None for a call nobody is keeping one of --
+        one from a flow run from a test, or from a flow that was called from nothing.
+      before: What each of its agents was writing to when it was called, to be handed back
+        when it returns: the agents belong to the run, and a flow that called another goes
+        on writing its own record afterwards.
+    """
+
+    record: Sub | None
+    before: tuple[Journal | None, ...]
 
 
 class Place(NamedTuple):
@@ -542,6 +561,12 @@ def calls(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entr
     its skill wins when parent and child use the same name, and the agents are restored to
     exactly what the caller carried when the call returns or raises.
 
+    Each call is written down as the run of a flow it is. The cycle of the run that called it
+    gets a record of that call -- one file per call, named for the flow and for this call of
+    it -- and what the called flow opens, keeps and calls in turn goes there rather than into
+    the record of whatever started the run. The record that called it says `called` and
+    `returned` with the filename, so a run reads back as the shape it ran in.
+
     Args:
       flow: The flow to call, by the name `-f` takes.
       inherit_skills: Whether skills carried by the calling flow remain available inside the
@@ -586,17 +611,20 @@ def calls(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entr
         # back as it found them so that the flow which called it goes on carrying its own.
         before = skill_policy.carry(named, driven)
         started = entered(named, driven)
-        _wrote(driven, "called", flow=named, task=task)
+        # And a record of its own to write into, in the cycle of the run that called it: a
+        # called flow opens sessions and calls flows of its own, and what it did is its own
+        # rather than a run's that happened to start it.
+        writing = _opened(driven, named, task, resumable=mark.resumable)
         try:
             answered = run(driven, task, *settings, *held)
-        except BaseException:
-            _ended(driven, started, named, before)
+        except BaseException as why:
+            _ended(driven, started, before, writing, type(why))
             raise
         if inspect.isawaitable(answered):
             # A flow written as a coroutine has not run yet: it is running while whoever
             # called it awaits it, so what says it is running has to last that long too.
-            return _awaited(answered, driven, started, named, before)
-        _ended(driven, started, named, before)
+            return _awaited(answered, driven, started, before, writing)
+        _ended(driven, started, before, writing)
         return None
 
     return calling
@@ -606,40 +634,94 @@ async def _awaited(
     answered: Awaitable[None],
     driven: tuple[Agent, ...],
     started: Running,
-    named: str,
     before: Sequence[tuple[Loaded, ...]],
+    writing: Writing,
 ) -> None:
     """Waits for a called flow that is a coroutine, and writes down that it ended.
 
     Args:
       answered: What calling it gave back.
-      driven: The agents it was called with, for the cycle to write to.
+      driven: The agents it was called with.
       started: What :func:`entered` answered with.
-      named: The flow, as it was asked for.
       before: What each of them was carrying before it was called.
+      writing: What :func:`_opened` answered with.
     """
     try:
         await answered
-    finally:
-        _ended(driven, started, named, before)
+    except BaseException as why:
+        _ended(driven, started, before, writing, type(why))
+        raise
+    _ended(driven, started, before, writing)
+
+
+def _opened(
+    driven: tuple[Agent, ...],
+    named: str,
+    task: str,
+    *,
+    resumable: bool,
+) -> Writing:
+    """Opens the record a called flow is written to, and points its agents at it.
+
+    Found through the agents rather than through anything of ours: the cycle belongs to the
+    run that was started, the agents were handed it as it began, and a flow called from a
+    `Runner` that opened none -- a flow run from a test, a flow called from a flow called
+    from nothing -- has nowhere to write and nothing to say.
+
+    The agents write into it for as long as the call lasts, which is what puts a session
+    opened inside a called flow in that flow's record rather than in the record of whatever
+    started the run. They are pointed back at what they were writing to when it returns, the
+    way they are handed back the skills they carried.
+
+    Args:
+      driven: The agents the called flow was handed.
+      named: The flow, as it was asked for.
+      task: What it was called with.
+      resumable: Whether it says it can be picked up again.
+
+    Returns:
+      The record and what to hand the agents back.
+    """
+    # Asked what it is rather than taken as read: what an agent asks of a journal is that it
+    # can be told a session was opened, and this is asking it for something else.
+    from hmz.cycle import Cycle
+
+    under = next((one.cycle for one in driven if isinstance(one.cycle, Cycle)), None)
+    if under is None:
+        return Writing(None, ())
+    # Cast because a flow sees its agents through `Agent`, which says what a flow may ask
+    # of one and nothing about what it was configured with -- and what a record says it
+    # was driven by is exactly that. They are the run's own agents either way.
+    record = under.called(
+        named, cast("Sequence[AgentBase]", driven), task, resumable=resumable
+    )
+    was = tuple(agent.cycle for agent in driven)
+    for agent in driven:
+        agent.cycle = record
+    return Writing(record, was)
 
 
 def _ended(
     driven: tuple[Agent, ...],
     started: Running,
-    named: str,
     before: Sequence[tuple[Loaded, ...]],
+    writing: Writing,
+    kind: type[BaseException] | None = None,
 ) -> None:
     """Writes down that a called flow has ended, and hands its agents back as they came.
 
     Args:
       driven: The agents it was called with.
       started: What :func:`entered` answered with.
-      named: The flow, as it was asked for.
       before: The skills each of them carried before the call, which are the calling flow's.
+      writing: What :func:`_opened` answered with.
+      kind: What was raised out of the called flow, if anything.
     """
     left(started)
-    _wrote(driven, "returned", flow=named)
+    if writing.record is not None:
+        for agent, wrote in zip(driven, writing.before, strict=True):
+            agent.cycle = wrote
+        writing.record.ended(kind)
     for agent, held in zip(driven, before, strict=True):
         agent.loads(held)
 
@@ -707,29 +789,6 @@ def _handed(
             )
         lands(flow, agent, place)
     return make(driven)
-
-
-def _wrote(driven: tuple[Agent, ...], event: str, **said: Any) -> None:
-    """Writes one line about a called flow into the run's own record, where there is one.
-
-    Through the agents rather than through anything of ours: the cycle belongs to the run that
-    was started, the agents were handed it as it began, and a flow called from a `Runner` that
-    opened none -- a flow run from a test, a flow called from a flow called from nothing --
-    has nowhere to write and nothing to say.
-
-    Args:
-      driven: The agents the called flow was handed.
-      event: What happened.
-      said: What is worth saying about it.
-    """
-    # Asked what it is rather than taken as read: what an agent asks of a journal is that it
-    # can be told a session was opened, and this is asking it for something else.
-    from hmz.cycle import Cycle
-
-    for agent in driven:
-        if isinstance(agent.cycle, Cycle):
-            agent.cycle.write(event, **said)
-            return
 
 
 def _holding(driven: tuple[Agent, ...], named: str) -> dict[str, Any]:

@@ -9,13 +9,14 @@ them.
 
 from __future__ import annotations
 
+import json
 import subprocess
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from hmz.agents import AgentConfig, Stopped
-from hmz.cycle import called, cycles, linked, opened, read, sessions
+from hmz.cycle import JOURNAL, called, cycles, linked, opened, read, sessions
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, events, written
 
@@ -206,6 +207,7 @@ def test_a_session_is_named_for_whose_it_is_what_ran_it_and_which_account(
         "the-session",
         "builder-claude@local-the-session",
         one.at,
+        str(tmp_path / "flow"),
     )
     assert one.name == called("builder", "claude", "", "the-session")
 
@@ -315,6 +317,36 @@ def test_a_cycle_reads_back_as_what_was_run_and_how_it_went(
     assert not ran.resumable
     assert [one.agent for one in ran.agents] == ["builder"]
     assert [one.ident for one in ran.sessions] == ["the-session"]
+
+
+def test_a_run_written_before_calls_had_records_still_reads_as_what_it_called(
+    tmp_path: Path,
+) -> None:
+    """A cycle is read where it was written, and older runs were written differently."""
+    at = tmp_path / "cycle"
+    at.mkdir()
+    lines: tuple[dict[str, Any], ...] = (
+        {"event": "began", "at": "1", "flow": "outer", "task": "go", "agents": []},
+        {"event": "called", "at": "2", "flow": "a", "task": "one"},
+        {"event": "called", "at": "3", "flow": "b", "task": "two"},
+        {"event": "returned", "at": "4", "flow": "b"},
+        {"event": "returned", "at": "5", "flow": "a"},
+        {"event": "called", "at": "6", "flow": "a", "task": "three"},
+        {"event": "ended", "at": "7", "how": "stopped"},
+    )
+    (at / JOURNAL).write_text(
+        "\n".join(json.dumps(one) for one in lines), encoding="utf-8"
+    )
+
+    ran = read(at)
+    assert ran is not None
+    # Three calls and not two: a run that says only which flow is read by taking a return
+    # for the last call of that flow still open, which is what nesting is.
+    assert [(one.flow, one.task, one.ended) for one in ran.called] == [
+        ("a", "one", "5"),
+        ("b", "two", "4"),
+        ("a", "three", ""),
+    ]
 
 
 def test_a_directory_that_holds_no_run_is_not_one(tmp_path: Path) -> None:

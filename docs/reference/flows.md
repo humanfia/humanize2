@@ -636,6 +636,13 @@ and whatever it called, innermost last; the interface names them on its status l
 `/status`, and the [cycle](/reference/tracing) records each call and each return. A flow that called
 another does not read as the flow somebody chose.
 
+**And each call is written down as a run of its own.** A called flow opens sessions, keeps its
+own state and calls flows of its own, so the cycle gives every call a record of its own beside
+the run's — `cycle.<flow>_<hex>.jsonl` — and the record of whatever called it says `called` and
+`returned` with that filename. What the called flow opened is in its record rather than in the
+record of whatever started the run. See [Records of called
+flows](/reference/tracing#records-of-called-flows).
+
 ## Where flows live
 
 `-f` takes a name or a path. A name is looked for nearest first:

@@ -103,6 +103,7 @@ Every run of a flow is one **cycle**, which is a directory:
 ```
 ~/.humanize/cycles/<workspace>/<datetime>-<hex>/
     cycle.jsonl                     what happened, a line at a time
+    cycle.<flow>_<hex>.jsonl        the same, for one flow the run called
     state.json                      what a flow that can be picked up again left behind
     profile.jsonl                   the programs it ran, for a run that was profiled
     sessions/<session>/…            a link per file the backend logged that session to
@@ -111,7 +112,8 @@ Every run of a flow is one **cycle**, which is a directory:
 
 Not all of it every time: `state.json` is there for a flow that [can be picked
 up](/reference/flows#a-flow-that-can-be-picked-up), `profile.jsonl` for a directory that asked
-to be [profiled](#profiling-a-run), and `traces/` from the first time a trace is collected.
+to be [profiled](#profiling-a-run), `traces/` from the first time a trace is collected, and a
+`cycle.<flow>_<hex>.jsonl` for each flow the run [called](#what-a-called-flow-writes-down).
 
 Find the run that just finished and list it:
 
@@ -144,6 +146,8 @@ head -3 "$run"cycle.jsonl
 | --- | --- | --- |
 | `began` | when the flow starts | `flow`, `task`, `workspace`, whether the flow can be picked up again and which run this one was picked up from, and one entry per agent with its id, backend, model, effort, account, what it may do, whether it could use goals and whether it was the person at the prompt |
 | `opened` | each time an agent opens a session | `agent`, `backend`, `provider`, `session`, the name the run gives it and where inside the cycle its links are |
+| `called` | when the flow calls another flow | `flow`, `task`, and the `cycle` — the record that call was written to |
+| `returned` | when that call returns, however it ended | `flow` and the same `cycle` |
 | `ended` | when the flow stops | `how`: `done`, `failed`, or `stopped` |
 
 Each session's own logs are pointed at from `sessions/<name>/`, under a name that says whose
@@ -182,6 +186,31 @@ from hmz.cycle import cycles, opened
 for cycle in cycles():                 # this workspace, oldest first
     print(cycle, opened(cycle))        # {"actor": ["0a1b…"], "reviewer": [...]}
 ```
+
+### What a called flow writes down
+
+A flow can [call another](/reference/flows#a-flow-that-calls-another-flow), and a called flow
+opens sessions and calls flows of its own. Each call is written to a record of its own beside
+the run's, named for the flow and for that call of it:
+
+```sh
+ls "$run"cycle.*.jsonl
+```
+
+```console
+cycle.jsonl  cycle.gen-plan_0a1b2c.jsonl
+```
+
+The run's own record says what it called and which file to read it in:
+
+```console
+{"event":"called","at":"...","flow":"official/humanize1:gen-plan","task":"...","cycle":"cycle.official-humanize1-gen-plan_0a1b2c.jsonl"}
+{"event":"returned","at":"...","flow":"official/humanize1:gen-plan","cycle":"cycle.official-humanize1-gen-plan_0a1b2c.jsonl"}
+```
+
+A called flow's own record holds the same events, its `began` says which record is `under` it,
+and its `ended` says how the call ended rather than how the run did. Still one run and still
+one directory: a called flow is part of the run that called it.
 
 ## Which run, and what else there is to trace
 

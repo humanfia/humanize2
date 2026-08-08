@@ -103,18 +103,18 @@ def written(
 
 
 def events(cycle: Path) -> list[dict[str, Any]]:
-    """Every line one cycle wrote, in the order it wrote them.
+    """Every line one record wrote, in the order it wrote them.
 
-    A cycle is a directory now -- the run's own record, and a link per session it opened --
-    so what four of these suites want is the record inside it.
+    A cycle is a directory now -- the run's own record, a record per flow the run called, and
+    a link per session any of them opened -- so what these suites want is one file inside it:
+    the run's own where they are handed the directory, and the one they name where they name
+    a record of a called flow.
 
     Args:
-      cycle: The cycle's directory.
+      cycle: The cycle's directory, or one record inside it.
 
     Returns:
       One record per line.
     """
-    return [
-        json.loads(line)
-        for line in (cycle / JOURNAL).read_text(encoding="utf-8").splitlines()
-    ]
+    at = cycle / JOURNAL if cycle.is_dir() else cycle
+    return [json.loads(line) for line in at.read_text(encoding="utf-8").splitlines()]

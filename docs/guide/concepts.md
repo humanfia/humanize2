@@ -153,8 +153,9 @@ See [Flows › Flowverses](/reference/flows#flowverses).
 
 It opens when the flow starts and closes when the flow stops, finished, failed or interrupted.
 It is never reopened. Its `cycle.jsonl` records the flow, the agents and the backend's id for
-every session each of them opened. Beside it are a link per file each session was logged to,
-whatever a flow that [can be picked up](/guide/resuming) left behind, the programs a
+every session each of them opened. Beside it are a record apiece for the flows this one
+[called](/reference/flows#a-flow-that-calls-another-flow), a link per file each session was logged to, whatever a flow
+that [can be picked up](/guide/resuming) left behind, the programs a
 [profiled](/guide/tracing#profiling-a-run) run started and the traces gathered of it
 afterwards. It does *not* record what the sessions said. The backend's own log is the
 turn-by-turn record, and a cycle is not a second copy of it.
