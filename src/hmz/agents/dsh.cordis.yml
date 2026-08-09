@@ -25,6 +25,20 @@
 - id: session-checkpoints
   name: '@deepseek-ai/dsh-session-checkpoint-policy'
 
+# What the conversation is costing the context window, and what to do once it is nearly
+# full. Without these a session that runs long enough is a session the model refuses for
+# length -- which is where a loop that opens no new conversation stops for good, since the
+# next turn is the same conversation and the same refusal. The threshold is the plugin's
+# own default, written out because it is the number this is about.
+- id: token-meter
+  name: '@deepseek-ai/dsh-token-meter'
+
+- id: compaction-basic
+  name: '@deepseek-ai/dsh-compaction-basic'
+  config:
+    thresholdRatio: 0.8
+    auto: true
+
 - id: subprocess
   name: '@deepseek-ai/dsh-subprocess-local'
 

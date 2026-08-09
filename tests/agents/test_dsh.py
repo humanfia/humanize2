@@ -9,7 +9,14 @@ from typing import TYPE_CHECKING, Any, ClassVar, Self, cast
 import pytest
 from pydantic import BaseModel
 
-from hmz.agents import DRIVEN, DshAgent, DshAgentConfig, DshSession, dsh
+from hmz.agents import (
+    DRIVEN,
+    DshAgent,
+    DshAgentConfig,
+    DshSession,
+    Unrecoverable,
+    dsh,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -373,7 +380,11 @@ def test_a_failed_turn_is_common_failure_and_does_not_open_the_session() -> None
     assert raised.value.stderr.endswith("provider busy")
     assert session.named is None
     assert agent.opened == []
-    assert Harness.made[0].closed
+    # The turn failed, not the runtime behind it. Closing one that is still up is what
+    # leaves a durable id with no live session under it, which every turn after this one
+    # would be refused for as an id collision.
+    assert not Harness.made[0].closed
+    assert not isinstance(raised.value, Unrecoverable)
 
 
 @pytest.mark.parametrize("reason", ["max-tokens", "blocked", "aborted", "interrupted"])
@@ -643,6 +654,98 @@ def test_provider_environment_reaches_the_sdk_runtime(
     assert launch[0].endswith("/env")
     assert launch[1:] == ("-u", "DEEPSEEK_BASE_URL", "/opt/dsh-runtime")
     assert made["request_timeout_seconds"] == 180.0
+
+
+def failing(said: str) -> tuple[str, dict[str, Any]]:
+    """One turn end that says the turn did not complete, in the runtime's own words."""
+    return (
+        "turn/end",
+        {"turn": 1, "reason": {"kind": "error", "error": {"message": said}}},
+    )
+
+
+#: What the model answers a conversation that has outgrown it with, verbatim.
+_OVERFLOWED = (
+    "This model's maximum context length is 1048576 tokens. However, you requested "
+    "1054143 tokens (798143 in the messages, 256000 in the completion). Please reduce "
+    "the length of the messages or completion."
+)
+
+#: What the persistence layer answers a durable id whose live session is not the one it
+#: was written by, which is what a runtime restarted under an adopted id produces.
+_COLLIDED = (
+    'session "session-abc" already has a persisted log on disk that does not match this '
+    "live session (id collision)"
+)
+
+
+@pytest.mark.parametrize("said", [_OVERFLOWED, _COLLIDED])
+def test_a_failure_no_other_try_could_change_is_said_once(said: str) -> None:
+    """The two that made a long run a loop rather than a run that stopped.
+
+    A conversation longer than the model takes is that long on the next try, and a durable
+    id the runtime refuses as a collision is refused as one every time. Retried on an
+    account's schedule, either is a flow that makes no progress and never ends.
+    """
+    Harness.next_scripts.append([failing(said)])
+
+    with pytest.raises(Unrecoverable) as raised:
+        DshAgent(configured())("work")
+
+    assert said in str(raised.value)
+
+
+def test_an_ordinary_failure_is_still_one_to_take_again() -> None:
+    Harness.next_scripts.append([failing("provider is briefly unavailable")])
+
+    with pytest.raises(subprocess.CalledProcessError) as raised:
+        DshAgent(configured())("work")
+
+    assert not isinstance(raised.value, Unrecoverable)
+
+
+def test_a_turn_that_outgrew_the_model_is_taken_once_under_every_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The loop the report was about, from the outside: one failure, and one turn.
+
+    An account that says a turn under it is worth taking again would otherwise take this
+    one again on every rung of its chain, each try failing on the same words.
+    """
+    from hmz import providers
+
+    tried_again = providers.Provider(
+        "dsh", providers.LOCAL, way="", retries=3, policy="none", fallback="second"
+    )
+    second = providers.Provider("dsh", "second", way="", retries=3, policy="none")
+
+    def chain(account: providers.Provider) -> list[providers.Provider]:
+        return [account, second]
+
+    monkeypatch.setattr(providers, "chain", chain)
+    Harness.next_scripts.extend([failing(_OVERFLOWED)] for _ in range(8))
+    agent = DshAgent(configured())
+    monkeypatch.setattr(agent, "node", lambda: tried_again)
+
+    with pytest.raises(Unrecoverable):
+        agent("work")
+
+    assert len(Harness.made[0].client.prompts) == 1
+
+
+def test_the_runtime_composition_compacts_before_the_model_refuses_the_turn() -> None:
+    """A session that runs long enough must compact rather than overflow.
+
+    Without this the first turn past the context window is where a loop driving one
+    conversation stops for good: the next turn is the same conversation and the same
+    refusal, and nothing in the composition ever makes it shorter.
+    """
+    cordis = dsh.importlib.resources.files("hmz.agents").joinpath("dsh.cordis.yml")
+    composed = cordis.read_text()
+
+    assert "@deepseek-ai/dsh-token-meter" in composed
+    assert "@deepseek-ai/dsh-compaction-basic" in composed
+    assert "auto: true" in composed
 
 
 def test_the_runtime_composition_uses_only_plugins_bundled_with_the_sdk() -> None:

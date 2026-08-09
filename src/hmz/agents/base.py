@@ -23,7 +23,7 @@ from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import IO, TYPE_CHECKING, Any, ClassVar, Protocol, overload
 
-from .event import Event, Failed, Question, Stopped, Usage, say
+from .event import Event, Failed, Question, Stopped, Unrecoverable, Usage, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
 from .skills import Loaded, mount, unmount
 
@@ -777,6 +777,12 @@ class SessionBase(ABC):
         what to carry on under once those are spent -- and each account names the next, so
         what a turn walks is a chain rather than a single second place.
 
+        Which kind it was is the backend's to say, since only the backend knows what its own
+        failure means, and it says the second kind by raising `Unrecoverable`. Nothing here
+        reads a message to guess at it, and nothing here tries one of those again: a failure
+        that cannot come out differently, retried on a schedule, is a flow that makes no
+        progress and never stops.
+
         All of it inside the session that was running: the conversation is the backend's own
         and is named by an id, so the same session carries on under the next account. What a
         failed try already put on the transcript stays there -- it is how somebody reading it
@@ -791,7 +797,10 @@ class SessionBase(ABC):
 
         Raises:
             subprocess.CalledProcessError: If every try under every account of the chain
-              failed, which is the last of them raised as the turn's own failure.
+              failed, which is the last of them raised as the turn's own failure -- or at
+              once, without another try or another account, for an `Unrecoverable`: a turn
+              that failed for a reason no other try could come out differently on is a turn
+              that has failed, and trying it again is a loop rather than a recovery.
         """
         from hmz import providers
         from hmz.providers import retry
@@ -829,6 +838,14 @@ class SessionBase(ABC):
                     time.sleep(waiting)
                 try:
                     yield from self._stream(prompt, schema=schema)
+                except Unrecoverable:
+                    # A turn that would fail the same way however often it is taken, and
+                    # under whichever account takes it: a prompt longer than the model's
+                    # context window is that long again on the next try, and a conversation
+                    # its backend can no longer be reached under is not reachable a second
+                    # later. Tried again, those are a loop that runs until somebody stops
+                    # it -- so this one is the turn's own failure, said once.
+                    raise
                 except subprocess.CalledProcessError as failed:
                     last = failed
                 else:

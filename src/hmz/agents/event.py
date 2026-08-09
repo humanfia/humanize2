@@ -16,7 +16,7 @@ from typing import IO, TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-__all__ = ["Event", "Failed", "Question", "Stopped", "Usage", "say"]
+__all__ = ["Event", "Failed", "Question", "Stopped", "Unrecoverable", "Usage", "say"]
 
 #: The kinds every backend here counts, and which of them each also counts beside those. A
 #: kind is named the same thing wherever it is counted, so that one flow reading two backends
@@ -122,6 +122,25 @@ class Failed(subprocess.CalledProcessError):
         """
         said = [super().__str__(), _words(self.stderr), _plainly(self.output)]
         return " ".join(one for one in said if one)
+
+
+class Unrecoverable(Failed):
+    """A turn that failed for a reason no other try could come out differently on.
+
+    Most of what goes wrong in a turn is worth another go: a gateway that answered 503, a
+    subscription that said `too many requests`, a socket that closed mid-stream are each the
+    same call away from working, which is what an account's retries and the chain behind it
+    are for. Some of it is not. A prompt the model refused for being longer than its context
+    window is that long again on the next try; a conversation whose backend can no longer be
+    reached under the id it was opened with is not reachable under it a second later either.
+
+    Tried again, those become a loop: the same failure, at whatever interval the account was
+    given, for as long as anybody leaves it running. So they are said once, as this, and
+    whatever is trying a turn again MUST let this through rather than count it as an attempt.
+
+    A `Failed` still, and so a `CalledProcessError`: a flow catches turns rather than the
+    reasons they went wrong, and every loop written against one goes on working.
+    """
 
 
 #: How much of what a failed turn said is worth putting in the message. Enough for the

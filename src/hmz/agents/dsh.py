@@ -25,7 +25,7 @@ import yaml
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event, Failed, Usage, say
+from .event import Event, Failed, Unrecoverable, Usage, say
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping
@@ -51,6 +51,15 @@ _KEY_REQUIRED = (
     "and create a key account; or set DEEPSEEK_API_KEY before starting hmz."
 )
 _GOAL = "Use create_goal to pursue this objective until it is complete:\n\n{}"
+
+#: What the model says when the conversation no longer fits in it. Read from the message
+#: because that is where the runtime puts it: a turn refused for length is refused at the
+#: same length on the next try, so it is a failure to report rather than one to repeat.
+_TOO_LONG = (
+    "maximum context length",
+    "context length exceeded",
+    "context_length_exceeded",
+)
 
 
 class _Subscription(Protocol):
@@ -250,15 +259,15 @@ class DshSession(SessionBase):
                 say(result.text, sys.stdout)
             yield result
         except subprocess.CalledProcessError as refused:
-            self._shut()
+            self._failing(refused)
             yield self._shows(Event(kind="failed", text=_diagnostic(refused)))
             raise
         except (ModuleNotFoundError, ValueError):
             self._shut()
             raise
         except Exception as why:
-            self._shut()
-            refused = Failed(1, ["dsh", session_id], output=answer, stderr=str(why))
+            refused = _refusal(session_id, answer, str(why))
+            self._failing(why)
             yield self._shows(Event(kind="failed", text=_diagnostic(refused)))
             raise refused from why
         finally:
@@ -266,6 +275,21 @@ class DshSession(SessionBase):
             if anchored:
                 # Coganchor reconciles the mirror when the supervised process exits.
                 self._shut()
+
+    def _failing(self, why: BaseException) -> None:
+        """Lets go of the runtime behind a failed turn, where the turn is what went wrong.
+
+        Only where it is: a turn refused by the model, or one that ran out of the time it
+        was given, leaves a runtime that is up and a conversation that is whole, and closing
+        it is what makes the next turn on this session impossible -- the id has been adopted,
+        the runtime that holds it has gone, and every turn from then on is an id collision.
+        Which was one failure at the context window turning into a flow that never finished.
+
+        Args:
+          why: What the turn failed with.
+        """
+        if _runtime_gone(why):
+            self._shut()
 
     def _shows(self, event: Event) -> Event:
         """Shows an event on an unwatched run and returns it for the stream."""
@@ -647,7 +671,7 @@ def _tokens(value: object) -> float:
 def _failed(
     session_id: str, answer: str, reason: Mapping[str, Any] | None
 ) -> subprocess.CalledProcessError:
-    """Turns a non-completed dsh turn end into the common turn failure."""
+    """Turns a non-completed dsh turn end into the common turn failure, of its own kind."""
     held = reason or {}
     error = _mapping(held.get("error") or held.get("failure"))
     if error.get("code") == "MISSING_CREDENTIAL":
@@ -655,12 +679,50 @@ def _failed(
     else:
         detail = error.get("message")
         why = str(detail) if isinstance(detail, str) and detail else json.dumps(held)
-    return Failed(
-        1,
-        ["dsh", session_id],
-        output=answer,
-        stderr=f"DeepSeek Harness turn did not complete: {why}",
+    return _refusal(
+        session_id, answer, f"DeepSeek Harness turn did not complete: {why}"
     )
+
+
+def _runtime_gone(why: BaseException) -> bool:
+    """Whether a failed turn took its runtime with it, or left one the next turn may use.
+
+    Args:
+      why: What the turn failed with.
+
+    Returns:
+      Whether nothing is left running to carry the conversation on in. The transport closing
+      is the one failure that says so: the runtime is a process, and a turn the model refused
+      or a request that ran out of time is a turn that failed inside a process still up.
+    """
+    try:
+        errors = importlib.import_module("deepseek_harness.errors")
+    except ModuleNotFoundError:
+        # No SDK to have started a runtime with, so there is nothing to keep.
+        return True
+    closed = cast("type[BaseException]", vars(errors)["TransportClosedError"])
+    return isinstance(why, closed)
+
+
+def _refusal(session_id: str, answer: str, said: str) -> Failed:
+    """One turn's failure, as the kind of failure it is.
+
+    Args:
+      session_id: The conversation it was taken in.
+      answer: What the turn had said before it stopped.
+      said: What went wrong, as it is to be read.
+
+    Returns:
+      An `Unrecoverable` where another try is the same failure again -- a conversation that
+      no longer fits the model it is being sent to is that long on the next try, and a
+      durable id the runtime refuses as a collision is refused as one every time -- and an
+      ordinary `Failed` otherwise, which an account's retries and the chain behind it are
+      free to take again.
+    """
+    read = said.lower()
+    terminal = any(one in read for one in _TOO_LONG) or "id collision" in read
+    kind = Unrecoverable if terminal else Failed
+    return kind(1, ["dsh", session_id], output=answer, stderr=said)
 
 
 def _diagnostic(refused: subprocess.CalledProcessError) -> str:

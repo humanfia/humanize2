@@ -29,7 +29,7 @@ from .config import (
     isolated,
 )
 from .dsh import DshAgent, DshAgentConfig, DshSession
-from .event import Event, Failed, Question, Stopped, Usage
+from .event import Event, Failed, Question, Stopped, Unrecoverable, Usage
 from .grok import GrokBuildAgent, GrokBuildAgentConfig, GrokBuildSession
 from .hooks import EVERYWHERE, Hook, Hooks, Hung, Moment, Occasion, Unhooked, Verdict
 from .human import HumanAgent, HumanSession
@@ -142,6 +142,7 @@ __all__ = [
     "Stopped",
     "StreamSessionBase",
     "Unhooked",
+    "Unrecoverable",
     "Usage",
     "Verdict",
     "anchored",

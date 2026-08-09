@@ -58,6 +58,15 @@ the other way. The waits are the ones everybody uses: `none`, `constant`, `linea
 `exponential`, `exponential-jitter` (full jitter, which is what keeps a flow's agents from all
 coming back on the same second) and `fibonacci`.
 
+**Some failures are taken once whatever the account says.** A backend that knows its own
+failure cannot come out differently says so by raising `hmz.agents.Unrecoverable`, and that
+one is neither retried nor carried to the next account in the chain. A conversation longer
+than the model's context window is that long again on the next try; a backend that will not
+answer under the session id it was opened with will not answer under it a second later. An
+account set to retry would otherwise take those on its own schedule for as long as anybody
+left the flow running. It is a `subprocess.CalledProcessError` like every other failed turn,
+so a flow that catches turns catches it.
+
 **Then the chain moves on.** Each account names the one to carry on under when it has failed,
 and that one names the next:
 
@@ -144,6 +153,15 @@ agent = DshAgent(DshAgentConfig(model="deepseek-v4-flash", effort="high"))
 It also offers `deepseek-v4-pro`. The SDK and bundled runtime are currently a developer
 preview; humanize supports `deepseek-harness-sdk>=0.1.0rc6,<0.2`.
 
+Its runtime composition turns on the runtime's own automatic compaction, at the plugin's
+default threshold of 0.8 of the model's context window. One conversation driven for long
+enough otherwise reaches a turn the model refuses for length, and a loop that keeps talking
+to the same conversation never gets past it: the next turn is the same conversation and the
+same refusal. That refusal, and a session id the runtime will not answer under, are the two
+`Unrecoverable` failures of this backend — [taken once](#when-an-account-goes-down) rather
+than retried. A turn that fails without taking its runtime with it leaves that runtime up, so
+the conversation carries on into the turn after it.
+
 A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land),
 [what it may do](#what-an-agent-may-do), [which account it runs as](#which-account-it-runs-as),
 whether [goals](/guide/goals) are available to it, and nothing else — the
@@ -208,7 +226,9 @@ Both return what the agent answered, stripped.
 
 A turn that fails raises `subprocess.CalledProcessError` — whatever it was actually run
 through, so a flow catches turns rather than transports — and leaves the session unopened, so
-the next call retries the turn rather than resuming something that may not exist.
+the next call retries the turn rather than resuming something that may not exist. One that
+failed for a reason no other try could come out differently on raises `Unrecoverable`, which
+is a `CalledProcessError` too and is described [above](#when-an-account-goes-down).
 
 It says **why**, which a bare `CalledProcessError` does not:
 
