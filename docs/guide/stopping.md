@@ -63,6 +63,13 @@ this by accident. Let it propagate. The [cycle](/guide/tracing#what-a-run-writes
 records the run as **stopped by hand** rather than as one that finished. That is the difference
 between "it decided it was done" and "somebody stopped it", and the only place that
 distinction is written down.
+There is one other thing `suppress` does not catch, for the same reason. An
+[`Unrecoverable`](/reference/agents#when-an-account-goes-down) is a turn that failed for a
+reason no other try could come out differently on — a conversation longer than the model's
+context window, a session id the backend will not answer under. A `while True` that swallowed
+one would go round on the same failure until somebody stopped it, so it comes out of the loop
+and the run ends with it. Unlike a stop, it is a `CalledProcessError`, so a flow that really
+does want to catch everything still can.
 
 `agent.prompted()` raises it too, so a run ended while it waited also reads as ended by hand.
 `agent.stopped` is the quiet way to ask the same question. It is a bool, and never a raise:

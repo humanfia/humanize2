@@ -251,8 +251,10 @@ agent(task, suppress=True)   # "" if it failed, and the loop goes round again
 ```
 
 It catches a turn that failed and **nothing else**: not an agent that has been
-[stopped](#stopping), and not a backend with no [goal](#goals) feature, which is a flow to
-correct rather than a turn to retry.
+[stopped](#stopping), not a backend with no [goal](#goals) feature, which is a flow to correct
+rather than a turn to retry, and not an `Unrecoverable`. That last one for the reason a stop is
+not caught: a `while True` that swallowed a failure no other try could come out differently on
+would go round on the same failure until somebody stopped it.
 
 ## Sessions
 

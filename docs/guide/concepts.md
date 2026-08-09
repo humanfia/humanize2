@@ -234,7 +234,9 @@ agent, opposite behaviour. The flow decides, not the agent.
 **Turn failing vs. agent stopping — what a loop should do.** A turn that failed is ordinary;
 `suppress=True` turns it into an empty answer and the loop goes round again. An agent that has
 been *told to stop* (ctrl+c twice in the interface, or `agent.stop()`) raises `Stopped`. `suppress`
-deliberately does not catch it, because a loop that carried on past it would never end.
+deliberately does not catch it, because a loop that carried on past it would never end. It does
+not catch an `Unrecoverable` either, and for the same reason: a turn that failed for a reason
+no other try could come out differently on is one the next round would meet again.
 
 ---
 

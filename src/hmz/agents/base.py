@@ -575,12 +575,21 @@ class SessionBase(ABC):
             was told, which is a failed turn however cleanly the backend exited.
           Stopped: If the agent has been told to take no further turn -- which `suppress`
             does not cover, since a loop that carried on past it would never end.
+          Unrecoverable: If the turn failed for a reason no other try could come out
+            differently on, which `suppress` does not cover either and for the same reason: a
+            loop that went round again would meet the same failure every time.
         """
         said = ""
         try:
             for event in self.stream(prompt, schema=schema):
                 if event.kind == "result":
                     said = event.text
+        except Unrecoverable:
+            # Not covered by `suppress`, for the reason `Stopped` is not: a loop that carried
+            # on past a turn no other try could come out differently on would go round on the
+            # same failure until somebody stopped it. A conversation longer than the model
+            # takes is that long on the next round too.
+            raise
         except subprocess.CalledProcessError:
             if not suppress:
                 raise
@@ -1233,6 +1242,8 @@ class SessionBase(ABC):
             raise RuntimeError(f"{self._agent.id}: goals are disabled")
         try:
             return self._pursue(objective)
+        except Unrecoverable:
+            raise  # not covered by `suppress`, for the reason it is not in a turn
         except subprocess.CalledProcessError:
             if not suppress:
                 raise

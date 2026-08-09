@@ -21,13 +21,21 @@
 
 ## `__init__.py`
 
-Expose `AgentConfig`, `AgentBase`, `Event`, `Question`, `Stopped`, `SessionBase`,
-`CommandSessionBase`, `StreamSessionBase`, and all agent and session classes.
+Expose `AgentConfig`, `AgentBase`, `Event`, `Question`, `Stopped`, `Failed`, `Unrecoverable`,
+`Usage`, `SessionBase`, `CommandSessionBase`, `StreamSessionBase`, and all agent and session
+classes.
 
 ## `event.py`
 
-`Event`, `Question`, `Stopped` and `say`: what a turn says while it runs and what it asks,
-with no behaviour on them.
+`Event`, `Question`, `Stopped`, `Usage`, `Failed`, `Unrecoverable` and `say`: what a turn says
+while it runs, what it asks, what it cost, and how it failed -- with no behaviour on them.
+
+- `Failed` MUST be a `subprocess.CalledProcessError` that says what went wrong where whoever it
+  happened to can read it: a flow catches turns rather than transports, and the sentence a CLI
+  failed with is the whole of what a person needs.
+- `Unrecoverable` MUST be a `Failed` a turn is not taken again for. It is what a backend says
+  of a failure no other try could come out differently on, and nothing outside the backend
+  MUST read a message to guess at one.
 
 - These MUST NOT name the base classes. Every backend needs them and none of them needs the
   base classes to say one, so a reader of somebody else's stream format imports this alone.
@@ -320,6 +328,12 @@ class SessionBase(ABC):
   for a shape that answered in some other one MUST be caught by it too, and MUST answer `None`
   rather than `""`: an answer that is not what was asked for is a turn that did not do what it
   was told, however cleanly the backend exited.
+- It MUST NOT catch an `Unrecoverable` either, for the reason it does not catch a stop: a turn
+  that failed for a reason no other try could come out differently on is one a loop would meet
+  again on its next round, and a `while True` that swallowed it would go round on the same
+  failure until somebody stopped it. Which failures those are is the backend's to say, and
+  whatever tries a turn again MUST let one through rather than counting it as an attempt --
+  the same failure on a schedule is a flow that makes no progress and never ends.
 - A turn given a `schema` MUST answer with that model or not at all, and the model MUST be the
   whole of what the backend is asked: its fields, their types, which of them are required and
   the line each was declared with are already in it, so nothing about the shape MUST be said

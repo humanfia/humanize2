@@ -733,6 +733,21 @@ def test_a_turn_that_outgrew_the_model_is_taken_once_under_every_account(
     assert len(Harness.made[0].client.prompts) == 1
 
 
+def test_a_flow_that_catches_its_own_turns_does_not_catch_this_one() -> None:
+    """The loop the report was about, from the flow's side.
+
+    `suppress=True` is the `|| true` a Ralph loop writes beside every call, and a `while True`
+    that swallowed a failure no other try could come out differently on would go round on the
+    same failure until somebody stopped it. So this one is not caught, for the reason a stop
+    is not.
+    """
+    Harness.next_scripts.append([failing(_OVERFLOWED)])
+    session = DshAgent(configured()).new()
+
+    with pytest.raises(Unrecoverable):
+        session("work", suppress=True)
+
+
 def test_the_runtime_composition_compacts_before_the_model_refuses_the_turn() -> None:
     """A session that runs long enough must compact rather than overflow.
 
