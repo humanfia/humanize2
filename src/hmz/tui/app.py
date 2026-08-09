@@ -1750,7 +1750,13 @@ class Humanize(App[None]):
         The screen is one transcript, so what is cleared is that one: clearing every agent's
         would be `/clear` reaching into ones nobody was looking at.
         """
-        self._keeping(self._attached).lines.clear()
+        kept = self._keeping(self._attached)
+        kept.lines.clear()
+        # And what it was in the middle of saying, which is gone with the lines it was said
+        # against: the next part opens its own, and the next agent to speak on the one they
+        # all appear on says which agent it is rather than running on from a name nobody can
+        # see any more.
+        kept.packed, kept.spoke = False, ""
         self.query_one("#transcript", Transcript).clear()
         self._welcome()  # a cleared screen is a screen just opened, and one opens with this
         self._draw()

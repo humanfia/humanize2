@@ -23,6 +23,7 @@ from hmz.agents import AgentConfig, Event
 from hmz.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.app import _EVERY, _KEPT
+from hmz.tui.monitor import short
 from hmz.tui.pick import Held, reads
 from hmz.tui.selecting import Transcript
 from tests.stubs import ShellAgent, ShellSession, written
@@ -617,6 +618,28 @@ async def test_the_diagram_marks_who_is_working_and_who_handed_to_whom() -> None
         assert "↓ 1" in drawn  # the handover from the first to the second
         assert "1 of 2 working" in drawn
         assert "1 turn" in drawn
+
+
+@pytest.mark.timeout(60)
+async def test_a_cleared_screen_still_says_which_agent_a_line_is_from() -> None:
+    """The name is said once as it changes, so a screen cleared under one has to forget it."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        one, first, _two, _second = await _both_working(app, driver)
+        app._heard(one, first, Event(kind="text", text="before the clear"))
+        await driver.pause()
+        app.action_clear()
+        await driver.pause()
+        assert "before the clear" not in _transcript(app)
+
+        app._heard(one, first, Event(kind="text", text="after the clear"))
+        await driver.pause()
+
+        shown = _transcript(app)
+        assert "after the clear" in shown
+        assert (
+            short(one.id) in shown
+        )  # said again, there being nothing above it that said it
 
 
 @pytest.mark.timeout(60)
