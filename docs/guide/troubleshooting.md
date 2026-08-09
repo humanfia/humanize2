@@ -127,11 +127,11 @@ have. It holds no API key and talks to no model provider itself.
 command -v claude codex kimi pi opencode mimo
 ```
 
-### `no choosing a flow while a flow is running: esc stops it first`
+### `no choosing a flow while a flow is running: ctrl+c twice stops it first`
 
 Or `no switching flow while a flow is running`. You choose a flow in order to run it. So
 humanize stops whatever was running. It says so rather than doing it behind your back. Press
-esc first.
+ctrl+c twice first.
 
 ### `a flow is already running`
 
@@ -199,7 +199,7 @@ Open the session with a turn first.
 `pursue` is the backend's own goal feature, not a prompt asking for one. `suppress=True` does
 not catch this, deliberately. Asking for a feature that is not there is a flow to correct.
 
-### My loop never ends after I press esc
+### My loop never ends after I stop it
 
 Your loop is catching the stop. `Stopped` is not a `CalledProcessError`, and `suppress=True`
 does not catch it. But a bare `except Exception` in your flow will. Let it propagate.

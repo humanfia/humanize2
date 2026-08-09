@@ -10,15 +10,15 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  the transcript: one conversation, a turn after another              │
+│  the transcript: one agent, or all of them, a turn after another     │
 │                                                                      │
 ├──────────────────────────────────────────────────────────────────────┤
-│              builder · claude/claude-opus-4-8:high · 2 of 5          │  ← what each agent runs
-│              reviewer · codex/gpt-5.6-sol:high · 3 · unread          │
+│              builder · claude/claude-opus-4-8:high · ● 2 · reading   │  ← what each agent runs
+│              reviewer · codex/gpt-5.6-sol:high · ○ 3 · unread        │
 │                       48.2k tokens · 91/s                            │
 │ ❯ type here                                                          │  ← the editor
 ├──────────────────────────────────────────────────────────────────────┤
-│ ·|· builder… (73s · esc to interrupt)    enter say · tab agent · …  │  ← the status line
+│ ·|· builder… (73s · ctrl+c twice to stop)   esc status · tab agent  │  ← the status line
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -28,16 +28,17 @@ three lines on how to begin — what starts a flow, what `/flow` and `/agents` c
 transcript is a record, so a copy of either up there could only ever be the copy that was true
 when you opened it. Both are on the lines round the editor, which are redrawn.
 
-**The transcript** is one conversation, not every agent's at once. Which one, and how to move
-between them, is [below](#reading-one-conversation).
+**The transcript** is one agent's, or the one where every agent's work appears together —
+which is the one it opens on. Which, and how to move between them, is
+[below](#reading-one-agent).
 
 **Above the editor**, one line per agent the flow drives: the name the flow calls it, then what
 it runs as `cli/model:effort`, then the machine its turns land on where that is not this one,
 [what it may do](/guide/permissions) where that is not the ordinary rung, the
 [account](#which-cli-and-which-account) it runs as where that is not this machine's own, and
-finally the conversations it has open — `2 of 5` on the agent holding the one you are reading,
-the count alone on the others, and `unread` against one holding a conversation that has said
-something since you last looked at it. Under them, what the run has cost so far and the rate it is
+finally what it is holding — `●` or `○` for whether it is working, how many conversations it
+has open, `reading` on the agent whose transcript is on the screen, and `unread` on one that
+has said something since you last looked at it. Under them, what the run has cost so far and the rate it is
 costing it at — per model, since two agents at one model are one bill, and over a recent window
 only, so a flow that has stopped reads as stopped.
 
@@ -52,7 +53,10 @@ in, with your home written as `~`.
 
 **The status line, right:** the keys that do something *right now*, and only those. A shortcut
 listed in a state it does nothing in is worse than one that is not listed at all, and there is
-nowhere else to look them up.
+nowhere else to look them up. What **ctrl+c** would do next is what it is called by there,
+since it is the one key that means something different for having just been pressed. In a
+terminal too narrow for all of them, the ones at the front go first: those are the keys that
+mean the same thing whenever they are pressed.
 
 ## Keys
 
@@ -61,10 +65,10 @@ nowhere else to look them up.
 | **enter** | Sends what is typed. Over an open [offers list](#completion), takes what is highlighted instead. |
 | **shift+enter** | Breaks the line, which is what enter would do anywhere else. |
 | **ctrl+j** | The same, for a terminal that cannot tell shift+enter from enter. |
-| **esc** | Stops the flow — the whole flow, not just the turn. Dismisses the offers list first, if one is open. Silent when nothing is running. |
-| **ctrl+c** | Takes back the nearest thing there is to take back: what is half-typed if anything is, the turn of the conversation being read if not. Silent when there is neither. |
+| **esc** | Opens [`/status`](#how-the-run-is-going), which is where the run is read and the flow is drawn. Dismisses the offers list first, if one is open. |
+| **ctrl+c** | Takes back the nearest thing there is to take back: what is half-typed if anything is, the run if not. Twice stops the flow, a third press does not wait for it to unwind, and with nothing running twice leaves. |
 | **↑ / ↓** | Walks what was typed here before — but only off the first and last line, so a prompt of several lines is still moved around in. Over an open offers list, moves within the list. |
-| **tab** | [Steps to the next agent that is working](#reading-one-conversation) and reads its conversation. Over an open offers list, takes the highlighted offer instead. |
+| **tab** | [Steps to the next agent that is working](#reading-one-agent), and round to the one they all appear on. Over an open offers list, takes the highlighted offer instead. |
 | **shift+tab** | Steps to the one before it. |
 
 shift+enter reaches a program only from a terminal that speaks the keyboard protocol that has
@@ -78,15 +82,21 @@ asked for it — and shift+enter does not break the line there. ctrl+j is what d
 between handles the protocol properly, so iTerm2 under tmux breaks the line on shift+enter
 like everywhere else.
 
-ctrl+c never leaves. It is pressed while work is going on, and what it ends is that work: the
-conversation on the screen is closed under its turn, so the flow reads the turn as one that
-failed — the same thing it would have read had the agent fallen over by itself. A flow that
-catches its own turns carries on from there; one that does not stops there. The rest of the
-flow is left running, ten conversations being what a flow may have open and one of them being
-what is on the screen. esc is what stops all of it, and `/exit` is what leaves.
+**ctrl+c is asked twice, and means three things.** With something half-typed it clears the
+line, which is what it does in every terminal there is. With nothing typed and a flow
+running, the first press says `press ctrl+c again to stop the flow` and the second one stops
+it: a day's work is behind a key that is also pressed by mistake. A third press does not wait
+for the flow to unwind — every conversation still open is closed under its turn, which is the
+backend's process going, and what the flow reads as a turn that failed. With nothing running,
+two presses leave; `/exit` is the other way out.
+
+**esc does not stop anything.** It is pressed to dismiss whatever is on the screen everywhere
+else in this interface, so it is not the key that ends a day's work: it opens
+[`/status`](#how-the-run-is-going) instead, which is where the run is read and where the
+flow is drawn.
 
 Focus cannot leave the editor. There is nowhere else for it to go — which is why tab and
-shift+tab are free to read the conversations. While a sheet is up over the interface they are
+shift+tab are free to read the agents. While a sheet is up over the interface they are
 the sheet's, and while the offers list is open tab is its.
 
 ## Selecting and copying
@@ -138,10 +148,10 @@ list appears under the editor with a line about each.
 | `/cycles` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/guide/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
-| `/status` | | How the run is going: who is working, every handover between agents with how often it happened, and what each model has cost. That directed graph is the shape of the run. |
-| `/details` | `[on\|off]` | Shows or hides tool calls and thinking. They are one question — how much of the working to show — so they are one switch. |
+| `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent, marked as it works, with the handovers between them drawn as the arrows joining them. Enter reads an agent. **esc** opens it. |
+| `/details` | `[on\|off]` | Shows or hides everything a turn did on the way to its answer: tool calls, thinking, and whatever a backend printed on its way past. One question — how much of the working to show — so one switch. **Off** to begin with. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
-| `/clear` | | Clears the screen, and nothing else: the conversation being read, not the others, and nothing that is running. |
+| `/clear` | | Clears the screen, and nothing else: the transcript being read, not the others, and nothing that is running. |
 | `/export` | | Writes what is on the screen to `.humanize/<datetime>.session.md`, as it was written rather than as it was wrapped: everything drawn there since the last `/clear`, which is every conversation that has been read rather than only the one showing now. |
 | `/exit` | | Leaves. |
 
@@ -151,55 +161,117 @@ which.
 **`hmz anchor` is deliberately not here.** It is not a thing to do to a
 flow that is running, and a command that only ever means one thing is a command line.
 
-## Reading one conversation
+## Reading one agent
 
 A flow drives several agents, and each of them holds as many conversations as it likes — a
 Ralph loop opens one a turn, a fan-out holds one per worktree. All of them written down the
-same screen is none of them readable, so **the transcript is one conversation**, and **tab**
-and **shift+tab** step to the next agent and the one before, wrapping at either end.
+same screen with no way of reading any one back is none of them readable, so **there is a
+transcript per agent, and one more where every agent's work appears together**. That last one
+is what the interface opens on: before you have any reason to single an agent out, what you
+are watching is the flow.
 
-**They step between the ones that are working.** With ten agents going, what you are stepping
-between is the ones thinking right now, not the ones that have stopped. A conversation between
-its turns is still read once you are on it — what you are reading is left where it is until you
-press one of these — but it is not stepped onto, and with nothing working at all both keys do
-nothing.
+**tab** and **shift+tab** step round it and whichever agents are working, wrapping at either
+end. With ten agents going, what you are stepping between is the ones thinking right now, not
+the ones that have stopped. An agent between its turns is still read once you are on it — what
+you are reading is left where it is until you press one of these — but it is not stepped onto.
+Every agent there is can still be read from [`/status`](#how-the-run-is-going), which draws the
+whole flow: that is where the one that has stopped, or has not started, is picked out by name.
 
-The conversation you are reading is the one:
-
-- the transcript shows — moving to another writes a line saying which one is being read from
-  there down, and draws what it has said under that;
-- a line you type goes into;
-- the line above the prompt marks as `2 of 5`, against the agent holding it.
-
-**Nothing you have read is taken off the screen.** Moving to another conversation carries on
-under the line saying so, and so does a conversation ending under you — a Ralph loop drops one
-a turn, and the line then says `that conversation has gone`. Only `/clear` clears.
-
-That line also says **which agents are working**: `●` for one with a turn open, `○` for one
-that has stopped. It is the first thing to look for with several going at once, and the only
-thing on that line that changes by itself:
+**Every conversation of one agent is that agent's one transcript**, running on down it. A
+Ralph loop opens one a turn, and nothing is redrawn when it does — the screen would otherwise
+be wiped every turn, taking with it the turn you were reading, the line you typed and whatever
+went wrong. Which conversation a turn is in is said where the turn begins, for an agent holding
+more than one:
 
 ```
-   builder · claude/claude-opus-5:max · ● 2 of 5
+● claude#a1b2 is working · conversation 3 of 3
+```
+
+**Stepping onto another agent draws that agent's transcript from the top**, under a line
+saying which is being read. What one agent has done is that agent's; a screen that only ever
+appended would be every agent's lines shuffled into one another. Only `/clear` clears, and it
+clears the one you are reading rather than reaching into ones you were not looking at.
+
+On the transcript they all appear on, a line says which agent each part is from as that
+changes — once, rather than a name against every line:
+
+```
+── claude#a1b2
+
+● claude#a1b2 is working
+
+● Ready. The tests pass.
+```
+
+The line above the prompt says **which agents are working**: `●` for one with a turn open, `○`
+for one that has stopped. It is the first thing to look for with several going at once, and
+the only thing on that line that changes by itself:
+
+```
+   builder · claude/claude-opus-5:max · ● 2 · reading
    reviewer · codex/gpt-5.6-sol:high · ○ 1 · unread
 ```
 
-An agent holding a conversation that has said something since you last looked at it is marked
-`unread` there, so a flow of ten conversations is not nine nobody knows to look at.
+`reading` marks the agent whose transcript is on the screen, and `unread` one that has said
+something since you last looked at it — so a flow of ten agents is not nine nobody knows to
+look at. Nothing is marked unread while you are reading all of them at once: what an agent
+said went onto that screen too, and you have just read it there.
 
-You start out reading the first conversation the flow opens, so a flow that only drives one
-agent needs none of this. With no flow running there is nothing to read and both keys do
-nothing. A flow that talks to you is talking to you here, so the conversation with the person
-is not one of the ones these keys move between.
+A flow that talks to you is talking to you here, so the person is not one of the agents these
+keys move between. With no flow running there is nothing working, and both keys leave you on
+the transcript they all appear on.
 
-**What is being read is held by the conversation itself**, not by where it comes in the list.
-The list churns — a Ralph loop drops one every turn — and when the one you were reading goes,
-the newest of that agent's is read instead, since a loop that dropped one has already opened
-the next. Where that agent has none left, whatever is nearest to where it was.
+**A typed line goes to the agent you are reading** — of its conversations, the one with a turn
+open. Where you are reading all of them at once there is no one agent you can have meant, so it
+goes to whichever has a turn open, which is the one the screen is showing anyway.
 
 What is kept is bounded, a flow being a thing that runs for days: the last eight conversations,
 and the last two thousand lines of each. Older lines and older conversations are gone from the
 screen, not from the [trace](/reference/tracing) — that is what a trace is for.
+
+## How the run is going
+
+`/status` says how the run is going and draws the shape of it, and **esc** is what opens it. It
+is read rather than answered, so it is not refused while a flow runs, and it is redrawn while
+it is open — what it is about moves without anybody touching it.
+
+The shape of a flow is not written down anywhere. A flow is a Python file that may branch any
+way it likes, so what it did is read off the turns going past — and drawn as a box per agent,
+in the order the flow takes them, with the handovers between neighbours as the arrows joining
+them:
+
+```
+  ▣ every agent · 1 of 2 working · reading
+
+  ┌──────────────────────────────────────────────┐
+  │ ● builder · claude#a1b2                      │
+  │ claude/claude-opus-5:high · 12 turns         │
+  └──────────────────────────────────────────────┘
+      ↓ 6   ↑ 5
+  ┌──────────────────────────────────────────────┐
+  │ ○ reviewer · codex#c3d4                      │
+  │ codex/gpt-5.6-sol:high · 5 turns             │
+  └──────────────────────────────────────────────┘
+
+   Working:  builder
+   Running:  431s
+   Also:     builder → reporter · ×2
+   Tokens:   claude-opus-5                48.2k    91/s
+```
+
+`●` is an agent with a turn open and `○` one that has stopped, and they move as the run does.
+A handover between two agents the boxes did not put next to each other is said under the
+diagram as `Also` rather than drawn: a line crossing the page from the first box to the fourth
+is a line nothing in a terminal draws readably.
+
+**Enter or a click on a box reads that agent** — whether or not it is working. tab is held to
+the ones thinking, so this is the one place an agent that has stopped, or has not started, is
+reached. The first row is the transcript every agent's work appears on, which is the way back
+to watching the flow rather than one agent of it.
+
+The agents of the last run are still drawn once it is over. Their transcripts are still on the
+screen and still worth reading back, and a run that has just ended is usually the one you want
+to look at.
 
 ## Talking to a running flow
 
@@ -248,11 +320,12 @@ lines` for one message too long to show whole. Only what is drawn is cut; the wh
 you typed is what goes. A flow that ends, however it ends, drops whatever is still pinned into
 the transcript and says it was never sent.
 
-A line reaches [the conversation you are reading](#reading-one-conversation), and only while a
-turn of it is open. Not whichever agent happens to be working: an agent may be holding one
-conversation you are reading and taking a turn in another, and a line said to the wrong one is
-a line said to somebody else. A conversation between turns would answer it on its own, outside
-the flow, so it waits for the turn that starts next instead.
+A line reaches [the agent you are reading](#reading-one-agent) — of its conversations, the one
+with a turn open. Not whichever agent happens to be working: a flow drives several, and a line
+said to the one that is not on the screen is a line said to somebody else. Reading all of them
+at once there is no one agent you can have meant, so it goes to whichever has a turn open. A
+conversation between turns would answer it on its own, outside the flow, so it waits for the
+turn that starts next instead.
 
 How far "into the turn" it gets depends on the backend:
 
@@ -651,7 +724,7 @@ that says which run it came from.
 happened does not change under you, so the list is worth having open mid-run — but a run
 picked up is a flow started, and there is one going. It is said under the list rather than by
 shutting the menu, since the question the menu is asking is still worth answering: `a flow is
-running; esc stops it before another can be picked up`.
+running; ctrl+c twice stops it before another can be picked up`.
 
 A directory nothing has ever been run in says so under the empty list. The same trace is
 [`hmz trace collect`](/reference/cli#hmz-trace-collect) on a command line, with `--cycle` to

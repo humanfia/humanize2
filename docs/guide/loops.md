@@ -64,7 +64,7 @@ Or say it outright:
 ```
 
 `/flow` is **refused while a flow is running**. You get `no choosing a flow while a flow is
-running: esc stops it first`. So stop the last one with esc before you choose the next. Looking
+running: ctrl+c twice stops it first`. So stop the last one before you choose the next. Looking
 and leaving without choosing changes nothing.
 
 ::: details What the three built-in flows are
@@ -101,17 +101,17 @@ happened, and what each model has cost. On a one-agent flow the graph is dull. O
 Above the editor, continuously:
 
 ```
-   assistant · claude/claude-opus-4-8:high · ● 1 of 1
+   assistant · claude/claude-opus-4-8:high · ● 1
                        48.2k tokens · 91/s
 ```
 
-`●` is an agent with a turn open. `1 of 1` is which conversation you are reading, of the ones
-this agent has open **right now**. A Ralph loop holds one conversation at a time, and that
-conversation is the turn's own. It lets the conversation go when the turn ends, so the number
-after `of` does not climb with the turns. Between turns it holds none and the line says nothing
-about conversations at all. **tab** steps between the ones that are working. That matters on a
-flow that holds several at once, such as [two agents taking turns](/tutorials/take-home), or a fan-out
-reading `1 of 200`.
+`●` is an agent with a turn open, and `1` is how many conversations it has open **right now**.
+A Ralph loop holds one at a time, and that conversation is the turn's own. It lets the
+conversation go when the turn ends, so the number does not climb with the turns; between turns
+it holds none and the line says nothing about conversations at all. All of them run down this
+agent's one transcript either way — nothing is redrawn when the next one opens. **tab** steps
+between the agents that are working, which matters on a flow that drives several, such as
+[two agents taking turns](/tutorials/take-home).
 
 The cost line is per model, over a recent window, so a flow that has stopped reads as stopped.
 See [Cost and rate](/guide/tally).
@@ -131,7 +131,7 @@ You can also type at it. That goes into the turn that is running, as before.
 
 ## Stop the loop
 
-**esc.**
+**ctrl+c**, twice.
 
 The loop never ends by itself; it is a `while True`. A stop raises `Stopped` inside the flow's
 code. `suppress=True` deliberately **does not** catch that — otherwise the loop would carry on

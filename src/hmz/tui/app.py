@@ -5,10 +5,13 @@ editor under it between two rules, and a status line under that. Nothing sits be
 how the run is going is on `/status`, and `/flow` both chooses the loop and, a page along,
 sets what each of its agents runs.
 
-The transcript is one conversation rather than every agent's at once. A flow drives several
-agents and each of them holds as many conversations as it likes, so tab and shift+tab attach
-to the next and the previous of the ones it has open: what is read is one of them, and so is
-what is said to.
+The transcript is a tab per agent, and one more where all of them appear together. A flow
+drives several agents and each of them holds as many conversations as it likes; every agent's
+lines interleaved is none of them readable, and a screen wiped every time a loop opened its
+next conversation is a screen nobody can read back through. So each agent keeps a transcript
+of its own, all of its conversations running on down it, and the tab this opens on is the one
+that shows the lot -- which is where somebody watches a flow rather than an agent. tab and
+shift+tab step between that one and whichever agents are working.
 
 It opens on the flow that is only talking to one agent, so that saying something is all it
 takes to start. A flow is what you reach for once talking to one agent is not the shape of
@@ -64,11 +67,13 @@ from .complete import about, hinted, offered, takes
 from .discover import installable, installed
 from .history import History
 from .monitor import Monitor, short, thousands
+from .pick import EVERY as _EVERY
 from .pick import (
     Adjusted,
     Adjusts,
     Chosen,
     Cycles,
+    Drawn,
     Flows,
     Flowverses,
     Held,
@@ -143,14 +148,18 @@ _PINNED = 5
 #: cannot ask for a negative number of columns.
 _NARROW = 20
 
-#: How many conversations the transcript is kept for, and how many lines of each. A flow runs
-#: for days and a Ralph loop opens a conversation a turn, so keeping every line of every one
-#: of them is a run that grows until somebody stops it. Eight is more than a flow has open at
-#: once -- an agent or two apiece -- so what falls off the end is a conversation there is no
-#: longer anything to attach to; two thousand lines is more of one than anybody reads back
-#: through, and about what a long turn's tools and thinking come to.
-_KEPT = 8
+#: How many transcripts are kept, and how many lines of each. One per agent and one for all
+#: of them together, so a flow of ten agents is eleven -- and the ones before that are the
+#: agents of flows that have already ended, which are kept until there are this many newer.
+#: Two thousand lines is more of one than anybody reads back through, and about what a long
+#: turn's tools and thinking come to.
+_KEPT = 16
 _LINES = 2000
+
+#: How long a second ctrl+c has to arrive in for the two to be one gesture. Long enough to
+#: read the line that says what the next press does and then press it, and short enough that
+#: a press minutes later is a first press rather than half of one nobody remembers making.
+_AGAIN = 3.0
 
 #: The three steps one agent of a flow is configured in, in the order they are asked: which
 #: coding agent takes its turns and as whom, which model it runs and at what effort, and --
@@ -299,16 +308,24 @@ class _Shown(NamedTuple):
 
 @dataclass
 class _Kept:
-    """What one conversation has to show, held against it rather than against the screen.
+    """What one transcript has to show, held against it rather than against the screen.
+
+    One per agent, and one more for all of them together. Held rather than drawn once and
+    forgotten because stepping to another agent draws that agent's from the top: a transcript
+    is what that agent has done, and a screen that only ever appended would be every agent's
+    lines shuffled into one another with no way of reading any of them back.
 
     Attributes:
-      lines: What has been put in the transcript against it, oldest first and held to the
-        last `_LINES` of them, the ones before that falling off the front.
+      lines: What has been put in it, oldest first and held to the last `_LINES` of them, the
+        ones before that falling off the front.
       unread: Whether it has said something since it was last read, which is what the line
-        above the prompt marks an agent holding one with.
+        above the prompt marks an agent with.
       packed: Whether the last part shown was one the next may run on from. A thing about the
-        conversation rather than about the screen: two of them talking at once would
-        otherwise space each other's lines.
+        transcript rather than about the screen: two agents talking at once would otherwise
+        space each other's lines.
+      spoke: Which agent said the last thing on it, so that the one where all of them appear
+        together says who a line is from when that changes. "" on an agent's own, where
+        there is only ever the one answer to it.
     """
 
     lines: deque[_Shown] = field(
@@ -316,6 +333,7 @@ class _Kept:
     )
     unread: bool = False
     packed: bool = False
+    spoke: str = ""
 
 
 class Editor(TextArea):
@@ -507,12 +525,14 @@ class Humanize(App[None]):
 
     BINDINGS: ClassVar = [
         Binding("ctrl+c", "interrupt", "interrupt", priority=True),
-        # What the status line says while a flow runs, and what opencode's esc does there.
-        # The editor takes esc first while it is offering something, and only then.
-        Binding("escape", "stop_flow", "interrupt", show=False),
-        # Forwards and backwards through the conversations the flow has open. Priority, since
-        # tab and shift+tab are the screen's own way of moving the focus about, and there is
-        # nowhere here for the focus to go.
+        # How the run is going, which is where the flow is drawn. Not what stops a flow: a
+        # key pressed to dismiss whatever is on the screen must not be the key that ends a
+        # day's work, and esc is pressed to dismiss things everywhere else in this
+        # interface. The editor takes it first while it is offering something.
+        Binding("escape", "status", "status", show=False),
+        # Round the transcripts: the one every agent is on, then whichever are working.
+        # Priority, since tab and shift+tab are the screen's own way of moving the focus
+        # about, and there is nowhere here for the focus to go.
         Binding("tab", "attach_next", "next agent", priority=True),
         Binding("shift+tab", "attach_previous", "previous agent", priority=True),
     ]
@@ -561,31 +581,90 @@ class Humanize(App[None]):
         self.exit()
 
     def action_interrupt(self) -> None:
-        """Takes back the nearest thing there is to take back: the line, then the turn.
+        """Takes back the nearest thing there is to take back, on a press or two or three.
 
-        Which is what ctrl+c means in a coding agent's terminal, less the leaving: the
-        half-written line if there is one, and otherwise the turn of the conversation being
-        read. That conversation is ended under its turn, so what the flow gets back is a
-        turn that failed -- the same thing it would have got had the agent fallen over by
-        itself, and so a flow that catches its own turns carries on and one that does not
-        stops. The rest of the flow is left where it is: what is being read is one
-        conversation of however many are open, and esc is what stops all of them.
+        The half-written line first, if there is one, which is what ctrl+c does in every
+        terminal there is and what nobody presses it twice for.
 
-        Nothing at all where there is nothing to take back, as tab does with nothing to step
-        to: this is pressed at a turn that is running, and a complaint where none is would
-        be in the way.
+        With nothing typed it is the run, and it is asked twice: a flow is a day's work
+        behind a key that is also pressed by mistake, so the first press says what the next
+        one does and the second one does it. Every agent is told to take no further turn, so
+        the turn running now is closed out and the loop ends rather than handing on.
+
+        A third press does not wait for it. A flow that has been told to stop unwinds in its
+        own time -- a loop sleeps off its round, a server is given its seconds -- and a third
+        press closes every conversation still open under whatever turn it is in, which is the
+        backend's process going. That is the last thing a key can do about a flow.
+
+        With nothing running it is the interface, asked the same way: twice, because leaving
+        is not what ctrl+c means anywhere else and a first press that left would be a run
+        somebody ended while reaching to clear a line.
         """
         editor = self.query_one(Editor)
         if editor.text:
             editor.text = ""
+            self._presses = 0
             return
-        session = self._interrupting()
-        if session is None:
+        now = time.monotonic()
+        # A press long enough after the last is the first of its own gesture: nobody
+        # remembers pressing this two minutes ago, and the line that said what the next one
+        # would do has been gone for most of that.
+        self._presses = self._presses + 1 if now - self._pressed < _AGAIN else 1
+        self._pressed = now
+        if self._agents:
+            self._interrupts()
+        elif self._stopping:
+            # A flow told to stop and not yet gone. However long ago it was told: this is
+            # the one thing left that a key can do about it, and asking for it twice over
+            # would be asking twice about a run that is already over.
+            self._forces()
+        elif self._presses > 1:
+            self.action_quit()
+        else:
+            self.show("[dim]— press ctrl+c again to leave —[/dim]")
+        self._draw()
+
+    def _interrupts(self) -> None:
+        """The first two presses at a flow that is running: say so, then stop it."""
+        if self._presses < 2:  # noqa: PLR2004 -- the second press is what stops it
+            self.show("[dim]— press ctrl+c again to stop the flow —[/dim]")
             return
-        self.show("[dim]— interrupting the turn —[/dim]")
-        # On this thread, as stopping the whole flow is: closing a conversation is closing
+        self.action_stop_flow()
+        # Counted from nothing again, so that the press after this one is the one that does
+        # not wait for the flow to unwind rather than the one that leaves.
+        self._presses = 0
+
+    def _forces(self) -> None:
+        """The press after the one that stopped a flow, which does not wait for it to go.
+
+        Telling an agent to stop closes its conversations, and a backend that took no notice
+        of that is the reason there is a third press: every conversation still open is closed
+        again, which is the backend's process going. What the flow gets back is a turn that
+        failed, the same thing it would have got had the agent fallen over by itself.
+
+        And the run reads as over from here, whatever is still unwinding behind it: nothing
+        is left that a turn could still be running in, so nothing is left spinning at the
+        person who has just asked twice for it to stop.
+        """
+        closing = [
+            session
+            for agent in self._stopping
+            for session in agent.sessions
+            if session in self._working
+        ]
+        self._presses = 0
+        self._stopping = []
+        if not closing:
+            return
+        self.show(
+            f"[dim]— closing {len(closing)} conversation(s) under their turns —[/dim]"
+        )
+        # On this thread, as telling the flow to stop is: closing a conversation is closing
         # the process behind it, which is a second at the outside.
-        session.close()
+        for session in closing:
+            with contextlib.suppress(Exception):  # a conversation already gone is gone
+                session.close()
+            self._working.discard(session)
 
     def __init__(
         self,
@@ -623,15 +702,18 @@ class Humanize(App[None]):
         self._monitor = Monitor()
         self._tally = Tally([], self._monitor)
         #: Whether what a turn did on its way to an answer -- the tools it used, the thinking
-        #: it did aloud -- is shown, which `/details` toggles.
-        self._details = True
+        #: it did aloud, whatever it printed on its way past -- is shown, which `/details`
+        #: toggles. Off, because a flow is watched to see where it has got to: what the
+        #: agents said to each other and to you is that, and a tool row per file read is a
+        #: transcript nobody is reading and the answer scrolled off the top of it.
+        self._details = False
         #: Whether an agent may stop and ask, which `/afk` toggles. It may, until you say you
         #: are not there: a question nobody answers is a flow that has stopped.
         self._afk = False
         #: The question a turn has stopped on, if one has, and where its answer goes -- and
-        #: which conversation it was shown on, so that what it will take for an answer is
-        #: shown under it rather than wherever the person is looking by the time it lands.
-        self._asked_on: weakref.ref[SessionBase] | None = None
+        #: which agent it was shown against, so that what it will take for an answer is shown
+        #: under it rather than wherever the person is looking by the time it lands.
+        self._asked_on: str | None = None
         self._asking: Question | None = None
         self._answer = ""
         self._answered = threading.Event()
@@ -687,19 +769,29 @@ class Humanize(App[None]):
         self.history = History()
         #: When each agent's turn started, for the line that closes it.
         self._began: dict[str, float] = {}
-        #: What each conversation has to show, against the conversation itself, so that
-        #: attaching to one draws what it has said rather than every agent's at once. Keyed
-        #: weakly: a flow drops a conversation a turn, and a transcript that held one open
-        #: would be the interface keeping alive what the flow has let go of. The one under
-        #: None is the interface's own, which is what there is to show before anything is
-        #: attached -- the box this opens with, and whatever started the flow.
-        self._kept: dict[weakref.ref[SessionBase] | None, _Kept] = {}
-        #: The conversation being read: what the transcript shows, and where a typed line
-        #: goes. Held by identity rather than by where it comes in the list, since the list
-        #: churns; beside it the agent it belonged to and where it came, so that one which
-        #: has gone can be replaced by the nearest thing there is to it.
-        self._attached: weakref.ref[SessionBase] | None = None
-        self._attached_was: tuple[str, int] = ("", 0)
+        #: What each transcript has to show: one per agent, under that agent's id, and one
+        #: under `_EVERY` where all of them appear together. Kept by name rather than by the
+        #: object, since an agent's conversations come and go under it -- a Ralph loop opens
+        #: one a turn -- and what is read is the agent rather than whichever of them is open.
+        self._kept: dict[str, _Kept] = {}
+        #: Which transcript is being read: what the screen shows, and which agent a typed
+        #: line is said to. The one they all appear on until somebody steps off it, that
+        #: being where a flow is watched rather than one agent of it.
+        self._attached: str = _EVERY
+        #: When ctrl+c was last pressed, and how many times it has been pressed in a row, so
+        #: that the second and third mean more than the first. `_AGAIN` is how long a press
+        #: counts for.
+        self._pressed = 0.0
+        self._presses = 0
+        #: The agents of a flow that has been told to stop and has not finished unwinding.
+        #: A third ctrl+c closes their conversations under whatever turn is still open, which
+        #: is the only thing left that a key can do about a flow already on its way out.
+        self._stopping: list[AgentBase] = []
+        #: The agents of the last run, which outlive it: their transcripts are still on the
+        #: screen when the flow is over, so the diagram that reads one out is still about
+        #: them. `_agents` is the running flow's and is let go of the moment it ends, so that
+        #: the next thing typed starts something rather than being put to a flow that is gone.
+        self._ran: list[AgentBase] = []
         #: The conversations with a turn open, which are the only ones a typed line can go
         #: into: one written to a conversation between turns is answered on its own, outside
         #: the flow. Weakly held, for the reason the transcript is.
@@ -888,8 +980,12 @@ class Humanize(App[None]):
 
         Output is barred rather than indented because that is what opencode does with it:
         a command and what it said are one block, set apart from the words around them.
+
+        Only with `/details` on. What a backend writes on its way past is the working rather
+        than the answer -- the same thing its tool rows and its thinking are -- and a flow
+        watched to see where it has got to is one where all of that is in the way.
         """
-        if event.text.strip():
+        if event.text.strip() and self._details:
             for line in escape(event.text.rstrip("\n")).splitlines():
                 self.show(f"[dim]  {_CAME_BACK}  {line}[/]")
 
@@ -925,26 +1021,34 @@ class Humanize(App[None]):
         self._copied = time.monotonic()
         self._draw()
 
-    def _said_by_you(self, text: str) -> None:
+    def _said_by_you(self, text: str, whose: str = "") -> None:
         """Puts something you said in the transcript, behind the `❯` Claude Code marks it with.
 
         Args:
           text: What was said.
+          whose: The agent it was put to, where it went to one -- so that it lands on that
+            agent's transcript and on the one they all appear on, as everything else that
+            agent says does. A word put into a turn is part of that conversation, and would
+            otherwise be on whichever screen happened to be up when the agent took it. "" for
+            a line that went to nobody in particular: a command, the task that starts a flow,
+            a line a flow that ended never took.
         """
-        # What the conversation being read says next starts its own part.
-        self._keeping(self._reading()).packed = False
+        # What is read next starts its own part.
+        self._keeping(whose or None).packed = False
         said = escape(text).splitlines() or [""]
-        self.show("")
-        self.show(f"[dim]{_YOURS}[/] {said[0]}")
-        for line in said[1:]:
-            self.show(f"  {line}")
+        for line in (
+            "",
+            f"[dim]{_YOURS}[/] {said[0]}",
+            *(f"  {one}" for one in said[1:]),
+        ):
+            self._into(whose or None, line)
 
     def show(self, text: str, style: str = "") -> None:
-        """Puts a line in the transcript, on the conversation being read.
+        """Puts a line in the transcript, on whichever one is being read.
 
         The interface's own lines go where you are looking: what you typed, what a command
-        came back with, what went wrong. They are not any conversation's, and a transcript
-        that dropped them would be one where half of what you did never happened.
+        came back with, what went wrong. They are nobody's transcript in particular, and one
+        that dropped them would be a screen where half of what you did never happened.
 
         Args:
           text: What to show, taken as markup when no style is given and as plain text
@@ -954,50 +1058,79 @@ class Humanize(App[None]):
         body = text if style == "" else f"[{style}]{escape(text)}[/{style}]"
         self._into(None, body)
 
-    def _into(
-        self, session: SessionBase | None, content: object, *, shrink: bool = True
-    ) -> None:
-        """Keeps something against the conversation it belongs to, and draws it if it is read.
+    def _into(self, whose: str | None, content: object, *, shrink: bool = True) -> None:
+        """Keeps something on the transcripts it belongs on, and draws it if one is read.
+
+        An agent's line goes on two: that agent's own, and the one where every agent's work
+        appears together. Which is what makes the second a place to watch a flow from rather
+        than a copy of one agent -- and what makes stepping onto an agent a transcript of
+        that agent rather than the screen carrying on.
 
         Args:
-          session: Whose it is, or None for the interface's own -- which belongs to whichever
-            conversation is being read, since that is the one it was said over.
+          whose: The agent it is from, or None for the interface's own -- which belongs to
+            whichever transcript is being read, since that is the one it was said over.
           content: What to draw, as markup or as something Rich renders.
           shrink: Whether to draw it to fit.
         """
-        reading = self._reading()
-        where = session if session is not None else reading
-        kept = self._keeping(where)
-        kept.lines.append(_Shown(content, shrink))
-        if where is reading:
-            self.query_one("#transcript", Transcript).write(content, shrink=shrink)
-        else:
-            kept.unread = True  # and the line above the prompt says so until it is read
+        where = [_EVERY, whose] if whose else [self._attached]
+        for one in where:
+            kept = self._keeping(one)
+            if one == _EVERY and whose and kept.spoke != whose:
+                # Two agents working at once are two agents whose lines land here in the
+                # order they were said, so the one being read from has to be said. Once, as
+                # it changes: a name against every line is a column nobody is reading.
+                kept.spoke = whose
+                self._writes(one, _Shown("", shrink=True))
+                said = f"[dim]{_RULE * 2} {escape(short(whose))}[/]"
+                self._writes(one, _Shown(said, shrink=True))
+            self._writes(one, _Shown(content, shrink))
 
-    def _keeping(self, session: SessionBase | None) -> _Kept:
-        """What is kept of one conversation, opening a place for it the first time.
+    def _writes(self, whose: str, shown: _Shown) -> None:
+        """Puts one line on one transcript, and on the screen where that one is read.
 
         Args:
-          session: The conversation, or None for the interface's own with nothing attached.
+          whose: Which transcript, as `_keeping` names them.
+          shown: The line.
+        """
+        kept = self._keeping(whose)
+        kept.lines.append(shown)
+        if whose == self._attached:
+            self.query_one("#transcript", Transcript).write(
+                shown.content, shrink=shown.shrink
+            )
+        elif _EVERY not in (whose, self._attached):
+            # Nothing is unread while every agent is being read: it went onto that transcript
+            # too, and it was read there. Marking it would be marking every agent of the flow
+            # as having something nobody has looked at, on the one screen that shows the lot.
+            kept.unread = True  # and the line above the prompt says so until it is read
+
+    def _keeping(self, whose: str | None) -> _Kept:
+        """What is kept of one transcript, opening one the first time.
+
+        Args:
+          whose: The agent it is of, or `_EVERY` for the one they all appear on. None means
+            the one being read, which is what the interface's own lines are said over.
 
         Returns:
-          What it has to show, which is what attaching to it draws.
+          What it has to show, which is what stepping onto it draws.
         """
-        key = weakref.ref(session) if session is not None else None
+        key = self._attached if whose is None else whose
         if (kept := self._kept.get(key)) is not None:
             return kept
         kept = self._kept[key] = _Kept()
-        # The oldest conversations go first, and never the one being read or the one just
-        # opened: a flow that opens one a turn would otherwise be kept in full for as long as
-        # it runs, and what is dropped this way is one there is nothing left to attach to.
-        over = len([one for one in self._kept if one is not None]) - _KEPT
-        dropping = [one for one in self._kept if one not in (None, key, self._attached)]
+        # The oldest go first, and never the one being read, the one all of them are on, or
+        # the one just opened: a machine that has run twenty flows would otherwise keep every
+        # agent of all of them, and what is dropped this way is an agent no flow still holds.
+        over = len(self._kept) - _KEPT
+        dropping = [
+            one for one in self._kept if one not in (_EVERY, key, self._attached)
+        ]
         for gone in dropping[: max(over, 0)]:
             del self._kept[gone]
         return kept
 
     def _conversations(self) -> list[tuple[AgentBase, SessionBase]]:
-        """Every conversation the flow has open, in the order tab steps through them.
+        """Every conversation the flow has open, in the order the flow takes its agents.
 
         The person is not among them: they are an agent a flow talks to rather than one it
         drives, and the conversation with them is this prompt.
@@ -1015,146 +1148,109 @@ class Humanize(App[None]):
             for session in agent.sessions
         ]
 
-    def _reading(self) -> SessionBase | None:
-        """The conversation being read, moving on where the one it was has gone.
+    def _driven(self) -> list[AgentBase]:
+        """The agents there are transcripts of, which is the run's or the last run's.
 
-        Conversations come and go -- a Ralph loop opens one a turn and drops the one before
-        it -- so what is attached is held by identity, and one that has gone is replaced by
-        the newest of that agent's, a loop that dropped one having already opened the next.
-        Failing that, whatever is nearest to where it was, so that an agent leaving the flow
-        entirely still leaves something to read.
-
-        Returns:
-          The conversation, or None while the flow has none open: one that has not started a
-          conversation yet, and one that is over.
-        """
-        held = self._attached() if self._attached is not None else None
-        open_now = self._conversations()
-        if held is not None and any(session is held for _, session in open_now):
-            return held
-        if not open_now:
-            self._attached = None
-            return None
-        who, was = self._attached_was
-        theirs = [at for at, (agent, _) in enumerate(open_now) if agent.id == who]
-        return self._now_reading(
-            open_now, theirs[-1] if theirs else min(was, len(open_now) - 1)
-        )
-
-    def _interrupting(self) -> SessionBase | None:
-        """The conversation ctrl+c would end, which is the one being read while it works.
-
-        What is attached rather than what :meth:`_reading` would attach: this is asked of
-        the status line twice a second, and moving what is being read is a thing for a draw
-        to do rather than for a line about the keys.
+        The last run's once it is over, because its transcripts are still on the screen and
+        still worth reading back: a run that ended is the one somebody wants to look at.
+        Nothing that asks this can mistake one for a flow that is running -- what is working
+        is asked of the conversations, and there are none of those once a run is over.
 
         Returns:
-          The conversation, or None where the one being read is between turns or gone --
-          both of which are a turn there is no taking back.
+          One apiece, in the order the flow takes them, less the person -- who is talked to
+          at this prompt rather than read.
         """
-        reading = self._attached() if self._attached is not None else None
-        return reading if reading is not None and reading in self._working else None
+        from hmz.agents import HumanAgent
 
-    def _now_reading(
-        self,
-        open_now: list[tuple[AgentBase, SessionBase]],
-        at: int,
-        *,
-        stepped: bool = False,
-    ) -> SessionBase:
-        """Reads one of the conversations there are, carrying on under a line saying so.
+        held = self._agents or self._ran
+        return [one for one in held if not isinstance(one, HumanAgent)]
 
-        The screen is not cleared to do it. A flow that opens a conversation a turn would
-        otherwise wipe the screen every time it did, and what was on it -- the turn you were
-        reading, the line you typed, what went wrong -- would be gone for having been said to
-        a conversation that is over. So what is on the screen stays on it, a line says what is
-        being read from here down, and the conversation now being read is drawn under that.
+    def _working_agents(self) -> list[str]:
+        """Which of the flow's agents have a turn open, in the order the flow takes them.
+
+        Returns:
+          Their ids. These are the ones tab steps between: with ten agents going, what
+          somebody is stepping between is the ones thinking.
+        """
+        return [
+            agent.id
+            for agent in self._driven()
+            if any(session in self._working for session in agent.sessions)
+        ]
+
+    def _reading(self) -> AgentBase | None:
+        """The agent being read, where one is rather than all of them.
+
+        Returns:
+          The agent, or None on the transcript they all appear on and for one whose flow is
+          over -- the transcript stays up either way, there being nothing to say to it.
+        """
+        return next((one for one in self._driven() if one.id == self._attached), None)
+
+    def _says_to(self) -> SessionBase | None:
+        """Which conversation a typed line goes into, which is the one on the screen.
+
+        The agent being read is what is being said to; of its conversations, the one with a
+        turn open, since a line written to one between turns is answered on its own outside
+        the flow. Where all of them are being read there is no one agent to have meant, so it
+        is whichever has a turn open -- which is what the transcript is showing.
+
+        Returns:
+          The conversation, or None where there is none open to say it to yet.
+        """
+        agent = self._reading()
+        if agent is not None:
+            return self._working_in(agent)
+        working = [one for _, one in self._conversations() if one in self._working]
+        return working[0] if working else None
+
+    def _now_reading(self, whose: str, *, stepped: bool = True) -> None:
+        """Reads one of the transcripts there are, drawing it from the top.
+
+        From the top, and not by carrying on where the screen was: what an agent has done is
+        that agent's transcript, and a screen that only appended would be every agent's lines
+        shuffled into one another. Stepping between an agent's own conversations is not this
+        -- they are all one transcript, so a loop that opens one a turn goes on down the same
+        screen rather than replacing it.
 
         Args:
-          open_now: The conversations there are, as :meth:`_conversations` gives them.
-          at: Which of them to read.
-          stepped: Whether somebody pressed tab for this, rather than the conversation being
-            read having gone out from under them.
-
-        Returns:
-          The conversation now being read.
+          whose: Which transcript, as `_keeping` names them.
+          stepped: Whether somebody asked for this, rather than what was being read having
+            gone with the flow that held it.
         """
-        agent, session = open_now[at]
-        # Whether one was being read, and which -- two questions, because a conversation the
-        # flow has let go of is a reference that answers None while still saying there was one.
-        reading, was = (
-            self._attached is not None,
-            self._attached() if self._attached is not None else None,
-        )
-        self._attached = weakref.ref(session)
-        self._attached_was = (agent.id, at)
-        kept = self._keeping(session)
-        # What was shown with nothing attached is the head of this conversation: the box this
-        # opened with, and whatever was said to start the flow. It is on the screen already --
-        # it was read where it was written -- and it is kept against this conversation so that
-        # a transcript drawn again from what was kept does not start mid-sentence.
-        head = self._kept.pop(None, None)
-        if head is not None:
-            kept.lines = deque([*head.lines, *kept.lines], maxlen=_LINES)
+        if whose == self._attached:
+            return  # already the one on the screen, so nothing has happened
+        self._attached = whose
+        kept = self._keeping(whose)
         kept.unread = False
-        if session is was:
-            return (
-                session  # what is being read has not changed, so nothing has happened
-            )
-        self._reading_now(agent, at, open_now, gone=reading and not stepped)
-        if head is None:
-            # Under the line that says so: what this conversation has said, which is nothing
-            # for one just opened and everything for one being read again. Not for the first
-            # of a run -- what was kept against it then is the head, which is already up.
-            shown = self.query_one("#transcript", Transcript)
-            for line in kept.lines:
-                shown.write(line.content, shrink=line.shrink)
-        return session
-
-    def _reading_now(
-        self,
-        agent: AgentBase,
-        at: int,
-        open_now: list[tuple[AgentBase, SessionBase]],
-        *,
-        gone: bool,
-    ) -> None:
-        """Says which conversation is being read from here down, and why where that is not you.
-
-        Written straight to the screen rather than kept against a conversation: it is a thing
-        that happened to the screen rather than a thing either conversation said, and one kept
-        against a conversation would be said again every time that one was read.
-
-        Args:
-          agent: Whose conversation it is.
-          at: Where it comes among all of them.
-          open_now: All of them, so that this one can be counted among that agent's.
-          gone: Whether the conversation being read went out from under whoever was reading it,
-            rather than being stepped off.
-        """
-        theirs = [one for one, (whose, _) in enumerate(open_now) if whose is agent]
-        which = (
-            f"{_DOT}{theirs.index(at) + 1} of {len(theirs)}" if len(theirs) > 1 else ""
-        )
-        # A blank line first, for the reason every other part of a turn has one: what is above
-        # this belongs to another conversation, and the two run together without it.
+        if whose == _EVERY:
+            # Everything every agent has said is on this one, so reading it is reading all of
+            # them: an agent left marked unread here would be marked for what is on the screen.
+            for one in self._kept.values():
+                one.unread = False
+        agent = self._reading()
         shown = self.query_one("#transcript", Transcript)
-        shown.write("")
+        shown.clear()
+        held = len(agent.sessions) if agent is not None else 0
+        many = f"{_DOT}{held} conversations" if held > 1 else ""
+        named = "every agent" if whose == _EVERY else f"{escape(short(whose))}{many}"
         shown.write(
-            f"[dim]— {'that conversation has gone, now ' if gone else ''}"
-            f"reading {escape(short(agent.id))}{which} —[/dim]"
+            f"[dim]{_RULE} {'' if stepped else 'that flow has gone, now '}"
+            f"reading {named} {_RULE}[/]"
         )
+        for line in kept.lines:
+            shown.write(line.content, shrink=line.shrink)
 
-    def _unread(self, session: SessionBase) -> bool:
-        """Whether one conversation has said something since it was last read.
+    def _unread(self, whose: str) -> bool:
+        """Whether one transcript has something on it nobody has looked at.
 
         Args:
-          session: The conversation.
+          whose: Which one, as `_keeping` names them.
 
         Returns:
-          True if there is something on it nobody has looked at.
+          True if it has said something since it was last read.
         """
-        kept = self._kept.get(weakref.ref(session))
+        kept = self._kept.get(whose)
         return kept is not None and kept.unread
 
     def _held(self) -> list[Held]:
@@ -1165,74 +1261,50 @@ class Humanize(App[None]):
           with no flow running, which is a line about what is set up rather than about what
           it is doing.
         """
-        from hmz.agents import HumanAgent
-
-        reading = self._reading()
-        held: list[Held] = []
-        for agent in self._agents:
-            if isinstance(agent, HumanAgent):
-                continue
-            sessions = agent.sessions
-            at = next(
-                (one for one, session in enumerate(sessions) if session is reading),
-                None,
+        return [
+            Held(
+                many=len(agent.sessions),
+                reading=agent.id == self._attached,
+                unread=self._unread(agent.id),
+                working=any(one in self._working for one in agent.sessions),
             )
-            held.append(
-                Held(
-                    many=len(sessions),
-                    at=at,
-                    unread=any(
-                        self._unread(session)
-                        for one, session in enumerate(sessions)
-                        if one != at
-                    ),
-                    working=any(session in self._working for session in sessions),
-                )
-            )
-        return held
+            for agent in self._driven()
+        ]
 
     def action_attach_next(self) -> None:
-        """Reads the next conversation the flow has open, which is what tab is for.
-
-        Forwards through the agents it drives and each of their conversations, and round
-        again at the end: a flow may have a dozen of them open, and stepping to the next is
-        quicker than anything that has to be opened in order to be chosen from.
-        """
+        """Reads the next agent that is working, which is what tab is for."""
         self._attach_by(1)
 
     def action_attach_previous(self) -> None:
-        """Reads the conversation before this one, which is what shift+tab is for."""
+        """Reads the one before it, which is what shift+tab is for."""
         self._attach_by(-1)
 
-    def _attach_by(self, step: int) -> None:
-        """Moves what is being read to the next conversation that is working, either way round.
+    def _ring(self) -> list[str]:
+        """What tab steps round: the transcript all of them are on, then the ones working.
 
-        The ones that are working, rather than every one the flow has open: with a flow that
-        drives ten agents, what somebody is stepping between is the ones thinking right now.
-        A conversation between its turns is still read once it is reached -- what is being
-        read is left alone until this is pressed -- but it is not stepped onto.
+        The ones working rather than every agent the flow drives: with ten agents going,
+        what somebody is stepping between is the ones thinking. Every agent there is can
+        still be read, from the diagram on `/status`, which is where an agent that has
+        stopped is picked out by name rather than stepped past.
+
+        Returns:
+          The transcripts to step round, the one they are all on first -- so that there is
+          always the way back to watching the flow rather than one agent of it.
+        """
+        return [_EVERY, *self._working_agents()]
+
+    def _attach_by(self, step: int) -> None:
+        """Moves what is being read one step round the ring, either way.
 
         Args:
           step: How far, and which way.
         """
-        open_now = self._conversations()
-        working = [one for one in open_now if one[1] in self._working]
-        if not working:
-            return  # nothing is working, which is a key that does nothing rather than an error
-        held = self._reading()
-        # From where the read one stands among all of them, so that stepping on from a
-        # conversation that has since stopped goes to the next one that has not.
-        at = next(
-            (one for one, (_, session) in enumerate(open_now) if session is held), -1
-        )
-        ahead = [
-            one for one, (_, session) in enumerate(open_now) if session in self._working
-        ]
-        if step > 0:
-            landing = next((one for one in ahead if one > at), ahead[0])
-        else:
-            landing = next((one for one in reversed(ahead) if one < at), ahead[-1])
-        self._now_reading(open_now, landing, stepped=True)
+        ring = self._ring()
+        # From where the one being read stands, and from the start where it is not on the
+        # ring at all -- an agent that has stopped since it was stepped onto, which is left
+        # up until somebody asks for something else.
+        at = ring.index(self._attached) if self._attached in ring else 0
+        self._now_reading(ring[(at + step) % len(ring)])
         self._draw()
 
     @on(TextArea.Changed)
@@ -1306,9 +1378,7 @@ class Humanize(App[None]):
             # A flow that has run out of things to do until it is told one. Spinning a bar at
             # it would read as a turn that has been thinking for as long as you have been
             # deciding what to say, which is the opposite of what is happening.
-            left = (
-                f"[$text-muted]{_SPINNER[0]} waiting for you{_DOT}esc to interrupt[/]"
-            )
+            left = f"[$text-muted]{_SPINNER[0]} waiting for you{_DOT}ctrl+c twice to stop[/]"
         elif working or self._agents:
             bar = _SPINNER[int(time.monotonic() / _REFRESH) % len(_SPINNER)]
             # Whoever is talking and how long their turn has been going, or -- between two
@@ -1322,7 +1392,7 @@ class Humanize(App[None]):
             named = ", ".join(short(who) for who in working) or self._flowing()
             left = (
                 f"[$secondary]{bar}[/] {escape(named)}… "
-                f"[$text-muted]({time.monotonic() - since:.0f}s{_DOT}esc to interrupt)[/]"
+                f"[$text-muted]({time.monotonic() - since:.0f}s{_DOT}ctrl+c twice to stop)[/]"
             )
         else:
             # The flow that is set up to run, and the directory it would run in. Only with
@@ -1368,14 +1438,19 @@ class Humanize(App[None]):
         pinned.update(Content("\n".join(waiting)))
         for ruled in self.query(".rule").results(Static):
             ruled.update(_RULE * self.size.width)
-        right = f"[$text-muted]{_DOT.join(self._keys())}[/]"
         # Measured as drawn rather than as written: markup is not what takes up columns.
         # Textual's own, since these are Textual's markup and name its colours.
-        gap = (
-            self.size.width
-            - 4
-            - sum(Content.from_markup(end).cell_length for end in (left, right))
-        )
+        room = self.size.width - 4 - Content.from_markup(left).cell_length
+        keys = self._keys()
+        while len(keys) > 1 and len(_DOT.join(keys)) > room:
+            # The row is drawn against the right-hand edge, so what will not fit falls off
+            # that end -- which is where the keys that change are. The ones at the front are
+            # the ones that mean the same thing whenever they are pressed, so they are what
+            # gives: a row that clipped `ctrl+c` to say `shift+enter newline` would be a row
+            # holding the one key nobody has to be told about and losing the one they do.
+            keys.pop(0)
+        right = f"[$text-muted]{_DOT.join(keys)}[/]"
+        gap = room - len(_DOT.join(keys))
         self.query_one("#status", Static).update(
             left + " " * max(2, gap) + right, layout=False
         )
@@ -1482,7 +1557,9 @@ class Humanize(App[None]):
         """The keys that do something right now, said in the order they are reached for.
 
         Only the ones that work: a shortcut listed in a state it does nothing in is worse
-        than one that is not listed at all, and there is nowhere else to look them up.
+        than one that is not listed at all, and there is nowhere else to look them up. What
+        ctrl+c would do next is what it is called by, since it is the one key here that
+        means something different for having just been pressed.
         """
         if self.query_one("#offers", OptionList).has_class("offering"):
             return ["↑↓ move", "tab take", "esc dismiss"]
@@ -1497,19 +1574,43 @@ class Humanize(App[None]):
                 if self._agents
                 else "enter start"
             )
-        if self._conversations():
-            # Only with something to read: with one conversation open it is what attaches to
-            # it, and with none it is a key that does nothing.
+        if len(self._ring()) > 1:
+            # Only with somewhere to step: with nothing working there is the one transcript
+            # every agent is on, and a key that lands back where it started is not a key.
             keys.append("tab agent")
         keys.append("/ commands")
         keys.append("shift+enter newline")
-        if self._agents:
-            keys.append("esc stop")
+        keys.append("esc status")
         if self.query_one(Editor).text:
             keys.append("ctrl+c clear")
-        elif self._interrupting() is not None:
-            keys.append("ctrl+c interrupt")
+        elif self._counting():
+            keys.append(
+                "ctrl+c again to stop" if self._agents else "ctrl+c again to exit"
+            )
+        elif self._agents:
+            keys.append("ctrl+c stop")
+        elif self._stopping:
+            keys.append("ctrl+c close them")
+        else:
+            keys.append("ctrl+c exit")
         return keys
+
+    def _counting(self) -> bool:
+        """Whether a ctrl+c has been pressed and the next one is still the second of it.
+
+        Read where the keys are drawn, which is twice a second, so this is also where a
+        gesture nobody finished is forgotten: a line saying what the next press does is
+        wrong the moment that press would be a first press again.
+
+        Returns:
+          Whether the last press still stands.
+        """
+        if not self._presses:
+            return False
+        if time.monotonic() - self._pressed < _AGAIN:
+            return True
+        self._presses = 0
+        return False
 
     def _mid_run(self, what: str) -> bool:
         """Whether a flow is running, and says so where that is why nothing happened.
@@ -1527,24 +1628,53 @@ class Humanize(App[None]):
         """
         if not self._agents:
             return False
-        self.show(f"hmz: {what} while a flow is running: esc stops it first", "red")
+        self.show(
+            f"hmz: {what} while a flow is running: ctrl+c twice stops it first", "red"
+        )
         return True
 
-    def action_status(self) -> None:
-        """Opens the sheet saying how the run is going, which is readable while it runs.
+    @work
+    async def action_status(self) -> None:
+        """Opens the sheet saying how the run is going, which is what esc is.
 
-        Unlike the two that choose something: this one is read and changes nothing, so there
-        is nothing for it to conflict with.
+        Readable while a flow runs, unlike the two that choose something: it changes nothing
+        about the run, so there is nothing for it to conflict with. The one thing it answers
+        with is which transcript to read, the diagram being where an agent is picked out by
+        name -- working or not, which is what tab is held to.
         """
-        self.push_screen(
+        reading = await self.push_screen_wait(
             Status(
                 self._flow_named,
                 self._named_by,
                 self._models,
                 self._monitor,
                 self._config,
+                drawn=self._boxes(),
+                reading=self._attached,
             )
         )
+        if reading is not None:
+            self._now_reading(reading)
+            self._draw()
+
+    def _boxes(self) -> list[Drawn]:
+        """The agents of the run as the diagram draws them, in the order the flow takes them.
+
+        Returns:
+          One apiece, and nothing at all with no flow running -- which is a sheet about what
+          is set up rather than about what it is doing.
+        """
+        named = self._named_by
+        return [
+            Drawn(
+                who=agent.id,
+                named=named[at] if at < len(named) else "",
+                runs=self._models[at].spec if at < len(self._models) else "",
+                working=any(one in self._working for one in agent.sessions),
+                reading=agent.id == self._attached,
+            )
+            for at, agent in enumerate(self._driven())
+        ]
 
     @on(Editor.Sent)
     def _sent(self, event: Editor.Sent) -> None:
@@ -1587,8 +1717,13 @@ class Humanize(App[None]):
             if (switched := self._switched(argv, now=self._details)) is None:
                 return
             self._details = switched
-            shown = "shown" if self._details else "hidden"
-            self.show(f"[dim]tool calls and thinking {shown}[/dim]")
+            self.show(
+                "[dim]showing the working: every tool call, all of the thinking, and "
+                "whatever a backend prints on its way past[/dim]"
+                if self._details
+                else "[dim]showing what each turn said, and nothing of how it got "
+                "there[/dim]"
+            )
         elif name == "afk":
             if (switched := self._switched(argv, now=self._afk)) is None:
                 return
@@ -1612,29 +1747,31 @@ class Humanize(App[None]):
         what is on screen is the whole of what starting over would have thrown away. What is
         running is left running, and what it has done so far is still beside it.
 
-        The screen is one conversation, so what is cleared is that one's: clearing every
-        conversation would be `/clear` reaching into ones nobody was looking at.
+        The screen is one transcript, so what is cleared is that one: clearing every agent's
+        would be `/clear` reaching into ones nobody was looking at.
         """
-        self._keeping(self._reading()).lines.clear()
+        self._keeping(self._attached).lines.clear()
         self.query_one("#transcript", Transcript).clear()
         self._welcome()  # a cleared screen is a screen just opened, and one opens with this
         self._draw()
 
     def action_stop_flow(self) -> None:
-        """Stops the whole flow, not just the turn -- which is what esc is for.
+        """Stops the whole flow, not just the turn -- which is the second ctrl+c.
 
         Every agent is told to take no further turn, so the one running now is closed out and
         the loop driving it ends rather than handing on to the next agent. The agents are let
         go of here rather than when the flow's own thread notices, so that the next thing
-        said starts something instead of being put to a flow that is on its way out. Silent
-        when nothing is running: esc is pressed to dismiss things, and a complaint apiece
-        would be in the way.
+        said starts something instead of being put to a flow that is on its way out -- and
+        kept as the ones stopping, since a flow unwinds in its own time and the press after
+        this one is the one that does not wait for it. Silent when nothing is running.
         """
         for agent in self._agents:
             agent.stop()
         if self._agents:
             self.show("[dim]— stopping the flow —[/dim]")
-        self._agents = []
+        # Held by identity, so that the run's own thread can say when it has finished
+        # unwinding and nothing says it of a run that started since.
+        self._agents, self._stopping = [], self._agents
         self._spoke.set()  # and a flow waiting to be told hears that it is over
         self._never_sent("the flow stopped first")
 
@@ -1648,7 +1785,7 @@ class Humanize(App[None]):
         """
         for agent in self._agents:
             agent.stop()
-        self._agents = []
+        self._agents, self._stopping = [], []
         self._spoke.set()
 
     def _never_sent(self, because: str) -> None:
@@ -2249,7 +2386,13 @@ class Humanize(App[None]):
             self.show(f"hmz: {why}", "red")
             return
         agents = list(runner.agents)
-        self._agents = agents
+        self._agents = self._ran = agents
+        # Nothing is left of the flow before this one to press a key about, and what is
+        # being read is one of its agents unless it was the transcript they all appear on.
+        # Which is where a run is watched from, so it is where a run starts.
+        self._stopping = []
+        if self._attached != _EVERY:
+            self._now_reading(_EVERY, stepped=False)
         self._monitor = Monitor()
         # What the run costs is read from the logs the agents keep, which they write as they
         # go: a backend only says what a turn cost once the turn is over, and a turn is long.
@@ -2282,6 +2425,10 @@ class Humanize(App[None]):
                 # a server is given seconds to go -- and the next flow may have started in
                 # the meantime. Clearing then would leave the running one unreachable, and
                 # saying it was done would be saying it of the wrong flow.
+                if self._stopping is agents:
+                    # Stopped by hand, and now finished unwinding: there is nothing left for
+                    # the press that does not wait for it to reach.
+                    self._stopping = []
                 if self._agents is agents:
                     self._agents = []
                     with contextlib.suppress(RuntimeError):
@@ -2299,10 +2446,15 @@ class Humanize(App[None]):
     def _heard(
         self, agent: AgentBase, session: SessionBase | None, event: Event
     ) -> None:
-        """Shows what a turn said, on the transcript of the conversation that said it.
+        """Shows what a turn said, on the transcript of the agent that said it.
 
-        And takes what it cost into what the right-hand column shows, which is per agent: a
-        conversation is where a thing is read, and the bill is the agent's.
+        And takes what it cost into what `/status` shows, which is per agent: an agent is
+        what is read, and the bill is the agent's too.
+
+        What is shown of a turn is what the turn was for unless `/details` says otherwise:
+        the agent starting, what it said, and the agent stopping. The tools it used and the
+        thinking it did aloud are how it got there, and a screen of them is a screen where
+        the answer went past between two file reads. `/details` is what asks for all of it.
 
         Called from whichever thread the turn is running on, which is why everything drawn
         from here goes through `_on_screen`.
@@ -2311,9 +2463,8 @@ class Humanize(App[None]):
           agent: Whose turn said it.
           session: Which of that agent's conversations said it, or None for something the
             agent said rather than one of them -- a question put by a server that speaks for
-            every conversation it holds. That one goes on the transcript of whichever of the
-            agent's conversations is working, and on the one being read where none of them
-            is, so that a turn which stopped to ask still reaches whoever is at the prompt.
+            every conversation it holds. Either way it is shown against the agent, all of
+            whose conversations are the one transcript.
           event: What was said.
         """
         # First, whatever else happens: showing a line raises once the interface has gone, and
@@ -2325,6 +2476,7 @@ class Humanize(App[None]):
             # one thing that makes a word said rather than posted.
             self._on_screen(self._took, agent.id, event.text)
             return
+        whose = agent.id
         if event.kind == "begins":
             self._monitor.begins(agent.id, agent.config.model)
             self._began[agent.id] = time.monotonic()
@@ -2332,6 +2484,18 @@ class Humanize(App[None]):
                 # Which is what makes it a conversation a typed line may go into: one written
                 # to a conversation between turns is answered on its own, outside the flow.
                 self._working.add(session)
+            # A turn takes minutes and says nothing for most of them, so the line that says
+            # one has started is the whole of what a flow looks like while it thinks. Which
+            # of that agent's conversations, where it has more than one: a loop that opens
+            # one a turn runs them all down the one transcript, and this is where each of
+            # them begins.
+            self._on_screen(
+                self._part,
+                whose,
+                f"[dim]{_SAID} {escape(short(agent.id))} is working"
+                f"{self._conversation(agent, session)}[/]",
+                packs=False,
+            )
         elif event.kind == "ends":
             self._monitor.ends(agent.id)
             if session is not None:
@@ -2339,13 +2503,11 @@ class Humanize(App[None]):
             # Whatever it was holding is not on its way anywhere now: the turn it was put
             # into is over, and it never said it had it.
             self._on_screen(self._ended_holding, agent.id)
-            # The line opencode closes a message with: a filled square, two spaces, then the
-            # parts separated by a middle dot.
             took = time.monotonic() - self._began.pop(agent.id, time.monotonic())
             # The line Claude Code closes a turn with, which says how long it worked.
             self._on_screen(
                 self._part,
-                session,
+                whose,
                 f"[dim]{_WORKED} Worked for {took:.0f}s"
                 f"{_DOT}{escape(short(agent.id))}[/]",
                 packs=False,
@@ -2355,14 +2517,14 @@ class Humanize(App[None]):
             named, _, about = escape(event.text).partition(" ")
             self._on_screen(
                 self._part,
-                session,
+                whose,
                 f"[green]{_SAID}[/] {named}[dim]({about})[/]",
                 packs=True,
             )
         elif event.kind == "reasoning" and self._details:
             self._on_screen(
                 self._part,
-                session,
+                whose,
                 "\n".join(
                     f"[dim italic]{line}[/]" for line in escape(event.text).splitlines()
                 ),
@@ -2372,13 +2534,12 @@ class Humanize(App[None]):
             self._on_screen(
                 self._asked_by,
                 agent,
-                session,
                 f"[yellow]{_SAID}[/] {escape(event.text)}",
             )
         elif event.kind == "failed":
             self._on_screen(
                 self._part,
-                session,
+                whose,
                 f"[red]hmz: {escape(event.text)}[/]",
                 packs=False,
             )
@@ -2388,7 +2549,7 @@ class Humanize(App[None]):
             said = escape(event.text).splitlines() or [""]
             self._on_screen(
                 self._part,
-                session,
+                whose,
                 "\n".join(
                     [
                         f"[green]{_SAID}[/] {said[0]}",
@@ -2398,38 +2559,53 @@ class Humanize(App[None]):
                 packs=False,
             )
 
-    def _asked_by(
-        self, agent: AgentBase, session: SessionBase | None, text: str
-    ) -> None:
+    @staticmethod
+    def _conversation(agent: AgentBase, session: SessionBase | None) -> str:
+        """Which of an agent's conversations a turn is being taken in, where it has several.
+
+        Args:
+          agent: Whose turn it is.
+          session: The conversation it is in, or None where the agent said it.
+
+        Returns:
+          Which one, counting from one, and nothing at all for an agent holding one -- there
+          being nothing to tell it apart from.
+        """
+        held = agent.sessions
+        if session is None or len(held) < 2:  # noqa: PLR2004 -- one is none to tell apart
+            return ""
+        at = next(
+            (one for one, held_one in enumerate(held) if held_one is session), None
+        )
+        return "" if at is None else f"{_DOT}conversation {at + 1} of {len(held)}"
+
+    def _asked_by(self, agent: AgentBase, text: str) -> None:
         """Puts a question where whoever is at the prompt will come across it.
 
-        A question is the one thing an agent says that may not be any one conversation's: the
-        server a codex or a kimi agent puts it through serves every conversation that agent
-        holds, so it says which agent asked and no more. It goes on whichever of that agent's
-        conversations is working, and on the one being read where none of them is -- either
-        way somewhere it can be answered from, which is what a question is for.
+        On that agent's own transcript and on the one they all appear on, as everything else
+        it says goes: it is that agent's question whichever of its conversations put it, and
+        the server a codex or a kimi agent puts one through serves every conversation it
+        holds and so names none of them.
 
         Args:
           agent: Who asked.
-          session: Which of its conversations asked, or None where the agent asked.
           text: The question, as markup.
         """
-        asked = session if session is not None else self._working_in(agent)
         # Written down so that what it will take for an answer goes under it rather than
         # wherever the person happens to be looking by then: the two are one question.
-        self._asked_on = weakref.ref(asked) if asked is not None else None
-        self._part(asked, text, packs=False)
+        self._asked_on = agent.id
+        self._part(agent.id, text, packs=False)
 
     def _working_in(self, agent: AgentBase) -> SessionBase | None:
-        """Which of one agent's conversations has a turn open, for a thing the agent said.
+        """Which of one agent's conversations has a turn open, for a line said to it.
 
         Args:
           agent: The agent.
 
         Returns:
-          The newest of its conversations that is working, or None where none of them is --
-          which leaves what it said on whatever is being read. Only the conversations there
-          are to read: the person's is this prompt, and is not one of them.
+          The newest of its conversations that is working, or None where none of them is,
+          which is a line that waits for whichever turn starts next. Only the conversations
+          there are to read: the person's is this prompt, and is not one of them.
         """
         working = [
             session
@@ -2438,23 +2614,23 @@ class Humanize(App[None]):
         ]
         return working[-1] if working else None
 
-    def _part(self, session: SessionBase | None, text: str, *, packs: bool) -> None:
+    def _part(self, whose: str | None, text: str, *, packs: bool) -> None:
         """Puts one part of a turn in the transcript, spaced as opencode spaces its own.
 
         A blank line goes between the parts, except between two that pack -- one-line tool
-        rows run together, and everything else is set apart. Spaced per conversation: two of
-        them talking at once would otherwise run each other's lines together.
+        rows run together, and everything else is set apart. Spaced per transcript: two
+        agents talking at once would otherwise run each other's lines together.
 
         Args:
-          session: Whose part it is, or None for one to show on whatever is being read.
+          whose: The agent whose part it is, or None for one to show on whatever is read.
           text: The part, as markup.
           packs: Whether this part is one that runs on from the one before it.
         """
-        kept = self._keeping(session if session is not None else self._reading())
+        kept = self._keeping(whose)
         if not (packs and kept.packed):
-            self._into(session, "")
+            self._into(whose, "")
         kept.packed = packs
-        self._into(session, text)
+        self._into(whose, text)
 
     def _background(self, work: Callable[[], int]) -> None:
         """Runs something off the event loop, showing what it says rather than dying of it.
@@ -2555,12 +2731,12 @@ class Humanize(App[None]):
 
         The question is shown as the turn says it, like anything else the agent said. What is
         added here is what it will take for an answer, which only the one asking knows -- and
-        it goes on the conversation the question went on, or the two would be read apart.
+        it goes against the agent the question went against, or the two would be read apart.
 
         Args:
           question: What the agent wants to know.
         """
-        asked = self._asked_on() if self._asked_on is not None else None
+        asked = self._asked_on
         for option in question.options:
             self._into(asked, f"      [dim]· {escape(option)}[/dim]")
         self._into(asked, "   [dim]type an answer, or /afk to stop being asked[/dim]")
@@ -2596,12 +2772,14 @@ class Humanize(App[None]):
         self._hand_over()
 
     def _hand_over(self) -> None:
-        """Puts the oldest waiting line into the conversation being read, one at a time.
+        """Puts the oldest waiting line into the conversation on the screen, one at a time.
 
-        Into that one rather than into whichever agent happens to be working: a flow drives
-        several agents and each of them holds as many conversations as it likes, so "the one
-        that is working" is not something a line can be said to. The one being read is, and
-        it is the one whose answer is on the screen.
+        Into the agent being read rather than into whichever happens to be working: a flow
+        drives several, and a line said to the one that is not on the screen is a line said
+        to the wrong agent. Of that agent's conversations it is the one with a turn open,
+        since a line written to one between turns is answered on its own outside the flow.
+        Where every agent is being read at once there is no one of them to have meant, so it
+        is whichever has a turn open -- which is the one the screen is showing anyway.
 
         One at a time and never two: a backend given a second word while it is still
         swallowing the first runs the two together and answers once, so five lines typed in
@@ -2613,7 +2791,7 @@ class Humanize(App[None]):
         the flow -- so it waits for whichever turn starts next, and a running flow never
         drops one.
         """
-        session = self._reading()
+        session = self._says_to()
         if session is None or session not in self._working:
             return
         # The agent alongside its conversation: a word put in is pinned against whoever has
@@ -2686,7 +2864,7 @@ class Humanize(App[None]):
             if (who, text) not in self._given:
                 return  # somebody else's word, or one already written down
             self._given.remove((who, text))
-        self._said_by_you(text)
+        self._said_by_you(text, who)
         self._draw()
         self._hand_over()  # and the next one behind it goes now that this is through
 

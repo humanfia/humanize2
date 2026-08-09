@@ -59,11 +59,13 @@ Everything you type joins one queue and leaves it a line at a time. The next lin
 once the turn has said it has the one before it. A turn takes one waiting line, not the whole
 queue. Three `hi` in a row are three things said, and they come back as three answers.
 
-### It reaches the conversation you are reading
+### It reaches the agent you are reading
 
-Your line reaches the conversation you are reading, not whichever agent happens to be working.
-An agent may hold one conversation you are reading while taking a turn in another. A line said
-to the wrong one is a line said to somebody else. See [Many conversations at
+Your line reaches the agent you are reading, not whichever happens to be working. A flow
+drives several, and a line said to the one that is not on the screen is a line said to
+somebody else. Of that agent's conversations it goes to the one with a turn open. Reading all
+of them at once there is no one agent you can have meant, so it goes to whichever has a turn
+open — which is the one the screen is showing anyway. See [Many conversations at
 once](/guide/conversations).
 
 ## What each backend does with it

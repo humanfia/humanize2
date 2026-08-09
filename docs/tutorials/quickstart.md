@@ -191,7 +191,7 @@ round 2
 ```
 
 ::: warning A Ralph loop does not stop on its own
-That is what it is for — you leave one running for hours. Press **esc** in the interface, or
+That is what it is for — you leave one running for hours. Press **ctrl+c** twice in the interface, or
 **ctrl+c** at a command line, when you have seen enough. Every round is written down, so
 stopping loses nothing.
 :::
@@ -242,7 +242,7 @@ For a nine-hour run it is the only view that fits on a screen.
 | `hmz` | the interface |
 | `hmz exec -f FLOW -a CLI/MODEL:EFFORT "task"` | the same flows, unattended |
 | `hmz trace collect` | the run as a timeline |
-| **esc** | stops the flow |
+| **ctrl+c** twice | stops the flow |
 
 ## Where to go next
 

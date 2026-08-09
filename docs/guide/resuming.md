@@ -1,7 +1,7 @@
 # Picking a run up
 
 A loop that runs for a week will be stopped and started: a machine goes down, somebody presses
-esc, or a turn takes the process with it. A **flow** (a file on disk) may say it can be picked
+by hand, or a turn takes the process with it. A **flow** (a file on disk) may say it can be picked
 up where its last run left off. A flow that says so keeps what it is tracking in a dict.
 
 ## Try it
@@ -132,7 +132,7 @@ be run, which is what carrying on would come to.
 Collecting a trace is offered for every run, whatever its flow says.
 
 Carrying one on is refused while a flow is running, and the refusal is said on the sheet rather
-than on the way out. The question is still worth answering, and [esc](/guide/stopping) is what
+than on the way out. The question is still worth answering, and [stopping](/guide/stopping) is what
 stops a flow.
 
 Naming a run rather than taking the last one is the same thing from Python:

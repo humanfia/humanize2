@@ -34,6 +34,7 @@ from hmz.tui.pick import (
     Confirms,
     Flows,
     Signing,
+    Status,
     Ways,
 )
 from tests.stubs import events as recorded
@@ -412,10 +413,17 @@ async def test_what_the_flow_did_is_on_status(workspace: Path) -> None:
 
         # Read while the flow is still running, which is the whole point of a sheet for it.
         app.action_status()
-        await driver.pause()
-        said = str(app.screen.query_one("#said", Label).content)
-        assert "×1" in said  # the one agent, and its one turn
+        await until(lambda: isinstance(app.screen, Status), driver)
+        said = str(app.screen.query_one("#tuning", Label).content)
         assert "flow" in said
+        # The flow itself, drawn: the transcript all of them are on, then a box per agent.
+        boxes = app.screen.query_one("#choices", OptionList)
+        drawn = "\n".join(
+            str(boxes.get_option_at_index(one).prompt)
+            for one in range(boxes.option_count)
+        )
+        assert "every agent" in drawn
+        assert "1 turn" in drawn  # the one agent, and its one turn
         assert app._monitor.turns.total() == 1
 
 
@@ -649,8 +657,13 @@ async def test_what_is_running_is_not_swapped_underneath_itself(
         assert app._models == [Runs("claude/m:high")]
         # And `/status` is not refused either: it is read, so nothing conflicts with it.
         app.action_status()
-        await driver.pause()
-        assert "flow" in str(app.screen.query_one("#said", Label).content)
+        await until(lambda: isinstance(app.screen, Status), driver)
+        assert "flow" in str(app.screen.query_one("#tuning", Label).content)
+
+        await driver.press("escape")
+        await until(lambda: not isinstance(app.screen, Status), driver)
+        app.action_stop_flow()
+        await until(lambda: not app._agents, driver)
 
 
 @pytest.mark.timeout(90)
@@ -698,13 +711,16 @@ async def test_an_agent_is_set_up_again_under_the_flow_that_is_running_it(
 
 
 @pytest.mark.timeout(90)
-async def test_escape_stops_the_flow_and_not_just_the_turn(workspace: Path) -> None:
-    """Esc ends the loop, rather than letting it hand on to the next agent.
+async def test_two_ctrl_c_stop_the_flow_and_not_just_the_turn(workspace: Path) -> None:
+    """Ctrl+c twice ends the loop, rather than letting it hand on to the next agent.
 
     A flow is a loop, so stopping the turn under way is not stopping anything: the loop
     would go round again. Every agent is told, and the one that raises `Stopped` takes the
     loop with it -- which is why `Stopped` is not the failed turn a flow's own `|| true`
     catches.
+
+    Twice, because a day's work is behind a key that is also pressed by mistake: the first
+    press says what the next one does and the second one does it.
     """
     written(workspace, "flow", FLOW)
     app = Humanize()
@@ -716,17 +732,51 @@ async def test_escape_stops_the_flow_and_not_just_the_turn(workspace: Path) -> N
             lambda: bool(app._agents and any(agent.sessions for agent in app._agents)),
             driver,
         )
-        await driver.press("escape")
+        await driver.press("ctrl+c")
+        await driver.pause()
+        assert app._agents  # one press asks, and asks rather than doing it
+        assert "press ctrl+c again" in _transcript(app)
+
+        await driver.press("ctrl+c")
         await until(lambda: not app._agents, driver)  # the flow itself is over
 
         assert "stopping the flow" in _transcript(app)
-        # And the run is over with it: a cycle is one run of one flow, and esc ends one.
+        # And the run is over with it: a cycle is one run of one flow, and this ends one.
         (cycle,) = cycles(workspace)
         assert recorded(cycle)[-1] == {
             "event": "ended",
             "at": unittest.mock.ANY,
             "how": "stopped",
         }
+
+
+@pytest.mark.timeout(90)
+async def test_escape_is_how_the_run_is_read_rather_than_how_it_is_stopped(
+    workspace: Path,
+) -> None:
+    """A key pressed to dismiss things must not be the key that ends a day's work."""
+    from hmz.tui.pick import Status
+
+    written(workspace, "flow", FLOW)
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._flow_named, app._models = "flow", [Runs("claude/m:high")]
+        await driver.press(*"start")
+        await driver.press("enter")
+        await until(
+            lambda: bool(app._agents and any(agent.sessions for agent in app._agents)),
+            driver,
+        )
+        held = app._agents
+
+        await driver.press("escape")
+        await until(lambda: isinstance(app.screen, Status), driver)
+
+        assert app._agents is held  # read, and nothing stopped by reading it
+        await driver.press("escape")
+        await driver.pause()
+        app.action_stop_flow()
+        await until(lambda: not app._agents, driver)
 
 
 @pytest.mark.timeout(90)
@@ -992,48 +1042,134 @@ async def test_ctrl_c_takes_back_the_line_and_never_the_interface() -> None:
         assert app.is_running  # with nothing left to take back it stays up
 
 
-@pytest.mark.timeout(90)
-async def test_ctrl_c_ends_the_turn_being_read_and_the_flow_reads_it_as_failed(
-    workspace: Path,
-) -> None:
-    """With no line to take back, what it takes back is the turn on the screen.
+@pytest.mark.timeout(60)
+async def test_a_third_ctrl_c_does_not_wait_for_the_flow_to_unwind() -> None:
+    """A flow told to stop goes in its own time, and the press after that does not wait.
 
-    Which the flow gets as a turn that failed, exactly as it would have had the agent
-    fallen over by itself: one that catches its own turns carries on, and the agents it was
-    handed are still there to take the next one.
+    Every conversation still open is closed under its turn, which is the backend's process
+    going: what the flow gets back is a turn that failed, exactly as it would have had the
+    agent fallen over by itself. It is the last thing a key can do about a run.
     """
-    written(workspace, "flow", CATCHING)
+    from hmz.agents import AgentConfig, Event
+    from tests.stubs import ShellAgent, ShellSession
+
+    closed: list[ShellSession] = []
+
+    class Closing(ShellSession):
+        def close(self) -> None:
+            closed.append(self)
+            super().close()
+
+    class Closes(ShellAgent):
+        def new(self, cwd: object = None) -> Closing:
+            del cwd
+            return Closing(self)
+
     app = Humanize()
     async with app.run_test() as driver:
-        app._flow_named, app._models = "flow", [Runs("claude/m:high")]
-        await driver.press(*"start")
-        await driver.press("enter")
-        await until(lambda: app._interrupting() is not None, driver)
+        agent = Closes(AgentConfig(model="m", effort="high"))
+        app._agents = [agent]
+        session = agent.new()
+        app._heard(agent, session, Event(kind="begins", text=""))
+        await driver.pause()
 
         await driver.press("ctrl+c")
-        await until((workspace / "said.txt").exists, driver)
+        await driver.press("ctrl+c")
+        await driver.pause()
+        assert not app._agents  # stopped, and still unwinding
+        assert app._stopping == [agent]
+        assert (
+            session in app._working
+        )  # which is a turn nothing has reported the end of
 
-        assert "interrupting the turn" in _transcript(app)
-        assert app.is_running  # the turn, rather than the interface
+        closed.clear()
+        await driver.press("ctrl+c")
+        await driver.pause()
 
-    # The turn came back as a failed one and was caught, and the agent it was taken on was
-    # left to take another: only the conversation was ended, not the run.
-    assert (workspace / "said.txt").read_text().strip() == "'' False"
+        # Closed again, whatever the first close came to: a backend that ignored one is the
+        # reason there is a third press at all. And the run reads as over from here.
+        assert closed == [session]
+        assert session not in app._working
+        assert "closing 1 conversation" in _transcript(app)
+        assert app.is_running  # the run, rather than the interface
+        assert not app._stopping  # and nothing left for a fourth press to reach
+
+
+@pytest.mark.timeout(60)
+async def test_two_ctrl_c_leave_when_there_is_nothing_running() -> None:
+    """Leaving is not what ctrl+c means anywhere else, so it is asked for twice here too."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press("ctrl+c")
+        await driver.pause()
+
+        assert app.is_running
+        assert "press ctrl+c again to leave" in _transcript(app)
+
+        await driver.press("ctrl+c")
+        await driver.pause()
+
+        assert not app.is_running
 
 
 @pytest.mark.timeout(60)
 async def test_details_covers_the_thinking_as_well_as_the_tools() -> None:
-    """One question -- how much of the working to show -- and so one switch."""
+    """One question -- how much of the working to show -- and so one switch.
+
+    Off to begin with: a flow is watched to see where it has got to, and what the agents said
+    is that. How each of them got there is asked for.
+    """
     app = Humanize()
     async with app.run_test() as driver:
-        assert app._details
+        assert not app._details
 
         await driver.press(*"/details")
         await driver.press("enter")
         await driver.pause()
 
-        assert not app._details
+        assert app._details
         assert "thinking" in _transcript(app)  # said to be part of the same switch
+
+
+@pytest.mark.timeout(60)
+async def test_what_a_turn_did_on_the_way_is_shown_only_where_it_is_asked_for() -> None:
+    """The complaint this answers: a screen of tool rows, with the answer somewhere in it."""
+    from hmz.agents import Event
+    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+        app._agents = [agent]
+        session = agent.new()
+
+        def turn() -> None:
+            app._heard(agent, session, Event(kind="begins", text=""))
+            app._heard(agent, session, Event(kind="tool", text="Read pyproject.toml"))
+            app._heard(agent, session, Event(kind="reasoning", text="thinking aloud"))
+            app._heard(agent, session, Event(kind="text", text="the answer"))
+            app._heard(agent, session, Event(kind="ends", text=""))
+
+        await asyncio.to_thread(turn)
+        await until(lambda: "Worked for" in _transcript(app), driver)
+
+        shown = _transcript(app)
+        # What the flow is doing, and what it said: which agent is working, and its answer.
+        assert "is working" in shown
+        assert "the answer" in shown
+        # And none of how it got there, which is what nobody asked to read.
+        assert "pyproject.toml" not in shown
+        assert "thinking aloud" not in shown
+
+        await driver.press(*"/details on")
+        await driver.press("enter")
+        await driver.pause()
+        await asyncio.to_thread(turn)
+        await until(lambda: "thinking aloud" in _transcript(app), driver)
+
+        shown = _transcript(app)
+        assert "Read(pyproject.toml)" in shown
+        assert "thinking aloud" in shown
 
 
 def test_a_backend_offers_what_it_last_said_it_runs(
@@ -1155,7 +1291,7 @@ async def test_every_line_typed_between_turns_is_a_turn_of_one_conversation(
         assert not app.query_one("#queued", Static).has_class("waiting")
         assert app._queued == []
 
-        await driver.press("escape")
+        app.action_stop_flow()
         await until(lambda: not app._agents, driver)
 
 
@@ -1294,14 +1430,15 @@ async def test_deepseek_chat_sends_hello_and_draws_the_sdk_reply(
 async def test_a_flow_waiting_to_be_told_something_can_still_be_stopped(
     talking: Path,
 ) -> None:
-    """Esc has to reach a flow that is doing nothing at all, or nothing ever releases it."""
+    """A key has to reach a flow doing nothing at all, or nothing ever releases it."""
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"first")
         await driver.press("enter")
         await until(lambda: app._awaiting, driver)  # waiting, with no turn open
 
-        await driver.press("escape")
+        await driver.press("ctrl+c")
+        await driver.press("ctrl+c")
         await until(lambda: not app._agents, driver)
 
         # And the run is written down as stopped rather than as one that finished.
@@ -1336,7 +1473,7 @@ async def test_clearing_the_screen_clears_the_screen_and_nothing_else(
             app._agents
         )  # the flow the first line started was not stopped with the screen
 
-        await driver.press("escape")
+        app.action_stop_flow()
         await until(lambda: not app._agents, driver)
 
 
@@ -1435,6 +1572,8 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
         session = agent.new()
         app._said_by_you("do the thing")
 
+        app._details = True  # so that a tool row is one of the parts there are to draw
+
         # From a thread of its own, as a turn always says things: `_heard` hands them to the
         # event loop, which it may only do from somewhere that is not the event loop.
         def turn() -> None:
@@ -1449,6 +1588,7 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
         shown = _transcript(app)
 
     assert "❯ do the thing" in shown  # what you said
+    assert "is working" in shown  # which agent has the turn, said as it starts
     assert (
         "● Bash(git status)" in shown
     )  # a tool on the bullet, its argument in brackets
@@ -2035,7 +2175,7 @@ async def test_a_switch_takes_on_and_off_as_well_as_being_flipped() -> None:
         await driver.press(*"/details sideways")
         await driver.press("enter")
         await driver.pause()
-        assert app._details is True  # unchanged, and said so rather than guessed at
+        assert app._details is False  # unchanged, and said so rather than guessed at
         assert "say on or off" in _transcript(app)
 
 
@@ -2111,7 +2251,7 @@ async def test_two_things_said_get_two_answers_and_not_three(
         assert shown.count("answer to first") == 1
         assert shown.count("answer to second") == 1
 
-        await driver.press("escape")
+        app.action_stop_flow()
         await until(lambda: not app._agents, driver)
 
 

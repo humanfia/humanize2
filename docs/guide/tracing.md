@@ -177,7 +177,7 @@ A cycle covers one run and is never reopened. Carrying a flow on is another run,
 of its own, written into a cycle that says which run it was picked up from.
 
 An agent [stopped by hand](/guide/stopping) makes the run `stopped` rather than `failed`,
-whatever the turn under way made of it. A run you ended with esc is written down as `stopped`
+whatever the turn under way made of it. A run you stopped by hand is written down as `stopped`
 too.
 
 ```python

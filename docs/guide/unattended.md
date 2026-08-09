@@ -147,7 +147,7 @@ process takes it too. The turn under way dies with it, what it was doing is left
 to, and the command exits `130`.
 
 The [cycle](/guide/tracing#what-a-run-writes-down) records that run as **`failed`**. `stopped`
-is for an agent [told to stop by hand](/guide/stopping), with esc in the interface or
+is for an agent [told to stop by hand](/guide/stopping), with ctrl+c twice in the interface or
 `agent.stop()` from inside the flow. Nothing on a command line tells the two apart.
 
 ## Opening the interface already set up

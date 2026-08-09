@@ -6,25 +6,31 @@ you want it to end now.
 
 ## Try it
 
-Press **esc** in the interface while a flow is running. The whole flow stops, not just the
-turn.
+Press **ctrl+c** twice in the interface while a flow is running. The whole flow stops, not
+just the turn.
 
-An open [offers list](/guide/completion) is dismissed first, if there is one. It is silent when
-nothing is running.
+Twice, because a day's work is behind a key that is also pressed by mistake: the first press
+says `press ctrl+c again to stop the flow` and the second one does it.
 
 ## The three ways to stop
 
 | | |
 | --- | --- |
-| **esc**, in the interface | Stops the flow — the whole flow, not just the turn. Dismisses an open [offers list](/guide/completion) first, if there is one. Silent when nothing is running. |
+| **ctrl+c** twice, in the interface | Stops the flow — the whole flow, not just the turn. Clears what is half-typed first, if anything is. |
 | **ctrl+c**, on a `hmz exec` command line | The same. |
 | **`agent.stop()`**, from anywhere | The same, for that agent. |
 
-In the interface, **ctrl+c** works differently. It stops one turn rather than the flow. It
-stops what is half-typed, if anything, and otherwise the turn of the conversation being read.
-That conversation is closed under its turn, so the flow reads a turn that *failed* rather than
-an agent that was stopped. `suppress=True` catches it, the agent is still there to take the
-next turn, and the rest of the flow runs on. **esc** stops all of it.
+**A third press does not wait for it.** A flow told to stop unwinds in its own time — a loop
+sleeps off its round, a server is given its seconds — and the press after the one that stopped
+it closes every conversation still open under whatever turn it is in. That is the backend's
+process going, so the flow reads a turn that *failed* rather than an agent that was stopped,
+and nothing is left reading as a run in progress. It is the last thing a key can do about a
+run.
+
+**esc does not stop anything.** It is pressed to dismiss whatever is on the screen everywhere
+else in the interface, so it is not the key that ends a day's work: it opens
+[`/status`](/reference/tui#how-the-run-is-going) instead. With nothing running at all, two
+presses of **ctrl+c** leave the interface.
 
 ## What a stop does to the turn under way
 
@@ -55,7 +61,7 @@ while True:
 `Stopped` is not a `subprocess.CalledProcessError`. Nothing that catches a failed turn catches
 this by accident. Let it propagate. The [cycle](/guide/tracing#what-a-run-writes-down) then
 records the run as **stopped by hand** rather than as one that finished. That is the difference
-between "it decided it was done" and "somebody pressed esc", and the only place that
+between "it decided it was done" and "somebody stopped it", and the only place that
 distinction is written down.
 
 `agent.prompted()` raises it too, so a run ended while it waited also reads as ended by hand.
@@ -75,10 +81,10 @@ hung off it did. `Stopped` is the one exception, and it is let out.
 read, not the others, and nothing that is running.
 
 **Not choosing another flow.** `/flow` is refused while one is running. It refuses with `no
-choosing a flow while a flow is running: esc stops it first`. A flow drives the agents it was
-handed, and it must not have them swapped underneath it. Press **esc** first, then choose. The
-page of `/flow` that chooses one is shut while one runs. Looking and leaving without choosing
-changes nothing.
+choosing a flow while a flow is running: ctrl+c twice stops it first`. A flow drives the
+agents it was handed, and it must not have them swapped underneath it. Stop it first, then
+choose. The page of `/flow` that chooses one is shut while one runs. Looking and leaving
+without choosing changes nothing.
 
 **Not a question ending.** A question still up when the flow ends or is stopped ends with it.
 Stopping is never blocked on one.

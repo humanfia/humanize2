@@ -259,7 +259,7 @@ before its first turn, as a flow handed the wrong number of agents is.
 ## A flow that can be picked up
 
 A loop meant to run for a week is a loop that will be stopped and started: a machine goes down,
-somebody presses esc, a turn takes the process with it. So a flow may say it can be picked up
+somebody stops it, a turn takes the process with it. So a flow may say it can be picked up
 where the last run of it left off, and one that does takes a dict as its last argument — after
 the config, for a flow that takes one — holding whatever it wrote there last time.
 
@@ -508,7 +508,7 @@ One `-a` for each agent the flow drives, in the order it takes them. Full syntax
 
 In the [interface](/reference/tui), `/flow` picks one by name — tab and shift+tab are for stepping
 between the agents of the flow that is running.
-Picking one while a flow runs is refused: esc stops it first, since a flow drives the agents it
+Picking one while a flow runs is refused: ctrl+c twice stops it first, since a flow drives the agents it
 was handed and must not have them swapped underneath it.
 
 ## Several flows in one file
@@ -986,8 +986,9 @@ do.
 A flow ends when `run` returns — most of the built-in ones never do, and are ended from
 outside:
 
-- **esc** in the interface. (ctrl+c there ends one turn rather than the flow: the conversation
-  being read is closed under its turn, which the flow reads as a turn that failed.)
+- **ctrl+c** twice in the interface. (One press asks. A third does not wait for the flow to
+  unwind: every conversation still open is closed under its turn, which the flow reads as a
+  turn that failed.)
 - **ctrl+c** on a `hmz exec` command line.
 - **`agent.stop()`** from anywhere.
 

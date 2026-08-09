@@ -11,7 +11,7 @@ watching. Only the YAML below is specific to GitHub Actions.
 | **Questions** | An agent that asks is told nobody answered and carries on. There is nothing to switch — see [Being away](/guide/afk). |
 | **The person** | A `Person` answers nothing, so a conversation flow does the one thing it was given and returns. |
 | **Settings** | `hmz exec` reads nothing and remembers nothing. The line is the whole configuration. |
-| **Stopping** | Nothing presses esc. A `while True` flow will run until the job's timeout, so give it a bound. |
+| **Stopping** | Nobody is there to stop it. A `while True` flow will run until the job's timeout, so give it a bound. |
 
 ## Bound the run
 

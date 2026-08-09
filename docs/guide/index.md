@@ -29,7 +29,7 @@ These are for looking things up. If you have not used humanize before, the
 | [History](/guide/history) | Everything typed here before, on ↑ and ↓ |
 | [Exporting a transcript](/guide/export) | `/export` writes what is on screen, as it was written |
 | [What a project remembers](/guide/settings) | Reopening finds it set up the way you left it |
-| [Stopping](/guide/stopping) | **esc** ends the flow; what that does to a turn |
+| [Stopping](/guide/stopping) | **ctrl+c** twice ends the flow; what that does to a turn |
 
 ## Setting an agent up
 

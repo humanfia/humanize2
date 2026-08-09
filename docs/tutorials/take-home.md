@@ -135,7 +135,7 @@ flowverse](/guide/flowverses) — a git repository of flows — into `~/.humaniz
 
 ::: warning `flame_chase` never stops itself
 There is no exit condition in those eighteen lines, because "as few cycles as possible" has no
-end. Stop it with **ctrl+c** at a command line, or **esc** in the interface, when the curve
+end. Stop it with **ctrl+c** at a command line, or **ctrl+c** twice in the interface, when the curve
 flattens.
 :::
 

@@ -32,7 +32,7 @@ def test_an_agent_holding_two_turns_at_once_stops_when_both_do() -> None:
     assert monitor.now_working() == []
 
 
-def test_the_graph_is_who_handed_to_whom_and_how_often() -> None:
+def test_the_shape_is_who_handed_to_whom_and_how_often() -> None:
     """An actor and the reviewer reading its work, twice around: that is the shape of rlar."""
     monitor = Monitor()
     for _ in range(2):
@@ -40,13 +40,25 @@ def test_the_graph_is_who_handed_to_whom_and_how_often() -> None:
             monitor.begins(agent, "opus")
             monitor.ends(agent)
 
-    graph = "\n".join(monitor.graph())
+    shape = monitor.shape()
 
-    assert "actor" in graph
-    assert "reviewer" in graph
-    assert monitor.handovers[("actor", "reviewer")] == 2
-    assert monitor.handovers[("reviewer", "actor")] == 1  # the second round back round
-    assert monitor.turns["actor"] == 2
+    assert shape.turns == {"actor": 2, "reviewer": 2}
+    assert shape.working == frozenset()
+    assert shape.handovers[("actor", "reviewer")] == 2
+    assert shape.handovers[("reviewer", "actor")] == 1  # the second round back round
+
+
+def test_the_shape_is_taken_whole_rather_than_read_as_it_moves() -> None:
+    """What is drawn is one moment of the run, not three moments of three counters."""
+    monitor = Monitor()
+    monitor.begins("actor", "opus")
+
+    shape = monitor.shape()
+    monitor.ends("actor")
+    monitor.begins("reviewer", "opus")
+
+    assert shape.working == frozenset({"actor"})
+    assert shape.turns == {"actor": 1}
 
 
 def test_an_agent_taking_two_turns_running_hands_to_nobody() -> None:

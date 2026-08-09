@@ -101,7 +101,7 @@ be halved by the accounting.
 The readout sits under the agent lines, above the editor:
 
 ```
-              builder · claude/claude-opus-4-8:high · ● 2 of 5
+              builder · claude/claude-opus-4-8:high · ● 2 · reading
               reviewer · codex/gpt-5.6-sol:high · ○ 3 · unread
                        48.2k tokens · 91/s
 ```

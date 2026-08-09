@@ -33,12 +33,12 @@ whole queue. Three lines in a row are three things said, and they come back as t
 If no turn is open, the line is held for the next one. A line said to a running flow is never
 dropped.
 
-## It reaches the conversation you are reading
+## It reaches the agent you are reading
 
-Not whichever agent happens to be working. An agent may hold one conversation you are reading
-while taking a turn in another, and a line said to the wrong one is a line said to somebody
-else — so the line goes where you are looking. See [Many turns at once](/features/concurrency)
-for what "several conversations" means here.
+Not whichever agent happens to be working. A flow drives several, and a line said to the one
+that is not on the screen is a line said to somebody else — so the line goes where you are
+looking. See [Many turns at once](/features/concurrency) for what "several conversations"
+means here.
 
 ## Why some backends can take one and some cannot
 

@@ -1,8 +1,9 @@
 # Showing the working — `/details`
 
 `/details` is a switch in the interface that decides how much of a **turn** you see. A turn is
-one request to the agent and what it does in reply. Turn it on to watch every tool call and
-every line of thinking while you debug; turn it off to read only what the agent said.
+one request to the agent and what it does in reply. It starts **off**: what you watch a flow
+for is where it has got to, and what its agents said is that. Turn it on to see every tool
+call and every line of thinking while you debug.
 
 ## Try it
 
@@ -10,21 +11,29 @@ Type `/details on` in the interface to see everything the agent does.
 
 ```
 /details            flips it
-/details on         tool calls and thinking are shown
-/details off        only what the agent says
+/details on         all of the working: tool calls, thinking, printed output
+/details off        which agent is working, and what it said   ← the default
 ```
 
 You now see the agent's tool calls and thinking alongside what it says. Type `/details off` to
-hide them and read only what the agent says.
+hide them and read only what the agent said.
 
 ## What each setting looks like
 
-**Off** shows the transcript as the answer: what the agent said, turn after turn. This is the
-reading view. A nine-hour Ralph loop reads as a conversation.
+**Off** shows the flow: which agent has started a turn, what it said, and how long it worked.
+This is the reading view, and the one you get. A nine-hour Ralph loop reads as a conversation.
 
-**On** also shows every tool the agent reached for and every line it thought aloud. This is the
-debugging view. It is where you find out that the agent read the wrong file, or spent four
-minutes grepping.
+```
+● claude#a1b2 is working
+
+● Ready. The three failing tests pass now.
+
+✻ Worked for 74s · claude#a1b2
+```
+
+**On** also shows every tool the agent reached for, every line it thought aloud, and whatever
+its backend printed on the way past — all of it, not a sample. This is the debugging view. It
+is where you find out that the agent read the wrong file, or spent four minutes grepping.
 
 Both settings draw from the same [events](/reference/agents#watching-a-turn-as-it-happens):
 `text`, `reasoning` and `tool`. The switch only decides which of them are drawn. Nothing is
@@ -64,11 +73,12 @@ agent.watch(looking)
 
 - **On**, the first time you run an unfamiliar flow, to find out what shape its turns are.
 - **On**, when a turn is taking far longer than it should.
-- **Off**, for a run you are reading rather than debugging, and for anything you will
-  [`/export`](/guide/export) and show somebody.
+- **Off**, which is where it starts: for a run you are reading rather than debugging, and for
+  anything you will [`/export`](/guide/export) and show somebody.
 
 ## See also
 
+- [`/status`](/reference/tui#how-the-run-is-going) — the flow drawn, and who is working
 - [Cost and rate](/guide/tally) — the other readout of a turn in progress
 - [Tracing](/guide/tracing) — the whole of it, afterwards
 - [TUI › Commands](/reference/tui#commands)

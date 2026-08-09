@@ -65,38 +65,50 @@ line, with what the flow is doing beside the transcript.
   still stand once the cursor is back in the middle of it.
 - Keys the offers are using MUST be theirs only while there are offers: a prompt of more than
   one line needs its arrows back, and focus MUST NOT be able to leave the editor.
-- The transcript MUST be one conversation rather than every agent's at once: a flow drives
-  several agents and an agent holds several sessions, and all of them interleaved is none of
-  them readable. What each session says MUST be kept against that session, and the transcript
-  MUST show the one being read. What is kept MUST be bounded -- a flow runs for days and a
-  Ralph loop opens a session a turn -- by keeping the last few sessions and the last few lines
-  of each.
-- Reading another session MUST NOT clear the screen, however it came to be read. A line MUST
-  say which one is being read from there down -- and, where the one being read went out from
-  under whoever was reading it rather than being stepped off, that it went -- and what that
-  session has to show MUST be drawn under that line. A loop that opens a session a turn would
-  otherwise wipe the screen every turn, taking with it the turn somebody was reading, the line
-  they typed and whatever went wrong. Only `/clear` clears.
-- tab and shift+tab MUST step to the next and the previous session that is *working*,
-  wrapping, and MUST do nothing at all where none is. The ones working rather than every one
-  the flow holds: with ten agents going, what somebody is stepping between is the ones
-  thinking. A session read already MUST be left where it is when its turn ends -- it is being
-  read -- but MUST NOT be stepped onto again until it is working. What is read MUST be held by
-  identity rather than by where it comes among them, since a flow opens and drops them as it
-  runs: when the one being read goes, the newest of that agent's MUST be read instead, and
-  the nearest that is still there where that agent has none.
-- Which session is being read MUST be visible, beside how many that agent holds, and a
-  session that is not being read and has said something since it was last looked at MUST be
-  marked as having something unread. Otherwise a flow of ten conversations is nine nobody
-  knows to look at.
+- The transcript MUST be one per agent, and one more where every agent's work appears
+  together: a flow drives several agents and each of them holds as many conversations as it
+  likes, and all of them interleaved with no way of reading any one back is none of them
+  readable. What an agent says MUST be kept against that agent and against the one they are
+  all on. What is kept MUST be bounded -- a machine runs one flow after another -- by keeping
+  the last few and the last few lines of each, and neither the one being read nor the one
+  they are all on MUST ever be among what is dropped.
+- It MUST open on the one they all appear on, and a run starting MUST return to it. That is
+  where a flow is watched rather than one agent of it, which is what somebody at this prompt
+  is doing before they have any reason to single one out.
+- Every conversation of one agent MUST be that agent's one transcript, running on down it,
+  and opening another MUST NOT clear the screen or draw anything again. A Ralph loop opens
+  one a turn, and a screen redrawn every turn is one nobody can read back through. Which of
+  them a turn is being taken in MUST be said where the turn begins, for an agent holding more
+  than one.
+- Stepping onto another agent MUST draw that agent's transcript from the top, under a line
+  saying which is being read. What one agent has done is that agent's, and a screen that only
+  ever appended would be every agent's lines shuffled into one another. Only `/clear` clears,
+  and it MUST clear the one being read rather than reaching into ones nobody was looking at.
+- tab and shift+tab MUST step round the transcript they are all on and whichever agents are
+  *working*, wrapping. The ones working rather than every agent the flow drives: with ten
+  agents going, what somebody is stepping between is the ones thinking. An agent read already
+  MUST be left where it is when its turn ends -- it is being read -- but MUST NOT be stepped
+  onto again until it is working. Every agent there is MUST still be readable, from the
+  diagram `/status` draws: an agent that has stopped is picked out by name there rather than
+  stepped past.
+- Which agent is being read MUST be visible, beside how many conversations it holds, and one
+  that is not being read and has said something since it was last looked at MUST be marked as
+  having something unread. Otherwise a flow of ten agents is nine nobody knows to look at.
+  Nothing MUST be marked unread while the one they all appear on is being read: what an agent
+  said went onto that one too and was read there, so marking it would be marking every agent
+  of the flow for what is on the screen.
 - Whether each agent is working MUST be visible on that same line. It is the first thing
   looked for with several going at once -- who is thinking and who has stopped -- and the one
   thing there that changes without anybody touching it.
-- A typed line MUST reach the session being read, not whichever agent has a turn open: an
-  agent holding two sessions is working in one of them, and a line said to the other is a
-  line said to the wrong conversation. It MUST reach it only while a turn of that session is
-  open -- one between turns would answer it on its own, outside the flow -- and MUST wait for
-  the turn that starts next otherwise.
+- A word put into a turn MUST be kept against the agent that took it, rather than against
+  whichever transcript was on the screen when it went. It is part of that conversation, and a
+  conversation read back with half of what was said to it missing is not that conversation.
+- A typed line MUST reach the agent being read, not whichever happens to have a turn open: a
+  flow drives several, and a line said to the one that is not on the screen is a line said to
+  the wrong agent. Of that agent's conversations it MUST reach the one with a turn open --
+  one between turns would answer it on its own, outside the flow -- and MUST wait for the turn
+  that starts next otherwise. Where every agent is being read at once there is no one of them
+  to have meant, so it MUST reach whichever has a turn open.
 - What is running MUST be what is running: a flow may reach for another by name and run it, so
   the line that names one MUST name the flow that was started and whatever it called, innermost
   last, and the sheet that says how the run is going MUST say the same. A flow that called
@@ -113,11 +125,17 @@ line, with what the flow is doing beside the transcript.
 - Setting the flow up MUST NOT be a command here either: it is asked as the flow is chosen, so
   a command for it would be a second way in to one sheet of one menu -- and one that has to
   say `that flow takes no setting up` for most of the flows there are.
-- A turn MUST be shown as it happens: which agent is taking it, each tool it uses as one
-  compact row, and what it says. It MUST be shown once -- a backend teeing to stderr for the
-  benefit of a plain terminal MUST NOT also be shown here. `/details` MUST toggle all of what
-  a turn did on the way to its answer, tool calls and thinking together: they are one question
-  -- how much of the working to show -- and were two switches for no reason.
+- A turn MUST be shown as it happens: that the agent has started one, which agent it is, and
+  what it says. It MUST be shown once -- a backend teeing to stderr for the benefit of a plain
+  terminal MUST NOT also be shown here. A turn thinks for minutes and says nothing for most of
+  them, so the line saying one has started is the whole of what a flow looks like while it
+  works.
+- `/details` MUST toggle all of what a turn did on the way to its answer -- tool calls,
+  thinking, and whatever a backend printed on its way past -- and MUST start off. They are one
+  question, how much of the working to show, and were two switches for no reason. Off, because
+  a flow is watched to see where it has got to: what the agents said is that, and a tool row
+  per file read is a screen nobody is reading with the answer somewhere in it. On, all of it
+  MUST be shown rather than a sample of it.
 - An agent that stops to ask MUST be able to reach whoever is at the prompt: the question and
   what it offers MUST be shown, and the next line typed MUST be the answer rather than a word
   put into the turn. It MUST be shown against whichever of that agent's sessions is working,
@@ -128,13 +146,22 @@ line, with what the flow is doing beside the transcript.
   been said that none is there. A question still up when the flow ends or is stopped MUST end
   with it, so that stopping a flow is never blocked on one.
 - `ctrl+c` MUST take back the nearest thing there is to take back: what is half-typed if
-  anything is, and the turn of the conversation being read if not. That turn MUST end the way
-  a turn whose agent fell over ends -- the conversation closed under it -- so that the flow
-  reads it as a turn that failed and carries on or stops exactly as it would have had the
-  agent gone by itself. The rest of the flow MUST be left running: what is being read is one
-  conversation of however many the flow has open, and esc is what stops all of them. It MUST
-  NOT close the interface, however many times it is pressed: it is pressed while work is
-  going on, and leaving is not what was meant by it.
+  anything is, and the run if not. The run MUST be asked for twice -- the first press saying
+  what the next one does, the second one stopping the flow -- because a day's work is behind a
+  key that is also pressed by mistake. Stopping it MUST tell every agent to take no further
+  turn, so that the turn running now is closed out and the loop ends rather than handing on.
+- A third press MUST NOT wait for it. A flow told to stop unwinds in its own time, so the
+  press after the one that stopped it MUST close every conversation still open under whatever
+  turn it is in -- which is the backend's process going, and what the flow reads as a turn
+  that failed -- and MUST leave nothing behind still reading as a run in progress. That is
+  the last thing a key can do about a run.
+- With nothing running, two presses MUST leave. Twice for the reason stopping is asked twice,
+  and never on one press: it is pressed while work is going on, and leaving is not what was
+  meant by it. A press long enough after the last MUST be the first of its own gesture.
+- `esc` MUST NOT stop a flow. It is pressed to dismiss whatever is on the screen everywhere
+  else in this interface, and a key pressed to dismiss things MUST NOT be the key that ends a
+  day's work. It MUST be `/status` instead, which is where the run is read and where the flow
+  is drawn.
 - A line that cannot be carried out MUST be shown and MUST leave the interface up. Only
   `/exit` closes it.
 - A key of the interface's own MUST NOT fire while a sheet is up over it: a sheet is open in
@@ -434,8 +461,31 @@ adjusted rather than chosen.
   asked to do -- what is being picked up is what ran, and an agent swapped under it would be
   a different run wearing its name. It MUST be a run of its own, saying which run it came
   from, since a closed cycle is never reopened. While a flow is running it MUST be refused
-  where it was asked for, esc being what stops one.
+  where it was asked for, `ctrl+c` twice being what stops one.
 - It MUST be readable while a flow runs: what has already happened does not change under one.
+
+### How the run is going
+
+- `/status` MUST say how the run is going and MUST draw the shape of it, and MUST be what
+  `esc` opens. It is read rather than answered in every other respect, so it MUST NOT be
+  refused while a flow runs and MUST be redrawn while it is open: what it is about moves
+  without anybody touching it.
+- The shape MUST be drawn as a box per agent rather than listed. It is a graph, and a graph
+  read as an adjacency list is one nobody reads. The boxes MUST be in the order the flow takes
+  its agents, and the handovers between neighbours MUST be the arrows joining them, with how
+  often each went. That is the shape of nearly every flow there is, since a flow is written as
+  one agent after another. A handover the boxes have no arrow for MUST be said under the
+  diagram rather than drawn: a line crossing the page from the first box to the fourth is a
+  line nothing in a terminal draws readably.
+- Which agents are working MUST be marked on the boxes, and MUST move as they do. It is the
+  one thing on this sheet that changes by itself, and the reason somebody opened it.
+- Enter or a click on a box MUST read that agent, whether or not it is working. `tab` is held
+  to the ones working, so this is the one place an agent that has stopped -- or has not
+  started -- is reached. The first row MUST be the transcript every agent's work appears on,
+  which is the way back to watching the flow rather than one agent of it.
+- The agents of the last run MUST still be drawn once it is over. Their transcripts are still
+  on the screen and still worth reading back, and a run that has just ended is the one
+  somebody wants to look at.
 
 ### What humanize remembers
 
@@ -466,6 +516,13 @@ adjusted rather than chosen.
 
 ```python
 @dataclass(frozen=True, slots=True)
+class Shape:
+    turns: Mapping[str, int]
+    working: frozenset[str]
+    handovers: Mapping[tuple[str, str], int]
+
+
+@dataclass(frozen=True, slots=True)
 class Spend:
     model: str
     tokens: int
@@ -485,7 +542,7 @@ class Monitor:
     ) -> None: ...
     def spending(self, now: float | None = None) -> list[Spend]: ...
     def now_working(self) -> list[str]: ...
-    def graph(self) -> list[str]: ...
+    def shape(self) -> Shape: ...
 ```
 
 What a flow is doing, kept from the turns going past -- which is the only place it is visible,
@@ -494,9 +551,10 @@ a flow being a Python file that may branch any way it likes.
 - MUST be written from `AgentBase.watch`, and MUST NOT ask anything of the flow.
 - Every read and every write MUST hold the lock: the turns are on threads of their own and
   the interface reads while they run.
-- `graph` MUST report every agent the flow has run, marking whichever are working, and every
-  handover between them with how often it happened: that directed graph is the shape of the
-  run.
+- `shape` MUST report every agent the flow has run and how many turns each took, whichever
+  are working, and every handover between them with how often it happened: that directed graph
+  is the shape of the run. It MUST be taken whole under the lock, so that what is drawn from
+  it is one moment of the run rather than three moments of three counters.
 - `spending` MUST be per model rather than per agent, since two agents at one model are one
   bill, and MUST report a rate over a recent window only -- a flow that has stopped reads as
   stopped rather than as whatever it once averaged.

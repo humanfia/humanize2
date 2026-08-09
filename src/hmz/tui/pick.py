@@ -55,7 +55,7 @@ from hmz.kept import Kept, Runs
 from hmz.telemetry import KEPT, SAYS, SENT
 
 from .discover import installed, machines, ready_to_open
-from .monitor import short, thousands
+from .monitor import Shape, short, thousands
 from .selecting import Choices
 
 if TYPE_CHECKING:
@@ -74,6 +74,7 @@ if TYPE_CHECKING:
     from .monitor import Monitor
 
 __all__ = [
+    "EVERY",
     "Account",
     "Accounts",
     "Agent",
@@ -89,6 +90,7 @@ __all__ = [
     "Does",
     "Doing",
     "Drafts",
+    "Drawn",
     "Fitted",
     "Flows",
     "Flowverses",
@@ -201,22 +203,23 @@ _LIVE = 0.5
 
 
 class Held(NamedTuple):
-    """What one agent of a running flow is holding: its conversations, and which is read.
+    """What one agent of a running flow is holding, and whether it is the one being read.
 
     Attributes:
       many: How many conversations it has open, which is none for an agent that has opened
         none and for every agent of a flow that is not running.
-      at: Which of them is being read, counting from zero, or None for an agent none of
-        whose conversations is.
-      unread: Whether one it holds that is not being read has said something since it was
-        last looked at.
+      reading: Whether this agent's transcript is the one on the screen. All of its
+        conversations are that one transcript, so this is a yes or a no rather than which of
+        them: an agent is what is stepped onto, and a loop that opens one conversation a
+        turn runs them all down the same screen.
+      unread: Whether it has said something since it was last looked at.
       working: Whether any of its conversations has a turn open. Which is the first thing
         somebody looks for with several agents going at once -- who is thinking and who has
         stopped -- and the only one of these that changes by itself.
     """
 
     many: int = 0
-    at: int | None = None
+    reading: bool = False
     unread: bool = False
     working: bool = False
 
@@ -234,16 +237,16 @@ def _holds(held: Held) -> str:
       held: What it is holding.
 
     Returns:
-      Whether it is working, then `2 of 5` for the agent holding the one being read -- which
-      of them it is being the half worth knowing -- or the count alone for the others, and
-      `unread` after it where one of those has said something since it was last looked at.
-      Nothing at all for an agent holding none, which is every agent of a flow that is not
-      running.
+      Whether it is working, how many conversations it has, `reading` for the one whose
+      transcript is on the screen and `unread` for one that has said something since it was
+      last looked at. Nothing at all for an agent holding none, which is every agent of a
+      flow that is not running.
     """
     if not held.many:
         return ""
-    reading = f"{held.at + 1} of {held.many}" if held.at is not None else f"{held.many}"
-    said = f"{_WORKING} {reading}" if held.working else f"{_IDLE} {reading}"
+    said = f"{_WORKING if held.working else _IDLE} {held.many}"
+    if held.reading:
+        return f"{said}{_DOT}reading"
     return f"{said}{_DOT}unread" if held.unread else said
 
 
@@ -6423,26 +6426,202 @@ class Cycles(Sheet[Doing]):
         if said == carries_on and self._underway:
             # Said here rather than on the way out: the question this sheet is asking is
             # still worth answering, and a flow is stopped with esc rather than from here.
-            self._said = (
-                "a flow is running; esc stops it before another can be picked up"
-            )
+            self._said = "a flow is running; ctrl+c twice stops it before another can be picked up"
             self._fill()
             return
         self.dismiss(Doing(ran.at, said, tuple(self._told)))
 
 
-class Status(ModalScreen[None]):
-    """How the run is going: who is working, who handed to whom, and what it has cost.
+#: What the diagram draws one agent's box with, and what it joins two of them by. Light
+#: box-drawing, which is what a terminal has for a box that is a label rather than a frame.
+_BOX = ("┌", "┐", "└", "┘", "─", "│")
+
+#: What says a handover went down the diagram and what says it came back up it, and what
+#: stands between two agents the flow never handed between directly.
+_DOWN, _UP, _NEITHER = "↓", "↑", "┆"
+
+#: How wide one agent's box is drawn, at most. Wide enough for an agent's name beside what
+#: it runs, and narrow enough that two of them do not need a terminal nobody has.
+_WIDEST = 64
+
+#: The transcript every agent's work appears on, which is what the first row of the diagram
+#: attaches to and what this sheet answers with where that row is taken. Written down once,
+#: here, and read from `hmz.tui.app` rather than said again there: the sheet answers with
+#: what the interface reads, and two names for it are two that could come apart.
+#:
+#: Nobody's, since it is not an agent's: an agent id is what every other transcript is kept
+#: under, and no agent is called this.
+EVERY = ""
+
+
+class Drawn(NamedTuple):
+    """One agent of a run, as the diagram on `/status` draws it.
+
+    Attributes:
+      who: The agent id, which is what attaching to it names and what the graph counts it
+        under.
+      named: What the flow calls it, or "" for a flow that names none of its agents.
+      runs: What it runs, as the line that says what each agent is says it.
+      working: Whether it has a turn open right now.
+      reading: Whether its transcript is the one on the screen behind this sheet.
+    """
+
+    who: str
+    named: str = ""
+    runs: str = ""
+    working: bool = False
+    reading: bool = False
+
+
+def _boxed(said: list[tuple[str, str]], width: int) -> list[str]:
+    """One agent, drawn as a box the width of the diagram.
+
+    Args:
+      said: The lines to put in it, each as the colour to draw it in and the plain words to
+        draw. Plain, so that what will not fit can be cut before any markup is put round it:
+        a bracket an agent's name happens to hold is a bracket, and an escape of one is
+        characters that are not columns.
+      width: How wide to draw it, borders included.
+
+    Returns:
+      The box, a line at a time, each exactly as wide as the last.
+    """
+    left, right, under_left, under_right, across, side = _BOX
+    room = width - 4
+    return [
+        f"[$text-muted]{left}{across * (width - 2)}{right}[/]",
+        *(
+            f"[$text-muted]{side}[/] [{colour}]{escape(_fits(line, room))}[/]"
+            f"{' ' * max(0, room - len(_fits(line, room)))} [$text-muted]{side}[/]"
+            for colour, line in said
+        ),
+        f"[$text-muted]{under_left}{across * (width - 2)}{under_right}[/]",
+    ]
+
+
+def _fits(said: str, room: int) -> str:
+    """One line of a box, cut to the room there is for it rather than running past its side.
+
+    Args:
+      said: The words, as they are.
+      room: How many columns there are between the two sides of the box.
+
+    Returns:
+      Them, or as much of them as fits with an ellipsis where the rest was.
+    """
+    return said if len(said) <= room else said[: room - 1] + "…"
+
+
+def _joins(down: int, up: int, width: int) -> list[str]:
+    """The arrows between two boxes, saying which way the flow went and how often.
+
+    Args:
+      down: How many times the agent above handed to the one below.
+      up: How many times it came back the other way.
+      width: How wide the boxes are, so the arrows sit under them rather than beside them.
+
+    Returns:
+      The one line between the two boxes.
+    """
+    ways = [f"{_DOWN} {down}" for _ in range(1) if down] + [
+        f"{_UP} {up}" for _ in range(1) if up
+    ]
+    said = "   ".join(ways) or _NEITHER
+    return [f"[$text-muted]{' ' * min(4, max(0, width // 2 - 2))}{said}[/]"]
+
+
+def diagram(drawn: Sequence[Drawn], shape: Shape, width: int) -> list[list[str]]:
+    """The agents of a run and the handovers between them, as one box apiece.
+
+    The shape of a flow is not written anywhere: a flow is a Python file that may branch any
+    way it likes, so what it did is read off the turns going past. Drawn down the page in the
+    order the flow takes its agents, with the handovers between neighbours as the arrows that
+    join them -- which is the shape of nearly every flow there is, since a flow is written as
+    one agent after another. The rest are said under it rather than drawn as lines crossing
+    the page, there being no way to draw those in a terminal that reads as anything.
+
+    Args:
+      drawn: The agents, in the order the flow takes them.
+      shape: The run as a graph, which says who is working and who handed to whom.
+      width: How much room there is across.
+
+    Returns:
+      One block of lines per agent, in the same order: the arrows above it and then its box,
+      so that a list of blocks is the diagram from top to bottom.
+    """
+    across = max(24, min(_WIDEST, width - len(_INDENT) - 5))
+    blocks: list[list[str]] = []
+    for at, one in enumerate(drawn):
+        block = (
+            []
+            if at == 0
+            else _joins(
+                shape.handovers.get((drawn[at - 1].who, one.who), 0),
+                shape.handovers.get((one.who, drawn[at - 1].who), 0),
+                across,
+            )
+        )
+        taken = shape.turns.get(one.who, 0)
+        mark = _WORKING if one.working else _IDLE
+        head = _DOT.join(part for part in (one.named, short(one.who)) if part)
+        under = _DOT.join(
+            part
+            for part in (
+                one.runs,
+                f"{taken} turn{'' if taken == 1 else 's'}" if taken else "",
+                "reading" if one.reading else "",
+            )
+            if part
+        )
+        colour = "$secondary" if one.working else "$text-muted"
+        drawn_block = block + _boxed(
+            [(colour, f"{mark} {head}"), ("$text-muted", under)], across
+        )
+        blocks.append([f"{_INDENT}{line}" for line in drawn_block])
+    return blocks
+
+
+def elsewhere(drawn: Sequence[Drawn], shape: Shape) -> list[str]:
+    """The handovers the diagram has no arrow for, said rather than drawn.
+
+    Which are the ones between agents the boxes did not put next to each other: a line
+    crossing the page from the first box to the fourth is a line nothing in a terminal draws
+    readably, so it is a row under the diagram instead.
+
+    Args:
+      drawn: The agents, in the order the flow takes them.
+      shape: The run as a graph.
+
+    Returns:
+      One line per handover the boxes have no arrow for, which is nothing at all for the
+      flows that are one agent after another.
+    """
+    order = {one.who: at for at, one in enumerate(drawn)}
+    return [
+        f"{escape(short(sender))} → {escape(short(taker))}{_DOT}×{often}"
+        for (sender, taker), often in sorted(shape.handovers.items())
+        if abs(order.get(sender, -1) - order.get(taker, -1)) != 1
+        or sender not in order
+        or taker not in order
+    ]
+
+
+class Status(Sheet[str]):
+    """How the run is going, and the shape of it: who is working, and who handed to whom.
 
     Which is where the column that used to sit beside the transcript went. What a flow is
     doing is worth a look now and then and not worth a fifth of the screen the whole time:
     the transcript is what is being read, and the column was taking width off it to say
-    something that mostly had not changed since the last glance. Opened while a flow runs,
-    since that is when there is anything to see, and redrawn while it is open.
-    """
+    something that mostly had not changed since the last glance.
 
-    CSS = _SHEET
-    BINDINGS: ClassVar = [("escape", "back", "back")]
+    It is also where an agent is picked out to be read. tab steps between the ones working,
+    which is what somebody wants while several are thinking; this is the whole flow drawn at
+    once, so it is where the one that has stopped -- or has not started -- is reached. Enter
+    or a click on a box answers with that agent, and the first row is the transcript every
+    agent's work appears on, which is the way back to watching the flow.
+
+    Redrawn while it is open, since what it is about moves without anybody touching it.
+    """
 
     def __init__(
         self,
@@ -6451,6 +6630,8 @@ class Status(ModalScreen[None]):
         models: list[Runs],
         monitor: Monitor,
         config: BaseModel | None = None,
+        drawn: Sequence[Drawn] = (),
+        reading: str = EVERY,
     ) -> None:
         """Reads one run.
 
@@ -6460,6 +6641,10 @@ class Status(ModalScreen[None]):
           models: What each of its agents runs, and where its turns land.
           monitor: The run itself, read again each time this is redrawn.
           config: What the flow was set up with, for a flow that takes any setting up.
+          drawn: The agents there are to read, in the order the flow takes them, or nothing
+            at all with no flow running -- which is a sheet about what is set up rather than
+            about what it is doing.
+          reading: Which transcript is on the screen behind this, so the diagram can say so.
         """
         super().__init__()
         self._flow = flow
@@ -6467,29 +6652,75 @@ class Status(ModalScreen[None]):
         self._models = models
         self._monitor = monitor
         self._config = config
+        self._boxes = list(drawn)
+        self._reading = reading
+        #: Which row the cursor is on, by agent: the list is put up again twice a second,
+        #: and a row number would move under it as the flow opens and drops agents.
+        self._was = reading
+        #: The boxes as they were last drawn, so that a redraw which would draw the same
+        #: thing draws nothing. This is on a timer, and a list rebuilt twice a second is one
+        #: that loses the click somebody was making on it and jumps under anybody scrolling.
+        self._shown: list[str] = []
 
-    def compose(self) -> ComposeResult:
-        """The rule, what this is, the fields, and the way out."""
-        with Vertical(id="sheet"):
-            yield Label(id="rule")
-            yield Label(id="asked")
-            yield Label(id="said")
-            yield Label(id="keys")
-
-    def on_mount(self) -> None:
-        """Rules the top of the sheet across, says what it is, and starts redrawing."""
-        self.query_one("#rule", Label).update(_RULE * self.size.width)
+    def _ask(self) -> None:
+        """Says what this is, puts the flow up, and starts redrawing."""
         self.query_one("#asked", Label).update("Status")
-        self.query_one("#keys", Label).update("Esc to close")
-        self._draw()
-        self.set_interval(_LIVE, self._draw)
+        self.query_one("#about", Label).update(
+            "How the run is going, and the shape of it. Enter reads an agent -- whether or "
+            "not it is working, which is what tab is held to."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+        self.set_interval(_LIVE, self._fill)
 
-    def action_back(self) -> None:
-        """Leaves, there being nothing here to answer."""
-        self.dismiss(None)
+    def _fill(self) -> None:
+        """Puts the flow up as it stands, keeping the cursor where it was.
 
-    def _draw(self) -> None:
-        """Puts up what the run looks like as of now."""
+        Put up again rather than adjusted, because everything on it moves: an agent starts a
+        turn, a handover happens, a token is spent. The cursor is held by agent rather than
+        by row so that it stays on the same box while that happens.
+        """
+        listing = self.query_one("#choices", OptionList)
+        at = listing.highlighted
+        if at is not None and 0 <= at < listing.option_count:
+            self._was = str(listing.get_option_at_index(at).id or "")
+        working = sum(1 for one in self._boxes if one.working)
+        rows = [
+            Option(
+                f"{_INDENT}[{'$secondary' if working else '$text-muted'}]▣[/] every agent"
+                f"{_DOT}[$text-muted]"
+                f"{working} of {len(self._boxes)} working[/]"
+                + (f"{_DOT}[$text-muted]reading[/]" if self._reading == EVERY else ""),
+                id=EVERY,
+            )
+        ]
+        shape = self._monitor.shape()
+        rows += [
+            Option("\n".join(block), id=one.who)
+            for one, block in zip(
+                self._boxes, diagram(self._boxes, shape, self.size.width), strict=True
+            )
+        ]
+        drawn = [str(row.prompt) for row in rows]
+        if drawn != self._shown:
+            self._shown = drawn
+            listing.clear_options()
+            listing.add_options(rows)
+            listing.highlighted = next(
+                (one for one, row in enumerate(rows) if str(row.id or "") == self._was),
+                0,
+            )
+            self.shortens()
+        # Said every time either way: what the run has come to moves whether or not the shape
+        # of it does, and a line of text redrawn under the list is nothing to click on.
+        self._says(shape)
+
+    def _says(self, shape: Shape) -> None:
+        """Puts what the run has come to under the diagram: what it is, and what it has cost.
+
+        Args:
+          shape: The run as a graph, taken at the same moment the boxes were.
+        """
         over = (self._monitor.until or time.monotonic()) - self._monitor.began
         spending = self._monitor.spending()
         # Grouped as Claude Code groups its own: what is set up, what is happening, what it
@@ -6505,11 +6736,12 @@ class Status(ModalScreen[None]):
             [
                 (
                     "Working",
-                    [short(who) for who in self._monitor.now_working()]
+                    [short(who) for who in sorted(shape.working)]
                     or ["[$text-muted]nobody[/]"],
                 ),
                 ("Running", [f"{over:.0f}s"]),
-                ("Turns", self._monitor.graph() or ["[$text-muted]nothing yet[/]"]),
+                # Only the ones the boxes have no arrow for: the rest are drawn above.
+                ("Also", elsewhere(self._boxes, shape)),
             ],
             [
                 (
@@ -6529,7 +6761,16 @@ class Status(ModalScreen[None]):
                 for at, value in enumerate(values):
                     # The field is named against the first of its values and the rest are
                     # left to line up under it, which is how a list reads as one field.
+                    # No indent of its own: what is under the diagram is drawn in the block
+                    # the sheet already indents, and a second one would step it in past the
+                    # boxes it is about.
                     head = f"{field}:" if at == 0 else ""
-                    lines.append(f"{_INDENT}[$text-muted]{head:<{_FIELD}}[/]{value}")
+                    lines.append(f"[$text-muted]{head:<{_FIELD}}[/]{value}")
             lines.append("")
-        self.query_one("#said", Label).update("\n".join(lines))
+        self.query_one("#tuning", Label).update("\n".join(lines))
+        self.query_one("#keys", Label).update(f"↑↓ move{_DOT}enter read{_DOT}esc close")
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Answers with the transcript to read, which is what a click on a box means."""
+        self.dismiss(str(event.option.id or EVERY))

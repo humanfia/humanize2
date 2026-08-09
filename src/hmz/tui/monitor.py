@@ -11,8 +11,12 @@ import threading
 import time
 from collections import Counter, deque
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-__all__ = ["Monitor", "Spend", "short", "thousands"]
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+__all__ = ["Monitor", "Shape", "Spend", "short", "thousands"]
 
 #: How far back the rate is measured. Five minutes is long enough to carry across the gaps a
 #: flow leaves -- a turn that thinks, a round it sleeps off, a commit it makes -- and short
@@ -54,6 +58,26 @@ def short(agent: str) -> str:
         return agent[:16]
     backend = kind.removesuffix("Agent").removesuffix("CLI").removesuffix("Code")
     return f"{backend.lower()}#{tail[:4]}"
+
+
+@dataclass(frozen=True, slots=True)
+class Shape:
+    """The directed graph of a run so far, taken whole so a reader never sees it mid-change.
+
+    Which is the shape of the flow, and the only place it is ever visible: a flow is a Python
+    file that may branch any way it likes, so what it did is read off the turns going past
+    rather than asked of it.
+
+    Attributes:
+      turns: How many turns each agent that has worked has taken.
+      working: Which of them have a turn open right now.
+      handovers: How often each agent handed on to each other agent, as the flow went from
+        one to the next.
+    """
+
+    turns: Mapping[str, int]
+    working: frozenset[str]
+    handovers: Mapping[tuple[str, str], int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,22 +280,18 @@ class Monitor:
         with self._lock:
             return sorted(self.working)
 
-    def graph(self) -> list[str]:
-        """The agents this flow has run, and what handed to what, as lines to show.
+    def shape(self) -> Shape:
+        """The run as a graph: who has worked, who is working, who handed to whom.
+
+        Taken under the lock and copied out of it, so that whatever draws it is drawing one
+        moment of the run rather than three moments of three counters.
 
         Returns:
-          One line per agent, marked if it is working, then one per handover -- which together
-          are the directed graph of the run so far, drawn as an adjacency list because that is
-          what stays readable in a corner of a screen.
+          The graph, which is what the diagram on `/status` is drawn from.
         """
         with self._lock:
-            lines = [
-                f"{'▶' if agent in self.working else '·'} {short(agent)}"
-                f"  [dim]×{taken}[/dim]"
-                for agent, taken in self.turns.most_common()
-            ]
-            lines += [
-                f"  [dim]{short(sender)} → {short(taker)} ×{often}[/dim]"
-                for (sender, taker), often in self.handovers.most_common()
-            ]
-            return lines
+            return Shape(
+                turns=dict(self.turns),
+                working=frozenset(self.working),
+                handovers=dict(self.handovers),
+            )
