@@ -54,7 +54,7 @@ from hmz.backends import named
 from hmz.kept import Kept, Runs
 from hmz.telemetry import KEPT, SAYS, SENT
 
-from .discover import installed, machines
+from .discover import installed, machines, ready_to_open
 from .monitor import short, thousands
 from .selecting import Choices
 
@@ -838,21 +838,22 @@ def opens_on(
 ) -> list[Runs]:
     """The one agent to fall back on where nothing has been remembered for a place.
 
-    The first backend installed here that has said what it runs, at the first model it named
-    -- which is that CLI's own idea of what it runs by default, and the only idea of it worth
-    having. Nothing is written down here: a model named in this file would be a model this
-    file was right about on the day it was written.
+    The first backend installed here that has said what it runs and can be opened without
+    further setup, at the first model it named -- which is that CLI's own idea of what it runs
+    by default, and the only idea of it worth having. Nothing is written down here: a model
+    named in this file would be a model this file was right about on the day it was written.
 
     Args:
       agents: The backends there are, and what each of them says it runs.
       goals: Whether backend goals start available to it.
 
     Returns:
-      The one agent, or nothing at all where no backend here has yet said what it runs --
-      which is a catalogue to fill rather than a model to guess at.
+      The one agent, or nothing at all where no backend here has both said what it runs and
+      can be opened without further setup.
     """
+    where = Path.cwd()
     for backend, found in agents.items():
-        if found:
+        if found and ready_to_open(backend, where):
             # Not the hardest effort, which is where the cursor starts: that is the one to
             # reach for, and this is the one to spend before anybody has asked for anything.
             # `high` where the model takes it, which is nearly always -- and the least it

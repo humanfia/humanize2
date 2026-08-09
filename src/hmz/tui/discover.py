@@ -26,7 +26,7 @@ from hmz.backends import profiles, speaking
 if TYPE_CHECKING:
     from hmz.backends import Model
 
-__all__ = ["installable", "installed", "machines"]
+__all__ = ["installable", "installed", "machines", "ready_to_open"]
 
 #: How long the machines around here are given to name themselves before the list goes up
 #: without them. A docker daemon that is not answering is not a reason to sit at a sheet.
@@ -72,6 +72,31 @@ def _is_installed(backend: str) -> bool:
     if (added := speaking().get(backend)) is not None:
         return bool(added) and shutil.which(added[0]) is not None
     return shutil.which(backend) is not None
+
+
+def ready_to_open(backend: str, where: Path) -> bool:
+    """Whether an installed backend may be chosen without somebody choosing it.
+
+    A CLI on ``PATH`` is there because somebody installed it. DeepSeek Harness is different:
+    its SDK arrives with humanize, so its presence says nothing about whether its local
+    account has been configured. It remains installed and selectable without a key, but must
+    not make a new prompt look ready to run.
+
+    Args:
+      backend: The backend being considered as the implicit fallback.
+      where: The workspace its local account would run in.
+
+    Returns:
+      Whether the backend may be used as the implicit local fallback.
+    """
+    if backend != "dsh":
+        return True
+
+    # Local so discovering ordinary CLIs does not import any agent implementation. The SDK
+    # runtime itself remains lazy inside the dsh driver and is not started by this check.
+    from hmz.agents.dsh import native_ready
+
+    return native_ready(where)
 
 
 def machines() -> list[tuple[str, str]]:

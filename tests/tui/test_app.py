@@ -1167,9 +1167,13 @@ async def test_every_line_typed_between_turns_is_a_turn_of_one_conversation(
 async def test_deepseek_chat_explains_a_missing_api_key_instead_of_staying_blank(
     _installed: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands it over
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setenv("DSH_HOME", str(tmp_path / "dsh-home"))
     app = Humanize(agents=[Runs("dsh/deepseek-v4-flash:high")])
+    assert app._models == [Runs("dsh/deepseek-v4-flash:high")]
+
     async with app.run_test() as driver:
         await driver.press(*"hello")
         await driver.press("enter")
@@ -1182,6 +1186,23 @@ async def test_deepseek_chat_explains_a_missing_api_key_instead_of_staying_blank
 
         app.action_stop_flow()
         await until(lambda: not app._agents, driver)
+
+
+@unittest.mock.patch(
+    "hmz.tui.app.installed",
+    return_value={"dsh": (Model("deepseek-v4-flash", ("max", "high", "off")),)},
+)
+def test_deepseek_with_a_local_key_can_be_the_chat_default(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands it over
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setenv("DSH_HOME", str(tmp_path / "dsh-home"))
+
+    app = Humanize()
+
+    assert app._models == [Runs("dsh/deepseek-v4-flash:high")]
 
 
 @pytest.mark.timeout(60)
