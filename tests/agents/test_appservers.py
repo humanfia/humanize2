@@ -225,8 +225,6 @@ for line in sys.stdin:
             send({"method": "turn/completed",
                   "params": {"turn": {"id": "turn_fake", "status": "failed",
                                       "error": {"type": "usageLimitExceeded"}}}})
-            send({"method": "thread/status/changed",
-                  "params": {"status": {"type": "idle"}}})
             continue
         send({"method": "item/agentMessage/delta", "params": {"delta": "workspace-write"}})
         send({"method": "item/completed",
@@ -694,12 +692,13 @@ def test_a_codex_session_with_no_turn_running_cannot_be_talked_to() -> None:
         session.interject("hello?")
 
 
-def test_a_codex_turn_that_failed_does_not_answer_as_if_it_landed(
+@pytest.mark.timeout(5)
+def test_a_codex_turn_that_failed_does_not_wait_for_the_thread_to_idle(
     codex: _FakeServer,
 ) -> None:
-    """The thread goes idle either way, so a turn that failed must say so rather than "".
+    """A completed turn is terminal even when Codex never says its thread is idle.
 
-    Otherwise a loop feeds an empty answer forward as the work of the turn before it.
+    A failed turn must say so rather than leave the flow waiting forever for another event.
     """
     agent = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high"))
     session = agent.new()

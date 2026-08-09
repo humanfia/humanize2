@@ -461,13 +461,13 @@ class _AppServer:
                         case "turn/completed" if told.get("turn", {}).get(
                             "status"
                         ) not in (None, "completed"):
-                            # A turn can end by failing or by being interrupted, and the
-                            # thread goes idle either way: a turn that did not land must not
-                            # answer as if it had.
+                            # A failed or interrupted turn is complete even when the server
+                            # does not follow it with a separate idle notification.
                             turn_said = told["turn"]
                             failed = json.dumps(
                                 turn_said.get("error") or turn_said.get("status")
                             )
+                            break
                         case "thread/status/changed" if (
                             begun and told["status"]["type"] == "idle"
                         ):
