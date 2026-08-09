@@ -104,6 +104,31 @@ async def test_one_is_added_named_and_written_down_when_the_menu_is_saved(
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
+async def test_save_accepts_a_named_agent_without_backing_out(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+) -> None:
+    """The explicit action returns to the outer draft, which still saves the complete list."""
+    Templates().keep([Kept("reviewer", Runs("claude/claude-opus-5:max"))])
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _into_saved(app, driver)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+
+        await onto(app, driver, "effort")
+        await driver.press("left")
+        await driver.pause()
+        await opens(app, driver, "save")
+        await until(lambda: isinstance(app.screen, Saved), driver)
+
+        assert Templates().all()[0].runs == Runs("claude/claude-opus-5:max")
+        await keeps(app, driver)
+
+    assert Templates().all()[0].runs == Runs("claude/claude-opus-5:high")
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_one_is_taken_away_by_pressing_d_twice(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
@@ -210,11 +235,12 @@ async def test_a_flows_agent_is_saved_out_under_a_new_name_or_over_one(
     """The other half of importing: what was tuned in a flow is worth keeping."""
     Templates().keep([Kept("reviewer", Runs("claude/claude-opus-5:max"))])
     app = Humanize()
+    was = (app._flow_named, list(app._models))
     async with app.run_test() as driver:
         await into_flows(app, driver)
         await into_agent(app, driver)
 
-        await opens(app, driver, "save")
+        await opens(app, driver, "save as")
         await until(lambda: isinstance(app.screen, Names), driver)
         # The ones already there, to be written over, and what this one is called as a new
         # one under them.
@@ -227,6 +253,7 @@ async def test_a_flows_agent_is_saved_out_under_a_new_name_or_over_one(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Agent), driver)
         await until(lambda: "saved as builder" in _under(app), driver)
+        assert (app._flow_named, app._models) == was
 
     held = {one.name: one.runs for one in Templates().all()}
     assert held["reviewer"] == Runs("claude/claude-opus-5:max")

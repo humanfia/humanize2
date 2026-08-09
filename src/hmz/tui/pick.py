@@ -993,6 +993,7 @@ _HALVES = "\x1f"
 
 #: The pages the flow menu is, in the order they are turned between.
 _FLOW_PAGE, _AGENT_PAGE = 0, 1
+_SAVE = "save"
 
 
 #: What this project's own flows are listed under, which is where a copy of one lands: the
@@ -1023,8 +1024,8 @@ class Flows(Drafts[Chosen]):
     settings is chosen in order to be run with settings, and the moment it is chosen is the
     one moment somebody is thinking about that flow rather than about its agents.
 
-    Nothing is applied by turning a page or by walking out. What the menu holds is a draft of
-    the whole of it, and it lands when it is saved on the way out.
+    Nothing is applied by turning a page. What the menu holds is a draft of the whole of it,
+    and it lands together from the save row or when saving is confirmed on the way out.
     """
 
     TABS: ClassVar = ("Flow", "Agents")
@@ -1232,7 +1233,7 @@ class Flows(Drafts[Chosen]):
             if self._tab == _FLOW_PAGE
             else f"What each agent {escape(self._flow)} drives is: the CLI that takes its "
             "turns, the account they run as, the model at an effort, and what it may do. "
-            "Enter opens one. Nothing lands until this menu is saved on the way out."
+            "Enter opens one, and save applies the complete flow setup."
         )
         if self._tab != _FLOW_PAGE:
             self.tabbed(self._tab_line())
@@ -1433,13 +1434,14 @@ class Flows(Drafts[Chosen]):
         return ""
 
     def _agents_page(self) -> None:
-        """Puts up one row per agent the flow drives, and what each of them is now."""
+        """Puts up each agent the flow drives, followed by saving the complete setup."""
         listing = self.query_one("#choices", OptionList)
         named = tuple(place.name for place in self._places)
         lines = reads(named, self._runs)
-        self._counting = len(str(max(len(self._places), 1)))
-        at = min(listing.highlighted or 0, max(len(self._places) - 1, 0))
-        listing.set_options(
+        total = len(self._places) + 1
+        self._counting = len(str(total))
+        at = min(listing.highlighted or 0, total - 1)
+        rows = [
             Option(
                 self._row(
                     seen,
@@ -1453,14 +1455,31 @@ class Flows(Drafts[Chosen]):
                 id=f"={seen}",
             )
             for seen in range(len(self._places))
+        ]
+        rows.append(
+            Option(
+                self._row(
+                    len(self._places),
+                    _SAVE,
+                    "save the flow and all of its agents",
+                    here=at == len(self._places),
+                    inforce=False,
+                ),
+                id=f"={_SAVE}",
+            )
         )
-        listing.highlighted = at if self._places else None
+        listing.set_options(rows)
+        listing.highlighted = at
         self._drawn = listing.highlighted
         said = self._said or ("" if self._places else self._noagents())
         self.query_one("#tuning", Label).update(
             f"[$text-muted]{said}[/]" if said else ""
         )
-        self.query_one("#keys", Label).update("Enter to set one up · Esc to close")
+        self.query_one("#keys", Label).update(
+            "Enter to save · Esc to close"
+            if at == len(self._places)
+            else "Enter to set one up · Esc to close"
+        )
 
     def _noagents(self) -> str:
         """Why there is no agent to set up, which is not always the same reason."""
@@ -1576,7 +1595,15 @@ class Flows(Drafts[Chosen]):
             if name:
                 self._chose(name)
             return
-        self._configuring(int(str(event.option.id or "=0").removeprefix("=")))
+        held = str(event.option.id or "").removeprefix("=")
+        if held == _SAVE:
+            self.applied()
+            return
+        try:
+            at = int(held)
+        except ValueError:
+            return
+        self._configuring(at)
 
     def _chose(self, name: str) -> None:
         """Takes a flow as the one to run, and reads back what it was last set up with.
@@ -4243,7 +4270,7 @@ _SKILLS = "skills"
 _PERMIT = "permission"
 _GOALS = "goals"
 _WHERE = "where"
-_SAVE = "save"
+_SAVE_AS = "save as"
 
 #: Which of them are stepped along where they stand rather than opened, and which are opened.
 _STEPPED = (_EFFORT, _SWARM, _PERMIT, _GOALS)
@@ -4263,9 +4290,9 @@ class Agent(Drafts[Fitted]):
     settles which of them it may name. Changing the CLI therefore lets go of the model, which
     belonged to the CLI before it.
 
-    A saved agent can be copied in at the top and saved out at the bottom. What is imported is
-    a copy: an agent tuned inside a flow is that flow's, and writing the changes back into the
-    thing it was copied from would change every other flow that had imported it.
+    A saved agent can be copied in at the top and saved as a reusable copy at the bottom. What
+    is imported is a copy: an agent tuned inside a flow is that flow's, and writing the changes
+    back into the thing it was copied from would change every other flow that had imported it.
     """
 
     BINDINGS: ClassVar = [
@@ -4338,10 +4365,14 @@ class Agent(Drafts[Fitted]):
     def _ask(self) -> None:
         """Says whose agent this is, and what setting it up settles."""
         self.query_one("#asked", Label).update(f"Set up {escape(self._named)}")
+        saving = (
+            "Save accepts this setup; save as keeps a reusable copy."
+            if self._place is not None
+            else "Save accepts this setup."
+        )
         self.query_one("#about", Label).update(
             "What this one agent is. Enter opens the row under the cursor, and the arrows "
-            "step the ones that are a rung rather than a list. Nothing is applied until this "
-            "sheet is left and saving is confirmed."
+            f"step the ones that are a rung rather than a list. {saving}"
         )
         self._fill()
         self.query_one("#choices", OptionList).focus()
@@ -4402,8 +4433,9 @@ class Agent(Drafts[Fitted]):
             )
         elif image := _settled(self._place):
             rows.append((_WHERE, f"in a container of {image}", "the flow settled this"))
-        if not self._is_named:
-            rows.append((_SAVE, "", "save this as an agent you can import"))
+        rows.append((_SAVE, "", "accept this agent setup"))
+        if self._place is not None:
+            rows.append((_SAVE_AS, "", "save a reusable agent you can import"))
         return rows
 
     def _fill(self) -> None:
@@ -4430,6 +4462,10 @@ class Agent(Drafts[Fitted]):
             if held in _STEPPED
             else "Type to name it · Esc to close"
             if held == _NAME
+            else "Enter to save · Esc to close"
+            if held == _SAVE
+            else "Enter to save a copy · Esc to close"
+            if held == _SAVE_AS
             else "Enter to open · Esc to close"
         )
 
@@ -4452,7 +4488,7 @@ class Agent(Drafts[Fitted]):
         # opened: without it a blank name reads as a row nothing can be typed into.
         caret = "[reverse] [/reverse]" if here and held == _NAME else ""
         # A row that opens something says so, as a menu anywhere says it.
-        opens = "" if held in _STEPPED or held == _NAME else " ▸"
+        opens = "" if held in _STEPPED or held in (_NAME, _SAVE) else " ▸"
         # Padded on what is shown rather than on what is written: markup is not columns.
         named = escape(held) + " " * max(1, _ASPECT - len(held))
         room = _HOW - len(value) - len(opens) - (1 if caret else 0)
@@ -4601,7 +4637,10 @@ class Agent(Drafts[Fitted]):
         if held in _STEPPED:
             self._step(-1)
             return
-        if held in (_CLI, _ACCOUNT, _MODEL, _SKILLS, _WHERE, _IMPORT, _SAVE):
+        if held == _SAVE:
+            self.applied()
+            return
+        if held in (_CLI, _ACCOUNT, _MODEL, _SKILLS, _WHERE, _IMPORT, _SAVE_AS):
             self._opens(held)
 
     @work
@@ -4627,8 +4666,8 @@ class Agent(Drafts[Fitted]):
             await self._chose_where(showing)
         elif held == _IMPORT:
             await self._imports(showing)
-        else:
-            await self._saves(showing)
+        elif held == _SAVE_AS:
+            await self._saves_as(showing)
         self._fill()
 
     async def _chose_cli(self, showing: App[None]) -> None:
@@ -4734,7 +4773,7 @@ class Agent(Drafts[Fitted]):
         )
         self.changed()
 
-    async def _saves(self, showing: App[None]) -> None:
+    async def _saves_as(self, showing: App[None]) -> None:
         """Writes this agent down under a name, new or one already there."""
         from hmz.kept import Templates
 

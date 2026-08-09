@@ -142,7 +142,7 @@ list appears under the editor with a line about each.
 
 | Command | Takes | What it does |
 | --- | --- | --- |
-| `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Nothing lands until you save on the way out. |
+| `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Its Agents page saves the complete setup; esc remains the way to save or discard on the way out. |
 | `/flowverses` | | [Where flows come from](/guide/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
 | `/cycles` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/guide/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
@@ -394,10 +394,11 @@ true of all of them:
   a modifier held down.
 - **Typing does not search.** Every letter is a key, so a search is asked for with **s** and
   left with **esc**, which clears what was typed. While one is running the letters go into it.
-- **Nothing lands until you save on the way out.** Esc asks — a box in the middle of the
-  screen, over the menu rather than instead of it, with the two answers there are: save and
-  close, or discard and close. Esc on the box is the way back to the menu. A menu you only
-  looked at asks nothing.
+- **Nothing lands until you save.** `/flow` has a `save` row on its Agents page for the
+  complete flow setup. Esc remains available on every menu: it asks in a box in the middle of
+  the screen, over the menu rather than instead of it, whether to save and close or discard
+  and close. Esc on the box is the way back to the menu. A menu you only looked at asks
+  nothing.
 
 `/cycles` and `/flowverses` are lists of the same kind, and the first two are true of them as
 well. The third is not: neither holds a draft of anything, so what is asked for there happens
@@ -450,7 +451,8 @@ and taking one away are [`/flowverses`](#where-flows-come-from).
 
 Choosing a flow reads back what that flow was last set up with here, asks
 [what the flow itself takes](#setting-a-flow-up) where it takes anything, and lands on the
-**Agents** page, which is the next thing to answer.
+**Agents** page, which is the next thing to answer. Its last row, `save`, validates every
+agent and applies the flow and all its agents together.
 
 **The Flow page is shut while a flow is running** — a flow is chosen in order to be started,
 and there is one going. The Agents page never is: an agent thinking too little, on the wrong
@@ -512,8 +514,7 @@ enter opens one. Everything that agent is is a row of one sheet:
   Set up builder
 
   What this one agent is. Enter opens the row under the cursor, and the arrows step the ones
-  that are a rung rather than a list. Nothing is applied until this sheet is left and saving is
-  confirmed.
+  that are a rung rather than a list. Save accepts this setup; save as keeps a reusable copy.
 
     1. import       ▸                          copy a saved agent into this one
   ❯ 2. cli          claude ▸                   which coding agent takes its turns
@@ -524,7 +525,8 @@ enter opens one. Everything that agent is is a row of one sheet:
     7. permission   bypass                     what it may do without being asked
     8. goals        on                         whether the backend's own goals are available
     9. where        this machine ▸             the machine its work lands on
-   10. save         ▸                          save this as an agent you can import
+   10. save                                    accept this agent setup
+   11. save as      ▸                          save a reusable agent you can import
 
   Enter to open · Esc to close
 ```
@@ -544,8 +546,10 @@ a row only for an agent [the flow says may be pointed at a machine](#where-each-
 for one the flow put in a container it is read rather than opened, and for one that works here
 it is not there at all.
 
-Esc off the sheet asks about anything you changed and hands it back to the menu, which is still
-holding it: nothing is written down until the menu itself is saved.
+`save` accepts this agent and returns straight to the flow's Agents page. It changes only the
+flow draft; the complete setup is written down when `save` is chosen on that outer page.
+`save as` instead asks for a name and immediately keeps a reusable copy without applying the
+flow. Esc off the agent sheet remains a fallback: it asks whether to accept or discard changes.
 
 ## Which CLI, and which account
 
@@ -617,13 +621,17 @@ what it may do — none of which is a thing about the flow that happens to be dr
 | `a` | Add one. It has a `name` row of its own, which a flow's agent has not. |
 | `d` `d` | Take one away. |
 
+The setup sheet for a named agent also ends with `save`, which accepts that agent and returns
+to this list. The outer menu still holds all additions, edits and removals together until the
+menu itself is saved.
+
 They live in `~/.humanize/agents.yaml`, and land there when the menu is saved. The same store
 is on the command line as [`hmz agents`](/reference/cli#hmz-agents), for a machine being set up or a
 CI job.
 
 **A flow imports a copy.** The `import` row of a flow's agent copies everything the saved one
-is; changing it afterwards changes that flow's agent alone. The `save` row is the other half:
-what you tuned inside a flow, written down under a new name or over one already there.
+is; changing it afterwards changes that flow's agent alone. The `save as` row is the other
+half: what you tuned inside a flow, written down under a new name or over one already there.
 
 ## Where each agent works
 

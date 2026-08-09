@@ -175,6 +175,7 @@ async def test_one_agent_is_one_sheet_of_rows_in_the_order_they_depend(
             "goals",
             "where",
             "save",
+            "save as",
         ]
         # The account nobody chose is always the first row of the list it is chosen from.
         assert "as local" in _value(app, "provider")
@@ -196,9 +197,9 @@ async def test_two_agents_are_two_rows_and_a_sheet_apiece(
         await driver.press("tab")
         await until(lambda: sheet._tab == 1, driver)
         listing = sheet.query_one("#choices", OptionList)
-        await until(lambda: len(listing.options) == 2, driver)
+        await until(lambda: len(listing.options) == 3, driver)
 
-        assert rows(app) == ["0", "1"]
+        assert rows(app) == ["0", "1", "save"]
         assert "builder" in str(listing.get_option_at_index(0).prompt)
         assert "reviewer" in str(listing.get_option_at_index(1).prompt)
 
@@ -213,6 +214,74 @@ async def test_two_agents_are_two_rows_and_a_sheet_apiece(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Agent), driver)
         assert "reviewer" in _asked(app)
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
+async def test_explicit_saves_accept_two_agents_then_apply_the_complete_flow(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    flows: Path,
+    tmp_path: Path,
+) -> None:
+    """A two-agent flow can be set up and saved without backing through either sheet."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _open(app, driver, "pair")
+        await onto(app, driver, "effort")
+        await driver.press("left")
+        await driver.pause()
+
+        await opens(app, driver, "save")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        assert rows(app) == ["0", "1", "save"]
+
+        await onto(app, driver, "1")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await onto(app, driver, "effort")
+        await driver.press("right")
+        await driver.pause()
+        await opens(app, driver, "save")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+
+        await onto(app, driver, "save")
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Flows), driver)
+
+    chosen = [
+        Runs("claude/claude-opus-5:high"),
+        Runs("claude/claude-opus-5:max"),
+    ]
+    assert app._flow_named == "pair"
+    assert app._models == chosen
+    assert Settings(tmp_path).agents("pair") == chosen
+
+
+@pytest.mark.timeout(60)
+@unittest.mock.patch("hmz.tui.app.installed", return_value={})
+async def test_explicit_flow_save_refuses_an_agent_with_no_model(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
+    flows: Path,
+) -> None:
+    """The save row uses the same completeness check as saving on the way out."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/flow here")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        sheet = cast("Flows", app.screen)
+        if sheet._tab != 1:
+            await driver.press("tab")
+            await until(lambda: sheet._tab == 1, driver)
+
+        await onto(app, driver, "save")
+        await driver.press("enter")
+        await driver.pause()
+
+        assert app.screen is sheet
+        assert "builder has no model yet" in str(
+            sheet.query_one("#tuning", Label).content
+        )
 
 
 @pytest.mark.timeout(60)
