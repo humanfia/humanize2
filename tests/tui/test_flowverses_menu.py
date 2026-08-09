@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList
 
-from hmz.flows import OFFICIAL, flowverses
+from hmz.flows import LOCAL, OFFICIAL, USER, flowverses
 from hmz.flows import verses as store
 from hmz.tui import Humanize
 from hmz.tui.pick import Fetches, Flowverses, Holds
@@ -82,13 +82,13 @@ def _under(sheet: Flowverses | Holds) -> str:
 
 @pytest.mark.timeout(60)
 async def test_every_place_flows_come_from_is_listed(theirs: Path) -> None:
-    """Two of them always -- the package and the repository the rest come from -- and yours."""
+    """Four of them always -- humanize's two and your own two -- and whatever was added."""
     store.add(str(theirs))
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        assert rows(app) == ["builtin", OFFICIAL, "theirs"]
+        assert rows(app) == ["builtin", OFFICIAL, "theirs", LOCAL, USER]
         drawn = str(
             sheet.query_one("#choices", OptionList).get_option("=builtin").prompt
         )
@@ -218,7 +218,7 @@ async def test_one_is_added_from_here(theirs: Path) -> None:
         await until(lambda: isinstance(app.screen, Flowverses), driver)
         await until(lambda: "theirs" in rows(app), driver)
 
-        assert [one.name for one in flowverses()][-1] == "theirs"
+        assert [one.name for one in flowverses()][-3] == "theirs"
         assert "is fetched" in _under(sheet)
 
 
@@ -271,28 +271,35 @@ async def test_one_that_was_added_may_be_taken_away_from_here(theirs: Path) -> N
 
         await driver.press("d")
         await until(lambda: "press d again" in _under(sheet), driver)
-        assert [one.name for one in flowverses()] == ["builtin", OFFICIAL, "theirs"]
+        assert [one.name for one in flowverses()] == [
+            "builtin",
+            OFFICIAL,
+            "theirs",
+            LOCAL,
+            USER,
+        ]
 
         await driver.press("d")
         await until(lambda: "no longer here" in _under(sheet), driver)
 
-        assert [one.name for one in flowverses()] == ["builtin", OFFICIAL]
-        assert rows(app) == ["builtin", OFFICIAL]
+        assert [one.name for one in flowverses()] == ["builtin", OFFICIAL, LOCAL, USER]
+        assert rows(app) == ["builtin", OFFICIAL, LOCAL, USER]
 
 
 @pytest.mark.timeout(60)
-async def test_neither_of_humanize_s_own_may_be_taken_away() -> None:
-    """One is the package and one is where the rest come from: both are always in the list."""
+@pytest.mark.parametrize("named", ["builtin", LOCAL])
+async def test_none_of_the_ones_always_here_may_be_taken_away(named: str) -> None:
+    """The package, where the rest come from, and the two your own flows live in."""
     app = Humanize()
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
-        await onto(app, driver, "builtin")
+        await onto(app, driver, named)
 
         await driver.press("d")
         await driver.press("d")
         await until(lambda: "always here" in _under(sheet), driver)
 
-        assert rows(app) == ["builtin", OFFICIAL]
+        assert rows(app) == ["builtin", OFFICIAL, LOCAL, USER]
 
 
 @pytest.mark.timeout(60)

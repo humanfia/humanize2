@@ -987,18 +987,13 @@ def _complete(runs: Runs) -> bool:
 
 
 #: What separates the two halves of a row's id on the flows page: which place it came from,
-#: and which flow it is. A byte no name has in it, since either half may hold anything -- a
-#: flow of yours is offered by its path, and a path holds slashes and dots and spaces.
+#: and which flow it is. A byte no name has in it, since the second half may hold anything --
+#: a flow is offered under the place it came from, and holds a slash and may hold a colon.
 _HALVES = "\x1f"
 
 #: The pages the flow menu is, in the order they are turned between.
 _FLOW_PAGE, _AGENT_PAGE = 0, 1
 _SAVE = "save"
-
-
-#: What this project's own flows are listed under, which is where a copy of one lands: the
-#: first of the places a flow of your own may be, as `hmz.flows` names them.
-_MINE = "local"
 
 
 class Flows(Drafts[Chosen]):
@@ -1259,18 +1254,18 @@ class Flows(Drafts[Chosen]):
         """The places flows come from, in the order the arrows step through them.
 
         Returns:
-          Every flowverse there is, fetched or not, and then this project's flows and yours
-          where there are any. A flowverse is one of them whether or not it has been
-          downloaded -- fetching it is what having it here is for -- but your own directories
-          are not places to add anything to, so an empty one is nothing to step to.
+          Every flowverse there is, fetched or not, except an empty one of your own. A
+          flowverse is one of them whether or not it has been downloaded -- fetching it is
+          what having it here is for -- but your own directories are not places to fetch
+          anything into, so an empty one is nothing to step to.
         """
-        from hmz.flows import flowverses, where
+        from hmz.flows import MINE, flowverses
 
-        verses = [one.name for one in flowverses()]
-        return verses + [
-            whose
-            for whose, _ in where
-            if whose not in verses and any(one.whose == whose for one in self._all())
+        return [
+            one.name
+            for one in flowverses()
+            if one.name not in MINE
+            or any(offer.whose == one.name for offer in self._all())
         ]
 
     def _stepping(self) -> list[str]:
@@ -1333,7 +1328,7 @@ class Flows(Drafts[Chosen]):
         return said
 
     def _verse(self, named: str) -> Flowverse | None:
-        """The flowverse of that name, or None for one of your own directories."""
+        """The flowverse of that name, or None for a name none of them answers to."""
         from hmz.flows import flowverses
 
         return next((one for one in flowverses() if one.name == named), None)
@@ -1528,7 +1523,7 @@ class Flows(Drafts[Chosen]):
         fetched again over whatever was written into it, so an edit made there is an edit
         that goes away; a copy here is yours, and is what `f` is for.
         """
-        from hmz.flows import fork
+        from hmz.flows import LOCAL, fork
 
         if self._tab != _FLOW_PAGE:
             return
@@ -1546,7 +1541,7 @@ class Flows(Drafts[Chosen]):
         # The list is something else now: there is a flow of yours that was not there, and
         # the name it took means it from here on.
         self._offers, self._was = None, ""
-        self._where = _MINE
+        self._where = LOCAL
         mine = escape(named.rpartition("/")[2])
         self._said = (
             f"copied to {escape(at)} -- yours to change, and {mine} now means it"
@@ -1699,12 +1694,15 @@ def _came_from(one: Flowverse) -> str:
     Returns:
       The URL with whatever was signed into it taken out -- a private one is added as
       `https://x-access-token:$TOKEN@...`, and this is drawn where somebody can read it --
-      or a phrase for the two that came from nowhere.
+      or, for the ones fetched from nowhere, what they are instead: the package's own flows,
+      and the directory each of yours is read from.
     """
-    from hmz.flows.verses import BUILTIN, plain
+    from hmz.flows.verses import BUILTIN, MINE, plain
 
     if one.name == BUILTIN:
         return "the flows humanize ships"
+    if one.name in MINE:
+        return f"your own flows in {MINE[one.name]}"
     return plain(one.url) if one.url else "not a clone of anything"
 
 
@@ -1833,8 +1831,8 @@ class Flowverses(Sheet[list[str]]):
         self.query_one("#asked", Label).update("Flowverses")
         self.query_one("#about", Label).update(
             "Where flows come from: a git repository with a flows/ directory apiece, cloned "
-            "under humanize's home and offered under the name it is kept there. Enter says "
-            "what one holds. What happens here happens as it is asked for."
+            "under humanize's home, and the flows of your own read where they lie. Each is "
+            "offered under its name here. Enter says what one holds."
         )
         self._read()
         self._fill()
@@ -1945,9 +1943,14 @@ class Flowverses(Sheet[list[str]]):
         if one is None:
             return
         if not one.url:
-            self._said = (
-                f"{escape(one.name)} came with humanize; there is nothing to fetch"
+            from hmz.flows.verses import MINE
+
+            said = (
+                f"is read from {MINE[one.name]}"
+                if one.name in MINE
+                else "came with humanize"
             )
+            self._said = f"{escape(one.name)} {said}; there is nothing to fetch"
             self._fill()
             return
         name = one.name

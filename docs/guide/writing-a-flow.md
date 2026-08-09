@@ -35,10 +35,11 @@ Run the flow by name from the command line.
 hmz exec -f twice -a claude/claude-opus-4-8:high "add a --dry-run flag to calc.py"
 ```
 
-humanize also offers the flow in the interface. `/flow` lists the flows in `.humanize/flows`
-here, the ones in `~/.humanize/flows`, the ones humanize ships, and everything in every
-[**flowverse**](/guide/flowverses) fetched here. A flowverse is a place where flows live. Each
-place has **←** and **→** to step between them.
+humanize also offers the flow in the interface. `/flow` lists the flows humanize ships,
+everything in every [**flowverse**](/guide/flowverses) fetched here, and your own — the ones in
+`.humanize/flows` here as `local`, and the ones in `~/.humanize/flows` as `user`. A flowverse is
+a place where flows live, and your own two directories are places like any other. Each place has
+**←** and **→** to step between them.
 
 ## The contract, in three rules
 
@@ -165,8 +166,8 @@ one:
 
 | Lives at | Called |
 | --- | --- |
-| `.humanize/flows/twice/__init__.py` | `twice` in this project, or by path |
-| `~/.humanize/flows/twice/__init__.py` | `twice` in every project |
+| `.humanize/flows/twice/__init__.py` | `twice` in this project, or `local/twice` |
+| `~/.humanize/flows/twice/__init__.py` | `twice` in every project, or `user/twice` |
 | a [flowverse](/guide/flowverses) | `<flowverse>/twice` |
 | anywhere else | its path: `-f ./flows/twice` |
 

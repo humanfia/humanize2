@@ -363,8 +363,8 @@ in a list under the editor:
 - `/` offers the commands, each with a line about what it does and what it takes after its
   name.
 - `/flow ` offers the flows there are — the ones humanize ships, the ones every
-  [flowverse](/reference/flows#flowverses) fetched here holds, and the ones under `.humanize/flows`
-  here or in your home directory.
+  [flowverse](/reference/flows#flowverses) fetched here holds, and your own `local/` and `user/`
+  ones under `.humanize/flows` here or in your home directory.
 
 An offer is the whole of what the word becomes, so taking one replaces what was typed rather
 than being appended to it. What is offered is reconsidered when the cursor moves as well as
@@ -413,10 +413,10 @@ made of several lists names them under the titles, and `←` / `→` step betwee
 `/flow` opens on two pages — **Flow** and **Agents** — and the first of them puts up the flows
 of one place at a time, with `←` and `→` stepping between the places: every
 [flowverse](/reference/flows#flowverses) — `builtin`, which is the package's own, `official`, which is
-where the rest come from, and whatever else has been added — and then `local`, this project's
-flows under `.humanize/flows`, and `user`, yours under `~/.humanize/flows`, each where there
-are any. The strip above the list is the places, with the one being read marked; the list is
-that place's flows and nothing else.
+where the rest come from, whatever else has been added, and last `local`, this project's flows
+under `.humanize/flows`, and `user`, yours under `~/.humanize/flows`, each where there are any.
+The strip above the list is the places, with the one being read marked; the list is that
+place's flows and nothing else.
 
 ```
   Flow
@@ -471,9 +471,10 @@ them, so what you type finds a flow without your having to remember which flowve
 ## Where flows come from
 
 `/flowverses` is the places themselves — a git repository with a `flows/` directory apiece,
-cloned under humanize's home and offered under the name it is kept there. A place that has
-never been fetched is listed all the same, with its URL and `not fetched yet` beside it: what
-there is to run is not the same question as what has been downloaded.
+cloned under humanize's home, and the flows of your own read where they lie. Each is offered
+under the name it is listed under. A place that has never been fetched is listed all the same,
+with its URL and `not fetched yet` beside it: what there is to run is not the same question as
+what has been downloaded.
 
 ![The /flowverses list: builtin, which holds the flows humanize ships, and official, a GitHub
 URL marked as not fetched yet](/demo/flowverses.png)
@@ -482,8 +483,8 @@ URL marked as not fetched yet](/demo/flowverses.png)
 | --- | --- |
 | **enter** | What that flowverse holds: one row per flow, with the line it says about itself. Reading them means importing them, so it is asked of the one you opened rather than of all of them at once. |
 | **a** | Add one: a URL or an `owner/repo`, and a name to keep it under. |
-| **r** | Fetch the one under the cursor again, or for the first time. `builtin` came with humanize and says there is nothing to fetch. |
-| **d** **d** | Take an added one away, flows and all. `builtin` and `official` are always here, and say so. |
+| **r** | Fetch the one under the cursor again, or for the first time. `builtin` came with humanize, and `local` and `user` are directories of your own: all three say there is nothing to fetch. |
+| **d** **d** | Take an added one away, flows and all. `builtin`, `official`, `local` and `user` are always here, and say so. |
 
 Its own menu rather than three more keys on `/flow`, because they are about something else:
 adding a repository, fetching one again and taking one away are done to the list of places,

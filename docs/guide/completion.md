@@ -15,7 +15,7 @@ the highlighted offer, and **esc** to dismiss it.
 | Typed | Offered |
 | --- | --- |
 | `/` | the commands, each with a line about what it does and what it takes after its name |
-| `/flow ` | the flows there are: the ones humanize ships, the ones every [flowverse](/guide/flowverses) fetched here holds, and the ones under `.humanize/flows` here or in your home directory |
+| `/flow ` | the flows there are: the ones humanize ships, the ones every [flowverse](/guide/flowverses) fetched here holds, and your own `local/` and `user/` ones under `.humanize/flows` here or in your home directory |
 
 ## The keys
 

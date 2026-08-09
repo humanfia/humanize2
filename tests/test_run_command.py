@@ -653,10 +653,10 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     where it is -- and one taking a built-in's name stands in for it, which is what makes
     a project able to mean its own `chat` by `chat`.
 
-    What each of them is *called* is another question: only the ones humanize ships and the
-    ones a flowverse holds are called by a name, and a flow of yours is called by its path --
-    so one of yours sharing a name with one of humanize's is listed beside it rather than
-    instead of it.
+    What each of them is *called* is another question, and the answer is the one every place
+    gets: `<where it came from>/<flow>`, which for these two places is `local` and `user`. So
+    one of yours sharing a name with one of humanize's is listed beside it under a name of its
+    own rather than instead of it.
     """
     from hmz.flows import find, found
 
@@ -673,16 +673,22 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     listed = found()
 
     named = [(one.whose, one.name) for one in listed]
-    assert ("local", ".humanize/flows/theirs") in named
-    assert ("user", "~/.humanize/flows/yours") in named
+    assert ("local", "local/theirs") in named
+    assert ("user", "user/yours") in named
     # Both, under names of their own: one is not offered as if it were the other.
-    assert ("local", ".humanize/flows/chat") in named
+    assert ("local", "local/chat") in named
     assert ("builtin", "chat") in named
     # `-f` still takes a bare name, and the nearest flow answering to it is what runs.
     assert find("chat") == str((project / ".humanize/flows/chat" / ENTRY).resolve())
     assert find("yours") == str((home / ".humanize/flows/yours" / ENTRY).resolve())
     assert find("ralph_loop").endswith(f"src/hmz/flows/builtin/ralph_loop/{ENTRY}")
-    # And it takes what the list calls one, which is a path, `~` and all.
+    # And it takes what the list calls one, which says which place it came from and so is the
+    # spelling nothing can stand in for.
+    assert find("user/yours") == str((home / ".humanize/flows/yours" / ENTRY).resolve())
+    assert find("local/chat") == str(
+        (project / ".humanize/flows/chat" / ENTRY).resolve()
+    )
+    # A path is still a path, `~` and all: a flow being written lives wherever it is.
     assert find("~/.humanize/flows/yours") == str(
         (home / ".humanize/flows/yours" / ENTRY).resolve()
     )

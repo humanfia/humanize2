@@ -280,6 +280,8 @@ def test_the_quiet_list_is_one_name_a_line_and_nothing_else(
         store.BUILTIN,
         store.OFFICIAL,
         "mine",
+        store.LOCAL,
+        store.USER,
     ]
 
 

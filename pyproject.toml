@@ -138,8 +138,10 @@ ignore = [
 "src/hmz/agents/dsh.py" = ["SLF001"]
 "src/hmz/agents/kimi.py" = ["SLF001"]
 # Looking for a flow is allowed to find nothing. `os.path` answers False for a
-# directory it cannot read where `Path` raises, and the module says so at `where`.
+# directory it cannot read, and for a `~` with no home behind it, where `Path` raises;
+# both modules say so where they reach for one -- `find` here, `_own` there.
 "src/hmz/flows/__init__.py" = ["PTH"]
+"src/hmz/flows/verses.py" = ["PTH"]
 # A flow is a directory whose `__init__.py` holds its entry points, and that module's
 # docstring is about them -- how the flow loops, what each agent is for, and the line
 # that starts it. What a flow prints is what it says: the interface captures everything

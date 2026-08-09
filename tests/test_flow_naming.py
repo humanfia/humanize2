@@ -9,7 +9,7 @@ agents it drives and only for the settings it takes.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
@@ -29,9 +29,6 @@ from hmz.flows import (
 )
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, written
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 CONFIG = AgentConfig(model="m", effort="high")
 
@@ -214,8 +211,8 @@ def test_each_flow_in_a_file_is_offered_under_its_own_name(
     listed = [(one.name, one.about) for one in found() if one.whose == "local"]
 
     assert listed == [
-        (".humanize/flows/three:gen-idea", "Opens a loose idea into a draft."),
-        (".humanize/flows/three:build", "builds it, under review"),
+        ("local/three:gen-idea", "Opens a loose idea into a draft."),
+        ("local/three:build", "builds it, under review"),
     ]
 
 
@@ -232,9 +229,7 @@ def test_an_auxiliary_flow_is_callable_but_not_offered(
         ("", True),
         ("engine", False),
     ]
-    assert [one.name for one in found() if one.whose == "local"] == [
-        ".humanize/flows/composed"
-    ]
+    assert [one.name for one in found() if one.whose == "local"] == ["local/composed"]
     assert drives("composed:engine") == ("",)
     agent = ShellAgent(CONFIG)
     Runner("composed:engine", [agent]).run("echo internal")
@@ -351,13 +346,57 @@ def test_a_flow_that_is_one_file_is_a_flow_too(
     monkeypatch.chdir(project)
 
     assert find("alone") == str((project / ".humanize/flows/alone.py").resolve())
-    assert [one.name for one in found() if one.whose == "local"] == [
-        ".humanize/flows/alone"
-    ]
+    assert [one.name for one in found() if one.whose == "local"] == ["local/alone"]
     assert drives("alone") == ("",)
     agent = ShellAgent(CONFIG)
     Runner("alone", [agent]).run("echo alone")
     assert agent.opened
+
+
+def test_a_flow_that_is_one_file_is_found_by_the_path_that_leaves_the_py_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both shapes of a path, since a single-file flow is written down without its extension.
+
+    A path is what is typed for a flow that is nowhere flows are kept, and it is also what
+    every older spelling of one of your own was. Either resolves, or a flow is findable one
+    way and not the other -- which is a flow that is offered and cannot be run.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    project = tmp_path / "project"
+    (project / ".humanize/flows").mkdir(parents=True)
+    (project / ".humanize/flows/alone.py").write_text(ONE)
+    monkeypatch.chdir(project)
+    at = str((project / ".humanize/flows/alone.py").resolve())
+
+    assert find(".humanize/flows/alone.py") == at  # the file, pointed at outright
+    assert (
+        find(".humanize/flows/alone") == at
+    )  # and the same path without the extension
+
+
+def test_every_flow_that_is_offered_is_one_that_can_be_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One rule names them and one rule finds them, so a listed name MUST resolve to a file.
+
+    The list and the lookup are the two halves that have to agree: a name that is offered and
+    then found nothing is a row in the picker that fails when it is chosen.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    project = tmp_path / "project"
+    written(project / ".humanize/flows", "whole", ONE)  # a flow that is a directory
+    written(tmp_path / "home/.humanize/flows", "mine", ONE)  # and one of yours
+    (project / ".humanize/flows/alone.py").write_text(ONE)  # and one that is a file
+    (project / ".humanize/flows/three.py").write_text(THREE)  # holding three of them
+    monkeypatch.chdir(project)
+
+    listed = found()
+
+    assert {"local/whole", "local/alone", "user/mine", "local/three:build"} <= {
+        one.name for one in listed
+    }
+    assert [one.name for one in listed if not Path(find(one.name)).is_file()] == []
 
 
 def test_a_directory_wins_a_name_a_file_also_uses(
@@ -372,9 +411,7 @@ def test_a_directory_wins_a_name_a_file_also_uses(
 
     assert find("both") == str((project / ".humanize/flows/both" / ENTRY).resolve())
     # And it is offered once rather than twice, under the one name it has.
-    assert [one.name for one in found() if one.whose == "local"] == [
-        ".humanize/flows/both"
-    ]
+    assert [one.name for one in found() if one.whose == "local"] == ["local/both"]
 
 
 #: A flow that reads what it does out of the module beside it, which is how a flow keeps a

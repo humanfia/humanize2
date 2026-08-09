@@ -28,8 +28,9 @@ A `Person` place does **not** count. Nobody chooses what the person runs.
 
 `-f` named something that is not there, or a directory with no flow in it. humanize looks for a
 name in `.humanize/flows`, then `~/.humanize/flows`, then among the flows humanize ships and
-every [flowverse](/reference/flows#flowverses) fetched here. Anything with a slash that is not
-a flowverse's is taken as a path. See [where flows live](/reference/flows#where-flows-live).
+every [flowverse](/reference/flows#flowverses) fetched here. A name no place answers to is taken
+as a path — `flows/mine` and `flows/mine.py` both. See
+[where flows live](/reference/flows#where-flows-live).
 
 ### `the official flowverse has not been fetched yet`
 

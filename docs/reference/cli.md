@@ -57,7 +57,7 @@ hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] <task>
 
 | Argument | |
 | --- | --- |
-| `-f`, `--flow <flow>[:<name>]` | **Required.** The flow to drive: the name of one humanize ships, `<flowverse>/<flow>` for one a [flowverse](/reference/flows#flowverses) holds, or the path to a file — which is what a flow of your own is called. A file that holds [several flows](/reference/flows#several-flows-in-one-file) is said which, after a colon. See [where flows live](/reference/flows#where-flows-live). |
+| `-f`, `--flow <flow>[:<name>]` | **Required.** The flow to drive: the name of one humanize ships, `<where>/<flow>` for one any other place holds — a [flowverse](/reference/flows#flowverses), or `local`/`user` for your own — or the path to a flow anywhere else. A file that holds [several flows](/reference/flows#several-flows-in-one-file) is said which, after a colon. See [where flows live](/reference/flows#where-flows-live). |
 | `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](/reference/flows#settings-of-the-flow-s-own). The flow's own model checks it before the first turn. |
 | `-a`, `--agent <spec>` | **Repeated once for each agent the flow drives**, in the order it takes them — so none at all for a flow whose only side is you, since nobody chooses what the person runs. |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
@@ -262,8 +262,8 @@ hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 ## `hmz flowverses`
 
 Where flows come from: a git repository with a `flows/` directory apiece, cloned under
-humanize's home and offered under the name it is kept there. See
-[Flowverses](/guide/flowverses).
+humanize's home, and the flows of your own read where they lie. Each is offered under the name
+it is listed here under. See [Flowverses](/guide/flowverses).
 
 ```
 hmz flowverses list [-q|--quiet]
@@ -284,6 +284,10 @@ is not always a moment you are sitting in the interface. Naming no command at al
 | `add <url> [<name>]` | Fetches one. `<url>` is a URL, a path, or `owner/repo` for one on GitHub; `<name>` is what to keep it under, defaulting to the repository's own name as `git clone` does. |
 | `fetch <name>` | Fetches it again, or for the first time — which is what `official` usually has done to it. What the repository says now, not a merge into what you have. |
 | `remove <name>` | Takes it away, flows and all. |
+
+`local` and `user` are your own flows — `.humanize/flows` here, and the one in your home
+directory — listed as places like the rest. Nothing fetches them, so `add`, `fetch` and
+`remove` refuse all three.
 
 What was added is findable by `-f` at once — it is the same store, reached another way:
 
@@ -456,8 +460,8 @@ A backend home that does not exist is skipped rather than being an error.
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
 | `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** in `/flowverses` | A [flowverse](/guide/flowverses), cloned. Every flow in it is offered as `<name>/<flow>`. |
 | `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |
-| `.humanize/flows/*/` | you | This project's own flows. |
-| `~/.humanize/flows/*/` | you | Your flows, in every project. |
+| `.humanize/flows/*/` | you | This project's own flows, offered as `local/<flow>`. |
+| `~/.humanize/flows/*/` | you | Your flows in every project, offered as `user/<flow>`. |
 
 `~/.humanize` is `$HUMANIZE_HOME` where that is set. The directories are made by whatever writes
 into them.

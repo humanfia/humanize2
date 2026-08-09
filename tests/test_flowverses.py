@@ -16,7 +16,17 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.flows import BUILTIN, ENTRY, FLOWS, OFFICIAL, find, flowverses, found
+from hmz.flows import (
+    BUILTIN,
+    ENTRY,
+    FLOWS,
+    LOCAL,
+    OFFICIAL,
+    USER,
+    find,
+    flowverses,
+    found,
+)
 from hmz.flows import verses as store
 from tests.stubs import written
 
@@ -116,7 +126,13 @@ def test_one_that_was_added_is_offered_under_the_name_it_was_kept_under(
     assert added.fetched
     assert added.url == str(theirs)  # where it came from, as its own clone says
     assert not added.fixed
-    assert [one.name for one in flowverses()] == [BUILTIN, OFFICIAL, "theirs"]
+    assert [one.name for one in flowverses()] == [
+        BUILTIN,
+        OFFICIAL,
+        "theirs",
+        LOCAL,
+        USER,
+    ]
     # Its flows, less the file that is not one.
     assert store.flows(added) == ["loop", "review"]
 
@@ -141,7 +157,7 @@ def test_a_repository_that_is_not_there_says_so(tmp_path: Path) -> None:
     with pytest.raises(OSError, match=r"git|repository"):
         store.add(str(tmp_path / "nowhere"))
 
-    assert [one.name for one in flowverses()] == [BUILTIN, OFFICIAL]
+    assert [one.name for one in flowverses()] == [BUILTIN, OFFICIAL, LOCAL, USER]
 
 
 def test_fetching_takes_what_the_repository_says_now(theirs: Path) -> None:
@@ -179,7 +195,7 @@ def test_one_that_was_added_may_be_taken_away(theirs: Path) -> None:
     store.add(str(theirs))
 
     assert store.remove("theirs")
-    assert [one.name for one in flowverses()] == [BUILTIN, OFFICIAL]
+    assert [one.name for one in flowverses()] == [BUILTIN, OFFICIAL, LOCAL, USER]
     assert not store.remove("theirs")  # and again is not an error, it is already gone
 
 

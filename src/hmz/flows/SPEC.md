@@ -131,11 +131,16 @@ def __getattr__(name: str) -> object: ...
   not told one, and for a file that is one flow MUST fall back to the file's own docstring: a
   file that is one flow is documented as that flow.
 - A name MUST resolve to the `__init__.py` of the directory called that, else to the `.py`
-  file called that. A path given outright MAY be either.
-- A flow MUST be found by name: the ones humanize ships and the ones a flowverse holds by a
-  bare name, one of yours by its path. Nearest MUST win -- this project's flows, then yours,
-  then whatever there is to run -- so that a project may mean its own `chat` by `chat`. A name
-  qualified by a flowverse MUST be that flowverse's, and MUST NOT be stood in for.
+  file called that. A path given outright MAY be either, and MUST be taken in both shapes:
+  a path with the extension left off is how a single-file flow is written down everywhere a
+  name is not, and one shape resolving where the other does not is a flow that is offered and
+  cannot be run.
+- A flow MUST be found by name: the ones humanize ships by a bare name, and every other by the
+  place it came from -- `official/rlar`, `local/scheduler`. The flows of your own MUST be a
+  place like any other, so that one rule says what a flow is called and one list says where
+  they are. Nearest MUST win -- this project's flows, then yours, then whatever there is to
+  run -- so that a project may mean its own `chat` by `chat`. A name qualified by the place it
+  came from MUST be that place's, and MUST NOT be stood in for.
 - A flow MUST be run to be read, with its own directory and the directory the flows are in
   importable while it runs and only while: what a flow imports is not something the rest of
   the process should be able to.
@@ -149,9 +154,10 @@ def __getattr__(name: str) -> object: ...
   what they import and what sets their tests up -- but one that will not run MUST be, under the
   name it would have had: it is a flow somebody named, and saying so where it is picked beats
   hiding it.
-- What one flowverse offers MUST be worked out in `offers` and nowhere else, and `found` MUST
-  be that asked of each flowverse in turn. Anything wanting a single flowverse's flows MUST ask
-  it too rather than building a name from a filename: a file may hold several flows and the file
+- What one place offers MUST be worked out in `offers` and nowhere else, and `found` MUST be
+  that asked of each place in turn -- the flows of your own included, which is what makes them
+  a place rather than an exception. Anything wanting a single one's flows MUST ask it too
+  rather than building a name from a filename: a file may hold several flows and the file
   beside it none, so a name spelled out anywhere else is a name `-f` would refuse -- and two
   places deciding what a flow is called is two places to drift.
 - A flow MAY say it is not to be offered in a list of them. A flow reached only by another
@@ -371,6 +377,9 @@ class Flowverse:
 def flowverses() -> list[Flowverse]: ...
 
 
+def nearest() -> list[Flowverse]: ...
+
+
 def holds(one: Flowverse) -> Path: ...
 
 
@@ -399,6 +408,17 @@ def refresh(at: Path) -> None: ...
   `~/.humanize/flowverses/<name>/`, and every flow in it MUST be offered under that name. A
   directory with no entry point in it, or one whose name starts with an underscore, MUST NOT
   be one of them: it is what the flows beside it import.
+- The flows of your own MUST be two places here like any other, `local` for `.humanize/flows`
+  where humanize is being run and `user` for the one in your home directory. They are
+  directories rather than repositories -- nothing fetches them, and what is in one is whatever
+  you put there -- so they MUST be read where they stand the way `builtin` is, and MUST NOT be
+  fetched, added under, or taken away. Everything that goes looking for a flow MUST have one
+  list to look in: a place of yours that had to be listed separately is a second rule for what
+  a flow is called, which is a name that will not resolve.
+- These places MUST have two orders, and both MUST be written down here: the order they are
+  offered in, which is humanize's own first and yours last, and the order a name is looked up
+  in, which is nearest first. A place missing from either is a flow that is offered and cannot
+  be run, or one that runs and is nowhere to be seen.
 - Fetching a repository MUST be written down once and reached for by everything that fetches
   one -- a flowverse, and a repository of skills a flow named -- so that a clone and a fetch
   mean the same thing whichever asked for it.
@@ -409,16 +429,19 @@ def refresh(at: Path) -> None: ...
 - Where the flows of one are MUST be worked out in one place, `builtin`'s reading of its own
   directory included: everything that goes looking for a flow asks that one place, so an
   exception written down once is an exception rather than a rule to remember.
-- Two MUST always be listed: `builtin`, which is the package's own and is fetched from nowhere,
-  and `official`, which is humanize's repository of the rest. Neither MUST be removable, and
-  `official` MUST be listed whether or not it has been fetched -- a list that only mentioned it
-  once somebody had thought to add it would be a list that hid what there is to run.
+- Four MUST always be listed: `builtin`, which is the package's own and is fetched from
+  nowhere, `official`, which is humanize's repository of the rest, and the two the flows of
+  your own live in. None MUST be removable, and `official` MUST be listed whether or not it has
+  been fetched -- a list that only mentioned it once somebody had thought to add it would be a
+  list that hid what there is to run.
 - A name MUST be one directory name, and one that could climb out of the directory they are
   kept in MUST be refused wherever it is given.
-- Neither of the two that are always listed MUST be a name a flowverse can be added under.
+- None of the four that are always listed MUST be a name a flowverse can be added under.
   Cloned into `builtin` a repository would be in nobody's list, since that name is skipped when
-  they are listed; cloned into `official` it would be shown against humanize's own URL. Both
-  MUST be refused where the name is given rather than discovered afterwards.
+  they are listed; cloned into `official` it would be shown against humanize's own URL; cloned
+  into either of yours it would be listed under a name that is read from a directory somewhere
+  else and never looked at. All MUST be refused where the name is given rather than discovered
+  afterwards.
 - Fetching one again MUST take what the repository says now rather than merge into it: a
   flowverse is a copy of somebody else's repository, not a branch of your own, and a merge
   nobody asked for is a fetch that fails the next time it is run.

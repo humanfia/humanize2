@@ -171,7 +171,7 @@ async def _set_up(app: Humanize, driver: Pilot[None], flow: str = "settable") ->
             break
         await driver.press("right")
         await driver.pause()
-    await onto(app, driver, f"local\x1f.humanize/flows/{flow}")
+    await onto(app, driver, f"local\x1flocal/{flow}")
     await driver.press("enter")
     await driver.pause()
 
@@ -337,7 +337,7 @@ async def test_how_it_was_set_up_is_kept_and_read_back(
             await keeps(app, driver)
             await until(lambda: app._config is not None, driver)
 
-    assert Settings(tmp_path).config(".humanize/flows/settable")["loud"] is True
+    assert Settings(tmp_path).config("local/settable")["loud"] is True
     # And a second interface opens on it, rather than back at the flow's own defaults.
     again = Humanize()
     assert again._config is not None

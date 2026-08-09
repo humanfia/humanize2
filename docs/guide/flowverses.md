@@ -152,7 +152,7 @@ A flowverse that has never been fetched has nothing to read yet. It says so, and
 
 | Key | |
 | --- | --- |
-| **←** **→** | Step between the places flows come from, a list apiece — every flowverse, then `local` and `user` where either holds anything |
+| **←** **→** | Step between the places flows come from, a list apiece — every flowverse, ending with `local` and `user` where either holds anything |
 | **f** | Copy the flow under the cursor into `.humanize/flows/`, to change |
 
 A flow whose file will not import is still listed, under the name it would have had and with
@@ -178,33 +178,43 @@ Typing `/flow` and pressing enter still sends `/flow`. A command that has been w
 whole is offered nothing to finish it with, so `/flowverses` never sits under a cursor waiting
 to be taken by the enter that meant to send the shorter one.
 
+## Your own flows are a place too
+
+The flows in `.humanize/flows` here and in `~/.humanize/flows` are two more places flows come
+from, called `local` and `user`. They are flowverses in everything but the fetching: read where
+they lie, listed beside the rest, and offered under the name of the place they are in. Nothing
+clones them and nothing can take them away, so `add`, `fetch` and `remove` all say so.
+
+One list, so one rule for what a flow is called and one place a name is looked up.
+
 ## Where a name is looked for
 
 `-f` takes a name or a path. A name is looked for **nearest first**:
 
 | | |
 | --- | --- |
-| `.humanize/flows/*/` | this project's own |
-| `~/.humanize/flows/*/` | yours, in every project |
+| `local` | `.humanize/flows/*` — this project's own |
+| `user` | `~/.humanize/flows/*` — yours, in every project |
 | — | the ones humanize ships, and every flowverse there is |
 
 Nearest wins. A flow of your own may stand in for one of humanize's by taking its name. A
 `.humanize/flows/chat/__init__.py` is what `-f chat` runs *in that project*.
 
-What a flow is **called** is a separate question:
+What a flow is **called** is a separate question, and every place answers it the same way:
 
 | | |
 | --- | --- |
 | `chat` | one humanize ships |
 | `official/rlar` | one a flowverse holds — the one spelling nothing can stand in for |
-| `.humanize/flows/chat` | this project's own |
-| `~/.humanize/flows/chat` | yours, in every project |
+| `local/chat` | this project's own |
+| `user/chat` | yours, in every project |
 
 Yours is listed *beside* humanize's rather than instead of it, and what each was [set up to
 run](/guide/settings) is remembered apart.
 
-Anything with a slash or an extension in it is a path, taken as given. A file whose name starts
-with `_` is not a flow.
+A name that no place answers to is taken as a path — a flow being written, a file a script
+wrote out. Both shapes work: `flows/nightly` finds `flows/nightly/__init__.py` and
+`flows/nightly.py` alike. A file whose name starts with `_` is not a flow.
 
 ## A flowverse is a library too
 

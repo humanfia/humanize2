@@ -649,8 +649,8 @@ flows](/reference/tracing#records-of-called-flows).
 
 | | |
 | --- | --- |
-| `.humanize/flows/*/` | this project's own |
-| `~/.humanize/flows/*/` | yours, in every project |
+| `local` | `.humanize/flows/*` — this project's own |
+| `user` | `~/.humanize/flows/*` — yours, in every project |
 | — | the ones humanize ships, and every [flowverse](#flowverses) there is |
 
 Nearest wins, so a flow of your own may stand in for one of humanize's by taking its name — a
@@ -662,24 +662,25 @@ you already have a copy of — in either shape, since a directory would otherwis
 single-file flow's name without touching the file it is in — rather than writing over it. A
 copy that fails partway leaves nothing behind, so the name is free to try again.
 
-What a flow is **called** is another question. The ones humanize ships are called by a bare
-name; a flowverse's are called `<flowverse>/<flow>`, which is the one spelling nothing can stand
-in for; a flow of yours is called by its path, short enough to read:
+What a flow is **called** is another question, and one rule answers it for every place: the
+ones humanize ships are called by a bare name, and every other by the place it came from,
+which is the one spelling nothing can stand in for. Your own two places are `local` and `user`:
 
 | | |
 | --- | --- |
 | `chat` | one humanize ships |
 | `official/rlar` | one the official flowverse holds |
-| `.humanize/flows/chat` | this project's own |
-| `~/.humanize/flows/chat` | yours, in every project |
+| `local/chat` | this project's own |
+| `user/chat` | yours, in every project |
 
 So yours is listed beside humanize's rather than instead of it, `-f` takes either, and what
 each was [set up to run](/reference/tui#what-it-remembers) is remembered apart — a flow of yours cannot
 quietly inherit the agents or the settings of the one it shares a name with.
 
-Anything with a slash in it is a path, taken as given: a flow's directory, or a `.py` file to
-run as one — `-f ./flows/mine` and `-f ./flows/mine.py` both work, the directory being tried
-first. A directory whose name starts with `_` is not a flow.
+A name no place answers to is taken as a path: a flow's directory, or a `.py` file to run as
+one — `-f ./flows/mine`, `-f ./flows/mine.py` and `-f ./flows/mine/` all work, the directory
+being tried first and the `.py` beside a path with the extension left off. A directory whose
+name starts with `_` is not a flow.
 
 **A flow imports what travels with it.** While one is read, its own directory and the directory
 the flows are in are both on `sys.path`, and only while: `import _prompts` reaches the module
@@ -746,15 +747,21 @@ brings. It is cloned into
 name. Nothing outside that directory is read, so the repository is free to have a README, a
 pyproject and a test suite of its own without any of it being taken for a flow.
 
-Two are always there:
+Four are always there:
 
 | | |
 | --- | --- |
 | `builtin` | the flows in the package, which are [the three below](#the-flows-humanize-ships) |
 | `official` | [humanfia/flowverse](https://github.com/humanfia/flowverse), which is everything else humanize offers |
+| `local` | `.humanize/flows` where humanize is being run — this project's own |
+| `user` | `~/.humanize/flows` — yours, in every project |
 
 `official` is listed before it has been fetched — what there is to run is not the same question
-as what has been downloaded — and neither of the two can be taken away.
+as what has been downloaded — and none of the four can be taken away.
+
+The last two are places rather than repositories: nothing fetches them, and what is in one is
+whatever you put there. They are listed as flowverses all the same, so that one rule says what
+a flow is called and one list says where they are. `add`, `fetch` and `remove` all refuse them.
 
 In the [interface](/reference/tui), `/flowverses` is where they live: `a` adds one, `r` fetches
 the one under the cursor again, `d` twice takes an added one away, and enter says what one

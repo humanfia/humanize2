@@ -35,7 +35,8 @@ def flowverses(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="hmz flowverses",
         description="Where flows come from: a git repository with a `flows/` directory apiece, "
-        "cloned under humanize's home and offered under the name it is kept there.",
+        "cloned under humanize's home, and the flows of your own read where they lie. Each is "
+        "offered under the name it is listed here under.",
     )
     doing = parser.add_subparsers(dest="doing", metavar="COMMAND")
 
@@ -122,7 +123,10 @@ def _show(name: str) -> int:
     print(f"kept in     {one.at}")
     print(f"fetched     {'yes' if one.fetched else 'no'}")
     if one.fixed:
-        print("always here humanize's own; not one to take away")
+        from hmz.flows.verses import MINE
+
+        why = "a directory of your own" if one.name in MINE else "humanize's own"
+        print(f"always here {why}; not one to take away")
     if not one.fetched:
         print(f"\nnothing of it is here yet; `hmz flowverses fetch {one.name}` gets it")
         return 0
@@ -201,21 +205,24 @@ def _ask(one: Flowverse) -> int:
 def _from(one: Flowverse) -> str:
     """Where a flowverse came from, as it may be printed where a person can read it.
 
-    Asked of the name rather than of the URL. An empty URL means two different things -- the
-    flows humanize ships, which are fetched from nowhere, and a directory whose origin could
-    not be read -- and answering both with the first would put humanize's name on somebody
-    else's flows.
+    Asked of the name rather than of the URL. An empty URL means several different things --
+    the flows humanize ships, the two directories your own live in, and a directory whose
+    origin could not be read -- and answering all of them with the first would put humanize's
+    name on somebody else's flows.
 
     Args:
       one: The flowverse.
 
     Returns:
-      The URL with anything secret in it taken out, or a phrase for the two that have none.
+      The URL with anything secret in it taken out, or what it is instead for the ones that
+      have none.
     """
-    from hmz.flows.verses import BUILTIN, plain
+    from hmz.flows.verses import BUILTIN, MINE, plain
 
     if one.name == BUILTIN:
         return _PACKAGE
+    if one.name in MINE:
+        return f"your own flows in {MINE[one.name]}"
     # Scrubbed where a flowverse is scrubbed, which is beside the flowverses: this line is
     # printed every time they are listed, and the interface prints the same one.
     return plain(one.url) if one.url else _NOWHERE

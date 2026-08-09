@@ -5,11 +5,17 @@ it, and a `skills/` of the skills it brings -- laid out the way every one of the
 skill out, one directory apiece with a `SKILL.md` in it. So a flow is a thing that can be
 copied, forked and edited whole, and what it needs to do its work travels with it.
 
-Named rather than pathed: `hmz exec -f ralph_loop` is a name, and anything with a slash or an
-extension in it is a path taken as given. A name is looked for in the places flows come from --
-the ones humanize ships, the ones its own repository holds, whatever [flowverses](verses.py)
-have been added, and then this project's own directory and yours -- so a flow of your own may
-stand in for one of humanize's by taking its name.
+Named rather than pathed: `hmz exec -f ralph_loop` is a name, and a path is what is left for
+a flow that is nowhere any of them are kept. A name is looked for in the places flows come
+from, which is every [flowverse](verses.py) there is -- the ones humanize ships, the ones its
+own repository holds, whatever has been added, and the flows of your own in `.humanize/flows`
+here and in your home directory. Those last two are `local` and `user`, and are flowverses
+like the rest of them: one place a flow is read from, one rule for what it is called, and one
+list to look in.
+
+Which of them a bare name means is nearest first -- yours, then everybody else's -- so a flow
+of your own may stand in for one of humanize's by taking its name, and `local/chat` is the
+spelling that says which one it is.
 
 A flow is a function marked with :func:`flow`, and nothing else is one. `@flow()` is the flow
 its directory holds under the directory's own name; `@flow(name="draft")` is one of several it
@@ -58,7 +64,18 @@ from .driving import (
     running,
     wanted,
 )
-from .verses import BUILTIN, FLOWS, OFFICIAL, Flowverse, flowverses, holds
+from .verses import (
+    BUILTIN,
+    FLOWS,
+    LOCAL,
+    MINE,
+    OFFICIAL,
+    USER,
+    Flowverse,
+    flowverses,
+    holds,
+    nearest,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -96,9 +113,11 @@ __all__ = [
     "ENTRY",
     "EVERYWHERE",
     "FLOWS",
+    "LOCAL",
     "OFFICIAL",
     "PERMISSIONS",
     "SWARM",
+    "USER",
     "WINDOW",
     "Agent",
     "AgentConfig",
@@ -148,12 +167,12 @@ __all__ = [
     "inside",
     "loaded",
     "models",
+    "nearest",
     "offered",
     "offers",
     "resumes",
     "running",
     "wanted",
-    "where",
 ]
 
 #: The two modules of humanize's own that a flow reaches through here whole: what each CLI
@@ -234,19 +253,6 @@ ENTRY = "__init__.py"
 #: What a flow's own name is separated from the one inside it by. A flow that holds one flow
 #: is named by itself; one that holds three names each of them after it.
 _INSIDE = ":"
-
-#: Where a flow of your own lives, nearest first, and what to call each place on screen. Kept
-#: unresolved: the project one is relative to wherever humanize is being run, and `~` is
-#: whoever is running it, neither of which is settled when this is imported.
-#:
-#: Looked in with `os.path` and `glob` rather than `pathlib`: a place that cannot be read, or
-#: a `~` with no home behind it, is a place with no flows in it. The os functions say that;
-#: the pathlib ones raise, which would make an unreadable `.humanize/flows` in this directory
-#: the reason a flow humanize itself came with could not be found.
-where = (
-    ("local", ".humanize/flows"),
-    ("user", "~/.humanize/flows"),
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -518,28 +524,20 @@ class Offer(NamedTuple):
 def found() -> list[Offer]:
     """Every flow there is to run, and where each came from.
 
+    Every place asked the same question, which is :func:`offers`, and asked it in the order
+    they are offered in: the flows humanize ships, then the ones its own repository holds,
+    then whatever flowverses have been added, then this project's own flows and yours. One
+    place works out what a flow is called and one place lists them, because two of either is
+    two things to drift apart -- and a name that has drifted is a name `-f` will not take.
+
     Returns:
-      One per flow: the flows humanize ships, then the ones its own repository holds, then
-      whatever flowverses have been added, then this project's own and yours. A flow humanize
-      ships is called by a bare name, one from a flowverse by `<flowverse>/<name>`, and one of
-      yours by its path -- so a flow of yours that happens to share a name with one of
-      humanize's is a different flow here rather than the same one, and is written down,
-      offered and remembered under a name of its own. A file that holds several says so,
-      `<name>:<inside>` apiece.
+      One per flow. A flow humanize ships is called by a bare name and every other by
+      `<where it came from>/<name>` -- `official/rlar`, `local/scheduler` -- so a flow of
+      yours that happens to share a name with one of humanize's is a different flow here
+      rather than the same one, and is written down, offered and remembered under a name of
+      its own. A file that holds several says so, `<name>:<inside>` apiece.
     """
-    listed: list[Offer] = []
-    for verse in flowverses():
-        listed.extend(offers(verse))
-    for whose, folder in where:
-        for base in offered(Path(os.path.expanduser(folder))):
-            # The same test `find` applies, or the two disagree: a directory with no entry
-            # point in it would be listed as a flow and then not be there when it was picked.
-            at_ = entry(Path(os.path.expanduser(folder)), base)
-            if at_ is None:
-                continue
-            called = os.path.join(folder, base)
-            listed.extend(Offer(whose, one, said) for one, said in _named(at_, called))
-    return listed
+    return [one for verse in flowverses() for one in offers(verse)]
 
 
 def entry(under: Path, name: str) -> Path | None:
@@ -602,9 +600,12 @@ def offers(one: Flowverse) -> list[Offer]:
 
     Returns:
       One per flow, by directory, alphabetically: `<flowverse>/<flow>`, except for the flows
-      humanize ships, which are called by a bare name. A flow that holds several names each of
-      them, `<flow>:<inside>` apiece, and a directory that holds none is not among them -- a
-      directory of flows has directories beside them that are not one.
+      humanize ships, which are called by a bare name. Yours are named the same way as anybody
+      else's -- `local/scheduler`, `user/scheduler` -- so that a flow of yours sharing a name
+      with one of humanize's is listed beside it under a name of its own rather than instead
+      of it. A flow that holds several names each of them, `<flow>:<inside>` apiece, and a
+      directory that holds none is not among them -- a directory of flows has directories
+      beside them that are not one.
 
       Nothing at all for a flowverse that has not been fetched, which is not the same answer as
       one that holds nothing, and is why :class:`Flowverse` says which it is.
@@ -688,9 +689,9 @@ def find(named_: str) -> str:
     """Where the entry point of the flow called this is.
 
     Args:
-      named_: A flow's name -- `ralph_loop`, `official/rlar`, `humanize1:gen-plan` -- or the
-        path to a flow taken as given, which is what a flow of your own is called, `~` and
-        all: its directory, or the file to run outright.
+      named_: A flow's name -- `ralph_loop`, `official/rlar`, `local/scheduler`,
+        `humanize1:gen-plan` -- or the path to a flow taken as given, `~` and all: its
+        directory, or the file to run outright.
 
     Returns:
       The path to run: the flow the flowverse named holds, else the nearest flow of that
@@ -701,8 +702,8 @@ def find(named_: str) -> str:
     at_, _ = _split(named_)
     whose, _, rest = at_.partition("/")
     if rest:
-        # Named outright -- `official/rlar` -- which is the one spelling that says which
-        # flowverse, and so the one that cannot be stood in for by a flow of your own.
+        # Named outright -- `official/rlar`, `local/scheduler` -- which is the one spelling
+        # that says which place it came from, and so the one that cannot be stood in for.
         for verse in flowverses():
             beside = entry(holds(verse), rest)
             if whose == verse.name and beside is not None:
@@ -710,20 +711,19 @@ def find(named_: str) -> str:
     else:
         # Nearest wins: this project, then yours, then whatever there is to run -- so a flow
         # of your own may stand in for one of humanize's by taking its name.
-        for _, folder in where:
-            beside_ = entry(Path(os.path.expanduser(folder)), at_)
-            if beside_ is not None:
-                return os.path.realpath(beside_)
-        for verse in flowverses():
+        for verse in nearest():
             beside = entry(holds(verse), at_)
             if beside is not None:
                 return str(beside.resolve())
-    # A path taken as given: the flow's directory, or the file itself for whoever points at
-    # one outright -- a flow being written, a file a test wrote out.
+    # A path taken as given, in both the shapes a flow is: the directory it is, the file it is
+    # for whoever points at one outright -- a flow being written, a file a test wrote out --
+    # and the `.py` beside a path with the extension left off, which is how a single-file flow
+    # is written down anywhere its name is not what it is called by.
     said = os.path.expanduser(at_)
-    if os.path.isfile(os.path.join(said, ENTRY)):
-        return os.path.realpath(os.path.join(said, ENTRY))
-    return os.path.realpath(said) if os.path.isfile(said) else at_
+    for shape in (os.path.join(said, ENTRY), said, f"{said}.py"):
+        if os.path.isfile(shape):
+            return os.path.realpath(shape)
+    return at_
 
 
 def at(named_: str) -> str:
@@ -798,7 +798,7 @@ def fork(named_: str, into: str | os.PathLike[str] | None = None) -> str:
     beside = os.path.dirname(found_)
     whole = os.path.basename(found_) == ENTRY
     name = os.path.basename(beside) if whole else os.path.basename(found_)
-    mine = os.path.expanduser(str(into) if into is not None else where[0][1])
+    mine = os.path.expanduser(str(into) if into is not None else MINE[LOCAL])
     at_ = os.path.join(mine, name)
     # Both shapes of the name, whichever this one is: a flow is a directory or a file, the
     # directory wins the name where there is one of each, and a copy that landed beside a

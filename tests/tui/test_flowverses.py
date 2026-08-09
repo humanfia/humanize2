@@ -247,7 +247,7 @@ async def test_the_flows_of_your_own_are_a_place_of_their_own(tmp_path: Path) ->
 
         assert "local" in _places(sheet)
         await _steps(app, driver, "local")
-        assert _rows(sheet) == [".humanize/flows/mine"]
+        assert _rows(sheet) == ["local/mine"]
 
 
 @pytest.mark.timeout(60)
@@ -347,12 +347,12 @@ async def test_one_of_the_flows_a_file_holds_is_chosen_like_any_other(
         sheet = await _steps(app, driver, "local")
 
         assert _rows(sheet) == [
-            ".humanize/flows/three:gen-idea",
-            ".humanize/flows/three:rlcr",
+            "local/three:gen-idea",
+            "local/three:rlcr",
         ]
 
         # The second of them, which drives two agents.
-        await onto(app, driver, "local\x1f.humanize/flows/three:rlcr")
+        await onto(app, driver, "local\x1flocal/three:rlcr")
         await driver.press("enter")
 
         # On to what that flow drives, rather than a refusal that the file has no `run`.
@@ -382,7 +382,7 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
         await until(lambda: bool(_rows(sheet)), driver)
 
         # The first of them, which says it takes an `n`.
-        await onto(app, driver, "local\x1f.humanize/flows/three:gen-idea")
+        await onto(app, driver, "local\x1flocal/three:gen-idea")
         await driver.press("enter")
 
         await until(lambda: isinstance(app.screen, Configures), driver)
@@ -393,7 +393,7 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
         await until(lambda: sheet._tab == 1, driver)
         await driver.press("shift+tab")
         await until(lambda: sheet._tab == 0, driver)
-        await onto(app, driver, "local\x1f.humanize/flows/three:rlcr")
+        await onto(app, driver, "local\x1flocal/three:rlcr")
         await driver.press("enter")
         await until(lambda: sheet._tab == 1, driver)
 
@@ -422,7 +422,7 @@ async def test_a_flow_is_copied_here_to_be_changed(
         assert "chat now means it" in _under(sheet)
         # And it is a flow of your own from here on, listed where your own are.
         await _steps(app, driver, "local")
-        assert _rows(sheet) == [".humanize/flows/chat"]
+        assert _rows(sheet) == ["local/chat"]
 
     at = tmp_path / ".humanize" / "flows" / "chat"
     assert "one agent, one session" in (at / "__init__.py").read_text()
