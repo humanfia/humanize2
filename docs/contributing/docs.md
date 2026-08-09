@@ -170,13 +170,18 @@ already in them, which run 8 to 20 seconds end to end.
 
 `.github/workflows/build-docs.yml` builds on every push and pull request that touches `docs/`, and
 deploys to GitHub Pages on a push to `main`. It is served at
-[hmz.humanfia.ai](https://hmz.humanfia.ai), which is a custom domain and so is the site's own
-root: the config sets **no `base`**, and `docs/public/CNAME` is what keeps the domain on the
-artifact each deploy publishes. `humanfia.github.io/humanize2` redirects here.
+[docs.humanfia.ai/humanize2](https://docs.humanfia.ai/humanize2/). The custom domain is the
+organisation's own pages site, so this repository is a project page under a subdirectory of it:
+the config sets **`base: '/humanize2/'`**, and this repository publishes no `CNAME` of its own —
+one here would move the whole site to a domain root that belongs to something else.
+`humanfia.github.io/humanize2` redirects here.
 
-Serving it under a subdirectory again would mean setting `base` back — and a `base` that does not
-match where the site is served is a page whose every stylesheet, script and link asks for a path
-that is not there, which is a site that looks like unstyled markdown.
+A `base` that does not match where the site is served is a page whose every stylesheet, script
+and link asks for a path that is not there, which is a site that looks like unstyled markdown.
+So anything written by hand that names a path from the site's root — a `head` link in the
+config, an `href` or `src` in a component under `.vitepress/theme` — must go through
+`withBase`, or name the base itself where it cannot. What a markdown page links to, and what
+the nav, the sidebar and the theme's own logo name, VitePress prepends the base to already.
 
 ## The other documentation
 

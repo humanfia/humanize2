@@ -3,7 +3,7 @@
 ![humanize](https://socialify.git.ci/humanfia/humanize2/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2Fhumanfia%2Fhumanize2%2Fraw%2Frefs%2Fheads%2Fmain%2Fdocs%2Fpublic%2Flogo.svg&name=1&owner=1&pattern=Circuit+Board&pulls=1&stargazers=1&theme=Auto)
 
 [![CI](https://github.com/humanfia/humanize2/actions/workflows/ci.yml/badge.svg)](https://github.com/humanfia/humanize2/actions/workflows/ci.yml)
-[![docs](https://github.com/humanfia/humanize2/actions/workflows/build-docs.yml/badge.svg)](https://hmz.humanfia.ai/)
+[![docs](https://github.com/humanfia/humanize2/actions/workflows/build-docs.yml/badge.svg)](https://docs.humanfia.ai/humanize2/)
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
@@ -22,7 +22,7 @@ Orchestrate, execute, and observe agent flows
 ## Security
 
 Three things to know before pointing one at a repository you care about. Each is explained in
-[Security](https://hmz.humanfia.ai/guide/security):
+[Security](https://docs.humanfia.ai/humanize2/guide/security):
 
 - humanize runs every agent with **permission prompts disabled**, and nothing turns them back on.
 - **A flow is a directory of Python, and reading one means running it**, so adding a flowverse
@@ -51,7 +51,7 @@ dsh web
 Needs Python ≥ 3.12 and at least one supported backend: `agy`, `claude`, `codex`, `grok`,
 `kimi`, `pi`, `qwen`, `opencode` or `mimo` on your PATH — or none of them, since DeepSeek
 Harness arrives with humanize. See
-[Installation](https://hmz.humanfia.ai/guide/installation).
+[Installation](https://docs.humanfia.ai/humanize2/guide/installation).
 
 ## Usage
 
@@ -92,20 +92,20 @@ To collect what a run left behind, and open it in [ui.perfetto.dev](https://ui.p
 hmz trace collect
 ```
 
-[Quickstart](https://hmz.humanfia.ai/tutorials/quickstart) goes from here to a run you can
+[Quickstart](https://docs.humanfia.ai/humanize2/tutorials/quickstart) goes from here to a run you can
 read back, in fifteen minutes.
 
 ## Documentation
 
-**[hmz.humanfia.ai](https://hmz.humanfia.ai/)**, in four parts. Its source is under
+**[docs.humanfia.ai/humanize2](https://docs.humanfia.ai/humanize2/)**, in four parts. Its source is under
 [docs/](docs/).
 
-- **[Tutorials](https://hmz.humanfia.ai/tutorials/)** — six, in order. A quickstart, three real
+- **[Tutorials](https://docs.humanfia.ai/humanize2/tutorials/)** — six, in order. A quickstart, three real
   pieces of work run end to end, and two flows written from scratch.
-- **[Guides](https://hmz.humanfia.ai/guide/)** — a page per feature, each answering "how do I
+- **[Guides](https://docs.humanfia.ai/humanize2/guide/)** — a page per feature, each answering "how do I
   use this?" and opening with something you can paste.
-- **[Features](https://hmz.humanfia.ai/features/)** — what humanize does, described in one page.
-- **[Reference](https://hmz.humanfia.ai/reference/cli)** — the complete CLI, TUI and Python API.
+- **[Features](https://docs.humanfia.ai/humanize2/features/)** — what humanize does, described in one page.
+- **[Reference](https://docs.humanfia.ai/humanize2/reference/cli)** — the complete CLI, TUI and Python API.
 
 ## Maintainers
 
@@ -115,7 +115,7 @@ read back, in fifteen minutes.
 
 PRs accepted. Ask a question or discuss a substantial change first in
 [issues](https://github.com/humanfia/humanize2/issues), and see
-[Contributing](https://hmz.humanfia.ai/contributing/) for the checks a commit has to
+[Contributing](https://docs.humanfia.ai/humanize2/contributing/) for the checks a commit has to
 pass.
 
 ```sh

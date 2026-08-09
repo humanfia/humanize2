@@ -3,6 +3,7 @@
 // agents, an agent driving a CLI, work landing somewhere, and a record of all of it. Hover
 // one to read what it is; click it for the page.
 import { computed, ref } from 'vue'
+import { withBase } from 'vitepress'
 
 interface Feature {
   said: string
@@ -142,7 +143,7 @@ const caption = computed(
           :key="one.link"
           class="chip"
           :class="{ deep: one.deep, held: held?.link === one.link }"
-          :href="one.link"
+          :href="withBase(one.link)"
           @mouseenter="held = one"
           @mouseleave="held = null"
           @focus="held = one"

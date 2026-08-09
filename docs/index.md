@@ -20,6 +20,10 @@ hero:
       link: https://github.com/humanfia/humanize2
 ---
 
+<script setup>
+import { withBase } from 'vitepress'
+</script>
+
 <HmzInstall />
 
 <section class="hmz-section">
@@ -38,7 +42,7 @@ hero:
   </header>
   <HmzFeatures />
   <p class="hmz-note">
-    A page each, drawn rather than described: <a href="/features/">Features</a>.
+    A page each, drawn rather than described: <a :href="withBase('/features/')">Features</a>.
   </p>
 </section>
 
@@ -50,8 +54,8 @@ hero:
   </header>
   <HmzAnchor />
   <p class="hmz-note">
-    How it works, syscall by syscall: <a href="/features/anchor">The anchor</a>. What you are
-    deliberately not entitled to: <a href="/reference/remote-execution">its reference</a>.
+    How it works, syscall by syscall: <a :href="withBase('/features/anchor')">The anchor</a>. What you are
+    deliberately not entitled to: <a :href="withBase('/reference/remote-execution')">its reference</a>.
   </p>
 </section>
 
@@ -64,7 +68,7 @@ hero:
   <HmzStack />
   <p class="hmz-note">
     The whole tree, the rules and the exemptions:
-    <a href="/contributing/architecture">Architecture</a>.
+    <a :href="withBase('/contributing/architecture')">Architecture</a>.
   </p>
 </section>
 
@@ -77,32 +81,32 @@ hero:
   <HmzGallery />
   <p class="hmz-note">
     Recorded against a stand-in coding agent, in a container of its own — see
-    <a href="/contributing/docs#the-terminal-demos">Working on these docs</a>.
+    <a :href="withBase('/contributing/docs#the-terminal-demos')">Working on these docs</a>.
   </p>
 </section>
 
 <section class="hmz-section">
   <div class="hmz-paths">
-    <a href="/features/">
+    <a :href="withBase('/features/')">
       <strong>What there is</strong>
       <span>A page and a diagram each, for what it does and how it works.</span>
     </a>
-    <a href="/tutorials/quickstart">
+    <a :href="withBase('/tutorials/quickstart')">
       <strong>Never used it</strong>
       <span>Nothing installed to a run you can open in Perfetto, in fifteen minutes.</span>
     </a>
-    <a href="/guide/">
+    <a :href="withBase('/guide/')">
       <strong>One feature</strong>
       <span>A page each, opening with something you can paste.</span>
     </a>
-    <a href="/reference/cli">
+    <a :href="withBase('/reference/cli')">
       <strong>Looking it up</strong>
       <span>Every command, key, flag and Python call.</span>
     </a>
   </div>
   <p class="hmz-warn">
     humanize runs every agent with permission prompts disabled, and nothing turns them back on.
-    Read <a href="/guide/security">Security</a> before pointing one at a repository you care
+    Read <a :href="withBase('/guide/security')">Security</a> before pointing one at a repository you care
     about.
   </p>
 </section>

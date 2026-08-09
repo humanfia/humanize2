@@ -3,6 +3,7 @@
 // for, so the page arrives without nine animations in flight; hover plays one, and a click
 // opens it at full size.
 import { onMounted, onUnmounted, ref } from 'vue'
+import { withBase } from 'vitepress'
 
 interface Shot {
   src: string
@@ -117,7 +118,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       @click="show(i)"
     >
       <span class="frame">
-        <img :src="shown(shot)" :alt="shot.caption" loading="lazy" />
+        <img :src="withBase(shown(shot))" :alt="shot.caption" loading="lazy" />
         <span class="zoom">open</span>
       </span>
       <span class="meta">
@@ -130,11 +131,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   <Teleport to="body">
     <div v-if="open !== null" class="lightbox" @click.self="close">
       <figure>
-        <img :src="SHOTS[open].src" :alt="SHOTS[open].caption" />
+        <img :src="withBase(SHOTS[open].src)" :alt="SHOTS[open].caption" />
         <figcaption>
           <code>{{ SHOTS[open].title }}</code>
           <span>{{ SHOTS[open].caption }}</span>
-          <a :href="SHOTS[open].href">read the guide →</a>
+          <a :href="withBase(SHOTS[open].href)">read the guide →</a>
         </figcaption>
       </figure>
       <button class="close" type="button" aria-label="close" @click="close">✕</button>

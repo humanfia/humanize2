@@ -3,6 +3,7 @@
 // everything it is allowed to name. It is a DAG -- everything points downward, nothing points
 // both ways -- and hovering a layer lights up exactly what it is built on.
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { withBase } from 'vitepress'
 
 interface Node {
   id: string
@@ -140,7 +141,7 @@ function hold(id: string) {
     <div class="read">
       <div class="who">
         <code>hmz.{{ node.id }}</code>
-        <a :href="node.href">read it →</a>
+        <a :href="withBase(node.href)">read it →</a>
       </div>
       <p>{{ node.blurb }}</p>
       <p class="deps">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, ref } from 'vue'
+import { withBase } from 'vitepress'
 
 const LINE = 'pip install git+https://github.com/humanfia/humanize2.git'
 
@@ -29,7 +30,7 @@ onUnmounted(() => clearTimeout(clearing))
     </button>
     <p class="under">
       Python ≥ 3.12 · drives the coding agent CLI you already log into · no API key of its own
-      <a href="/guide/installation">Installation</a>
+      <a :href="withBase('/guide/installation')">Installation</a>
     </p>
   </div>
 </template>
