@@ -89,25 +89,24 @@ _PERMITTED = {
     "bypass": {"approvalPolicy": "never", "sandbox": "danger-full-access"},
 }
 
-#: What every turn is run under whatever it is allowed to do.
-_SERVICE = {"serviceTier": "default"}
-
 #: What each kind of token is called in the totals the server states. Cached input is counted
 #: inside the input rather than beside it, so it is not a kind of its own here: adding it would
 #: be counting the same tokens twice.
 _KINDS = {"input": "inputTokens", "output": "outputTokens"}
 
 
-def unattended(permission: str) -> dict[str, Any]:
+def unattended(permission: str, service_tier: str = "default") -> dict[str, Any]:
     """What a turn is started with, at the rung the agent was configured for.
 
     Args:
       permission: One of :data:`hmz.agents.config.PERMISSIONS`.
+      service_tier: The common provider service tier requested for this agent.
 
     Returns:
       The settings to send with the turn, and with the thread it runs on.
     """
-    return _SERVICE | _PERMITTED.get(permission, _PERMITTED["bypass"])
+    service = "priority" if service_tier == "fast" else "default"
+    return {"serviceTier": service} | _PERMITTED.get(permission, _PERMITTED["bypass"])
 
 
 #: How long a server being taken down is given to go before it is left to the operating system,
@@ -794,6 +793,7 @@ class CodexAgentConfig(AgentConfig):
     overrides: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         object.__setattr__(self, "overrides", _overrides(self.overrides))
 
 
@@ -867,7 +867,10 @@ class CodexSession(SessionBase):
                         if schema is not None
                         else {}
                     ),
-                    **unattended(self._agent.config.permission),
+                    **unattended(
+                        self._agent.config.permission,
+                        self._agent.config.service_tier,
+                    ),
                 },
                 self._running,
             ):
@@ -925,7 +928,10 @@ class CodexSession(SessionBase):
                     {
                         "cwd": self._workspace(),
                         "model": self._agent.config.model,
-                        **unattended(self._agent.config.permission),
+                        **unattended(
+                            self._agent.config.permission,
+                            self._agent.config.service_tier,
+                        ),
                     },
                 )["thread"]["id"]
             )
@@ -956,6 +962,7 @@ class CodexSession(SessionBase):
                     "input": [{"type": "text", "text": objective}],
                     "model": config.model,
                     "effort": self.effort,
+                    **unattended(config.permission, config.service_tier),
                 }
             )
             self._adopt(thread)
@@ -972,6 +979,8 @@ class CodexAgent(AgentBase):
     """
 
     moments: ClassVar[frozenset[Moment]] = EVERYWHERE | {Moment.PERMISSION_REQUEST}
+
+    service_tiers = ("default", "fast")
 
     #: codex keeps itself going toward an objective, which is what `pursue` reaches for.
     pursues: ClassVar[bool] = True

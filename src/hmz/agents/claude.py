@@ -134,6 +134,7 @@ class ClaudeCodeAgentConfig(AgentConfig):
     allowed_tools: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         if (
             len(self.allowed_tools) > _ALLOWED_TOOLS_MAX
             or self.allowed_tools != tuple(sorted(set(self.allowed_tools)))
@@ -213,6 +214,11 @@ class ClaudeCodeSession(StreamSessionBase):
                 ["--permission-mode", mode]
                 if (mode := _PERMITTED.get(self._agent.config.permission))
                 else ["--dangerously-skip-permissions"]
+            ),
+            "--settings",
+            json.dumps(
+                {"fastMode": self._agent.config.service_tier == "fast"},
+                separators=(",", ":"),
             ),
             "--model",
             self._agent.config.model,
@@ -548,6 +554,8 @@ class ClaudeCodeSession(StreamSessionBase):
 
 class ClaudeCodeAgent(AgentBase):
     """Claude Code, driven over its streaming JSON protocol so a turn can be talked to."""
+
+    service_tiers = ("default", "fast")
 
     #: Every moment a turn passes through, and one more: Claude asks before it uses a tool,
     #: over the same stream the turn is read from, and waits for the answer. So this is the

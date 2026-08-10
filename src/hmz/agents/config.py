@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "PERMISSIONS",
+    "SERVICE_TIERS",
     "AgentConfig",
     "AgentDefaults",
     "Goal",
@@ -40,6 +41,11 @@ __all__ = [
 #: A backend with no sandbox of its own cannot tell `workspace-write` from `auto`, and says so
 #: where it maps them rather than pretending to a rung it has not got.
 PERMISSIONS = ("read-only", "workspace-write", "auto", "bypass")
+
+#: How quickly a provider is asked to serve one agent, independent of how hard its model
+#: reasons. Backends map these common meanings into their own request vocabulary and refuse
+#: ``fast`` when they cannot express it exactly.
+SERVICE_TIERS = ("default", "fast")
 
 
 class Goal:
@@ -118,6 +124,8 @@ class AgentConfig:
     Attributes:
       model: The model name or identifier the backend is asked for.
       effort: The reasoning effort the backend is asked for, in the backend's own wording.
+      service_tier: How quickly the provider is asked to serve the same model and effort, as
+        one of :data:`SERVICE_TIERS`. ``fast`` buys lower latency rather than less reasoning.
       machine: The machine the agent's work lands on, or None to work on this one. One that is
         already running is named by the anchor onto it; one started for the agent is started on
         the first turn and says where it is itself. The agent runs here either way, so its
@@ -141,10 +149,18 @@ class AgentConfig:
 
     model: str
     effort: str
+    service_tier: str = "default"
     machine: MachineConfig | None = None
     permission: str = "bypass"
     provider: str = ""
     goals: bool = True
+
+    def __post_init__(self) -> None:
+        if self.service_tier not in SERVICE_TIERS:
+            raise ValueError(
+                "service_tier must be one of "
+                f"{', '.join(SERVICE_TIERS)}, not {self.service_tier!r}"
+            )
 
 
 def anchored(target: str) -> MachineConfig | None:

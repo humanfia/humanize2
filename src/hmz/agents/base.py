@@ -1819,6 +1819,11 @@ class AgentBase(ABC):
     #: has not rather than raising on the first turn.
     pursues: ClassVar[bool] = False
 
+    #: Provider service tiers this backend can express exactly. A backend opts into ``fast``
+    #: only when it has a native request setting for it, so unsupported requests fail before
+    #: the first provider turn.
+    service_tiers: ClassVar[tuple[str, ...]] = ("default",)
+
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent that has opened nothing yet.
 
@@ -1829,6 +1834,11 @@ class AgentBase(ABC):
             being restarted; two left unnamed are two, which is how one configuration driven
             twice -- an actor and the reviewer reading its work -- stays two.
         """
+        if config.service_tier not in self.service_tiers:
+            raise ValueError(
+                f"{type(self).__name__} does not support service tier "
+                f"{config.service_tier!r}; expected {', '.join(self.service_tiers)}"
+            )
         self._config = config
         #: What this agent's turns are to think at, where a flow has said something other
         #: than what it was configured with, and None where it has not.

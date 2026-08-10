@@ -100,6 +100,22 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     )
 """
 
+#: One common provider-latency setting reaches both supported backend configs.
+SERVICE_TIER_CONFIG = """
+import json
+from pathlib import Path
+
+from hmz.agents import AgentBase
+from hmz.flows import flow
+
+
+@flow
+def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+    Path(__file__).with_suffix(".json").write_text(
+        json.dumps([agent.config.service_tier for agent in agents])
+    )
+"""
+
 #: The same flow, declaring its agents as a named tuple: as many as there are places, and what
 #: each of them is for. It reaches them by name to prove it was handed the type it asked for.
 NAMED = """
@@ -297,6 +313,23 @@ def test_a_claude_agent_receives_its_native_allowed_tools_rule(
         ]
     )
     assert json.loads((tmp_path / "flow.json").read_text()) == ["Bash(git diff *)"]
+
+
+def test_one_service_tier_setting_reaches_claude_and_codex(tmp_path: Path) -> None:
+    flow = _flow(tmp_path, SERVICE_TIER_CONFIG)
+    main(
+        [
+            "exec",
+            "-f",
+            flow,
+            "-a",
+            "cli=claude,model=m,effort=max,service_tier=fast",
+            "-a",
+            "cli=codex,model=m,effort=max,service_tier=fast",
+            "task",
+        ]
+    )
+    assert json.loads((tmp_path / "flow.json").read_text()) == ["fast", "fast"]
 
 
 def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(

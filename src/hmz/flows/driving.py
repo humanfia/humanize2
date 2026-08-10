@@ -1172,6 +1172,7 @@ def _about() -> dict[str, Any]:
                         "cli": each.backend,
                         "model": each.config.model,
                         "effort": each.config.effort,
+                        "service_tier": each.config.service_tier,
                         "account": each.config.provider
                         or "as this machine is signed in",
                         "may": each.config.permission,
