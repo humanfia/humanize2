@@ -109,7 +109,10 @@ read back, in fifteen minutes.
 
 ## Maintainers
 
-[@futrime](https://github.com/futrime)
+[@futrime](https://github.com/futrime), [@SihaoLiu](https://github.com/SihaoLiu), [@lyken17](https://github.com/lyken17).
+
+This project was initiated by Sihao Liu at UCLA [PolyArch/humanize](https://github.com/PolyArch/humanize), then contributed 
+by NVIDIA Research, MIT HAN LAB, NUNCHAKU and many community members.
 
 ## Contributing
 
@@ -128,4 +131,4 @@ If you edit this README, please conform to the
 
 ## License
 
-[Apache-2.0](LICENSE) © Zijian Zhang
+[Apache-2.0](LICENSE)
