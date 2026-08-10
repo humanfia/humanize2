@@ -173,12 +173,10 @@ bounded unattended flow. It is frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
 would silently split one conversation across two models.
 
-`service_tier` is `default` unless asked for otherwise. Codex also takes `fast`, mapped to
-its native `priority` service tier. It does not lower `effort` or choose a smaller model. A
-backend that cannot express `fast` refuses it before the first turn rather than silently
-running at another tier. In particular, Claude Code's interactive `/fast` is unavailable in
-the `--print` Agent SDK path humanize drives, so a Claude agent rejects `fast` instead of
-silently receiving standard service.
+`service_tier` is `default` unless asked for otherwise. Claude and Codex also take `fast`:
+Claude receives `fastMode: true`, and Codex receives its native `priority` service tier. It
+does not lower `effort` or choose a smaller model. A backend that cannot express `fast`
+refuses it before the first turn rather than silently running at another tier.
 
 ```python
 from hmz.agents import CodexAgent, CodexAgentConfig

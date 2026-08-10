@@ -323,13 +323,13 @@ def test_one_service_tier_setting_reaches_claude_and_codex(tmp_path: Path) -> No
             "-f",
             flow,
             "-a",
-            "cli=claude,model=m,effort=max",
+            "cli=claude,model=m,effort=max,service_tier=fast",
             "-a",
             "cli=codex,model=m,effort=max,service_tier=fast",
             "task",
         ]
     )
-    assert json.loads((tmp_path / "flow.json").read_text()) == ["default", "fast"]
+    assert json.loads((tmp_path / "flow.json").read_text()) == ["fast", "fast"]
 
 
 def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(
