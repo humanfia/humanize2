@@ -215,11 +215,6 @@ class ClaudeCodeSession(StreamSessionBase):
                 if (mode := _PERMITTED.get(self._agent.config.permission))
                 else ["--dangerously-skip-permissions"]
             ),
-            "--settings",
-            json.dumps(
-                {"fastMode": self._agent.config.service_tier == "fast"},
-                separators=(",", ":"),
-            ),
             "--model",
             self._agent.config.model,
             "--effort",
@@ -554,8 +549,6 @@ class ClaudeCodeSession(StreamSessionBase):
 
 class ClaudeCodeAgent(AgentBase):
     """Claude Code, driven over its streaming JSON protocol so a turn can be talked to."""
-
-    service_tiers = ("default", "fast")
 
     #: Every moment a turn passes through, and one more: Claude asks before it uses a tool,
     #: over the same stream the turn is read from, and waits for the answer. So this is the

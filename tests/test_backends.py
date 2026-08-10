@@ -129,8 +129,8 @@ def test_a_claude_agent_may_name_one_native_allowed_tools_rule() -> None:
     assert overrides == (("allowed_tools", "Bash(git diff *)"),)
 
 
-@pytest.mark.parametrize("backend", ["claude", "codex"])
-def test_supported_backends_share_one_service_tier_setting(backend: str) -> None:
+def test_codex_accepts_the_common_service_tier_setting() -> None:
+    backend = "codex"
     profile, _, _, tier, _, _, overrides = backends.read(
         f"cli={backend},model=m,effort=max,service_tier=fast"
     )

@@ -110,24 +110,6 @@ def test_claude_allowed_tool_rules_are_canonical() -> None:
         )
 
 
-@pytest.mark.parametrize(
-    ("service_tier", "fast_mode"), [("default", False), ("fast", True)]
-)
-def test_claude_maps_the_common_service_tier_to_fast_mode(
-    service_tier: str, fast_mode: bool
-) -> None:
-    session = ClaudeCodeAgent(
-        ClaudeCodeAgentConfig(
-            model="claude-opus-5",
-            effort="max",
-            service_tier=service_tier,
-        )
-    ).new()
-    argv = session._command()
-    settings = json.loads(argv[argv.index("--settings") + 1])
-    assert settings == {"fastMode": fast_mode}
-
-
 def test_service_tier_is_closed() -> None:
     with pytest.raises(ValueError, match="service_tier must be one of"):
         ClaudeCodeAgentConfig(
@@ -143,6 +125,15 @@ def test_fast_service_tier_fails_before_an_unsupported_backend_turn() -> None:
             KimiCodeCLIAgentConfig(
                 model="kimi-code/k3",
                 effort="high",
+                service_tier="fast",
+            )
+        )
+
+    with pytest.raises(ValueError, match="does not support service tier"):
+        ClaudeCodeAgent(
+            ClaudeCodeAgentConfig(
+                model="claude-opus-5",
+                effort="max",
                 service_tier="fast",
             )
         )
