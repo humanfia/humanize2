@@ -178,6 +178,11 @@ Claude receives `fastMode: true`, and Codex receives its native `priority` servi
 does not lower `effort` or choose a smaller model. A backend that cannot express `fast`
 refuses it before the first turn rather than silently running at another tier.
 
+The field records and sends the requested tier; provider availability still decides the
+effective tier. Claude subscription sessions require usage credits for fast mode and may
+report standard service when credits are disabled or fast mode is cooling down. Provider
+usage records, rather than the request alone, are authoritative for the tier actually served.
+
 ```python
 from hmz.agents import CodexAgent, CodexAgentConfig
 
