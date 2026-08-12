@@ -14,6 +14,12 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
 
+  // `docs/tapes/` is the machinery the demos are rendered by, not a page of the site: its
+  // README is written for somebody standing in that directory with docker. Left in, VitePress
+  // publishes it at /tapes/README -- a page no sidebar holds, that the search still offers.
+  // What a reader needs of it is in Contributing.
+  srcExclude: ['tapes/**'],
+
   head: [
     // Written out with the base in it: VitePress prepends the base to a theme's own
     // links and to what a page names, and hands `head` to the template as it is.

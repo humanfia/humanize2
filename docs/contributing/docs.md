@@ -35,6 +35,10 @@ docs/
 └── tapes/                    the VHS scripts the demos are rendered from
 ```
 
+`tapes/` is the one directory under `docs/` that is not the site: `srcExclude` keeps its README
+out of the build, because a page written for somebody standing in that directory with docker is
+not a page a reader of the site is looking for. What they need of it is below.
+
 Four kinds of page, and a page that is two of them is two pages.
 
 | | | |
@@ -53,7 +57,10 @@ and a reader learning read a feature page.
 - Links are written from the site root, without the extension: `/guide/afk`. VitePress checks
   them at build time.
 - Assets in `public/` are referenced from the root without `public`: `![…](/tui.svg)`.
-- Do not add a `## Table of Contents`. The right-hand outline is generated.
+- Do not add a `## Table of Contents`. The right-hand outline is generated, from `##` and `###`.
+  A page whose `###`s are dozens of error messages sets `outline: 2` in its frontmatter, the way
+  [Troubleshooting](/guide/troubleshooting) does: forty half-sentences, each cut off at the same
+  width, name nothing. The handful of places they happen in do.
 - The first `#` heading is the page title.
 - Wrap prose at 95 columns, as the rest of the repository does.
 - A guide opens with two or three sentences under the title saying what the feature is and when
@@ -72,7 +79,8 @@ reference, and every one of those is a better page for it than a front page is.
 ```
 .vitepress/theme/
 ├── index.ts                  registers the components; the rest is VitePress's default theme
-├── style.css                 the palette, the hero, and the shell every section is drawn in
+├── style.css                 the palette, the hero, the shell every section is drawn in,
+│                              and the width the nav folds into a button at
 └── components/
     ├── HmzInstall.vue        the one line, and a button that copies it
     ├── HmzOrchestra.vue      a run simulated lane by lane, landing on a trace strip

@@ -82,6 +82,11 @@
   position: relative;
   isolation: isolate;
   padding-bottom: 96px;
+  /* The field below is drawn wider than the page so it runs off both edges rather than
+     stopping at one. Unclipped, the half of it past the right edge is scrollable width:
+     a quarter of a screen of empty page to scroll into. `clip` cuts it without making a
+     scroll container, so nothing inside stops being sticky. */
+  overflow-x: clip;
 }
 
 .VPHome::before {
@@ -266,5 +271,30 @@
 @media (prefers-reduced-motion: reduce) {
   .VPHome::before {
     animation: none;
+  }
+}
+
+/* The default theme opens the nav bar out into five links, a search box and the overflow
+   button at 768px wide. Five is one more than fits: from 768px to 812px the button holding
+   the theme switch and the GitHub link sits past the right edge, and the page scrolls
+   sideways to reach it. So the nav stays a button until 960px -- the width the sidebar comes
+   back at. Below that the layout is already the compact one, and now the nav is too.
+   The doubled class outweighs the scoped selectors these rules are overriding. */
+@media (min-width: 768px) and (max-width: 959px) {
+  .VPNavBarHamburger.VPNavBarHamburger {
+    display: flex;
+  }
+
+  .VPNavBarMenu.VPNavBarMenu {
+    display: none;
+  }
+
+  /* What it holds -- the theme switch, the GitHub link -- the nav screen holds already. */
+  .VPNavBarExtra.VPNavBarExtra {
+    display: none;
+  }
+
+  .VPNavScreen.VPNavScreen {
+    display: block;
   }
 }

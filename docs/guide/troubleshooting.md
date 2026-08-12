@@ -1,3 +1,10 @@
+---
+# Every entry here is one h3, and there are dozens of them: an outline of the errors
+# themselves is a wall of half-sentences, all cut off at the same width. The outline
+# names the places a problem happens in; the page itself lists the errors.
+outline: 2
+---
+
 # Troubleshooting
 
 Each entry shows what a problem looks like and what to do about it. The entries are grouped by
