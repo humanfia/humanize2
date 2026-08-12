@@ -151,7 +151,22 @@ def _add(
         print("hmz: an agent is written down under a name", file=sys.stderr)
         return 1
     try:
-        profile, model, effort, provider, permission, overrides = read(spec)
+        (
+            profile,
+            model,
+            effort,
+            service_tier,
+            provider,
+            permission,
+            overrides,
+        ) = read(spec)
+        if service_tier != "default":
+            print(
+                "hmz: service_tier is a per-run setting on the agent line, "
+                "not a saved-agent setting",
+                file=sys.stderr,
+            )
+            return 1
         if overrides:
             print(
                 "hmz: config.KEY is a setting of the agent on the line that runs it, "

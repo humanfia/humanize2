@@ -1194,7 +1194,7 @@ def named(backend: str) -> Profile | None:
 
 def read(
     spec: str,
-) -> tuple[Profile, str, str, str, str | None, tuple[tuple[str, str], ...]]:
+) -> tuple[Profile, str, str, str, str, str | None, tuple[tuple[str, str], ...]]:
     """Reads one `-a` into the backend to drive, what to drive it at, and as whom.
 
     Args:
@@ -1202,21 +1202,22 @@ def read(
         where a model or an effort holding the punctuation the short form separates on goes.
         The CLI may name a provider after an `@`, as `claude@deepseek/MODEL:EFFORT`, which is
         the account that agent's turns run as; `provider=` says the same thing written out.
-        The written-out form may also name the agent's permission rung as `permission=`, and
-        backend-native settings as `config.KEY=VALUE`. Codex accepts app-server overrides;
-        Claude accepts one exact `allowed_tools` rule.
+        The written-out form may also name the common provider latency tier as
+        `service_tier=`, the agent's permission rung as `permission=`, and backend-native
+        settings as `config.KEY=VALUE`. Codex accepts app-server overrides and Claude one
+        exact `allowed_tools` rule.
 
     Returns:
-      The backend, the model, the effort, the provider -- which is "" for an agent that runs
-      as whoever is at this machine already runs its CLI -- the permission, which is None
-      for an agent that runs at the default rung, and the `config.KEY` pairs, which is ()
-      where none were named.
+      The backend, model, effort, common service tier, provider -- which is "" for an agent
+      that runs as whoever is at this machine already runs its CLI -- permission, which is
+      None at the default rung, and the `config.KEY` pairs, which is () where none were named.
 
     Raises:
       ValueError: If it is neither spelling, or names no backend there is. What it says is
         what a command line reports after the agent it could not read.
     """
     provider = ""
+    service_tier = "default"
     permission: str | None = None
     overrides: list[tuple[str, str]] = []
     if "=" in spec:
@@ -1224,10 +1225,11 @@ def read(
             key.strip(): value.strip()
             for key, _, value in (part.partition("=") for part in spec.split(","))
         }
-        backend, model, effort, provider, permission = (
+        backend, model, effort, service_tier, provider, permission = (
             given.pop("cli", ""),
             given.pop("model", ""),
             given.pop("effort", ""),
+            given.pop("service_tier", "default"),
             given.pop("provider", ""),
             given.pop("permission", None),
         )
@@ -1240,8 +1242,8 @@ def read(
                 del given[key]
         if given:
             raise ValueError(
-                f"{', '.join(sorted(given))} is not cli, model, effort, provider, "
-                "permission or config.KEY"
+                f"{', '.join(sorted(given))} is not cli, model, effort, service_tier, "
+                "provider, permission or config.KEY"
             )
     else:
         # Read from both ends: a model may hold slashes of its own -- Kimi Code's and
@@ -1262,9 +1264,12 @@ def read(
     if profile is None or not model.strip() or not effort.strip():
         raise ValueError(
             "expected CLI[@PROVIDER]/MODEL:EFFORT or "
-            "cli=CLI,model=MODEL,effort=EFFORT[,provider=PROVIDER]"
+            "cli=CLI,model=MODEL,effort=EFFORT[,service_tier=SERVICE_TIER]"
+            "[,provider=PROVIDER]"
             "[,permission=PERMISSION][,config.KEY=VALUE]"
         )
+    if not service_tier.strip():
+        raise ValueError("service_tier cannot be empty")
     if overrides and profile.name not in {"claude", "codex"}:
         raise ValueError("config.KEY is only for Claude or Codex")
     if profile.name == "claude" and any(
@@ -1275,6 +1280,7 @@ def read(
         profile,
         model.strip(),
         effort.strip(),
+        service_tier.strip(),
         provider.strip(),
         permission,
         tuple(overrides),

@@ -548,6 +548,7 @@ def _drove(agents: Sequence[AgentBase]) -> list[dict[str, Any]]:
             "backend": agent.backend,
             "model": agent.config.model,
             "effort": agent.config.effort,
+            "service_tier": agent.config.service_tier,
             "permission": agent.config.permission,
             # What it was configured with rather than what a turn of it ends up running as:
             # the account a turn fell back onto is written down against the session that ran

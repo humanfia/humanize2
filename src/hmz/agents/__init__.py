@@ -20,6 +20,7 @@ from .claude import ClaudeCodeAgent, ClaudeCodeAgentConfig, ClaudeCodeSession
 from .codex import CodexAgent, CodexAgentConfig, CodexSession
 from .config import (
     PERMISSIONS,
+    SERVICE_TIERS,
     AgentConfig,
     AgentDefaults,
     Goal,
@@ -85,6 +86,7 @@ __all__ = [
     "DRIVEN",
     "EVERYWHERE",
     "PERMISSIONS",
+    "SERVICE_TIERS",
     "SWARM",
     "WINDOW",
     "AcpAgent",

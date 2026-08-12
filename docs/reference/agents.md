@@ -162,7 +162,8 @@ same refusal. That refusal, and a session id the runtime will not answer under, 
 than retried. A turn that fails without taking its runtime with it leaves that runtime up, so
 the conversation carries on into the turn after it.
 
-A config takes `model`, `effort`, an optional [`machine`](#where-the-turns-land),
+A config takes `model`, `effort`, `service_tier`, an optional
+[`machine`](#where-the-turns-land),
 [what it may do](#what-an-agent-may-do), [which account it runs as](#which-account-it-runs-as),
 whether [goals](/guide/goals) are available to it, and nothing else — the
 [skills it carries](#the-skills-an-agent-carries) are not among them, being its CLI's own and
@@ -172,6 +173,16 @@ bounded unattended flow. It is frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
 would silently split one conversation across two models.
 
+`service_tier` is `default` unless asked for otherwise. Claude and Codex also take `fast`:
+Claude receives `fastMode: true`, and Codex receives its native `priority` service tier. It
+does not lower `effort` or choose a smaller model. A backend that cannot express `fast`
+refuses it before the first turn rather than silently running at another tier.
+
+The field records and sends the requested tier; provider availability still decides the
+effective tier. Claude subscription sessions require usage credits for fast mode and may
+report standard service when credits are disabled or fast mode is cooling down. Provider
+usage records, rather than the request alone, are authoritative for the tier actually served.
+
 ```python
 from hmz.agents import CodexAgent, CodexAgentConfig
 
@@ -179,6 +190,7 @@ agent = CodexAgent(
     CodexAgentConfig(
         model="gpt-5.6-sol",
         effort="max",
+        service_tier="fast",
         overrides=(
             ("model_context_window", "1000000"),
             ("model_auto_compact_token_limit", "900000"),
@@ -187,9 +199,17 @@ agent = CodexAgent(
 )
 ```
 
-On a command line the same settings are that agent's `config.KEY=VALUE`, not a flag of
-`hmz exec`. Only `model_context_window` and `model_auto_compact_token_limit` are taken. The
-user's `~/.codex/config.toml` is left as it was.
+On a command line the common tier is a top-level agent field, while backend-native settings
+remain that agent's `config.KEY=VALUE`, not flags of `hmz exec`:
+
+```sh
+hmz exec -f flow.py:run \
+    -a 'cli=codex,model=gpt-5.6-sol,effort=max,service_tier=fast,config.model_context_window=1000000' \
+    task
+```
+
+Codex takes only `model_context_window` and `model_auto_compact_token_limit` as native
+overrides. The user's `~/.codex/config.toml` is left as it was.
 
 Claude's exact native allow rule is configured the same way and is handed to
 `--allowedTools`; it does not widen the agent's permission rung:
