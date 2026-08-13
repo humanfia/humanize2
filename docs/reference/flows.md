@@ -33,11 +33,13 @@ moments a hook hangs on, what a turn cost, what an agent is configured with, wha
 runs — all come from that one name:
 
 ```python
-from hmz.flows import Agent, Moment, Person, Session, calls, flow
+from hmz.flows import Agent, Moment, Person, Session, Unrecoverable, calls, flow
 ```
 
 A flow that named `hmz.agents` for the type of what it drives would be a flow written against
 which CLI is behind it, and it would break the day humanize moved anything. It never has to.
+`Unrecoverable` is exposed here too, so bounded flows can distinguish a transient failed turn
+from one whose next attempt would necessarily fail the same way.
 
 | Name | Is |
 | --- | --- |

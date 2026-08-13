@@ -17,7 +17,9 @@ import pytest
 
 import hmz.flows
 from hmz.agents import HumanAgent
+from hmz.agents import Unrecoverable as AgentUnrecoverable
 from hmz.flows import BUILTIN_AT, Agent, Person, Session
+from hmz.flows import Unrecoverable as FlowUnrecoverable
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -63,6 +65,11 @@ def test_a_name_it_does_not_offer_is_an_attribute_error() -> None:
     """Handing names through must not turn a typo into something that is silently None."""
     with pytest.raises(AttributeError):
         _ = hmz.flows.ClaudeCodeAgent  # type: ignore[attr-defined]
+
+
+def test_an_unrecoverable_turn_is_the_same_exception_a_flow_can_catch() -> None:
+    """The flow-facing vocabulary is handed through, not redefined at the boundary."""
+    assert FlowUnrecoverable is AgentUnrecoverable
 
 
 def _members(protocol: type) -> set[str]:
