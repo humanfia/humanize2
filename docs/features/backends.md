@@ -38,10 +38,11 @@ what it says is kept:
   to ask. A backend that would not answer leaves the account made — an account whose models are
   not known yet is one to ask again, not one that failed.
 
-Claude Code's subscription picker hides the `fable` alias even when the account can run it.
-For subscription accounts, humanize uses Claude's official `ANTHROPIC_CUSTOM_MODEL_OPTION`
-hook while asking for the catalogue, and keeps the `fable` alias so a turn can pass it through
-as `--model fable`. Key, gateway and cloud accounts are left to their own catalogue.
+Nothing is added to what a backend answered. Claude Code will report a model named by
+`ANTHROPIC_CUSTOM_MODEL_OPTION` without checking that the account can run it, so humanize
+never sets that variable to put a model in front of you: a catalogue is what the account said
+it runs. One you set yourself is passed through untouched, and is kept under the alias you
+chose rather than the id Claude resolves it to — the alias is what `--model` takes.
 
 ## The efforts are a vocabulary, so they are written down
 

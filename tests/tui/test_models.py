@@ -276,11 +276,11 @@ async def test_the_key_asks_the_cli_and_puts_up_what_it_says(
     "hmz.tui.app.installed",
     return_value={"claude": (Model("fable", ("max", "high")),)},
 )
-async def test_fable_is_selectable_as_the_claude_model(
+async def test_a_name_in_the_catalogue_is_the_one_a_turn_runs_at(
     _installed: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands the catalogue over
     flows: Path,
 ) -> None:
-    """The alias selected in the catalogue is the one Claude receives on a turn."""
+    """Whatever the account said it runs is picked and passed on under that same name."""
     app = Humanize()
     async with app.run_test() as driver:
         await _to_the_models(app, driver)

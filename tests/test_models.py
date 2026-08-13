@@ -51,10 +51,10 @@ CLAUDE = json.dumps(
     }
 )
 
-#: Claude's official custom-model hook reports a hidden subscription model by its alias. The
-#: resolved id is deliberately different: hmz must keep the alias because that is what a user
-#: can pass to `/model` and to `--model`.
-CLAUDE_FABLE = json.dumps(
+#: What Claude answers when somebody has set `ANTHROPIC_CUSTOM_MODEL_OPTION` themselves. The
+#: resolved id is deliberately a different name: the alias is the one they chose and the one
+#: `--model` takes, so it is the one a catalogue keeps.
+CLAUDE_CUSTOM = json.dumps(
     {
         "type": "control_response",
         "response": {
@@ -207,47 +207,41 @@ def test_every_backend_is_asked_the_way_that_backend_answers(
     assert [model.name for model in found] == wanted
 
 
-def test_claude_keeps_the_alias_of_a_custom_model_and_requests_fable(
+def test_claude_keeps_the_alias_of_a_custom_model(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The alias is what Claude accepts, even though its response has a canonical id too."""
+    monkeypatch.setenv("ANTHROPIC_CUSTOM_MODEL_OPTION", "fable")
     bin_ = tmp_path / "bin"
-    stands_in(monkeypatch, bin_, "claude", CLAUDE_FABLE)
+    stands_in(monkeypatch, bin_, "claude", CLAUDE_CUSTOM)
 
     found = models.ask("claude")
 
     assert [model.name for model in found] == ["fable"]
     environment = seen(bin_, "claude")["env"]
     assert isinstance(environment, dict)
+    # Passed through as it was set, rather than replaced by one of humanize's own choosing.
     assert environment["ANTHROPIC_CUSTOM_MODEL_OPTION"] == "fable"
 
 
-def test_claude_does_not_replace_an_existing_custom_model_option(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("provider", ["", "subscribed"])
+def test_claude_is_never_asked_about_a_model_humanize_thought_of(
+    provider: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A caller's custom model remains the value Claude is asked to list."""
-    monkeypatch.setenv("ANTHROPIC_CUSTOM_MODEL_OPTION", "my-model")
+    """Claude lists a custom model without checking the account can run it.
+
+    So naming one to get a hidden model listed would put a model in the catalogue for every
+    account that cannot run it -- which is the one thing a catalogue asked for rather than
+    written down exists to avoid.
+    """
     bin_ = tmp_path / "bin"
     stands_in(monkeypatch, bin_, "claude", CLAUDE)
+    if provider:
+        providers.add("claude", provider, "login", {})
 
-    models.ask("claude")
+    found = models.ask("claude", provider)
 
-    environment = seen(bin_, "claude")["env"]
-    assert isinstance(environment, dict)
-    assert environment["ANTHROPIC_CUSTOM_MODEL_OPTION"] == "my-model"
-
-
-def test_claude_key_accounts_are_not_given_the_subscription_alias(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Fable is opt-in for a subscription, not a guess for a Claude API key."""
-    bin_ = tmp_path / "bin"
-    stands_in(monkeypatch, bin_, "claude", CLAUDE)
-    providers.add("claude", "key", "key", {"ANTHROPIC_API_KEY": "sk-x"})
-
-    found = models.ask("claude", "key")
-
-    assert "fable" not in [model.name for model in found]
+    assert [model.name for model in found] == ["claude-nine", "claude-quick"]
     environment = seen(bin_, "claude")["env"]
     assert isinstance(environment, dict)
     assert "ANTHROPIC_CUSTOM_MODEL_OPTION" not in environment
