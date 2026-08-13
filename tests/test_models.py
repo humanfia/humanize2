@@ -51,6 +51,29 @@ CLAUDE = json.dumps(
     }
 )
 
+#: Claude's official custom-model hook reports a hidden subscription model by its alias. The
+#: resolved id is deliberately different: hmz must keep the alias because that is what a user
+#: can pass to `/model` and to `--model`.
+CLAUDE_FABLE = json.dumps(
+    {
+        "type": "control_response",
+        "response": {
+            "subtype": "success",
+            "request_id": "models",
+            "response": {
+                "models": [
+                    {
+                        "value": "fable",
+                        "resolvedModel": "claude-fable-5",
+                        "description": "Custom model (fable)",
+                        "supportedEffortLevels": ["high", "max"],
+                    }
+                ]
+            },
+        },
+    }
+)
+
 #: What `codex debug models` renders: the efforts per model, and the ones it does not offer.
 CODEX = json.dumps(
     {
@@ -182,6 +205,52 @@ def test_every_backend_is_asked_the_way_that_backend_answers(
     found = models.ask(cli)
 
     assert [model.name for model in found] == wanted
+
+
+def test_claude_keeps_the_alias_of_a_custom_model_and_requests_fable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The alias is what Claude accepts, even though its response has a canonical id too."""
+    bin_ = tmp_path / "bin"
+    stands_in(monkeypatch, bin_, "claude", CLAUDE_FABLE)
+
+    found = models.ask("claude")
+
+    assert [model.name for model in found] == ["fable"]
+    environment = seen(bin_, "claude")["env"]
+    assert isinstance(environment, dict)
+    assert environment["ANTHROPIC_CUSTOM_MODEL_OPTION"] == "fable"
+
+
+def test_claude_does_not_replace_an_existing_custom_model_option(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A caller's custom model remains the value Claude is asked to list."""
+    monkeypatch.setenv("ANTHROPIC_CUSTOM_MODEL_OPTION", "my-model")
+    bin_ = tmp_path / "bin"
+    stands_in(monkeypatch, bin_, "claude", CLAUDE)
+
+    models.ask("claude")
+
+    environment = seen(bin_, "claude")["env"]
+    assert isinstance(environment, dict)
+    assert environment["ANTHROPIC_CUSTOM_MODEL_OPTION"] == "my-model"
+
+
+def test_claude_key_accounts_are_not_given_the_subscription_alias(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fable is opt-in for a subscription, not a guess for a Claude API key."""
+    bin_ = tmp_path / "bin"
+    stands_in(monkeypatch, bin_, "claude", CLAUDE)
+    providers.add("claude", "key", "key", {"ANTHROPIC_API_KEY": "sk-x"})
+
+    found = models.ask("claude", "key")
+
+    assert "fable" not in [model.name for model in found]
+    environment = seen(bin_, "claude")["env"]
+    assert isinstance(environment, dict)
+    assert "ANTHROPIC_CUSTOM_MODEL_OPTION" not in environment
 
 
 def test_an_antigravity_model_takes_the_effort_its_own_name_carries(

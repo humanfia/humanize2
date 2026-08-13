@@ -38,6 +38,11 @@ what it says is kept:
   to ask. A backend that would not answer leaves the account made — an account whose models are
   not known yet is one to ask again, not one that failed.
 
+Claude Code's subscription picker hides the `fable` alias even when the account can run it.
+For subscription accounts, humanize uses Claude's official `ANTHROPIC_CUSTOM_MODEL_OPTION`
+hook while asking for the catalogue, and keeps the `fable` alias so a turn can pass it through
+as `--model fable`. Key, gateway and cloud accounts are left to their own catalogue.
+
 ## The efforts are a vocabulary, so they are written down
 
 An effort is the backend's own word for how hard to think, and a ladder keeps in a way a

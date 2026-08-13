@@ -272,6 +272,32 @@ async def test_the_key_asks_the_cli_and_puts_up_what_it_says(
 
 
 @pytest.mark.timeout(60)
+@unittest.mock.patch(
+    "hmz.tui.app.installed",
+    return_value={"claude": (Model("fable", ("max", "high")),)},
+)
+async def test_fable_is_selectable_as_the_claude_model(
+    _installed: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands the catalogue over
+    flows: Path,
+) -> None:
+    """The alias selected in the catalogue is the one Claude receives on a turn."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _to_the_models(app, driver)
+        await until(lambda: _rows(app) == 1, driver)
+        assert "fable" in str(
+            app.screen.query_one("#choices", OptionList).get_option_at_index(0).prompt
+        )
+
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Agent), driver)
+        await keeps(app, driver)
+        await keeps(app, driver)
+
+    assert app._models == [Runs("claude/fable:high")]
+
+
+@pytest.mark.timeout(60)
 @unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
 async def test_a_cli_that_will_not_say_says_so_under_the_list(
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
