@@ -210,7 +210,8 @@ def _line() -> ArgumentParser:
         dest="agents",
         metavar="CLI/MODEL:EFFORT",
         help="what one of that flow's agents runs, repeated once for each it drives, in the "
-        "order it takes them; the written-out form may include permission=PERMISSION; needs -f",
+        "order it takes them; the written-out form may include service_tier=SERVICE_TIER "
+        "and permission=PERMISSION; needs -f",
     )
     parser.add_argument(
         "-c",

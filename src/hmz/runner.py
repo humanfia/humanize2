@@ -338,7 +338,8 @@ def flow_and_agents(
         metavar="CLI/MODEL:EFFORT",
         help="one agent, repeated once for each the flow drives, in the order it takes "
         "them; also written cli=CLI,model=MODEL,effort=EFFORT with optional "
-        "permission=PERMISSION and backend-native config.KEY=VALUE. CLI is one of "
+        "service_tier=SERVICE_TIER, permission=PERMISSION and backend-native "
+        "config.KEY=VALUE. CLI is one of "
         f"{', '.join(sorted(one.name for one in backends.profiles()))}",
     )
     parser.add_argument(

@@ -1834,11 +1834,7 @@ class AgentBase(ABC):
             being restarted; two left unnamed are two, which is how one configuration driven
             twice -- an actor and the reviewer reading its work -- stays two.
         """
-        if config.service_tier not in self.service_tiers:
-            raise ValueError(
-                f"{type(self).__name__} does not support service tier "
-                f"{config.service_tier!r}; expected {', '.join(self.service_tiers)}"
-            )
+        self._serves(config)
         self._config = config
         #: What this agent's turns are to think at, where a flow has said something other
         #: than what it was configured with, and None where it has not.
@@ -1946,8 +1942,29 @@ class AgentBase(ABC):
 
         Args:
           config: What every turn of it is to run at from now on.
+
+        Raises:
+          ValueError: If the backend cannot express the service tier asked for. The same
+            refusal as at construction, and for the same reason: a tier that cannot be sent
+            must be said no to rather than silently served at another one.
         """
+        self._serves(config)
         self._config = config
+
+    def _serves(self, config: AgentConfig) -> None:
+        """Refuses a config asking for a service tier this backend has no way of sending.
+
+        Args:
+          config: What the agent is to run at.
+
+        Raises:
+          ValueError: If the tier is not one of :attr:`service_tiers`.
+        """
+        if config.service_tier not in self.service_tiers:
+            raise ValueError(
+                f"{type(self).__name__} does not support service tier "
+                f"{config.service_tier!r}; expected {', '.join(self.service_tiers)}"
+            )
 
     def rename(self, name: str) -> None:
         """Calls this agent what the flow driving it calls it, if it has no name of its own.

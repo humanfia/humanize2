@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -146,6 +147,28 @@ def test_fast_service_tier_fails_before_an_unsupported_backend_turn() -> None:
                 service_tier="fast",
             )
         )
+
+
+def test_a_tier_a_backend_cannot_send_is_refused_however_it_is_asked_for() -> None:
+    """`reconfigure` is the other way in, and a flow may reach for it mid-run."""
+    agent = KimiCodeCLIAgent(
+        KimiCodeCLIAgentConfig(model="kimi-code/k3", effort="high")
+    )
+
+    with pytest.raises(ValueError, match="does not support service tier"):
+        agent.reconfigure(replace(agent.config, service_tier="fast"))
+
+    assert agent.config.service_tier == "default"  # left as it was
+
+
+def test_a_tier_a_backend_can_send_is_taken_by_reconfigure() -> None:
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-5", effort="max"))
+
+    agent.reconfigure(replace(agent.config, service_tier="fast"))
+
+    assert agent.config.service_tier == "fast"
+    argv = agent.new()._command()
+    assert json.loads(argv[argv.index("--settings") + 1]) == {"fastMode": True}
 
 
 @pytest.mark.parametrize(
