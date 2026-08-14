@@ -94,6 +94,39 @@ the environment, nothing taken out of it, no path answered by another. Nothing m
 *to* it, either: an agent that is to try it is an agent given no account, which is where its
 chain already starts.
 
+## When the agent has nowhere left to run
+
+Some failures no account answers. The model was retired this morning, the CLI will not start,
+the region has gone dark, the rate limit is on the whole account rather than on one request.
+Another key for the same backend is another way of asking the same thing that is not there.
+
+What answers those is another agent, and it is written down
+[between the two](/guide/fallback) rather than on either:
+
+```sh
+hmz fallback add claude@work/claude-opus-5:high codex@key/gpt-5.6-sol:high
+```
+
+```python
+agent.spec          # 'claude@work/claude-opus-5:high' -- how a fallback names it
+agent.stands_in()   # the agent that takes its turns, or None where nothing was written down
+```
+
+It is the last thing a turn tries, after the retries and after the account chain, and the
+reason is the conversation. No backend takes another backend's session id, so the turn that
+moves is taken in a **new session** of the agent it moved to — carrying the skills the flow
+gave the agent it left, and answering back through the session that asked, so the flow sees
+one turn either way.
+
+That session is opened once and held for as long as the one that asked for it, and ends when
+it does. The conversation is lost at the move and not every turn after it: a stateful loop
+that moved is one conversation on the other side.
+
+The stand-in is built the first time a turn has nowhere left to go, and kept: an agent that
+went down is not one to try again each turn, and a chain of four agents all started when the
+run was would be three CLIs held open for a failure that never came. An `Unrecoverable` is
+still taken once — it is not carried here either.
+
 It all happens on the **same** conversation: the session is the backend's own and is named by
 an id, so the account it moves to picks it up where the last one left off. The agent stays
 there for every turn after — an account that has gone down is not one to try again each turn —
@@ -165,13 +198,75 @@ the conversation carries on into the turn after it.
 A config takes `model`, `effort`, `service_tier`, an optional
 [`machine`](#where-the-turns-land),
 [what it may do](#what-an-agent-may-do), [which account it runs as](#which-account-it-runs-as),
-whether [goals](/guide/goals) are available to it, and nothing else — the
+whether [goals](/guide/goals) are available to it,
+[whether it may search the web](#whether-an-agent-may-search-the-web), and nothing else — the
 [skills it carries](#the-skills-an-agent-carries) are not among them, being its CLI's own and
 its flow's. Codex also takes `overrides`, the app-server `-c` keys that are not already one
 of those fields. Claude takes `allowed_tools`, exact native `--allowedTools` rules for a
 bounded unattended flow. It is frozen,
 because a session resumes under the settings it opened with — a config that changed mid-flow
 would silently split one conversation across two models.
+
+### An agent that is not quite the one you were handed
+
+What an agent is, is settled where it is made. A flow is handed agents and drives them; what
+each runs, where its turns land, what it is called and which of the flow's skills it carries
+are answers somebody already gave — at a prompt, on a command line, in a settings file — and a
+flow that could change one of them would be a flow rewriting the choice its run was started
+with.
+
+So there is one way to have an agent that differs, and it makes one:
+
+```python
+from dataclasses import replace
+
+careful = agent.clone(config=replace(agent.config, effort="max"))
+```
+
+Everything the call does not name is the agent it came from, the skills it carries included.
+Everything a *run* puts on an agent is not: the clone has opened no conversation, spent
+nothing, is watched by nobody, has nothing hung on its moments and is written down nowhere —
+and it is not stopped for the one it came from having been. Two agents, which is what they are,
+so it gets a name of its own unless you give it one. A trace that read a clone as its original
+would read a comparison of two efforts as one agent changing its mind.
+
+There is nowhere to say any of it again. `reconfigure`, `runs_on`, `loads`, `rename` and
+`disable_goals` are still there, on the interface *whoever hands an agent to a flow* holds —
+`hmz.flows.Driven` — because somebody does settle them: the runner before the first turn, the
+calling of one flow by another, and the interface when you say a running agent is to go on as
+something else. A flow declares `hmz.flows.Agent` and reaches none of them.
+
+### Whether an agent may search the web
+
+`web_search` is `True` unless asked for otherwise, because reaching the web is what a coding
+agent has always been able to do. Off is a choice, and one worth having: a run that must read
+only this repository, one under a per-query rate limit somebody is paying for, one whose
+answers have to be reproducible tomorrow.
+
+```python
+config = ClaudeCodeAgentConfig(model="claude-opus-5", effort="high", web_search=False)
+```
+
+It means the same thing on every backend that can express it, which means it is sent in both
+directions rather than only one. Claude searches the web unless told not to, so off adds
+`WebSearch,WebFetch` to `--disallowedTools`; Codex searches nothing until it is asked to, so on
+sends `-c tools.web_search=true`. If it were only ever sent one way, `on` would mean two
+different things.
+
+| backend | how it is said |
+| --- | --- |
+| `claude` | `--disallowedTools WebSearch,WebFetch` when off |
+| `codex` | `-c tools.web_search=true\|false`, both ways |
+| `grok` | `--disallowed-tools web_search,web_fetch` when off |
+| `qwen` | `--exclude-tools web_search,web_fetch` when off |
+| `opencode`, `mimo` | `webfetch: deny` in its permission table when off |
+| `agy`, `dsh`, `kimi`, `pi` | no way of being told — off is refused |
+
+A backend with no way of being told **refuses it off**, wherever the config arrives — where the
+agent is made, and where one already running is set up as something else. An agent that quietly
+went on searching would be a setting that lies. It composes with
+[what an agent may do](#what-an-agent-may-do) rather than overriding it: a rung that already
+withholds the reaching-out tools goes on withholding them whatever this says.
 
 `service_tier` is `default` unless asked for otherwise. Claude and Codex also take `fast`:
 Claude receives `fastMode: true`, and Codex receives its native `priority` service tier. It
@@ -960,8 +1055,27 @@ from hmz.agents.skills import skills
 skills("claude")   # what it would load here: yours, and this project's
 
 agent.loaded       # the skills the flow driving it brings, mounted onto every session
-agent.loads(...)   # what the runner calls to say so; a flow does not call this itself
+agent.loads(...)   # what the runner calls to say so; a flow cannot call this itself
 ```
+
+Which of the flow's skills **one conversation** carries is that conversation's own answer, and
+may be said again while it runs:
+
+```python
+session = agent.new()
+session.skills             # every one the flow brought, until it is told otherwise
+session.loads(["writing"]) # from its next turn on
+session.loads(None)        # all of them again
+```
+
+An agent is what it was made as; a conversation is a thing that gets somewhere. One that has
+finished reading the codebase and started writing the tests wants the skill about writing them
+and no longer wants the eight about reading it — and it is the same conversation either way.
+
+What is put where the backend reads it is settled as a turn opens, not when `loads` is called:
+a session may not have a directory yet, and a turn already running must not have what it is
+working by moved underneath it. A name the flow does not bring is ignored rather than refused,
+so a session asking for one a fork of the flow no longer has carries the rest.
 
 What humanize *does* add is [the skills a flow brings](/reference/flows#the-skills-a-flow-brings).
 Those are mounted onto every session the flow's agents open — copied where that backend reads

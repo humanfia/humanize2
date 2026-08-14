@@ -145,6 +145,16 @@ class AgentConfig:
       goals: Whether backend goals are available to this agent. This is always an explicit
         on/off setting; a flow may suggest the initial picker value with `AgentDefaults`, but
         that suggestion is resolved before the agent is constructed.
+      web_search: Whether this agent may search the web. On, because that is what a coding
+        agent has always been able to do and what most work wants; off is a choice, and is
+        made where the agents are chosen -- a run that must read only this repository, one
+        under a rate limit somebody is paying per query on, one whose answers have to be
+        reproducible tomorrow. It is said the same way on every backend that can be told, in
+        both directions rather than only one: a CLI whose own web search is off until it is
+        asked for is asked for it here, so that on means the same thing wherever it is read.
+        A backend with no way of being told refuses it off, the way one with no service tier
+        to send refuses `fast` -- an agent that quietly went on searching would be a setting
+        that lies.
     """
 
     model: str
@@ -154,6 +164,7 @@ class AgentConfig:
     permission: str = "bypass"
     provider: str = ""
     goals: bool = True
+    web_search: bool = True
 
     def __post_init__(self) -> None:
         if self.service_tier not in SERVICE_TIERS:

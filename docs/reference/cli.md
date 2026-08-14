@@ -70,6 +70,7 @@ cli=claude,model=claude-opus-4-8,effort=high
 claude@deepseek/claude-opus-4-8:high
 cli=claude,model=claude-opus-4-8,effort=high,provider=deepseek
 cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only
+cli=claude,model=claude-opus-4-8,effort=high,web_search=off
 cli=codex,model=gpt-5.6-sol,effort=max,config.model_context_window=1000000,config.model_auto_compact_token_limit=900000
 ```
 
@@ -94,6 +95,10 @@ unambiguous short spelling go.
 - `permission=` names [what that agent may do](/reference/agents#what-an-agent-may-do): `read-only`,
   `workspace-write`, `auto` or `bypass`. It is available in the written-out form only and
   defaults to `bypass`. A misspelling is refused before any agent runs.
+- `web_search=` says whether that agent [may search the web](/reference/agents#whether-an-agent-may-search-the-web),
+  as `on` or `off`. It is available in the written-out form only and defaults to on, which is
+  what a coding agent has always done. A backend with no way of being told refuses it off
+  before any agent runs.
 - `config.KEY=VALUE` names a Codex app-server `-c` override for **that agent**. Only
   `model_context_window` and `model_auto_compact_token_limit` are taken, both as a positive
   integer, and only on `cli=codex`. This is not `hmz exec -c`, which is the flow's YAML.
@@ -403,6 +408,35 @@ hmz providers retry claude/anthropic -n 3 -p exponential-jitter -t 120
 hmz providers show claude/deepseek
 hmz providers remove claude/deepseek
 ```
+
+## `hmz fallback`
+
+```sh
+hmz fallback list [-q|--quiet]
+hmz fallback show <cli>[@<account>]/<model>:<effort>
+hmz fallback add <cli>[@<account>]/<model>:<effort> <cli>[@<account>]/<model>:<effort>
+hmz fallback remove <cli>[@<account>]/<model>:<effort>
+```
+
+Where a turn goes when the agent taking it cannot take it at all — a model retired, a CLI that
+will not start, a rate limit on the whole account rather than one request. Its own command
+rather than a line of `hmz providers`, because an account's chain is a thing about an account
+and this is about neither of the two agents it names.
+
+An agent is named exactly the way [`-a`](#writing-an-agent) names one. `show` prints the whole
+walk rather than the one step, since the walk is what a failed turn does.
+
+```sh
+hmz fallback add claude/claude-opus-5:high codex/gpt-5.6-sol:high
+hmz fallback add claude@work/claude-opus-5:high codex@key/gpt-5.6-sol:high
+hmz fallback show claude/claude-opus-5:high
+hmz fallback remove claude/claude-opus-5:high
+```
+
+An agent cannot fall back to itself, one agent has one place to go, and a chain that comes
+round on itself ends at the second sight of an agent. The same steps are in the interface at
+[`/fallback`](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken), and what they mean is
+[Falling back](/guide/fallback).
 
 ## Environment variables
 

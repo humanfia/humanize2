@@ -53,7 +53,7 @@ def agents(argv: list[str]) -> int:
         "agent",
         metavar="CLI[@PROVIDER]/MODEL:EFFORT",
         help="what it runs, as `-a` takes it; the written-out form may include "
-        "permission=PERMISSION",
+        "permission=PERMISSION and web_search=on|off",
     )
     writing.add_argument(
         "--anchor",
@@ -66,6 +66,13 @@ def agents(argv: list[str]) -> int:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="whether its backend's own goals are available to it",
+    )
+    writing.add_argument(
+        "--web-search",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="whether it may search the web, defaulting to what the agent line said and to "
+        "on where it said nothing",
     )
     writing.add_argument(
         "--force",
@@ -88,6 +95,7 @@ def agents(argv: list[str]) -> int:
         args.agent,
         anchor=args.anchor,
         goals=args.goals,
+        web_search=args.web_search,
         force=args.force,
     )
 
@@ -129,6 +137,7 @@ def _show(name: str) -> int:
     print(f"may         {runs.permission or 'whatever it is asked to'}")
     print(f"works       {runs.anchor or 'here'}")
     print(f"goals       {'on' if runs.goals else 'off'}")
+    print(f"web search  {'on' if runs.web_search else 'off'}")
     # The skills are the CLI's own: every one it finds here, installed and switched off the
     # way that CLI does it, plus whatever the flow it is driving mounts onto its sessions.
     print("skills      as its CLI finds them")
@@ -141,6 +150,7 @@ def _add(
     *,
     anchor: str,
     goals: bool,
+    web_search: bool | None,
     force: bool,
 ) -> int:
     """Writes one agent down under a name, refusing a name already taken."""
@@ -158,6 +168,7 @@ def _add(
             service_tier,
             provider,
             permission,
+            searches,
             overrides,
         ) = read(spec)
         if service_tier != "default":
@@ -198,6 +209,9 @@ def _add(
         permission or "",
         provider,
         goals,
+        # The flag where one was given, else whatever the spec said, else on -- which is
+        # what an agent nobody has been asked about does.
+        web_search if web_search is not None else searches is not False,
     )
     # Whole, as the menu writes them: one written over keeps its place in the list, and one
     # that is new goes on the end, which is the order they were written down in.
@@ -239,4 +253,8 @@ def _reads(runs: Runs) -> str:
         said.append(f"on {runs.anchor}")
     if runs.permission:
         said.append(runs.permission)
+    # Only where it is a narrowing: on is what an agent nobody has been asked about does,
+    # and a line that said so of every agent would be a line saying nothing.
+    if not runs.web_search:
+        said.append("no web search")
     return "  ".join(said)

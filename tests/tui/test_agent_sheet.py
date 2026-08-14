@@ -173,6 +173,9 @@ async def test_one_agent_is_one_sheet_of_rows_in_the_order_they_depend(
             "skills",
             "permission",
             "goals",
+            # Only for a CLI that can be told: a switch for something the backend would go
+            # on doing either way would be a switch that lies.
+            "web search",
             "where",
             "save",
             "save as",

@@ -555,6 +555,7 @@ def _drove(agents: Sequence[AgentBase]) -> list[dict[str, Any]]:
             # there, which is where it happened.
             "provider": agent.config.provider,
             "goals": agent.config.goals,
+            "web_search": agent.config.web_search,
             # Asked as the run is written down rather than read back off a name: what the
             # person's backend is called is the agents' own business, and what a run picked
             # up again needs is which of its agents nobody chose.

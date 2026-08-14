@@ -33,7 +33,7 @@ moments a hook hangs on, what a turn cost, what an agent is configured with, wha
 runs — all come from that one name:
 
 ```python
-from hmz.flows import Agent, Moment, Person, Session, Unrecoverable, calls, flow
+from hmz.flows import Agent, Moment, Person, Session, Unrecoverable, flow, load
 ```
 
 A flow that named `hmz.agents` for the type of what it drives would be a flow written against
@@ -105,6 +105,17 @@ repository, and everything it brings is mounted onto every session its agents op
 And a flow may say it [can be picked up](#a-flow-that-can-be-picked-up) where the last run of it
 left off: `@flow(resumable=True)` is handed a dict as its last argument, holding whatever it
 wrote there last time.
+
+**What a flow may ask of an agent, and what it may not.** A flow declares `Agent`, which is
+what it may ask: turns, sessions, goals, batches, what the run has cost, what is hung on the
+moments of a turn, and what the agent is configured with. What an agent *is* — what it runs,
+where its turns land, what it is called, which of the flow's skills it carries — is an answer
+somebody already gave, so it is not on `Agent` at all. A flow that wants one set up differently
+[makes one](/reference/agents#an-agent-that-is-not-quite-the-one-you-were-handed):
+
+```python
+careful = agent.clone(config=replace(agent.config, effort="max"))
+```
 
 ## A flow that waits for more than one thing
 
@@ -541,7 +552,7 @@ The name is what you write in the mark and nothing else — a name written down 
 run should not change under whoever renames the function. `@flow(about="…")` says what it does
 where flows are listed, which is otherwise the first line of its docstring.
 
-An implementation flow used only through `calls()` can stay out of those lists and the `/flow`
+An implementation flow used only through `load()` can stay out of those lists and the `/flow`
 picker without losing its name:
 
 ```python
@@ -566,17 +577,17 @@ for it by the same name `-f` takes, and you are handed the flow itself to run wi
 you already have:
 
 ```python
-from hmz.flows import Agent, calls, flow
+from hmz.flows import Agent, flow, load
 
 @flow
 def run(agents: tuple[Agent, Agent], task: str) -> None:
-    plan = calls("official/humanize1:gen-plan")
+    plan = load("official/humanize1:gen-plan")
     plan(agents, f"plan this first: {task}")
     for _ in range(3):
         agents[0].new()(task)
 ```
 
-`calls` takes what `-f` takes — `ralph_loop`, `official/rlar`, `humanize1:gen-plan`, a path of
+`load` takes what `-f` takes — `ralph_loop`, `official/rlar`, `humanize1:gen-plan`, a path of
 your own — so a flowverse is a library as well as a menu. A name nothing answers to is refused
 where you ask for it rather than an hour into your loop.
 
@@ -589,12 +600,12 @@ that what it asks reaches whoever is at the prompt.
 Nothing is renamed. The agents belong to the run that was started, and what has already been
 written down about them stays true.
 
-**It is read again at every call.** `calls` holds the name rather than the function it found:
+**It is read again at every call.** `load` holds the name rather than the function it found:
 each call runs the flow's entry point afresh, so a flow rewritten between two calls of it — by
 hand, or by an agent this very flow is driving — is the one that runs next. That is what makes
 a loop that improves its own flow a loop that then runs the improved one. A flow that was
 rewritten into something that is no longer a flow is refused at the call, the way a name that
-was wrong is refused at `calls`.
+was wrong is refused at `load`.
 
 **It brings its own skills.** The called flow's `skills/`, and the repositories it declared,
 are [mounted](#the-skills-a-flow-brings) onto the sessions its agents open while it runs — and
@@ -606,7 +617,7 @@ happened, and leaves the agents exactly as it found them.
 A wrapper flow may deliberately keep its own skills available inside the called flow:
 
 ```python
-calls("official/rlar", inherit_skills=True)(agents, task)
+load("official/rlar", inherit_skills=True)(agents, task)
 ```
 
 The called flow's skills come first and win any same-name collision. Parent-only skills are
@@ -618,7 +629,7 @@ not implicitly given its caller's capabilities.
 as a third argument — an instance of that flow's model, or the fields to build one from:
 
 ```python
-calls("official/rlar")(agents, task, {"rounds": 9})
+load("official/rlar")(agents, task, {"rounds": 9})
 ```
 
 They are read back through the flow's own model at the moment it is called, so a flow that
@@ -630,7 +641,7 @@ awaited by whoever called it:
 ```python
 @flow
 async def run(agents: tuple[Agent], task: str) -> None:
-    await calls("official/rlar")(agents, task)
+    await load("official/rlar")(agents, task)
 ```
 
 **What is running is both of them.** `hmz.flows.running()` reports the flow that was started
@@ -740,6 +751,36 @@ project's own, or another flow's mounted by a session that is still running — 
 left where it is and the session reads what is there. A flow called by another flow does not
 change what the flow that called it is working by.
 
+### Which of them one conversation carries
+
+Every session carries all of them unless it says otherwise, and a session may say otherwise
+while it runs:
+
+```python
+reading = agent.new()
+reading.loads(["reading-a-codebase"])
+reading("Find where the retry logic lives.")
+
+reading.loads(["writing-tests"])       # from the next turn on
+reading("Now write the tests for it.")
+
+reading.skills                          # ('writing-tests',)
+```
+
+An agent is what it was made as; a conversation is a thing that gets somewhere, and this is the
+one thing about what it works by that changes as it does. What is put where the backend reads
+it is settled as a turn opens — a session may not have a directory yet, and a turn already
+running must not have what it is working by moved underneath it — so a session told between two
+turns is carrying what it was told about on the turn after.
+
+`loads(None)` is every one the flow brought, which is where a session starts. `loads([])` is
+none of them: that conversation works by what the CLI already has. A name the flow does not
+bring is ignored rather than refused, so a session asking for one a fork of the flow dropped
+carries the rest.
+
+Two conversations of one agent may carry different sets at once, which is what makes this the
+session's answer rather than the agent's.
+
 ## Flowverses
 
 A flowverse is a git repository with a `flows/` directory in it: one directory per flow, each
@@ -801,11 +842,42 @@ own docstring.
 | `ralph_loop` | 1 | A fresh session every turn, so nothing carries over: the agent starts from the task and the repository each time. |
 | `stateful_ralph` | 1 | One session, held for the whole run, re-sent the task every turn. |
 
-Both loops [can be picked up](#a-flow-that-can-be-picked-up), and what they keep is `rounds`:
-one left going for days is one that will be stopped, so running it again goes on from the round
-it reached rather than back at one. Nothing else carries — a session is opened rather than
-reopened, so `stateful_ralph` started again is a conversation of its own. `chat` keeps nothing:
-what was said is the conversation, and the backend logged it.
+Both loops [can be picked up](#a-flow-that-can-be-picked-up), and what they keep is `rounds`
+and `output`: one left going for days is one that will be stopped, so running it again goes on
+from the round it reached rather than back at one. Nothing else carries — a session is opened
+rather than reopened, so `stateful_ralph` started again is a conversation of its own. `chat`
+keeps nothing: what was said is the conversation, and the backend logged it.
+
+### What ends a loop
+
+A loop with nothing to stop it runs until somebody stops it, which is a bill nobody agreed to
+and a week of rounds nobody read. So every loop here that has no stopping condition of its own
+takes a **budget**, in millions of output tokens:
+
+```sh
+hmz exec -f ralph_loop -c budget.yaml -a claude/claude-opus-5:high "$(cat TASK.md)"
+```
+
+```yaml
+budget: 25    # millions of output tokens; 0 goes on until it is stopped
+```
+
+**10 million by default.** Output rather than every kind, because output is what a model is
+asked to produce and the only kind a loop of its own accord grows: what goes in is the task and
+the repository, and a round that read more of them is not a round that did more.
+
+The spend is kept in the state, as `output`, because the rounds are — a budget that started
+again at nothing every time the loop was picked up would be no budget at all for the loop a
+week of restarts is, so what is counted is every run of that flow in that workspace. A loop that
+has spent its budget is **over**, and what is over is not picked up: it clears what it kept, so
+the next run there opens on a budget of its own and at round one.
+
+`chat` and `official/rlar` have no budget, because each already ends: a conversation ends when
+you stop typing, and `rlar` ends when its reviewer agrees the work is done. `humanize1:rlcr`
+ends on `--max` rounds. The loops that take one are `ralph_loop`, `stateful_ralph`,
+`official/continue_loop`, `official/flame_chase`, `official/goal` and
+`official/fixed_juice_ralph` — where `budget` is the same quantity `juice` is, read at the
+scale of the loop rather than of a turn.
 
 Their source is the best documentation of this API there is — `src/hmz/flows/builtin/` in
 a checkout, or wherever `pip` put it.
@@ -821,7 +893,7 @@ flowbench's loops, written against this API.
 | `official/fixed_juice_ralph` | 1 | Ralph with a governor on it: it [moves the effort](/reference/agents#moving-the-effort-while-it-runs) a rung a round to hold the agent to `juice` output tokens per turn of the model. |
 | `official/continue_loop` | 1 | Sends the task once, then keeps nudging `continue`. Until a turn lands the task is sent again — `continue` on its own would open a session that never saw it. |
 | `official/goal` | 1 | Ralph, with the task set as the agent's [own goal](/reference/agents#goals). The loop only starts it over when it stopped without having met it. |
-| `official/flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. |
+| `official/flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. Its [budget](#what-ends-a-loop) is what the pair spend between them. |
 | `official/rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. The review *is* the actor's next prompt, word for word, and the reviewer is also the one that says the task is finished — which is what ends the run. |
 | `official/humanize1:gen-idea` | `drafter` | Opens a loose idea into a repo-grounded draft. |
 | `official/humanize1:gen-plan` | `planner`, `analyst` | Turns that draft into a plan both sides have converged on. |
@@ -829,8 +901,10 @@ flowbench's loops, written against this API.
 
 Every one of them but the two drafting phases [can be picked up](#a-flow-that-can-be-picked-up),
 each keeping the little it honestly can. The three Ralphs keep the round they reached, as
-`rounds`; `fixed_juice_ralph` keeps the rung its governor settled at as well, since a loop
-started again at the top of the ladder walks back down to it a paid turn at a time.
+`rounds`, and what they have spent, as `output`, which is what their
+[budget](#what-ends-a-loop) is held against; `fixed_juice_ralph` keeps the rung its governor
+settled at as well, since a loop started again at the top of the ladder walks back down to it a
+paid turn at a time.
 `flame_chase` keeps whose turn is next, two turns in a row being the one thing a pair taking
 turns must not do. `rlar` keeps the review the actor is owed, word for word, which is the one
 thing a restart would otherwise throw away — and keeps nothing at all where the reviewer agreed,

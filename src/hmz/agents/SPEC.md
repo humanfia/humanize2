@@ -67,6 +67,7 @@ class AgentConfig:
     permission: str = "bypass"
     provider: str = ""
     goals: bool = True
+    web_search: bool = True
 ```
 
 - `goals` MUST be the explicit on/off availability of backend goals for this agent. It has
@@ -91,10 +92,22 @@ class AgentConfig:
   `AgentBase.provider` MUST answer `None` for it, so that a turn under it is the turn an agent
   with no account has always taken. It is a setting of the agent because it is the agent that
   signs in: two agents of one CLI on two accounts are two accounts running at once.
+- `web_search` MUST be whether this agent may search the web, and MUST be on for an agent
+  nobody has been asked about: that is what a coding agent has always been able to do. It
+  MUST mean the same thing on every backend that can express it, which means saying it in
+  both directions rather than only one -- a CLI whose own web search is off until it is asked
+  for MUST be asked for it, or on would mean two things. A backend that cannot be told MUST
+  refuse it off wherever the config arrives, the way one with no service tier to send refuses
+  `fast`: an agent that went on searching would be a setting that lies. Which backends those
+  are MUST be read off `hmz.backends`, so that the one place that says what a CLI is is the
+  one place this is said too, and whatever is choosing an agent MUST put the question only
+  where there is an answer.
 - What skills an agent carries MUST NOT be a setting of it. A skill installed on this machine
   is its CLI's own -- installed the way that CLI installs one, switched off the way that CLI
   switches one off -- and humanize MUST NOT rewrite, override or disable any of them. What a
   flow brings MUST be mounted onto the sessions it opens instead, which is `hmz.flows.skills`.
+  Which of *those* one session carries MUST be that session's own answer, and is the one thing
+  about what an agent works by that MAY be said again while it is working.
 - An anchored turn MUST be run by spawning `AnchorConfig.command(argv)`, never by calling
   coganchor in this process: a turn is pumped from threads of its own, which a supervisor that
   forks the agent and takes the process's signal handling cannot be given.
@@ -208,6 +221,19 @@ class AgentBase(ABC):
 - `id` MUST be the given name, or one no other agent answers to when no name is given, so that
   two agents of the same config are two agents. `rename` MUST take a name from a flow only for
   an agent that was not named where it was made: a name given is a name kept.
+- `clone` MUST answer with another agent of this one's backend, differing in what the call
+  names and in nothing else -- its config, its name, and the flow's skills it carries. It is
+  the one way to have an agent that is not the one you were handed, and there MUST be nowhere
+  to say any of it again afterwards: what an agent is, is settled where it is made.
+- What a run puts on an agent rather than sets it up with MUST NOT come across: the clone MUST
+  have opened no conversation, spent nothing, be watched by nobody, have nothing hung on its
+  moments and be written down nowhere, and MUST NOT be stopped for the one it came from having
+  been. Two agents, which is what they are. It MUST be named as any agent is -- the name given,
+  else one nothing else answers to -- and MUST be refused a config its backend cannot express,
+  where every other agent is refused one.
+- A backend made from something other than a config MUST say how one of it is made rather than
+  answer `clone` differently: the person at the prompt is made from nothing at all, and `clone`
+  MUST be one thing wherever it is called.
 - `reconfigure` MUST replace what every turn from then on runs at, and MUST leave the turn
   under way as it started: a model does not think harder halfway through an answer. It is the
   one thing that changes a frozen config, and it is for the one case that config was frozen
@@ -356,6 +382,14 @@ class SessionBase(ABC):
   The whole of a turn MUST be under it -- the moments it fires and what it says as well as what
   the backend is told -- so that two threads calling one session are two turns one after the
   other rather than two halves of a turn each.
+- A session MUST say which of the flow's skills it carries and MUST take being told which,
+  from its next turn on: what is put where the backend reads them MUST be settled as a turn
+  opens rather than when the session was made, since a session is rooted at a directory it may
+  not have yet and a turn already running MUST NOT have what it is working by moved underneath
+  it. A session told nothing MUST carry every one the flow brought. A name the flow does not
+  bring MUST be ignored rather than refused, and a session carrying what it was already
+  carrying MUST do nothing at all -- which is every turn but the first and every turn after a
+  change.
 - A session MUST run its turns in the directory it was opened at, and MUST say which that is.
   For an agent whose turns land on another machine that directory MUST be named as that machine
   names it, MUST be inside the workspace the anchor names, and MUST be reached through this

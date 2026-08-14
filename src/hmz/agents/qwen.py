@@ -45,6 +45,10 @@ _WITHHELD = {
     "bypass": (),
 }
 
+#: The two that reach the web, by the names Qwen Code calls them, taken away at every rung
+#: for an agent told not to search it rather than only at the one that already refuses them.
+_WEB_TOOLS = ("web_search", "web_fetch")
+
 #: What each kind of thing said reads as. `assistant` carries the agent talking and the tools
 #: it reached for in the one message; `result` is the turn's own answer and is read for what
 #: it cost rather than shown twice.
@@ -147,7 +151,9 @@ class QwenCodeSession(CommandSessionBase):
             "--approval-mode",
             "yolo",
         ]
-        withheld = _WITHHELD.get(self._agent.config.permission, ())
+        withheld = list(_WITHHELD.get(self._agent.config.permission, ()))
+        if not self._agent.config.web_search:
+            withheld += [one for one in _WEB_TOOLS if one not in withheld]
         if withheld:
             argv += ["--exclude-tools", ",".join(withheld)]
         if (schema := self._shaping) is not None:

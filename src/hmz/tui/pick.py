@@ -68,6 +68,11 @@ if TYPE_CHECKING:
     from hmz.agents import AgentBase, Moment
     from hmz.backends import Model, Way
     from hmz.cycle import Ran
+
+    # Under another name, because `Falls` here is the sheet one account's chain is chosen on
+    # and this is the step itself. Two things called the same thing in one file is one of
+    # them being read as the other.
+    from hmz.fallbacks import Falls as Step
     from hmz.flows import Flowverse, Offer, Place
     from hmz.providers import Provider
 
@@ -91,6 +96,7 @@ __all__ = [
     "Doing",
     "Drafts",
     "Drawn",
+    "Fallbacks",
     "Fitted",
     "Flows",
     "Flowverses",
@@ -282,6 +288,8 @@ def reads(
                 # this machine is signed in as.
                 one.permission,
                 one.provider,
+                # And the same rule: on is what an agent nobody was asked about does.
+                "" if one.web_search else "no web search",
                 _holds(holding[at]) if at < len(holding) else "",
             )
             if part
@@ -4272,11 +4280,12 @@ _SWARM = "swarm"
 _SKILLS = "skills"
 _PERMIT = "permission"
 _GOALS = "goals"
+_SEARCHES = "web search"
 _WHERE = "where"
 _SAVE_AS = "save as"
 
 #: Which of them are stepped along where they stand rather than opened, and which are opened.
-_STEPPED = (_EFFORT, _SWARM, _PERMIT, _GOALS)
+_STEPPED = (_EFFORT, _SWARM, _PERMIT, _GOALS, _SEARCHES)
 
 
 class Agent(Drafts[Fitted]):
@@ -4356,6 +4365,7 @@ class Agent(Drafts[Fitted]):
         )
         self._provider: str = runs.provider
         self._goals = True if place is not None and place.goal else runs.goals
+        self._searches = runs.web_search
         self._anchor = runs.anchor
         #: What the chosen CLI says it runs as the chosen account, read once per pair: this
         #: is redrawn each time the cursor moves, and reading it is reading a file.
@@ -4426,6 +4436,17 @@ class Agent(Drafts[Fitted]):
                 ),
             ]
         )
+        # Only where that CLI can be told. A row offering to switch off something the
+        # backend would go on doing is a row that lies, so a backend with no way of being
+        # told is one this question is not put about.
+        if self._tellable():
+            rows.append(
+                (
+                    _SEARCHES,
+                    _YES if self._searches else _NO,
+                    "whether it may search the web",
+                )
+            )
         if self._place is None or pointed(self._place):
             rows.append(
                 (
@@ -4541,6 +4562,13 @@ class Agent(Drafts[Fitted]):
         model = self._under_model()
         return model is not None and model.swarms
 
+    def _tellable(self) -> bool:
+        """Whether the chosen CLI can be told whether its agents may search the web."""
+        from hmz.backends import named
+
+        profile = named(self._cli) if self._cli else None
+        return profile is not None and profile.searches
+
     def _made(self) -> Runs:
         """This agent as it now stands, which is what the sheet answers with."""
         # `swarm` in front of the effort is how a fleet is asked for: one turn at one effort,
@@ -4558,6 +4586,10 @@ class Agent(Drafts[Fitted]):
             ),
             provider=self._provider,
             goals=self._goals,
+            # On for a CLI that cannot be told, whatever the row said before the CLI was
+            # changed to that one: an agent whose backend has no way of being told is one
+            # that searches the web, and a config saying otherwise is one it would refuse.
+            web_search=self._searches or not self._tellable(),
         )
 
     def applied(self) -> None:
@@ -4623,6 +4655,8 @@ class Agent(Drafts[Fitted]):
             if self._place is not None and self._place.goal:
                 return  # the flow requires them, so there is nothing here to turn off
             self._goals = not self._goals
+        elif held == _SEARCHES:
+            self._searches = not self._searches
         else:
             return
         self.changed()
@@ -4770,6 +4804,7 @@ class Agent(Drafts[Fitted]):
         # What the flow requires is the flow's, and is not a thing an import may overwrite.
         if self._place is None or not self._place.goal:
             self._goals = one.runs.goals
+        self._searches = one.runs.web_search
         self._catalogue, self._read_for = None, ("", "")
         self._said = (
             f"copied from {escape(chosen)}; changing it here changes only this one"
@@ -5169,6 +5204,365 @@ class Names(Sheet[str]):
           event: What was chosen.
         """
         self.dismiss(str(event.option.id).removeprefix("="))
+
+
+class Fallbacks(Drafts[list[str]]):
+    """Where a turn goes when what was taking it cannot, on both of the scales that has.
+
+    Two things are called falling back and they answer two different failures, so this is two
+    pages rather than one list.
+
+    An **account** goes down -- a subscription that ran out, a key that was refused, a gateway
+    that answered 503 -- and the answer is another account of the same backend. It happens
+    inside the conversation that was running, because the conversation is the backend's own
+    and is named by an id, so the agent is the same agent at the same model throughout. That
+    is a thing about the account, and is written on it.
+
+    An **agent** has nowhere left to run -- a model retired, a CLI that will not start, a
+    region gone dark, a rate limit on the whole account rather than one request -- and no
+    other account of that backend answers it. What answers it is another agent: another CLI,
+    another model, another effort, another account. The conversation cannot come with it, no
+    backend taking another backend's session id, so the turn is taken in a session of the
+    agent it moved to.
+
+    Its own menu rather than a row of the accounts, because half of it is not about accounts
+    at all -- and because this is the question somebody has when they ask it: not "what does
+    this account do when it fails" but "what happens when this stops working".
+    """
+
+    TABS: ClassVar = ("Agents", "Accounts")
+    LETTERS: ClassVar = frozenset({"search", "adding", "drop"})
+
+    BINDINGS: ClassVar = [
+        ("escape", "back", "back"),
+        Binding("tab", "next_tab", "next page", priority=True),
+        Binding("shift+tab", "prev_tab", "previous page", priority=True),
+        Binding("s", "search", "search", priority=True),
+        Binding("a", "adding", "add one", priority=True),
+        Binding("d", "drop", "take one away", priority=True),
+    ]
+
+    #: Which page is which, so that neither is a number to remember.
+    _AGENTS, _ACCOUNTS = 0, 1
+
+    def __init__(self, agents: dict[str, tuple[Model, ...]]) -> None:
+        """Reads what is written down on both scales.
+
+        Args:
+          agents: The backends offered here, and what each of them says it runs. An agent is
+            chosen on the same sheet a flow's agent is chosen on, so this is what it needs.
+        """
+        super().__init__()
+        from hmz import fallbacks
+
+        self._agents = dict(agents)
+        #: The steps between agents, held until the menu is saved.
+        self._steps: list[Step] = list(fallbacks.falls())
+        #: Which of them the cursor is on, by the agent it is written against.
+        self._was = self._steps[0].spec if self._steps else ""
+        #: The accounts, and what each is being made to fall back to on this page. Kept apart
+        #: from the steps because they land through another door: an account's chain is a
+        #: thing about the account, and `hmz.providers` is where it is written.
+        self._chains: dict[str, str] = {}
+        self._found: list[Provider] | None = None
+        self._said = ""
+
+    def _ask(self) -> None:
+        """Says what these are, and puts up whichever page is open."""
+        self.query_one("#asked", Label).update("Fallback")
+        self.query_one("#about", Label).update(
+            "Where a turn goes when what was taking it cannot. An agent falls back to a "
+            "whole other agent -- another CLI, model, effort or account -- in a session of "
+            "its own, and is what is left when a backend has nowhere to run. An account "
+            "falls back to another account of the same CLI, inside the conversation that "
+            "was running."
+        )
+        self._fill()
+        self.query_one("#choices", OptionList).focus()
+
+    def _accounts(self) -> list[Provider]:
+        """Every account there is, read once: this is redrawn per keystroke."""
+        from hmz import providers
+        from hmz.backends import profiles
+
+        if self._found is None:
+            held = providers.providers()
+            whose = {each.cli for each in held}
+            mine = [
+                one
+                for profile in profiles()
+                if (one := providers.find(profile.name, providers.LOCAL)) is not None
+                and profile.name in whose
+            ]
+            self._found = sorted(held + mine, key=lambda one: (one.cli, one.name))
+        return self._found
+
+    def _named(self, one: Provider) -> str:
+        """What one account is called here, which is `cli/name`."""
+        return f"{one.cli}/{one.name}"
+
+    def _rows(self) -> list[tuple[str, str, str]]:
+        """Every row of the page that is open: its id, what it is, and where it goes.
+
+        Returns:
+          One `(id, what fails, where its turns go)` apiece.
+        """
+        if self._tab == self._AGENTS:
+            return [(one.spec, one.spec, one.to) for one in self._steps]
+        return [
+            (
+                self._named(one),
+                f"{one.cli}/{one.name or 'as local'}",
+                self._chains.get(self._named(one), one.fallback),
+            )
+            for one in self._accounts()
+        ]
+
+    def _fill(self) -> None:
+        """Puts the page up, each row saying what fails and where its turns go instead."""
+        listing = self.query_one("#choices", OptionList)
+        self._follows(listing)
+        rows = [row for row in self._rows() if self.fits(row[1], row[2])]
+        self._counting = len(str(max(len(rows), 1)))
+        if all(row[0] != self._was for row in rows):
+            self._was = rows[0][0] if rows else ""
+        at = next((seen for seen, row in enumerate(rows) if row[0] == self._was), 0)
+        listing.set_options(
+            Option(
+                self._row(
+                    seen,
+                    said,
+                    f"falls back to {goes}" if goes else "falls back nowhere",
+                    here=seen == at,
+                    inforce=bool(goes),
+                ),
+                id=f"={named}",
+            )
+            for seen, (named, said, goes) in enumerate(rows)
+        )
+        listing.highlighted = at if rows else None
+        self._drawn = listing.highlighted
+        self.tabbed(self._tab_line())
+        self.query_one("#tuning", Label).update(
+            f"[$text-muted]{self._said or self._nothing(rows)}[/]"
+        )
+        self.query_one("#keys", Label).update(
+            "Enter for where its turns go · a adds one · d twice takes one away · "
+            f"Esc to close{self.searching()}"
+            if self._tab == self._AGENTS
+            else f"Enter for where its turns go · Esc to close{self.searching()}"
+        )
+
+    def _nothing(self, rows: Sequence[object]) -> str:
+        """What to say under a page, which is something only where it has nothing on it.
+
+        Args:
+          rows: What is on the page.
+
+        Returns:
+          The line, or "" for a page with something on it.
+        """
+        if rows:
+            return ""
+        if self._tab == self._AGENTS:
+            return "no agent falls back to another yet; a says one does"
+        return "no accounts yet; /providers makes one"
+
+    def _turned(self) -> None:
+        """Starts each page at its own first row rather than at the last page's cursor."""
+        rows = self._rows()
+        self._was, self._said = (rows[0][0] if rows else ""), ""
+
+    def _follows(self, listing: OptionList) -> None:
+        """Takes which row the cursor is on off the list, by its id.
+
+        Args:
+          listing: The list.
+        """
+        at = listing.highlighted
+        if at is not None and 0 <= at < listing.option_count:
+            named = str(listing.get_option_at_index(at).id or "").removeprefix("=")
+            if named:
+                self._was = named
+
+    def action_adding(self) -> None:
+        """Says that one more agent falls back to another, which is two agents to choose."""
+        if self._tab != self._AGENTS:
+            self._said = "an account is made in /providers; this says where one goes"
+            self._fill()
+            return
+        self._adds()
+
+    def action_drop(self) -> None:
+        """Takes the step under the cursor away, once d has been pressed twice."""
+        if self._tab != self._AGENTS:
+            self._said = "an account is taken away in /providers"
+            self._fill()
+            return
+        named = self.under()
+        if not named:
+            return
+        if not self._armed(named):
+            self._said = f"press d again to take {escape(named)} away"
+            self._fill()
+            return
+        self._steps = [one for one in self._steps if one.spec != named]
+        self._said = f"{escape(named)} falls back nowhere when this menu is saved"
+        self.changed()
+        self._fill()
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Asks where the turns of whatever is under the cursor go.
+
+        Args:
+          event: What was chosen.
+        """
+        named = str(event.option.id or "").removeprefix("=")
+        if not named:
+            return
+        if self._tab == self._AGENTS:
+            self._points(named)
+            return
+        one = next(
+            (each for each in self._accounts() if self._named(each) == named), None
+        )
+        if one is not None:
+            self._chain(one)
+
+    @work
+    async def _adds(self) -> None:
+        """Chooses the agent that cannot run, and then the one that takes its turns."""
+        said = await self._chosen("The agent that cannot run")
+        if not said:
+            return
+        at = await self._chosen(f"What takes {said}'s turns")
+        if not at:
+            return
+        self._writes(said, at)
+
+    @work
+    async def _points(self, said: str) -> None:
+        """Chooses where one agent's turns go, for a step already held.
+
+        Args:
+          said: The agent, as it is written down.
+        """
+        at = await self._chosen(f"What takes {said}'s turns")
+        if at:
+            self._writes(said, at)
+
+    def _writes(self, said: str, at: str) -> None:
+        """Holds one step until the menu is saved, refusing one that points at itself.
+
+        Args:
+          said: The agent that cannot run.
+          at: The agent that takes its turns.
+        """
+        if said == at:
+            self._said = "an agent cannot fall back to itself"
+            self._fill()
+            return
+        from hmz import fallbacks
+
+        self._steps = [one for one in self._steps if one.spec != said] + [
+            fallbacks.Falls(said, at)
+        ]
+        self._was, self._said = said, ""
+        self.changed()
+        self._fill()
+
+    async def _chosen(self, asked: str) -> str:
+        """Puts up the sheet one agent is set up on, and answers with what it comes to.
+
+        The same sheet a flow's agent and a saved agent are chosen on, so that an agent is one
+        thing to choose wherever it is chosen -- CLI, account, model, effort and the rest.
+        What is kept of it here is the four that name it.
+
+        Args:
+          asked: What the sheet says it is asking.
+
+        Returns:
+          The agent as a fallback names it, or "" for a sheet that was walked out of or one
+          that came back naming no model.
+        """
+        from hmz import fallbacks
+
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        spare = opens_on(self._agents)
+        fitted = await showing.push_screen_wait(
+            Agent(asked, spare[0] if spare else Runs(""), self._agents)
+        )
+        if fitted is None:
+            return ""
+        cli, _, rest = fitted.runs.spec.partition("/")
+        model, _, effort = rest.rpartition(":")
+        if not (cli and model and effort):
+            return ""
+        return fallbacks.spec(cli, model, effort, fitted.runs.provider)
+
+    @work
+    async def _chain(self, one: Provider) -> None:
+        """Asks which account a turn under this one carries on under when it fails.
+
+        Args:
+          one: The account it is about.
+        """
+        named = self._named(one)
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        chosen = await showing.push_screen_wait(
+            Falls(one.cli, one.name, self._chains.get(named, one.fallback))
+        )
+        if chosen is None:
+            return  # walked out, which changes nothing
+        if chosen == one.fallback:
+            self._chains.pop(named, None)
+        else:
+            self._chains[named] = chosen
+        self._said = ""
+        self.changed()
+        self._fill()
+
+    def applied(self) -> None:
+        """Writes down every step and every chain, and answers with what it did."""
+        from hmz import fallbacks, providers
+
+        told: list[str] = []
+        # Against what is written down rather than over it: a menu somebody opened to change
+        # one thing must not report the four it left alone as things it did.
+        was = {one.spec: one.to for one in fallbacks.falls()}
+        held = {one.spec: one.to for one in self._steps}
+        for gone in was:
+            if gone not in held:
+                fallbacks.clear(gone)
+                told.append(f"[dim]{escape(gone)} falls back to nowhere[/dim]")
+        for said, at in held.items():
+            if was.get(said) == at:
+                continue
+            try:
+                fallbacks.points(said, at)
+            except ValueError as why:
+                told.append(f"hmz: {escape(str(why))}")
+            else:
+                told.append(f"[dim]{escape(said)} falls back to {escape(at)}[/dim]")
+        for whose, at in self._chains.items():
+            cli, _, name = whose.partition("/")
+            try:
+                providers.points(cli, name, at)
+            except ValueError as why:
+                told.append(f"hmz: {escape(str(why))}")
+            else:
+                told.append(
+                    f"[dim]{escape(whose)} falls back to "
+                    f"{escape(at) if at else 'nowhere'}[/dim]"
+                )
+        self.dismiss(told)
 
 
 class Saved(Drafts[list[str]]):

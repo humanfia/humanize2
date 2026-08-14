@@ -333,8 +333,11 @@ adjusted rather than chosen.
 - The account MUST always offer the machine's own first, as `as local`: an agent nobody has
   been asked about runs as whoever signed the CLI in, and that is a row rather than a blank.
 - A row that is a rung in an order -- the effort, what it may do, whether it runs as a fleet,
-  whether goals are available -- MUST be stepped where it stands on the arrows. Everything else
-  MUST open a sheet of its own and come back.
+  whether goals are available, whether it may search the web -- MUST be stepped where it
+  stands on the arrows. Everything else MUST open a sheet of its own and come back.
+- Whether it may search the web MUST be a row only for a CLI that can be told: a switch for
+  something the backend would go on doing whichever way it was set is a switch that lies, and
+  a CLI with no way of being told is one this question is not put about.
 - Where an agent works MUST be a row only where the flow said that agent may be pointed at a
   machine, and MUST be read rather than opened where the flow settled it: an agent that works
   here, and one the flow isolates in a container of its own, are each a question nobody is
@@ -435,6 +438,28 @@ adjusted rather than chosen.
 - The row that takes variables of your own MUST take several, a line apiece, and MUST break
   the line on the same keys the editor does: enter is what takes the form, so a list typed
   into one row needs a key of its own to be a list at all.
+
+### Where a turn goes when it cannot be taken
+
+- Falling back MUST be a menu of its own rather than a row of the accounts. Two things are
+  called that and they answer two different failures: an account that goes down, which
+  another account of the same backend answers inside the conversation that was running, and
+  an agent that has nowhere left to run -- a model retired, a CLI that will not start, a rate
+  limit on the whole account -- which only another agent answers. Half of it is not about
+  accounts at all, and the question somebody has when they come here is not "what does this
+  account do when it fails" but "what happens when this stops working".
+- It MUST be two pages of one menu rather than two menus, since it is one question at two
+  scales: the steps between agents, and the chains between accounts. Both MUST be held until
+  the menu is saved, as everything held on a menu is.
+- A step MUST be two agents chosen, and each MUST be chosen on the same sheet a flow's agent
+  and a saved agent are chosen on: an agent is one thing to choose -- a CLI, an account, a
+  model at an effort -- and a second way of choosing one would be a second thing to keep
+  right. An agent that would fall back to itself MUST be refused where it is said.
+- The accounts page MUST be the same store `/providers` walks, and its keys MUST say so: an
+  account is made and taken away there, and this page is where it is said what one falls back
+  to. A key that did nothing MUST say why rather than do nothing.
+- An empty page MUST say which key writes one down. A list with nothing in it and nothing
+  under it reads as a feature that does not work.
 
 ### The runs that have already happened
 

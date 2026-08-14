@@ -21,6 +21,7 @@ _ABOUT = {
     "flowverses": "Manage the places flows come from",
     "agents": "Set what each agent runs",
     "providers": "Manage the accounts agents run as",
+    "fallback": "Where a turn goes when an agent or an account cannot take it",
     "cycles": "The runs of this directory, and what to do with one",
     "settings": "What humanize remembers, here and everywhere",
     "status": "Show how the run is going",

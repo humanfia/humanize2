@@ -90,6 +90,22 @@ falling to a key, and a key that is refused falling to a gateway.
 - **The machine's own account is the start of a chain and never the end of one.** An agent that
   is to try that account is an agent given no account, which is where its chain already begins.
 
+## When there is no account left
+
+Some failures no account answers. The model was retired this morning; the CLI will not start;
+the region has gone dark; the rate limit is on the whole account rather than on one request.
+Another key for the same backend is another way of asking the same thing that is not there.
+
+What answers those is another **agent** — another CLI, another model, another effort — and that
+is written between the two agents rather than on either, because it is about neither on its
+own: it is what to do when *this* CLI, at *this* model, at *this* effort, as *this* account,
+cannot run. [`/fallback`](/guide/fallback) is where it is said.
+
+It is the second thing tried and not the first, and the reason is the conversation. No backend
+takes another backend's session id, so a turn that leaves its backend leaves the conversation
+and is taken in a new session on the other side. The account chain keeps the conversation and
+is walked to its end first; this is what is left after that. The flow sees one turn either way.
+
 ## How it waits
 
 An account also says how a turn under it is tried again before the chain moves on: how many

@@ -181,6 +181,9 @@ class Session(Protocol): ...
 class Agent(Protocol): ...
 
 
+class Driven(Agent, Protocol): ...
+
+
 class Person(Agent, Protocol): ...
 ```
 
@@ -197,6 +200,20 @@ What a flow drives, written as interfaces and nothing else.
   MUST be here, being how an agent is driven rather than what a flow drives -- and nothing here
   MUST be reachable only through the class, since a flow that called another hands over what it
   was given and the called flow is handed the same thing.
+- The two MUST be two interfaces. What an agent *is* -- what it runs, where its turns land,
+  what it is called, which of a flow's skills it carries -- is an answer somebody already
+  gave, at a prompt or on a command line or in a settings file, and a flow that could change
+  one of them would be a flow rewriting the choice its run was started with. So `Agent` MUST
+  be what a flow may ask and MUST NOT include the settling, and `Driven` MUST be `Agent` plus
+  it: whoever hands an agent over holds one of those, and a flow declares the other. What is
+  written down here MUST be the whole of both, and the drivers MUST answer to both.
+- A flow that wants an agent set up differently MUST make one, which MUST be `Agent.clone`:
+  it says what is to differ and there MUST be nowhere to say it again. What it answers MUST be
+  another agent rather than this one changed -- its own name where none was given, having
+  opened nothing, spent nothing, watched by nobody, hooked to nothing and written down
+  nowhere -- since two agents at two efforts are two agents, and a trace that read them as one
+  would read a comparison as one agent changing its mind. Everything the call does not name
+  MUST be the agent it came from, the skills it carries included.
 - The drivers MUST answer to it structurally, and `hmz.agents` MUST NOT import it. The arrow
   points one way -- a flow names what it drives, and a driver is written without ever naming a
   flow -- and a driver that inherited from this would be the layer below reaching up. That
@@ -205,6 +222,14 @@ What a flow drives, written as interfaces and nothing else.
 - A flow MUST declare the places it drives with these, and what it writes beside one -- a
   moment, a `Goal`, a `Remote`, an `Isolated`, an `AgentDefaults` -- MUST go on meaning what it
   means. What is annotated is which interface, not which class.
+- Which of a flow's skills one conversation carries MUST be the session's own to say, and
+  MUST be sayable again while the conversation runs: an agent is what it was made as, and a
+  conversation is a thing that gets somewhere -- one that has finished reading and started
+  writing wants the skill about writing and no longer wants the eight about reading. A session
+  nobody has said anything about MUST carry every one the flow brought, which is what every
+  session of every flow has always carried, and a name the flow does not bring MUST be ignored
+  rather than refused: what a session may carry is the flow's to say, and a fork that dropped
+  a skill is a session carrying the rest rather than a turn that will not run.
 - `Person` MUST be what a flow declares for the person at the prompt, and the class that
   answers to it MUST be read as the same place: a flow written before there was an interface
   named the class, and it is the same place either way. The class itself MUST be reachable
@@ -253,7 +278,7 @@ def resumes(flow: str | os.PathLike[str]) -> bool: ...
 def carries(flow: str | os.PathLike[str], agents: Sequence[Agent]) -> None: ...
 
 
-def calls(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry: ...
+def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry: ...
 
 
 def running() -> tuple[Running, ...]: ...
@@ -313,7 +338,7 @@ run another. `hmz.runner` asks this and then opens a cycle around the answer.
 - Anything the flow itself raises as it is read MUST be left alone. `NotAFlow` MUST be for a
   line to correct and nothing else, so that a flow whose own setup fails is not reported as a
   command line to fix.
-- `calls` MUST answer with one flow ready for another flow to run, found by the same name `-f`
+- `load` MUST answer with one flow ready for another flow to run, found by the same name `-f`
   takes: a flow is a loop over agents, and a loop worth having is one another loop can reach
   for. A name nothing answers to MUST be refused where it is asked for rather than where the
   answer is called, so that a flow which asks for another by the wrong name says so at once

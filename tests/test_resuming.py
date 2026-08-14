@@ -226,11 +226,11 @@ def test_a_called_flow_keeps_its_own_state_under_its_own_name(
         "from typing import Any\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.flows import calls\n\n\n"
+        "from hmz.flows import load\n\n\n"
         "@flow(resumable=True)\n"
         "def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:\n"
         '    state["outer"] = state.get("outer", 0) + 1\n'
-        '    calls("inner")(agents, task)\n',
+        '    load("inner")(agents, task)\n',
     )
 
     Runner("outer", [ShellAgent(CONFIG)]).run("go")
@@ -244,14 +244,14 @@ def test_a_flow_called_outside_a_run_is_handed_a_dict_that_is_nowhere(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A call is a call: a flow with nowhere to keep its state runs and keeps none."""
-    from hmz.flows import calls
+    from hmz.flows import load
 
     monkeypatch.chdir(tmp_path)
     where = tmp_path / ".humanize/flows"
     where.mkdir(parents=True)
     written(where, "counts", COUNTS)
 
-    calls("counts")([ShellAgent(CONFIG)], "go")
+    load("counts")([ShellAgent(CONFIG)], "go")
 
     assert cycles() == []
 

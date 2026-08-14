@@ -15,7 +15,7 @@ import pytest
 from hmz.agents import AgentConfig
 from hmz.agents.skills import Loaded
 from hmz.cycle import JOURNAL, cycles, read, records, sessions
-from hmz.flows import NotAFlow, calls, running
+from hmz.flows import NotAFlow, load, running
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, events, written
 
@@ -47,13 +47,13 @@ from pathlib import Path
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.flows import calls, running
+from hmz.flows import load, running
 
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     Path("running.txt").write_text(",".join(one.flow for one in running()))
-    calls("inner")(agents, f"inner: {task}")
+    load("inner")(agents, f"inner: {task}")
     Path("outer.txt").write_text(task)
 '''
 
@@ -63,13 +63,13 @@ TWICE = '''"""The one that calls the same flow twice."""
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.flows import calls
+from hmz.flows import load
 
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
-    calls("inner")(agents, "once")
-    calls("inner")(agents, "again")
+    load("inner")(agents, "once")
+    load("inner")(agents, "again")
 '''
 
 #: One that calls the one in the middle, so that the run is three flows deep.
@@ -77,12 +77,12 @@ NESTS = '''"""The one at the top."""
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.flows import calls
+from hmz.flows import load
 
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
-    calls("deeper")(agents, "mid")
+    load("deeper")(agents, "mid")
 '''
 
 #: One that opens a session of its own and then calls a flow that opens one too.
@@ -90,14 +90,14 @@ DEEPER = '''"""The one in the middle."""
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.flows import calls
+from hmz.flows import load
 
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     agent.new()("echo middle")
-    calls("inner")(agents, "deep")
+    load("inner")(agents, "deep")
 '''
 
 
@@ -155,10 +155,10 @@ def test_the_called_flow_is_running_while_it_runs(flows: Path) -> None:
         '"""Calls the one that says."""\n\n'
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.flows import calls\n\n\n"
+        "from hmz.flows import load\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    calls("deep")(agents, task)\n',
+        '    load("deep")(agents, task)\n',
     )
 
     Runner("over", [ShellAgent(CONFIG)]).run("go")
@@ -171,7 +171,7 @@ def test_a_flow_asked_for_by_a_name_nothing_answers_to_says_so_when_it_is_asked(
 ):
     """At the asking rather than an hour into a loop, which is the point of asking early."""
     with pytest.raises(NotAFlow):
-        calls("no_such_flow_anywhere")
+        load("no_such_flow_anywhere")
 
 
 def test_a_called_flow_is_handed_the_agents_it_declares(flows: Path) -> None:
@@ -194,7 +194,7 @@ def test_a_called_flow_is_handed_the_agents_it_declares(flows: Path) -> None:
     )
     one, two = ShellAgent(CONFIG), ShellAgent(CONFIG)
 
-    calls("named")([one, two], "go")
+    load("named")([one, two], "go")
 
     said = (flows / "named.txt").read_text()
     assert said.startswith("Both ")
@@ -205,7 +205,7 @@ def test_a_called_flow_given_the_wrong_number_of_agents_says_so(flows: Path) -> 
     """Before its first turn, which is where every other miscount is caught."""
     del flows
     with pytest.raises(NotAFlow, match="drives 1 agents, 2 given"):
-        calls("inner")([ShellAgent(CONFIG), ShellAgent(CONFIG)], "go")
+        load("inner")([ShellAgent(CONFIG), ShellAgent(CONFIG)], "go")
 
 
 def test_a_called_flow_is_set_up_the_way_a_run_of_it_is(flows: Path) -> None:
@@ -226,16 +226,16 @@ def test_a_called_flow_is_set_up_the_way_a_run_of_it_is(flows: Path) -> None:
         '    Path("settable.txt").write_text(str((config or Config()).rounds))\n',
     )
 
-    calls("settable")([ShellAgent(CONFIG)], "go", {"rounds": 9})
+    load("settable")([ShellAgent(CONFIG)], "go", {"rounds": 9})
     assert (flows / "settable.txt").read_text() == "9"
 
-    calls("settable")(
+    load("settable")(
         [ShellAgent(CONFIG)], "go"
     )  # and as it comes, where none was given
     assert (flows / "settable.txt").read_text() == "3"
 
     with pytest.raises(NotAFlow, match="takes no config"):
-        calls("inner")([ShellAgent(CONFIG)], "go", {"rounds": 9})
+        load("inner")([ShellAgent(CONFIG)], "go", {"rounds": 9})
 
 
 def test_a_call_refused_leaves_the_caller_carrying_its_own_skills(flows: Path) -> None:
@@ -255,7 +255,7 @@ def test_a_call_refused_leaves_the_caller_carrying_its_own_skills(flows: Path) -
     agent.loads([Loaded("mine", flows)])
 
     with pytest.raises(NotAFlow, match="takes no config"):
-        calls("deep")([agent], "go", {"rounds": 9})
+        load("deep")([agent], "go", {"rounds": 9})
 
     assert [one.name for one in agent.loaded] == ["mine"]
 
@@ -283,10 +283,10 @@ def test_a_flow_that_calls_one_written_as_a_coroutine_awaits_it(flows: Path) -> 
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.flows import calls\n\n\n"
+        "from hmz.flows import load\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    await calls("slow")(agents, task)\n'
+        '    await load("slow")(agents, task)\n'
         '    Path("after.txt").write_text("and then this")\n',
     )
 
@@ -426,13 +426,13 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.flows import calls
+from hmz.flows import load
 
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     try:
-        calls("bad")(agents, task)
+        load("bad")(agents, task)
     except RuntimeError:
         pass
 ''',
@@ -469,10 +469,10 @@ def test_a_flow_that_fails_is_no_longer_running(flows: Path) -> None:
         '"""Calls the one that raises, and lets it through."""\n\n'
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.flows import calls\n\n\n"
+        "from hmz.flows import load\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    calls("bad")(agents, task)\n',
+        '    load("bad")(agents, task)\n',
     )
 
     with pytest.raises(RuntimeError, match="no"):
@@ -484,7 +484,7 @@ def test_a_flow_that_fails_is_no_longer_running(flows: Path) -> None:
 def test_a_flow_rewritten_between_calls_is_the_one_that_runs_next(flows: Path) -> None:
     """Which is what makes a loop that improves its own flows a loop that then runs them.
 
-    A flow is a directory on disk, read by running it, and `calls` reads it again at every
+    A flow is a directory on disk, read by running it, and `load` reads it again at every
     call rather than holding the function it found the first time. So a flow rewritten while
     the run is going -- by hand, or by an agent this very flow is driving -- is run as it is
     now. Nothing else lets a run improve the thing it is being run by.
@@ -496,10 +496,10 @@ def test_a_flow_rewritten_between_calls_is_the_one_that_runs_next(flows: Path) -
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.flows import calls\n\n\n"
+        "from hmz.flows import load\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
-        '    calling = calls("inner")\n'
+        '    calling = load("inner")\n'
         "    calling(agents, task)\n"
         '    at = Path(".humanize/flows/inner/__init__.py")\n'
         "    at.write_text(at.read_text().replace('Path(\"inner.txt\")', "
@@ -533,12 +533,12 @@ def test_a_called_flow_brings_its_own_skills_and_hands_the_agents_back(
         "from pathlib import Path\n\n"
         "from hmz.agents import AgentBase\n"
         "from hmz.flows import flow\n"
-        "from hmz.flows import calls\n\n\n"
+        "from hmz.flows import load\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
         "    (agent,) = agents\n"
         '    said = [",".join(one.name for one in agent.loaded)]\n'
-        '    calls("deep")(agents, task)\n'
+        '    load("deep")(agents, task)\n'
         '    said.append(",".join(one.name for one in agent.loaded))\n'
         '    Path("carried.txt").write_text("|".join(said))\n',
         {"over-notes": card.format(name="over-notes")},
@@ -589,12 +589,12 @@ from pathlib import Path
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.flows import calls
+from hmz.flows import load
 
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
-    calls("deep", inherit_skills=True)(agents, task)
+    load("deep", inherit_skills=True)(agents, task)
     Path("restored.txt").write_text(",".join(one.name for one in agents[0].loaded))
 ''',
         {
@@ -642,13 +642,13 @@ from pathlib import Path
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.flows import calls
+from hmz.flows import load
 
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
     try:
-        calls("bad", inherit_skills=True)(agents, task)
+        load("bad", inherit_skills=True)(agents, task)
     except RuntimeError:
         pass
     Path("restored-after-error.txt").write_text(",".join(one.name for one in agents[0].loaded))

@@ -218,13 +218,13 @@ wrote out. Both shapes work: `flows/nightly` finds `flows/nightly/__init__.py` a
 
 ## A flowverse is a library too
 
-`calls` takes exactly what `-f` takes, so a flow in a flowverse can be called from inside
+`load` takes exactly what `-f` takes, so a flow in a flowverse can be called from inside
 another flow:
 
 ```python
-from hmz.flows import calls
+from hmz.flows import load
 
-plan = calls("official/humanize1:gen-plan")
+plan = load("official/humanize1:gen-plan")
 plan(agents, f"plan this first: {task}")
 ```
 

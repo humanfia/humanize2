@@ -133,11 +133,17 @@ class OpencodeSession(CommandSessionBase):
         two agents of one flow may be allowed different things, and neither is a reason to
         change what the person who started the flow has configured.
         """
+        allowed = dict(
+            _PERMITTED.get(self._agent.config.permission, _PERMITTED["bypass"])
+        )
+        if not self._agent.config.web_search:
+            # `webfetch` is the one tool opencode reaches the web with, so it is the one to
+            # deny. A rung that already denies it is not asked twice: the two say the same
+            # thing here, and either of them saying it is enough.
+            allowed["webfetch"] = "deny"
         return {
             **super()._environment(),
-            type(self).permits: json.dumps(
-                _PERMITTED.get(self._agent.config.permission, _PERMITTED["bypass"])
-            ),
+            type(self).permits: json.dumps(allowed),
         }
 
     def _reads(self, line: str, *, error: bool) -> Iterator[Event]:

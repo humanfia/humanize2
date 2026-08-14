@@ -1039,6 +1039,13 @@ class CodexAgent(AgentBase):
                     # Per server rather than in config, so this flow changes no other Codex
                     # session belonging to the user.
                     argv += ["--disable", "goals"]
+                # Said in both directions rather than only when it is off: Codex searches
+                # nothing until it is asked to, so an agent that may search the web has to
+                # say so here for `web_search` to mean on every backend what it says.
+                argv += [
+                    "-c",
+                    f"tools.web_search={'true' if self.config.web_search else 'false'}",
+                ]
                 argv += ["--stdio"]
                 for key, value in getattr(self.config, "overrides", ()):
                     # The same `-c` Codex's own client takes, scoped to this server: a

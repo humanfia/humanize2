@@ -25,6 +25,7 @@ These are for looking things up. If you have not used humanize before, the
 | [Showing the working](/guide/details) | `/details`: tool calls and thinking, or only what the agent says |
 | [The shape of a run](/guide/status) | `/status`: who is working, who handed to whom, what it cost |
 | [Being away](/guide/afk) | `/afk`: whether an agent may stop and ask you something |
+| [Falling back](/guide/fallback) | `/fallback`: where a turn goes when what was taking it cannot |
 | [Completion](/guide/completion) | What a half-typed line could become, under the editor |
 | [History](/guide/history) | Everything typed here before, on ↑ and ↓ |
 | [Exporting a transcript](/guide/export) | `/export` writes what is on screen, as it was written |

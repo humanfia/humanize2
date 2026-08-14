@@ -161,6 +161,20 @@ def _agents(argv: list[str]) -> int:
     return agents(argv)
 
 
+def _fallback(argv: list[str]) -> int:
+    """Lists, writes down and takes away where one agent's turns go when it cannot run.
+
+    Args:
+      argv: The arguments after `hmz fallback`.
+
+    Returns:
+      Its exit status.
+    """
+    from .fallback import fallback
+
+    return fallback(argv)
+
+
 def _providers(argv: list[str]) -> int:
     """Lists, makes and takes away the accounts an agent may be run as.
 
@@ -210,8 +224,8 @@ def _line() -> ArgumentParser:
         dest="agents",
         metavar="CLI/MODEL:EFFORT",
         help="what one of that flow's agents runs, repeated once for each it drives, in the "
-        "order it takes them; the written-out form may include service_tier=SERVICE_TIER "
-        "and permission=PERMISSION; needs -f",
+        "order it takes them; the written-out form may include service_tier=SERVICE_TIER, "
+        "permission=PERMISSION and web_search=on|off; needs -f",
     )
     parser.add_argument(
         "-c",
@@ -254,9 +268,13 @@ def _tui(argv: list[str]) -> int:
         parser.error("-a says what runs the flow, so it needs -f")
     if args.config is not None and not flow:
         parser.error("-c says how the flow runs, so it needs -f")
+    # What each line said about searching the web, kept beside the line itself: the rest of
+    # what an agent is travels in the spec and is read again where the agent is made, and
+    # this is a switch rather than a word of the spec by the time the interface holds it.
+    searching: list[bool] = []
     for spec in args.agents:
         try:
-            read_agent(spec)
+            searching.append(read_agent(spec)[6] is not False)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
     setting = None
@@ -286,7 +304,11 @@ def _tui(argv: list[str]) -> int:
     Humanize(
         flow=flow,
         agents=[
-            Runs(spec, goals=places[at].goals_default)
+            Runs(
+                spec,
+                goals=places[at].goals_default,
+                web_search=searching[at],
+            )
             for at, spec in enumerate(args.agents)
         ],
         config=setting,
@@ -306,6 +328,10 @@ COMMANDS = {
     "flowverses": (_flowverses, "the places flows come from"),
     "agents": (_agents, "the agents written down under a name"),
     "providers": (_providers, "the accounts an agent may be run as"),
+    "fallback": (
+        _fallback,
+        "where a turn goes when the agent taking it cannot take it at all",
+    ),
 }
 
 #: What humanize spawns for itself, carried out like any command and listed as none of them.

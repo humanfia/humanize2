@@ -173,6 +173,12 @@ class Profile:
       swarms: Whether a turn of this backend also runs as a fleet of subagents rather than as
         one agent. A property of the backend rather than of a model: it is a way of taking a
         turn, and every model that takes turns here takes them that way too.
+      searches: Whether this backend can be told whether its agents may search the web. A
+        property of the backend rather than of a model, for the reason `swarms` is: reaching
+        the web is a tool the CLI hands its agent, and the CLI is what hands it. False for one
+        with no way of being told, whose agents go on reaching the web exactly as that CLI
+        lets them -- an agent configured not to search on a backend that cannot be told would
+        be a setting that lies, so it is refused where it is written instead.
       creds: What a login to this backend leaves behind: the paths it reads its credentials
         back out of and writes its refreshed ones to. One under this backend's home per entry,
         or one under the user's own home where the entry starts with `~/` -- which is where
@@ -204,6 +210,7 @@ class Profile:
     mounts: str = ""
     beyond: tuple[str, ...] = ()
     swarms: bool = False
+    searches: bool = False
     creds: tuple[str, ...] = ()
     ways: tuple[Way, ...] = ()
     ambient: tuple[str, ...] = ()
@@ -323,6 +330,9 @@ _AGY = ("high", "medium", "low")
 PROFILES = (
     Profile(
         name="claude",
+        # `WebSearch` and `WebFetch` are tools like any other to Claude, and
+        # `--disallowedTools` is the flag that takes a tool away.
+        searches=True,
         aliases=("claude", "claude-code"),
         home_var="CLAUDE_CONFIG_DIR",
         home_dir=".claude",
@@ -483,6 +493,9 @@ PROFILES = (
     ),
     Profile(
         name="codex",
+        # `tools.web_search` is a setting of the app server, and is sent in both
+        # directions: Codex searches nothing until it is asked to.
+        searches=True,
         aliases=("codex",),
         home_var="CODEX_HOME",
         home_dir=".codex",
@@ -598,6 +611,9 @@ PROFILES = (
     ),
     Profile(
         name="grok",
+        # `web_search` and `web_fetch` are the two Grok Build already names where a
+        # rung takes the reaching outside the workspace away.
+        searches=True,
         # `grokbuild` among them because that is what the class driving it is called, and an
         # agent names its backend by its own class name.
         aliases=("grok", "grok-build", "grokbuild"),
@@ -793,6 +809,9 @@ PROFILES = (
     ),
     Profile(
         name="qwen",
+        # `web_search` and `web_fetch` are what Qwen Code calls the two, and
+        # `--exclude-tools` is what it takes a tool away with.
+        searches=True,
         aliases=("qwen", "qwen-code"),
         home_var="QWEN_HOME",
         home_dir=".qwen",
@@ -848,6 +867,9 @@ PROFILES = (
     ),
     Profile(
         name="opencode",
+        # `webfetch` is the one reaching-out tool opencode names, and its permission
+        # table is where each tool is allowed or denied.
+        searches=True,
         aliases=("opencode",),
         # No home variable of its own: it keeps its data where every other program does, in a
         # directory of its own under the one `XDG_DATA_HOME` names.
@@ -918,6 +940,8 @@ PROFILES = (
     ),
     Profile(
         name="mimo",
+        # mimocode is opencode's, permission table and all.
+        searches=True,
         aliases=("mimo", "mimocode", "mimo-code"),
         home_var="XDG_DATA_HOME",
         home_in="mimocode",
@@ -1194,7 +1218,9 @@ def named(backend: str) -> Profile | None:
 
 def read(
     spec: str,
-) -> tuple[Profile, str, str, str, str, str | None, tuple[tuple[str, str], ...]]:
+) -> tuple[
+    Profile, str, str, str, str, str | None, bool | None, tuple[tuple[str, str], ...]
+]:
     """Reads one `-a` into the backend to drive, what to drive it at, and as whom.
 
     Args:
@@ -1205,12 +1231,14 @@ def read(
         The written-out form may also name the common provider latency tier as
         `service_tier=`, the agent's permission rung as `permission=`, and backend-native
         settings as `config.KEY=VALUE`. Codex accepts app-server overrides and Claude one
-        exact `allowed_tools` rule.
+        exact `allowed_tools` rule. `web_search=` says whether the agent may search the web,
+        as `on` or `off`.
 
     Returns:
       The backend, model, effort, common service tier, provider -- which is "" for an agent
       that runs as whoever is at this machine already runs its CLI -- permission, which is
-      None at the default rung, and the `config.KEY` pairs, which is () where none were named.
+      None at the default rung, whether it may search the web, which is None where nobody
+      said, and the `config.KEY` pairs, which is () where none were named.
 
     Raises:
       ValueError: If it is neither spelling, or names no backend there is. What it says is
@@ -1219,19 +1247,21 @@ def read(
     provider = ""
     service_tier = "default"
     permission: str | None = None
+    searching: str | None = None
     overrides: list[tuple[str, str]] = []
     if "=" in spec:
         given = {
             key.strip(): value.strip()
             for key, _, value in (part.partition("=") for part in spec.split(","))
         }
-        backend, model, effort, service_tier, provider, permission = (
+        backend, model, effort, service_tier, provider, permission, searching = (
             given.pop("cli", ""),
             given.pop("model", ""),
             given.pop("effort", ""),
             given.pop("service_tier", "default"),
             given.pop("provider", ""),
             given.pop("permission", None),
+            given.pop("web_search", None),
         )
         for key, value in list(given.items()):
             if key.startswith("config."):
@@ -1243,7 +1273,7 @@ def read(
         if given:
             raise ValueError(
                 f"{', '.join(sorted(given))} is not cli, model, effort, service_tier, "
-                "provider, permission or config.KEY"
+                "provider, permission, web_search or config.KEY"
             )
     else:
         # Read from both ends: a model may hold slashes of its own -- Kimi Code's and
@@ -1266,7 +1296,7 @@ def read(
             "expected CLI[@PROVIDER]/MODEL:EFFORT or "
             "cli=CLI,model=MODEL,effort=EFFORT[,service_tier=SERVICE_TIER]"
             "[,provider=PROVIDER]"
-            "[,permission=PERMISSION][,config.KEY=VALUE]"
+            "[,permission=PERMISSION][,web_search=on|off][,config.KEY=VALUE]"
         )
     if not service_tier.strip():
         raise ValueError("service_tier cannot be empty")
@@ -1283,5 +1313,37 @@ def read(
         service_tier.strip(),
         provider.strip(),
         permission,
+        _switched(searching),
         tuple(overrides),
     )
+
+
+def _switched(said: str | None) -> bool | None:
+    """One on-or-off setting as it was written out, or nothing where nobody wrote it.
+
+    The words are the ones every switch here is written with, and nothing else is taken: a
+    line that meant off and was spelled some other way is a line to correct rather than a
+    setting quietly left on.
+
+    Args:
+      said: What was written, or None where the setting was not named at all.
+
+    Returns:
+      True, False, or None for a setting nobody said anything about.
+
+    Raises:
+      ValueError: If it was said and is neither word.
+    """
+    if said is None:
+        return None
+    held = {
+        "on": True,
+        "true": True,
+        "yes": True,
+        "off": False,
+        "false": False,
+        "no": False,
+    }.get(said.strip().lower())
+    if held is None:
+        raise ValueError(f"web_search must be on or off, not {said!r}")
+    return held

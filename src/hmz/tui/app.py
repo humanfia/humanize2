@@ -74,6 +74,7 @@ from .pick import (
     Chosen,
     Cycles,
     Drawn,
+    Fallbacks,
     Flows,
     Flowverses,
     Held,
@@ -111,6 +112,7 @@ _OWN = (
     "flowverses",
     "agents",
     "providers",
+    "fallback",
     "cycles",
     "settings",
     "status",
@@ -1705,6 +1707,8 @@ class Humanize(App[None]):
             self.action_agents()
         elif name == "providers":
             self.action_providers()
+        elif name == "fallback":
+            self.action_fallback()
         elif name == "cycles":
             self.action_cycles()
         elif name == "flowverses":
@@ -1973,6 +1977,7 @@ class Humanize(App[None]):
                     machine=machine,
                     provider=runs.provider,
                     goals=runs.goals,
+                    web_search=runs.web_search,
                     **({"permission": runs.permission} if runs.permission else {}),
                 )
             )
@@ -2174,6 +2179,22 @@ class Humanize(App[None]):
         self._flow(["-f", ran.flow, *named, ran.task], resume=cycle)
 
     @work
+    async def action_fallback(self) -> None:
+        """Opens where a turn goes when what was taking it cannot, which is `/fallback`.
+
+        Its own menu rather than a row of the accounts, because half of it is not about
+        accounts at all: an agent that has nowhere left to run falls back to a whole other
+        agent, and that is written between the two rather than on either.
+
+        Not refused while a flow runs, as the accounts are not: what is written down here is
+        read by a turn that has failed, so a step added now is one the next failure walks.
+        """
+        agents = installed()
+        agents.update(installable())
+        for one in await self.push_screen_wait(Fallbacks(agents)) or ():
+            self.show(one)
+
+    @work
     async def action_providers(self) -> None:
         """Opens the accounts an agent may be run as, which is what `/providers` is for.
 
@@ -2331,6 +2352,7 @@ class Humanize(App[None]):
                 and not runs.permission
                 and not runs.provider
                 and agent.config.goals is runs.goals
+                and agent.config.web_search is runs.web_search
             ):
                 moved.append(agent)
                 continue
@@ -2351,6 +2373,7 @@ class Humanize(App[None]):
                         machine=anchored(runs.anchor),
                         provider=runs.provider,
                         goals=runs.goals,
+                        web_search=runs.web_search,
                         **({"permission": runs.permission} if runs.permission else {}),
                     )
                 )

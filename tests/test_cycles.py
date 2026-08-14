@@ -86,6 +86,7 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
             "permission": "bypass",
             "provider": "",
             "goals": True,
+            "web_search": True,
             "person": False,
         },
         {
@@ -97,6 +98,7 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
             "permission": "bypass",
             "provider": "",
             "goals": True,
+            "web_search": True,
             "person": False,
         },
     ]

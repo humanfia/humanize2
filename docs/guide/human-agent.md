@@ -97,7 +97,7 @@ one fewer agent, because nobody chooses the person. If you have your own, hand i
 it asks reaches whoever is at the prompt:
 
 ```python
-calls("chat")((assistant, agents.human), task)
+load("chat")((assistant, agents.human), task)
 ```
 
 ## See also

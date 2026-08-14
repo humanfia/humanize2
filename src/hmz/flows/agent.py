@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from hmz.agents.skills import Loaded
     from hmz.machines import MachineConfig
 
-__all__ = ["Agent", "Person", "Session"]
+__all__ = ["Agent", "Driven", "Person", "Session"]
 
 
 class Session(Protocol):
@@ -79,6 +79,26 @@ class Session(Protocol):
 
     @effort.setter
     def effort(self, effort: str) -> None: ...
+
+    @property
+    def skills(self) -> tuple[str, ...]:
+        """The flow's skills this conversation carries, by name, in the flow's own order."""
+        ...
+
+    def loads(self, skills: Iterable[str] | None) -> None:
+        """Says which of the flow's skills this conversation carries from its next turn on.
+
+        The one thing about what an agent works by that changes while it is working, and it
+        is the conversation's rather than the agent's: an agent is what it was made as, and a
+        conversation is a thing that gets somewhere. A loop that has finished reading and
+        started writing says so here.
+
+        Args:
+          skills: The names to carry, or None for every one the flow brought. A name the flow
+            does not bring is ignored rather than refused, so a session asking for one a fork
+            of the flow no longer has carries the rest.
+        """
+        ...
 
     @overload
     def __call__(self, prompt: str, *, suppress: bool = False) -> str: ...
@@ -412,6 +432,62 @@ class Agent(Protocol):
         """Has everything its turns say reach `listener` as they say it."""
         ...
 
+    def clone(
+        self,
+        *,
+        config: AgentConfig | None = None,
+        name: str | None = None,
+        skills: Iterable[Loaded] | None = None,
+    ) -> Agent:
+        """Another agent of this one's backend, differing in what this names and nothing else.
+
+        The one way a flow has of getting an agent that is not quite the one it was handed,
+        and it is a second agent rather than this one changed::
+
+            careful = agent.clone(config=replace(agent.config, effort="max"))
+
+        Everything an agent *is* is settled where it is made, so this is where it is settled
+        for the new one and there is nowhere it can be said again. What a run puts on an agent
+        rather than sets it up with does not come across: the clone has opened no conversation,
+        spent nothing, is watched by nobody and is being written down nowhere -- and it is not
+        one of the agents the run was started with, so what it does is its own.
+
+        Args:
+          config: What every session of it runs at, or None for this agent's own.
+          name: What to call it, or None for one nothing else answers to: two agents are two
+            agents, and a trace that read a clone as its original would read a comparison of
+            two efforts as one agent changing its mind.
+          skills: The flow's skills it carries, or None for the ones this agent carries.
+
+        Returns:
+          The new agent.
+        """
+        ...
+
+    def asked(self, question: Question) -> str | None:
+        """Puts something a turn stopped to ask to whoever is driving this agent."""
+        ...
+
+    def prompted(self) -> str | None:
+        """Waits for the next thing to say to it, for a flow that is a conversation."""
+        ...
+
+
+class Driven(Agent, Protocol):
+    """An agent as whoever hands it to a flow holds it: everything above, and settling it.
+
+    The line between the two is who is entitled to say what an agent is. A flow is handed
+    agents and drives them; what each of them runs, where its turns land, what it is called
+    and which of the flow's skills it carries are answers somebody already gave -- at a
+    prompt, on a command line, in a settings file -- and a flow that could change them would
+    be a flow rewriting the choice it was started with. So they are not on :class:`Agent`,
+    and a flow that wants one set up differently makes one with :meth:`Agent.clone`.
+
+    They are still on something, because somebody does settle them: `hmz.runner` before the
+    first turn, `hmz.flows.driving` around a flow that called another, and the interface when
+    somebody watching a run says this agent is to go on as something else. That is this.
+    """
+
     def rename(self, name: str) -> None:
         """Calls it something else, which is what a trace will group its sessions under."""
         ...
@@ -430,19 +506,11 @@ class Agent(Protocol):
         ...
 
     def loads(self, skills: Iterable[Loaded]) -> None:
-        """Tells it which skills to mount onto every session it opens from now on."""
+        """Tells it which of a flow's skills its sessions may carry from now on."""
         ...
 
     def disable_goals(self) -> None:
         """Switches its backend's own goal feature off for the rest of the run."""
-        ...
-
-    def asked(self, question: Question) -> str | None:
-        """Puts something a turn stopped to ask to whoever is driving this agent."""
-        ...
-
-    def prompted(self) -> str | None:
-        """Waits for the next thing to say to it, for a flow that is a conversation."""
         ...
 
 
@@ -466,7 +534,8 @@ if TYPE_CHECKING:
     #: what joins the two is checked here, where a type checker reads it, and a driver that
     #: stops answering to this reads as a driver to correct rather than as a flow that fails
     #: on its first turn.
-    _implemented: tuple[type[Agent], type[Session], type[Person]] = (
+    _implemented: tuple[type[Agent], type[Driven], type[Session], type[Person]] = (
+        AgentBase,
         AgentBase,
         SessionBase,
         HumanAgent,

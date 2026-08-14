@@ -1,24 +1,24 @@
 # A flow that calls a flow
 
-`calls` runs one flow from inside another, hands it the agents it declares, and passes
+`load` runs one flow from inside another, hands it the agents it declares, and passes
 settings and skills through. Reach for it when one flow is a reusable step that others build
 on — which is what turns a flowverse into a library rather than a menu.
 
 ## Call one
 
-`calls` takes exactly what `-f` takes. It hands you the flow itself, which you run with the
+`load` takes exactly what `-f` takes. It hands you the flow itself, which you run with the
 agents you already have:
 
 ```python
 # .humanize/flows/planned/__init__.py
 """Plan it with humanize1, then build it three rounds."""
 
-from hmz.flows import Agent, calls, flow
+from hmz.flows import Agent, flow, load
 
 
 @flow
 def run(agents: tuple[Agent, Agent], task: str) -> None:
-    plan = calls("official/humanize1:gen-plan")
+    plan = load("official/humanize1:gen-plan")
     plan(agents, f"plan this first: {task}")
     for _ in range(3):
         agents[0].new()(task)
@@ -28,7 +28,7 @@ def run(agents: tuple[Agent, Agent], task: str) -> None:
 hmz exec -f planned -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "add undo to the editor"
 ```
 
-`calls` accepts `ralph_loop`, `official/rlar`, `humanize1:gen-plan`, a path of your own —
+`load` accepts `ralph_loop`, `official/rlar`, `humanize1:gen-plan`, a path of your own —
 anything `-f` takes. **A name nothing answers to is refused where you ask for it**, not an hour
 into your loop.
 
@@ -39,7 +39,7 @@ list or a tuple. It arrives as that flow's own `NamedTuple`, named the way that 
 them:
 
 ```python
-calls("official/rlar")([builder, checker], task)     # arrives as Agents(actor=…, reviewer=…)
+load("official/rlar")([builder, checker], task)     # arrives as Agents(actor=…, reviewer=…)
 ```
 
 To find out what a flow wants without driving it:
@@ -61,7 +61,7 @@ A flow that takes [settings of its own](/guide/flow-settings) takes them here to
 argument. Pass an instance of that flow's model, or the fields to build one from:
 
 ```python
-calls("official/rlar")(agents, task, {"rounds": 9})
+load("official/rlar")(agents, task, {"rounds": 9})
 ```
 
 The settings are read back through the flow's own model **at the moment it is called**. A flow
@@ -75,7 +75,7 @@ by whoever called it:
 ```python
 @flow
 async def run(agents: tuple[Agent], task: str) -> None:
-    await calls("official/rlar")(agents, task)
+    await load("official/rlar")(agents, task)
 ```
 
 ## Pass wrapper skills through
@@ -84,7 +84,7 @@ A called flow carries its own skills by default. A wrapper whose purpose is to a
 capability can keep its skills available inside the called flow:
 
 ```python
-calls("official/rlar", inherit_skills=True)(agents, task)
+load("official/rlar", inherit_skills=True)(agents, task)
 ```
 
 On a name clash the child wins. Parent-only skills follow it, and the agents return carrying
@@ -105,7 +105,7 @@ class Agents(NamedTuple):
 
 @flow
 def run(agents: Agents, task: str) -> None:
-    calls("chat")((agents.assistant, agents.human), task)
+    load("chat")((agents.assistant, agents.human), task)
 ```
 
 ## See that both are running

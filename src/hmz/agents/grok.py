@@ -35,6 +35,11 @@ _COMMAND = "grok"
 _ONLY = {"read-only": ("read_file", "grep", "list_dir")}
 _WITHHELD = {"workspace-write": ("web_search", "web_fetch")}
 
+#: And the same two where the reaching outside the workspace is refused on its own
+#: rather than as a rung: an agent told not to search the web is refused them at every
+#: rung, and one whose rung already refuses them is not refused them twice.
+_WEB_TOOLS = ("web_search", "web_fetch")
+
 #: What each kind of line reads as. A tool call that is only being updated is not shown
 #: again: it was shown when it started, and a row per status is a transcript of statuses.
 _SAYS = {"text": "text", "thought": "reasoning"}
@@ -102,7 +107,10 @@ class GrokBuildSession(CommandSessionBase):
         permission = self._agent.config.permission
         if only := _ONLY.get(permission):
             argv += ["--tools", ",".join(only)]
-        if withheld := _WITHHELD.get(permission):
+        withheld = list(_WITHHELD.get(permission, ()))
+        if not self._agent.config.web_search:
+            withheld += [one for one in _WEB_TOOLS if one not in withheld]
+        if withheld:
             argv += ["--disallowed-tools", ",".join(withheld)]
         if (schema := self._shaping) is not None:
             argv += ["--json-schema", json.dumps(schema.model_json_schema())]

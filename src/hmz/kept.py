@@ -44,6 +44,9 @@ class Runs(NamedTuple):
         under, or "" to run as this machine is already signed in.
       goals: Whether backend goals are available. This is always an on/off answer; any
         suggestion attached to the flow's agent place is resolved before this is constructed.
+      web_search: Whether it may search the web. On is what an agent nobody has been asked
+        about does, and is written down all the same, for the reason `goals` is: it is an
+        answer somebody gave rather than a silence.
     """
 
     spec: str
@@ -51,6 +54,7 @@ class Runs(NamedTuple):
     permission: str = ""
     provider: str = ""
     goals: bool = True
+    web_search: bool = True
 
 
 class Kept(NamedTuple):
@@ -93,8 +97,10 @@ def written(runs: Runs) -> dict[str, Any]:
     if runs.provider:
         held["provider"] = runs.provider
     # Both values are material: on may be an override of a workflow whose default is off, so
-    # what is written down always records the explicit two-way choice.
+    # what is written down always records the explicit two-way choice. Web search is written
+    # the same way and for the same reason.
     held["goals"] = runs.goals
+    held["web_search"] = runs.web_search
     return held
 
 
@@ -116,12 +122,16 @@ def read_back(held: dict[str, Any], *, goals: bool = True) -> Runs | None:
     # asked about has always run at; one that names no account runs as this machine is signed
     # in. A `skills` an older file holds is the CLI's own business now, and is read past.
     said = held.get("goals")
+    searches = held.get("web_search")
     return Runs(
         f"{cli}/{model}:{effort}",
         str(held.get("anchor") or ""),
         str(held.get("permission") or ""),
         str(held.get("provider") or ""),
         said if isinstance(said, bool) else goals,
+        # An entry written before there was such a setting is one whose agent searched the
+        # web, that being what every agent did then.
+        searches if isinstance(searches, bool) else True,
     )
 
 

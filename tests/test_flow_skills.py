@@ -100,12 +100,12 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 '''
 
 #: A flow that holds a session open and calls another flow while it is open, which is what
-#: `calls` is for: the two of them are running at once, in one workspace.
+#: `load` is for: the two of them are running at once, in one workspace.
 CALLING = '''"""Holds a session open, then calls another flow."""
 
 from hmz.agents import AgentBase
 from hmz.flows import flow
-from hmz.flows import calls
+from hmz.flows import load
 
 
 @flow
@@ -113,7 +113,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     (agent,) = agents
     held = agent.new()
     held("true")  # a turn, so this flow's session is open and its skills are mounted
-    calls("inner")(agents, task)
+    load("inner")(agents, task)
     held.close()
 '''
 

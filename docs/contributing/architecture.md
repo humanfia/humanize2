@@ -12,6 +12,7 @@ src/hmz/
 ├── backends.py       every fact about a coding agent CLI that is not code
 ├── models.py         what each backend runs, asked of it and kept per account
 ├── cycle.py          what one run of one flow was, written down as it happens
+├── fallbacks.py     where a turn goes when the agent taking it cannot take it at all
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
 ├── cli/              the command line: one module per command that has a parser
 ├── agents/           the contract, and the driver for each backend
@@ -35,7 +36,8 @@ a target and could be lifted out whole, so it has a name of its own.
 | `agents/` | The drivers: one per backend, plus the vocabulary a turn is described in (`Event`, `Question`, `Moment`). `AgentBase` and `SessionBase` answer to the interface `flows/` declares, structurally — this layer never names a flow. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
 | `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |
-| `flows/` | What a flow is: the interface it drives, the mark, what it says it drives, the skills it brings, calling one from another, and where flowverses are fetched to. The one import a flow writes — what it needs from another layer is handed through from here. `builtin/` beside it is the three humanize ships. | `Agent`, `Session`, `Person`, `flow`, `calls`, `drives`, `wanted`, `found`, `find`, `held`, `fork`, `flowverses` |
+| `flows/` | What a flow is: the interface it drives, the mark, what it says it drives, the skills it brings, calling one from another, and where flowverses are fetched to. The one import a flow writes — what it needs from another layer is handed through from here. `builtin/` beside it is the three humanize ships. | `Agent`, `Session`, `Person`, `flow`, `load`, `drives`, `wanted`, `found`, `find`, `held`, `fork`, `flowverses` |
+| `fallbacks.py` | Where a turn goes when the agent taking it cannot take it at all: a step written between two agents, rather than on the account, which `providers` already answers for. Names `backends` and nothing else. | `Falls`, `falls`, `points`, `clear`, `chain`, `spec`, `reads` |
 | `cycle.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Cycle`, `cycles`, `read`, `opened`, `state`, `resumed` |
 | `runner.py` | Handing a flow the agents it declared, naming them, and running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. What the flow says it drives is `flows/`'s to answer. | `Runner`, `flow_and_agents`, `read_agent`, `set_up_from` |
 | `tracing/` | Reading the backends' logs back — and, for a profiled run, sampling the programs its agents start — and rendering both as one Chrome trace. | `collect`, `profile.Profiler` |
@@ -54,7 +56,7 @@ agents/
 
 flows/
 ├── agent.py      Agent, Session, Person — what a flow drives, as interfaces and nothing else
-├── driving.py    what a flow says it drives, read off its own entry point, and calls()
+├── driving.py    what a flow says it drives, read off its own entry point, and load()
 ├── __init__.py   the mark, finding one by name, and the one import a flow writes
 ├── skills.py     the skills a flow brings, its own and the ones it named
 ├── verses.py     where flows come from when they come from somewhere else

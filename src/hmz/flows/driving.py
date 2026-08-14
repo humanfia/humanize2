@@ -7,7 +7,7 @@ command line, the flow picker, another flow -- can put the right questions befor
 runs. A flow given the wrong number of agents, or one that cannot run a moment the flow hangs
 a hook on, is refused where it was written down rather than hours into a loop.
 
-And a loop worth having is one another loop can reach for, which is :func:`calls`: a flow
+And a loop worth having is one another loop can reach for, which is :func:`load`: a flow
 found by the same name `-f` takes, handed the agents the calling flow was given, carrying its
 own skills and its own kept state, and written down -- in a record of its own, beside the
 record of the run that called it -- as running under whatever called it.
@@ -49,14 +49,13 @@ if TYPE_CHECKING:
     from hmz.cycle import Sub
 
     from . import Flow as Marked
-    from .agent import Agent
+    from .agent import Agent, Driven
 
 __all__ = [
     "Entry",
     "NotAFlow",
     "Place",
     "Running",
-    "calls",
     "carries",
     "configures",
     "declares",
@@ -64,6 +63,7 @@ __all__ = [
     "entered",
     "lands",
     "left",
+    "load",
     "resumes",
     "running",
     "set_up",
@@ -414,6 +414,25 @@ def declares(
     )
 
 
+def _settles(agent: Agent) -> Driven:
+    """One agent as whoever hands it to a flow holds it, rather than as a flow does.
+
+    A flow sees an agent through :class:`~hmz.flows.agent.Agent`, which is what a flow may
+    ask of one and says nothing about setting it up: an agent is what somebody already chose,
+    and a flow that could change it would be a flow rewriting that choice. This module is one
+    of the three places entitled to -- it settles where an isolated agent works, and what the
+    flow it is about to run works by -- so it says so here rather than reaching through a
+    class it must not name.
+
+    Args:
+      agent: The agent, as the flow holds it.
+
+    Returns:
+      The same agent, as whoever hands it over holds it.
+    """
+    return cast("Driven", agent)
+
+
 def carries(flow: str | os.PathLike[str], agents: Sequence[Agent]) -> None:
     """Gives every agent of a flow the skills that flow works by.
 
@@ -450,7 +469,7 @@ def carries(flow: str | os.PathLike[str], agents: Sequence[Agent]) -> None:
     except OSError as unreachable:
         raise NotAFlow(f"{flow}: {unreachable}") from unreachable
     for agent in agents:
-        agent.loads(loaded)
+        _settles(agent).loads(loaded)
 
 
 def _brings(flow: str | os.PathLike[str]) -> tuple[str, ...]:
@@ -499,7 +518,7 @@ class _CalledSkills:
         before = [agent.loaded for agent in agents]
         carries(flow, agents)
         for agent, parent in zip(agents, before, strict=True):
-            agent.loads(self.combine(parent, agent.loaded))
+            _settles(agent).loads(self.combine(parent, agent.loaded))
         return before
 
     def combine(
@@ -525,16 +544,16 @@ _ISOLATED_SKILLS = _CalledSkills()
 _INHERITED_SKILLS = _InheritedCalledSkills()
 
 
-def calls(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry:
+def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry:
     """One flow, ready for another flow to run: what it marked, found by name.
 
     A flow is a loop over agents, and a loop worth having is one another loop can reach for::
 
-        from hmz.flows import Agent, calls, flow
+        from hmz.flows import Agent, flow, load
 
         @flow
         def run(agents: tuple[Agent, Agent], task: str) -> None:
-            plan = calls("official/humanize1:gen-plan")
+            plan = load("official/humanize1:gen-plan")
             plan(agents, f"plan this first: {task}")
             agents[0].new()(task)
 
@@ -542,13 +561,17 @@ def calls(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entr
     path of your own -- so a flow reaches another flow the way a person does, and a flowverse
     is a library as well as a menu.
 
+    Loading rather than calling, because that is what this does: what comes back is a flow to
+    run, and running it is the caller's own line. It is not :func:`hmz.flows.loaded`, which is
+    what running a flow's file leaves behind -- one loads a flow, the other reads a file.
+
     What comes back is the flow's own function, with the run written down around it: what is
     running is what the interface shows, and a flow that called another must not read as the
     flow that was started. It is called the way the flow itself is -- the agents, the task,
     and the config for one that says it takes one -- and answers with whatever the flow
     answers with, so a flow written as a coroutine is awaited by whoever called it::
 
-        await calls("official/rlar")(agents, task)
+        await load("official/rlar")(agents, task)
 
     The flow is read again at each call, and so are the skills it brings. A flow is a
     directory on disk, and one that has been rewritten between two calls of it -- by hand, or
@@ -723,7 +746,7 @@ def _ended(
             agent.cycle = wrote
         writing.record.ended(kind)
     for agent, held in zip(driven, before, strict=True):
-        agent.loads(held)
+        _settles(agent).loads(held)
 
 
 def _handed(
@@ -847,7 +870,7 @@ def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
                 "nothing to point it at"
             )
         try:
-            agent.runs_on(isolated(place.where.image))
+            _settles(agent).runs_on(isolated(place.where.image))
         except RuntimeError as opened:
             raise NotAFlow(f"{flow}: {called} {opened}") from opened
         return
@@ -1177,6 +1200,7 @@ def _about() -> dict[str, Any]:
                         or "as this machine is signed in",
                         "may": each.config.permission,
                         "goals": each.config.goals,
+                        "web_search": each.config.web_search,
                         "works": "here" if each.config.machine is None else "elsewhere",
                         "skills": [loaded.name for loaded in each.loaded],
                     }

@@ -21,7 +21,7 @@ import weakref
 from abc import ABC, abstractmethod
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
-from typing import IO, TYPE_CHECKING, Any, ClassVar, Protocol, overload
+from typing import IO, TYPE_CHECKING, Any, ClassVar, Literal, Protocol, Self, overload
 
 from .event import Event, Failed, Question, Stopped, Unrecoverable, Usage, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
@@ -385,6 +385,22 @@ class SessionBase(ABC):
             be inside the workspace the anchor names.
         """
         self._agent = agent
+        #: Which of the flow's skills this conversation carries, by name, or None for every
+        #: one of them -- which is what a session nobody has said anything about carries. It
+        #: is the session's rather than the agent's because it is the one thing about what an
+        #: agent works by that changes while it is working: a conversation that has got as
+        #: far as writing the tests wants the skill about writing them and no longer wants
+        #: the eight about reading the codebase, and it is the same conversation either way.
+        self._skills: tuple[str, ...] | None = None
+        #: And which of them are actually down in the workspace now, or None while none are.
+        #: The two differ for exactly as long as it takes the next turn to start, which is
+        #: where what was asked for is put where the backend reads it.
+        self._mounted: tuple[str, ...] | None = None
+        #: The conversation on the agent this one falls back to, once a turn of this one has
+        #: had to be taken there. Held for as long as this session is rather than opened per
+        #: turn: what this conversation was is lost at the move, and losing a second one
+        #: every turn after it would be a stateful loop started over every round.
+        self._moved_to: SessionBase | None = None
         #: Where this conversation works, as it was given, or None for wherever the flow is.
         self._cwd = os.fspath(cwd) if cwd is not None else None
         self._id: str | None = None
@@ -434,6 +450,43 @@ class SessionBase(ABC):
         # A session drops itself from its agent when it is collected, so the agent neither holds
         # a flow's discarded sessions nor has to prune them while someone is reading them.
         agent._hold(self)
+
+    @property
+    def skills(self) -> tuple[str, ...]:
+        """The flow's skills this conversation carries, by name, in the flow's own order.
+
+        Every one the flow brought unless this session has been told otherwise, which is what
+        a session nobody has said anything about carries. A name this session was told to
+        carry that the flow does not bring is not among them: what a session may carry is the
+        flow's to say, and a name nothing answers to is a name to correct rather than a skill
+        to invent.
+        """
+        brought = self._agent.loaded
+        if self._skills is None:
+            return tuple(one.name for one in brought)
+        wanted = set(self._skills)
+        return tuple(one.name for one in brought if one.name in wanted)
+
+    def loads(self, skills: Iterable[str] | None) -> None:
+        """Says which of the flow's skills this conversation is to carry from its next turn.
+
+        The one thing about what an agent works by that a flow may change while it is
+        working, and it is a session's rather than an agent's: an agent is what it was set up
+        as, and a conversation is a thing that gets somewhere. A loop that has finished
+        reading and started writing says so here, and the turn after it is the turn that
+        carries the writing skill.
+
+        What is put where the backend reads it is settled at the start of the next turn
+        rather than now: a session is opened at a directory and may not have one yet, and a
+        turn already running must not have what it is working by moved underneath it.
+
+        Args:
+          skills: The names to carry, which are the names the flow brought them under, or
+            None for every one of them. Names the flow does not bring are ignored, so a
+            session that asked for one a fork of the flow no longer has is a session carrying
+            the rest rather than a turn that will not run.
+        """
+        self._skills = None if skills is None else tuple(dict.fromkeys(skills))
 
     @property
     def id(self) -> str:
@@ -749,9 +802,7 @@ class SessionBase(ABC):
                 # for. On the prompt as it is sent rather than on the one the hooks and the
                 # transcript see, which is the flow's own words: a schema in the transcript
                 # is the plumbing showing through.
-                for event in self._falling_back(
-                    self._shaped_ask(prompt, schema), schema=schema
-                ):
+                for event in self._falling_back(prompt, schema=schema):
                     if event.kind == "result":
                         # Held back: a hook may yet send the agent on, and a turn that was
                         # sent on has not answered.
@@ -846,7 +897,9 @@ class SessionBase(ABC):
                     )
                     time.sleep(waiting)
                 try:
-                    yield from self._stream(prompt, schema=schema)
+                    yield from self._stream(
+                        self._shaped_ask(prompt, schema), schema=schema
+                    )
                 except Unrecoverable:
                     # A turn that would fail the same way however often it is taken, and
                     # under whichever account takes it: a prompt longer than the model's
@@ -882,9 +935,68 @@ class SessionBase(ABC):
                     f"{instead.name or 'this machine is signed in'}",
                 )
             )
+        # Every account of this backend is spent. What is left is another agent -- another
+        # CLI, another model, another effort -- which is a step written down between the two
+        # rather than on either, and is the second thing tried because it is the one that
+        # cannot carry the conversation: no backend takes another backend's session id.
+        stood_in = self._agent.stands_in()
+        if stood_in is not None:
+            self._heard(
+                Event(
+                    kind="tool",
+                    text=f"{self._agent.backend} has nowhere left to run; carrying on as "
+                    f"{stood_in.spec}",
+                )
+            )
+            yield from self._instead(stood_in, prompt, schema=schema)
+            return
         if last is None:  # nothing ran at all, which is nothing this can raise about
             raise RuntimeError("no account to take the turn under")
         raise last
+
+    def _instead(
+        self,
+        stood_in: AgentBase,
+        prompt: str,
+        *,
+        schema: type[BaseModel] | None = None,
+    ) -> Iterator[Event]:
+        """This turn, taken in a session of the agent this one falls back to.
+
+        A new session rather than this one carried on: the conversation is the backend's own
+        and is named by an id nothing else answers to, so a turn that leaves its backend
+        leaves the conversation. What the flow sees is one turn either way -- the events come
+        back through the session it asked, bracketed by the moments and the `begins` and
+        `ends` this session was already going to say.
+
+        The stand-in walks its own accounts and then its own next step, so a chain of three
+        agents is this called once and then once again inside it. It cannot come round: the
+        agent that stood in was built holding only the steps after its own.
+
+        Opened once and held, for as long as this session is: what this conversation was is
+        lost at the move, and a second one lost every turn after it would be a stateful loop
+        started over every round. It works where this one works, and goes when this one goes.
+
+        Args:
+          stood_in: The agent taking the turn.
+          prompt: What the flow is asking, in its own words: shaped again for the backend that
+            is about to be asked, since one that can be held to a shape is told separately and
+            one that cannot is asked in the prompt.
+          schema: The shape to answer in, or None.
+
+        Yields:
+          What the stand-in said, in the order it said it.
+        """
+        if self._moved_to is None:
+            self._moved_to = stood_in.new(self._cwd)
+        session = self._moved_to
+        session._shaping = schema
+        # The flow's skills go with the turn: the stand-in was made carrying them, and a
+        # session of it puts them where its own backend reads them, which is not where this
+        # one's does. Whichever of them this session carries, since it is this session's turn.
+        session.loads(self._skills)
+        session._mounts()
+        yield from session._falling_back(prompt, schema=schema)
 
     def _shaped_ask(self, prompt: str, schema: type[BaseModel] | None) -> str:
         """The prompt as the backend is to be given it, shape and all.
@@ -1047,6 +1159,10 @@ class SessionBase(ABC):
             self._ended = True
             self._fire(Moment.SESSION_END)
         self._shut()
+        if self._moved_to is not None:
+            # And the conversation this one moved to, which is this conversation carried on
+            # somewhere else: it ends when this one does.
+            self._moved_to.close()
         if not self._working:
             # What the session mounted goes when the conversation does. Not while a turn is
             # still running by it, though: this is called to stop an agent, and stopping one
@@ -1064,6 +1180,9 @@ class SessionBase(ABC):
         if self._unmounting is not None:
             self._unmounting()
             self._unmounting = None
+        # And nothing is down, so the next turn puts down whatever this session carries then
+        # -- which is what a session closed and spoken to again is owed.
+        self._mounted = None
 
     def _shut(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
         """Lets go of whatever is holding this conversation open.
@@ -1136,14 +1255,20 @@ class SessionBase(ABC):
         )
 
     def _mounts(self) -> None:
-        """Gives this session the skills the flow brought, as it opens.
+        """Puts the skills this session carries where the backend reads them, as a turn opens.
 
-        Where that backend reads a project's own skills, for as long as the session lives:
-        a flow works by the skills it carries, and a session of it that had none would be a
-        turn asked to do something the flow never gave it the means to do. As the session
-        opens rather than when it was made, since the directory it works in is settled by
-        then -- and per session, so a skill rewritten between turns is the one the next
-        session carries.
+        Where that backend reads a project's own skills, for as long as this session carries
+        them: a flow works by the skills it carries, and a session of it that had none would
+        be a turn asked to do something the flow never gave it the means to do. As a turn
+        opens rather than when the session was made, since the directory it works in is
+        settled by then -- and per session, so a skill rewritten between turns is the one the
+        next turn carries.
+
+        Asked each turn rather than once, because which of them this session carries is a
+        thing a flow may change while the conversation is going: a session told to put one
+        down and take another up has the one it was told about from its next turn, which is
+        this one. A session carrying what it was already carrying does nothing at all here,
+        which is every turn but the first and every turn after a change.
 
         Nothing at all for a flow that brings none, which is most of them, and for a backend
         that reads no such directory: those carry what their CLI installed and no more.
@@ -1157,16 +1282,36 @@ class SessionBase(ABC):
           container given this workspace reads this directory and gets them; a machine across
           a network keeps its own, and a flow that brings skills is a flow to run here.
         """
-        if not self._agent.loaded or self._unmounting is not None:
-            return  # nothing to mount, or this session is holding them already
+        carrying = self._carrying()
+        if tuple(one.name for one in carrying) == self._mounted:
+            return  # already carrying exactly these, which is every turn but the first
+        # What it was carrying goes before what it is to carry arrives: two sets of skills in
+        # the one directory is the session carrying what it was told to put down.
+        self._unmounted()
+        if not carrying:
+            self._mounted = ()
+            return
         workspace = self.cwd
         if not os.path.isdir(workspace):  # noqa: PTH112
             return  # a session that cannot say where it works is one that will not run
-        mounted = mount(self._agent.backend, workspace, self._agent.loaded)
+        mounted = mount(self._agent.backend, workspace, carrying)
         if mounted.at:
             # A finalizer rather than a line in `close`, and callable so that whichever of
             # the two gets there first is the one that runs -- once, whatever happens after.
             self._unmounting = weakref.finalize(self, unmount, mounted)
+        self._mounted = tuple(one.name for one in carrying)
+
+    def _carrying(self) -> tuple[Loaded, ...]:
+        """The skills this session is to have down, as the flow brought them.
+
+        Returns:
+          The flow's own, in the flow's order, less any this session was told not to carry.
+        """
+        brought = self._agent.loaded
+        if self._skills is None:
+            return tuple(brought)
+        wanted = set(self._skills)
+        return tuple(one for one in brought if one.name in wanted)
 
     def _environment(self) -> Mapping[str, str]:
         """What to set in the command's environment on top of this process's own.
@@ -1797,6 +1942,48 @@ class StreamSessionBase(SessionBase):
         """
 
 
+def _built(spec: str) -> AgentBase | Literal[False]:
+    """One agent, made from the spec a fallback names it by.
+
+    Made here rather than by whatever wrote the step down, because it is made at the moment a
+    turn has nowhere left to go: a chain of four agents that were all started when the run was
+    would be three CLIs held open for a failure that never came.
+
+    Args:
+      spec: The agent, as `CLI[@ACCOUNT]/MODEL:EFFORT`.
+
+    Returns:
+      The agent, or False for a spec that no longer names one -- a CLI nobody has installed
+      here, a step written down against a backend that has gone. A turn then fails the way it
+      failed before anybody wrote a step down, which is the answer that says what went wrong
+      rather than the one about the step.
+    """
+    from hmz import backends
+
+    from . import driver
+
+    try:
+        profile, model, effort, _tier, provider, may, searches, held = backends.read(
+            spec
+        )
+        kind, config = driver(profile.name)
+    except (ValueError, KeyError):
+        return False
+    extra: dict[str, Any] = {}
+    if may is not None:
+        extra["permission"] = may
+    if searches is not None:
+        extra["web_search"] = searches
+    if held and profile.name == "codex":
+        extra["overrides"] = held
+    elif held:
+        extra["allowed_tools"] = tuple(value for _key, value in held)
+    try:
+        return kind(config(model=model, effort=effort, provider=provider, **extra))
+    except (ValueError, TypeError):
+        return False
+
+
 class AgentBase(ABC):
     """A coding agent behind a uniform interface: structure only, and no history.
 
@@ -1898,6 +2085,13 @@ class AgentBase(ABC):
         #: the next turn of that flow to sign in as somebody else. None until it is asked for.
         self._at: Provider | None = None
         self._starting = threading.Lock()
+        #: The agent this one's turns go to once it has nowhere left to run, once it has been
+        #: asked for -- False for an agent that falls back nowhere, so that reading the chain
+        #: is a thing that happens once rather than once a turn.
+        self._stands_in: AgentBase | Literal[False] | None = None
+        #: The rest of that chain, for an agent that is itself a stand-in, or None for one
+        #: that has not been told and reads it off what is written down.
+        self._beyond: tuple[str, ...] | None = None
 
     @property
     def id(self) -> str:
@@ -1952,19 +2146,100 @@ class AgentBase(ABC):
         self._config = config
 
     def _serves(self, config: AgentConfig) -> None:
-        """Refuses a config asking for a service tier this backend has no way of sending.
+        """Refuses a config this backend has no way of expressing.
+
+        Two of them: a service tier it cannot send, and web search it cannot switch off.
+        Both are refused wherever the config arrives -- where the agent is made, and where one
+        already running is set up as something else -- since a setting a backend quietly
+        ignored would be a setting that lies about what the agent is doing.
 
         Args:
           config: What the agent is to run at.
 
         Raises:
-          ValueError: If the tier is not one of :attr:`service_tiers`.
+          ValueError: If the tier is not one of :attr:`service_tiers`, or web search was
+            switched off for a backend with no way of being told.
         """
         if config.service_tier not in self.service_tiers:
             raise ValueError(
                 f"{type(self).__name__} does not support service tier "
                 f"{config.service_tier!r}; expected {', '.join(self.service_tiers)}"
             )
+        if not config.web_search and not self._tellable():
+            raise ValueError(
+                f"{type(self).__name__} has no way of being told not to search the web; "
+                "web_search must be on for it"
+            )
+
+    def _tellable(self) -> bool:
+        """Whether this backend can be told whether its agents may search the web.
+
+        Read off the backend rather than written down on the class, so that the one place
+        that says what a CLI is is the one place this is said too.
+
+        Returns:
+          True where it can be told, and False for a backend nothing here knows -- a
+          stand-in written for a test, a CLI somebody added by hand -- which is the answer
+          that refuses rather than the one that pretends.
+        """
+        from hmz.backends import named
+
+        profile = named(self.backend)
+        return profile is not None and profile.searches
+
+    def clone(
+        self,
+        *,
+        config: AgentConfig | None = None,
+        name: str | None = None,
+        skills: Iterable[Loaded] | None = None,
+    ) -> Self:
+        """Another agent of this one's backend, differing in what this call names and nothing.
+
+        Which is what an agent set up differently is: not this agent changed, but a second one
+        beside it. An agent is what it was made as -- a flow is handed one and drives it, and
+        a flow that could set it up as something else would be a flow rewriting what the
+        person who started the run chose -- so the way to have one that is not quite this one
+        is to make one, and this is that written down::
+
+            careful = agent.clone(config=replace(agent.config, effort="max"))
+
+        Everything that is not named is this agent's. Everything that a run puts on an agent
+        rather than sets it up with is not: the clone has opened no conversation, has spent
+        nothing, is watched by nobody, has no hook hung on it, and is being written down
+        nowhere. Two agents, which is what they are.
+
+        And nothing about it can be said afterwards. That is the whole of the point: what an
+        agent is, is settled where it is made, and this is where a second one is made.
+
+        Args:
+          config: What every session of it runs at, or None for this agent's own.
+          name: What to call it, or None for one nothing else answers to -- since two agents
+            are two agents, and a trace that read them as one would read a comparison of two
+            efforts as one agent that changed its mind. Given a name, it is that agent.
+          skills: The flow's skills it carries, or None for the ones this agent carries.
+
+        Returns:
+          The new agent.
+        """
+        made = self._remade(self._config if config is None else config, name)
+        made.loads(self._loads if skills is None else skills)
+        return made
+
+    def _remade(self, config: AgentConfig, name: str | None) -> Self:
+        """Builds one of this class, for a backend whose making is the ordinary one.
+
+        Overridden by an agent that is not made from a config -- the person at the prompt is
+        made from nothing at all -- so that :meth:`clone` is one thing wherever it is called.
+
+        Args:
+          config: What it runs at.
+          name: What to call it, or None for one nothing else answers to.
+
+        Returns:
+          The new agent.
+        """
+        return type(self)(config, name=name)
 
     def rename(self, name: str) -> None:
         """Calls this agent what the flow driving it calls it, if it has no name of its own.
@@ -2236,6 +2511,61 @@ class AgentBase(ABC):
 
         return tuple(providers.chain(self.node()))
 
+    @property
+    def spec(self) -> str:
+        """This agent as a command line names it: `CLI[@ACCOUNT]/MODEL:EFFORT`.
+
+        The account it was configured with rather than the one it has moved to, since that is
+        what somebody wrote down when they said where this agent falls back to: an agent that
+        walked its own accounts and ran out is still the agent they meant.
+        """
+        from hmz import fallbacks
+
+        return fallbacks.spec(
+            self.backend, self._config.model, self.effort, self._config.provider
+        )
+
+    def stands_in(self) -> AgentBase | None:
+        """The agent that takes this one's turns, once this one has nowhere left to run.
+
+        Which is the other half of a chain: an account that goes down is answered by the next
+        account of the same backend, inside the conversation that was running, and this is
+        what is left when there is no next account -- a model retired, a CLI that will not
+        start, a whole account rate-limited rather than one request. Another agent then, and a
+        turn taken in a session of its own, because no backend can be handed another
+        backend's session id.
+
+        Made at most once and kept, for the reason an account that has moved stays moved: the
+        agent that went down is not one to try again each turn, and a stand-in made afresh
+        every time would be a new conversation and a new set of skills mounted every turn.
+        Held only for as long as this agent is: it is this agent's answer.
+
+        Returns:
+          The agent to take the turn, already carrying this agent's skills and holding the
+          rest of the chain so that it cannot come round to this one, or None where nothing
+          was written down about this agent -- which is the turn failing as it always has.
+        """
+        from hmz import fallbacks
+
+        with self._starting:
+            if self._stands_in is not None:
+                return self._stands_in or None
+            walked = (
+                self._beyond
+                if self._beyond is not None
+                else tuple(fallbacks.chain(self.spec)[1:])
+            )
+            # Written down as "nothing", so that an agent with nowhere to go is asked once
+            # rather than once a turn: reading the chain is reading a file.
+            self._stands_in = made = _built(walked[0]) if walked else False
+            if made:
+                made.loads(self._loads)
+                made.cycle = self.cycle
+                # Only the steps after its own: a chain read again from the top by each hop
+                # would be a chain that walks the agents before it a second time.
+                made._beyond = walked[1:]
+            return made or None
+
     def fall_back(self, provider: Provider) -> None:
         """Runs every turn from here on under another account.
 
@@ -2368,10 +2698,18 @@ class AgentBase(ABC):
         A turn is where a flow spends its time -- a model can think for minutes -- so a stop
         that waited for one would not read as a stop. What the turn was doing is left where
         it got to; what ends is the agent's part in it.
+
+        And whatever is standing in for it, since a turn of this agent's may be being taken
+        there: an agent stopped whose stand-in went on thinking would be a run ended by hand
+        that did not end.
         """
         self._stopped = True
         for session in self.sessions:
             session.close()
+        with self._starting:
+            stood_in = self._stands_in
+        if stood_in:
+            stood_in.stop()
 
     def watch(
         self, listener: Callable[[AgentBase, SessionBase | None, Event], None]

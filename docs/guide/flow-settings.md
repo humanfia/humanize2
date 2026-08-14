@@ -166,7 +166,7 @@ another model is refused before its first turn, as one handed the wrong number o
 - [Remembered per flow](/guide/settings), so twenty settings are not twenty questions every
   morning.
 - A third argument when another flow [calls yours](/guide/calling-flows):
-  `calls("pair")(agents, task, {"rounds": 9})`.
+  `load("pair")(agents, task, {"rounds": 9})`.
 
 ## Try this
 

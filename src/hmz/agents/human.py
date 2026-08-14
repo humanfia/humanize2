@@ -308,6 +308,18 @@ class HumanAgent(AgentBase):
         """
         super().__init__(AgentConfig(model="human", effort=""), name=name)
 
+    def _remade(self, config: AgentConfig, name: str | None) -> HumanAgent:  # noqa: ARG002
+        """Another person, which is the same person: they are made rather than configured.
+
+        Args:
+          config: What they run at, which is nothing: a person runs no model.
+          name: What to call them, or None for the name a person is made under.
+
+        Returns:
+          The new agent.
+        """
+        return type(self)(name=name or "human")
+
     def new(self, cwd: str | os.PathLike[str] | None = None) -> HumanSession:
         """Opens a conversation with them.
 

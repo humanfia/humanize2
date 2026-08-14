@@ -110,6 +110,24 @@ elsewhere](/guide/remote-execution) is given them where that machine reads this 
 container handed this workspace is such a place. Otherwise the agent works with the skills its
 CLI installs.
 
+## Which of them a conversation carries
+
+Every session an agent opens carries all of the flow's skills — until it says otherwise:
+
+```python
+session = agent.new()
+session.loads(["writing-tests"])   # from its next turn on
+session.loads(None)                # all of them again
+```
+
+An agent is what it was made as. A conversation is a thing that gets somewhere, and this is the
+one thing about what it works by that moves with it: a session that has finished reading the
+codebase and started writing the tests wants the skill about writing them and no longer wants
+the eight about reading it. Two conversations of one agent may carry different sets at once.
+
+This is about the skills the **flow** brings. The ones the CLI installed are still that CLI's
+own, and nothing here switches one of those on or off.
+
 ## At the prompt
 
 The `skills` row of the sheet an agent is set up on reads `as its CLI finds them`. Opening it

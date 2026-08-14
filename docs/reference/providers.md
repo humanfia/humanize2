@@ -270,7 +270,16 @@ In the interface, `/providers` walks the same list, with the account this machin
 into last under each CLI's heading. **a** makes one and **d** twice takes it away; **enter**
 opens what else can be done to the one under the cursor — correct what it holds, sign it in
 again, say what it falls back to, say how a failed turn under it is tried again. The screens
-themselves are [TUI › The accounts themselves](/reference/tui#the-accounts-themselves).
+themselves are [TUI › The accounts themselves](/reference/tui#the-accounts-themselves), and the
+account chains are also the second page of [`/fallback`](/guide/fallback).
+
+**An account's chain and an agent's are two different things.** This one answers an account
+going down — a subscription that ran out, a key refused, a gateway that answered 503 — and it
+happens inside the conversation that was running, with the same agent at the same model
+throughout. A model that has been retired, a CLI that will not start, a rate limit on the whole
+account rather than one request: none of those is answered by another account of that backend,
+and what answers them is [another agent](/guide/fallback), which a turn walks only once this
+chain is spent.
 
 ## One account, several CLIs
 
@@ -509,5 +518,8 @@ agent.provider      # Provider | None -- which account its turns run as, None be
                     #   the account this machine is already signed into
 agent.node()        # the same as an account, never None: what the chain is walked from
 agent.walks()       # that account and everything it falls back to, in order
+agent.spec          # `CLI[@ACCOUNT]/MODEL:EFFORT` -- how a fallback names this agent
+agent.stands_in()   # the agent that takes its turns once it has nowhere left to run,
+                    #   or None where nothing was written down about it
 agent.environment() # what those turns are run with, on top of what they inherit
 ```

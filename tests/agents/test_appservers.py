@@ -860,7 +860,17 @@ def test_codex_can_disable_goals_before_its_server_starts(
 
     assert not agent.goals_enabled
     assert agent.server is not None
-    assert started == [["codex", "app-server", "--disable", "goals", "--stdio"]]
+    assert started == [
+        [
+            "codex",
+            "app-server",
+            "--disable",
+            "goals",
+            "-c",
+            "tools.web_search=true",
+            "--stdio",
+        ]
+    ]
     with pytest.raises(RuntimeError, match="goals are disabled"):
         agent.new().pursue("the suite passes", suppress=True)
 
@@ -899,6 +909,8 @@ def test_codex_passes_allowlisted_overrides_to_its_app_server(
         [
             "codex",
             "app-server",
+            "-c",
+            "tools.web_search=true",
             "--stdio",
             "-c",
             "model_context_window=1000000",

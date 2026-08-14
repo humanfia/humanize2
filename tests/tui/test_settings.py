@@ -58,6 +58,7 @@ def test_an_agent_is_kept_under_what_its_flow_calls_it(tmp_path: Path) -> None:
         "model": "n",
         "effort": "low",
         "goals": True,
+        "web_search": True,
     }
     # A flow that says only how many it drives has nothing to call them, so they are
     # numbered -- and a model holding slashes of its own survives the round trip.

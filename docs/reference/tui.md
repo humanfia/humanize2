@@ -151,6 +151,7 @@ list appears under the editor with a line about each.
 | `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent, marked as it works, with the handovers between them drawn as the arrows joining them. Enter reads an agent. **esc** opens it. |
 | `/details` | `[on\|off]` | Shows or hides everything a turn did on the way to its answer: tool calls, thinking, and whatever a backend printed on its way past. One question — how much of the working to show — so one switch. **Off** to begin with. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
+| `/fallback` | | Where a turn goes when what was taking it cannot: an agent that has nowhere left to run, and an account that has gone down. See [below](#where-a-turn-goes-when-it-cannot-be-taken). |
 | `/clear` | | Clears the screen, and nothing else: the transcript being read, not the others, and nothing that is running. |
 | `/export` | | Writes what is on the screen to `.humanize/<datetime>.session.md`, as it was written rather than as it was wrapped: everything drawn there since the last `/clear`, which is every conversation that has been read rather than only the one showing now. |
 | `/exit` | | Leaves. |
@@ -525,9 +526,10 @@ enter opens one. Everything that agent is is a row of one sheet:
     6. skills       as its CLI finds them ▸    what it will be carrying, which its CLI keeps
     7. permission   bypass                     what it may do without being asked
     8. goals        on                         whether the backend's own goals are available
-    9. where        this machine ▸             the machine its work lands on
-   10. save                                    accept this agent setup
-   11. save as      ▸                          save a reusable agent you can import
+    9. web search   on                         whether it may search the web
+   10. where        this machine ▸             the machine its work lands on
+   11. save                                    accept this agent setup
+   12. save as      ▸                          save a reusable agent you can import
 
   Enter to open · Esc to close
 ```
@@ -542,7 +544,10 @@ which models that CLI will name; the account settles which of them it may name. 
 CLI lets go of the model**, which belonged to the CLI before it.
 
 **The arrows step a row that is a rung in an order** — the effort, what it may do, swarm mode,
-whether goals are available. Everything else opens a sheet of its own and comes back. `where` is
+whether goals are available, whether it may search the web. Everything else opens a sheet of its
+own and comes back. `web search` is a row only for a CLI that can be told: claude, codex, grok,
+qwen, opencode and mimo. A switch for something the backend would go on doing either way is a
+switch that lies, so for every other CLI the question is not put. `where` is
 a row only for an agent [the flow says may be pointed at a machine](#where-each-agent-works);
 for one the flow put in a container it is read rather than opened, and for one that works here
 it is not there at all.
@@ -802,6 +807,44 @@ The retry sheet answers in rungs rather than in numbers: the tries step through 
 15m and 1h. A text box for an integer is a text box to validate.
 
 The same accounts are on the command line as [`hmz providers`](/reference/providers#hmz-providers).
+
+## Where a turn goes when it cannot be taken
+
+`/fallback` is two pages of one menu, because two different things are called falling back.
+
+**Agents.** An agent that has nowhere left to run — a model retired, a CLI that will not
+start, a rate limit on the whole account rather than one request — falls back to a whole other
+agent. `a` chooses the one that cannot run and then the one that takes its turns, each on
+[the same sheet](#what-each-agent-is) a flow's agent is chosen on. `d` twice takes a step away.
+Enter on a row says where that agent's turns go instead.
+
+**Accounts.** **tab** turns to the account chains, which are the ones
+[`/providers`](#the-accounts-themselves) also reaches: enter says which account of the same CLI
+a turn under this one carries on under. Making an account and taking one away stay there, and
+the keys here say so rather than doing nothing.
+
+Both are held until the menu is saved on the way out, as everything on a menu is.
+
+```
+  Fallback
+
+  Where a turn goes when what was taking it cannot. An agent falls back to a whole other
+  agent -- another CLI, model, effort or account -- in a session of its own, and is what is
+  left when a backend has nowhere to run. An account falls back to another account of the
+  same CLI, inside the conversation that was running.
+
+  Agents · Accounts   tab turns the page
+
+  ❯ 1. claude@work/claude-opus-5:high     falls back to codex@key/gpt-5.6-sol:high
+    2. codex@key/gpt-5.6-sol:high         falls back to dsh/deepseek-v4-flash:high
+
+  Enter for where its turns go · a adds one · d twice takes one away · Esc to close
+```
+
+An agent cannot fall back to itself, and a chain that comes round on itself ends at the second
+sight of an agent. The same steps are on the command line as
+[`hmz fallback`](/reference/cli#hmz-fallback), and what they mean is
+[Falling back](/guide/fallback).
 
 ## What humanize remembers
 

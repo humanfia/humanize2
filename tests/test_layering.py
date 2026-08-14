@@ -39,6 +39,10 @@ ALLOWED: dict[str, set[str]] = {
     "hmz.agents": {
         "hmz.backends",
         "hmz.coganchor",
+        # A turn that has walked its accounts to the end asks where the agent itself falls
+        # back to, and builds the agent that is named. It names only `backends`, so this
+        # widens the DAG without bending it.
+        "hmz.fallbacks",
         "hmz.machines",
         # Which account a turn runs as is a setting of the agent, so driving one reads the
         # providers. They name nothing above themselves, so this widens the DAG without
@@ -51,6 +55,12 @@ ALLOWED: dict[str, set[str]] = {
     },
     "hmz.backends": set(),
     "hmz.coganchor": set(),
+    # Where a turn goes when the agent taking it cannot take it at all, which is written
+    # between two agents. An agent is named the way a command line names one, so this reads
+    # `backends` to read one -- the leaf those facts are written down in, which names nothing
+    # itself and so widens the DAG without bending it. It names no agent and no account: what
+    # is written down is two lines of text, and whoever walks the chain builds what it names.
+    "hmz.fallbacks": {"hmz.backends"},
     "hmz.coganchor.serve": {"hmz.coganchor", "hmz.coganchor.proto"},
     # A run writes down which sessions its agents opened, and points a link at each of the
     # logs the backend is writing them to. Where those logs are is a fact about the CLI, and
@@ -118,6 +128,10 @@ ALLOWED: dict[str, set[str]] = {
         # The runs of this directory, which `/cycles` lists and picks one up from. It names
         # the agents and the facts about them, both of which are under the interface too.
         "hmz.cycle",
+        # `/fallback` is where it is said what a turn does when the agent taking it cannot,
+        # which is the other half of what `/providers` says about an account. It names only
+        # `backends`, so this widens the DAG without bending it.
+        "hmz.fallbacks",
         "hmz.flows",
         # What a run left behind, gathered into a trace from the sheet the runs are read on.
         # It names the facts about the backends and nothing above itself.

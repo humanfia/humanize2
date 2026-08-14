@@ -11,6 +11,7 @@
 ├── cli
 ├── coganchor
 ├── cycle.py
+├── fallbacks.py
 ├── flows
 ├── kept.py
 ├── machines
@@ -202,6 +203,7 @@ class Runs(NamedTuple):
     permission: str = ""
     provider: str = ""
     goals: bool = True
+    web_search: bool = True
 
 
 class Kept(NamedTuple):
@@ -237,6 +239,77 @@ under humanize's own home.
   imports one MUST take a copy rather than a link.
 - A file that is missing, unreadable or not what this writes MUST read as nothing written down
   rather than as a reason to stop.
+
+## `fallbacks.py`
+
+```python
+@dataclass(frozen=True, slots=True)
+class Falls:
+    spec: str
+    to: str
+
+
+def spec(backend: str, model: str, effort: str, provider: str = "") -> str: ...
+
+
+def reads(said: str) -> str: ...
+
+
+def falls() -> list[Falls]: ...
+
+
+def points(said: str, at: str) -> Falls: ...
+
+
+def clear(said: str) -> bool: ...
+
+
+def chain(said: str) -> list[str]: ...
+```
+
+Where a turn goes when the agent taking it cannot take it at all -- which is the other half of
+what `hmz.providers` writes on an account, and is a layer of its own because it is about
+neither of the two agents on its own.
+
+- An account's chain and this MUST be two things and MUST stay two. An account that goes down
+  is answered by another account of the same backend, inside the conversation that was
+  running, with the same agent at the same model throughout; that is a thing about the
+  account and MUST go on being written on it. A model retired, a CLI that will not start, a
+  rate limit on the whole account rather than one request: none of those is answered by
+  another account, and what answers them MUST be another agent.
+- A step MUST be written between two agents rather than on either. It is about neither on its
+  own -- it is what to do when this CLI, at this model, at this effort, as this account,
+  cannot run -- and two agents of one CLI on one account at two models are two things to say,
+  which an answer written on the account could not say.
+- An agent MUST be named the way `-a` names one, and MUST be read through `hmz.backends`
+  rather than matched here: what may be written down is exactly what a command line takes,
+  and one spelling of it is what is written. A name no backend answers to MUST be refused
+  where it is written rather than found by the turn that needed it.
+- A step MUST NOT point at the agent it is written against, and a chain that comes round on
+  itself MUST end at the second sight of an agent: either would otherwise be a turn that
+  could never run out of places to go. One agent MUST have one place to go -- writing one
+  again MUST say the new thing and not both, a chain that forked being a chain nothing can
+  walk.
+- `chain` MUST answer with this agent first whether or not anything was written down about
+  it, so that whoever walks one walks a list rather than a list and a special case.
+- What is written down MUST be read whole every time it is read: a chain is what a failed turn
+  asks for, and the answer is the walk rather than the step. A file that cannot be read MUST
+  hold nothing rather than end every run on the machine, and an entry naming a backend there
+  is none of MUST be read past.
+- A turn MUST walk its account chain to the end before it walks this: the account chain keeps
+  the conversation and this cannot, no backend taking another backend's session id. The turn
+  that moves MUST be taken in a new session of the agent it moved to, MUST carry the skills
+  the flow gave the agent it left, and MUST be answered back through the session that asked --
+  one turn is one turn, whoever took it. That session MUST be opened once and held for as
+  long as the one that asked for it, and MUST end when it does: what the conversation was is
+  lost at the move, and losing a second one every turn after it would be a stateful loop
+  started over every round.
+- The agent standing in MUST be made at most once and kept, for the reason an account that has
+  moved stays moved: an agent that went down is not one to try again each turn. It MUST be
+  made only when a turn has nowhere left to go -- a chain of four agents all started when the
+  run was would be three CLIs held open for a failure that never came -- and MUST hold only
+  the steps after its own, or a chain read from the top by each hop would walk the failed ones
+  twice.
 
 ## `cycle.py`
 
@@ -516,7 +589,7 @@ that can happen to a flowverse -- added, fetched again, taken away.
 ## `hmz agents`
 
 ```shell
-hmz agents [list [-q] | show <name> | add <name> <cli>[@<provider>]/<model>:<effort> [--anchor <target>] [--goals|--no-goals] [--force] | remove <name>]
+hmz agents [list [-q] | show <name> | add <name> <cli>[@<provider>]/<model>:<effort> [--anchor <target>] [--goals|--no-goals] [--web-search|--no-web-search] [--force] | remove <name>]
 ```
 
 The agents written down under a name: what there is, what one of them is, and the two things
@@ -559,6 +632,22 @@ three things that can happen to one -- made, signed in again, taken away.
   as that account, and what it said MUST be reported. A CLI that would not answer MUST NOT
   make the line fail: the account was made, which is what the line was for. `--no-login` MUST
   ask nothing either -- a line that says not to run the backend does not run it.
+
+## `hmz fallback`
+
+```shell
+hmz fallback [list [-q] | show <cli>[@<account>]/<model>:<effort> | add <cli>[@<account>]/<model>:<effort> <cli>[@<account>]/<model>:<effort> | remove <cli>[@<account>]/<model>:<effort>]
+```
+
+Where a turn goes when the agent taking it cannot take it at all.
+
+- It MUST be a command of its own rather than a line of `hmz providers`: an account's chain is
+  a thing about an account, and this is about neither of the two agents it names.
+- An agent MUST be named exactly as `-a` names one, so that a fallback is written the way the
+  thing it is about is written.
+- `show` MUST print the whole walk rather than the one step, since the walk is what a failed
+  turn does, and MUST say so where an agent falls back nowhere.
+- It MUST be the same store the interface's own `/fallback` walks.
 
 ## `hmz cred`
 

@@ -261,6 +261,7 @@ def read_agent(
     str,
     str,
     str | None,
+    bool | None,
     tuple[tuple[str, str], ...],
 ]:
     """Reads and validates one command-line agent specification.
@@ -270,14 +271,15 @@ def read_agent(
 
     Returns:
       The backend, model, effort, common service tier, provider, optional permission rung,
-      and backend-native ``config.KEY`` pairs.
+      whether it may search the web -- None where nobody said -- and backend-native
+      ``config.KEY`` pairs.
 
     Raises:
       ValueError: If the specification is malformed or names no permission rung there is.
     """
     from .agents import PERMISSIONS, SERVICE_TIERS
 
-    profile, model, effort, service_tier, provider, permission, overrides = (
+    profile, model, effort, service_tier, provider, permission, searches, overrides = (
         backends.read(spec)
     )
     if service_tier not in SERVICE_TIERS:
@@ -289,7 +291,16 @@ def read_agent(
         raise ValueError(
             f"permission must be one of {', '.join(PERMISSIONS)}, not {permission!r}"
         )
-    return profile, model, effort, service_tier, provider, permission, overrides
+    return (
+        profile,
+        model,
+        effort,
+        service_tier,
+        provider,
+        permission,
+        searches,
+        overrides,
+    )
 
 
 def flow_and_agents(
@@ -338,8 +349,8 @@ def flow_and_agents(
         metavar="CLI/MODEL:EFFORT",
         help="one agent, repeated once for each the flow drives, in the order it takes "
         "them; also written cli=CLI,model=MODEL,effort=EFFORT with optional "
-        "service_tier=SERVICE_TIER, permission=PERMISSION and backend-native "
-        "config.KEY=VALUE. CLI is one of "
+        "service_tier=SERVICE_TIER, permission=PERMISSION, web_search=on|off and "
+        "backend-native config.KEY=VALUE. CLI is one of "
         f"{', '.join(sorted(one.name for one in backends.profiles()))}",
     )
     parser.add_argument(
@@ -388,6 +399,7 @@ def flow_and_agents(
                 service_tier,
                 provider,
                 permission,
+                searches,
                 overrides,
             ) = read_agent(spec)
         except ValueError as bad:
@@ -399,6 +411,8 @@ def flow_and_agents(
         extra: dict[str, Any] = {"service_tier": service_tier}
         if permission is not None:
             extra["permission"] = permission
+        if searches is not None:
+            extra["web_search"] = searches
         if overrides and profile.name == "codex":
             extra["overrides"] = overrides
         elif overrides:

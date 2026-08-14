@@ -174,6 +174,7 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'Providers', link: '/guide/providers' },
+            { text: 'Falling back', link: '/guide/fallback' },
             { text: 'Containers', link: '/guide/containers' },
             { text: 'Remote execution', link: '/guide/remote-execution' },
             { text: 'Worktrees', link: '/guide/worktrees' },

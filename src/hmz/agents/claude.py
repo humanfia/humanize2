@@ -33,6 +33,11 @@ _CONTINUATION_TOOLS = (
     "CronList",
 )
 
+#: The tools that reach the web, by the names Claude calls them. Both, because searching and
+#: fetching are one question here: an agent told not to search the web that went on reading
+#: whatever page it liked would be answering the same question the other way.
+_WEB_TOOLS = ("WebSearch", "WebFetch")
+
 _ALLOWED_TOOLS_MAX = 32
 
 _ALLOWED_TOOL_RULE_MAX_CHARS = 4096
@@ -229,13 +234,19 @@ class ClaudeCodeSession(StreamSessionBase):
             # Claude validates the answer against this itself, so a turn that lands has
             # answered in the shape: what comes back is the object, and nothing else.
             argv += ["--json-schema", json.dumps(self._shaping.model_json_schema())]
+        # A tool call is a tool call, and `--disallowedTools` is that call written as a rule.
+        # Two things are said with it and the flag takes one list, so they are one list: an
+        # agent whose goals were switched off is refused the tools that would carry work past
+        # the turn humanize is holding -- a subagent of its own, a wakeup, anything on the
+        # scheduler -- and one told not to search the web is refused the two that reach it.
+        # Everything else it may reach for is what its permission rung says it may.
+        denied: list[str] = []
         if not self._agent.goals_enabled:
-            # A tool call is a tool call, and `--disallowedTools` is that call written as a
-            # rule: an agent whose goals were switched off is refused the ones that would
-            # carry work past the turn humanize is holding -- a subagent of its own, a
-            # wakeup, anything on the scheduler. Everything else it may reach for is what its
-            # permission rung says it may, exactly as before.
-            argv += ["--disallowedTools", ",".join(_CONTINUATION_TOOLS)]
+            denied += _CONTINUATION_TOOLS
+        if not self._agent.config.web_search:
+            denied += _WEB_TOOLS
+        if denied:
+            argv += ["--disallowedTools", ",".join(denied)]
         allowed_tools = getattr(self._agent.config, "allowed_tools", ())
         if allowed_tools:
             argv += ["--allowedTools", ",".join(allowed_tools)]
