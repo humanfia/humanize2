@@ -81,13 +81,14 @@ it adds nothing. Then check `python3 --version` there. See
 - File contents are pushed in full before any command runs, and again when the session ends.
 - Structural changes — create, remove, rename, link, chmod — are replayed there *first*, so the
   target's own error is what the agent sees.
-- Commands run in the target's copy of the working directory, including helpers bundled with
-  the agent itself.
+- Commands run in the target's copy of the working directory, including work helpers such as
+  ripgrep that are bundled with the agent itself.
 - Whatever those commands reach on the network.
 
 **Stays here**
 
-- The agent's own executable and its re-execs.
+- The agent's own runtime executables and re-execs. For an npm-installed Codex, that includes
+  Node, the native CLI and its code-mode host.
 - Its state directory. humanize knows the ten known CLIs by name — `agy`, `claude`, `codex`,
   `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen` — and its own `~/.humanize`. Any
   other agent that keeps state inside the workspace has to be named with `--local-path`.
