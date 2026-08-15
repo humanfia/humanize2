@@ -124,12 +124,26 @@ claude --help
 codex --version
 ```
 
+### `codex: this machine will not run an agent at bypass, so it runs at auto`
+
+Not a failure: a note, said once per agent. This Codex was given requirements by somebody
+else — an enterprise policy that arrives with the account, or a `requirements.toml` on a
+machine whose platform packages Codex — and they forbid the `danger-full-access` sandbox that
+[`bypass`](/guide/permissions) is. Codex refuses such a call outright, so humanize asks again a
+rung down, at `auto`: the same freedom, with Codex asking before it reaches past the workspace
+and humanize granting what it asks. Set the agent to `auto` in `/agents` to say it yourself and
+skip the note. What the machine allows is its own to say:
+
+```sh
+cat /etc/codex/requirements.toml
+```
+
 ## In the interface
 
 ### `no coding agent is installed here`
 
-None of `claude`, `codex` or `kimi` is on your `PATH`. humanize drives the CLI you already
-have. It holds no API key and talks to no model provider itself.
+None of `claude`, `codex` or `kimi` was found, on your `PATH` or in the directories an
+installer puts one in. humanize drives the CLI you already have. It holds no API key and talks to no model provider itself.
 
 ```sh
 command -v claude codex kimi pi opencode mimo

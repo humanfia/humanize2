@@ -1036,6 +1036,24 @@ reaches for whichever of its own settings says the same thing:
 rather than an approximation of one. Where a backend cannot tell two rungs apart it says so
 here rather than pretending: a dash is the rung above it, run again.
 
+**A Codex whose rules are somebody else's runs a rung down rather than not at all.** An
+installation can be given requirements — an enterprise policy that arrives with the account, a
+`requirements.toml` the platform that packages Codex puts on its machines — and one that
+forbids `danger-full-access` refuses every call that asks for it: `` `approval_policy =
+"never"` cannot be used because requirements do not allow `sandbox_mode =
+"danger-full-access"` ``. Which would be every turn of a flow at the default rung failing on
+such a machine. So humanize takes the answer: it runs that agent at `auto` instead — the same
+freedom with the asking turned back on, and the asking is granted — and says so once, where a
+turn's own words go when nothing is watching the agent:
+
+```
+codex: this machine will not run an agent at bypass, so it runs at auto, where what it asks
+for is granted
+```
+
+It is found out once per agent rather than once per turn, and the rung you chose is what is
+tried first: an agent set to `auto` in `/agents` asks for `auto` and never sees this.
+
 **`auto` is the rung where a hook gets a say.** It is the one setting under which a backend
 actually asks before it acts and waits for the answer, so it is the one where a hook hung on
 [`PERMISSION_REQUEST`](#hooks) can refuse something and have the agent hear it. Claude Code

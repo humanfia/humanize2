@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
-from .config import AgentConfig
+from .config import PERMISSIONS, AgentConfig
 from .event import Event, Failed, Question, Usage, say
 from .hooks import EVERYWHERE, Moment, Occasion
 
@@ -107,6 +107,49 @@ def unattended(permission: str, service_tier: str = "default") -> dict[str, Any]
     """
     service = "priority" if service_tier == "fast" else "default"
     return {"serviceTier": service} | _PERMITTED.get(permission, _PERMITTED["bypass"])
+
+
+#: What a Codex somebody else settled the rules for says when it will not run at the rung it
+#: was asked for. An installation can be given requirements -- an enterprise policy delivered
+#: with the account, a `requirements.toml` the platform the machine belongs to put there -- and
+#: one that forbids the sandbox a rung is refuses the whole call rather than running it
+#: tighter: `approval_policy = "never"` cannot be used because requirements do not allow
+#: `sandbox_mode = "danger-full-access"`. Which is every turn of an agent nobody was asked
+#: about failing on such a machine, since `bypass` is what one runs at.
+_FORBIDDEN = "requirements do not allow"
+
+
+def _rung(params: Mapping[str, Any]) -> str | None:
+    """Which rung of the ladder a call's parameters are asking for.
+
+    Args:
+      params: What the call was made with.
+
+    Returns:
+      The rung they name, or None for a call that says nothing about what the agent may do.
+    """
+    return next(
+        (
+            rung
+            for rung, settings in _PERMITTED.items()
+            if all(params.get(key) == value for key, value in settings.items())
+        ),
+        None,
+    )
+
+
+def _tighter(permission: str) -> str:
+    """The rung below one this machine's Codex will not take.
+
+    Args:
+      permission: The rung that was refused.
+
+    Returns:
+      The next rung down, and "" for the bottom of the ladder -- where a refusal is a machine
+      that will not run an agent at all rather than one to be met halfway.
+    """
+    at = PERMISSIONS.index(permission) if permission in PERMISSIONS else 0
+    return PERMISSIONS[at - 1] if at else ""
 
 
 #: How long a server being taken down is given to go before it is left to the operating system,
@@ -195,6 +238,9 @@ class _AppServer:
         )
         self._pending = itertools.count(1)
         self._writing = threading.Lock()  # a line is written whole or not at all
+        #: What each rung asked for actually runs at here, which is itself until this machine's
+        #: Codex has refused it. Written the once, by the call that found out.
+        self._instead: dict[str, str] = {}
         #: What each thread has spent so far, by kind, as the server counts it: a running
         #: total, so what one turn cost is the rise across it.
         self._counted: dict[str, Counter[str]] = {}
@@ -217,8 +263,86 @@ class _AppServer:
         held = [one() for one in self._held]
         return [one for one in held if one is not None]
 
+    def permitted(self, permission: str, service_tier: str) -> dict[str, Any]:
+        """What a call of this server is told an agent at that rung may do.
+
+        The rung asked for, until this machine's Codex has refused it: an installation given
+        requirements that forbid the sandbox a rung is takes none of that rung's calls, and
+        what it will take instead is remembered here -- so one refusal is the whole cost of
+        finding out, rather than one per turn.
+
+        Args:
+          permission: One of :data:`hmz.agents.config.PERMISSIONS`.
+          service_tier: The common provider service tier requested for this agent.
+
+        Returns:
+          The settings to send, at the loosest rung this Codex will take of the one asked for.
+        """
+        return unattended(self._instead.get(permission, permission), service_tier)
+
     def call(self, method: str, params: dict[str, Any]) -> Any:
         """Makes one call and reads until it is answered.
+
+        A call naming a rung this machine's Codex will not take is made again a rung down: an
+        installation whose requirements forbid full access refuses `bypass` outright, and the
+        rung below is `auto` -- the same freedom with the asking turned back on, which this
+        client grants. So a flow nobody was asked about goes on running unattended there.
+
+        Args:
+          method: The method to call.
+          params: What to call it with.
+
+        Returns:
+          What the server answered with.
+
+        Raises:
+          subprocess.CalledProcessError: If it refused the call for anything but the rung it
+            named, or stopped before answering.
+        """
+        while True:
+            try:
+                return self._called(method, params)
+            except Failed as refused:
+                if (instead := self._stepped(params, refused)) is None:
+                    raise
+                params = instead
+
+    def _stepped(
+        self, params: dict[str, Any], refused: Failed
+    ) -> dict[str, Any] | None:
+        """The same call a rung down, where Codex refused the rung this one named.
+
+        Args:
+          params: What the call was made with.
+          refused: What the server said about it.
+
+        Returns:
+          Those parameters at the next rung down, or None where the refusal was about
+          something else or there is no rung left below the one it named.
+        """
+        if _FORBIDDEN not in str(refused.stderr or ""):
+            return None
+        asked = _rung(params)
+        if asked is None or not (instead := _tighter(asked)):
+            return None
+        # Every rung that was already running at the refused one runs at this one now: a
+        # ladder walked down twice must not leave the first step pointing at the second.
+        for rung, taken in list(self._instead.items()):
+            if taken == asked:
+                self._instead[rung] = instead
+        self._instead[asked] = instead
+        if not self._watched():
+            # Where a turn's own words go when nothing is watching the agent, which is the one
+            # place a line of ours belongs: something watching owns the screen.
+            say(
+                f"codex: this machine will not run an agent at {asked}, so it runs at"
+                f" {instead}, where what it asks for is granted",
+                sys.stderr,
+            )
+        return params | _PERMITTED[instead]
+
+    def _called(self, method: str, params: dict[str, Any]) -> Any:
+        """Makes that one call, exactly as it stands, and reads until it is answered.
 
         Args:
           method: The method to call.
@@ -867,7 +991,7 @@ class CodexSession(SessionBase):
                         if schema is not None
                         else {}
                     ),
-                    **unattended(
+                    **self._agent.server.permitted(
                         self._agent.config.permission,
                         self._agent.config.service_tier,
                     ),
@@ -921,6 +1045,9 @@ class CodexSession(SessionBase):
           The thread's id, which is also the session's.
         """
         server = self._agent.server
+        rung = server.permitted(
+            self._agent.config.permission, self._agent.config.service_tier
+        )
         if (thread := self._id) is None:
             return str(
                 server.call(
@@ -928,14 +1055,13 @@ class CodexSession(SessionBase):
                     {
                         "cwd": self._workspace(),
                         "model": self._agent.config.model,
-                        **unattended(
-                            self._agent.config.permission,
-                            self._agent.config.service_tier,
-                        ),
+                        **rung,
                     },
                 )["thread"]["id"]
             )
-        server.call("thread/resume", {"threadId": thread})
+        # Said again on the way back in: a thread picked up is picked up under the settings it
+        # was left with, and this session's rung is what its agent is configured for now.
+        server.call("thread/resume", {"threadId": thread, **rung})
         return thread
 
     def _pursue(self, objective: str) -> str:
@@ -962,7 +1088,7 @@ class CodexSession(SessionBase):
                     "input": [{"type": "text", "text": objective}],
                     "model": config.model,
                     "effort": self.effort,
-                    **unattended(config.permission, config.service_tier),
+                    **server.permitted(config.permission, config.service_tier),
                 }
             )
             self._adopt(thread)

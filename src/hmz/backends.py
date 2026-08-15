@@ -19,6 +19,7 @@ purpose does: driving in :mod:`hmz.agents`, reading back in :mod:`hmz.tracing`.
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -34,9 +35,11 @@ __all__ = [
     "Profile",
     "Way",
     "alike",
+    "elsewhere",
     "forget",
     "named",
     "profiles",
+    "program",
     "read",
     "remember",
     "serves",
@@ -1214,6 +1217,64 @@ def named(backend: str) -> Profile | None:
       Its profile, or None for a name no backend answers to.
     """
     return next((one for one in profiles() if backend in one.aliases), None)
+
+
+#: Where a coding agent's CLI lands when it is installed, besides wherever `PATH` names. A flow
+#: is not always started from a shell somebody set up: a notebook kernel, a service, the
+#: launcher of a runtime platform each hand their child the `PATH` they were given, and one
+#: that is missing the directory an installer wrote to would make an agent that is installed
+#: read as one that is not. Looked in after `PATH`, so whatever somebody put in front stays in
+#: front, and only for a name -- a command given as a path is that path or nothing.
+_INSTALLED_AT = (
+    "~/.local/bin",  # where an installer run as a person puts it
+    "/usr/local/bin",  # and where one run as root does
+    "/opt/homebrew/bin",  # homebrew on apple silicon, which a bare login shell misses
+    "/usr/bin",
+    "/bin",
+)
+
+
+def program(command: str) -> str | None:
+    """The program a backend's command runs, as the path to actually spawn.
+
+    Args:
+      command: What the CLI is installed as -- `codex` -- or a path to it.
+
+    Returns:
+      The program to run, and None where there is none: a name `PATH` does not have and no
+      installer left anywhere this looks is a backend that is not installed here.
+    """
+    if os.sep in command:
+        return command if _runnable(Path(command)) else None
+    return shutil.which(command) or elsewhere(command)
+
+
+def elsewhere(command: str) -> str | None:
+    """Where a CLI is installed, for a command this machine's `PATH` does not name.
+
+    Args:
+      command: What the CLI is installed as.
+
+    Returns:
+      The path to run instead, and None for a command `PATH` already names -- which is run by
+      the name it was written with, exactly as it always was -- and for one nothing has
+      installed anywhere this looks.
+    """
+    if os.sep in command or shutil.which(command) is not None:
+        return None
+    return next(
+        (
+            str(at)
+            for directory in _INSTALLED_AT
+            if _runnable(at := Path(directory).expanduser() / command)
+        ),
+        None,
+    )
+
+
+def _runnable(path: Path) -> bool:
+    """Whether that path is a program this machine would run."""
+    return path.is_file() and os.access(path, os.X_OK)
 
 
 def read(

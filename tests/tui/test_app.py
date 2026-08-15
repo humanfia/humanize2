@@ -1194,10 +1194,10 @@ def test_a_backend_offers_what_it_last_said_it_runs(
         )
     )
 
-    def which(name: str) -> str:
-        return f"/usr/bin/{name}"
+    def program(command: str) -> str:
+        return f"/usr/bin/{command}"
 
-    monkeypatch.setattr(discover.shutil, "which", which)
+    monkeypatch.setattr(discover, "program", program)
 
     found = discover.installed()
 

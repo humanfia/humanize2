@@ -15,13 +15,12 @@ on the key that says to ask again -- and read here.
 from __future__ import annotations
 
 import importlib.util
-import shutil
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from hmz import models
-from hmz.backends import profiles, speaking
+from hmz.backends import profiles, program, speaking
 
 if TYPE_CHECKING:
     from hmz.backends import Model
@@ -36,7 +35,8 @@ _LOOKING_SECONDS = 2.0
 def installed() -> dict[str, tuple[Model, ...]]:
     """The backends on this machine, and what each last said it runs.
 
-    Costs a `which` apiece and one file read, so it can be asked for at a prompt.
+    Costs a look for each backend's program and one file read, so it can be asked for at a
+    prompt.
 
     Returns:
       One entry per backend that is on this machine, as the models it last said it runs for
@@ -70,8 +70,8 @@ def _is_installed(backend: str) -> bool:
         return importlib.util.find_spec("deepseek_harness") is not None
     # A CLI somebody added is started by the command they gave rather than by its own name.
     if (added := speaking().get(backend)) is not None:
-        return bool(added) and shutil.which(added[0]) is not None
-    return shutil.which(backend) is not None
+        return bool(added) and program(added[0]) is not None
+    return program(backend) is not None
 
 
 def ready_to_open(backend: str, where: Path) -> bool:

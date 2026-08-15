@@ -116,7 +116,8 @@ The right-hand end of the status line lists the keys that do something right now
 whole of what you have to remember.
 
 ::: details It says `no coding agent is installed here`
-humanize offers exactly the CLIs on your `PATH`, plus DeepSeek Harness when a key is set. See
+humanize offers exactly the CLIs it can find — on your `PATH`, or where an installer would
+have put one — plus DeepSeek Harness when a key is set. See
 [Troubleshooting](/guide/troubleshooting#no-coding-agent-is-installed-here).
 :::
 

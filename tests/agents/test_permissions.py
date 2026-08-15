@@ -349,3 +349,137 @@ def test_a_failed_turn_is_still_a_failed_turn_at_every_rung(
         ClaudeCodeAgent(
             ClaudeCodeAgentConfig(model="m", effort="high", permission="read-only")
         ).new()("hi")
+
+
+#: A `codex app-server` on a machine whose Codex was given requirements of somebody else's: an
+#: enterprise policy that arrives with the account, or the `requirements.toml` a platform that
+#: packages Codex puts on its machines. One forbidding the sandbox `bypass` is refuses the whole
+#: call rather than running it tighter, which is every turn of an unattended flow failing there.
+#: A model of `boom` is refused for a reason that is not the rung, which must not be stepped.
+_REQUIRED = """
+import json, pathlib, sys
+
+LOG = pathlib.Path(sys.argv[0] + ".log")
+
+
+def send(message):
+    sys.stdout.write(json.dumps(message) + "\\n")
+    sys.stdout.flush()
+
+
+for line in sys.stdin:
+    call = json.loads(line)
+    with LOG.open("a") as stream:
+        json.dump(call, stream)
+        stream.write("\\n")
+    if "id" not in call:
+        continue
+    told = call.get("params") or {}
+    if told.get("sandbox") == "danger-full-access":
+        send({"jsonrpc": "2.0", "id": call["id"], "error": {"code": -32600, "message":
+              'failed to load configuration: `approval_policy = "never"` cannot be used '
+              'because requirements do not allow `sandbox_mode = "danger-full-access"`; '
+              "Codex would fall back to read-only permissions with approvals disabled. "
+              "Choose an `approval_policy` based on what you need, such as `on-request`, "
+              "or choose an allowed sandbox mode."}})
+        continue
+    if told.get("model") == "boom":
+        send({"jsonrpc": "2.0", "id": call["id"], "error": {"code": -32600, "message":
+              "the model is not supported when using a ChatGPT account"}})
+        continue
+    send({"jsonrpc": "2.0", "id": call["id"], "result": {"thread": {"id": "thread_fake"}}
+          if call["method"] == "thread/start" else {}})
+    if call["method"] == "thread/start":
+        send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
+    if call["method"] == "turn/start":
+        send({"method": "turn/started", "params": {"turnId": "turn_fake"}})
+        send({"method": "item/completed",
+              "params": {"item": {"type": "agentMessage", "text": "done"}}})
+        send({"method": "turn/completed", "params": {}})
+        send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
+"""
+
+
+def _codex(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Puts that `codex` on PATH, and says where it writes down what it was asked."""
+    binaries = tmp_path / "bin"
+    binaries.mkdir(exist_ok=True)
+    fake = binaries / "codex"
+    fake.write_text(f"#!{sys.executable}\n{_REQUIRED}")
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
+    return binaries / "codex.log"
+
+
+def test_codex_runs_a_rung_down_where_this_machine_will_not_take_the_one_asked_for(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`bypass` is what an unattended flow runs at, and some installations forbid it.
+
+    The rung below is the same freedom with the asking turned back on, and the asking is
+    granted here -- so the flow runs rather than failing on every turn it takes.
+    """
+    log = _codex(tmp_path, monkeypatch)
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
+
+    assert session("do the task") == "done"
+
+    started = [call for call in _noted(log) if call.get("method") == "thread/start"]
+    assert [one["params"]["sandbox"] for one in started] == [
+        "danger-full-access",
+        "workspace-write",
+    ]
+    assert started[-1]["params"]["approvalPolicy"] == "on-request"
+
+
+def test_codex_finds_out_what_this_machine_takes_once_and_not_once_a_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One refusal is the whole cost of finding out, and a resumed thread is told the same."""
+    log = _codex(tmp_path, monkeypatch)
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
+    session("do the task")
+    session("and the next")
+
+    calls = _noted(log)
+    refused = [
+        one for one in calls if one["params"].get("sandbox") == "danger-full-access"
+    ]
+    resumed = [one for one in calls if one.get("method") == "thread/resume"]
+    assert len(refused) == 1
+    assert resumed[0]["params"]["sandbox"] == "workspace-write"
+    assert resumed[0]["params"]["approvalPolicy"] == "on-request"
+    assert [
+        one["params"]["approvalPolicy"]
+        for one in calls
+        if one.get("method") == "turn/start"
+    ] == ["on-request", "on-request"]
+
+
+def test_codex_steps_down_for_the_rung_and_for_nothing_else(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A refusal about the account or the model is the turn's answer, not a rung to walk down."""
+    _codex(tmp_path, monkeypatch)
+    session = CodexAgent(CodexAgentConfig(model="boom", effort="high")).new()
+
+    with pytest.raises(subprocess.CalledProcessError, match="not supported"):
+        session("do the task")
+
+
+@pytest.mark.parametrize(
+    ("refused", "instead"),
+    [
+        ("bypass", "auto"),
+        ("auto", "workspace-write"),
+        ("workspace-write", "read-only"),
+        ("read-only", ""),
+    ],
+)
+def test_the_rung_below_each_rung_is_the_next_one_down(
+    refused: str, instead: str
+) -> None:
+    """And below the bottom there is nothing: a machine that will not run one at all."""
+    from hmz.agents.codex import _tighter
+
+    assert _tighter(refused) == instead

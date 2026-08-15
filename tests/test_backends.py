@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from hmz import backends
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_every_backend_answers_to_its_own_name() -> None:
@@ -142,3 +147,58 @@ def test_supported_backends_share_one_service_tier_setting(backend: str) -> None
     assert profile.name == backend
     assert tier == "fast"
     assert overrides == ()
+
+
+def _installed_at(directory: Path, name: str) -> Path:
+    """Puts a program of that name in a directory, the way an installer would."""
+    directory.mkdir(parents=True, exist_ok=True)
+    program = directory / name
+    program.write_text("#!/bin/sh\nexit 0\n")
+    program.chmod(0o755)
+    return program
+
+
+def test_a_cli_the_path_names_is_the_one_that_is_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Whatever somebody put in front stays in front: PATH is looked at first."""
+    wanted = _installed_at(tmp_path / "bin", "codex")
+    _installed_at(tmp_path / "local", "codex")
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    monkeypatch.setattr(backends, "_INSTALLED_AT", (str(tmp_path / "local"),))
+
+    assert backends.program("codex") == str(wanted)
+
+
+def test_a_cli_installed_where_installers_install_one_is_found_off_any_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A PATH of somebody else's is not a machine with nothing installed on it.
+
+    A notebook kernel, a service and a runtime platform's launcher each hand their child the
+    PATH they were given, and an agent installed here is installed either way.
+    """
+    wanted = _installed_at(tmp_path / "local", "codex")
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    monkeypatch.setattr(backends, "_INSTALLED_AT", (str(tmp_path / "local"),))
+
+    assert backends.program("codex") == str(wanted)
+
+
+def test_a_name_nothing_answers_to_is_no_program(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    monkeypatch.setattr(backends, "_INSTALLED_AT", (str(tmp_path / "local"),))
+
+    assert backends.program("codex") is None
+
+
+def test_a_command_written_as_a_path_is_that_path_or_nothing(tmp_path: Path) -> None:
+    """One somebody wrote down is where they said, rather than a name to go looking for."""
+    program = _installed_at(tmp_path / "opt", "codex")
+    unrunnable = tmp_path / "opt" / "notes.txt"
+    unrunnable.write_text("not a program")
+
+    assert backends.program(str(program)) == str(program)
+    assert backends.program(str(unrunnable)) is None

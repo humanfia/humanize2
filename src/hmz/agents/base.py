@@ -2668,6 +2668,16 @@ class AgentBase(ABC):
           The command to spawn, which is `argv` itself for an agent that is neither anchored
           nor run under a provider -- which is most of them.
         """
+        from hmz.backends import elsewhere
+
+        # A command this machine's PATH does not name is run by the path it is installed at
+        # instead: a flow started by something with a PATH of its own -- a notebook kernel, a
+        # service, the launcher of a runtime platform -- would otherwise fail to start an
+        # agent that is installed here. Everything else is spawned exactly as it was written,
+        # so a name PATH answers to is still the name that runs, and one nothing answers to
+        # still fails saying what could not be found.
+        if (found := elsewhere(argv[0])) is not None:
+            argv = [found, *argv[1:]]
         provider = self.provider
         if provider is not None and provider.args:
             argv = [*argv, *provider.args]

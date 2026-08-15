@@ -5,6 +5,7 @@ import importlib.util
 import shutil
 from typing import TYPE_CHECKING
 
+from hmz import backends
 from hmz.tui import discover
 
 if TYPE_CHECKING:
@@ -25,6 +26,9 @@ def test_dsh_is_installed_when_its_python_sdk_is_importable(
         )
 
     monkeypatch.setattr(shutil, "which", missing_executable)
+    # And nothing where an installer would have left one either: what is installed here is
+    # what this test says it is, rather than what the developer's own machine has.
+    monkeypatch.setattr(backends, "_INSTALLED_AT", ())
     monkeypatch.setattr(
         importlib.util,
         "find_spec",
@@ -51,6 +55,7 @@ def test_a_missing_dsh_sdk_is_installable_but_not_installed(
         return None
 
     monkeypatch.setattr(shutil, "which", missing_executable)
+    monkeypatch.setattr(backends, "_INSTALLED_AT", ())
     monkeypatch.setattr(importlib.util, "find_spec", missing_module)
 
     assert discover.installed() == {}

@@ -19,8 +19,8 @@ Harness), `grok` (Grok Build), `kimi` (Kimi Code), `mimo` (mimocode), `opencode`
 Protocol](/reference/agents#a-cli-of-your-own), at `/providers`.
 
 humanize does not talk to a model provider. It drives the CLI you already have, logged in the
-way you already log in, so your credentials never pass through it. A backend that is not on
-your `PATH` is not offered.
+way you already log in, so your credentials never pass through it. A backend humanize cannot find is not
+offered: it looks on your `PATH` and then where an installer would have put one.
 
 Each backend is driven through whichever of its own interfaces can express what an agent is
 configured with: its command line where that is enough, and the app server it serves its own

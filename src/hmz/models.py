@@ -26,7 +26,7 @@ import subprocess
 from typing import TYPE_CHECKING, Any, cast
 
 from hmz import home, providers
-from hmz.backends import Model, named, speaking
+from hmz.backends import Model, elsewhere, named, speaking
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -221,7 +221,10 @@ def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., st
     environ |= dict(held.env) if held is not None else {}
 
     def run(args: list[str], said: str = "") -> str:
-        argv = [profile.name, *args]
+        # Started as a turn of it is started, which is by name where PATH names one and by
+        # the path it is installed at where it does not: a backend found somewhere this
+        # machine's PATH does not name is still a backend to ask.
+        argv = [elsewhere(profile.name) or profile.name, *args]
         # Under the provider's own credential paths, which is the whole of what makes the
         # answer that account's rather than this machine's.
         done = subprocess.run(

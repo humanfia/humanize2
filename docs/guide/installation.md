@@ -62,7 +62,11 @@ humanize can run the backends installed in its environment. Check the CLI backen
 command -v agy claude codex grok kimi pi qwen opencode mimo
 ```
 
-A CLI backend that is not on your `PATH` is not offered. `dsh` stays in the list of CLIs that
+A CLI backend humanize cannot find is not offered. It looks on your `PATH` first, and then
+where an installer would have put one — `~/.local/bin`, `/usr/local/bin`, `/opt/homebrew/bin`,
+`/usr/bin`, `/bin` — so a backend installed on this machine is offered even when whatever
+started `hmz` handed it a `PATH` of its own. That last part is what a notebook kernel, a
+service or a runtime platform's launcher does. `dsh` stays in the list of CLIs that
 an agent may be set to when its SDK is missing, so that it can show the installation command.
 It becomes selectable when this import succeeds:
 

@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import BaseModel
 
+from hmz import backends
 from hmz.agents import (
     CodexAgent,
     CodexAgentConfig,
@@ -375,6 +376,20 @@ def _agent(effort: str = "high") -> KimiCodeCLIAgent:
     return KimiCodeCLIAgent(KimiCodeCLIAgentConfig(model="kimi-code/k3", effort=effort))
 
 
+def _named(argv: list[str]) -> list[str]:
+    """One command, with the program written as the name its CLI is installed under.
+
+    Args:
+      argv: The command as it would be spawned, whose program is the path this machine has
+        that CLI at.
+
+    Returns:
+      The same command, said the way it is written down, so that what a test reads is the
+      arguments a turn is made of rather than where this machine keeps its coding agents.
+    """
+    return [Path(argv[0]).name, *argv[1:]]
+
+
 def _bodies(server: _FakeServer, path: str) -> list[dict[str, Any]]:
     """What was sent to each call on one of the daemon's paths, oldest first.
 
@@ -576,6 +591,23 @@ def test_codex_resumes_the_thread_a_later_goal_is_set_on(codex: _FakeServer) -> 
         methods.count("thread/start") == 1
     )  # one thread, resumed rather than reopened
     assert methods.count("thread/resume") == 1
+
+
+def test_codex_runs_where_the_path_it_was_started_with_does_not_name_it(
+    codex: _FakeServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A flow is not always started from a shell somebody set up.
+
+    A notebook kernel, a service and a runtime platform's launcher each hand their child the
+    PATH they were given, and an agent installed on this machine is installed either way: it
+    is run by the path it is installed at rather than by a name that PATH has to resolve.
+    """
+    monkeypatch.setattr(backends, "_INSTALLED_AT", (str(tmp_path / "bin"),))
+    monkeypatch.setenv("PATH", str(tmp_path / "nothing"))
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
+
+    assert session.pursue("the suite passes") == "answered"
+    assert next(call["method"] for call in codex.calls()) == "initialize"
 
 
 def test_codex_starts_no_app_server_until_a_turn_needs_one(
@@ -860,7 +892,9 @@ def test_codex_can_disable_goals_before_its_server_starts(
 
     assert not agent.goals_enabled
     assert agent.server is not None
-    assert started == [
+    # By the path this machine has Codex installed at, which is a name only where it is not
+    # installed at all: what is being read here is the arguments it is started with.
+    assert [_named(argv) for argv in started] == [
         [
             "codex",
             "app-server",
@@ -905,7 +939,7 @@ def test_codex_passes_allowlisted_overrides_to_its_app_server(
     )
 
     assert agent.server is not None
-    assert started == [
+    assert [_named(argv) for argv in started] == [
         [
             "codex",
             "app-server",

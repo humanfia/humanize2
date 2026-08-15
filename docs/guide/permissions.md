@@ -75,6 +75,15 @@ reaches for whichever of its own settings says the same thing:
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one.
 
+**A Codex whose rules were set by somebody else runs a rung down rather than not at all.** Some
+installations arrive with requirements — an enterprise policy on the account, a
+`requirements.toml` on a machine whose platform packages Codex — and one that forbids
+`danger-full-access` refuses every call asking for it, which would be every turn at the default
+rung. humanize asks again at `auto` instead: the same freedom, with Codex asking before it
+reaches past the workspace and humanize granting what it asks. It is found out once per agent,
+and the rung you chose is always what is tried first. See
+[Troubleshooting](/guide/troubleshooting#codex-this-machine-will-not-run-an-agent-at-bypass-so-it-runs-at-auto).
+
 Where a backend cannot tell two rungs apart, it says so rather than pretending. **A dash is the
 rung above it, run again.** Asking Kimi for `auto` gets you `workspace-write` behaviour, not a
 quiet promotion to `bypass`. Asking pi for anything above `read-only` gets you the same agent
