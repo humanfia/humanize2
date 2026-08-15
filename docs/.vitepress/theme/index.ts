@@ -1,6 +1,7 @@
-// The home page is a set of diagrams rather than a page of prose, and each feature page is
-// one diagram of its own, so the theme exists to register them. Everything else is VitePress's
-// default theme untouched: the guides, tutorials and reference render exactly as they did.
+// The features landing is a set of diagrams rather than a page of prose, each feature page is
+// one diagram of its own, and every flow has its loop played on its own page -- so the theme
+// exists to register them. Everything else is VitePress's default theme untouched: the guides,
+// tutorials and reference render exactly as they did.
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 
@@ -8,6 +9,8 @@ import HmzAccounts from './components/HmzAccounts.vue'
 import HmzAnchor from './components/HmzAnchor.vue'
 import HmzBackends from './components/HmzBackends.vue'
 import HmzFeatures from './components/HmzFeatures.vue'
+import HmzFlowShape from './components/HmzFlowShape.vue'
+import HmzFlows from './components/HmzFlows.vue'
 import HmzGallery from './components/HmzGallery.vue'
 import HmzGoal from './components/HmzGoal.vue'
 import HmzInstall from './components/HmzInstall.vue'
@@ -32,6 +35,8 @@ export default {
     app.component('HmzAnchor', HmzAnchor)
     app.component('HmzBackends', HmzBackends)
     app.component('HmzFeatures', HmzFeatures)
+    app.component('HmzFlowShape', HmzFlowShape)
+    app.component('HmzFlows', HmzFlows)
     app.component('HmzGallery', HmzGallery)
     app.component('HmzGoal', HmzGoal)
     app.component('HmzInstall', HmzInstall)

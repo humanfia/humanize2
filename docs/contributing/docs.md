@@ -23,10 +23,10 @@ inbound links moving is a red build rather than a 404 somebody finds later.
 
 ```
 docs/
-├── .vitepress/config.mts     nav, sidebars, everything
-├── .vitepress/theme/         the palette, and the diagrams the home page is made of
-├── index.md                  the home page
+├── .vitepress/config.mts     nav, sidebars, the root's redirect, everything
+├── .vitepress/theme/         the palette, and every diagram on the site
 ├── features/                 one page per feature, each built on a diagram you can push
+├── flows/                    one page per flow, each with its own loop played on it
 ├── tutorials/                six, in order, each a whole piece of work
 ├── guide/                    one page per feature, answering "how do I use this?"
 ├── reference/                CLI, TUI, and the Python API
@@ -35,15 +35,22 @@ docs/
 └── tapes/                    the VHS scripts the demos are rendered from
 ```
 
+**There is no `index.md`.** The site's root is a redirect to `/features/`, written into the
+built site by `buildEnd` and served by a dev-server middleware beside it — both in
+`config.mts`, both naming one constant. A front page that explained nothing, above five
+sections that explain everything, was a page a reader passed through; what it used to draw is
+drawn on the page it now goes to.
+
 `tapes/` is the one directory under `docs/` that is not the site: `srcExclude` keeps its README
 out of the build, because a page written for somebody standing in that directory with docker is
 not a page a reader of the site is looking for. What they need of it is below.
 
-Four kinds of page, and a page that is two of them is two pages.
+Five kinds of page, and a page that is two of them is two pages.
 
 | | | |
 | --- | --- | --- |
-| **Features** | understanding | One page per feature, built around a diagram the reader can push. What it is and why it works the way it does. **No commands and no code**: a reader who wants to run it is one click from the guide, which every page ends by naming. |
+| **Features** | understanding | One page per feature, built around a diagram the reader can push. What it is and why it works the way it does. **No commands and no code**: a reader who wants to run it is one click from the guide, which every page ends by naming. Its index is the front of the site. |
+| **Flows** | what there is to run | One page per flow humanize or the official flowverse ships, named the way `-f` takes it, opening with the `hmz exec` line and the shape of its loop. What it is for, what it takes, and what a run picked up carries in. |
 | **Tutorials** | learning | Taken in order, start to finish, with every command written out. A reader following one is not choosing anything; they are being led. Six of them, and adding a seventh means arguing that one of the six should go. |
 | **Guides** | doing | "How do I use X?" One feature each. Opens with a `## Try it` section short enough to paste, then explains the rest. A reader here has a job and knows what they want. |
 | **Reference** | looking up | Complete and dry. Every flag, key, argument and return. A reader here already knows what they are looking for. |
@@ -70,29 +77,50 @@ and a reader learning read a feature page.
 Adding a page means adding it to `sidebar` in `.vitepress/config.mts`; it will not appear
 otherwise.
 
-## The home page
+## The front of the site
 
-`index.md` is a frontmatter hero, one line of install, and five drawings. It explains nothing:
-a reader who wants to know how to use something is one click from a tutorial, a guide or the
-reference, and every one of those is a better page for it than a front page is.
+`features/index.md` is what somebody arriving is handed: one line of install with the way to
+the quickstart beside it, four drawings, the recorded demos, and the index of the feature
+pages. It explains nothing at length — a reader who wants to know how to use something is one
+click from a tutorial, a guide or the reference, and every one of those is a better page for it.
 
 ```
 .vitepress/theme/
 ├── index.ts                  registers the components; the rest is VitePress's default theme
-├── style.css                 the palette, the hero, the shell every section is drawn in,
-│                              and the width the nav folds into a button at
+├── style.css                 the palette, the shell every diagram is drawn in, and the width
+│                              the nav folds into a button at
+├── flows.ts                  every flow there is, and the shape of each one
 └── components/
-    ├── HmzInstall.vue        the one line, and a button that copies it
+    ├── HmzInstall.vue        the one line, a button that copies it, and the way to the quickstart
     ├── HmzOrchestra.vue      a run simulated lane by lane, landing on a trace strip
     ├── HmzFeatures.vue       eight features, one small drawing each
     ├── HmzAnchor.vue         pick a syscall, watch which side of the anchor answers it
-    ├── HmzStack.vue          the layers, and what each is allowed to name
     └── HmzGallery.vue        the recorded demos, played on hover and opened on click
 ```
 
+## The flow pages
+
+Two components and one module, and the module is the point: `theme/flows.ts` holds every flow's
+name, where it comes from, what it drives and what stops it — **and** the script of turns its
+loop is, which `HmzFlowShape` plays. The catalogue and the diagrams cannot disagree, and a flow
+added to the flowverse is one entry there rather than a page and a drawing that drift apart.
+
+```
+HmzFlows.vue        flows/               every flow as a card, its loop drawn small and moving
+HmzFlowShape.vue    flows/*              one flow's rounds, played: who takes a turn, on
+                                          whose session, and what it hands the next one
+```
+
+What the shapes are read off is the flows themselves: `src/hmz/flows/builtin/` for the three
+humanize ships, and [humanfia/flowverse](https://github.com/humanfia/flowverse) for the rest.
+A `new` box is a session the flow opened for that turn and a `held` box is another turn of the
+one it had — which is most of what separates these flows from each other, and so is the thing
+the diagram draws largest.
+
 ## The feature pages
 
-One page, one diagram, one component, registered in the same `index.ts`:
+One page, one diagram, one component, registered in the same `index.ts` — the feature pages,
+and the one elsewhere that is built the same way:
 
 ```
 HmzMap.vue          features/            the six stages, and every page hung off one
@@ -108,18 +136,22 @@ HmzResume.vue       features/resuming    pull the plug, then run it again
 HmzGoal.vue         features/goals       the model deciding, beside your code deciding
 HmzMoments.vue      features/hooks       hang a hook, run the turn, read what it said
 HmzPerson.vue       features/human       a questionnaire built out of a pydantic model
+HmzStack.vue        contributing/architecture
+                                         the layers, and what each is allowed to name
 ```
 
 Four things they are all held to:
 
 - **A drawing says what the code does.** `HmzAnchor` and `HmzSyscalls` route each call the way
   `coganchor/SPEC.md` and `coganchor/linux/seccomp.py` route it; `HmzStack`'s edges are the
-  `ALLOWED` table in `tests/test_layering.py`; `HmzBackends` is `hmz/backends.py` and which
+  `ALLOWED` table in `tests/test_layering.py`; every box in `theme/flows.ts` is a turn a flow
+  really takes; `HmzBackends` is `hmz/backends.py` and which
   session base each agent class derives from; `HmzAccounts`' waits are the formulas in
   `providers/retry.py`; every agent on `HmzOrchestra` is spelled the way `hmz exec -a` would
   take it. A diagram that drifts from those is a diagram that lies to a reader.
-- **A simulation is not dressed up as a recording.** `HmzOrchestra` and the feature diagrams are
-  drawn; the gallery on the home page is what the real thing looks like.
+- **A simulation is not dressed up as a recording.** `HmzOrchestra`, the feature diagrams and
+  the flow shapes are drawn; the gallery below them is what the real thing looks like, and says
+  so.
 - **Interaction is the argument.** The switch on `HmzTimeline` exists because the clock
   correction is hard to believe in prose, and the one on `HmzTurns` because "two turns on one
   session are sequential" is a rule people read past. A control that does not settle a question

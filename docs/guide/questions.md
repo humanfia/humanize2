@@ -38,7 +38,7 @@ def run(agents: Agents, task: str) -> None:
 ```
 
 Saying something to a `Person` is asking what to say next; what it answers with is what you
-typed. This flow is [`chat`](/reference/flows#the-flows-humanize-ships), the flow the interface
+typed. This flow is [`chat`](/flows/chat), the flow the interface
 opens on.
 
 **Step 2.** Run it from a command line.

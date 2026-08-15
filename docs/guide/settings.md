@@ -133,7 +133,7 @@ stretch again.
 ## The first time
 
 With nothing remembered, the interface opens on the
-[`chat`](/reference/flows#the-flows-humanize-ships) flow. It opens on the first backend
+[`chat`](/flows/chat) flow. It opens on the first backend
 installed here that has said what it runs, at the first model it named and at `high`. The first
 model is that CLI's own idea of what it runs by default. `high` is deliberately not the hardest
 setting. It is the one to reach for rather than the one to spend before anybody has asked for

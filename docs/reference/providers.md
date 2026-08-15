@@ -13,7 +13,7 @@ A coding agent CLI signs in once. Claude Code keeps its account under `~/.claude
 `claude` started on this machine is whoever is signed in there — so a flow that wants two of
 them on two accounts has two accounts wanting one directory.
 
-A provider is the second directory. [flame_chase](/reference/flows#the-official-flowverse) hands
+A provider is the second directory. [flame_chase](/flows/flame-chase) hands
 the same task to two agents in turn; here both are Claude Code — one on the Anthropic
 subscription running Opus, one on a DeepSeek endpoint running DeepSeek's own model:
 

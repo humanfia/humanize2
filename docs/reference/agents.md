@@ -916,7 +916,7 @@ moves a turn at a time rather than a request at a time.
 many. That average is what an effort moves: a model asked to think harder writes more in each
 answer and takes longer over it. So it is the number to steer by when what is being held is
 how hard the thing is thinking rather than how fast a bill is running up, and it is what
-[`fixed_juice_ralph`](/reference/flows#the-official-flowverse) governs on. A window with no
+[`fixed_juice_ralph`](/flows/fixed-juice-ralph) governs on. A window with no
 turn in it reads as `0.0`: nothing to go on, which a flow tells apart from a turn that said
 nothing.
 

@@ -834,7 +834,7 @@ where it is yours — and where the name then means your copy.
 ## The flows humanize ships
 
 Three, which are the shapes a flow takes. Each names the `hmz exec` line that starts it in its
-own docstring.
+own docstring, and each has a [page of its own](/flows/) with its loop drawn on it.
 
 | Flow | Agents | What it does |
 | --- | --- | --- |
@@ -886,7 +886,8 @@ a checkout, or wherever `pip` put it.
 
 Everything else humanize offers is in [humanfia/flowverse](https://github.com/humanfia/flowverse),
 which is [fetched](#flowverses) the first time somebody wants what is in it. Five of these are
-flowbench's loops, written against this API.
+flowbench's loops, written against this API. [Flows](/flows/) is the same list with the shape of
+each one drawn.
 
 | Flow | Agents | What it does |
 | --- | --- | --- |
@@ -898,6 +899,8 @@ flowbench's loops, written against this API.
 | `official/humanize1:gen-idea` | `drafter` | Opens a loose idea into a repo-grounded draft. |
 | `official/humanize1:gen-plan` | `planner`, `analyst` | Turns that draft into a plan both sides have converged on. |
 | `official/humanize1:rlcr` | `builder`, `reviewer` | Builds the plan under review until nothing is left to say. Run it in a git repository. |
+| `official/parallel_flame_chase` | 7 | A coordinator plans three isolated lanes and leaves; six actors alternate two to a lane and coordinate by durable report. Lane 1 alone writes the original source; lanes 2 and 3 work in snapshots and publish artifacts. |
+| `official/parallel_flame_chase_mission` | 7 | The same three lanes, with a fresh coordinator returning to adjudicate outcomes, deadlines, stalls and objective revisions, and to run periodic portfolio audits. |
 
 Every one of them but the two drafting phases [can be picked up](#a-flow-that-can-be-picked-up),
 each keeping the little it honestly can. The three Ralphs keep the round they reached, as
@@ -911,7 +914,9 @@ thing a restart would otherwise throw away — and keeps nothing at all where th
 a run that is over being nothing to carry on. `humanize1:rlcr` keeps which `.humanize/rlcr/`
 directory the loop is in and reads `state.md` back as it stands, rather than stamping a new
 directory beside a week of rounds. `gen-idea` and `gen-plan` keep nothing: each writes one file,
-and running one again is meant to write another.
+and running one again is meant to write another. The two parallel flows keep their plan, their
+snapshots and each lane's A/B alternation, and take `resume_mode: fresh` to start another run
+rather than carry that one on.
 
 `humanize1` is [PolyArch/humanize](https://github.com/PolyArch/humanize), and its three commands
 are [three flows in one file](#several-flows-in-one-file) — set up on their own agents, run one
@@ -927,6 +932,12 @@ the builder has to be a backend that runs it.
 
 It writes what the plugin writes, where the plugin writes it: `.humanize/rlcr/<timestamp>/`
 with `state.md`, `goal-tracker.md`, and a prompt, summary, contract and review per round.
+
+The two `parallel_flame_chase` flows are one runtime under two public names. They share a hidden
+sibling module so their isolation and recovery semantics cannot drift apart, and differ in
+whether the coordinator comes back: the base flow stops at durable peer coordination, and the
+mission flow adds scoped evidence audits, interruptions and an integration queue. Both want
+exactly seven agents, in the order the flow names them.
 
 Read [Security](/guide/security) before starting any of them.
 

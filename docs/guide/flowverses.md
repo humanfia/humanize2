@@ -78,8 +78,8 @@ the repository to.
 
 | | |
 | --- | --- |
-| `builtin` | the flows in the package: [`chat`, `ralph_loop`, `stateful_ralph`](/reference/flows#the-flows-humanize-ships) |
-| `official` | [humanfia/flowverse](https://github.com/humanfia/flowverse) — everything else humanize offers |
+| `builtin` | the flows in the package: [`chat`, `ralph_loop`, `stateful_ralph`](/flows/) |
+| `official` | [humanfia/flowverse](https://github.com/humanfia/flowverse) — [everything else](/flows/) humanize offers |
 
 Run a flow from `official` by giving `-f` the flowverse and the flow:
 
@@ -292,6 +292,7 @@ A flow that stopped loading is a red build.
 
 ## See also
 
+- [Flows](/flows/) — every flow the two of them hold, with the shape of each drawn
 - [Flows › Flowverses](/reference/flows#flowverses)
 - [The official flowverse](/reference/flows#the-official-flowverse)
 - [Testing a flow](/guide/testing-flows)

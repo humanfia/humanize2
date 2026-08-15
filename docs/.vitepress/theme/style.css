@@ -1,6 +1,6 @@
 /* The palette comes from the logo -- #608ab1 -- rather than from VitePress's default green,
-   so the chevron, the buttons, the links and every diagram on the home page are one colour
-   family. Each diagram then adds one accent of its own from the pair below. */
+   so the chevron, the buttons, the links and every diagram on the site are one colour family.
+   Each diagram then adds one accent of its own from the pair below. */
 
 :root {
   --vp-c-brand-1: #2a6ea6;
@@ -23,16 +23,6 @@
   --hmz-grid: rgba(96, 138, 177, 0.16);
   --hmz-panel-bg: var(--vp-c-bg-soft);
   --hmz-panel-border: var(--vp-c-divider);
-
-  --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: linear-gradient(
-    110deg,
-    #608ab1 0%,
-    #2a9d8f 45%,
-    #7c6cf0 100%
-  );
-  --vp-home-hero-image-background-image: linear-gradient(-45deg, #608ab1 30%, #14b8a6 70%);
-  --vp-home-hero-image-filter: blur(52px);
 }
 
 .dark {
@@ -53,13 +43,13 @@
   --hmz-lane-6: #9aa3b8;
 
   --hmz-grid: rgba(140, 184, 222, 0.14);
-  --vp-home-hero-image-filter: blur(64px);
 }
 
-/* A feature page is a diagram with prose around it, so its column is wider than a prose column
-   would be -- a timeline squeezed into 688px is a timeline nobody can read. The prose inside it
-   is held to its own measure, so only the diagrams and the tables take the extra room.
-   `pageClass: hmz-feature` in each page's front matter is what turns this on. */
+/* A feature page -- and a flow page, and the features landing the site's root goes to -- is a
+   diagram with prose around it, so its column is wider than a prose column would be: a timeline
+   squeezed into 688px is a timeline nobody can read. The prose inside it is held to its own
+   measure, so only the diagrams and the tables take the extra room. `pageClass: hmz-feature` in
+   each page's front matter is what turns this on. */
 .Layout.hmz-feature .VPDoc.has-aside .content-container {
   max-width: 940px;
 }
@@ -72,133 +62,18 @@
   max-width: 46rem;
 }
 
-.Layout.hmz-feature .vp-doc > div > .hmz-panel {
-  margin: 22px 0 28px;
+/* The diagrams and card grids stand in the flow of a document now rather than inside a section
+   of a front page, so the space around one is set here. Only a direct child of the content is
+   matched: the same class names occur inside these components, laying out their own insides. */
+.vp-doc > div > .hmz-panel,
+.vp-doc > div > .gallery,
+.vp-doc > div > .flows,
+.vp-doc > div > .hmz-paths,
+.vp-doc > div > .grid {
+  margin: 22px 0 30px;
 }
 
-/* The hero sits on a slow-drifting field so the first screenful is moving before anything
-   is scrolled. It is drawn behind everything and takes no clicks. */
-.VPHome {
-  position: relative;
-  isolation: isolate;
-  padding-bottom: 96px;
-  /* The field below is drawn wider than the page so it runs off both edges rather than
-     stopping at one. Unclipped, the half of it past the right edge is scrollable width:
-     a quarter of a screen of empty page to scroll into. `clip` cuts it without making a
-     scroll container, so nothing inside stops being sticky. */
-  overflow-x: clip;
-}
-
-.VPHome::before {
-  content: '';
-  position: absolute;
-  inset: -10% -20% auto -20%;
-  height: 720px;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(38% 46% at 22% 18%, rgba(96, 138, 177, 0.28), transparent 70%),
-    radial-gradient(34% 42% at 78% 12%, rgba(20, 184, 166, 0.22), transparent 70%),
-    radial-gradient(30% 38% at 55% 46%, rgba(124, 108, 240, 0.18), transparent 72%);
-  animation: hmz-drift 24s ease-in-out infinite alternate;
-}
-
-@keyframes hmz-drift {
-  from {
-    transform: translate3d(-2%, 0, 0) scale(1);
-  }
-  to {
-    transform: translate3d(3%, 3%, 0) scale(1.08);
-  }
-}
-
-.VPHome .VPHero .name {
-  font-size: clamp(48px, 9vw, 84px);
-  letter-spacing: -0.02em;
-}
-
-/* The glow behind the chevron is smaller than the chevron, so the mark stays legible on it. */
-.VPHome .VPHero .image-bg {
-  width: 240px;
-  height: 240px;
-  opacity: 0.75;
-}
-
-.VPHome .VPHero .tagline {
-  max-width: 34rem;
-}
-
-/* Every home-page section is one of these: an eyebrow, a title, a diagram, and at most one
-   line of prose. Prose belongs in the guides. */
-.hmz-section {
-  max-width: 1152px;
-  margin: 0 auto;
-  padding: 64px 24px 0;
-}
-
-.hmz-section > header {
-  margin-bottom: 26px;
-}
-
-.hmz-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--vp-c-brand-1);
-}
-
-.hmz-eyebrow::before {
-  content: '';
-  width: 22px;
-  height: 2px;
-  border-radius: 2px;
-  background: currentColor;
-}
-
-.hmz-section h2 {
-  margin: 10px 0 0;
-  border: 0;
-  padding: 0;
-  font-size: clamp(26px, 3.4vw, 38px);
-  line-height: 1.16;
-  letter-spacing: -0.02em;
-  font-weight: 700;
-}
-
-.hmz-section h2 em {
-  font-style: normal;
-  background: linear-gradient(100deg, var(--vp-c-brand-1), var(--hmz-accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.hmz-section > header p {
-  margin: 10px 0 0;
-  max-width: 46rem;
-  color: var(--vp-c-text-2);
-  line-height: 1.6;
-}
-
-.hmz-panel {
-  border: 1px solid var(--hmz-panel-border);
-  border-radius: 16px;
-  background: var(--hmz-panel-bg);
-  overflow: hidden;
-}
-
-.hmz-note {
-  margin: 14px 2px 0;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--vp-c-text-3);
-}
-
-/* The last strip: four ways in, and the one warning that belongs on a front page. */
+/* Four ways on, at the foot of the page the site's root goes to. */
 .hmz-paths {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -220,6 +95,14 @@
   transform: translateY(-2px);
 }
 
+/* A card that is a link is still a card: the theme underlines and recolours every `a` in the
+   content, which across a whole card reads as a mistake. */
+.vp-doc .hmz-paths a,
+.vp-doc .hmz-paths a:hover {
+  font-weight: inherit;
+  text-decoration: none;
+}
+
 .hmz-paths strong {
   display: block;
   font-size: 15px;
@@ -234,19 +117,6 @@
   color: var(--vp-c-text-3);
 }
 
-.hmz-warn {
-  margin: 20px 0 0;
-  padding: 14px 18px;
-  border: 1px solid var(--vp-c-warning-soft);
-  border-left: 3px solid var(--vp-c-warning-1);
-  border-radius: 10px;
-  background: var(--vp-c-warning-soft);
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--vp-c-text-2);
-}
-
-.hmz-warn a,
 .hmz-note a {
   font-weight: 600;
   color: var(--vp-c-brand-1);
@@ -259,26 +129,23 @@
 }
 
 @media (max-width: 640px) {
-  .hmz-section {
-    padding: 48px 20px 0;
-  }
-
   .hmz-paths {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .VPHome::before {
-    animation: none;
-  }
+/* A flow is named the way `-f` takes it, and `official/parallel_flame_chase_mission` is longer
+   than the sidebar is wide. The theme lets a line like that run off the edge; this breaks it
+   instead, and only where there is nothing else to break on. */
+.VPSidebarItem .text {
+  overflow-wrap: anywhere;
 }
 
-/* The default theme opens the nav bar out into five links, a search box and the overflow
-   button at 768px wide. Five is one more than fits: from 768px to 812px the button holding
-   the theme switch and the GitHub link sits past the right edge, and the page scrolls
-   sideways to reach it. So the nav stays a button until 960px -- the width the sidebar comes
-   back at. Below that the layout is already the compact one, and now the nav is too.
+/* The default theme opens the nav bar out into its links, a search box and the overflow button
+   at 768px wide. Six links are more than fit there: the button holding the theme switch and the
+   GitHub link sits past the right edge, and the page scrolls sideways to reach it. So the nav
+   stays a button until 960px -- the width the sidebar comes back at, and by then there is room
+   for all six. Below that the layout is already the compact one, and now the nav is too.
    The doubled class outweighs the scoped selectors these rules are overriding. */
 @media (min-width: 768px) and (max-width: 959px) {
   .VPNavBarHamburger.VPNavBarHamburger {

@@ -77,7 +77,7 @@ flow can therefore log that its agent wanted to ask, without answering it.
 
 ## When to leave it off
 
-- The [`chat`](/reference/flows#the-flows-humanize-ships) flow, where a question is the point.
+- The [`chat`](/flows/chat) flow, where a question is the point.
 - A flow that drives [the person as an agent](/guide/human-agent). That side of it is you, and
   `/afk` makes it answer nothing, which ends the conversation.
 - Any flow that asks you for [an answer in a shape](/guide/shapes). A questionnaire nobody

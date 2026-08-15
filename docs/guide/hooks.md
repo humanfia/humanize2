@@ -117,7 +117,7 @@ def keep_going(occasion: Occasion) -> Verdict | None:
     return None
 ```
 
-That is what [`official/humanize1:rlcr`](/reference/flows#the-official-flowverse) is built on:
+That is what [`official/humanize1:rlcr`](/flows/humanize1) is built on:
 a round *is* the builder believing the plan is done and trying to stop, and what the reviewer
 says is what it hears instead. Compare [Goals](/guide/goals), where the model decides.
 

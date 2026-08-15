@@ -98,7 +98,10 @@ machines            │
       cli   ← may name anything; it is what joins them
 ```
 
-It is a DAG with no exceptions. Nothing points both ways.
+<HmzStack />
+
+It is a DAG with no exceptions. Nothing points both ways. The diagram above is the same table
+drawn: hover a layer and it lights up exactly what that layer is allowed to name.
 
 Two edges are worth explaining:
 

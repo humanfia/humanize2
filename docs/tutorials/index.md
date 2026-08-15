@@ -35,6 +35,7 @@ A flow is a directory of Python. These two write one from scratch.
 
 ## After that
 
+- Every flow there is to run, with the shape of each drawn: [Flows](/flows/).
 - Every feature, one page each: [Guides](/guide/).
 - Every flag, key and Python call: [Reference](/reference/cli).
 - What humanize does, in one page: [Features](/features/).

@@ -39,7 +39,7 @@ def run(agents: Chat, task: str) -> None:
         said = agents.human(answered)
 ```
 
-That is [`chat`](/reference/flows#the-flows-humanize-ships), the flow the interface opens on.
+That is [`chat`](/flows/chat), the flow the interface opens on.
 
 A `Person` is not one of the agents you name with `-a`, because **nobody is asked what the
 person runs**. The flow above drives two agents, so you start it with one `-a`:

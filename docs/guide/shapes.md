@@ -46,7 +46,7 @@ if review is not None and review.done:
     return
 ```
 
-That is what [`official/rlar`](/reference/flows#the-official-flowverse) ends on, and what
+That is what [`official/rlar`](/flows/rlar) ends on, and what
 `humanize1` asks its analyst and its reviewer before it starts anything.
 
 Here is a whole flow built on it:

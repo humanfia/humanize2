@@ -110,7 +110,7 @@ over it. So that average is what an effort moves.
 agent.juice(over=60)
 ```
 
-`juice()` is what [`official/fixed_juice_ralph`](/reference/flows#the-official-flowverse)
+`juice()` is what [`official/fixed_juice_ralph`](/flows/fixed-juice-ralph)
 governs on. It is a Ralph loop that moves the effort a rung a round to hold the agent to a
 target. See [Cost and rate](/guide/tally).
 

@@ -97,14 +97,17 @@ read back, in fifteen minutes.
 
 ## Documentation
 
-**[docs.humanfia.ai/humanize2](https://docs.humanfia.ai/humanize2/)**, in four parts. Its source is under
+**[docs.humanfia.ai/humanize2](https://docs.humanfia.ai/humanize2/)**, in five parts. Its source is under
 [docs/](docs/).
 
+- **[Features](https://docs.humanfia.ai/humanize2/features/)** — what humanize does, a diagram each. The
+  front of the site.
+- **[Flows](https://docs.humanfia.ai/humanize2/flows/)** — every flow it can run, from `chat` to seven
+  agents in three isolated lanes, with the shape of each one drawn.
 - **[Tutorials](https://docs.humanfia.ai/humanize2/tutorials/)** — six, in order. A quickstart, three real
   pieces of work run end to end, and two flows written from scratch.
 - **[Guides](https://docs.humanfia.ai/humanize2/guide/)** — a page per feature, each answering "how do I
   use this?" and opening with something you can paste.
-- **[Features](https://docs.humanfia.ai/humanize2/features/)** — what humanize does, described in one page.
 - **[Reference](https://docs.humanfia.ai/humanize2/reference/cli)** — the complete CLI, TUI and Python API.
 
 ## Maintainers
