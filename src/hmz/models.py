@@ -21,6 +21,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import pathlib
 import re
 import subprocess
 from typing import TYPE_CHECKING, Any, cast
@@ -556,6 +557,64 @@ def _qwen(profile: Profile, _run: Callable[..., str]) -> list[Model]:
     return [Model(name, profile.efforts, profile.swarms) for name in _ADVISORY["qwen"]]
 
 
+def _zcode(profile: Profile, run: Callable[..., str]) -> list[Model]:
+    """What ZCode's app server says the providers it is configured with front.
+
+    Its command line has no `models`, because a model there belongs to a provider its
+    configuration file names, and what resolves that file into a catalogue is the app server.
+    So it is asked the way anything asks it: one frame in, one answer out, and the process
+    ends when there is nothing more on its stdin.
+
+    Args:
+      profile: ZCode's own.
+      run: What puts the question.
+
+    Returns:
+      One per model it is configured for, as `provider/id`, at the thought levels it said that
+      model takes.
+
+    Raises:
+      ValueError: If nothing it wrote answers the question.
+    """
+    where = str(pathlib.Path.cwd())
+    asked = json.dumps(
+        {
+            "id": 1,
+            "method": "workspace/readState",
+            "params": {
+                "workspace": {"workspacePath": where, "workspaceKey": where},
+            },
+        }
+    )
+    for line in run(["app-server", "--stdio"], asked + "\n").splitlines():
+        try:
+            frame = _loaded(line)
+        except (TypeError, ValueError):
+            continue  # the server asks things of its client on the same stream
+        if frame.get("id") != 1 or "result" not in frame:
+            continue
+        held = cast("dict[str, Any]", frame.get("result") or {})
+        catalogue = cast("dict[str, Any]", held.get("modelCatalog") or {})
+        found: list[Model] = []
+        for one in cast("list[Any]", catalogue.get("available") or []):
+            model = cast("dict[str, Any]", one)
+            named = cast("dict[str, Any]", model.get("ref") or {})
+            reasoning = cast("dict[str, Any]", model.get("reasoning") or {})
+            levels = [
+                cast("dict[str, Any]", rung).get("value")
+                for rung in cast("list[Any]", reasoning.get("levels") or [])
+            ]
+            found.append(
+                Model(
+                    f"{named.get('providerId', '')}/{named.get('modelId', '')}",
+                    _rungs(profile, levels),
+                    profile.swarms,
+                )
+            )
+        return found
+    raise ValueError("it said nothing about what it runs")
+
+
 def _listed(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """What opencode and mimocode list, which is a model a line and its size after it.
 
@@ -673,4 +732,5 @@ _READING: dict[str, Callable[[Profile, Callable[..., str]], list[Model]]] = {
     "qwen": _qwen,
     "opencode": _listed,
     "mimo": _listed,
+    "zcode": _zcode,
 }

@@ -91,6 +91,7 @@ const BACKENDS: Backend[] = [
   { name: 'pi', held: false, how: 'asked in the prompt, and what it says is read back' },
   { name: 'opencode', held: false, how: 'asked in the prompt, and what it says is read back' },
   { name: 'mimo', held: false, how: 'asked in the prompt, and what it says is read back' },
+  { name: 'zcode', held: false, how: 'asked in the prompt, and what it says is read back' },
 ]
 
 const shape = ref(0)

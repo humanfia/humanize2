@@ -31,7 +31,7 @@ a target and could be lifted out whole, so it has a name of its own.
 
 | Layer | Is | Entry points |
 | --- | --- | --- |
-| `backends.py` | Names, aliases, efforts, home directories, log globs, credential paths, ways in and skill directories for all ten backends. Facts, not code — standard library only, and no model id anywhere in it. | `PROFILES`, `named()`, `profiles()`, `read()`, `remember()` |
+| `backends.py` | Names, aliases, efforts, home directories, log globs, credential paths, ways in and skill directories for all eleven backends. Facts, not code — standard library only, and no model id anywhere in it. | `PROFILES`, `named()`, `profiles()`, `read()`, `remember()` |
 | `models.py` | What each backend runs, asked of that backend the way it offers being asked, and kept per account. Nothing here is a list: a CLI ships models without asking anybody. | `ask`, `offered`, `asked`, `where` |
 | `agents/` | The drivers: one per backend, plus the vocabulary a turn is described in (`Event`, `Question`, `Moment`). `AgentBase` and `SessionBase` answer to the interface `flows/` declares, structurally — this layer never names a flow. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
@@ -52,7 +52,8 @@ agents/
 ├── hooks.py      Moment, Occasion, Verdict, Hooks — the same, for what a turn stops at
 ├── base.py       AgentBase and SessionBase: two halves of one object, declared in one file
 ├── config.py     AgentConfig, anchored
-└── claude.py codex.py kimi.py pi.py opencode.py mimo.py human.py
+└── claude.py agy.py codex.py dsh.py grok.py kimi.py pi.py qwen.py opencode.py mimo.py
+    zcode.py acp.py human.py
 
 flows/
 ├── agent.py      Agent, Session, Person — what a flow drives, as interfaces and nothing else
@@ -181,12 +182,20 @@ SPEC; propose the SPEC change separately.
 
 ## Adding things
 
-**A backend.** A `Profile` in `backends.py`, a driver in `agents/`, a reader in
-`tracing/readers/`, its state paths in `coganchor/statepaths.py`, and an entry in the `DRIVEN`
-table in `agents/__init__.py`, which `runner.py` and the interface both read. Subclass
-`CommandSessionBase` if a turn is one run of a command line, or
-`StreamSessionBase` if it is one long-lived process spoken to a line at a time —
+**A backend.** A `Profile` in `backends.py`, a driver in `agents/`, an entry in the `DRIVEN`
+table in `agents/__init__.py`, which `runner.py` and the interface both read, a way of asking
+it what it runs in `models.py`'s `_READING` table, and its state paths in
+`coganchor/statepaths.py`. Subclass `CommandSessionBase` if a turn is one run of a command
+line, or `StreamSessionBase` if it is one long-lived process spoken to a line at a time —
 `agents/SPEC.md` says which and why.
+
+Then whatever its logs allow, and nothing more: a reader in `tracing/readers/` where a session
+of it can be gathered afterwards, and a branch in `tui/tally.py`'s `_spent` where a row of them
+says what one request cost, which is what a tally moving during a turn is read out of. A
+backend that writes neither gets neither, and says so rather than being left out.
+
+And the documentation. Several pages count the backends and several tables name every one of
+them, so one added without them is a site that says there are fewer than there are.
 
 **A machine.** Two classes in `machines/`, per [Machines](/reference/machines#writing-a-machine-of-your-own).
 

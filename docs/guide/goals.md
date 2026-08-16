@@ -41,6 +41,7 @@ The awaited twin is `agent.apursue(objective)`. A session has both: `session.pur
 | Codex | yes |
 | DeepSeek Harness | yes |
 | Kimi Code | yes |
+| ZCode | yes |
 | pi, opencode, mimocode | no |
 
 On a backend without one, `pursue` raises `NotImplementedError`, whether or not `suppress` is

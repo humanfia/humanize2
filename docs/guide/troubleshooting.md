@@ -146,7 +146,7 @@ None of `claude`, `codex` or `kimi` was found, on your `PATH` or in the director
 installer puts one in. humanize drives the CLI you already have. It holds no API key and talks to no model provider itself.
 
 ```sh
-command -v claude codex kimi pi opencode mimo
+command -v claude codex kimi pi opencode mimo zcode
 ```
 
 ### `no choosing a flow while a flow is running: ctrl+c twice stops it first`
@@ -197,7 +197,8 @@ colour at all.
 
 It should not. The cost readout tails the logs the backends write as they go, rather than
 waiting for a turn to end. If it does sit still, the backend's home is somewhere humanize is
-not looking. Check `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `KIMI_CODE_HOME`.
+not looking. Check `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `KIMI_CODE_HOME`. ZCode has no variable
+of its own, so its home is `~/.zcode` under whatever `HOME` says.
 
 ## Driving agents from Python
 

@@ -19,6 +19,7 @@ const HAVE = [
   { name: 'pi', has: false },
   { name: 'opencode', has: false },
   { name: 'mimo', has: false },
+  { name: 'zcode', has: true },
 ]
 
 const PURSUED = [

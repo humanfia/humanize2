@@ -67,14 +67,15 @@ What each backend keeps an account in, and so what a provider of it holds:
 | `qwen` | `~/.qwen/oauth_creds.json`, and the lock two of its processes rotate the token under |
 | `opencode` | `~/.local/share/opencode/auth.json` and `mcp-auth.json` |
 | `mimo` | `~/.local/share/mimocode/auth.json` and `mcp-auth.json` |
+| `zcode` | `~/.zcode/v2/credentials.json` — one file, shared with the ZCode desktop app and encrypted with a key derived from this machine and this user |
 
 `dsh` keeps none: it is driven through an SDK that takes a key out of the environment, so an
 account of it is variables and nothing to redirect.
 
 Each follows the variable that moves that CLI's home — `CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
 `GROK_HOME`, `KIMI_CODE_HOME`, `PI_CODING_AGENT_DIR`, `QWEN_HOME`, `XDG_DATA_HOME`. Antigravity
-is the exception, reading no variable of its own. See
-[Environment variables](/reference/cli#environment-variables).
+and ZCode are the exceptions, reading no variable of their own — what moves either home is
+the home itself. See [Environment variables](/reference/cli#environment-variables).
 
 ## The ways in
 
@@ -170,6 +171,15 @@ input and kept in codex's own store, so it is not kept a second time as a variab
 | --- | --- | --- |
 | `login` | Sign in to a Qwen account, in a session opened for it. Runs `qwen` and hands you the terminal: `/auth`, then `/quit`. | — |
 | `key` | A key for the OpenAI-compatible endpoint it runs against. | `OPENAI_API_KEY`, `OPENAI_BASE_URL` (`https://dashscope.aliyuncs.com/compatible-mode/v1`) |
+
+**`zcode`**
+
+| Way | | Asks for |
+| --- | --- | --- |
+| `login` | Sign in to a Z.AI account, in a browser. Runs `zcode login`. | — |
+| `device` | The same, from a machine with no browser on it. Runs `zcode login --no-browser`. | — |
+| `key` | A Z.AI or BigModel coding plan key, which its own models run on. | `ZCODE_API_KEY` |
+| `gateway` | An endpoint speaking ZCode's own protocol — a proxy, a router, another vendor. | `ZCODE_BASE_URL`, `ZCODE_API_KEY` |
 
 **Every backend but `dsh`, as well as its own:**
 
@@ -284,33 +294,35 @@ chain is spent.
 ## One account, several CLIs
 
 A vendor's credential is the vendor's rather than the CLI's. An Anthropic key is an Anthropic
-key whether Claude Code, pi, opencode or mimocode is holding it, and a Claude subscription
-token is one under whatever name each of them reads it under — so an account made for one
-backend is often an account several others could be run as.
+key whether Claude Code, pi, opencode, mimocode or ZCode is holding it, and a Claude
+subscription token is one under whatever name each of them reads it under — so an account
+made for one backend is often an account several others could be run as.
 
 ```console
 $ hmz providers add claude/work -w key -s ANTHROPIC_API_KEY=sk-… --no-login
 claude/work is written down at ~/.humanize/providers/claude/work
-it could also run pi, opencode, mimo; `--also` writes it down for them
+it could also run pi, opencode, mimo, zcode; `--also` writes it down for them
 
 $ hmz providers add claude/work -w key -s ANTHROPIC_API_KEY=sk-… --no-login --also all
 claude/work is written down at ~/.humanize/providers/claude/work
 pi/work is written down at ~/.humanize/providers/pi/work
 opencode/work is written down at ~/.humanize/providers/opencode/work
 mimo/work is written down at ~/.humanize/providers/mimo/work
+zcode/work is written down at ~/.humanize/providers/zcode/work
 
 $ hmz providers show claude/work
 …
 also runs   pi
 also runs   opencode
 also runs   mimo
+also runs   zcode
 ```
 
 `--also` takes the backends by name, comma separated, or `all` for every one that could be run
 as it. A copy is written down **under the same name**, spelled as that backend reads it — a
 Claude subscription token lands on pi as `ANTHROPIC_OAUTH_TOKEN` — and **over one already
 there**, which is what makes this a way of rotating a key everywhere at once rather than in
-four places.
+five places.
 
 `show` ends with an `also runs` line per backend this account could be run as, which is what it
 could be copied to rather than what it has been copied to: a backend already holding a copy
@@ -469,9 +481,9 @@ $ hmz exec -f ralph_loop -a claude@work/claude-opus-5:high "..."
 
 `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `CLAUDE_CODE_OAUTH_TOKEN`,
 `CLAUDE_CODE_USE_BEDROCK`, `OPENAI_API_KEY`, `CODEX_API_KEY`, `KIMI_MODEL_*`,
-`OPENCODE_AUTH_CONTENT`, `XIAOMI_API_KEY` and the rest of each backend's own — `hmz providers
-ways <cli>` names the ones its ways use. Everything else in the environment is left exactly as
-it was found, and an agent with **no** provider is not touched at all.
+`OPENCODE_AUTH_CONTENT`, `XIAOMI_API_KEY`, `ZCODE_API_KEY` and the rest of each backend's own
+— `hmz providers ways <cli>` names the ones its ways use. Everything else in the environment
+is left exactly as it was found, and an agent with **no** provider is not touched at all.
 
 ## Security
 

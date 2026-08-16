@@ -80,7 +80,7 @@ export default defineConfig({
           text: 'The shape of a run',
           collapsed: false,
           items: [
-            { text: 'Ten CLIs, one agent', link: '/features/backends' },
+            { text: 'Eleven CLIs, one agent', link: '/features/backends' },
             { text: 'A flow is Python', link: '/features/flows' },
             { text: 'Many turns at once', link: '/features/concurrency' },
             { text: 'Picked up where it stopped', link: '/features/resuming' },

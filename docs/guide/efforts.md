@@ -35,6 +35,7 @@ not still works. Backends take these efforts:
 | Kimi Code | `max`, `high`, `medium`, `low`, each also as `swarm…` |
 | pi | `max`, `xhigh`, `high`, `medium`, `low`, `minimal`, `off` |
 | opencode, mimocode | the model variant: `xhigh`, `high`, `medium`, `low`, `minimal` |
+| ZCode | `max`, `high`, `low`, `enabled`, `nothink`, `disabled` — two vocabularies, and a model takes one of them |
 
 **`ultracode`** is Claude Code's `xhigh` thinking with the turn opted into orchestrating a
 fleet of its own. It is more work than any single-agent effort, so it sits above `max`. It is
@@ -50,6 +51,11 @@ least of them, not the absence of a setting.
 
 **Codex's models differ from each other.** `gpt-5.6-sol` takes `ultra`; `gpt-5.5` does not. So
 the interface offers each model only the efforts it takes.
+
+**ZCode's ladder is two vocabularies in one.** Its models have two: the ones that take a
+thinking budget answer `max`, `high` and `low`, with `nothink` at the bottom of that one, and
+the ones that only take thinking-or-not answer `enabled` and `disabled`. Each model is offered
+the rungs it said it takes, and no model takes both halves.
 
 ## Set the effort
 
@@ -96,7 +102,8 @@ started at: a model does not think harder halfway through an answer.
 Each backend carries the effort in its own way. Codex, Kimi Code, opencode and mimocode take
 the effort with each turn, so the next turn carries the new one. Claude Code takes it as an
 argument of the process it is held open as, so moving it ends that process and resumes the
-conversation in one started at the new effort. pi has a command for it, and is told.
+conversation in one started at the new effort. pi has a command for it, and is told. ZCode's
+app server keeps the level on the session, so it is told the new one before the next turn.
 
 A `swarm` prefix moves with it: `agent.effort = "swarmmax"`.
 

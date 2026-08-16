@@ -5,13 +5,14 @@ the same numbers a request at a time, so this reads it there -- which is what ma
 move while the work is happening rather than in one jump at the end of it.
 
 The rows here are the shapes the real logs have: a Claude transcript's assistant message, a
-Codex rollout's `token_count`, a Kimi server event's completed step.
+Codex rollout's `token_count`, a Kimi server event's completed step, a ZCode rollout's
+whole model request.
 """
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
@@ -24,12 +25,11 @@ from hmz.agents import (
     DshAgentConfig,
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
+    ZcodeAgent,
+    ZcodeAgentConfig,
 )
 from hmz.tui.monitor import Monitor
 from hmz.tui.tally import Tally
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def _rows(path: Path, *rows: dict[str, object]) -> None:
@@ -229,6 +229,56 @@ def test_a_kimi_session_is_counted_from_the_steps_its_daemon_writes(home: Path) 
     Tally([agent], monitor).read()
 
     assert monitor.spent == {"kimi-code/k3": 22086}
+
+
+def test_a_zcode_session_is_counted_from_the_requests_it_rolls_out(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One row per model request, and the model it names is the one that request ran on.
+
+    ZCode has no home variable of its own, so what puts its home where a test owns it is the
+    home itself.
+    """
+    monkeypatch.setattr(Path, "home", lambda: home / "zcode_home")
+    log = home / "zcode_home" / ".zcode" / "cli" / "rollout" / "model-io-sess_z1.jsonl"
+    _rows(
+        log,
+        {
+            "sessionId": "sess_z1",
+            "model": {"providerId": "zai", "modelId": "glm-nine", "role": "main"},
+            "request": {"body": {"model": "glm-nine"}},
+            "response": {
+                "usage": {
+                    "inputTokens": 900,
+                    "outputTokens": 100,
+                    "totalTokens": 1000,
+                    "cacheReadTokens": 0,
+                    "cacheWriteTokens": 0,
+                }
+            },
+        },
+    )
+    agent = ZcodeAgent(ZcodeAgentConfig(model="zai/glm-nine", effort="high"))
+    agent.new()._adopt("sess_z1")
+    monitor = Monitor()
+    tally = Tally([agent], monitor)
+
+    tally.read()
+
+    assert monitor.spent == {"zai/glm-nine": 1000}
+
+    _rows(
+        log,
+        {
+            "sessionId": "sess_z1",
+            # The lite model a sub-agent ran on is counted as itself.
+            "model": {"providerId": "zai", "modelId": "glm-quick", "role": "lite"},
+            "response": {"usage": {"inputTokens": 40, "outputTokens": 10}},
+        },
+    )
+    tally.read()
+
+    assert monitor.spent == {"zai/glm-nine": 1000, "zai/glm-quick": 50}
 
 
 def test_a_row_that_is_only_half_written_is_left_for_the_next_read(home: Path) -> None:

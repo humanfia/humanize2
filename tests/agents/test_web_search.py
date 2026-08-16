@@ -35,7 +35,7 @@ from hmz.agents import (
 #: The backends that can be told, and the ones that cannot. Read off `hmz.backends` here as
 #: everything else reads it, so a backend that gains a way of being told is a backend this
 #: notices rather than a list to remember.
-TELLABLE = ("claude", "codex", "grok", "qwen", "opencode", "mimo")
+TELLABLE = ("claude", "codex", "grok", "qwen", "opencode", "mimo", "zcode")
 
 
 def test_an_agent_nobody_has_been_asked_about_may_search_the_web() -> None:

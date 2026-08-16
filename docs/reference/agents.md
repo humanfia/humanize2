@@ -35,6 +35,7 @@ name the interface shows. The classes keep the product's own full name.
 | `qwen` | `QwenCodeAgent` | `QwenCodeAgentConfig` | `QwenCodeSession` |
 | `opencode` | `OpencodeAgent` | `OpencodeAgentConfig` | `OpencodeSession` |
 | `mimo` | `MimoCodeAgent` | `MimoCodeAgentConfig` | `MimoCodeSession` |
+| `zcode` | `ZcodeAgent` | `ZcodeAgentConfig` | `ZcodeSession` |
 | whatever you added | `AcpAgent` | `AcpAgentConfig` | `AcpSession` |
 | you | `HumanAgent` | — (takes only `name=`) | `HumanSession` |
 
@@ -164,11 +165,11 @@ installed it set it up. It cannot be steered mid-turn either — every agent spe
 extension its own way — and it has no goal feature, no permission rungs and no logs for
 `hmz trace collect` to read.
 
-`pi`, `opencode` and `mimo` name a model as `provider/id` — `openai-codex/gpt-5.5`,
-`opencode/big-pickle`, `xiaomi/mimo-v2.5` — because a model there belongs to the provider that
-serves it, and the CLI is asked for the pair. `qwen` names whatever id the OpenAI-compatible
-endpoint behind it serves, and `grok` names one out of its own catalogue: `grok models` lists
-them.
+`pi`, `opencode`, `mimo` and `zcode` name a model as `provider/id` — `openai-codex/gpt-5.5`,
+`opencode/big-pickle`, `xiaomi/mimo-v2.5`, `zai/glm-5.3` — because a model there belongs to the
+provider that serves it, and the CLI is asked for the pair. `qwen` names whatever id the
+OpenAI-compatible endpoint behind it serves, and `grok` names one out of its own catalogue:
+`grok models` lists them.
 
 DeepSeek Harness is driven through its own Python SDK, which arrives with humanize rather
 than as an extra — there is nothing to install for it. It supports API-key login only:
@@ -260,6 +261,7 @@ different things.
 | `grok` | `--disallowed-tools web_search,web_fetch` when off |
 | `qwen` | `--exclude-tools web_search,web_fetch` when off |
 | `opencode`, `mimo` | `webfetch: deny` in its permission table when off |
+| `zcode` | `WebSearch` and `WebFetch` in the session's `toolDenylist` when off |
 | `agy`, `dsh`, `kimi`, `pi` | no way of being told — off is refused |
 
 A backend with no way of being told **refuses it off**, wherever the config arrives — where the
@@ -659,18 +661,18 @@ with one exception: a hook that drove an agent which has been [stopped](#stoppin
 `agent.moments` is what this one runs, and `hooks.on` refuses a moment that is not in it —
 where the hook is hung, rather than by quietly never firing.
 
-| Moment | Claude Code | Codex | Kimi Code | you |
-| --- | --- | --- | --- | --- |
-| everything above except `PERMISSION_REQUEST` | yes | yes | yes | no |
-| `PERMISSION_REQUEST` | yes | yes | no | no |
+| Moment | Claude Code | Codex | Kimi Code | ZCode | you |
+| --- | --- | --- | --- | --- | --- |
+| everything above except `PERMISSION_REQUEST` | yes | yes | yes | yes | no |
+| `PERMISSION_REQUEST` | yes | yes | no | yes | no |
 
-Claude Code and Codex ask before they use a tool — Claude over the same stream the turn is read
-from, Codex through its app server — and wait for the answer, so those are the two backends
-here where a refusal reaches the agent. It also wants the [`auto` rung](#what-an-agent-may-do),
-which is the one setting under which either of them asks at all. The rest are driven
-unattended, which is what a flow watching its agent rather than gating it means.
-`HumanAgent` runs none of them: a moment is a point in a turn of a model, and the person takes
-no such turn.
+Claude Code, Codex and ZCode ask before they use a tool — Claude over the same stream the turn
+is read from, Codex and ZCode each through the app server it is driven over — and wait for
+the answer, so those are the three backends here where a refusal reaches the agent. It
+also wants the [`auto` rung](#what-an-agent-may-do), which is the one setting under which any
+of them asks at all. The rest are driven unattended, which is what a flow watching its agent
+rather than gating it means. `HumanAgent` runs none of them: a moment is a point in a turn of
+a model, and the person takes no such turn.
 
 A flow says which moments it needs where it declares the agents it drives, and is refused before
 its first turn if it was given one that cannot run them — see
@@ -731,7 +733,7 @@ sessions under:
 ```python
 agent.id       # the name you gave it, the name the flow calls it, or one nothing else answers to
 agent.backend  # "agy", "claude", "codex", "dsh", "grok", "kimi", "mimo", "opencode",
-               # "pi", "qwen" — or whatever an ACP CLI of your own was added under
+               # "pi", "qwen", "zcode" — or whatever an ACP CLI of your own was added under
 agent.opened   # the backend's id for every session this agent ever opened, oldest first
 agent.sessions # the ones somebody still holds
 agent.config   # what it runs at
@@ -821,6 +823,7 @@ before the runtime starts unless its effort is `max`, `high` or `off`.
 | `pi` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
 | `qwen` | `low`, `medium`, `high`, `xhigh`, `max` |
 | `opencode`, `mimo` | the model variant: `minimal`, `low`, `medium`, `high`, `xhigh` |
+| `zcode` | `nothink`, `low`, `high`, `max` on the models that take a thinking budget — `disabled`, `enabled` on the ones that only think or not |
 
 **Antigravity CLI has one switch for what an agent may do** — approve every tool, or stop and
 ask — and nobody is at a prompt to be asked, so `read-only` and `workspace-write` are refused
@@ -840,6 +843,12 @@ of its own. It is more work than any single-agent effort, which is why it sits a
 **Kimi Code's effort says how wide to run as well as how hard to think.** `max` is one agent;
 `swarmmax` is the same thinking at the width of a fleet of subagents. The prefix is exported as
 `hmz.agents.SWARM` for anything that has to take it apart.
+
+**ZCode's ladder is two vocabularies in one**, because its models have two. The ones that take
+a thinking budget answer `max`, `high` and `low` — and `nothink` for the bottom of that one —
+while the ones that only take thinking-or-not answer `enabled` and `disabled`. humanize asks
+the backend which of them a model said it takes and narrows the ladder to those, so a model is
+offered one vocabulary rather than both.
 
 Codex's models differ from each other — `gpt-5.6-sol` takes `ultra`, `gpt-5.5` does not — so
 the interface offers each model only the efforts it takes.
@@ -865,7 +874,8 @@ would be describing a turn that never happened.
 Each backend carries it the way that backend takes it. Codex, Kimi Code, opencode and mimocode
 take the effort with each turn, so the next turn simply carries the new one. Claude Code and
 DeepSeek Harness take it when their runtime starts, so moving it restarts that runtime and
-resumes the same conversation at the new effort. pi has a command for it, and is told.
+resumes the same conversation at the new effort. pi has a command for it and ZCode a call on
+the session, and each is told between turns.
 
 A `swarm` prefix moves with it on Kimi Code: `agent.effort = "swarmmax"` is `max` thinking at
 the width of a fleet, from the next turn on.
@@ -906,10 +916,11 @@ the run, so a rate read a minute in is what that minute came to rather than a fi
 moved when one ended would stand still for all of them: most backends here are read as they
 say what each request to the model cost — Claude Code on the message it answered with,
 Codex on `thread/tokenUsage/updated`, DeepSeek Harness and pi on finalized assistant messages,
-opencode and mimocode on each step, Kimi Code from the session it is polling anyway.
-Antigravity, Grok Build and Qwen Code are the exception: each is one run per turn that states
-its usage only at the end, so what they spent lands on the closing `result` and their rate
-moves a turn at a time rather than a request at a time.
+opencode and mimocode on each step, Kimi Code from the session it is polling anyway, ZCode on
+the row its log gains per model request. Antigravity, Grok Build and Qwen Code are the
+exception: each is one run per turn that states its usage only at the end, so what they spent
+lands on the closing `result` and their rate moves a turn at a time rather than a request at a
+time.
 
 **`juice()` is the third reading, and it is not a clock at all.** It is what one turn of the
 *model* came out with — one request and the answer to it, of which a turn a flow asks for is
@@ -930,14 +941,14 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 
 ## What each backend can do
 
-| | `agy` | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Driven through | its command line, one run per turn | its command line, held open | its app server | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, one run per turn | its command line, one run per turn |
-| [`interject`](#talking-to-a-turn-already-running) | no — a run per turn has ended | yes — answered within the same turn | yes — a steer on the running turn | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended | no — a run per turn has ended |
-| [`pursue`](#goals) | no | yes | yes | yes | no | yes | no | no | no |
-| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no |
-| A turn held to a shape | `--json-schema` | `--json-schema` | `outputSchema` | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt |
-| Sub-agents in a trace | no | yes | yes | no | no | yes | no | no | no |
+| | `agy` | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Driven through | its command line, one run per turn | its command line, held open | its app server | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, one run per turn | its command line, one run per turn | its app server |
+| [`interject`](#talking-to-a-turn-already-running) | no — a run per turn has ended | yes — answered within the same turn | yes — a steer on the running turn | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended | no — a run per turn has ended | no — a second prompt is refused while one is running |
+| [`pursue`](#goals) | no | yes | yes | yes | no | yes | no | no | no | yes |
+| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | yes |
+| A turn held to a shape | `--json-schema` | `--json-schema` | `outputSchema` | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt |
+| Sub-agents in a trace | no | yes | yes | no | no | yes | no | no | no | no |
 
 DeepSeek Harness currently accepts only `permission="bypass"`. Its preview
 SDK exposes neither a per-session sandbox/approval control nor exact per-agent skill selection;
@@ -1025,12 +1036,12 @@ interface it is the `permission` row of the sheet an agent is set up on, stepped
 Every backend has a ladder of its own and none of them has the same four rungs, so each driver
 reaches for whichever of its own settings says the same thing:
 
-| Rung | `agy` | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `read-only` | refused | `plan` mode | `read-only` sandbox | — | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied |
-| `workspace-write` | refused | `acceptEdits` mode | `workspace-write` sandbox | — | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied |
-| `auto` | `--dangerously-skip-permissions` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | — | — | — | nothing denied |
-| `bypass` | `--dangerously-skip-permissions` | `bypassPermissions` | `danger-full-access` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — |
+| Rung | `agy` | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `read-only` | refused | `plan` mode | `read-only` sandbox | — | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied | `plan` mode |
+| `workspace-write` | refused | `acceptEdits` mode | `workspace-write` sandbox | — | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied | `edit` mode |
+| `auto` | `--dangerously-skip-permissions` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | — | — | — | nothing denied | `build` mode, which asks before a tool with side effects |
+| `bypass` | `--dangerously-skip-permissions` | `bypassPermissions` | `danger-full-access` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — | `yolo` mode |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one. Where a backend cannot tell two rungs apart it says so
@@ -1054,10 +1065,19 @@ for is granted
 It is found out once per agent rather than once per turn, and the rung you chose is what is
 tried first: an agent set to `auto` in `/agents` asks for `auto` and never sees this.
 
+**ZCode has a mode for each of these**, so nothing in its column is a repeat of the one above
+it. `plan` refuses an edit and refuses a command it reads as high-risk. `edit` changes the
+workspace without asking, and stops at a high-risk tool to ask — which is answered no at that
+rung, because an agent allowed its workspace is not allowed more for asking. `build`, the mode
+its own terminal opens in, asks the same question, and `auto` is the rung where the answer is
+yes. `yolo` asks nothing at all. ZCode's own `auto` mode is not this `auto` and is nobody's
+rung here: in that mode its permission service refuses every tool, saying the mode is reserved
+and not implemented yet.
+
 **`auto` is the rung where a hook gets a say.** It is the one setting under which a backend
 actually asks before it acts and waits for the answer, so it is the one where a hook hung on
-[`PERMISSION_REQUEST`](#hooks) can refuse something and have the agent hear it. Claude Code
-and Codex both run that moment; the rest have nothing to hang it on.
+[`PERMISSION_REQUEST`](#hooks) can refuse something and have the agent hear it. Claude Code,
+Codex and ZCode all run that moment; the rest have nothing to hang it on.
 
 ## The skills an agent carries
 
@@ -1102,7 +1122,7 @@ a project's own skills for as long as the session lives, and taken away again af
 | Backend | Where a flow's skills are mounted |
 | --- | --- |
 | `claude` | `.claude/skills/` in the workspace |
-| `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen` | `.agents/skills/`, the directory more than one of these agreed to read |
+| `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen`, `zcode` | `.agents/skills/`, the directory more than one of these agreed to read |
 | `agy`, `dsh`, `pi` | — none: none of them reads such a directory the way humanize drives it |
 
 A project's own skill of that name wins: a flow does not write over what the project keeps.

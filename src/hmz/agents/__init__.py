@@ -39,6 +39,7 @@ from .mimo import MimoCodeAgent, MimoCodeAgentConfig, MimoCodeSession
 from .opencode import OpencodeAgent, OpencodeAgentConfig, OpencodeSession
 from .pi import PiAgent, PiAgentConfig, PiSession
 from .qwen import QwenCodeAgent, QwenCodeAgentConfig, QwenCodeSession
+from .zcode import ZcodeAgent, ZcodeAgentConfig, ZcodeSession
 
 #: What each coding agent CLI is driven by here, under the name a command line calls it.
 #: One table rather than one apiece: whoever reads an `-a` builds an agent from it, and
@@ -55,6 +56,7 @@ DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
     "opencode": (OpencodeAgent, OpencodeAgentConfig),
     "pi": (PiAgent, PiAgentConfig),
     "qwen": (QwenCodeAgent, QwenCodeAgentConfig),
+    "zcode": (ZcodeAgent, ZcodeAgentConfig),
 }
 
 
@@ -147,6 +149,9 @@ __all__ = [
     "Unrecoverable",
     "Usage",
     "Verdict",
+    "ZcodeAgent",
+    "ZcodeAgentConfig",
+    "ZcodeSession",
     "anchored",
     "isolated",
 ]

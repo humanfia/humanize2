@@ -142,6 +142,7 @@ and this machine is the one to trust.
 | `pi` | `login` |
 | `opencode` | `login`, `wellknown`, `zen` |
 | `mimo` | `login`, `key` |
+| `zcode` | `login`, `device`, `key`, `gateway` |
 | all of them | `env` — variables of your own |
 
 A way with a command of its own is **handed the terminal**: its browser or its device code owns
@@ -263,9 +264,9 @@ with **once**, so one made or taken away now is one the next run sees.
 ## One account, several CLIs
 
 A vendor's credential is the vendor's rather than the CLI's. An Anthropic key is an Anthropic
-key whether Claude Code, pi, opencode or mimocode is holding it, and a subscription token is
-one under whatever name each of them reads it under: `CLAUDE_CODE_OAUTH_TOKEN` on Claude Code,
-`ANTHROPIC_OAUTH_TOKEN` on pi.
+key whether Claude Code, pi, opencode, mimocode or ZCode is holding it, and a subscription
+token is one under whatever name each of them reads it under: `CLAUDE_CODE_OAUTH_TOKEN` on
+Claude Code, `ANTHROPIC_OAUTH_TOKEN` on pi.
 
 So an account made for one backend is often an account several others could be run as, and
 making the same key four times by hand is four places to correct when it is rotated.
@@ -277,8 +278,8 @@ ticked and the rest listed and off.
 An account is worth writing down before the CLI that will use it is on this machine. Correcting
 one asks the same question again, of the account as corrected.
 
-![the question after claude/shared is made: pi, opencode and mimo, each marked not installed
-here yet and each switched off](/demo/alike.png)
+![the question after claude/shared is made: pi, opencode, mimo and zcode, each marked not
+installed here yet and each switched off](/demo/alike.png)
 
 A copy is written down **under the same name** and **over one already there**, spelled as that
 backend reads it. What it reads as there is that backend's own way where one asks for exactly

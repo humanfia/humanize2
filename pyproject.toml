@@ -137,6 +137,7 @@ ignore = [
 "src/hmz/agents/codex.py" = ["SLF001"]
 "src/hmz/agents/dsh.py" = ["SLF001"]
 "src/hmz/agents/kimi.py" = ["SLF001"]
+"src/hmz/agents/zcode.py" = ["SLF001"]
 # Looking for a flow is allowed to find nothing. `os.path` answers False for a
 # directory it cannot read, and for a `~` with no home behind it, where `Path` raises;
 # both modules say so where they reach for one -- `find` here, `_own` there.

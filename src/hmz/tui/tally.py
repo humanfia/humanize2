@@ -44,7 +44,8 @@ def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
     that produced it, and names the model on it -- which is how a sub-agent's cheaper model is
     counted as itself. Codex writes a `token_count` event whose `last_token_usage` is the
     request that just came back, the `total_token_usage` beside it being the thread so far.
-    Kimi writes a `turn.step.completed` whose usage is that step's.
+    Kimi writes a `turn.step.completed` whose usage is that step's. ZCode writes one row per
+    model request, holding what was sent, what came back and what that one cost.
 
     Args:
       backend: Whose log this row came out of.
@@ -81,6 +82,17 @@ def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
                 "cacheReadTokens",
                 "cacheWriteTokens",
             )
+        )
+    if backend == "zcode":
+        # One row per request the turn made, the whole of what was sent and what came back.
+        # Its `usage` is that request's, and the model beside it is the one it ran on -- which
+        # is how a title or a sub-agent on the lite model is counted as itself.
+        answered: dict[str, Any] = row.get("response") or {}
+        counting: dict[str, Any] = answered.get("usage") or {}
+        ran: dict[str, Any] = row.get("model") or {}
+        named = f"{ran.get('providerId', '')}/{ran.get('modelId', '')}".strip("/")
+        return named or None, sum(
+            int(counting.get(name) or 0) for name in ("inputTokens", "outputTokens")
         )
     envelope: dict[str, Any] = row.get("envelope") or {}
     payload: dict[str, Any] = row.get("payload") or envelope.get("payload") or {}

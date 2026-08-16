@@ -1069,7 +1069,7 @@ async def test_an_account_several_backends_could_run_asks_which_to_write_it_down
 
         # And then the question this is about: which of the others hold it too.
         await until(lambda: isinstance(app.screen, Alike), driver)
-        assert rows(app) == ["pi", "opencode", "mimo"]
+        assert rows(app) == ["pi", "opencode", "mimo", "zcode"]
         # Nothing is installed in this suite, so nothing starts switched on.
         await onto(app, driver, "opencode")
         await driver.press("right")

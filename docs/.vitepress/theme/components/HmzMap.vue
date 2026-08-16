@@ -84,7 +84,7 @@ const STAGES: Stage[] = [
     sub: 'the one you already have',
     features: [
       {
-        said: 'ten CLIs, one agent',
+        said: 'eleven CLIs, one agent',
         link: '/features/backends',
         about: 'Driven through whatever each of them offers, and asked what it runs rather than told.',
       },

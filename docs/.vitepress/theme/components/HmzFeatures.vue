@@ -20,8 +20,8 @@ import { withBase } from 'vitepress'
           <circle cx="158" cy="74" r="5.5" />
         </g>
       </svg>
-      <h3>One flow, ten CLIs</h3>
-      <p>claude · codex · dsh · agy · grok · kimi · qwen · pi · opencode · mimo</p>
+      <h3>One flow, eleven CLIs</h3>
+      <p>claude · codex · dsh · agy · grok · kimi · qwen · pi · opencode · mimo · zcode</p>
     </a>
 
     <a class="card" :href="withBase('/features/steering')">
@@ -194,7 +194,7 @@ svg text {
   text-anchor: middle;
 }
 
-/* one flow, ten CLIs */
+/* one flow, eleven CLIs */
 .fan path {
   fill: none;
   stroke: var(--vp-c-divider);

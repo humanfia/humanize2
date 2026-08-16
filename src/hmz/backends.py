@@ -328,6 +328,13 @@ _GATEWAY = (
 #: What Antigravity CLI calls its reasoning levels, hardest first.
 _AGY = ("high", "medium", "low")
 
+#: What ZCode calls a thought level, hardest first. Two ladders rather than one, because its
+#: models have two: the ones that take a budget are asked for `max`, `high` or `low`, and the
+#: ones that only take thinking or no thinking are asked for `enabled` or `disabled`. `nothink`
+#: is what the first kind calls the bottom of its own. They are one list here because a
+#: backend's efforts are one list, and a model narrows it to the rungs it answered with.
+_ZCODE = ("max", "high", "low", "enabled", "nothink", "disabled")
+
 #: Every backend humanize drives, as each of them reported itself. Codex says which efforts
 #: each of its models takes and they differ, so they are written down as it gave them.
 PROFILES = (
@@ -988,6 +995,73 @@ PROFILES = (
                 name="key",
                 about="a MiMo key, which its own models run on",
                 asks=(Asked(env="XIAOMI_API_KEY", about="the key", secret=True),),
+            ),
+        ),
+    ),
+    Profile(
+        name="zcode",
+        # `WebFetch` and `WebSearch` are the two tools it reaches outside the workspace with,
+        # and a session may be opened with a denylist naming them.
+        searches=True,
+        aliases=("zcode", "zcode-cli"),
+        # None: its configuration, its sessions and its skills are all under `~/.zcode`, and
+        # the one variable it does read moves the part the desktop app shares rather than the
+        # part a turn runs out of. What moves the whole of it is `HOME`.
+        home_var="",
+        home_dir=".zcode",
+        # One file per session, a line per request the turn made: what was sent, what came
+        # back and what it cost. Under `cli/`, which is where the command line keeps what is
+        # its own rather than the desktop app's.
+        logs=("cli/rollout/model-io-{ident}.jsonl",),
+        efforts=_ZCODE,
+        # Four places, which is what `zcode skills list` answers with: its own directory and
+        # the shared one under your home, and the same pair under the project. Both tiers, and
+        # no flag to turn either off.
+        skills=("skills/*/SKILL.md",),
+        shared=(".agents/skills/*/SKILL.md",),
+        works=(".zcode/skills/*/SKILL.md", ".agents/skills/*/SKILL.md"),
+        # The shared one of its two, being the directory more than one of these CLIs has
+        # agreed to read: a skill mounted there is a skill Codex and Kimi read too.
+        mounts=".agents/skills",
+        # One file, and the desktop app's rather than the command line's: a login is shared
+        # between them, encrypted with a key derived from this machine and this user.
+        creds=("v2/credentials.json",),
+        ambient=(
+            # Its own, which outrank the file whichever way it was signed in.
+            "ZCODE_API_KEY",
+            "ZCODE_BASE_URL",
+            "ZCODE_CREDENTIAL_SECRET",
+            "ZCODE_DATA_BASE_DIR",
+            "ZCODE_ENDPOINT_ORIGIN",
+            # And the vendors' own names, which it reads a key under for a provider speaking
+            # that vendor's protocol -- which the Z.AI plan it ships with is one of.
+            "ANTHROPIC_API_KEY",
+            "OPENAI_API_KEY",
+            "ZAI_API_KEY",
+        ),
+        ways=(
+            Way(
+                name="login",
+                about="sign in to a Z.AI account, in a browser",
+                argv=("zcode", "login"),
+            ),
+            Way(
+                name="device",
+                about="the same, from a machine with no browser on it",
+                argv=("zcode", "login", "--no-browser"),
+            ),
+            Way(
+                name="key",
+                about="a Z.AI or BigModel coding plan key, which its own models run on",
+                asks=(Asked(env="ZCODE_API_KEY", about="the API key", secret=True),),
+            ),
+            Way(
+                name="gateway",
+                about=_GATEWAY,
+                asks=(
+                    Asked(env="ZCODE_BASE_URL", about="where it is, as a URL"),
+                    Asked(env="ZCODE_API_KEY", about="the key it takes", secret=True),
+                ),
             ),
         ),
     ),

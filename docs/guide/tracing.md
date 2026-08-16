@@ -337,9 +337,9 @@ The backends' own home directories, which humanize only ever reads:
 | Kimi Code | `KIMI_CODE_HOME` | `~/.kimi-code` |
 
 Those four, and no others. **opencode, mimocode and Antigravity keep a session in a database
-rather than in a log file, and nothing here reads pi's, Grok Build's or Qwen Code's own logs
-yet.** So there is nothing to gather for those: a run of theirs is watched as it happens rather
-than collected after.
+rather than in a log file, and nothing here reads pi's, Grok Build's, Qwen Code's or ZCode's
+own logs yet.** So there is nothing to gather for those: a run of theirs is watched as it
+happens rather than collected after.
 
 A home that does not exist is skipped rather than being an error. So is a backend humanize has
 no reader for; its home being there changes nothing.

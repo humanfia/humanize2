@@ -49,8 +49,8 @@ dsh web
 ```
 
 Needs Python ≥ 3.12 and at least one supported backend: `agy`, `claude`, `codex`, `grok`,
-`kimi`, `pi`, `qwen`, `opencode` or `mimo` on your PATH — or none of them, since DeepSeek
-Harness arrives with humanize. See
+`kimi`, `pi`, `qwen`, `opencode`, `mimo` or `zcode` on your PATH — or none of them, since
+DeepSeek Harness arrives with humanize. See
 [Installation](https://docs.humanfia.ai/humanize2/guide/installation).
 
 ## Usage

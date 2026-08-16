@@ -370,8 +370,8 @@ Several moments are several arguments.
 
 **A goal is asked for the same way.** `agent.pursue(objective)` is the backend's own goal
 feature — the agent decides for itself that the objective has been met, and until it does, a
-turn that would have ended starts another. Four backends have one (Claude Code, codex, dsh, Kimi),
-so a flow built on it says so:
+turn that would have ended starts another. Five backends have one (Claude Code, codex, dsh,
+Kimi, ZCode), so a flow built on it says so:
 
 ```python
 from hmz.flows import Agent, Goal

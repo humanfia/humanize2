@@ -154,6 +154,29 @@ def test_qwen_is_read_from_its_own_and_shared_skill_directories(
     ]
 
 
+def test_zcode_is_read_from_its_own_and_shared_skill_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Four roots, which is what `zcode skills list` answers with.
+
+    Its own directory and the shared one under your home, and the same pair under the project.
+    It has no home variable of its own, so what moves them is the home itself.
+    """
+    _write(tmp_path / "home" / ".zcode" / "skills", "its-own")
+    _write(tmp_path / "home" / ".agents" / "skills", "shared")
+    _write(tmp_path / "project" / ".zcode" / "skills", "project-zcode")
+    _write(tmp_path / "project" / ".agents" / "skills", "project-agents")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.chdir(tmp_path / "project")
+
+    assert [one.name for one in skills("zcode")] == [
+        "its-own",
+        "shared",
+        "project-zcode",
+        "project-agents",
+    ]
+
+
 @pytest.mark.parametrize(
     ("backend", "under"), [("opencode", "opencode"), ("mimo", "mimocode")]
 )

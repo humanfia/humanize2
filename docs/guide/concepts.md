@@ -13,10 +13,10 @@ run of a flow is a **cycle**; an agent's turns land on a **machine** and may run
 ## Backend
 
 A coding agent CLI that is installed on this machine and that humanize knows how to drive.
-There are ten: `agy` (Antigravity CLI), `claude` (Claude Code), `codex`, `dsh` (DeepSeek
-Harness), `grok` (Grok Build), `kimi` (Kimi Code), `mimo` (mimocode), `opencode`, `pi` and
-`qwen` (Qwen Code). You can also add any CLI of your own that speaks the [Agent Client
-Protocol](/reference/agents#a-cli-of-your-own), at `/providers`.
+There are eleven: `agy` (Antigravity CLI), `claude` (Claude Code), `codex`, `dsh` (DeepSeek
+Harness), `grok` (Grok Build), `kimi` (Kimi Code), `mimo` (mimocode), `opencode`, `pi`, `qwen`
+(Qwen Code) and `zcode` (ZCode). You can also add any CLI of your own that speaks the [Agent
+Client Protocol](/reference/agents#a-cli-of-your-own), at `/providers`.
 
 humanize does not talk to a model provider. It drives the CLI you already have, logged in the
 way you already log in, so your credentials never pass through it. A backend humanize cannot find is not
@@ -54,7 +54,10 @@ Two consequences that surprise people:
 `low`/`medium`/`high`/`xhigh`/`max` and also `ultracode`. Codex's models each take their own
 subset. Kimi Code's effort also says how *wide* to run, where `swarmmax` is `max` thinking at
 the width of a fleet. For `pi`, effort is a thinking level down to `off`. For `opencode` and
-`mimocode`, it is the variant of the model. See [Agents](/reference/agents#efforts).
+`mimocode`, it is the variant of the model. ZCode's ladder holds two vocabularies at once,
+because its models do: the ones that take a thinking budget answer `max`/`high`/`low` and
+`nothink`, the ones that only take thinking-or-not answer `enabled`/`disabled`. See
+[Agents](/reference/agents#efforts).
 
 ## Session
 

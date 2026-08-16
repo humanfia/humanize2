@@ -458,7 +458,7 @@ def test_an_account_several_backends_could_run_says_so_when_it_is_made(
     assert run(*MINE, "--no-login") == 0
 
     said = capsys.readouterr().out
-    assert "it could also run pi, opencode, mimo" in said
+    assert "it could also run pi, opencode, mimo, zcode" in said
     assert "--also" in said
     assert providers.find("pi", "mine") is None  # said, and nothing written
 
@@ -470,7 +470,7 @@ def test_one_line_writes_an_account_down_for_every_backend_that_could_run_it(
     del house
     assert run(*MINE, "--no-login", "--also", "all") == 0
 
-    for cli_name in ("pi", "opencode", "mimo"):
+    for cli_name in ("pi", "opencode", "mimo", "zcode"):
         held = providers.find(cli_name, "mine")
         assert held is not None
         assert dict(held.env) == {"ANTHROPIC_API_KEY": KEY}

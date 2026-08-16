@@ -338,6 +338,7 @@ How far "into the turn" it gets depends on the backend:
 | **Kimi Code** | Queued, then steered into the turn already running. |
 | **pi** | A steer on the run it is making, taken into it rather than answered after it. |
 | **opencode**, **mimocode** | Nothing: a run per turn has ended by the time there is anything to say to it. |
+| **ZCode** | Nothing: its app server refuses a second prompt while one is running, and what its own terminal steers with is a channel that terminal holds. |
 
 An [anchored](/reference/remote-execution) Claude ends its process with each turn so that its work
 reaches the target before the turn says it landed — so it hears you between turns rather than
@@ -547,8 +548,8 @@ CLI lets go of the model**, which belonged to the CLI before it.
 **The arrows step a row that is a rung in an order** — the effort, what it may do, swarm mode,
 whether goals are available, whether it may search the web. Everything else opens a sheet of its
 own and comes back. `web search` is a row only for a CLI that can be told: claude, codex, grok,
-qwen, opencode and mimo. A switch for something the backend would go on doing either way is a
-switch that lies, so for every other CLI the question is not put. `where` is
+qwen, opencode, mimo and zcode. A switch for something the backend would go on doing either
+way is a switch that lies, so for every other CLI the question is not put. `where` is
 a row only for an agent [the flow says may be pointed at a machine](#where-each-agent-works);
 for one the flow put in a container it is read rather than opened, and for one that works here
 it is not there at all.

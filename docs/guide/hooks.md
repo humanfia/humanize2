@@ -127,23 +127,23 @@ A refused `STOP` is one of three ways to keep an agent going:
 | --- | --- | --- |
 | a `while` loop in the flow | your code, between turns | every backend |
 | a refused `STOP` hook | your code, inside the turn | every backend but `Person` |
-| [`agent.pursue`](/guide/goals) | the **model**, against the objective | Claude Code, Codex, DeepSeek Harness, Kimi |
+| [`agent.pursue`](/guide/goals) | the **model**, against the objective | Claude Code, Codex, DeepSeek Harness, Kimi, ZCode |
 
 ## Not every backend runs every moment
 
 `agent.moments` lists what a backend runs. If a moment is not in it, `hooks.on` **refuses** the
 hook where it is hung, rather than hanging one that quietly never fires.
 
-| Moment | Claude Code | Codex | Kimi Code | you |
-| --- | --- | --- | --- | --- |
-| everything except `PERMISSION_REQUEST` | yes | yes | yes | no |
-| `PERMISSION_REQUEST` | yes | yes | no | no |
+| Moment | Claude Code | Codex | Kimi Code | ZCode | you |
+| --- | --- | --- | --- | --- | --- |
+| everything except `PERMISSION_REQUEST` | yes | yes | yes | yes | no |
+| `PERMISSION_REQUEST` | yes | yes | no | yes | no |
 
-Claude Code and Codex ask before they use a tool and wait for the answer. Those are the two
-backends where a refusal reaches the agent. Kimi Code, pi, opencode and mimocode are driven
-unattended, which is what a flow watching its agent rather than gating it means. `Person`
-runs none of the moments: a moment is a point in a turn of a model, and the person takes no
-such turn.
+Claude Code, Codex and ZCode ask before they use a tool and wait for the answer. Those are the
+three backends where a refusal reaches the agent. Kimi Code, pi, opencode and mimocode are
+driven unattended, which is what a flow watching its agent rather than gating it means.
+`Person` runs none of the moments: a moment is a point in a turn of a model, and the person
+takes no such turn.
 
 `PERMISSION_REQUEST` also wants the [`auto` rung](/guide/permissions), the one setting under
 which a backend asks and waits.

@@ -77,6 +77,7 @@ once](/guide/conversations).
 | **Kimi Code** | Queued, then steered into the turn already running. |
 | **pi** | A steer on the run it is making, taken into it rather than answered after it. |
 | **opencode**, **mimocode** | Nothing: a run per turn has ended by the time there is anything to say to it. |
+| **ZCode** | Nothing: its app server refuses a second prompt while one is running, and the channel its own terminal steers with is that terminal's. |
 
 An [anchored](/guide/remote-execution) Claude ends its process with each turn so its work
 reaches the target before the turn says it landed. It hears you during a turn as any Claude

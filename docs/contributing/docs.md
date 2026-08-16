@@ -129,7 +129,7 @@ HmzAccounts.vue     features/accounts    the path swap, then the chain and its w
 HmzTimeline.vue     features/tracing     a trace, with the programs and the clock as switches
 HmzSteer.vue        features/steering    type a line into a running turn, or queue behind it
 HmzShape.vue        features/shapes      a model, how a backend is held to it, what comes back
-HmzBackends.vue     features/backends    eleven backends against what a flow may ask for
+HmzBackends.vue     features/backends    twelve backends against what a flow may ask for
 HmzLoops.vue        features/flows       the shapes a loop takes, stepped through
 HmzTurns.vue        features/concurrency twelve prompts, scheduled across n conversations
 HmzResume.vue       features/resuming    pull the plug, then run it again

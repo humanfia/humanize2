@@ -71,6 +71,7 @@ here when it says what each request to the model cost:
 | Codex | `thread/tokenUsage/updated` |
 | opencode, mimocode | each step |
 | Kimi Code | the session it is polling anyway |
+| ZCode | its `model-io` log, a row per request the turn made |
 
 ## `juice` — and it is not a clock at all
 

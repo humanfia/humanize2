@@ -50,6 +50,11 @@ in is not a thing that can be done at all, rather than a thing that is done late
 Between the two sit the backends driven through the app server they serve their own client
 from: the turn stays open, and the word is steered into the run already going.
 
+A session held open is not by itself somewhere to say something, though. ZCode's app server
+keeps the turn open and still refuses a second prompt while one is running: what its own
+terminal puts a word in over is a channel that terminal holds rather than anything the
+protocol offers the rest of us.
+
 One subtlety decides whether this works or corrupts the transcript. A backend that answers each
 thing it is told with a turn of its own has to be read until it has answered **everything**
 said in the turn, the words put in mid-turn included. Reading only as far as the first answer
@@ -61,6 +66,7 @@ loses what was put in, and leaves the rest for the next turn to take as its own.
 | **Codex** | A steer on the turn its app server is running. |
 | **Kimi Code** | Queued, then steered into the turn already running. |
 | **pi** | A steer on the run it is making, taken into it rather than answered after it. |
+| **ZCode** | Nothing: its app server holds the turn open and still refuses a second prompt while one is running. |
 | **opencode**, **mimocode**, and every other backend given a turn's whole prompt up front | Nothing: there is nothing there to hear it. |
 
 ## The anchored exception

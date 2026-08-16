@@ -65,15 +65,23 @@ with **←/→**.
 Every backend has a ladder of its own. None of them has the same four rungs. Each driver
 reaches for whichever of its own settings says the same thing:
 
-| Rung | Claude Code | Codex | Kimi Code | pi | opencode, mimocode |
-| --- | --- | --- | --- | --- | --- |
-| `read-only` | `plan` mode | `read-only` sandbox | plan mode | without `bash`, `edit`, `write` | `edit` and `bash` denied |
-| `workspace-write` | `acceptEdits` mode | `workspace-write` sandbox | plan mode off | — | `webfetch` denied |
-| `auto` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | nothing denied |
-| `bypass` | `bypassPermissions` | `danger-full-access` | `yolo` mode | — | — |
+| Rung | Claude Code | Codex | Kimi Code | pi | opencode, mimocode | ZCode |
+| --- | --- | --- | --- | --- | --- | --- |
+| `read-only` | `plan` mode | `read-only` sandbox | plan mode | without `bash`, `edit`, `write` | `edit` and `bash` denied | `plan` mode |
+| `workspace-write` | `acceptEdits` mode | `workspace-write` sandbox | plan mode off | — | `webfetch` denied | `edit` mode |
+| `auto` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | nothing denied | `build` mode, which asks before a tool with side effects |
+| `bypass` | `bypassPermissions` | `danger-full-access` | `yolo` mode | — | — | `yolo` mode |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one.
+
+**ZCode has a mode for each of these.** `plan` refuses an edit and refuses a command it reads
+as high-risk. `edit` changes the workspace without asking, and stops at a high-risk tool to
+ask — which is answered no at that rung, since an agent allowed its workspace is not allowed
+more for asking. `build`, the mode its own terminal opens in, asks the same question, and
+`auto` is where the answer is yes. `yolo` asks nothing at all. ZCode's own `auto` mode is not
+this one and is nobody's rung — in that mode it refuses every tool, saying the mode is reserved
+and not implemented yet.
 
 **A Codex whose rules were set by somebody else runs a rung down rather than not at all.** Some
 installations arrive with requirements — an enterprise policy on the account, a
@@ -104,10 +112,11 @@ def no_force_push(occasion: Occasion) -> Verdict | None:
 agent.hooks.on(Moment.PERMISSION_REQUEST, no_force_push)
 ```
 
-Claude Code and Codex both run that moment. The rest have nothing to hang it on. The optional
-`tool=` filter is **the backend's own name for what it asked about**. On Claude Code that name
-is `Bash`; on Codex it is `commandExecution`, `fileChange` or `permissions`. A hook meant for
-both leaves it off and reads `occasion.about`, as the one above does.
+Claude Code, Codex and ZCode all run that moment. The rest have nothing to hang it on. The
+optional `tool=` filter is **the backend's own name for what it asked about**. On Claude Code
+that name is `Bash`; on Codex it is `commandExecution`, `fileChange` or `permissions`. A hook
+meant for more than one of them leaves it off and reads `occasion.about`, as the one above
+does.
 
 A flow built on this says so where it declares its agents. If you give it an agent that cannot
 run the moment, it is refused before its first turn:

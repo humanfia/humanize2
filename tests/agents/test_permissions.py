@@ -298,12 +298,13 @@ def test_kimi_is_told_the_rung_as_a_mode_and_a_plan(
 def test_every_backend_has_something_to_say_at_every_rung() -> None:
     """A rung a backend quietly ignored would be a setting that lies."""
     from hmz.agents import codex as codex_module
-    from hmz.agents import kimi, opencode
+    from hmz.agents import kimi, opencode, zcode
 
     for rung in PERMISSIONS:
         assert rung in kimi._PERMITTED
         assert rung in opencode._PERMITTED
         assert rung in codex_module._PERMITTED
+        assert rung in zcode._PERMITTED
 
 
 def test_an_agent_allowed_less_is_another_agent_at_the_same_model() -> None:

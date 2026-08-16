@@ -70,7 +70,7 @@ The five that are worth reading even if you never install it.
 
 | | |
 | --- | --- |
-| [Ten CLIs, one agent](/features/backends) | Ten coding agents and anything speaking the Agent Client Protocol, each driven through whatever it actually offers. |
+| [Eleven CLIs, one agent](/features/backends) | Eleven coding agents and anything speaking the Agent Client Protocol, each driven through whatever it actually offers. |
 | [A flow is Python](/features/flows) | A loop, a subprocess call, a file read between turns. The agents are its arguments, and the shapes a loop takes are few. |
 | [Many turns at once](/features/concurrency) | Turns are sequential only inside one session. Two hundred conversations are two hundred turns. |
 | [Picked up where it stopped](/features/resuming) | A loop meant to run for a week is a loop that will be stopped. What it was keeping track of survives; the conversation does not. |

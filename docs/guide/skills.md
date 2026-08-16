@@ -44,10 +44,12 @@ Where each CLI keeps them is written down in `hmz.backends`:
 | `opencode` | `~/.config/opencode/skill(s)/*/SKILL.md`, `~/.agents/…`, `~/.claude/…` | `.opencode/skill(s)/*/SKILL.md`, `.agents/…`, `.claude/…` |
 | `pi` | `~/.pi/agent/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | — read only for a project you approved |
 | `qwen` | `~/.qwen/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | `.qwen/skills/*/SKILL.md`, `.agents/skills/*/SKILL.md` |
+| `zcode` | `~/.zcode/skills/*/SKILL.md`, `~/.agents/skills/*/SKILL.md` | `.zcode/skills/*/SKILL.md`, `.agents/skills/*/SKILL.md` |
 
 Each backend's own home moves where that backend's variable moves it: `CODEX_HOME`,
 `KIMI_CODE_HOME`, `GROK_HOME` and the rest. opencode and mimocode keep their skills beside
-their configuration rather than their data, so theirs move with `XDG_CONFIG_HOME`. `dsh` keeps
+their configuration rather than their data, so theirs move with `XDG_CONFIG_HOME`. `agy` and
+`zcode` have no variable of their own, so what moves their home is the home itself. `dsh` keeps
 none. Its command line reads skill directories, and the SDK humanize drives does not.
 
 humanize asks nothing of the CLI to find out, because asking would mean starting it. It writes
@@ -92,7 +94,7 @@ else maintains is one that keeps up.
 | Backend | Where |
 | --- | --- |
 | `claude` | `.claude/skills/` in the workspace |
-| `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen` | `.agents/skills/`, the directory more than one of these agreed to read |
+| `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen`, `zcode` | `.agents/skills/`, the directory more than one of these agreed to read |
 | `agy`, `dsh`, `pi` | — none: they carry what their CLI installs, and nothing else |
 
 The three given none read no such directory the way humanize drives them. `dsh`'s SDK reads

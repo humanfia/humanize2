@@ -39,6 +39,7 @@ That is why a model with slashes in it works:
 hmz exec -f ralph_loop -a kimi/kimi-code/k3:swarmmax "$(cat TASK.md)"
 hmz exec -f ralph_loop -a pi/openai-codex/gpt-5.5:high "$(cat TASK.md)"
 hmz exec -f ralph_loop -a opencode/opencode/big-pickle:high "$(cat TASK.md)"
+hmz exec -f ralph_loop -a zcode/zai/glm-5.3:high "$(cat TASK.md)"
 ```
 
 `<model>` and `<effort>` are whatever the CLI is asked for. humanize does **not** check them

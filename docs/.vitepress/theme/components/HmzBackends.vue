@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Eleven ways of running a coding agent, and what each of them can actually be asked for.
+// Twelve ways of running a coding agent, and what each of them can actually be asked for.
 // The rows are `hmz/backends.py` and the classes in `hmz/agents/`: which session base a
 // backend derives from is what decides whether it can be talked to mid-turn, `shapes` is
 // whether it can be held to a schema, and a `_pursue` of its own is whether it has a goal.
@@ -150,6 +150,18 @@ const BACKENDS: Backend[] = [
     logs: 'none to read',
     skills: 'five places',
     note: 'A fork of opencode, and one directory more: it reads Codex’s skills as well as Claude Code’s.',
+  },
+  {
+    name: 'zcode',
+    called: 'ZCode',
+    driven: 'server',
+    efforts: ['max', 'high', 'low', 'enabled', 'nothink', 'disabled'],
+    steer: 'no',
+    shape: 'asked in the prompt',
+    goal: true,
+    logs: 'read back',
+    skills: 'four places, the shared one included',
+    note: 'Its ladder is two vocabularies at once, because its models have two: the ones that take a thinking budget answer “max”, “high”, “low” and “nothink”, and the ones that only take thinking or not answer “enabled” or “disabled”. A model narrows it to its own half.',
   },
   {
     name: 'yours',

@@ -65,8 +65,8 @@ account runs with all of them unset unless that account set them.
 ## The same credential, under everybody else's name for it
 
 A vendor's key is the vendor's rather than the CLI's. An Anthropic key is an Anthropic key
-whether Claude Code, pi, opencode or mimocode is holding it, and `CLAUDE_CODE_OAUTH_TOKEN` and
-`ANTHROPIC_OAUTH_TOKEN` are one subscription under two names.
+whether Claude Code, pi, opencode, mimocode or ZCode is holding it, and
+`CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_OAUTH_TOKEN` are one subscription under two names.
 
 So an account made for one backend is an account several others could be run as, and copying it
 spells it the way the other backend reads it. What cannot travel is an account that is not

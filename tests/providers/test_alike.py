@@ -25,7 +25,7 @@ def test_a_vendor_key_is_an_account_every_backend_that_reads_it_could_run() -> N
     """Worked out from what each backend says it would take an account from."""
     one = providers.add("claude", "work", "key", {"ANTHROPIC_API_KEY": "sk-x"})
 
-    assert providers.serves(one) == ("pi", "opencode", "mimo")
+    assert providers.serves(one) == ("pi", "opencode", "mimo", "zcode")
 
 
 def test_one_credential_under_two_names_is_one_credential() -> None:

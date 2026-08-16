@@ -112,7 +112,7 @@ A backend is held to the shape in one of two ways:
 | **Claude Code** | `--json-schema`; it validates the answer itself |
 | **Antigravity**, **Grok Build**, **Qwen Code** | `--json-schema` on the run |
 | **Codex** | the turn's `outputSchema` |
-| anything else — `dsh`, `kimi`, `pi`, `opencode`, `mimo` | asked in the prompt, and what it says is read back |
+| anything else — `dsh`, `kimi`, `pi`, `opencode`, `mimo`, `zcode` | asked in the prompt, and what it says is read back |
 
 `Session.shapes` records which of the two a backend is. Either way the answer arrives as
 the model, or not at all.

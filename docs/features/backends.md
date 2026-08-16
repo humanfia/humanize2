@@ -2,11 +2,11 @@
 pageClass: hmz-feature
 ---
 
-# Ten CLIs, one agent
+# Eleven CLIs, one agent
 
 humanize never talks to a model provider. It drives the coding agent CLI you already have,
-logged in the way you already log in — ten of them, plus anything that speaks the Agent Client
-Protocol. There is no API key for it to hold.
+logged in the way you already log in — eleven of them, plus anything that speaks the Agent
+Client Protocol. There is no API key for it to hold.
 
 The one exception ships inside it: DeepSeek Harness arrives with humanize, because it has no
 subscription login to use instead.
@@ -51,7 +51,7 @@ catalogue does not: `xhigh` means the same thing next release. So the ladders ar
 hardest first, and a model narrows its backend's ladder to the rungs that model takes — in the
 ladder's own order, and to the whole of it where the backend said nothing about that model.
 
-Two of them are worth knowing about:
+Three of them are worth knowing about:
 
 - **A rung a backend takes but does not document is written down as one.** Claude Code's
   `ultracode` is `xhigh` with the turn opted into orchestrating a fleet of its own. No listing
@@ -59,6 +59,10 @@ Two of them are worth knowing about:
 - **Width is not depth.** Kimi Code's `max` is one agent and `swarmmax` is the same thinking at
   the width of a fleet — a second thing to say about a turn rather than a harder version of the
   first, so it is chosen beside the effort rather than among the rungs.
+- **One ladder can hold two vocabularies.** ZCode's models do not agree on what an effort is:
+  the ones that take a thinking budget answer `max`, `high`, `low` and `nothink`, and the ones
+  that only take thinking-or-not answer `enabled` and `disabled`. Both are rungs of the one
+  ladder, and a model narrows it to the half that model speaks.
 
 ## Driven through whatever each one actually offers
 

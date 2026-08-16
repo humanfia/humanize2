@@ -62,6 +62,10 @@ class MimoCodeAgent(ShellAgent):
     """A stand-in named for mimocode, which reads the shared project skill directory."""
 
 
+class ZcodeAgent(ShellAgent):
+    """A stand-in named for ZCode, which reads the shared project skill directory."""
+
+
 class PiAgent(ShellAgent):
     """A stand-in named for pi, whose project directories are read only once approved."""
 
@@ -262,6 +266,7 @@ def test_a_session_is_given_them_where_its_backend_reads_a_projects_own(
         QwenCodeAgent,
         OpencodeAgent,
         MimoCodeAgent,
+        ZcodeAgent,
     ],
 )
 def test_a_shared_skill_backend_is_given_flow_skills_in_the_project_directory(

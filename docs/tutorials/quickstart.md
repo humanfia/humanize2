@@ -18,7 +18,7 @@ Python 3.12 or newer, and **one coding agent CLI you have already logged into**.
 will do:
 
 ```sh
-command -v agy claude codex grok kimi pi qwen opencode mimo
+command -v agy claude codex grok kimi pi qwen opencode mimo zcode
 ```
 
 humanize drives the CLI you already have. It holds no API key and talks to no model provider
@@ -76,13 +76,14 @@ Pick the row for the CLI you have:
 | pi | `pi/openai-codex/gpt-5.6-luna:high` |
 | opencode | `opencode/opencode/big-pickle:high` |
 | mimocode | `mimo/mimo/mimo-auto:high` |
+| ZCode | `zcode/zai/glm-5.3:high` |
 | DeepSeek Harness | `dsh/deepseek-v4-flash:high`, with `export DEEPSEEK_API_KEY=sk-…` |
 
 Those are examples, not a fixed list. A model id is whatever that CLI shipped this week, and
-which ones you may name depends on the account you are logged in as — so `pi`, `opencode` and
-`mimo` write a model as `provider/id`, which is why their rows have an extra slash in them. To
-see what yours actually offers, open `/flow` in the interface and turn to its agents: humanize
-asks each CLI once and keeps the answer.
+which ones you may name depends on the account you are logged in as — so `pi`, `opencode`,
+`mimo` and `zcode` write a model as `provider/id`, which is why their rows have an extra slash
+in them. To see what yours actually offers, open `/flow` in the interface and turn to its
+agents: humanize asks each CLI once and keeps the answer.
 
 If you get the id wrong, the backend says so on the first turn:
 

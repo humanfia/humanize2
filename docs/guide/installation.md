@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **Python 3.12 or newer** | 3.12, 3.13 and 3.14 are the ones CI runs the tests on. |
-| **At least one supported backend** | `agy`, `claude`, `codex`, `grok`, `kimi`, `mimo`, `opencode`, `pi` or `qwen` on your `PATH` — or nothing at all, since DeepSeek Harness arrives with humanize and needs only a DeepSeek API key. |
+| **At least one supported backend** | `agy`, `claude`, `codex`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen` or `zcode` on your `PATH` — or nothing at all, since DeepSeek Harness arrives with humanize and needs only a DeepSeek API key. |
 | **A project you are willing to have rewritten** | Read [Security](/guide/security) first. |
 
 You need nothing else. Two features want more, but neither is needed for anything in the
@@ -59,7 +59,7 @@ see [Signing each backend in](#signing-each-backend-in) below.
 humanize can run the backends installed in its environment. Check the CLI backends with:
 
 ```sh
-command -v agy claude codex grok kimi pi qwen opencode mimo
+command -v agy claude codex grok kimi pi qwen opencode mimo zcode
 ```
 
 A CLI backend humanize cannot find is not offered. It looks on your `PATH` first, and then
@@ -90,6 +90,7 @@ Each CLI logs in its own way. humanize never sees the credential:
 | pi | `/login`, inside `pi` |
 | opencode | `opencode auth login` |
 | mimocode | `mimo auth login` |
+| ZCode | `zcode login` |
 | DeepSeek Harness | a DeepSeek API key saved by dsh, stored from an agent's `provider` row, or supplied as `DEEPSEEK_API_KEY` |
 
 DeepSeek Harness is currently a developer preview, and **arrives with humanize**.

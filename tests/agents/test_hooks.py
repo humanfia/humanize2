@@ -23,6 +23,7 @@ from hmz.agents import (
     OpencodeAgent,
     Unhooked,
     Verdict,
+    ZcodeAgent,
 )
 from tests.stubs import ShellAgent
 
@@ -179,9 +180,10 @@ def test_a_moment_the_backend_does_not_run_is_refused_where_it_is_hung() -> None
 
 
 def test_which_moments_each_backend_runs_is_said_on_the_agent() -> None:
-    """Two of them ask before a tool is used and wait for the answer; the rest do not."""
+    """Three of them ask before a tool is used and wait for the answer; the rest do not."""
     assert Moment.PERMISSION_REQUEST in ClaudeCodeAgent.moments
     assert Moment.PERMISSION_REQUEST in CodexAgent.moments
+    assert Moment.PERMISSION_REQUEST in ZcodeAgent.moments
     assert Moment.PERMISSION_REQUEST not in KimiCodeCLIAgent.moments
     assert Moment.PERMISSION_REQUEST not in OpencodeAgent.moments
     assert Moment.STOP in CodexAgent.moments

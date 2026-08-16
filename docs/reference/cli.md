@@ -78,16 +78,16 @@ The first two spellings mean the same thing. The written-out form exists because
 effort may hold the punctuation the short form separates on, and is also where settings with no
 unambiguous short spelling go.
 
-- `<cli>` is `agy`, `claude`, `codex`, `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi` or
-  `qwen` — or any CLI of your own [added at `/providers`](/reference/agents#a-cli-of-your-own).
+- `<cli>` is `agy`, `claude`, `codex`, `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen`
+  or `zcode` — or any CLI of your own [added at `/providers`](/reference/agents#a-cli-of-your-own).
   Several also answer to the longer name they are installed under: `antigravity`,
-  `claude-code`, `deepseek-harness`, `grok-build`, `kimi-code`, `qwen-code`, `mimocode` and
-  `mimo-code`.
+  `claude-code`, `deepseek-harness`, `grok-build`, `kimi-code`, `qwen-code`, `mimocode`,
+  `mimo-code` and `zcode-cli`.
 - `<model>` and `<effort>` are whatever that CLI is asked for — humanize does not check them
   against a list, so a model your account has and this documentation does not still works.
-- A model may hold slashes of its own — Kimi Code's are `kimi-code/k3`, and pi, opencode and
-  mimocode name every model as `provider/id` — so the CLI is read from the front and the effort
-  from after the last colon.
+- A model may hold slashes of its own — Kimi Code's are `kimi-code/k3`, and pi, opencode,
+  mimocode and ZCode name every model as `provider/id` — so the CLI is read from the front and
+  the effort from after the last colon.
 - An `@` after the CLI names the [provider](/reference/providers) that agent's turns run as — the
   account, not the model: `claude@deepseek`. Written out, it is `provider=`. A CLI is never
   spelled with an `@` in it, so the two are told apart wherever an agent is written. An agent
@@ -459,8 +459,8 @@ round on itself ends at the second sight of an agent. The same steps are in the 
 | `NO_COLOR` | the TUI | Honoured. |
 | `TEXTUAL_THEME` | the TUI | Names a Textual theme to use instead of humanize's own, which is your terminal's sixteen colours. A name no theme answers to is ignored. |
 
-Antigravity CLI is the one backend whose home cannot be moved: it reads no variable of its own,
-so its state is always `~/.gemini/antigravity-cli`.
+Antigravity CLI and ZCode are the two backends whose homes cannot be moved: neither reads a
+variable of its own, so their state is always `~/.gemini/antigravity-cli` and `~/.zcode`.
 
 A backend home that does not exist is skipped rather than being an error.
 
