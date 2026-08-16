@@ -18,6 +18,7 @@ __all__ = ["about", "hinted", "offered"]
 #: What each command does, shown beside its name.
 _ABOUT = {
     "flow": "Switch flow",
+    "btw": "Ask a side question",
     "flowverses": "Manage the places flows come from",
     "agents": "Set what each agent runs",
     "providers": "Manage the accounts agents run as",
@@ -38,6 +39,7 @@ _ABOUT = {
 #: flipped, and nothing says so unless the list does.
 _TAKES = {
     "afk": "[on|off]",
+    "btw": "<question>",
     "details": "[on|off]",
     "flow": "[flow]",
 }

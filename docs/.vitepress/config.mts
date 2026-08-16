@@ -184,6 +184,7 @@ export default defineConfig({
           collapsed: false,
           items: [
             { text: 'Talking to a running turn', link: '/guide/steering' },
+            { text: 'Side questions (/btw)', link: '/guide/btw' },
             { text: 'Many conversations at once', link: '/guide/conversations' },
             { text: 'Showing the working (/details)', link: '/guide/details' },
             { text: 'The shape of a run (/status)', link: '/guide/status' },
