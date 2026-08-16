@@ -108,7 +108,7 @@ read back, in fifteen minutes.
   pieces of work run end to end, and two flows written from scratch.
 - **[Guides](https://docs.humanfia.ai/humanize2/guide/)** — a page per feature, each answering "how do I
   use this?" and opening with something you can paste.
-- **[Reference](https://docs.humanfia.ai/humanize2/reference/cli)** — the complete CLI, TUI and Python API.
+- **[Reference](https://docs.humanfia.ai/humanize2/reference/)** — the complete CLI, TUI and Python API.
 
 ## Maintainers
 

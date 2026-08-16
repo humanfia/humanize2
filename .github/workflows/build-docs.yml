@@ -20,7 +20,11 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A superseded pull request build is worth cancelling. A push to main is not: this group
+  # holds `deploy` too, and a run cancelled while `deploy-pages` is publishing leaves Pages
+  # with a deployment that never finished, which is a site that 404s until something else is
+  # pushed. Two pushes to main a minute apart is all that takes.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:

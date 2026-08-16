@@ -48,7 +48,7 @@ export default defineConfig({
       { text: 'Flows', link: '/flows/', activeMatch: '/flows/' },
       { text: 'Tutorials', link: '/tutorials/', activeMatch: '/tutorials/' },
       { text: 'Guides', link: '/guide/', activeMatch: '/guide/' },
-      { text: 'Reference', link: '/reference/cli', activeMatch: '/reference/' },
+      { text: 'Reference', link: '/reference/', activeMatch: '/reference/' },
       {
         text: 'Contributing',
         link: '/contributing/',
@@ -249,6 +249,7 @@ export default defineConfig({
       ],
 
       '/reference/': [
+        { text: 'Reference', link: '/reference/' },
         {
           text: 'Command line',
           items: [
