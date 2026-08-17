@@ -52,7 +52,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, overload
 
 from .agent import Agent, Driven, Person, Session
-from .checking import Finding, checked
+from .checking import Capability, Finding, briefed, catalogue, checked
 from .driving import (
     NotAFlow,
     Place,
@@ -129,6 +129,7 @@ __all__ = [
     "Agent",
     "AgentConfig",
     "AgentDefaults",
+    "Capability",
     "Driven",
     "Event",
     "Failed",
@@ -164,7 +165,9 @@ __all__ = [
     "about",
     "at",
     "backends",
+    "briefed",
     "carries",
+    "catalogue",
     "checked",
     "configures",
     "container",

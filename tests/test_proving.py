@@ -30,7 +30,9 @@ if TYPE_CHECKING:
 
 #: A world that says no quickly: few turns allowed, and a short clock, so a flow that
 #: cannot end is caught in test time rather than in a minute apiece.
-QUICKLY = Scenario("never-done", verdict=False, answer="did some of it", turns=6, seconds=20.0)
+QUICKLY = Scenario(
+    "never-done", verdict=False, answer="did some of it", turns=6, seconds=20.0
+)
 
 #: A budget loop in miniature: each stub turn climbs 100k output tokens, so three turns
 #: spend the 250k this flow holds itself to.
