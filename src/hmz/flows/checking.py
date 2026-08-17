@@ -22,6 +22,7 @@ refuse flows that run.
 from __future__ import annotations
 
 import ast
+import contextlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NamedTuple, Protocol
@@ -32,7 +33,15 @@ if TYPE_CHECKING:
     import os
     from collections.abc import Iterator
 
-__all__ = ["Finding", "checked", "offered", "surface"]
+__all__ = [
+    "Capability",
+    "Finding",
+    "briefed",
+    "catalogue",
+    "checked",
+    "offered",
+    "surface",
+]
 
 
 class Finding(NamedTuple):
@@ -1557,3 +1566,232 @@ def _sleeps(body: list[ast.stmt]) -> bool:
             continue
         return False
     return True
+
+
+# ---------------------------------------------------------------------------------------
+# The capability catalogue: what this installed humanize serves, read off it live.
+# ---------------------------------------------------------------------------------------
+
+
+class Capability(NamedTuple):
+    """One thing a flow may build on, and which backends serve it.
+
+    Attributes:
+      name: What it is called: a primitive by one word, and a moment only some backends
+        reach as `moment:<its own name>`.
+      backends: The backends that serve it, or empty for one every backend serves.
+      said: What the ask looks like, with the code spelled out: this is what a compiler
+        or a person choosing what to build on is shown.
+    """
+
+    name: str
+    backends: frozenset[str]
+    said: str
+
+
+def catalogue() -> tuple[Capability, ...]:
+    """Everything a flow may build on here, read off the installed interface at call time.
+
+    At call time rather than written down, because this is what keeps a generated flow
+    honest across versions: the moments come off the live enum, the backend sets off the
+    driver classes' own declarations, and the asks off the same interfaces `surface` reads
+    -- so what the catalogue promises is what this installation serves, not what some
+    edition of it once did.
+
+    Returns:
+      One capability apiece: the primitives every backend serves, then what only some do
+      -- each moment outside `EVERYWHERE`, the shape a turn can be held to, the tools a
+      flow may offer, and the goal feature.
+    """
+    import inspect
+    import sys as running
+
+    from hmz.agents import DRIVEN, EVERYWHERE, Moment
+
+    agents = {name: held[0] for name, held in DRIVEN.items()}
+    sessions: dict[str, type] = {}
+    for name, cls in agents.items():
+        # The session class, read off what `new` says it answers with: the class itself
+        # is what carries `shapes` and `takes_tools`. By the name in the driver's own
+        # module rather than through `get_type_hints`, which would ask every annotation
+        # in the signature to resolve -- and a driver is free to keep `os` under
+        # TYPE_CHECKING.
+        told: object = None
+        with contextlib.suppress(Exception):
+            told = inspect.signature(cls.new).return_annotation
+            if isinstance(told, str):
+                told = vars(running.modules[cls.__module__]).get(told)
+        if isinstance(told, type):
+            sessions[name] = told
+    held: list[Capability] = [
+        Capability(
+            "turns",
+            frozenset(),
+            "one turn in a session of its own -- agent(prompt, suppress=True) -- or many "
+            "at once with agent.batch(prompts); suppress=True makes a failed turn answer "
+            "'' (or None, for a shaped one) instead of raising",
+        ),
+        Capability(
+            "sessions",
+            frozenset(),
+            "one conversation held across turns -- session = agent.new(cwd=...) then "
+            "session(prompt) -- and dropping the session is how a flow forgets",
+        ),
+        Capability(
+            "schema",
+            frozenset(),
+            "a turn read back as an object -- session(prompt, suppress=True, "
+            "schema=Model) answers the model or None, and the answer is guarded before a "
+            "field is read off it",
+        ),
+        Capability(
+            "budgets",
+            frozenset(),
+            "what a loop's bound reads -- agent.spent().output climbs as the run spends, "
+            "and session.rate() and session.juice() say how fast",
+        ),
+        Capability(
+            "hooks",
+            frozenset(),
+            "a word in at the moments of a turn -- agent.hooks.on(Moment.STOP, hook) "
+            "hangs a callable, and a Stop hook that refuses sends the agent on with what "
+            "it said",
+        ),
+        Capability(
+            "subflows",
+            frozenset(),
+            "one flow runs another -- load('official/rlar')(agents, task) -- found by "
+            "the same name -f takes, and refused where it is asked for if nothing "
+            "answers to it",
+        ),
+        Capability(
+            "person",
+            frozenset(),
+            "the person at the prompt is a place like any other -- agents that include a "
+            "Person field -- and person(said) asks them; run where nobody is at a "
+            "prompt, they answer nothing, and a flow written to stop on nothing stops",
+        ),
+        Capability(
+            "board",
+            frozenset(),
+            "named lines the flow and the person both write on and neither waits at -- "
+            "person.board.put('todo', said) and person.board.get('todo')",
+        ),
+        Capability(
+            "state",
+            frozenset(),
+            "a flow marked @flow(resumable=True) is handed a dict as its last argument, "
+            "holding what it wrote there last time -- and clears it when the run is over",
+        ),
+        Capability(
+            "config",
+            frozenset(),
+            "what a flow can be set up with is a pydantic model third argument -- "
+            "config: Config | None = None -- whose model_config refuses extras and whose "
+            "every field carries Field(description=...)",
+        ),
+        Capability(
+            "skills",
+            frozenset(),
+            "a flow's own skills live in its skills/ directory, one directory per skill "
+            "with a SKILL.md in it, and a session says which it carries with "
+            "session.loads([...])",
+        ),
+        Capability(
+            "clone",
+            frozenset(),
+            "an agent set up differently is another agent -- "
+            "agent.clone(config=replace(agent.config, effort='high')) -- having opened "
+            "nothing and spent nothing",
+        ),
+        Capability(
+            "moments",
+            frozenset(),
+            "the moments every backend reaches, for a hook to hang on: "
+            + ", ".join(f"Moment.{one.name}" for one in Moment if one in EVERYWHERE),
+        ),
+    ]
+    for moment in Moment:
+        if moment in EVERYWHERE:
+            continue
+        held.append(
+            Capability(
+                f"moment:{moment.value}",
+                frozenset(
+                    name for name, cls in agents.items() if moment in cls.moments
+                ),
+                f"Moment.{moment.name} is reached only where the backend says so -- "
+                f"declare it on the place, Annotated[Agent, Moment.{moment.name}], and "
+                "the run is refused an agent that cannot run it before its first turn",
+            )
+        )
+    held.append(
+        Capability(
+            "shapes",
+            frozenset(
+                name for name, one in sessions.items() if getattr(one, "shapes", False)
+            ),
+            "a turn held to the shape rather than asked to keep to it -- every backend "
+            "takes schema=, and these are the ones the answer is certain on",
+        )
+    )
+    held.append(
+        Capability(
+            "tools",
+            frozenset(
+                name
+                for name, one in sessions.items()
+                if getattr(one, "takes_tools", False)
+            ),
+            "a flow's own callbacks put in front of the agent -- "
+            "session.offers([Tool(...)]) -- which a backend not among these refuses; "
+            "type(session).takes_tools says so beforehand",
+        )
+    )
+    pursuing = frozenset(name for name, cls in agents.items() if cls.pursues)
+    held.append(
+        Capability(
+            "pursue",
+            pursuing,
+            "the backend's own goal feature -- session.pursue(objective) keeps the "
+            "agent going until it decides for itself the objective is met",
+        )
+    )
+    held.append(
+        Capability(
+            "goal",
+            pursuing,
+            "a place run under that feature declares it -- Annotated[Agent, Goal] -- "
+            "and is refused an agent whose backend has none before the first turn",
+        )
+    )
+    return tuple(held)
+
+
+def briefed() -> str:
+    """The catalogue rendered as the one page a compiler steers by.
+
+    Returns:
+      What every backend serves, then what only some do -- each with the backends that
+      do, so that a flow built on one can say where it runs.
+    """
+    held = catalogue()
+    lines = [
+        "What a flow may build on here, read off this installed humanize.",
+        "",
+        "Every backend:",
+    ]
+    lines.extend(f"- {one.name}: {one.said}" for one in held if not one.backends)
+    lines += [
+        "",
+        (
+            "Only some backends -- a flow built on one of these says so where it "
+            "declares the place, and is refused an unfit agent before the first turn:"
+        ),
+    ]
+    lines.extend(
+        f"- {one.name} ({', '.join(sorted(one.backends))}): {one.said}"
+        for one in held
+        if one.backends
+    )
+    return "\n".join(lines)
