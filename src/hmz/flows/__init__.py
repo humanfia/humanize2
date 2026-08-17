@@ -119,6 +119,7 @@ __all__ = [
     "EVERYWHERE",
     "FLOWS",
     "LOCAL",
+    "MINE",
     "NEVER_DONE",
     "OFFICIAL",
     "PERMISSIONS",
