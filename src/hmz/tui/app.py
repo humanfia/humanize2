@@ -60,16 +60,16 @@ from textual.widgets import OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
 from hmz import telemetry
-from hmz.runner import flow_and_agents
-from hmz.settings import Settings
+from hmz.sdk import Hmz
 
 from .btw import AgentProgress, FlowSnapshot, Observation, compact, format_snapshot
 from .complete import about, hinted, offered, takes
 from .discover import installable, installed
 from .history import History
 from .monitor import Monitor, short, thousands
-from .pick import EVERY as _EVERY
 from .pick import (
+    DETACHES,
+    STOPS,
     Adjusted,
     Adjusts,
     Chosen,
@@ -79,6 +79,7 @@ from .pick import (
     Flows,
     Flowverses,
     Held,
+    Leaves,
     Providers,
     Reports,
     Runs,
@@ -91,6 +92,7 @@ from .pick import (
     reads,
     settled,
 )
+from .pick import EVERY as _EVERY
 from .selecting import Choices, Transcript
 from .tally import Tally
 
@@ -101,6 +103,7 @@ if TYPE_CHECKING:
 
     from hmz.agents import AgentBase, Board, Event, Question, SessionBase
     from hmz.flows import Place
+    from hmz.sdk import Session
 
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
@@ -122,6 +125,7 @@ _OWN = (
     "details",
     "afk",
     "export",
+    "detach",
     "exit",
 )
 
@@ -543,6 +547,11 @@ class Humanize(App[None]):
 
     BINDINGS: ClassVar = [
         Binding("ctrl+c", "interrupt", "interrupt", priority=True),
+        # Textual's own is bound to leaving outright, which on a run being held apart from
+        # the terminal would end a day's work on one keypress and without the question
+        # `/exit` asks. It is not taken away -- a key somebody's fingers know is a key they
+        # will press -- but it means what `/exit` means.
+        Binding("ctrl+q", "exit", "exit", show=False, priority=True),
         # How the run is going, which is where the flow is drawn. Not what stops a flow: a
         # key pressed to dismiss whatever is on the screen must not be the key that ends a
         # day's work, and esc is pressed to dismiss things everywhere else in this
@@ -598,6 +607,57 @@ class Humanize(App[None]):
         self._agents = []
         self._close_btw()
         self.exit()
+
+    @work
+    async def action_exit(self) -> None:
+        """Closes the interface, having first asked what is to become of a running flow.
+
+        Closing the interface and stopping the run are two things wherever the run is being
+        held somewhere a terminal closing cannot reach: the flow goes on taking its turns and
+        the next terminal to open it is drawn for from the top. So it is asked rather than
+        assumed, and it is asked only where there is something to ask about -- with nothing
+        running, `/exit` is a window being closed.
+        """
+        if not self._agents:
+            self.action_quit()
+            return
+        said = await self.push_screen_wait(Leaves(held=self._session is not None))
+        if said == STOPS:
+            self.action_quit()
+        elif said == DETACHES:
+            self.action_detach()
+
+    def action_detach(self) -> None:
+        """Lets go of the terminal reading this, leaving the flow running.
+
+        The other half of `/exit`: what is closed is the terminal rather than the run. What
+        was running goes on running, and `hmz` in this directory opens it again.
+        """
+        session = self._session
+        if session is None:
+            self.show(
+                "hmz: this run is in the terminal it was opened in, so there is nothing to "
+                "let go of: closing the terminal closes the run",
+                "red",
+            )
+            return
+        if not session.attached:
+            self.show("hmz: nothing is reading this run to let go of", "red")
+            return
+        session.detach()
+
+    def reattached(self) -> None:
+        """Draws the whole screen again, for a terminal that has just begun reading this.
+
+        A terminal that has just arrived has none of what was drawn before it: it is in
+        whatever modes the shell left it in, at whatever size it happens to be, showing
+        whatever was on it. So the interface is stopped and started again on it, which is
+        what puts the modes back and draws every row from the top.
+
+        Called from whatever is holding the run, on a thread of its own.
+        """
+        with contextlib.suppress(Exception), self.suspend():
+            pass
 
     def _close_btw(self) -> None:
         """Closes the optional side sessions without touching any flow session."""
@@ -702,6 +762,7 @@ class Humanize(App[None]):
         flow: str = "",
         agents: Sequence[Runs] = (),
         config: BaseModel | None = None,
+        session: Session | None = None,
     ) -> None:
         """Initializes an interface holding no agents, because nothing is running yet.
 
@@ -713,6 +774,9 @@ class Humanize(App[None]):
             nothing to open on what was remembered.
           config: What that flow is set up with, or None to open on what was remembered.
             Checked by whatever read the line: an interface is opened set up, not corrected.
+          session: What is holding this run somewhere a terminal closing cannot reach, or
+            None for one opened in the terminal it is drawn on -- where letting go of the
+            terminal and stopping the run are the same thing, and `/detach` says so.
         """
         # `ansi_color` up front rather than left to the theme: Textual picks the filter it
         # runs every colour through inside `App.__init__`, before a theme set below could
@@ -726,6 +790,10 @@ class Humanize(App[None]):
         self.register_theme(_TERMINAL)
         asked = os.environ.get("TEXTUAL_THEME", "")
         self.theme = asked if asked in self.available_themes else _TERMINAL.name
+        #: What is holding this run where a terminal closing cannot reach it, or None for one
+        #: that is only in the terminal it was opened in. The whole of what the interface
+        #: knows about that: how many terminals are reading, and how to let go of them.
+        self._session = session
         #: The agents of the flow running now, which is who a typed line is said to.
         self._agents: list[AgentBase] = []
         #: What the flow has done so far, which is what the right-hand column shows, and who
@@ -774,9 +842,13 @@ class Humanize(App[None]):
         #: Nothing at all until some backend here has said what it runs, which is asked for in
         #: the background as this opens: a model to open on is one of that CLI's own, and
         #: there is no telling what those are without asking it.
+        #: humanize, as the one object everything the interface does goes through: the
+        #: flows there are, the agents and accounts they run as, the runs already made here
+        #: and the run being started now. A command line holds the same object.
+        self.hmz = Hmz()
         #: What this workspace was last set up to run, so that opening it again finds it
         #: that way rather than back at the default.
-        self.settings = Settings()
+        self.settings = self.hmz.settings
         self._flow_named = flow or self.settings.flow or _STARTS_ON
         self._models = list(agents)
         #: One place per agent the flow drives: what the flow calls it, which is "" apiece
@@ -938,13 +1010,12 @@ class Humanize(App[None]):
         """
         import asyncio
 
-        from hmz import models
-
+        accounts = self.hmz.accounts
         for backend in installed():
-            if models.asked(backend):
+            if accounts.asked(backend):
                 continue
             try:
-                await asyncio.to_thread(models.ask, backend)
+                await asyncio.to_thread(accounts.ask, backend)
             except Exception as why:  # noqa: BLE001 -- a CLI that will not say what it runs
                 # Not raised at whoever opened the interface: nobody asked for this, and a
                 # backend that will not answer is one to ask again from the models.
@@ -1524,9 +1595,9 @@ class Humanize(App[None]):
           The flows, innermost last, and the one that is set up to run where none is running --
           which is what this line says with nothing going on.
         """
-        from hmz.flows import running
-
-        return " ▸ ".join(one.flow for one in running()) or self._flow_named
+        return (
+            " ▸ ".join(one.flow for one in self.hmz.flows.running()) or self._flow_named
+        )
 
     def _waiting_lines(self, beside: int = 0) -> list[str]:
         """What has been said to the flow and not taken yet, as the pin above the prompt.
@@ -1783,7 +1854,9 @@ class Humanize(App[None]):
             self.show(f"hmz: {error}", "red")
             return
         if name == "exit":
-            self.action_quit()
+            self.action_exit()
+        elif name == "detach":
+            self.action_detach()
         elif name == "clear":
             self.action_clear()
         elif name == "btw":
@@ -2402,9 +2475,7 @@ class Humanize(App[None]):
         # Read again rather than off the interface's own `Settings`, which was made when it
         # opened: the first-start question writes through one of its own, so the long-lived
         # one would show a machine that has just answered as one nobody has asked.
-        from hmz.settings import Settings
-
-        written = Settings().enable_sentry
+        written = Hmz().settings.enable_sentry
         profiling = self.settings.profiling
         said = await self.push_screen_wait(
             Adjusts(
@@ -2503,9 +2574,7 @@ class Humanize(App[None]):
         Args:
           cycle: The run to pick up, by the directory it is written in.
         """
-        from hmz.cycle import read
-
-        ran = read(cycle)
+        ran = self.hmz.cycles.read(cycle)
         if ran is None:
             self.show(f"hmz: {escape(str(cycle))} is not a run", "red")
             return
@@ -2697,7 +2766,6 @@ class Humanize(App[None]):
         """
         from dataclasses import replace
 
-        from hmz import providers
         from hmz.agents import anchored
 
         moved: list[AgentBase] = []
@@ -2712,7 +2780,10 @@ class Humanize(App[None]):
             ):
                 moved.append(agent)
                 continue
-            if runs.provider and providers.find(agent.backend, runs.provider) is None:
+            if (
+                runs.provider
+                and self.hmz.accounts.find(agent.backend, runs.provider) is None
+            ):
                 # Asked now rather than when the first turn needs it: an agent that cannot
                 # find the account it was told to run as must not quietly run as whoever
                 # started it is signed in as, and must not do it half an hour in.
@@ -2745,13 +2816,11 @@ class Humanize(App[None]):
             for one starting from whatever the last run of it here left -- which is what
             running a resumable flow again means.
         """
-        from hmz.runner import Runner
-
         if self._agents:
             self.show("hmz: a flow is already running", "red")
             return
         try:
-            path, chosen, task, _, container = flow_and_agents(argv)
+            path, chosen, task, _, container = self.hmz.read(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
         try:
@@ -2766,7 +2835,7 @@ class Humanize(App[None]):
             # through this interface like everything else. How the flow itself is set up
             # goes with them: it is a setting of the flow rather than of any agent, so it
             # is not on the line that says what each of them runs.
-            runner = Runner(
+            runner = self.hmz.runner(
                 path, chosen, self._config, resume=resume, container=container
             )
         except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
@@ -3359,17 +3428,16 @@ def _machine() -> dict[str, object]:
     """
     import platform
 
-    from hmz import providers
     from hmz.agents.skills import skills
-    from hmz.flows import flowverses
 
+    held = Hmz()
     return {
         "python": platform.python_version(),
         "system": platform.system(),
         "clis": sorted(installed()),
         "accounts": [
             {"cli": one.cli, "name": one.name or "as local", "way": one.way or "-"}
-            for one in providers.providers()
+            for one in held.accounts.all()
         ],
         "skills": {
             cli: [one.name for one in skills(cli)]
@@ -3377,6 +3445,6 @@ def _machine() -> dict[str, object]:
             if skills(cli)
         },
         "flowverses": [
-            {"name": one.name, "fetched": one.fetched} for one in flowverses()
+            {"name": one.name, "fetched": one.fetched} for one in held.verses.all()
         ],
     }

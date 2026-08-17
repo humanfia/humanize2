@@ -2,7 +2,12 @@
 
 The same store the interface's `/providers` walks through, said as arguments instead: what
 there is, what a backend offers, and the three things that can happen to one -- made, signed
-in again, taken away.
+in again, taken away. It is reached through :class:`hmz.sdk.Hmz`, which is what the interface
+asks too: one place a thing is kept is one place it is kept, whichever way somebody reached it.
+
+What is here and nowhere else is the asking. A way in that has not been told everything it
+needs is answered at the terminal, and a secret is never echoed -- which is a thing about
+somebody sitting at a command line rather than about an account.
 """
 
 from __future__ import annotations
@@ -12,6 +17,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hmz.providers import Provider
+    from hmz.sdk import Accounts
 
 __all__ = ["providers"]
 
@@ -138,10 +144,8 @@ def providers(argv: list[str]) -> int:
 
 def _falls_back(cli: str, name: str, at: str) -> int:
     """Says which account a turn under this one carries on under when it fails."""
-    from hmz import providers as held
-
     try:
-        said = held.points(cli, name, at.strip())
+        said = _accounts().points(cli, name, at.strip())
     except ValueError as why:
         print(f"hmz: {why}", file=sys.stderr)
         return 1
@@ -179,6 +183,13 @@ def _named(said: str, *, made: bool = True) -> tuple[str, str]:
     return cli.strip(), name.strip()
 
 
+def _accounts() -> Accounts:
+    """The accounts, as the one object every way in reaches them through."""
+    from hmz.sdk import Hmz
+
+    return Hmz().accounts
+
+
 def _also(cli: str) -> list[Provider]:
     """The account this machine is signed into, where it says anything about itself.
 
@@ -192,14 +203,15 @@ def _also(cli: str) -> list[Provider]:
       about them on.
     """
     from hmz import backends
-    from hmz import providers as held
+    from hmz.providers import LOCAL
 
+    accounts = _accounts()
     wanted = backends.named(cli) if cli else None
     return [
         one
         for profile in backends.profiles()
         if (wanted is None or profile.name == wanted.name)
-        and (one := held.find(profile.name, held.LOCAL)) is not None
+        and (one := accounts.find(profile.name, LOCAL)) is not None
         and one.fallback
     ]
 
@@ -207,7 +219,6 @@ def _also(cli: str) -> list[Provider]:
 def _list(cli: str) -> int:
     """Prints every provider there is, or one backend's."""
     from hmz import backends
-    from hmz import providers as held
 
     if cli and backends.named(cli) is None:
         # Said rather than answered with everybody's: a name no backend answers to reads as
@@ -215,7 +226,7 @@ def _list(cli: str) -> int:
         # and its chain as though they were this one's.
         print(f"hmz: {cli}: no such coding agent", file=sys.stderr)
         return 1
-    found = held.providers(cli)
+    found = _accounts().all(cli)
     # And the account this machine is signed into, wherever it says something about itself:
     # a chain in force is a thing to see, and it is an account here too.
     mine = _also(cli)
@@ -235,9 +246,7 @@ def _list(cli: str) -> int:
 
 def _ways(cli: str) -> int:
     """Prints how one backend can be signed into."""
-    from hmz import providers as held
-
-    offered = held.ways(cli)
+    offered = _accounts().ways(cli)
     if not offered:
         print(f"hmz: {cli}: no such coding agent", file=sys.stderr)
         return 1
@@ -252,9 +261,8 @@ def _ways(cli: str) -> int:
 
 def _show(cli: str, name: str) -> int:
     """Prints what one provider holds, saying nothing a secret is."""
-    from hmz import providers as held
-
-    provider = held.find(cli, name)
+    accounts = _accounts()
+    provider = accounts.find(cli, name)
     if provider is None:
         print(f"hmz: no provider {cli}/{name}", file=sys.stderr)
         return 1
@@ -271,7 +279,7 @@ def _show(cli: str, name: str) -> int:
         print(f"adds        {one}")
     for named, instead in provider.swaps():
         print(f"answers     {named} -> {instead}")
-    for backend in held.serves(provider):
+    for backend in accounts.serves(provider):
         # What else this account is: a vendor's credential is the vendor's, and an account
         # that several backends could be run as is worth saying so about where it is read.
         print(f"also runs   {backend}")
@@ -294,9 +302,8 @@ def _copies(provider: Provider, also: str) -> int:
       Zero, or one for a backend named that this account could not be run as -- which is a
       line to correct rather than a copy to skip quietly.
     """
-    from hmz import providers as held
-
-    among = held.serves(provider)
+    accounts = _accounts()
+    among = accounts.serves(provider)
     if not also:
         if among:
             # Said rather than done: a line that did not ask for it gets a line saying it
@@ -308,7 +315,7 @@ def _copies(provider: Provider, also: str) -> int:
     wanted = among if also.strip() == "all" else _backends(also)
     for backend in wanted:
         try:
-            copied = held.copies(provider, backend)
+            copied = accounts.copies(provider, backend)
         except (ValueError, OSError) as why:
             print(f"hmz: {why}", file=sys.stderr)
             return 1
@@ -323,10 +330,8 @@ def _backends(said: str) -> tuple[str, ...]:
 
 def _remove(cli: str, name: str) -> int:
     """Takes a provider away."""
-    from hmz import providers as held
-
     try:
-        gone = held.remove(cli, name)
+        gone = _accounts().remove(cli, name)
     except ValueError as why:
         print(f"hmz: {why}", file=sys.stderr)
         return 1
@@ -347,14 +352,12 @@ def _add(
     also: str = "",
 ) -> int:
     """Makes a provider, asking for whatever its way still needs, and signs it in."""
-    from hmz import providers as held
-    from hmz.providers import login as signing
-
-    offered = held.ways(cli)
+    accounts = _accounts()
+    offered = accounts.ways(cli)
     if not offered:
         print(f"hmz: {cli}: no such coding agent", file=sys.stderr)
         return 1
-    chosen = signing.way_of(cli, way) if way else offered[0]
+    chosen = accounts.way(cli, way) if way else offered[0]
     if chosen is None:
         print(
             f"hmz: {cli} has no way in called {way!r}; try `hmz providers ways {cli}`",
@@ -362,7 +365,7 @@ def _add(
         )
         return 1
     try:
-        answers = held.env_of("\n".join(given))
+        answers = accounts.env("\n".join(given))
     except ValueError as why:
         print(f"hmz: {why}", file=sys.stderr)
         return 1
@@ -377,7 +380,7 @@ def _add(
         print(f"hmz: {why}", file=sys.stderr)
         return 1
     try:
-        provider = signing.make(cli, name, chosen, answers)
+        provider = accounts.make(cli, name, chosen, answers)
     except (ValueError, OSError) as why:
         print(f"hmz: {why}", file=sys.stderr)
         return 1
@@ -411,10 +414,8 @@ def _asks(cli: str, name: str) -> int:
       and exiting badly over it would be reporting the thing that worked as the thing that
       did not.
     """
-    from hmz import models
-
     try:
-        found = models.ask(cli, name)
+        found = _accounts().ask(cli, name)
     except Exception as why:  # noqa: BLE001 -- a CLI that will not say, however it will not
         print(f"hmz: {cli} did not say what it runs as {name}: {why}", file=sys.stderr)
         return 0
@@ -424,14 +425,12 @@ def _asks(cli: str, name: str) -> int:
 
 def _again(cli: str, name: str, given: list[str]) -> int:
     """Signs an existing provider in again, by the way it was made with."""
-    from hmz import providers as held
-    from hmz.providers import login as signing
-
-    provider = held.find(cli, name)
+    accounts = _accounts()
+    provider = accounts.find(cli, name)
     if provider is None:
         print(f"hmz: no provider {cli}/{name}", file=sys.stderr)
         return 1
-    chosen = signing.way_of(cli, provider.way)
+    chosen = accounts.way(cli, provider.way)
     if chosen is None or not chosen.argv:
         print(
             f"hmz: {cli}/{name} was made by {provider.way}, which has nothing to run; "
@@ -440,7 +439,7 @@ def _again(cli: str, name: str, given: list[str]) -> int:
         )
         return 1
     try:
-        answers = held.env_of("\n".join(given))
+        answers = accounts.env("\n".join(given))
         answers = _asking(chosen, answers)
     except ValueError as why:
         print(f"hmz: {why}", file=sys.stderr)
@@ -457,11 +456,10 @@ def _sign(provider: object, way: object, answers: dict[str, str]) -> int:
     """Runs the backend's own way in, and says what came of it."""
     from hmz.backends import Way
     from hmz.providers import Provider
-    from hmz.providers import login as signing
 
     assert isinstance(provider, Provider)  # noqa: S101 -- built by the caller, two lines up
     assert isinstance(way, Way)  # noqa: S101
-    status = signing.sign_in(provider, way, answers)
+    status = _accounts().sign_in(provider, way, answers)
     if status:
         # Including a CLI that is not installed: what is spawned is the supervisor, and a
         # program it cannot start is a status of its own with the reason already on stderr.
@@ -488,7 +486,7 @@ def _asking(way: object, given: dict[str, str]) -> dict[str, str]:
     import getpass
 
     from hmz.backends import Way
-    from hmz.providers import ENV, env_of
+    from hmz.providers import ENV
 
     assert isinstance(way, Way)  # noqa: S101 -- taken from the table two lines up
     answers = dict(given)
@@ -518,7 +516,7 @@ def _asking(way: object, given: dict[str, str]) -> dict[str, str]:
         lines: list[str] = []
         while said := input("  ").strip():
             lines.append(said)
-        answers = env_of("\n".join(lines))
+        answers = _accounts().env("\n".join(lines))
         if not answers:
             raise EOFError("NAME=VALUE")
     return answers

@@ -100,7 +100,11 @@ def test_forwards_every_argument_to_collect(
     if options["output"] is None:  # the default is named after the moment it was taken
         assert _STAMPED.fullmatch(str(passed["output"]).rpartition("/")[2])
         passed["output"] = None
-    assert collect.call_args.args == (target,)
+    else:  # named outright, however it is spelled by the time it gets there
+        passed["output"] = str(passed["output"])
+    # The workspace the line named, however it is spelled by the time it gets there.
+    (workspace,) = collect.call_args.args
+    assert (None if workspace is None else str(workspace)) == target
     assert passed == options
 
 

@@ -147,7 +147,9 @@ Underneath, humanize is running a **flow** called `chat` — a directory of Pyth
 which agents are driven, what each is asked, and when to stop. `chat` is the simplest one there
 is: one agent, one conversation, and every line you type is the next turn of it.
 
-Leave with `/exit`.
+Leave with `/exit`. With a flow running it asks first whether to stop it, since the run is
+[held apart from this terminal](/reference/daemon) and goes on running if you say to leave it —
+which is what `/detach` says outright. `hmz` in the same directory opens it again.
 
 ## Step 5 — run the same thing without the interface
 

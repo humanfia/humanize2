@@ -14,15 +14,21 @@ A directory holds sessions no run of a flow ever opened -- somebody's own aftern
 coding agent -- and `--session` and `--all` are how those are read back. They are not a run's
 trace and are not filed as one; they are here and nowhere else, since the interface's own
 `/cycles` is a list of runs and has nothing to hang them on.
+
+The runs and the gathering are both reached through :class:`hmz.sdk.Hmz`, which is what the
+sheet the runs are read on asks for the same trace.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser, Namespace
-    from pathlib import Path
+    from typing import Any
+
+    from hmz.sdk import Cycles
 
 __all__ = ["trace"]
 
@@ -104,19 +110,17 @@ def _collect(said: Namespace, parser: ArgumentParser) -> int:
     Returns:
       Zero, once the trace has been written.
     """
-    import datetime
+    from hmz.cli import many
+    from hmz.sdk import Hmz
 
-    from hmz.cycle import cycles, opened, read
-    from hmz.tracing.collector import collect as gather
-    from hmz.tracing.profile import PROFILE
-
+    runs = Hmz(said.workspace).cycles
     wider = bool(said.sessions or said.everything)
     if wider and said.cycle:
         parser.error(
             "a trace of a run holds that run's own sessions: --cycle takes neither "
             "--session nor --all"
         )
-    found = cycles(said.workspace)
+    found = runs.all()
     if said.cycle:
         found = [one for one in found if one.name.startswith(said.cycle)]
         if not found:
@@ -124,77 +128,54 @@ def _collect(said: Namespace, parser: ArgumentParser) -> int:
     # A run to trace, unless the line asked for what a run is not: the last of the workspace
     # where none was named, and none at all in a directory nothing has been run in.
     cycle = None if wider else found[-1] if found else None
-    # Who ran what, taken from the run being traced: the backends log a session under an id
-    # and never say whose it was, so two agents at one configuration are one agent to a trace
-    # unless the run itself says otherwise -- and the run wrote down that it did.
-    agents = opened(cycle) if cycle is not None else {}
-    profile = cycle / PROFILE if cycle is not None else None
-    # The run's own sessions, which are the trace. Asked for by id and not by workspace: the
-    # ids are exactly this run's, and a flow that worked in a machine's mirror logged them
-    # under a directory this one has never heard of.
-    held = (
-        [ident for ids in agents.values() for ident in ids]
-        if cycle is not None
-        else said.sessions
-    )
-    stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
-    output = said.output or str(_beside(cycle, said.workspace) / f"{stamp}.trace.json")
-
     try:
-        document = gather(
-            None if cycle is not None else said.workspace,
-            sessions=held,
-            agents=agents or None,
-            output=output,
-            start=said.start,
-            end=said.end,
-            profile=profile,
-        )
+        if cycle is not None:
+            # A trace of a run is the run's own to gather: which sessions it opened, which
+            # agent opened each, the profile beside them, and where it goes.
+            output, document = runs.traced(
+                cycle, output=said.output, start=said.start, end=said.end
+            )
+        else:
+            output, document = _elsewhere(runs, said)
     except ValueError as why:
         parser.error(str(why))
     summary = document["otherData"]
-    ran = read(cycle) if cycle is not None else None
+    ran = runs.read(cycle) if cycle is not None else None
     where = f" of {ran.name}" if ran is not None else ""
     programs = (
-        f", {_many(summary['programs'], 'program')}" if summary.get("programs") else ""
+        f", {many(summary['programs'], 'program')}" if summary.get("programs") else ""
     )
     print(
-        f"{output}{where}: {_many(summary.get('sessions', '0'), 'session')}, "
-        f"{_many(summary.get('slices', '0'), 'slice')}{programs}"
+        f"{output}{where}: {many(summary.get('sessions', '0'), 'session')}, "
+        f"{many(summary.get('slices', '0'), 'slice')}{programs}"
     )
     return 0
 
 
-def _many(count: str, thing: str) -> str:
-    """How many of something the trace holds, said as English says it.
+def _elsewhere(runs: Cycles, said: Namespace) -> tuple[Path, dict[str, Any]]:
+    """Gathers what a directory holds whoever opened it, which is a trace of no run.
+
+    A session no flow ever drove is still a session to read back. It is not a run's trace and
+    is not filed as one: it goes beside the runs rather than inside one, so that it is still
+    with the rest of what humanize keeps about this project rather than in whatever directory
+    somebody happened to be standing in.
 
     Args:
-      count: How many, as the trace counted them.
-      thing: What they are, in the singular.
+      runs: The runs of the workspace the line named.
+      said: What the line said.
 
     Returns:
-      The two words -- `1 session`, `3 sessions` -- since a line somebody reads is prose, and
-      `1 sessions` is a line that reads as a template nobody finished.
+      Where it was written, and the trace itself.
     """
-    return f"{count} {thing}" if count == "1" else f"{count} {thing}s"
+    import datetime
 
-
-def _beside(cycle: Path | None, workspace: str | None) -> Path:
-    """Where a trace goes when the line did not say, and makes the directory.
-
-    Args:
-      cycle: The run being traced, or None for a trace that is not of one -- a workspace
-        nothing has been run in, or a line that asked for sessions rather than a run.
-      workspace: What the line named, if anything.
-
-    Returns:
-      The directory to write into: the run's own `traces/`, or -- for a trace of no one run --
-      the directory that workspace's runs are kept in, so that it is still with the rest of
-      what humanize keeps about this project rather than in whatever directory somebody
-      happened to be standing in, and is still not inside a run it is not a trace of.
-    """
-    from hmz.cycle import TRACES, under
-
-    at = cycle / TRACES if cycle is not None else under(workspace)
-    at.mkdir(parents=True, exist_ok=True)
-    return at
+    where = Path(said.output) if said.output else None
+    if where is None:
+        at = runs.under()
+        at.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+        where = at / f"{stamp}.trace.json"
+    where.parent.mkdir(parents=True, exist_ok=True)
+    return where, runs.trace(
+        sessions=said.sessions, output=where, start=said.start, end=said.end
+    )

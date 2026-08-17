@@ -11,6 +11,7 @@
 ├── cli
 ├── coganchor
 ├── cycle.py
+├── daemon
 ├── fallbacks.py
 ├── flows
 ├── kept.py
@@ -18,6 +19,7 @@
 ├── models.py
 ├── providers
 ├── runner.py
+├── sdk
 ├── settings.py
 ├── telemetry.py
 ├── tracing
@@ -29,6 +31,13 @@ specified here. None of them MUST have a command line: `cli` is the whole of it,
 per command that takes a parser of its own, and it MUST reach a layer only from inside the
 command carried out in it, so that a command pays for no layer but its own -- and so that the
 same package serves as the target half of a session, where it is the only one installed.
+
+There are four ways in and one thing under them. `sdk` is humanize as one object, and `cli`,
+`daemon` and `tui` MUST each be a way of reaching it rather than a second copy of what it
+does: a command line reads a line and prints what came of it, a daemon holds a run where a
+terminal closing cannot end it, and the interface draws. What two of them would otherwise
+each have written MUST be written in `sdk` instead, so that a thing that can be done one way
+can be done every way and is refused the same way whichever way it was asked.
 
 No two layers MUST name each other. A pair that does is two things put in one place, not one
 thing above another, and is what `tests/test_layering.py` refuses.
@@ -515,7 +524,7 @@ never have reason to name this module.
 ## Commands
 
 ```shell
-hmz [<command> [<args>...]]
+hmz [--no-daemon] [<command> [<args>...]]
 ```
 
 - A line naming no command at all MUST open the terminal interface, which is every command at
@@ -523,6 +532,19 @@ hmz [<command> [<args>...]]
   naming something that is not a command MUST be a usage error listing the commands there
   are. Everything after the command name MUST reach that command untouched, `--help`
   included, so that each answers for its own arguments.
+- The interface MUST be opened on a run held apart from the terminal wherever there is a
+  terminal to hand over to, so that closing the terminal is not what ends a day's work: a
+  line naming no command MUST read whichever run is already being held in this directory, and
+  MUST start one where none is. A line that also says what to run MUST be a line to correct
+  where one is already being held -- a run that is set up is set up, and two answers to how it
+  is set up is one of them silently losing.
+- With no terminal on both ends -- output going to a file, a suite driving the interface
+  itself -- it MUST be opened in this process exactly as it always was, and `--no-daemon` MUST
+  say so outright. An environment variable MUST say the same thing for a whole machine without
+  writing anything down, as it does for whether humanize reports its own failures: a scripted
+  install and this suite are one variable rather than a flag each of them has to remember.
+  Anything at all that stops a run being held MUST be said and then done without: what is lost
+  is being able to walk away from it, which is not a reason to refuse to open.
 - `__main__.py` MUST run this same command line, so that `python -m hmz` is `hmz`.
 
 ## `hmz exec`
@@ -710,6 +732,27 @@ Where a turn goes when the agent taking it cannot take it at all.
 - `show` MUST print the whole walk rather than the one step, since the walk is what a failed
   turn does, and MUST say so where an agent falls back nowhere.
 - It MUST be the same store the interface's own `/fallback` walks.
+
+## `hmz daemon`
+
+```shell
+hmz daemon [list [-q] | status [<workspace>] | start [-f <flow>] [-a <agent>...] | attach [<workspace>] | stop [<workspace>] [--kill]]
+```
+
+The runs being held apart from a terminal: which there are, what one of them is doing, and the
+two ways one ends.
+
+- It MUST be about runs that are already being held rather than a second way of opening the
+  interface. `hmz` is how one is opened and read; this is what is left to say about one from
+  outside it -- which is why `attach` is here as the long way round of what `hmz` already
+  does, and `start` is here for a machine being set up rather than sat at.
+- What is running in one MUST be readable without attaching to it. A line asking is a line
+  somebody typed instead of opening the interface, and answering it by opening the interface
+  would be answering a different question.
+- Stopping MUST mean what closing the interface means -- the flow stopped, the interface
+  closed -- and MUST wait for it to go. Ending the process holding it MUST be asked for
+  outright, and MUST be what is left when the first will not work.
+- A directory nothing is being held in MUST say so and exit non-zero, rather than starting one.
 
 ## `hmz cred`
 

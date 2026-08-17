@@ -24,9 +24,35 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
-    from collections.abc import MutableMapping
+    from collections.abc import MutableMapping, Sequence
 
-__all__ = ["COMMANDS", "main"]
+    from pydantic import BaseModel
+
+    from hmz.daemon import Held
+    from hmz.kept import Runs
+
+__all__ = ["APART", "COMMANDS", "apart", "main", "many", "opens", "runs_of"]
+
+#: What says whether a run may be held apart from the terminal at all, for a machine that
+#: would rather it went with the window. `off`, `0` or `no`; anything else is silence, and
+#: silence is a run that is held wherever there is a terminal to hand over to.
+APART = "HUMANIZE_DAEMON"
+
+
+def many(count: int | str, thing: str) -> str:
+    """How many of something there are, said as English says it.
+
+    Here rather than beside either line that prints one: a listing that says `1 sessions` is
+    a line that reads as a template nobody finished, and there is one rule about that.
+
+    Args:
+      count: How many, as a number or as whatever counted them.
+      thing: What they are, in the singular.
+
+    Returns:
+      The two words -- `1 session`, `3 sessions`.
+    """
+    return f"{count} {thing}" if str(count) == "1" else f"{count} {thing}s"
 
 
 def _prepare_textual_terminal(
@@ -63,14 +89,15 @@ def _exec(argv: list[str]) -> int:
     """
     from hmz import telemetry
     from hmz.flows import NotAFlow
-    from hmz.runner import Runner, flow_and_agents
+    from hmz.sdk import Hmz
 
+    hmz = Hmz()
     # If it has been answered yes, and never otherwise: a run with nobody at a terminal is a
     # run with nobody to ask, and silence is not an answer.
-    telemetry.start()
-    path, agents, task, config, container = flow_and_agents(argv)
+    hmz.reports()
+    path, agents, task, config, container = hmz.read(argv)
     try:
-        runner = Runner(path, agents, config, container=container)
+        running = hmz.run(path, agents, task, config, container=container)
     except NotAFlow as error:
         # A flow that is not there, or one that takes other agents than these, is a command
         # line that was wrong before anything ran, so it exits as argparse's own rejections
@@ -78,7 +105,7 @@ def _exec(argv: list[str]) -> int:
         print(f"hmz exec: error: {error}", file=sys.stderr)
         raise SystemExit(2) from error
     try:
-        runner.run(task)
+        running.run()
     except (KeyboardInterrupt, SystemExit):
         # Somebody stopping a run is not a run that went wrong.
         raise
@@ -248,6 +275,13 @@ def _line() -> ArgumentParser:
         help="a YAML file of what to set that flow up with, as choosing it would ask for it; "
         "needs -f",
     )
+    parser.add_argument(
+        "--no-daemon",
+        dest="daemon",
+        action="store_false",
+        help="open the interface in this terminal rather than holding the run apart from it, "
+        "which is what makes closing the terminal close the run",
+    )
     return parser
 
 
@@ -269,32 +303,23 @@ def _tui(argv: list[str]) -> int:
     # reaching the lazily imported interface below.
     _prepare_textual_terminal()
 
-    from hmz.flows import configures, wanted
-    from hmz.kept import Runs
-    from hmz.runner import read_agent, set_up_from
-    from hmz.tui import Humanize
-
     parser = _line()
     args = parser.parse_args(argv)
-
     flow = args.flow or ""
+    # Each flag that says something about the flow, in the order they are written: a line
+    # short of the flow they are about is a line to correct before either is read.
     if args.agents and not flow:
         parser.error("-a says what runs the flow, so it needs -f")
     if args.config is not None and not flow:
         parser.error("-c says how the flow runs, so it needs -f")
-    # What each line said about searching the web, kept beside the line itself: the rest of
-    # what an agent is travels in the spec and is read again where the agent is made, and
-    # this is a switch rather than a word of the spec by the time the interface holds it.
-    searching: list[bool] = []
-    for spec in args.agents:
-        try:
-            searching.append(read_agent(spec)[6] is not False)
-        except ValueError as bad:
-            parser.error(f"bad agent {spec!r}: {bad}")
+    agents = runs_of(parser, flow, args.agents)
     setting = None
     if args.config is not None:
+        from hmz.sdk import Hmz
+
+        flows = Hmz().flows
         try:
-            model = configures(flow)
+            model = flows.configures(flow)
         except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
             parser.error(str(why))
         if model is None:
@@ -302,32 +327,213 @@ def _tui(argv: list[str]) -> int:
                 f"{flow} takes no setting up, so there is nothing for -c to say"
             )
         try:
-            setting = model.model_validate(set_up_from(args.config))
+            setting = model.model_validate(flows.set_up_from(args.config))
         except ValueError as refused:
             parser.error(f"{args.config}: {refused}")
-    places = ()
-    if args.agents:
+    return opens(parser, flow=flow, agents=agents, config=setting, held=args.daemon)
+
+
+def runs_of(parser: ArgumentParser, flow: str, agents: Sequence[str]) -> list[Runs]:
+    """Reads what each of a flow's agents runs off the line that named them.
+
+    Here rather than in either of the two lines that take it -- `hmz` and `hmz daemon start`
+    -- because it is one rule: what `-a` means, how many of them a flow takes, and what an
+    agent that named none of it does. Two readings of one line would be two ways of refusing
+    the same mistake.
+
+    Args:
+      parser: The line, for reporting one to correct.
+      flow: The flow they are to drive, or "" for a line that named none.
+      agents: What each of them runs, as `-a` spells one.
+
+    Returns:
+      One apiece, in the order the flow takes them, and nothing at all for a line that named
+      no agent.
+
+    Raises:
+      SystemExit: If the line names agents and no flow, an agent that is not one, or a
+        different number of them than the flow drives -- each as argparse rejects a line.
+    """
+    from hmz.kept import Runs
+    from hmz.sdk import Hmz
+
+    if not agents:
+        return []
+    if not flow:
+        parser.error("-a says what runs the flow, so it needs -f")
+    hmz = Hmz()
+    # What each line said about searching the web, kept beside the line itself: the rest of
+    # what an agent is travels in the spec and is read again where the agent is made, and
+    # this is a switch rather than a word of the spec by the time the interface holds it.
+    searching: list[bool] = []
+    for spec in agents:
         try:
-            places = wanted(flow)
-        except Exception as why:  # noqa: BLE001
-            parser.error(str(why))
-        if len(places) != len(args.agents):
+            searching.append(hmz.agents.reads(spec)[6] is not False)
+        except ValueError as bad:
+            parser.error(f"bad agent {spec!r}: {bad}")
+    try:
+        places = hmz.flows.places(flow)
+    except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
+        parser.error(str(why))
+    if len(places) != len(agents):
+        parser.error(f"{flow} drives {len(places)} agents, {len(agents)} given")
+    return [
+        Runs(spec, goals=places[at].goals_default, web_search=searching[at])
+        for at, spec in enumerate(agents)
+    ]
+
+
+def opens(
+    parser: ArgumentParser,
+    *,
+    flow: str = "",
+    agents: Sequence[Runs] = (),
+    config: BaseModel | None = None,
+    held: bool = True,
+) -> int:
+    """Opens the interface, on this terminal or on one a run of its own is being held on.
+
+    A run of a flow outlives the terminal it was started from, which is what makes `/detach`
+    a thing there is: the interface goes on running where nothing is reading it, and `hmz` in
+    this directory opens it again. So a line that opens the interface reads whichever run is
+    already being held here, and starts one where none is.
+
+    A terminal is what makes that worth doing. With nothing to attach -- output going to a
+    file, a test driving the interface itself -- the interface is opened here, in this
+    process, exactly as it always was.
+
+    Args:
+      parser: The line that asked, for reporting one to correct.
+      flow: The flow to open on, which is what `-f` names.
+      agents: What each of that flow's agents runs.
+      config: What that flow is set up with.
+      held: Whether the run may be held apart from this terminal at all.
+
+    Returns:
+      Zero, once the interface has been closed or this terminal has been let go of.
+    """
+    if not (held and _apart_is_wanted() and _at_a_terminal()):
+        return _here(flow=flow, agents=agents, config=config)
+
+    import functools
+
+    from hmz import daemon
+
+    found = daemon.running()
+    if found is not None:
+        if flow or agents or config is not None:
+            # A run that is set up is set up. Saying how it is to be set up while one is
+            # already being held is two answers to one question, and carrying on would be
+            # one of them silently losing.
             parser.error(
-                f"{flow} drives {len(places)} agents, {len(args.agents)} given"
+                "a run is already being held here, and it is set up as it was set up; "
+                "`hmz` reads it, and `hmz daemon stop` ends it"
             )
-    Humanize(
-        flow=flow,
-        agents=[
-            Runs(
-                spec,
-                goals=places[at].goals_default,
-                web_search=searching[at],
-            )
-            for at, spec in enumerate(args.agents)
-        ],
-        config=setting,
-    ).run()
+        if found.attach() == 0:
+            return 0
+        # It went between being found and being read, which is a directory with no run in it
+        # after all rather than a reason to open nothing.
+        print(
+            "hmz: the run that was being held here has gone, so a new one is opened",
+            file=sys.stderr,
+        )
+    opening = functools.partial(apart, flow, tuple(agents), config)
+    try:
+        found = daemon.start(opening)
+    except OSError as why:
+        # A machine that will not fork, a home directory that cannot be written, a socket
+        # that will not bind: none of those is a reason not to open the interface. What is
+        # lost is being able to walk away from the run, which is said and then done without.
+        print(
+            f"hmz: this run cannot be held apart from the terminal ({why}), "
+            "so it is opened here instead",
+            file=sys.stderr,
+        )
+        return _here(flow=flow, agents=agents, config=config)
+    return found.attach()
+
+
+def _here(
+    *,
+    flow: str = "",
+    agents: Sequence[Runs] = (),
+    config: BaseModel | None = None,
+) -> int:
+    """Opens the interface in this process, on the terminal it was started from."""
+    from hmz.tui import Humanize
+
+    Humanize(flow=flow, agents=list(agents), config=config).run()
     return 0
+
+
+def apart(
+    flow: str,
+    agents: tuple[Runs, ...],
+    config: BaseModel | None,
+    session: Held,
+) -> None:
+    """Opens the interface inside the process holding the run, and returns when it closes.
+
+    Args:
+      flow: The flow to open on.
+      agents: What each of that flow's agents runs.
+      config: What that flow is set up with.
+      session: What is holding the run, which is what `/detach` lets go of and what draws
+        the screen again for a terminal that has just arrived.
+    """
+    from hmz.sdk import Hmz
+    from hmz.tui import Humanize
+
+    app = Humanize(flow=flow, agents=list(agents), config=config, session=session)
+    # Each of these is called from a thread of whatever is holding the run, so each hands the
+    # work to the interface's own thread and waits there rather than here.
+    session.redrawn(lambda: app.call_from_thread(app.reattached))
+    session.stopping(lambda: app.call_from_thread(app.action_quit))
+    session.says(lambda: {"flows": [one.flow for one in Hmz().flows.running()]})
+    app.run()
+
+
+def _apart_is_wanted() -> bool:
+    """Whether this machine wants a run held apart from the terminal at all.
+
+    Answered for one process without writing anything down, the way the reporting question
+    is: a scripted install, a machine somebody would rather have the run go with the window
+    on, and this suite are all one variable rather than a line each of them has to remember
+    to pass.
+
+    Returns:
+      Whether to hold one. False only where the variable says so outright.
+    """
+    import os
+
+    return os.environ.get(APART, "").strip().lower() not in ("off", "0", "no")
+
+
+def _at_a_terminal() -> bool:
+    """Whether there is a terminal on both ends of this process to hand over to.
+
+    A run held apart from the terminal is read by a terminal proxying to it, so there has to
+    be one: output going to a file and input coming from a pipe are a run that is opened
+    here, in this process, exactly as it always was.
+
+    Returns:
+      Whether there is one.
+    """
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _daemon(argv: list[str]) -> int:
+    """Says what runs are being held apart from a terminal, and ends one.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      Zero, or one for something that could not be done.
+    """
+    from .daemon import daemon
+
+    return daemon(argv)
 
 
 #: Each command, as what carries it out and the line a listing shows it as. There is no
@@ -346,6 +552,7 @@ COMMANDS = {
         _fallback,
         "where a turn goes when the agent taking it cannot take it at all",
     ),
+    "daemon": (_daemon, "the runs being held apart from a terminal"),
 }
 
 #: What humanize spawns for itself, carried out like any command and listed as none of them.

@@ -2,7 +2,7 @@
 
 Installed backends are found here, and optional backends somebody can add are named separately
 so the picker can teach them how. An effort a model does not take is not offered against it.
-What each backend runs is what that backend last said it runs, which :mod:`hmz.models` keeps --
+What each backend runs is what that backend last said it runs, which the SDK's accounts keep --
 read off the disk here, because asking means starting a coding agent and a prompt cannot wait
 on one.
 
@@ -19,8 +19,8 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from hmz import models
 from hmz.backends import named, profiles, program, speaking
+from hmz.sdk import Hmz
 
 if TYPE_CHECKING:
     from hmz.backends import Model
@@ -43,8 +43,9 @@ def installed() -> dict[str, tuple[Model, ...]]:
       the account nobody chose. Empty for one that has never been asked, which is a catalogue
       to fill rather than a backend with nothing in it.
     """
+    accounts = Hmz().accounts
     return {
-        profile.name: models.offered(profile.name)
+        profile.name: accounts.models(profile.name)
         for profile in profiles()
         if _is_installed(profile.name)
     }
@@ -61,7 +62,7 @@ def installable() -> dict[str, tuple[Model, ...]]:
       One entry per supported optional backend missing from this Python environment, with
       the models it will offer once installed.
     """
-    return {"dsh": models.offered("dsh")} if not _is_installed("dsh") else {}
+    return {"dsh": Hmz().accounts.models("dsh")} if not _is_installed("dsh") else {}
 
 
 def _is_installed(backend: str) -> bool:

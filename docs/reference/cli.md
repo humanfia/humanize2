@@ -19,11 +19,19 @@ arguments.
 
 ```
 hmz                  # opens the terminal interface
+hmz --no-daemon      # opens it in this terminal, with the run going when the terminal does
 hmz --version        # prints the installed version
 hmz --help           # lists the commands
 ```
 
 There is no command that opens the interface. Naming nothing at all is how it opens.
+
+It opens on a run [held apart from this terminal](/reference/daemon), so that closing the
+terminal is not what ends a day's work: a line naming no command reads whichever run is already
+being held in this directory and starts one where none is. `--no-daemon` opens it in this
+process instead, which is also what happens with no terminal to hand over to — output going to
+a file, a suite driving the interface itself — and what happens if a run cannot be held at all,
+which is said on stderr and then done without.
 
 It opens on whatever this workspace was [last set up to run](/reference/tui#what-it-remembers) — or on
 what the line says, for a run that is always the same run:
@@ -42,6 +50,10 @@ Nothing is started: the interface opens ready, and the first thing you say is st
 it. What the line says is checked before the interface opens — a flow that will not load, a
 config the flow refuses, the wrong number of agents — so a line that is wrong is a line, not a
 sheet to walk back out of.
+
+A line that says what to run while a run is already being held here is a line to correct: a run
+that is set up is set up, and two answers to how it is set up would be one of them silently
+losing. `hmz` on its own reads it, and `hmz daemon stop` ends it.
 
 ```sh
 hmz -f official/humanize1:rlcr -c setup.yaml
@@ -448,6 +460,39 @@ round on itself ends at the second sight of a place. The same steps are in the i
 [`/fallback`](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken), and what they mean is
 [Falling back](/guide/fallback).
 
+## `hmz daemon`
+
+The runs being [held apart from a terminal](/reference/daemon): which there are, what one of them
+is doing, and the two ways one ends. `hmz` on its own is how one is opened and read; this is
+what is left to say about one from outside it.
+
+```
+hmz daemon [list [-q] | status [<workspace>] | start [-f <flow>] [-a <agent>]... | attach [<workspace>] | stop [<workspace>] [--kill]]
+```
+
+| | |
+| --- | --- |
+| `list` | Every run being held on this machine, oldest first: where, which process, since when, and how many terminals are reading. `-q` prints the directories alone, one a line. A line naming no command does this. |
+| `status [<workspace>]` | What one of them is doing, without attaching to it: how many are reading, and which flows are running under it. |
+| `start [-f <flow>] [-a <agent>]...` | Holds a run here without reading it, for a machine being set up rather than sat at. Takes `-f` and `-a` exactly as `hmz` does. |
+| `attach [<workspace>]` | Reads one from this terminal, which is the long way round of what `hmz` already does. |
+| `stop [<workspace>]` | Stops the flow and closes the interface, which is what `/exit` means, and waits for it to go. `--kill` ends the process holding both instead, for one that will not. |
+
+A directory nothing is being held in says so and exits non-zero rather than starting one.
+
+```console
+$ hmz daemon list
+/home/you/project   pid 41221  since 2026-08-28T09:12:04Z  1 terminal reading
+
+$ hmz daemon status
+workspace   /home/you/project
+pid         41221
+started     2026-08-28T09:12:04Z
+socket      /home/you/.humanize/daemons/project-58036393b2f5
+reading     1 terminal
+running     official/rlar
+```
+
 ## `hmz tools`
 
 ```sh
@@ -471,6 +516,7 @@ than as a turn that failed.
 | `HUMANIZE_TARGET` | `hmz anchor` | Default for `--target`. |
 | `HUMANIZE_TOKEN` | `hmz anchor`, `hmz anchor serve` | Default for `--token`. |
 | `HUMANIZE_LOG` | `hmz anchor`, `hmz anchor serve` | Default for `--log-level`. |
+| `HUMANIZE_DAEMON` | `hmz` with no command | `off`, `0` or `no` opens the interface in this terminal rather than [holding the run apart from it](/reference/daemon), which is what `--no-daemon` says on the line. Anything else — including empty — is silence, and silence holds the run. |
 | `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/guide/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
 | `HUMANIZE_SHADOWS` | `hmz anchor`, a container or a machine an agent works on | Where the mirrors coganchor has been pointed at are recorded. Defaults to `~/.cache/humanize/shadows`. |
 | `CLAUDE_CONFIG_DIR` | `hmz trace collect`, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
@@ -516,6 +562,9 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run and whether its runs are profiled, and the settings that are not a workspace's — `enable_sentry`, the answer to the [reporting](/guide/reporting) question. |
 | `~/.humanize/agents.yaml` | `hmz agents`, `/agents` | The agents written down under a name, to be reached for from any flow. |
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
+| `~/.humanize/daemons/<project>-<digest>/daemon.sock` | `hmz` with no command | The socket a terminal reaches a [held run](/reference/daemon) through. `0600`. |
+| `~/.humanize/daemons/<project>-<digest>/daemon.json` | the same | Which process is holding it, which workspace, and since when. |
+| `~/.humanize/daemons/<project>-<digest>/daemon.log` | the same | Whatever the daemon itself could not say through a terminal. |
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
 | `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** in `/flowverses` | A [flowverse](/guide/flowverses), cloned. Every flow in it is offered as `<name>/<flow>`. |
 | `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |
@@ -540,19 +589,36 @@ into them.
 Every command is a shell around a call you can make yourself. The layer each lives in is named
 in [Architecture](/contributing/architecture).
 
+Every one of them is [`Hmz`](/reference/sdk), which is the same object the command line holds:
+
+```python
+from hmz.sdk import Hmz
+
+hmz = Hmz()
+hmz.exec(["-f", "ralph_loop", "-a", "claude/claude-opus-5:high", "fix the build"])
+hmz.cycles.trace(output="run.trace.json")
+hmz.accounts.all("claude")
+hmz.verses.add("humanfia/flowverse")
+```
+
+- `hmz.exec(argv)` / `hmz.run(flow, agents, task)` — [Flows](/reference/flows)
+- `hmz.cycles.trace(...)` — [Tracing](/reference/tracing)
+- `hmz.accounts` — [Providers](/reference/providers)
+- `hmz.verses` — [Flowverses](/guide/flowverses)
+- `hmz.agents` — the agents written down under a name
+
+The layers under it are reachable directly where that is what you want — the SDK composes them
+and restates none of them:
+
 ```python
 from hmz.runner import Runner          # hmz exec
 from hmz.tracing import collect        # hmz trace collect
 from hmz.coganchor import connect      # hmz anchor
 from hmz.coganchor import check        # hmz anchor --check
-from hmz import providers              # hmz providers
-from hmz.flows import verses
+from hmz.daemon import running, start  # hmz daemon
 ```
 
 - `Runner(flow, agents).run(task)` — [Flows](/reference/flows)
 - `collect(workspace, *, sessions=…, agents=…, output=…, start=…, end=…, profile=…)` — [Tracing](/reference/tracing)
 - `connect(command, config)` / `check(config)` — [Remote execution](/reference/remote-execution)
-- `providers.providers(cli)` / `providers.find(cli, name)` / `providers.remove(cli, name)` —
-  [Providers](/reference/providers)
-- `verses.flowverses()` / `verses.add(url, name)` / `verses.fetch(name)` / `verses.remove(name)` —
-  [Flowverses](/guide/flowverses)
+- `running(workspace)` / `start(opens)` — [Daemon](/reference/daemon)

@@ -8,6 +8,10 @@ It is here because the moment you find out you need one is not always a moment y
 in the interface: a machine being set up, a CI job that runs a flow somebody else wrote, a
 line in a script. Nothing here reads a flow, and nothing here runs one -- listing what a
 flowverse holds is its filenames, which costs no import and starts nothing.
+
+The store itself is reached through :class:`hmz.sdk.Hmz`, which is the same object the
+interface's own `/flowverses` asks: one place a thing is kept is one place it is kept,
+whichever way somebody reached it.
 """
 
 from __future__ import annotations
@@ -89,16 +93,17 @@ def _list(*, quiet: bool) -> int:
     great deal of somebody else's code to run for a line that only asked which places there
     are. `show` is the line that asks what is in one, and is where that is paid for.
     """
-    from hmz.flows import verses as store
+    from hmz.sdk import Hmz
 
-    for one in store.flowverses():
+    verses = Hmz().verses
+    for one in verses.all():
         if quiet:
             print(one.name)
             continue
         # What has been downloaded is not the same question as what there is to run, so one
         # that has not been fetched says that rather than being left off the list.
         state = "fetched" if one.fetched else "not fetched"
-        print(f"{one.name:14} {state:12} {_from(one)}")
+        print(f"{one.name:14} {state:12} {verses.whence(one)}")
     return 0
 
 
@@ -111,15 +116,15 @@ def _show(name: str) -> int:
     question. It is asked of one flowverse rather than of all of them: somebody asking about
     theirs has not asked to run everybody else's.
     """
-    from hmz.flows import offers
-    from hmz.flows import verses as store
+    from hmz.sdk import Hmz
 
-    one = store.named(name)
+    verses = Hmz().verses
+    one = verses.find(name)
     if one is None:
         print(f"hmz: no flowverse called {name!r}", file=sys.stderr)
         return 1
     print(f"flowverse   {one.name}")
-    print(f"from        {_from(one)}")
+    print(f"from        {verses.whence(one)}")
     print(f"kept in     {one.at}")
     print(f"fetched     {'yes' if one.fetched else 'no'}")
     if one.fixed:
@@ -130,7 +135,7 @@ def _show(name: str) -> int:
     if not one.fetched:
         print(f"\nnothing of it is here yet; `hmz flowverses fetch {one.name}` gets it")
         return 0
-    held = offers(one)
+    held = verses.holds(one)
     for flow in held:
         # The name `-f` takes, worked out the one place that rule lives, and what the flow says
         # about itself beside it -- which is what somebody choosing between them is reading.
@@ -142,10 +147,10 @@ def _show(name: str) -> int:
 
 def _add(url: str, name: str) -> int:
     """Fetches a flowverse, and says what it is called here and where it landed."""
-    from hmz.flows import verses as store
+    from hmz.sdk import Hmz
 
     try:
-        one = store.add(url, name)
+        one = Hmz().verses.add(url, name)
     except (ValueError, OSError) as why:
         print(f"hmz: {why}", file=sys.stderr)
         return 1
@@ -155,23 +160,24 @@ def _add(url: str, name: str) -> int:
 
 def _fetch(name: str) -> int:
     """Fetches a flowverse again, or for the first time."""
-    from hmz.flows import verses as store
+    from hmz.sdk import Hmz
 
+    verses = Hmz().verses
     try:
-        one = store.fetch(name)
+        one = verses.fetch(name)
     except (ValueError, OSError) as why:
         print(f"hmz: {why}", file=sys.stderr)
         return 1
-    print(f"{one.name} is fetched from {store.plain(one.url)}")
+    print(f"{one.name} is fetched from {verses.plain(one.url)}")
     return _ask(one)
 
 
 def _remove(name: str) -> int:
     """Takes a flowverse away, flows and all."""
-    from hmz.flows import verses as store
+    from hmz.sdk import Hmz
 
     try:
-        gone = store.remove(name)
+        gone = Hmz().verses.remove(name)
     except (ValueError, OSError) as why:
         # OSError too: taking one away is an rmtree, and a directory that will not go -- a
         # parent that cannot be written, a symlink, a file still held open -- is a line that
@@ -200,39 +206,3 @@ def _ask(one: Flowverse) -> int:
     """
     print(f"`hmz flowverses show {one.name}` says what it holds")
     return 0
-
-
-def _from(one: Flowverse) -> str:
-    """Where a flowverse came from, as it may be printed where a person can read it.
-
-    Asked of the name rather than of the URL. An empty URL means several different things --
-    the flows humanize ships, the two directories your own live in, and a directory whose
-    origin could not be read -- and answering all of them with the first would put humanize's
-    name on somebody else's flows.
-
-    Args:
-      one: The flowverse.
-
-    Returns:
-      The URL with anything secret in it taken out, or what it is instead for the ones that
-      have none.
-    """
-    from hmz.flows.verses import BUILTIN, MINE, plain
-
-    if one.name == BUILTIN:
-        return _PACKAGE
-    if one.name in MINE:
-        return f"your own flows in {MINE[one.name]}"
-    # Scrubbed where a flowverse is scrubbed, which is beside the flowverses: this line is
-    # printed every time they are listed, and the interface prints the same one.
-    return plain(one.url) if one.url else _NOWHERE
-
-
-#: What is printed where the other flowverses print where they were fetched from. The flows
-#: humanize ships are not fetched from anywhere: they are in the package.
-_PACKAGE = "the flows humanize ships"
-
-#: For a directory under the flowverses home that is not a clone of anything, or is one whose
-#: origin cannot be read. Its flows are still offered, so it is still listed -- but where it
-#: came from is a question it has no answer to, which is not the same as having come from here.
-_NOWHERE = "-"

@@ -17,21 +17,24 @@ const W = 132
 const H = 40
 
 const NODES: Node[] = [
-  { id: 'tui', x: 300, y: 42, blurb: 'the terminal interface', href: '/reference/tui' },
-  { id: 'cli', x: 706, y: 42, blurb: 'one command line, over layers that have none', href: '/reference/cli' },
-  { id: 'runner', x: 300, y: 116, blurb: 'finds a flow, checks it, names the agents, drives it', href: '/reference/flows' },
-  { id: 'cycle', x: 452, y: 190, blurb: 'one run of one flow, written down as it happens', href: '/reference/tracing' },
-  { id: 'flows', x: 120, y: 264, blurb: 'what a flow is, where it is found, what it brings', href: '/reference/flows' },
-  { id: 'tracing', x: 770, y: 264, blurb: "the backends' own logs, read back as one Chrome trace", href: '/reference/tracing' },
-  { id: 'agents', x: 300, y: 338, blurb: 'the contract a flow is written against, and a driver per backend', href: '/reference/agents' },
-  { id: 'models', x: 770, y: 338, blurb: 'what each backend runs, asked of it the way it offers being asked', href: '/reference/providers' },
-  { id: 'machines', x: 120, y: 412, blurb: "where an agent's turns land: a container, a host, here", href: '/reference/machines' },
-  { id: 'providers', x: 560, y: 412, blurb: 'which account an agent runs as, kept apart from which CLI it is', href: '/reference/providers' },
-  { id: 'coganchor', x: 120, y: 486, blurb: 'syscall interposition: a supervisor here, a server there', href: '/reference/remote-execution' },
-  { id: 'backends', x: 660, y: 486, blurb: 'every fact about a coding agent CLI that is not code', href: '/guide/concepts' },
+  { id: 'tui', x: 190, y: 42, blurb: 'the terminal interface', href: '/reference/tui' },
+  { id: 'daemon', x: 450, y: 42, blurb: 'a run held where a terminal closing cannot end it', href: '/reference/daemon' },
+  { id: 'cli', x: 730, y: 42, blurb: 'one command line, over layers that have none', href: '/reference/cli' },
+  { id: 'sdk', x: 380, y: 116, blurb: 'humanize as one object, which every way in goes through', href: '/reference/sdk' },
+  { id: 'runner', x: 300, y: 190, blurb: 'finds a flow, checks it, names the agents, drives it', href: '/reference/flows' },
+  { id: 'cycle', x: 452, y: 264, blurb: 'one run of one flow, written down as it happens', href: '/reference/tracing' },
+  { id: 'flows', x: 120, y: 338, blurb: 'what a flow is, where it is found, what it brings', href: '/reference/flows' },
+  { id: 'tracing', x: 770, y: 338, blurb: "the backends' own logs, read back as one Chrome trace", href: '/reference/tracing' },
+  { id: 'agents', x: 300, y: 412, blurb: 'the contract a flow is written against, and a driver per backend', href: '/reference/agents' },
+  { id: 'models', x: 770, y: 412, blurb: 'what each backend runs, asked of it the way it offers being asked', href: '/reference/providers' },
+  { id: 'machines', x: 120, y: 486, blurb: "where an agent's turns land: a container, a host, here", href: '/reference/machines' },
+  { id: 'providers', x: 560, y: 486, blurb: 'which account an agent runs as, kept apart from which CLI it is', href: '/reference/providers' },
+  { id: 'coganchor', x: 120, y: 560, blurb: 'syscall interposition: a supervisor here, a server there', href: '/reference/remote-execution' },
+  { id: 'backends', x: 660, y: 560, blurb: 'every fact about a coding agent CLI that is not code', href: '/guide/concepts' },
 ]
 
 const EDGES: [string, string][] = [
+  ['tui', 'sdk'],
   ['tui', 'runner'],
   ['tui', 'cycle'],
   ['tui', 'flows'],
@@ -40,10 +43,20 @@ const EDGES: [string, string][] = [
   ['tui', 'models'],
   ['tui', 'providers'],
   ['tui', 'backends'],
+  ['cli', 'sdk'],
+  ['cli', 'daemon'],
   ['cli', 'runner'],
   ['cli', 'tracing'],
   ['cli', 'cycle'],
   ['cli', 'models'],
+  ['sdk', 'runner'],
+  ['sdk', 'cycle'],
+  ['sdk', 'flows'],
+  ['sdk', 'tracing'],
+  ['sdk', 'agents'],
+  ['sdk', 'models'],
+  ['sdk', 'providers'],
+  ['sdk', 'backends'],
   ['runner', 'cycle'],
   ['runner', 'flows'],
   ['runner', 'agents'],
@@ -86,7 +99,7 @@ const beneath = computed(() => new Set(EDGES.filter(([f]) => f === active.value)
 const above = computed(() => new Set(EDGES.filter(([, t]) => t === active.value).map(([f]) => f)))
 
 let tour: ReturnType<typeof setInterval> | undefined
-const ORDER = ['agents', 'coganchor', 'runner', 'tracing', 'tui', 'flows']
+const ORDER = ['agents', 'coganchor', 'sdk', 'tracing', 'tui', 'flows']
 
 onMounted(() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -108,7 +121,7 @@ function hold(id: string) {
 
 <template>
   <div class="stack hmz-panel">
-    <svg viewBox="0 0 900 530" role="img" aria-label="the layers of humanize, and what each may name">
+    <svg viewBox="0 0 900 604" role="img" aria-label="the layers of humanize, and what each may name">
       <g class="wires">
         <path
           v-for="wire in wires"

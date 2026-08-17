@@ -8,6 +8,9 @@ entirely, which is a CLI, an account and a model and nothing else.
 
 Trying again is said here too. How many goes a failed turn gets before the step is taken is a
 thing about the place rather than about the agent standing in it, so one command says both.
+
+The store is reached through :class:`hmz.sdk.Hmz`, which is what the interface's own
+`/fallback` asks as well: one place a thing is kept is one place it is kept.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hmz.fallbacks import Falls
+    from hmz.sdk import Fallbacks
 
 __all__ = ["fallback"]
 
@@ -34,8 +38,9 @@ def fallback(argv: list[str]) -> int:
     Returns:
       Zero, or one for a line to correct.
     """
-    from hmz import fallbacks
+    from hmz.sdk import Hmz
 
+    steps = Hmz().fallbacks
     parser = argparse.ArgumentParser(
         prog="hmz fallback",
         description="where a turn goes when the place taking it cannot take it at all",
@@ -71,8 +76,8 @@ def fallback(argv: list[str]) -> int:
     trying.add_argument(
         "-p",
         "--policy",
-        default=fallbacks.DEFAULT,
-        choices=[one.name for one in fallbacks.POLICIES],
+        default=steps.default,
+        choices=[one.name for one in steps.policies()],
         help="how long to wait between them",
     )
     trying.add_argument(
@@ -91,14 +96,14 @@ def fallback(argv: list[str]) -> int:
 
     args = parser.parse_args(argv)
     if args.doing in (None, "list"):
-        return _list(quiet=getattr(args, "quiet", False))
+        return _list(steps, quiet=getattr(args, "quiet", False))
     if args.doing == "show":
-        return _show(args.place)
+        return _show(steps, args.place)
     if args.doing == "add":
-        return _add(args.place, args.at)
+        return _add(steps, args.place, args.at)
     if args.doing == "retry":
-        return _retry(args.place, args.tries, args.policy, args.timeout)
-    return _remove(args.place)
+        return _retry(steps, args.place, args.tries, args.policy, args.timeout)
+    return _remove(steps, args.place)
 
 
 def _said(step: Falls) -> str:
@@ -110,11 +115,9 @@ def _said(step: Falls) -> str:
     return f"{step.tries} more tries, {step.policy}{over}; {goes}"
 
 
-def _list(*, quiet: bool) -> int:
+def _list(steps: Fallbacks, *, quiet: bool) -> int:
     """Prints every step, one a line, in the order they were written down."""
-    from hmz import fallbacks
-
-    found = fallbacks.falls()
+    found = steps.all()
     if not found:
         if quiet:
             return 0
@@ -128,16 +131,14 @@ def _list(*, quiet: bool) -> int:
     return 0
 
 
-def _show(place: str) -> int:
+def _show(steps: Fallbacks, place: str) -> int:
     """Prints the places one turn walks, the one it starts at first."""
-    from hmz import fallbacks
-
-    if not fallbacks.reads(place):
+    if not steps.reads(place):
         print(f"hmz: {place}: expected {_PLACE}", file=sys.stderr)
         return 1
-    walked = fallbacks.chain(place)
+    walked = steps.chain(place)
     for at, one in enumerate(walked):
-        step = fallbacks.tried(one)
+        step = steps.tried(one)
         tries = f"   [{step.tries} more tries, {step.policy}]" if step.tries else ""
         print(f"{at + 1}. {one}{tries}")
     if len(walked) == 1:
@@ -145,12 +146,10 @@ def _show(place: str) -> int:
     return 0
 
 
-def _add(place: str, at: str) -> int:
+def _add(steps: Fallbacks, place: str, at: str) -> int:
     """Says where one place's turns go when it has nowhere left to run."""
-    from hmz import fallbacks
-
     try:
-        step = fallbacks.points(place, at)
+        step = steps.points(place, at)
     except ValueError as why:
         print(f"hmz: {why}", file=sys.stderr)
         return 1
@@ -158,12 +157,12 @@ def _add(place: str, at: str) -> int:
     return 0
 
 
-def _retry(place: str, tries: int, policy: str, timeout: float) -> int:
+def _retry(
+    steps: Fallbacks, place: str, tries: int, policy: str, timeout: float
+) -> int:
     """Says how many goes a failed turn at one place gets before the step is taken."""
-    from hmz import fallbacks
-
     try:
-        step = fallbacks.retrying(place, tries, policy, timeout)
+        step = steps.retrying(place, tries, policy, timeout)
     except ValueError as why:
         print(f"hmz: {why}", file=sys.stderr)
         return 1
@@ -175,12 +174,10 @@ def _retry(place: str, tries: int, policy: str, timeout: float) -> int:
     return 0
 
 
-def _remove(place: str) -> int:
+def _remove(steps: Fallbacks, place: str) -> int:
     """Takes one step away, which is a place that falls back nowhere again."""
-    from hmz import fallbacks
-
-    if not fallbacks.clear(place):
+    if not steps.clear(place):
         print(f"hmz: nothing written down for {place}", file=sys.stderr)
         return 1
-    print(f"{fallbacks.reads(place)} falls back to nowhere")
+    print(f"{steps.reads(place)} falls back to nowhere")
     return 0

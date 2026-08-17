@@ -257,11 +257,13 @@ export default defineConfig({
           items: [
             { text: 'CLI', link: '/reference/cli' },
             { text: 'TUI', link: '/reference/tui' },
+            { text: 'Daemon', link: '/reference/daemon' },
           ],
         },
         {
           text: 'Python',
           items: [
+            { text: 'SDK', link: '/reference/sdk' },
             { text: 'Flows', link: '/reference/flows' },
             { text: 'Agents', link: '/reference/agents' },
             { text: 'Machines', link: '/reference/machines' },

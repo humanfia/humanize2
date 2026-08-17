@@ -155,13 +155,40 @@ list appears under the editor with a line about each.
 | `/fallback` | | Where a turn goes when what was taking it cannot: an agent that has nowhere left to run, and an account that has gone down. See [below](#where-a-turn-goes-when-it-cannot-be-taken). |
 | `/clear` | | Clears the screen, and nothing else: the transcript being read, not the others, and nothing that is running. |
 | `/export` | | Writes what is on the screen to `.humanize/<datetime>.session.md`, as it was written rather than as it was wrapped: everything drawn there since the last `/clear`, which is every conversation that has been read rather than only the one showing now. |
-| `/exit` | | Leaves. |
+| `/detach` | | [Lets go of this terminal](/reference/daemon) and leaves the flow running. The run carries on where nothing is reading it, and `hmz` in this directory opens it again from the top. Where nothing is holding the run — `--no-daemon`, or no terminal to hand over to — it says so rather than doing nothing. |
+| `/exit` | | Leaves. With a flow running it asks first what is to become of it: stop it and leave, or leave it running and let go of this terminal. With nothing running it is a window being closed, and asks nothing. |
 
 `/details` and `/afk` flip when given nothing, and take `on` or `off` when you want to say
 which.
 
 **`hmz anchor` is deliberately not here.** It is not a thing to do to a
 flow that is running, and a command that only ever means one thing is a command line.
+
+### Leaving, and letting go
+
+Closing the interface and stopping the run are two things. The run is
+[held in a process of its own](/reference/daemon), so a flow that is running goes on running
+where nothing is reading it — which is what makes `/detach` a thing there is, and what makes
+`/exit` ask rather than assume:
+
+```
+A flow is running here.
+Closing the interface is not, on its own, a thing to do to a run.
+
+  1  ▸ stop the flow, then leave
+        every agent takes no further turn, and the loop ends
+  2    leave it running, and let go of this terminal
+        the run carries on where nothing is reading it; `hmz` opens it again
+
+Enter to choose · Esc to stay here
+```
+
+Where the run is not being held — `--no-daemon`, or output going to a file — the second answer
+is staying here instead: an answer that cannot be carried out is not one to offer.
+
+`ctrl+c` twice is still what stops a flow, and is not what lets go of a terminal. **ctrl+q**
+puts the same question `/exit` does, rather than leaving outright: a key bound to leaving is a
+way round the one thing this asks about.
 
 ## Reading one agent
 
@@ -980,7 +1007,7 @@ the terminal's colours; a name no theme answers to is ignored rather than refuse
   what the flow itself takes is not asked. What each agent is stays open: that is the half
   worth changing mid-run.
 - **Guess at a bad line.** A line it cannot carry out is shown and the interface stays up. Only
-  `/exit` closes it.
+  `/exit` closes it — and `/detach`, which closes this terminal and not the run.
 - **Ask the flow anything.** What is drawn beside and under the transcript is kept from the
   turns going past. A flow is Python that may branch any way it likes, so that is the
   only place a run is ever visible.

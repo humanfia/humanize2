@@ -61,6 +61,10 @@ To use the TUI:
 hmz
 ```
 
+The run is held apart from the terminal, so closing the terminal does not end it: `/detach`
+lets go of the terminal and leaves the flow running, `hmz` in the same directory opens it
+again, and `hmz daemon list` says what is being held where.
+
 DeepSeek Harness takes an API key and no subscription login. Run `dsh web`, save the key
 under **Settings -> Models**, then open `/flow` in humanize, turn to its agents, set one to
 `dsh` and leave its account row on `as local` — which uses the key and the base URL saved in

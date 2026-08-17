@@ -14,7 +14,9 @@ src/hmz/
 ├── cycle.py          what one run of one flow was, written down as it happens
 ├── fallbacks.py     where a turn goes when the place taking it cannot take it at all
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
+├── sdk/              humanize as one object: Hmz, which every way in goes through
 ├── cli/              the command line: one module per command that has a parser
+├── daemon/           a run held where a terminal closing cannot end it
 ├── agents/           the contract, and the driver for each backend
 ├── flows/            what a flow is called, where it is found, what it brings, and the three it ships
 ├── machines/         where an agent's turns land
@@ -23,6 +25,13 @@ src/hmz/
 ├── tracing/          trajectories back out as a Chrome trace
 └── tui/              the terminal interface
 ```
+
+There are four ways in and one thing under them. `sdk/` is humanize as one object, and `cli/`,
+`daemon/` and `tui/` are each a way of reaching it rather than a second copy of what it does: a
+command line reads a line and prints what came of it, a daemon holds a run where a terminal
+closing cannot end it, and the interface draws. What two of them would otherwise each have
+written is written in `sdk/` instead, so that a thing that can be done one way can be done every
+way and is refused the same way whichever way it was asked.
 
 Every name says what it holds. `coganchor` is the one exception — it is a program that ships to
 a target and could be lifted out whole, so it has a name of its own.
@@ -41,7 +50,9 @@ a target and could be lifted out whole, so it has a name of its own.
 | `cycle.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Cycle`, `cycles`, `read`, `opened`, `state`, `resumed` |
 | `runner.py` | Handing a flow the agents it declared, naming them, and running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. What the flow says it drives is `flows/`'s to answer. | `Runner`, `flow_and_agents`, `read_agent`, `set_up_from` |
 | `tracing/` | Reading the backends' logs back — and, for a profiled run, sampling the programs its agents start — and rendering both as one Chrome trace. | `collect`, `profile.Profiler` |
+| `sdk/` | humanize as one object. A workspace, what is remembered about it, the flows there are, the agents and accounts they run as, the runs already made and the run being made now. It composes the layers and restates none of them, and it reaches each of them from inside the call that needs it — which is what lets `hmz exec` name it without paying for the tracer. | `Hmz`, `Run`, `Session` |
 | `tui/` | The terminal interface. | `Humanize` |
+| `daemon/` | A run held where a terminal closing cannot end it, and the terminals that come and go from it. A leaf: what it holds is a callable that opens a run and returns when it is over, so it knows nothing of what a run is. | `Daemon`, `Held`, `running`, `daemons`, `start` |
 | `cli/` | The one command line, over layers that have none of their own. | `main`, `COMMANDS` |
 
 ### Inside the bigger ones
@@ -94,7 +105,9 @@ machines            │
        │             │
     runner ──────────┤
        │             │
-      tui ── tracing ┘
+      sdk ── tracing ┘
+       │
+      tui        daemon   ← a leaf: it holds a callable, not a run
        │
       cli   ← may name anything; it is what joins them
 ```
@@ -175,6 +188,8 @@ what it *must* do, in MUST/MUST NOT terms, for whoever is changing it.
 | `src/hmz/providers/SPEC.md` | Which account an agent runs as, and how a turn is run under it |
 | `src/hmz/coganchor/SPEC.md` | What you are entitled to under an anchor, and what you deliberately are not |
 | `src/hmz/tracing/SPEC.md` | The collect API and how a trace is built |
+| `src/hmz/sdk/SPEC.md` | `Hmz` and everything it hands back |
+| `src/hmz/daemon/SPEC.md` | Holding a run apart from a terminal, and the terminals that read one |
 | `src/hmz/tui/SPEC.md` | Every behaviour the interface must have |
 
 `AGENTS.md` says not to modify a SPEC unless you were told to. Change the code to match the

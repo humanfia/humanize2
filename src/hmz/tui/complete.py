@@ -30,6 +30,7 @@ _ABOUT = {
     "details": "Toggle tool calls and thinking",
     "afk": "Toggle whether an agent may ask you",
     "export": "Write the transcript out",
+    "detach": "Let go of this terminal, leaving the flow running",
     "exit": "Exit humanize",
 }
 

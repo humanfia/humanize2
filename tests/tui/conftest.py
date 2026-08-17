@@ -15,6 +15,8 @@ back to the tests that are about it.
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -22,9 +24,18 @@ import pytest
 import hmz.tui.app
 import hmz.tui.pick
 from hmz.tui.pick import Flows
+from hmz.tui.selecting import Transcript
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
+
+    from textual.pilot import Pilot
+
+    from hmz.tui import Humanize
+
+#: How long anything here waits for the interface to catch up before giving up on it.
+PATIENCE = 30.0
 
 #: Catching up on fetches, before the suite takes it away again.
 _CATCHES = Flows._catches_up
@@ -60,3 +71,27 @@ def catching_up(_fetches_nothing: None, monkeypatch: pytest.MonkeyPatch) -> None
     before: two fixtures setting one attribute is the order they run in.
     """
     monkeypatch.setattr(Flows, "_catches_up", _CATCHES)
+
+
+async def until(ready: Callable[[], bool], driver: Pilot[None]) -> None:
+    """Pumps the interface until something is true, or gives up after a while.
+
+    Waited on the clock rather than counted in pump cycles: a cycle can pass in microseconds,
+    so counting them is a spin that finishes before the worker thread has done anything.
+
+    Args:
+      ready: What is being waited for.
+      driver: The interface to keep pumping while waiting.
+    """
+    deadline = time.monotonic() + PATIENCE
+    while not ready() and time.monotonic() < deadline:
+        await driver.pause()
+        await asyncio.sleep(0.02)
+
+
+def transcript(app: Humanize) -> str:
+    """Everything the interface has shown, as one searchable string.
+
+    Read while the interface is still up: its widgets go with it when it exits.
+    """
+    return app.query_one("#transcript", Transcript).text

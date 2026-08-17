@@ -44,6 +44,11 @@ def _humanize_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize-home"))
     monkeypatch.setenv("HUMANIZE_SENTRY", "off")
     monkeypatch.setenv("HUMANIZE_SHADOWS", str(tmp_path / "shadows"))
+    # And nothing here forks a run into the background. `hmz` with no command holds the run
+    # apart from the terminal, which is right at a prompt and wrong in a suite: a test run
+    # with `-s` from a real terminal would otherwise leave a detached interface behind it.
+    # The tests that are about the holding turn it back on for themselves.
+    monkeypatch.setenv("HUMANIZE_DAEMON", "off")
 
 
 @pytest.fixture(autouse=True)

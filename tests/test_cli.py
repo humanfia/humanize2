@@ -25,7 +25,12 @@ COMMANDS = [
     # And what a flow is, which is where the refusal a line naming no flow is answered with
     # is written. Naming it must not cost the drivers: what a flow imports from there that
     # is written down elsewhere is fetched when a flow names it, not when the line is read.
-    ("exec", {"runner", "flows", "backends", "telemetry", "settings", "kept"}),
+    # And the SDK, which is the one object every way in holds: it reaches a layer only from
+    # inside the call that needs it, so naming it costs nothing but itself.
+    (
+        "exec",
+        {"sdk", "runner", "flows", "backends", "telemetry", "settings", "kept"},
+    ),
     ("trace", set[str]()),
     ("anchor", {"coganchor"}),
     ("flowverses", set[str]()),

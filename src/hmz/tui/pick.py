@@ -75,11 +75,15 @@ if TYPE_CHECKING:
     from hmz.fallbacks import Falls as Step
     from hmz.flows import Flowverse, Offer, Place
     from hmz.providers import Provider
+    from hmz.sdk import Hmz
 
     from .monitor import Monitor, Under
 
 __all__ = [
+    "DETACHES",
     "EVERY",
+    "STAYS",
+    "STOPS",
     "Account",
     "Accounts",
     "Agent",
@@ -105,8 +109,10 @@ __all__ = [
     "Held",
     "Holds",
     "Imports",
+    "Leaves",
     "Names",
     "Picks",
+    "Popup",
     "Providers",
     "Saved",
     "Sheet",
@@ -894,10 +900,8 @@ def places_of(flow: str) -> tuple[Place, ...] | None:
       One place per agent it drives, and None where reading the flow raised at all -- which
       is a flow to report rather than a reason for a menu not to draw.
     """
-    from hmz.flows import wanted
-
     try:
-        return wanted(flow)
+        return _hmz().flows.places(flow)
     except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
         return None
 
@@ -912,10 +916,8 @@ def model_of(flow: str) -> type[BaseModel] | None:
       The model to ask with, or None for a flow that takes no setting up -- and for one that
       will not load, which is a flow to report where it is run rather than here.
     """
-    from hmz.flows import configures
-
     try:
-        return configures(flow)
+        return _hmz().flows.configures(flow)
     except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
         return None
 
@@ -1212,16 +1214,15 @@ class Flows(Drafts[Chosen]):
         per opening, however it goes, so that a machine with no network says so once rather
         than hammering a server on every keystroke.
         """
-        from hmz.flows import flowverses
-        from hmz.flows.verses import fetch
+        verses = _hmz().verses
 
-        for one in flowverses():
+        for one in verses.all():
             if not one.url or one.fetched:
                 continue
             name = one.name
 
             def fetching(named: str = name) -> str:
-                fetch(named)
+                verses.fetch(named)
                 return named
 
             await self._fetches(name, fetching)
@@ -1254,10 +1255,8 @@ class Flows(Drafts[Chosen]):
 
     def _all(self) -> list[Offer]:
         """Every flow there is, read once."""
-        from hmz.flows import found
-
         if self._offers is None:
-            self._offers = found()
+            self._offers = _hmz().flows.all()
         return self._offers
 
     def _wheres(self) -> list[str]:
@@ -1269,11 +1268,11 @@ class Flows(Drafts[Chosen]):
           what having it here is for -- but your own directories are not places to fetch
           anything into, so an empty one is nothing to step to.
         """
-        from hmz.flows import MINE, flowverses
+        from hmz.flows import MINE
 
         return [
             one.name
-            for one in flowverses()
+            for one in _hmz().verses.all()
             if one.name not in MINE
             or any(offer.whose == one.name for offer in self._all())
         ]
@@ -1339,9 +1338,7 @@ class Flows(Drafts[Chosen]):
 
     def _verse(self, named: str) -> Flowverse | None:
         """The flowverse of that name, or None for a name none of them answers to."""
-        from hmz.flows import flowverses
-
-        return next((one for one in flowverses() if one.name == named), None)
+        return _hmz().verses.find(named)
 
     def action_before(self) -> None:
         """Reads the place before this one."""
@@ -1533,7 +1530,7 @@ class Flows(Drafts[Chosen]):
         fetched again over whatever was written into it, so an edit made there is an edit
         that goes away; a copy here is yours, and is what `f` is for.
         """
-        from hmz.flows import LOCAL, fork
+        from hmz.flows import LOCAL
 
         if self._tab != _FLOW_PAGE:
             return
@@ -1543,7 +1540,7 @@ class Flows(Drafts[Chosen]):
             self._fill()
             return
         try:
-            at = fork(named)
+            at = _hmz().flows.fork(named)
         except (OSError, ValueError) as why:
             self._said = escape(str(why))
             self._fill()
@@ -1686,9 +1683,7 @@ class Flows(Drafts[Chosen]):
 
 def _added(url: str, name: str) -> str:
     """Fetches a flowverse and answers with what it is called here."""
-    from hmz.flows.verses import add
-
-    return add(url, name).name
+    return _hmz().verses.add(url, name).name
 
 
 def _came_from(one: Flowverse) -> str:
@@ -1707,13 +1702,7 @@ def _came_from(one: Flowverse) -> str:
       or, for the ones fetched from nowhere, what they are instead: the package's own flows,
       and the directory each of yours is read from.
     """
-    from hmz.flows.verses import BUILTIN, MINE, plain
-
-    if one.name == BUILTIN:
-        return "the flows humanize ships"
-    if one.name in MINE:
-        return f"your own flows in {MINE[one.name]}"
-    return plain(one.url) if one.url else "not a clone of anything"
+    return _hmz().verses.whence(one, "not a clone of anything")
 
 
 class Holds(Sheet[None]):
@@ -1754,11 +1743,9 @@ class Holds(Sheet[None]):
 
     def _flows(self) -> list[Offer]:
         """The flows it holds, read once: reading one means running its entry point."""
-        from hmz.flows import offers
-
         if self._offers is None:
             try:
-                self._offers = offers(self._verse)
+                self._offers = _hmz().verses.holds(self._verse)
             except OSError:
                 self._offers = []
         return self._offers
@@ -1850,9 +1837,7 @@ class Flowverses(Sheet[list[str]]):
 
     def _read(self) -> None:
         """Reads the flowverses off the disk, which is what the rows are drawn from."""
-        from hmz.flows import flowverses
-
-        self._found = flowverses()
+        self._found = _hmz().verses.all()
 
     def _about(self, one: Flowverse) -> str:
         """What a row says about one flowverse: where it came from, and whether it is here."""
@@ -1947,8 +1932,6 @@ class Flowverses(Sheet[list[str]]):
     @work
     async def action_refresh(self) -> None:
         """Fetches the flowverse under the cursor again, or for the first time."""
-        from hmz.flows.verses import fetch
-
         one = self._under()
         if one is None:
             return
@@ -1966,15 +1949,13 @@ class Flowverses(Sheet[list[str]]):
         name = one.name
 
         def fetching() -> str:
-            fetch(name)
+            _hmz().verses.fetch(name)
             return name
 
         await self._fetches(name, fetching)
 
     def action_drop(self) -> None:
         """Takes the flowverse under the cursor away, flows and all, once d is twice."""
-        from hmz.flows.verses import remove
-
         one = self._under()
         if one is None:
             return
@@ -1983,7 +1964,7 @@ class Flowverses(Sheet[list[str]]):
             self._fill()
             return
         try:
-            remove(one.name)
+            _hmz().verses.remove(one.name)
         except (OSError, ValueError) as why:
             self._said = escape(str(why))
             self._fill()
@@ -2167,8 +2148,6 @@ class Fetches(Sheet[tuple[str, str]]):
 
     def action_done(self) -> None:
         """Answers with where it is and what to call it, once there is somewhere to fetch."""
-        from hmz.flows.verses import where as kept
-
         url = self._typed_in.get("repository", "").strip()
         name = self._typed_in.get("name", "").strip()
         if not url:
@@ -2177,7 +2156,7 @@ class Fetches(Sheet[tuple[str, str]]):
             return
         if name:
             try:
-                kept(name)
+                _hmz().verses.where(name)
             except ValueError as why:
                 self._wrong = str(why)
                 self._fill()
@@ -2550,11 +2529,9 @@ class Falls(Sheet[str]):
 
     def _accounts(self) -> list[Provider]:
         """That CLI's own accounts, read once: this is redrawn per keystroke."""
-        from hmz import providers
-
         if self._found is None:
             self._found = [
-                one for one in providers.providers(self._cli) if one.name != self._name
+                one for one in _hmz().accounts.all(self._cli) if one.name != self._name
             ]
         return self._found
 
@@ -2654,9 +2631,7 @@ class Retries(Sheet[tuple[int, str, float]]):
 
     def _rows(self) -> list[tuple[str, str, str]]:
         """Every row this is made of: its id, what it is now, and what it means."""
-        from hmz import fallbacks
-
-        said = fallbacks.named(self._policy)
+        said = _hmz().fallbacks.named(self._policy)
         return [
             (
                 _HOW_MANY,
@@ -2715,15 +2690,13 @@ class Retries(Sheet[tuple[int, str, float]]):
         Args:
           by: One rung on or back.
         """
-        from hmz import fallbacks
-
         listing = self.query_one("#choices", OptionList)
         at = listing.highlighted or 0
         held = self._rows()[at][0] if 0 <= at < len(self._rows()) else ""
         if held == _HOW_MANY:
             self._retries = _stepped(_TRIES, self._retries, by)
         elif held == _POLICY:
-            names = [one.name for one in fallbacks.POLICIES]
+            names = [one.name for one in _hmz().fallbacks.policies()]
             self._policy = _stepped(names, self._policy, by)
         elif held == _HOW_LONG:
             self._timeout = _stepped(_FOR, self._timeout, by)
@@ -2824,9 +2797,7 @@ def _flowing(started: str) -> list[str]:
       with how long it has been going; and just the one that is set up to run where nothing
       is running.
     """
-    from hmz.flows import running
-
-    now = running()
+    now = _hmz().flows.running()
     if not now:
         return [escape(started)]
     return [
@@ -3254,6 +3225,17 @@ class Picks(Sheet[str]):
         self.dismiss(str(event.option.id).removeprefix("="))
 
 
+def _hmz() -> Hmz:
+    """humanize, as the one object every sheet reaches a store through.
+
+    Made where it is wanted rather than held: it costs nothing until something is asked of
+    it, and a sheet that reads a store twice reads the same store both times.
+    """
+    from hmz.sdk import Hmz
+
+    return Hmz()
+
+
 def _sets(provider: Provider) -> str:
     """What one account says about itself on a row: the way it was made by, and what it sets.
 
@@ -3436,16 +3418,15 @@ async def also(host: App[None], one: Provider) -> tuple[str, ...]:
       What it was copied to, and nothing at all where it could run nothing else, where the
       question was walked out of, or where every copy failed.
     """
-    from hmz import providers
-
-    among = providers.serves(one)
+    accounts = _hmz().accounts
+    among = accounts.serves(one)
     if not among:
         return ()
     said = await host.push_screen_wait(Alike(one, among))
     copied: list[str] = []
     for cli in said or ():
         try:
-            providers.copies(one, cli)
+            accounts.copies(one, cli)
         except (OSError, ValueError):
             continue  # a backend that will not take it is one it is not copied to
         copied.append(cli)
@@ -3496,15 +3477,14 @@ async def made(host: App[None], cli: str, *, whose: str = "") -> Made:
       What came of it: the account, whether its way in exited badly, and what stopped it
       before anything was written down. All three empty for a walk that was left.
     """
-    from hmz.providers import login as signing
-
+    accounts = _hmz().accounts
     way: Way | None = None
     while True:
         if way is None:
             named_way = await host.push_screen_wait(Ways(cli))
             if named_way is None:
                 return Made()  # walked out of the first question, which changes nothing
-            way = signing.way_of(cli, named_way)
+            way = accounts.way(cli, named_way)
             if way is None:
                 return (
                     Made()
@@ -3515,7 +3495,7 @@ async def made(host: App[None], cli: str, *, whose: str = "") -> Made:
             continue
         break
     try:
-        provider = signing.make(cli, signs.name or whose, way, signs.answers)
+        provider = accounts.make(cli, signs.name or whose, way, signs.answers)
     except (ValueError, OSError) as why:  # a name or a directory that will not do
         return Made(why=str(why))
     if not way.argv:
@@ -3529,7 +3509,7 @@ async def made(host: App[None], cli: str, *, whose: str = "") -> Made:
     # A login is a browser opened, a code read out, a token exchanged: it owns the screen
     # while it runs, and there is nothing for an interface to draw over it.
     with handed_over(host):
-        status = signing.sign_in(provider, way, signs.answers)
+        status = accounts.sign_in(provider, way, signs.answers)
     return Made(
         provider=provider,
         status=status,
@@ -3560,10 +3540,8 @@ async def asks(cli: str, name: str) -> int:
     """
     import asyncio
 
-    from hmz import models
-
     try:
-        return len(await asyncio.to_thread(models.ask, cli, name))
+        return len(await asyncio.to_thread(_hmz().accounts.ask, cli, name))
     except Exception:  # noqa: BLE001 -- a CLI that will not say is one to ask again later
         return 0
 
@@ -3612,16 +3590,15 @@ class Backends(Picks):
 
     def rows(self) -> list[tuple[str, str, str]]:
         """Every backend there is, saying how each of them can be signed into."""
-        from hmz.backends import profiles
-        from hmz.providers import ways
-
+        held = _hmz()
+        accounts = held.accounts
         return [
             (
                 profile.name,
                 profile.name,
-                ", ".join(way.name for way in ways(profile.name)),
+                ", ".join(way.name for way in accounts.ways(profile.name)),
             )
-            for profile in profiles()
+            for profile in held.backends()
         ] + [
             (
                 _SPEAKS,
@@ -3657,9 +3634,10 @@ class Ways(Picks):
 
     def rows(self) -> list[tuple[str, str, str]]:
         """Every way that backend offers, and the one every backend has."""
-        from hmz.providers import ways
-
-        return [(way.name, way.name, way.about) for way in ways(self._backend)]
+        return [
+            (way.name, way.name, way.about)
+            for way in _hmz().accounts.ways(self._backend)
+        ]
 
     def nothing(self) -> str:
         """Says so for a name no backend answers to, which is the only way this is empty."""
@@ -3876,9 +3854,7 @@ class Signing(Sheet[Signs]):
         sheet: a question left blank is a question to answer, and this is where answering it
         happens.
         """
-        from hmz.providers import env_of, where
-        from hmz.providers.login import asked
-
+        accounts = _hmz().accounts
         name = (self._name or self._typed_in.get(_CALLED, "")).strip()
         answers = {
             held: value
@@ -3886,16 +3862,16 @@ class Signing(Sheet[Signs]):
             if held.strip() and value
         }
         try:
-            where(self._cli, name)
+            accounts.where(self._cli, name)
             if said := self._typed_in.get(_TYPED, "").strip():
                 # Read here rather than where the account is made, so that a line that is not
                 # a variable is said on the row it was typed on.
-                answers |= env_of(said.replace("\r", "\n"))
+                answers |= accounts.env(said.replace("\r", "\n"))
         except ValueError as why:
             self._wrong = str(why)
             self._fill()
             return
-        if still := asked(self._way, answers):
+        if still := accounts.asks(self._way, answers):
             self._wrong = f"{still[0]} is still to be answered"
             self._fill()
             return
@@ -3906,7 +3882,35 @@ class Signing(Sheet[Signs]):
         self.dismiss(Signs(name, answers))
 
 
-class Confirms(Picks):
+class Popup(Picks):
+    """A question that arrived rather than one somebody walked to.
+
+    Drawn as a box in the middle of the screen rather than as a sheet: a sheet is walked to
+    and fills the width it is drawn in, and this arrives over whatever was there, says one
+    thing and is answered in a keypress. Each of these says for itself what it asks and what
+    box it is drawn in; what is here is the one thing they all do, which is to be read rather
+    than searched.
+    """
+
+    def check_action(
+        self,
+        action: str,
+        parameters: tuple[object, ...],
+    ) -> bool | None:
+        """Whether one of the keys is live, which a question of two answers narrows.
+
+        Args:
+          action: What the key would do.
+          parameters: What it would do it with.
+
+        Returns:
+          Whether to run it. Never the search: two rows are read rather than narrowed, and a
+          box in the middle of the screen has no room to say what was typed into one.
+        """
+        return action != "search" and super().check_action(action, parameters)
+
+
+class Confirms(Popup):
     """Whether to keep what a menu is holding, asked as it is walked out of.
 
     A menu applies nothing until it is left, so leaving one is the moment the changes in it
@@ -3932,23 +3936,6 @@ class Confirms(Picks):
             (_DROP, "discard and close", "leave everything as it was"),
         ]
 
-    def check_action(
-        self,
-        action: str,
-        parameters: tuple[object, ...],
-    ) -> bool | None:
-        """Whether one of the keys is live, which a question of two answers narrows.
-
-        Args:
-          action: What the key would do.
-          parameters: What it would do it with.
-
-        Returns:
-          Whether to run it. Never the search: two rows are read rather than narrowed, and a
-          box in the middle of the screen has no room to say what was typed into one.
-        """
-        return action != "search" and super().check_action(action, parameters)
-
     def _fill(self) -> None:
         """Puts the two answers up, and says what esc is here.
 
@@ -3960,6 +3947,69 @@ class Confirms(Picks):
         self.query_one("#keys", Label).update(
             "Enter to choose · Esc to go back to the menu"
         )
+
+
+#: What to do about a flow that is running when the interface is being closed: stop it, let
+#: go of the terminal and leave it running, or stay here after all. Named out here because
+#: what to do about each is the interface's rather than this sheet's: one of them closes it.
+STOPS, DETACHES, STAYS = "stops", "detaches", "stays"
+
+
+class Leaves(Popup):
+    """What is to become of the flow that is running, asked as the interface is closed.
+
+    Closing the interface is not on its own a thing to do to a run. A flow is a loop and a
+    turn thinks for minutes, so a day's work is behind the same three letters that close a
+    window -- and where the run is being held somewhere a terminal closing cannot reach, the
+    two are genuinely different things and only the person at the prompt knows which is meant.
+
+    Drawn as a box in the middle of the screen rather than as a sheet, for the reason the
+    question about a menu holding changes is: a sheet is a question somebody walked to, and
+    this is one that arrived.
+    """
+
+    #: The same box, said again for this class: every rule in this file selects by the name
+    #: of the sheet it is about, so a box drawn for another one is a rule of its own.
+    CSS = f"Leaves {{ align: center middle; background: transparent; }}\n{_POPUP}"
+
+    asked = "A flow is running here."
+    about = "Closing the interface is not, on its own, a thing to do to a run."
+
+    def __init__(self, *, held: bool) -> None:
+        """Initializes the question.
+
+        Args:
+          held: Whether this run is being held somewhere that outlives this terminal, which
+            is what makes leaving it running an answer there is.
+        """
+        super().__init__()
+        self._held = held
+
+    def rows(self) -> list[tuple[str, str, str]]:
+        """The two answers, the second of which is whichever one is true here."""
+        return [
+            (
+                STOPS,
+                "stop the flow, then leave",
+                "every agent takes no further turn, and the loop ends",
+            ),
+            (
+                DETACHES,
+                "leave it running, and let go of this terminal",
+                "the run carries on where nothing is reading it; `hmz` opens it again",
+            )
+            if self._held
+            else (
+                STAYS,
+                "stay here",
+                "nothing is stopped and nothing is closed",
+            ),
+        ]
+
+    def _fill(self) -> None:
+        """Puts the two answers up, and says what esc is here."""
+        super()._fill()
+        self.query_one("#keys", Label).update("Enter to choose · Esc to stay here")
 
 
 #: The two answers to the question humanize asks about itself on a first start.
@@ -4187,7 +4237,7 @@ def _shortly(said: str) -> str:
     return "/".join(parts[-_ENOUGH:]) if len(parts) > _ENOUGH else said
 
 
-class Reports(Picks):
+class Reports(Popup):
     """Whether humanize reports its own failures, asked once, on a first start.
 
     Asked rather than assumed either way. Assumed on, it would be a tool that started sending
@@ -4224,14 +4274,6 @@ class Reports(Picks):
             ),
             (_QUIET, "no, send nothing", "nothing about this machine leaves it"),
         ]
-
-    def check_action(
-        self,
-        action: str,
-        parameters: tuple[object, ...],
-    ) -> bool | None:
-        """Whether one of the keys is live, which a question of two answers narrows."""
-        return action != "search" and super().check_action(action, parameters)
 
     def _fill(self) -> None:
         """Puts the two answers up, and says what esc is here."""
@@ -4526,12 +4568,10 @@ class Agent(Drafts[Fitted]):
 
     def _models(self) -> tuple[Model, ...]:
         """What the chosen CLI says it runs as the chosen account, read once per pair."""
-        from hmz import models
-
         if self._catalogue is None or self._read_for != (self._cli, self._provider):
             self._read_for = (self._cli, self._provider)
             self._catalogue = (
-                models.offered(self._cli, self._provider)
+                _hmz().accounts.models(self._cli, self._provider)
                 if self._provider
                 else self._agents.get(self._cli, ())
             )
@@ -4779,9 +4819,7 @@ class Agent(Drafts[Fitted]):
 
     async def _imports(self, showing: App[None]) -> None:
         """Copies a saved agent into this one, name and all but the name."""
-        from hmz.kept import Templates
-
-        held = Templates().all()
+        held = _hmz().agents.all()
         if not held:
             self._said = "no agents have been saved yet; /agents saves one"
             return
@@ -4815,22 +4853,16 @@ class Agent(Drafts[Fitted]):
 
     async def _saves_as(self, showing: App[None]) -> None:
         """Writes this agent down under a name, new or one already there."""
-        from hmz.kept import Templates
-
+        agents = _hmz().agents
         if not (self._cli and self._model):
             self._said = "an agent with no model is not one to save"
             return
-        store = Templates()
-        listed = store.all()
-        name = await showing.push_screen_wait(Names(listed, self._named))
+        name = await showing.push_screen_wait(Names(agents.all(), self._named))
         if not name:
             return
-        runs = self._made()
-        store.keep(
-            [Kept(name, runs) if one.name == name else one for one in listed]
-            if any(one.name == name for one in listed)
-            else [*listed, Kept(name, runs)]
-        )
+        # Written over where the name is taken, which is what the sheet has just asked, and
+        # in the place it already had rather than at the end of the list.
+        agents.write(name, self._made())
         self._said = f"saved as {escape(name)}"
 
 
@@ -4941,9 +4973,7 @@ class Accounts(Picks):
 
     def rows(self) -> list[tuple[str, str, str]]:
         """The machine's own first, and then every account that CLI has here."""
-        from hmz import providers
-
-        found = providers.providers(self._backend)
+        found = _hmz().accounts.all(self._backend)
         if self._backend == "dsh":
             found = [
                 one
@@ -5085,14 +5115,14 @@ class Catalogue(Picks):
         """
         import asyncio
 
-        from hmz import models
-
         if not self._backend or self._asking:
             return
         self._asking, self._said = True, ""
         self._fill()
         try:
-            found = await asyncio.to_thread(models.ask, self._backend, self._provider)
+            found = await asyncio.to_thread(
+                _hmz().accounts.ask, self._backend, self._provider
+            )
         except Exception as why:  # noqa: BLE001 -- a CLI that would not answer, however
             # Said under the list rather than raised at whoever opened the sheet: a CLI that
             # is not signed in cannot say what it runs, and the question here still stands.
@@ -5289,11 +5319,9 @@ class Fallbacks(Drafts[list[str]]):
             what choosing a place is offered out of.
         """
         super().__init__()
-        from hmz import fallbacks
-
         self._agents = dict(agents)
         #: The steps, held until the menu is saved.
-        self._steps: list[Step] = list(fallbacks.falls())
+        self._steps: list[Step] = list(_hmz().fallbacks.all())
         #: Which of them the cursor is on, by the place it is written against.
         self._was = self._steps[0].spec if self._steps else ""
         self._said = ""
@@ -5429,11 +5457,9 @@ class Fallbacks(Drafts[list[str]]):
 
     def _step(self, said: str) -> Step:
         """The step written against one place, or an empty one for a place with none."""
-        from hmz import fallbacks
+        from hmz.fallbacks import Falls
 
-        return next(
-            (one for one in self._steps if one.spec == said), fallbacks.Falls(said)
-        )
+        return next((one for one in self._steps if one.spec == said), Falls(said))
 
     def _writes(self, said: str, at: str) -> None:
         """Holds where one place goes until the menu is saved, refusing one pointing at itself.
@@ -5489,8 +5515,6 @@ class Fallbacks(Drafts[list[str]]):
         Returns:
           The place as a step names it, or "" for a walk that was left part way through.
         """
-        from hmz import fallbacks
-
         showing = cast(
             "App[None]",
             self.app,  # pyright: ignore[reportUnknownMemberType]
@@ -5507,27 +5531,26 @@ class Fallbacks(Drafts[list[str]]):
         if not model:
             return ""
         self._said = escape(asked)
-        return fallbacks.spec(cli, model, account)
+        return _hmz().fallbacks.spec(cli, model, account)
 
     def applied(self) -> None:
         """Writes down every step, and answers with what it did."""
-        from hmz import fallbacks
-
+        steps = _hmz().fallbacks
         told: list[str] = []
         # Against what is written down rather than over it: a menu somebody opened to change
         # one thing must not report the four it left alone as things it did.
-        was = {one.spec: one for one in fallbacks.falls()}
+        was = {one.spec: one for one in steps.all()}
         held = {one.spec: one for one in self._steps}
         for gone in was:
             if gone not in held:
-                fallbacks.clear(gone)
+                steps.clear(gone)
                 told.append(f"[dim]{escape(gone)} falls back to nowhere[/dim]")
         for said, step in held.items():
             if was.get(said) == step:
                 continue
             try:
-                fallbacks.points(said, step.to)
-                fallbacks.retrying(said, step.tries, step.policy, step.timeout)
+                steps.points(said, step.to)
+                steps.retrying(said, step.tries, step.policy, step.timeout)
             except ValueError as why:
                 told.append(f"hmz: {escape(str(why))}")
             else:
@@ -5583,11 +5606,9 @@ class Saved(Drafts[list[str]]):
           agents: The backends offered here, and what each of them says it runs.
         """
         super().__init__()
-        from hmz.kept import Templates
-
         self._agents = dict(agents)
         #: What the menu is holding, which is what is written down when it is saved.
-        self._held: list[Kept] = list(Templates().all())
+        self._held: list[Kept] = list(_hmz().agents.all())
         #: Which of them the cursor is on, by name.
         self._was = self._held[0].name if self._held else ""
         self._said = ""
@@ -5727,9 +5748,7 @@ class Saved(Drafts[list[str]]):
 
     def applied(self) -> None:
         """Writes down exactly what the menu is holding, and says what it now holds."""
-        from hmz.kept import Templates
-
-        Templates().keep(self._held)
+        _hmz().agents.keep(self._held)
         self.dismiss(
             [
                 f"[dim]{len(self._held)} agents saved: "
@@ -5892,15 +5911,16 @@ class Providers(Drafts[list[str]]):
         Last in each CLI's group rather than first: what somebody came here to read is the
         accounts they made, and this is the one that was always there.
         """
-        from hmz import providers
-        from hmz.backends import profiles
+        from hmz.providers import LOCAL
 
-        held = providers.providers()
+        hmz = _hmz()
+        accounts = hmz.accounts
+        held = accounts.all()
         whose = {each.cli for each in held}
         mine = [
             one
-            for profile in profiles()
-            if (one := providers.find(profile.name, providers.LOCAL)) is not None
+            for profile in hmz.backends()
+            if (one := accounts.find(profile.name, LOCAL)) is not None
             and (profile.name in whose or one.fallback)
         ]
         self._found = sorted(
@@ -6113,14 +6133,11 @@ class Providers(Drafts[list[str]]):
         """
         from dataclasses import replace
 
-        from hmz import providers
-        from hmz.providers import login as signing
-
         if not one.name:
             self._said = self._machines(one.cli, "correct")
             self._fill()
             return
-        way = signing.way_of(one.cli, one.way)
+        way = _hmz().accounts.way(one.cli, one.way)
         if way is None:
             self._said = f"{escape(one.way)} is not a way in {escape(one.cli)} has"
             self._fill()
@@ -6140,7 +6157,7 @@ class Providers(Drafts[list[str]]):
         # is being corrected rather than as it was: a key rotated is a key rotated everywhere
         # it was copied to, which is what correcting one is usually for.
         corrected = replace(one, env=signs.answers)
-        among = providers.serves(corrected)
+        among = _hmz().accounts.serves(corrected)
         self._alike.pop(named, None)
         if among:
             chosen = await showing.push_screen_wait(Alike(corrected, among))
@@ -6238,8 +6255,7 @@ class Providers(Drafts[list[str]]):
         Args:
           one: The account, or None for the one the cursor is on.
         """
-        from hmz.providers import login as signing
-
+        accounts = _hmz().accounts
         one = one or self._under()
         if one is None:
             return
@@ -6247,7 +6263,7 @@ class Providers(Drafts[list[str]]):
             self._said = self._machines(one.cli, "sign in")
             self._fill()
             return
-        way = signing.way_of(one.cli, one.way)
+        way = accounts.way(one.cli, one.way)
         if way is None or not way.argv:
             self._said = (
                 f"{escape(one.name)} was made by {escape(one.way)}, which has nothing to "
@@ -6262,14 +6278,14 @@ class Providers(Drafts[list[str]]):
         # What it already holds answers what it can. A key the CLI keeps in its own store is
         # not among them -- it was never kept here -- so it is asked for again.
         answers = dict(one.env)
-        if signing.asked(way, answers):
+        if accounts.asks(way, answers):
             signs = await showing.push_screen_wait(Signing(one.cli, way, name=one.name))
             if signs is None:
                 return  # walked out, which signs nothing in and changes nothing
             answers |= signs.answers
         try:
             with handed_over(showing):
-                status = signing.sign_in(one, way, answers)
+                status = accounts.sign_in(one, way, answers)
         except OSError as why:  # the backend's own command is not on this machine
             self._said = escape(f"{way.argv[0]}: {why}")
             self._fill()
@@ -6320,8 +6336,7 @@ class Providers(Drafts[list[str]]):
 
     def applied(self) -> None:
         """Does everything the menu was holding, and answers with what became of each."""
-        from hmz import providers
-
+        accounts = _hmz().accounts
         told = list(self._told)
         # Taken away first, and then everything that is left: a chain pointed at an account
         # that is going in the same save is a chain that goes nowhere, and one written before
@@ -6329,7 +6344,7 @@ class Providers(Drafts[list[str]]):
         for taken in sorted(self._gone):
             cli, _, name = taken.partition("/")
             try:
-                gone = providers.remove(cli, name)
+                gone = accounts.remove(cli, name)
             except ValueError as why:  # a name nothing could ever have been kept under
                 told.append(f"hmz: {escape(str(why))}")
                 continue
@@ -6344,14 +6359,14 @@ class Providers(Drafts[list[str]]):
                 continue  # gone above, so there is nothing to correct or point anywhere
             if (answers := self._edits.get(named)) is not None:
                 try:
-                    corrected = providers.add(one.cli, one.name, one.way, answers)
+                    corrected = accounts.write(one.cli, one.name, one.way, answers)
                 except (OSError, ValueError) as why:
                     told.append(f"hmz: {escape(str(why))}")
                     continue
                 told.append(f"[dim]{escape(named)} is corrected[/dim]")
                 for cli in self._alike.get(named, ()):
                     try:
-                        providers.copies(corrected, cli)
+                        accounts.copies(corrected, cli)
                     except (OSError, ValueError) as why:
                         told.append(f"hmz: {escape(str(why))}")
                         continue
@@ -6360,7 +6375,7 @@ class Providers(Drafts[list[str]]):
                     )
             if (falls := self._chains.get(named)) is not None:
                 try:
-                    providers.points(one.cli, one.name, falls)
+                    accounts.points(one.cli, one.name, falls)
                 except ValueError as why:
                     told.append(f"hmz: {escape(str(why))}")
                 else:
@@ -6552,24 +6567,7 @@ def collected(ran: Ran) -> tuple[Path, str]:
     Returns:
       Where the trace was written, and a line saying what it holds.
     """
-    import datetime
-
-    from hmz.cycle import TRACES, opened
-    from hmz.tracing.collector import collect
-    from hmz.tracing.profile import PROFILE
-
-    at = ran.at / TRACES
-    at.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
-    where = at / f"{stamp}.trace.json"
-    agents = opened(ran.at)
-    document = collect(
-        None,
-        sessions=[ident for ids in agents.values() for ident in ids],
-        agents=agents or None,
-        output=where,
-        profile=ran.at / PROFILE,
-    )
+    where, document = _hmz().cycles.traced(ran.at)
     said = document["otherData"]
     held = f"{said.get('sessions', '0')} sessions, {said.get('slices', '0')} slices"
     if said.get("programs"):
@@ -6605,13 +6603,14 @@ class Cycles(Sheet[Doing]):
             thing to say no to rather than a thing to offer.
         """
         super().__init__()
-        from hmz.cycle import cycles, read
+        from hmz.sdk import Hmz
 
+        runs = Hmz(workspace).cycles
         #: Newest first: what somebody opening this came to look at is the run that has just
         #: happened, and a list of a hundred is one nobody scrolls to the end of.
         self._ran = [
             one
-            for one in (read(at) for at in reversed(cycles(workspace)))
+            for one in (runs.read(at) for at in reversed(runs.all()))
             if one is not None
         ]
         self._underway = running
@@ -6745,11 +6744,9 @@ class Cycles(Sheet[Doing]):
           Whether it is resumable, and False for one that will not load at all -- a flow that
           cannot be read cannot be run, which is what carrying on would come to.
         """
-        from hmz.flows import resumes
-
         if flow not in self._resumes:
             try:
-                self._resumes[flow] = resumes(flow)
+                self._resumes[flow] = _hmz().flows.resumes(flow)
             except Exception:  # noqa: BLE001 -- a flow is a file, and reading one runs it
                 self._resumes[flow] = False
         return self._resumes[flow]

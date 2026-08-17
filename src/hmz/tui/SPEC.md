@@ -23,7 +23,15 @@ Expose `Humanize`.
 
 ```python
 class Humanize(App[None]):
-    def __init__(self) -> None: ...
+    def __init__(
+        self,
+        flow: str = "",
+        agents: Sequence[Runs] = (),
+        config: BaseModel | None = None,
+        session: Session | None = None,
+    ) -> None: ...
+
+    def reattached(self) -> None: ...
 ```
 
 The terminal interface, which `hmz` with no command opens. It is a coding agent's own
@@ -164,6 +172,28 @@ line, with what the flow is doing beside the transcript.
   is drawn.
 - A line that cannot be carried out MUST be shown and MUST leave the interface up. Only
   `/exit` closes it.
+- `/exit` MUST ask what is to become of a flow that is running, and MUST NOT ask where none
+  is: closing the interface is a window being closed, and a day's work is not something to
+  end on three letters that mean `close this` everywhere else. The answers MUST be the two
+  there are here -- stop the flow and leave, and, where the run is being held somewhere a
+  terminal closing cannot reach, leave it running and let go of this terminal. Where it is
+  not, the second answer MUST be staying here instead: an answer that cannot be carried out
+  is not one to offer.
+- Every key that leaves MUST put the same question. A key bound to leaving outright is a way
+  round the one thing this asks about, so a terminal's own habit -- `ctrl+q`, which is what a
+  full-screen program is left on everywhere -- MUST mean what `/exit` means rather than being
+  taken away: a key somebody's fingers know is a key they will press.
+- `/detach` MUST let go of the terminal and leave the flow running, which is the other half
+  of the same question asked outright. Where nothing is holding the run it MUST say so rather
+  than do nothing: what would be let go of is the terminal the interface is in, and closing
+  that closes the run.
+- What is holding the run MUST be `hmz.sdk.Session` and no more of it: how many terminals are
+  reading, and how to let go of them. The interface MUST name no daemon -- it draws on a
+  terminal, and which terminal is not a thing it is told.
+- `reattached` MUST draw the whole screen again, for a terminal that has just begun reading a
+  run that was already going. A terminal that has just arrived has none of what was drawn
+  before it, so the interface MUST be stopped and started again on it rather than refreshed:
+  that is what puts the terminal's modes back as well as the rows.
 - A key of the interface's own MUST NOT fire while a sheet is up over it: a sheet is open in
   order to be answered, and reading another conversation is not an answer to it. The key MUST
   reach the sheet instead, rather than being swallowed by the interface and doing nothing.

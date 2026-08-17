@@ -9,6 +9,10 @@ up.
 It is the agents kept under a name and not the agents of any flow: what an agent is -- a CLI,
 an account, a model at an effort, what it may do -- is not a thing about the flow that happens
 to be driving it. Which flow drives what is `/flow`, and is a thing about a workspace.
+
+Nothing here reaches the store itself. What an agent written down is, and what refusing a name
+already taken means, is :class:`hmz.sdk.Hmz`'s -- the same answers the interface gets when it
+saves one from a menu. This reads the line and prints what came of it.
 """
 
 from __future__ import annotations
@@ -102,9 +106,9 @@ def agents(argv: list[str]) -> int:
 
 def _list(*, quiet: bool) -> int:
     """Prints every agent written down, by name and by what it runs."""
-    from hmz.kept import Templates
+    from hmz.sdk import Hmz
 
-    found = Templates().all()
+    found = Hmz().agents.all()
     if not found:
         if quiet:
             return 0
@@ -120,9 +124,9 @@ def _list(*, quiet: bool) -> int:
 
 def _show(name: str) -> int:
     """Prints what one agent is, a field a line, saying nothing where it says nothing."""
-    from hmz.kept import Templates
+    from hmz.sdk import Hmz
 
-    kept = Templates().find(name)
+    kept = Hmz().agents.find(name)
     if kept is None:
         print(f"hmz: no agent {name}", file=sys.stderr)
         return 1
@@ -154,94 +158,38 @@ def _add(
     force: bool,
 ) -> int:
     """Writes one agent down under a name, refusing a name already taken."""
-    from hmz.backends import read
-    from hmz.kept import Kept, Runs, Templates
+    from hmz.sdk import Hmz, Taken
 
-    if not name.strip():
-        print("hmz: an agent is written down under a name", file=sys.stderr)
-        return 1
     try:
-        (
-            profile,
-            model,
-            effort,
-            service_tier,
-            provider,
-            permission,
-            searches,
-            overrides,
-        ) = read(spec)
-        if service_tier != "default":
-            print(
-                "hmz: service_tier is a per-run setting on the agent line, "
-                "not a saved-agent setting",
-                file=sys.stderr,
-            )
-            return 1
-        if overrides:
-            print(
-                "hmz: config.KEY is a setting of the agent on the line that runs it, "
-                "not of one written down under a name",
-                file=sys.stderr,
-            )
-            return 1
+        kept = Hmz().agents.add(
+            name,
+            spec,
+            anchor=anchor,
+            goals=goals,
+            web_search=web_search,
+            force=force,
+        )
+    except Taken as why:
+        # Which flag means it, said here rather than where it was refused: a menu that has
+        # already asked which name to save over has nothing to add to the same refusal.
+        print(f"hmz: {why}; --force writes over it", file=sys.stderr)
+        return 1
     except ValueError as why:
-        print(f"hmz: {spec}: {why}", file=sys.stderr)
+        print(f"hmz: {why}", file=sys.stderr)
         return 1
-    if permission is not None and permission not in _rungs():
-        print(
-            f"hmz: permission must be one of {', '.join(_rungs())}, not {permission!r}",
-            file=sys.stderr,
-        )
-        return 1
-    templates = Templates()
-    held = templates.all()
-    already = next((one for one in held if one.name == name), None)
-    if already is not None and not force:
-        print(
-            f"hmz: there is already an agent called {name}; --force writes over it",
-            file=sys.stderr,
-        )
-        return 1
-    runs = Runs(
-        f"{profile.name}/{model}:{effort}",
-        anchor.strip(),
-        permission or "",
-        provider,
-        goals,
-        # The flag where one was given, else whatever the spec said, else on -- which is
-        # what an agent nobody has been asked about does.
-        web_search if web_search is not None else searches is not False,
-    )
-    # Whole, as the menu writes them: one written over keeps its place in the list, and one
-    # that is new goes on the end, which is the order they were written down in.
-    kept = [Kept(name, runs) if one.name == name else one for one in held] + (
-        [] if already is not None else [Kept(name, runs)]
-    )
-    templates.keep(kept)
-    print(f"{name}  {_reads(runs)}")
+    print(f"{kept.name}  {_reads(kept.runs)}")
     return 0
 
 
 def _remove(name: str) -> int:
     """Takes one agent away."""
-    from hmz.kept import Templates
+    from hmz.sdk import Hmz
 
-    templates = Templates()
-    held = templates.all()
-    if not any(one.name == name for one in held):
+    if not Hmz().agents.remove(name):
         print(f"hmz: no agent {name}", file=sys.stderr)
         return 1
-    templates.keep([one for one in held if one.name != name])
     print(f"{name} is no longer written down")
     return 0
-
-
-def _rungs() -> tuple[str, ...]:
-    """What an agent may be allowed to do, hardest last, as `hmz.agents` names them."""
-    from hmz.agents import PERMISSIONS
-
-    return PERMISSIONS
 
 
 def _reads(runs: Runs) -> str:

@@ -122,6 +122,29 @@ ALLOWED: dict[str, set[str]] = {
     # CLI, and the ptrace layer that answers a path. Neither of those names it back.
     "hmz.providers": {"hmz.backends", "hmz.coganchor"},
     "hmz.tracing": {"hmz.backends"},
+    # humanize as one object, which is what the command line, the daemon and the interface
+    # all hold. It is above the layers and below the four ways in, so it may name any of
+    # them and none of them may name it -- which is what keeps `hmz exec` from paying for a
+    # tracer: everything here is reached from inside the call that needs it.
+    "hmz.sdk": {
+        "hmz.agents",
+        "hmz.backends",
+        "hmz.cycle",
+        "hmz.fallbacks",
+        "hmz.flows",
+        "hmz.kept",
+        "hmz.models",
+        "hmz.providers",
+        "hmz.runner",
+        "hmz.settings",
+        "hmz.telemetry",
+        "hmz.tracing",
+    },
+    # The run held where a terminal closing cannot end it, which knows nothing of what a run
+    # is: it is handed something that opens one and returns when it is over. A leaf, so that
+    # the half of humanize which is a process and a socket can be read without any of the
+    # half that drives coding agents.
+    "hmz.daemon": set(),
     "hmz.tui": {
         "hmz.agents",
         "hmz.backends",
@@ -133,22 +156,19 @@ ALLOWED: dict[str, set[str]] = {
         # `backends`, so this widens the DAG without bending it.
         "hmz.fallbacks",
         "hmz.flows",
-        # What a run left behind, gathered into a trace from the sheet the runs are read on.
-        # It names the facts about the backends and nothing above itself.
-        "hmz.tracing",
         # The agents written down under a name, which `/agents` walks and `hmz agents` says
         # from a command line. It names nothing, so this widens the DAG without bending it.
         "hmz.kept",
-        # What each CLI runs, which the sheets offer and the key on them fills again.
-        "hmz.models",
         # `/providers` is where an account is made and `/agents` is where one is given to an
         # agent, so the interface reads the same leaf the agents do. It names nothing above
         # itself, so this widens the DAG without bending it.
         "hmz.providers",
-        "hmz.runner",
-        # What was set up to run here, which the interface both reads as it opens and writes
-        # as it is answered. A leaf, like the agents kept under a name beside it.
-        "hmz.settings",
+        # humanize as one object, which is what starts a flow, gathers a trace of one that
+        # has ended, and walks every store the sheets show. Everything the interface does
+        # rather than draws is asked of it -- which is why the runner, what humanize
+        # remembers and what each CLI runs are not named here: the sheets reach all three
+        # through this and nothing here may reach past it to them.
+        "hmz.sdk",
         # The interface is where humanize's own failures are answered for -- it is the one
         # thing here with somebody to ask -- and where what it does that nobody meant is
         # noticed. The reporter names nothing above itself.
