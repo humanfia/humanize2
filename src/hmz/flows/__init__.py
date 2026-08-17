@@ -66,6 +66,7 @@ from .driving import (
     running,
     wanted,
 )
+from .proving import ALWAYS_DONE, NEVER_DONE, SILENT, Outcome, Proof, Scenario, proved
 from .verses import (
     BUILTIN,
     FLOWS,
@@ -111,14 +112,17 @@ if TYPE_CHECKING:
     from hmz.backends import Model, Profile
 
 __all__ = [
+    "ALWAYS_DONE",
     "BUILTIN",
     "BUILTIN_AT",
     "ENTRY",
     "EVERYWHERE",
     "FLOWS",
     "LOCAL",
+    "NEVER_DONE",
     "OFFICIAL",
     "PERMISSIONS",
+    "SILENT",
     "SWARM",
     "USER",
     "WINDOW",
@@ -142,12 +146,15 @@ __all__ = [
     "NotAFlow",
     "Occasion",
     "Offer",
+    "Outcome",
     "Person",
     "Place",
     "Profile",
+    "Proof",
     "Question",
     "Remote",
     "Running",
+    "Scenario",
     "Session",
     "Stopped",
     "Unhooked",
@@ -178,6 +185,7 @@ __all__ = [
     "nearest",
     "offered",
     "offers",
+    "proved",
     "resumes",
     "running",
     "wanted",

@@ -9,6 +9,7 @@
 ├── builtin
 ├── checking.py
 ├── driving.py
+├── proving.py
 ├── skills.py
 └── verses.py
 ```
@@ -476,6 +477,72 @@ own.
   is `surface`, and what a flow may import MUST be read off this package's own tables, which
   is `offered`: the checker states what the interface is, so a second copy of either would be
   the drift it checks for.
+
+## `proving.py`
+
+```python
+class Scenario(NamedTuple):
+    name: str
+    verdict: bool | None
+    answer: str
+    climb: float = 100_000.0
+    turns: int = 200
+    seconds: float = 60.0
+
+
+NEVER_DONE: Scenario
+ALWAYS_DONE: Scenario
+SILENT: Scenario
+
+
+class Outcome(NamedTuple):
+    scenario: str
+    finished: bool
+    turns: int
+    said: str
+
+
+class Proof(NamedTuple):
+    findings: tuple[Finding, ...]
+    outcomes: tuple[Outcome, ...]
+
+
+def proved(
+    flow: str | os.PathLike[str],
+    *,
+    name: str = "",
+    config: Mapping[str, object] | None = None,
+    scenarios: tuple[Scenario, ...] = (NEVER_DONE, ALWAYS_DONE),
+) -> Proof: ...
+```
+
+The second of the two readings: the flow loaded and driven for real, by stubs, so that what
+only running the file can show is shown -- and shown in milliseconds, since every turn lands
+at once and costs what the scenario says.
+
+- The flow MUST be run in a process of its own, one per scenario, and the clock MUST be held
+  by the asking process: loading a flow means running its file, and a flow that hangs, spins
+  or corrupts what it touches must be able to be killed without taking the checker with it.
+  Nothing of the flow MUST execute in the asking process.
+- Every proof MUST end. A flow that takes turns is ended by the cap on them, one that takes
+  none by the clock, and which of the two it was MUST be said in the outcome: they are the
+  two ways a flow fails to stop, and the fix is different.
+- The stubs MUST claim every capability there is -- every moment, a goal feature, shapes,
+  tools -- since what is on trial is the flow and not the agents: refusing an agent that
+  cannot fill a place is the loading's job, done where the agents are real. Beneath the
+  claims they MUST be the real driver base classes, so that the hooks a flow hangs fire as
+  they would under a real backend, and a `Stop` hook that refuses is a counted turn.
+- A scenario MUST answer deterministically, whatever it is asked: every boolean field of a
+  shaped answer says its verdict, every string field says its answer, and a verdict of None
+  is a turn that answers nothing -- which is what a failed turn answers, so the silent
+  scenario is every guard tried at once. `NEVER_DONE` MUST be among the default scenarios:
+  the reviewer that never says done is the question every loop must have an answer to.
+- The world a proof runs in MUST sleep for free and MUST work in a scratch directory taken
+  away with the process: the rest a loop takes between rounds and the files it writes while
+  being proved are no part of its shape.
+- A flow the loading refuses MUST come back as a `refused-load` finding rather than a raise,
+  and the config rules MUST be run again on the model the loading actually resolved: a model
+  built out of the static reading's sight is still the one whoever sets the flow up meets.
 
 ## `verses.py`
 
