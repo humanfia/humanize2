@@ -133,7 +133,11 @@ class Profile:
     """One coding agent CLI, as everything outside its driver needs to know it.
 
     Attributes:
-      name: What this backend is called here, which is the command it is installed as.
+      name: What this backend is called here, which is the command it is installed as unless
+        `command` says otherwise.
+      command: What it is actually installed as, where that is not what it is called. Cursor's
+        agent is `cursor-agent`; everything else here is installed under its own name, so this
+        is empty for them.
       aliases: What a command line may call it, this name included. A backend is named twice
         where both spellings are what people call it, and neither is ambiguous.
       home_var: The environment variable that moves its home directory.
@@ -205,6 +209,7 @@ class Profile:
     home_dir: str
     logs: tuple[str, ...]
     efforts: tuple[str, ...]
+    command: str = ""
     home_in: str = ""
     skills: tuple[str, ...] = ()
     shared: tuple[str, ...] = ()
@@ -217,6 +222,18 @@ class Profile:
     creds: tuple[str, ...] = ()
     ways: tuple[Way, ...] = ()
     ambient: tuple[str, ...] = ()
+
+    def runs(self) -> str:
+        """The command that starts this backend, which is its name unless it says otherwise.
+
+        Read here rather than written down twice: everything that looks for a backend, asks
+        one what it runs, or starts a turn of one asks this, so a CLI installed under a name
+        that is not what it is called is one thing to say and not four.
+
+        Returns:
+          The command, as `PATH` would name it.
+        """
+        return self.command or self.name
 
     def directory(self) -> Path:
         """Where this backend keeps its state and its logs, wherever it has been moved to.
@@ -327,6 +344,13 @@ _GATEWAY = (
 
 #: What Antigravity CLI calls its reasoning levels, hardest first.
 _AGY = ("high", "medium", "low")
+
+#: What Cursor calls a reasoning effort, hardest first. Not a flag of its own: its models are
+#: parameterized, and how hard one thinks is written into the model it is asked for, as
+#: `claude-opus-4-8[effort=high]` -- which is the spelling its own command line documents. The
+#: three rungs are the ones its model list names, where a variant of a model carries the rung
+#: in its name: `gpt-5-high`, `gpt-5-low-fast`, and the ones it says run at a fixed medium.
+_CURSOR = ("high", "medium", "low")
 
 #: What ZCode calls a thought level, hardest first. Two ladders rather than one, because its
 #: models have two: the ones that take a budget are asked for `max`, `high` or `low`, and the
@@ -1061,6 +1085,60 @@ PROFILES = (
                 asks=(
                     Asked(env="ZCODE_BASE_URL", about="where it is, as a URL"),
                     Asked(env="ZCODE_API_KEY", about="the key it takes", secret=True),
+                ),
+            ),
+        ),
+    ),
+    Profile(
+        name="cursor",
+        # Its own command line has no way of taking a tool away: what an agent may reach for
+        # is `~/.cursor/cli-config.json`, which is the person at this machine's file and not
+        # one a driver writes. So web search is refused off here rather than said and ignored.
+        searches=False,
+        # Installed under two names, `agent` being the one its installer calls primary and
+        # `cursor-agent` the one it has always also written. The second, because `agent` is a
+        # name anything on a machine could have taken and this one has to be that CLI.
+        command="cursor-agent",
+        aliases=("cursor", "cursor-agent", "cursor-cli"),
+        # Its own variable, else the directory every program keeps its configuration in, else
+        # `~/.cursor` -- which is what `config` below covers the middle of.
+        home_var="CURSOR_CONFIG_DIR",
+        home_dir=".cursor",
+        # None to read: a chat is kept in the agent store rather than as a file per session,
+        # so there is no trajectory here for a trace to gather.
+        logs=(),
+        efforts=_CURSOR,
+        # Both tiers, under the layout every one of these CLIs reads a skill in. It reads
+        # several other CLIs' directories too, and those are theirs rather than this one's.
+        skills=("skills/*/SKILL.md",),
+        config=("cursor/skills/*/SKILL.md",),
+        works=(".cursor/skills/*/SKILL.md",),
+        mounts=".cursor/skills",
+        # What a login leaves behind, beside the settings it keeps in the same directory.
+        creds=("cli-config.json", "auth.json"),
+        ambient=(
+            "CURSOR_API_ENDPOINT",
+            "CURSOR_API_KEY",
+            "CURSOR_API_URL",
+            "CURSOR_AUTH_TOKEN",
+        ),
+        ways=(
+            Way(
+                name="login",
+                about="sign in to a Cursor account, in a browser",
+                argv=("cursor-agent", "login"),
+            ),
+            Way(
+                name="key",
+                about="a Cursor API key, from the dashboard",
+                asks=(Asked(env="CURSOR_API_KEY", about="the API key", secret=True),),
+            ),
+            Way(
+                name="gateway",
+                about=_GATEWAY,
+                asks=(
+                    Asked(env="CURSOR_API_ENDPOINT", about="where it is, as a URL"),
+                    Asked(env="CURSOR_API_KEY", about="the key it takes", secret=True),
                 ),
             ),
         ),

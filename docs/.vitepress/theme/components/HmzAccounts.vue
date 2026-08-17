@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Two halves of one idea: a CLI told nothing runs as an account it was never signed into
 // (`providers/redirect.py`), and the turn that fails walks the chain that account names
-// (`providers/store.py`), waiting the way `providers/retry.py` says to wait.
+// (`providers/store.py`), waiting the way `fallbacks.py` says the place it runs at waits.
 import { computed, onUnmounted, ref } from 'vue'
 
 type View = 'swap' | 'chain'
@@ -84,7 +84,7 @@ function fib(n: number): number {
   return held
 }
 
-// The same waits `retry.py` computes, with the jitter drawn as the band it is drawn from
+// The same waits `fallbacks.py` computes, with the jitter drawn as the band it is drawn from
 // rather than as one roll of it: a bar that moved every render would say the wrong thing.
 function waits(policy: string, attempt: number): number {
   const over = Math.max(attempt - 1, 0)
@@ -282,7 +282,7 @@ onUnmounted(() => cancelAnimationFrame(frame))
           </select>
         </label>
         <label>
-          <span>tries per account</span>
+          <span>tries per place</span>
           <input v-model.number="tries" type="range" min="1" max="5" step="1" />
           <b>{{ tries }}</b>
         </label>

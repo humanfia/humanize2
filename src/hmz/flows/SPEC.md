@@ -222,6 +222,14 @@ What a flow drives, written as interfaces and nothing else.
 - A flow MUST declare the places it drives with these, and what it writes beside one -- a
   moment, a `Goal`, a `Remote`, an `Isolated`, an `AgentDefaults` -- MUST go on meaning what it
   means. What is annotated is which interface, not which class.
+- A flow MUST be able to put callbacks of its own in front of an agent as tools it may reach
+  for, said on the conversation and taking effect from its next turn -- which is where a flow
+  is when it has something to offer. The callback MUST run in the process the flow is in, so
+  that an agent reaching for one is the flow's own code running and may do whatever the flow
+  may do, up to and including running another flow and waiting for it. A backend with no way of
+  being given a tool it was not shipped with MUST refuse one where it is offered, and MUST say
+  beforehand which it is, so that a flow may ask rather than catch. What that comes to is
+  `hmz.agents.tools`.
 - Which of a flow's skills one conversation carries MUST be the session's own to say, and
   MUST be sayable again while the conversation runs: an agent is what it was made as, and a
   conversation is a thing that gets somewhere -- one that has finished reading and started
@@ -234,6 +242,11 @@ What a flow drives, written as interfaces and nothing else.
   answers to it MUST be read as the same place: a flow written before there was an interface
   named the class, and it is the same place either way. The class itself MUST be reachable
   too: a place is annotated with the interface, and a person is made rather than annotated.
+- A `Person` MUST carry a board -- named lines the flow and the person both write on, which
+  neither waits at. Saying something to them stops the turn until they answer, and that is
+  right for a question and wrong for what there is to do next and how far through it is. Which
+  lines are one side's alone MUST be sayable, and the other side MUST be refused where it
+  writes. What that comes to is `hmz.agents.board`.
 - What is true of a backend rather than of one agent -- which moments it runs, whether it has
   a goal feature, whether it can be held to a shape -- MUST be declared on the class. It is
   read off the class where a flow is checked against the agents it was given, before any of
@@ -264,6 +277,18 @@ class Running(NamedTuple):
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]: ...
+
+
+def container() -> Mapped | None: ...
+
+
+@contextlib.contextmanager
+def contained(
+    image: str, workspace: str = ""
+) -> Generator[MachineConfig | None]: ...
+
+
+def lands_in(agents: Sequence[Agent], where_: MachineConfig) -> None: ...
 
 
 def wanted(flow: str | os.PathLike[str]) -> tuple[Place, ...]: ...
@@ -332,6 +357,22 @@ run another. `hmz.runner` asks this and then opens a cycle around the answer.
 - Where an agent works MUST be the flow's to say rather than a setting anybody may reach for,
   and MUST be settled here: a place that says nothing runs on this machine and MUST refuse an
   agent pointed anywhere else.
+- A whole run MAY be put in one container from outside, which is a convenience and not a second
+  way of saying where an agent works: it is said once, about all of them, by whoever started
+  the run. One container MUST be started for the run rather than one per agent -- the agents are
+  working on one thing, and two containers under one run would be two workspaces the second
+  agent could not see the first's work in -- and it MUST be taken down however the run ends.
+- Every agent MUST be pointed at it, over whatever each was configured with, since that is what
+  saying it once about all of them means. Two MUST be left alone: a place the flow itself
+  declared `Isolated`, where an agent works being the flow's to say, and the person at the
+  prompt, who takes no turn anywhere.
+- The flow's own reads, writes and commands MUST be able to reach it too. A container is handed
+  the project directory at the path it already has, so a file the flow opens is already the
+  file a turn opened; a command it runs is not, being run by this machine's shell against this
+  machine's tools, which is the thing a container was reached for to avoid. So the run's
+  container MUST be askable for, and MUST answer with the workspace as that machine has it --
+  `hmz.machines.Mapped`. A run on this machine MUST answer with nothing, a flow there doing
+  what it always did.
 - Everything here MUST read the flow as it is now, by running it. A flow rewritten between two
   readings -- by hand, or by an agent it is itself driving -- MUST be read as it is now, which
   is what makes a run that improves its own flow a run that then drives the improved one.

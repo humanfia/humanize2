@@ -378,14 +378,12 @@ def test_two_writing_at_once_do_not_take_each_others_files_away(
     def writes(policy: str) -> None:
         try:
             for _ in range(40):
-                store.retrying("claude", "mine", 2, policy, 0.0)
+                store.add("claude", "mine", way=policy, env={"ANTHROPIC_API_KEY": "k"})
                 store.points("claude", "mine", "spare")
         except BaseException as up:  # noqa: BLE001 -- the thread's, to be raised on the main one
             went.append(up)
 
-    both = [
-        threading.Thread(target=writes, args=(one,)) for one in ("constant", "linear")
-    ]
+    both = [threading.Thread(target=writes, args=(one,)) for one in ("key", "gateway")]
     for one in both:
         one.start()
     for one in both:
@@ -397,7 +395,7 @@ def test_two_writing_at_once_do_not_take_each_others_files_away(
         found is not None
     )  # and what is on disk is one whole account, not half of two
     assert found.fallback == "spare"
-    assert found.policy in ("constant", "linear")
+    assert found.way in ("key", "gateway")
     # And nothing is left lying beside it: every write took its own file with it.
     assert sorted(one.name for one in found.at.iterdir()) == [
         "home",
@@ -406,23 +404,24 @@ def test_two_writing_at_once_do_not_take_each_others_files_away(
     ]
 
 
-@pytest.mark.parametrize("said", ["1e400", "Infinity", "NaN", '"lots"', "-4"])
-def test_a_count_written_by_hand_is_read_past_rather_than_losing_the_account(
+@pytest.mark.parametrize("said", ["1e400", "Infinity", "NaN", "4", "null"])
+def test_a_fallback_written_by_hand_is_read_past_rather_than_losing_the_account(
     said: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A file edited by somebody is a file to read past: `int(inf)` is an OverflowError.
+    """A file edited by somebody is a file to read past rather than one to raise about.
 
-    Neither an `OSError` nor a `ValueError`, so nothing that guards these reads would catch
-    it, and one hand-edited file would take out every account of that backend.
+    An account is a name, and a fallback is the name of another: anything else in that field
+    is somebody's editing, and one hand-edited file must not take out every account of that
+    backend.
     """
     monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "held"))
     provider = store.add("claude", "mine", env={"ANTHROPIC_API_KEY": "not-a-key"})
     held = json.loads((provider.at / "provider.json").read_text())
-    held["retries"] = json.loads(said)
+    held["fallback"] = json.loads(said)
     (provider.at / "provider.json").write_text(json.dumps(held))
 
     found = store.find("claude", "mine")
 
     assert found is not None
-    assert found.retries == 0
+    assert found.fallback == ""
     assert [one.name for one in store.providers("claude")] == ["mine"]

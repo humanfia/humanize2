@@ -236,3 +236,100 @@ def test_a_session_may_be_opened_at_a_directory_on_the_machine_it_lands_on(
     assert session("cat which.txt") == "the package"
     assert session("pwd > where.txt; cat where.txt").endswith("packages/one")
     assert (tmp_path / "packages" / "one" / "where.txt").exists()
+
+
+#: A flow with two agents and nothing said about where either works, which is what a run put
+#: in a container from outside is: the flow did not ask for one, and every agent lands there.
+CONTAINED = """
+from typing import NamedTuple
+
+from hmz.flows import Agent, container, flow
+
+
+class Agents(NamedTuple):
+    builder: Agent
+    reviewer: Agent
+
+
+@flow
+def run(agents: Agents, task: str) -> None:
+    agents.builder("hostname > builder.txt")
+    agents.reviewer("hostname > reviewer.txt")
+    held = container()
+    held.write_text("from-the-flow.txt", held.run(["hostname"]).output)
+"""
+
+
+def test_a_run_may_be_put_in_one_container_and_every_agent_lands_there(
+    daemon: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Which is the convenience: said once from outside rather than agent by agent inside.
+
+    One container for the run rather than one apiece, so that what one agent writes is what
+    the next one reads -- and the flow's own code reaches the same place, which is the half a
+    mounted workspace does not answer for.
+    """
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "flow.py").write_text(CONTAINED)
+    agents = [
+        ShellAgent(AgentConfig(model="m", effort="high")),
+        ShellAgent(AgentConfig(model="m", effort="high")),
+    ]
+
+    Runner(tmp_path / "flow.py", agents, container=IMAGE).run("go")
+
+    # Both turns ran on the machine, and on the same one.
+    said = [
+        (tmp_path / one).read_text().strip()
+        for one in ("builder.txt", "reviewer.txt", "from-the-flow.txt")
+    ]
+    assert said[0] == said[1] == said[2]
+    assert said[0] != socket.gethostname()
+    # And it is taken down when the run ends, whichever way it ends.
+    assert _inspect(said[0], "{{.State.Running}}") == ""
+
+
+def test_the_flow_reaches_the_container_only_while_the_run_is_in_one() -> None:
+    """A run on this machine has none, and a flow does what it always did."""
+    from hmz.flows import container
+
+    assert container() is None
+
+
+def test_the_flow_reads_writes_and_runs_on_the_machine_the_run_lands_on(
+    daemon: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The half a mounted workspace does not answer for: the tools are the machine's.
+
+    A file is the same file either way -- the project directory is mounted at the path it
+    already has -- and a command is not, being run by this machine's shell against this
+    machine's tools unless it is sent there.
+    """
+    from hmz.machines import Mapped
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "here.txt").write_text("written here\n")
+    machine = DockerConfig(image=IMAGE, workspace=str(tmp_path)).create()
+    anchor = machine.start()
+    try:
+        with Mapped(anchor) as held:
+            assert held.workspace == str(tmp_path)
+            assert held.read_text("here.txt") == "written here\n"
+            held.write_text("there.txt", "written from the flow\n")
+            assert "here.txt" in held.listdir()
+            assert held.exists("here.txt")
+            assert not held.exists("nothing.txt")
+
+            said = held.run(
+                ["python3", "-c", "import platform; print(platform.node())"]
+            )
+            assert said.ok
+            assert said.status == 0
+            assert said.output.strip() != socket.gethostname()
+            # And a command that failed says so rather than reading as one that worked.
+            assert not held.run(["python3", "-c", "raise SystemExit(3)"]).ok
+    finally:
+        machine.stop()
+
+    # The work is here, because the directory the container was given is this one.
+    assert (tmp_path / "there.txt").read_text() == "written from the flow\n"

@@ -8,6 +8,8 @@ where any were changed from what it declares. Use it to see the **shape** of a r
 to whom and how many times — because a two-agent loop that was supposed to alternate and is in
 fact one agent doing everything looks different here from the first glance.
 
+It is also where [the board](/guide/board) is, for a flow that talks to you.
+
 ## Try it
 
 Type `/status`. Above the editor you get one line per agent, with `●` for an agent that has a
@@ -15,6 +17,36 @@ turn open and `○` for one that has stopped. On the status line, left, you see 
 and how long it has been going, or between turns the flow and how long the run has been going.
 Under the agent lines you see what the run has cost and the rate it is costing it at, per
 model, over a recent window.
+
+## What is drawn, and when
+
+**A box appears as its agent takes its first turn.** Not before. A flow may declare ten agents
+and reach three of them — it is Python, and it may never take the branch the other seven are on
+— so the diagram is what the run *is doing* rather than a list of what was configured. Each box
+stays for the rest of the run once it is there, and the agents of the last run are still drawn
+after it ends: what they did is still worth reading.
+
+**An agent one of them started of its own hangs under it.** Claude's `Task`, Codex's collab
+agent, Cursor's task tool — a fleet under a turn is agents, so it is drawn as agents rather
+than as another tool call:
+
+```
+  ┌──────────────────────────────────┐
+  │ ● builder · claude#4f2a          │
+  │ claude/claude-opus-5:max · 3 turns│
+  └──────────────────────────────────┘
+    ├╴◆ Task read the tests
+    └╴◇ Task find the flaky one
+```
+
+`◆` is one still going and `◇` one that has come back; a flow's own agents wear `●` and `○`
+instead, because they are a different kind of thing. A subagent is not a row to open: nobody
+chose what it runs, nothing can be said to it, and it has no transcript of its own. A flow that
+wants a word about one hangs a hook on
+[`SUBAGENT_START`](/reference/agents#not-every-backend-runs-every-moment).
+
+Enter on a **box** reads that agent, whether or not it is working — `tab` is held to the ones
+working, so this is where the one that has stopped is reached.
 
 ## Where it comes from
 

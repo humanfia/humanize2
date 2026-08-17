@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Question, Usage
-from .hooks import EVERYWHERE, Moment
+from .hooks import EVERYWHERE, SUBAGENTS, Moment
 
 if TYPE_CHECKING:
     import os
@@ -37,6 +37,11 @@ _CONTINUATION_TOOLS = (
 #: fetching are one question here: an agent told not to search the web that went on reading
 #: whatever page it liked would be answering the same question the other way.
 _WEB_TOOLS = ("WebSearch", "WebFetch")
+
+#: The tools Claude starts an agent of its own with. A turn that reaches for one of these has
+#: agents under it rather than a tool running, which is worth saying as what it is: the id the
+#: call was made under is what pairs the one that started with the result that ends it.
+_FLEET = ("Task", "Agent")
 
 _ALLOWED_TOOLS_MAX = 32
 
@@ -166,6 +171,10 @@ class ClaudeCodeSession(StreamSessionBase):
     #: hands it back, so a turn asked for a shape answers in it or does not answer.
     shapes: ClassVar[bool] = True
 
+    #: `--mcp-config` takes a server on the command line, so a flow's own callbacks reach
+    #: this turn without anything of the person at this machine's being written.
+    takes_tools: ClassVar[bool] = True
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:
@@ -189,6 +198,13 @@ class ClaudeCodeSession(StreamSessionBase):
         self._at: str | None = None
         #: The id Claude says this session has, taken only once a turn has landed in it.
         self._named: str | None = None
+        #: The agents this turn has started of its own, by the id of the call that started
+        #: each: Claude ends one by answering that call, and what comes back names no tool,
+        #: so what it was is remembered here until it does.
+        self._fleet: dict[str, str] = {}
+        #: Whether the process now up was started knowing about the flow's own callbacks, so
+        #: that a session which starts offering some is answered by starting one that does.
+        self._offering: bool | None = None
 
     @property
     def named(self) -> str | None:
@@ -250,6 +266,16 @@ class ClaudeCodeSession(StreamSessionBase):
         allowed_tools = getattr(self._agent.config, "allowed_tools", ())
         if allowed_tools:
             argv += ["--allowedTools", ",".join(allowed_tools)]
+        if not self._agent.toolbox.empty():
+            # The flow's own callbacks, as the one thing Claude takes a tool it was not
+            # shipped with on: a server on the command line rather than a line written into
+            # anybody's settings file. Added to whatever the person at this machine has
+            # configured rather than replacing it -- `--strict-mcp-config` would take their
+            # own servers away for the length of this flow, which is not this flow's to do.
+            argv += [
+                "--mcp-config",
+                json.dumps(self._agent.toolbox.config(), separators=(",", ":")),
+            ]
         return argv
 
     def _write(self, text: str, ticket: str = "") -> str:
@@ -282,16 +308,24 @@ class ClaudeCodeSession(StreamSessionBase):
     def _restarted(self) -> None:
         """Forgets what the last process had spent, which the new one has not counted."""
         self._counted, self._fed, self._seen = {}, Counter(), {}
+        # And whatever was under the turn the last process was taking: it went with it.
+        self._fleet = {}
         self._at = self.effort
+        self._offering = not self._agent.toolbox.empty()
 
     def _stale(self) -> bool:
         """Whether the process up was started to think at something this turn is not.
 
         `--effort` is an argument of the process, so a flow that moves it mid-session is
         answered by ending this one and resuming the conversation in a process started at the
-        new one -- exactly as asking for a shape is.
+        new one -- exactly as asking for a shape is. So is `--mcp-config`: a flow that offers
+        the agent a callback between two turns is answered the same way, since a Claude that
+        was started without one was never told the tool exists.
         """
-        return self._at is not None and self._at != self.effort
+        if self._at is not None and self._at != self.effort:
+            return True
+        offering = not self._agent.toolbox.empty()
+        return self._offering is not None and self._offering != offering
 
     def _spent(self, said: dict[str, Any]) -> tuple[dict[str, int], Usage]:
         """What the turn just ending cost, per model and by the kind it went on.
@@ -458,12 +492,23 @@ class ClaudeCodeSession(StreamSessionBase):
                     # The name and what it was called on, which is what a tool call reads
                     # as: `Read src/x.py`, `Bash git status`. Only what will fit on a row.
                     called: dict[str, Any] = part.get("input") or {}
-                    yield Event(
-                        kind="tool",
-                        text=f"{part.get('name') or 'tool'} {_about(called)}".strip()[
-                            :120
-                        ],
-                    )
+                    named = str(part.get("name") or "tool")
+                    said_as = f"{named} {_about(called)}".strip()[:120]
+                    if named in _FLEET:
+                        marked = str(part.get("id") or "")
+                        self._fleet[marked] = said_as
+                        yield Event(kind="subagent", text=said_as, whose=marked)
+                        continue
+                    yield Event(kind="tool", text=said_as)
+        elif said.get("type") == "user":
+            # A tool answering, which is the only thing said back to Claude on this stream
+            # that is worth reading: one of them is an agent of its own having finished.
+            for part in said.get("message", {}).get("content", []):
+                if part.get("type") != "tool_result":
+                    continue
+                marked = str(part.get("tool_use_id") or "")
+                if was := self._fleet.pop(marked, ""):
+                    yield Event(kind="subagent-ends", text=was, whose=marked)
 
     def _answer(self, said: dict[str, Any]) -> None:
         """Answers something Claude asked of us over the same stream the turn is read from.
@@ -568,10 +613,13 @@ class ClaudeCodeAgent(AgentBase):
 
     service_tiers = ("default", "fast")
 
-    #: Every moment a turn passes through, and one more: Claude asks before it uses a tool,
-    #: over the same stream the turn is read from, and waits for the answer. So this is the
-    #: one backend here where a hook can say no to something and have the agent hear it.
-    moments: ClassVar[frozenset[Moment]] = EVERYWHERE | {Moment.PERMISSION_REQUEST}
+    #: Every moment a turn passes through, and three more: Claude asks before it uses a tool,
+    #: over the same stream the turn is read from, and waits for the answer -- so this is the
+    #: one backend here where a hook can say no to something and have the agent hear it -- and
+    #: it says on the same stream when it starts an agent of its own and when that one is done.
+    moments: ClassVar[frozenset[Moment]] = (
+        EVERYWHERE | SUBAGENTS | {Moment.PERMISSION_REQUEST}
+    )
 
     #: Claude keeps itself going toward an objective, which is what `pursue` reaches for.
     pursues: ClassVar[bool] = True

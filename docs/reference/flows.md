@@ -117,6 +117,17 @@ somebody already gave, so it is not on `Agent` at all. A flow that wants one set
 careful = agent.clone(config=replace(agent.config, effort="max"))
 ```
 
+**What a flow may hand an agent.** A conversation takes two things from the flow while it is
+running: which of the flow's [skills](#which-of-them-one-conversation-carries) it carries, and
+which of the flow's own **callbacks** the agent may reach for as tools —
+
+```python
+session.offers([Tool(name="review", about="…", takes=Reviewing, call=…)])
+```
+
+— which is how an agent asks the flow for something mid-turn, up to and including another
+flow. See [Callbacks as tools](/guide/tools).
+
 ## A flow that waits for more than one thing
 
 A loop that has more than one turn going at a time has to be able to wait for several things at
@@ -509,6 +520,30 @@ Saying something to it is asking what to say next; what it answers with is what 
 — the flow above is started with one `-a` and drives two. Run from a command line, where nobody
 is at a prompt, it answers with nothing, so the loop ends and the flow does the one thing it
 was given.
+
+### The board
+
+Asking stops the turn. **The board does not.** It is a handful of named lines kept beside the
+run and drawn on [`/status`](/guide/status) — the flow reads and writes it whenever it likes,
+the person changes it whenever they like, and neither is ever waiting on the other:
+
+```python
+board = agents.human.board
+board.put("todo", task, about="one thing a line; add more whenever you like")
+board.put("doing", "nothing yet", whose="flow")  # the flow's; they read and do not write
+
+while waiting := [one for one in board.get("todo").splitlines() if one.strip()]:
+    board.put("doing", waiting[0])
+    agents.builder(waiting[0], suppress=True)
+    board.put("todo", "\n".join(waiting[1:]))    # either of you writes this one
+board.put("doing", "nothing left")
+```
+
+Which is what makes it a work queue: you put more up while the loop is going, and the next
+round takes it. `todo` is left as a line either of you writes, since taking an item off is the
+flow doing its half of that; `doing` is the flow's, and a line whose `whose` is one side's is
+refused to the other where it writes, with `Refused`, rather than quietly ignored. See
+[The mission board](/guide/board).
 
 ## Running one
 

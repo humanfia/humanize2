@@ -190,6 +190,48 @@ The same for every kind:
   that was already running is left running; only what was started here is stopped.
 - **The workspace is left behind** either way.
 
+## The whole run on one machine
+
+The setting above is per agent, which is what a flow says when one place needs a machine of its
+own. A run that wants **all** of them in one container says so from outside instead:
+
+```sh
+hmz exec -f ralph_loop --container python:3.12 -a claude/claude-opus-5:max "get the suite green"
+```
+
+One container is started as the run starts and taken down as it ends, and every agent is
+pointed at it — over whatever each was configured with, because that is what saying it once
+about all of them means. Two are left alone: a place the **flow** declared `Isolated` keeps the
+container the flow named, since where an agent works is the flow's to say; and the person at
+the prompt, who takes no turn anywhere.
+
+## The workspace as the flow reaches it
+
+An agent under a machine is answered for without being told. The flow driving it is not — it is
+this process, running Python — so a file it opens is this machine's file and a command it runs
+is this machine's command.
+
+For a container that was handed the project directory at the path it already has, the files are
+the same files either way. The commands are not, and that is what `container()` answers:
+
+```python
+from hmz.flows import container
+
+held = container()               # Mapped, or None for a run on this machine
+held.workspace                   # the project directory, as the machine names it
+held.read_text("pyproject.toml")
+held.write_text("notes.md", "…")
+held.listdir("src")
+held.exists("src/hmz")
+held.mkdir("build")
+held.remove("build/stale")
+said = held.run(["python", "-m", "pytest", "-q"])
+said.ok, said.status, said.output
+```
+
+Every path may be given as the machine names it or relative to the workspace. The connection is
+the one an anchored turn opens, made when the flow first asks and held for the rest of the run.
+
 ## Choosing between them
 
 | You want | Use |
@@ -252,6 +294,8 @@ from hmz.machines import (
     Anchored,
     DockerConfig,    # a container started for the agent
     Docker,
+    Mapped,          # the workspace on that machine, as the flow's own code reaches it
+    Ran,             # what one command run there came to: .status, .output, .ok
 )
 ```
 

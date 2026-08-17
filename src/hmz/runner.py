@@ -79,6 +79,7 @@ class Runner:
         agents: Sequence[AgentBase],
         config: BaseModel | dict[str, Any] | None = None,
         resume: str | os.PathLike[str] | None = None,
+        container: str = "",
     ) -> None:
         """Loads the flow and holds the agents to drive it with.
 
@@ -95,6 +96,11 @@ class Runner:
             this flow here, which is what running a resumable flow again means -- a loop
             meant to run for a week is one that carries on where it stopped. A flow that
             says nothing about being resumable ignores this, having nowhere to put it.
+          container: The image to run the whole of this in, or "" to run it on this machine.
+            A convenience rather than a second way of saying where an agent works: it starts
+            one container, points every agent of the run at it, and lets the flow's own code
+            reach it through `hmz.flows.container()` -- which is what a run in a container
+            is, said once from outside rather than agent by agent inside.
 
         Raises:
           NotAFlow: If the flow is not there, is not a flow -- nothing in it marked
@@ -167,6 +173,10 @@ class Runner:
         #: which run that was. Asked here rather than when the run starts, so that a cycle
         #: named at the prompt is one whoever named it hears about before anything runs.
         self._resumable = mark.resumable
+        #: The image the whole run works in, or "" for a run on this machine. The container
+        #: is started as the flow starts rather than here: constructing a runner reads a
+        #: flow, and reading one must not pull an image.
+        self._container = container
         self._picked_up: Path | None = None
         if self._resumable:
             self._picked_up = (
@@ -201,7 +211,7 @@ class Runner:
         import inspect
 
         from .cycle import Cycle, state
-        from .flows.driving import entered, left
+        from .flows.driving import contained, entered, lands_in, left
         from .settings import Settings
 
         # Written down as running before it is: what a flow calls is written down the same
@@ -210,21 +220,30 @@ class Runner:
         started = entered(self._flow, self._driven)
         picked_up = self._picked_up
         try:
-            with Cycle(
-                self._flow,
-                self._driven,
-                task,
-                resumable=self._resumable,
-                picked_up=picked_up.name if picked_up is not None else "",
-                # Whether this workspace asked for its runs to be profiled as well as
-                # traced, which is a thing about the project being worked on: a repository
-                # whose tests take an hour is a different question from one whose take a
-                # minute. Read here rather than in the cycle, which is the run written down
-                # rather than the settings under it.
-                profile=Settings().profiling,
-            ) as cycle:
+            # One container for the run, started here rather than where the runner was made:
+            # reading a flow must not pull an image, and a run that never starts must not
+            # leave one behind. Every agent is pointed at it as it comes up, and what the
+            # flow itself reads, writes and runs there is `hmz.flows.container`.
+            with (
+                contained(self._container) as where_,
+                Cycle(
+                    self._flow,
+                    self._driven,
+                    task,
+                    resumable=self._resumable,
+                    picked_up=picked_up.name if picked_up is not None else "",
+                    # Whether this workspace asked for its runs to be profiled as well as
+                    # traced, which is a thing about the project being worked on: a repository
+                    # whose tests take an hour is a different question from one whose take a
+                    # minute. Read here rather than in the cycle, which is the run written down
+                    # rather than the settings under it.
+                    profile=Settings().profiling,
+                ) as cycle,
+            ):
                 for agent in self._driven:
                     agent.cycle = cycle
+                if where_ is not None:
+                    lands_in(self._driven, where_)
                 # As it was set up, or as it comes: a flow that takes a config takes None
                 # for the run nobody set up, which is the default the flow declared. And
                 # after it, for a flow that says it can be picked up, what the run it is
@@ -305,7 +324,7 @@ def read_agent(
 
 def flow_and_agents(
     argv: list[str],
-) -> tuple[str, list[AgentBase], str, dict[str, Any] | None]:
+) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, str]:
     """Reads an `hmz exec` line into a flow, the agents to drive it, the task, and its setup.
 
     A flow says how many agents it drives, and this is where they come from: one for each, in
@@ -315,9 +334,10 @@ def flow_and_agents(
       argv: What followed the command name.
 
     Returns:
-      The flow's path, the agents to drive it with, the task, and what to set the flow up
-      with -- the YAML file `-c` named, read but not yet checked against the flow's own
-      model, or None where the line named none.
+      The flow's path, the agents to drive it with, the task, what to set the flow up with --
+      the YAML file `-c` named, read but not yet checked against the flow's own model, or
+      None where the line named none -- and the image to run the whole of it in, or "" for a
+      run on this machine.
 
     Raises:
       SystemExit: If the line does not name a flow and an agent apiece, or names a config
@@ -359,6 +379,14 @@ def flow_and_agents(
         metavar="PATH",
         help="a YAML file of what to set the flow up with, one field per line, as the flow "
         "declares them; only for a flow that says it can be set up",
+    )
+    parser.add_argument(
+        "--container",
+        default="",
+        metavar="IMAGE",
+        help="run the whole of it in a container of this image: every agent's turns land "
+        "there, the project directory is mounted at the path it already has, and the flow "
+        "reaches it through hmz.flows.container()",
     )
     parser.add_argument(
         "task",
@@ -424,7 +452,7 @@ def flow_and_agents(
             agents.append(agent(configured))
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
-    return args.flow, agents, args.task, held
+    return args.flow, agents, args.task, held, args.container
 
 
 def set_up_from(said: str | os.PathLike[str]) -> dict[str, Any]:

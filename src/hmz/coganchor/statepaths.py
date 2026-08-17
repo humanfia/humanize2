@@ -42,6 +42,13 @@ PROFILES: tuple[AgentProfile, ...] = (
         name="codex",
         state_paths=("~/.codex",),
     ),
+    # Cursor Agent keeps its settings, its rules and its login under one directory, and the
+    # versions of the CLI itself under another -- the second being where it re-execs from, so
+    # it stays on this machine like every other agent's own program.
+    AgentProfile(
+        name="cursor-agent",
+        state_paths=("~/.cursor", "~/.local/share/cursor-agent"),
+    ),
     AgentProfile(
         name="dsh",
         state_paths=("~/.dsh",),

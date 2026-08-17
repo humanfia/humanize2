@@ -709,20 +709,19 @@ def test_a_turn_that_outgrew_the_model_is_taken_once_under_every_account(
 ) -> None:
     """The loop the report was about, from the outside: one failure, and one turn.
 
-    An account that says a turn under it is worth taking again would otherwise take this
-    one again on every rung of its chain, each try failing on the same words.
+    A place that says a turn at it is worth taking again would otherwise take this one again
+    on every rung of its chain of accounts, each try failing on the same words.
     """
-    from hmz import providers
+    from hmz import fallbacks, providers
 
-    tried_again = providers.Provider(
-        "dsh", providers.LOCAL, way="", retries=3, policy="none", fallback="second"
-    )
-    second = providers.Provider("dsh", "second", way="", retries=3, policy="none")
+    tried_again = providers.Provider("dsh", providers.LOCAL, way="", fallback="second")
+    second = providers.Provider("dsh", "second", way="")
 
     def chain(account: providers.Provider) -> list[providers.Provider]:
         return [account, second]
 
     monkeypatch.setattr(providers, "chain", chain)
+    fallbacks.retrying(DshAgent(configured()).spec, 3, "none", 0.0)
     Harness.next_scripts.extend([failing(_OVERFLOWED)] for _ in range(8))
     agent = DshAgent(configured())
     monkeypatch.setattr(agent, "node", lambda: tried_again)

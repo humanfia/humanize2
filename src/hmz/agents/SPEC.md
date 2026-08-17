@@ -6,6 +6,7 @@
 .
 ├── __init__.py
 ├── base.py
+├── board.py
 ├── claude.py
 ├── codex.py
 ├── config.py
@@ -16,14 +17,15 @@
 ├── mimo.py
 ├── opencode.py
 ├── pi.py
-└── skills.py
+├── skills.py
+└── tools.py
 ```
 
 ## `__init__.py`
 
 Expose `AgentConfig`, `AgentBase`, `Event`, `Question`, `Stopped`, `Failed`, `Unrecoverable`,
-`Usage`, `SessionBase`, `CommandSessionBase`, `StreamSessionBase`, and all agent and session
-classes.
+`Usage`, `SessionBase`, `CommandSessionBase`, `StreamSessionBase`, `Tool`, `Toolbox`, `Board`,
+`Item`, and all agent and session classes.
 
 ## `event.py`
 
@@ -36,6 +38,13 @@ while it runs, what it asks, what it cost, and how it failed -- with no behaviou
 - `Unrecoverable` MUST be a `Failed` a turn is not taken again for. It is what a backend says
   of a failure no other try could come out differently on, and nothing outside the backend
   MUST read a message to guess at one.
+
+- An agent that starts an agent of its own MUST say so on the stream a turn is read from, as a
+  `subagent` and then a `subagent-ends`, each naming that agent by the backend's own id for it
+  so that the one that started and the one that ended read as one agent. A fleet under a turn
+  is agents, and whatever is watching MUST be able to show it as agents rather than as another
+  tool call. A backend that says only one of the two halves would be one whose subagents never
+  finish, so it MUST say both or neither.
 
 - These MUST NOT name the base classes. Every backend needs them and none of them needs the
   base classes to say one, so a reader of somebody else's stream format imports this alone.
@@ -106,8 +115,9 @@ class AgentConfig:
   is its CLI's own -- installed the way that CLI installs one, switched off the way that CLI
   switches one off -- and humanize MUST NOT rewrite, override or disable any of them. What a
   flow brings MUST be mounted onto the sessions it opens instead, which is `hmz.flows.skills`.
-  Which of *those* one session carries MUST be that session's own answer, and is the one thing
-  about what an agent works by that MAY be said again while it is working.
+  Which of *those* one session carries MUST be that session's own answer, and is one of the two
+  things about what an agent works by that MAY be said again while it is working. The other is
+  which of the flow's own callbacks it is offering, which is `hmz.agents.tools`.
 - An anchored turn MUST be run by spawning `AnchorConfig.command(argv)`, never by calling
   coganchor in this process: a turn is pumped from threads of its own, which a supervisor that
   forks the agent and takes the process's signal handling cannot be given.
@@ -122,6 +132,11 @@ may be hung on, what it is told when one arrives, and what it may say back.
   written in the language the flow is written in.
 - `Hooks.on` MUST refuse a moment the agent does not run, saying so where the hook is hung
   rather than hours into a loop. Which moments those are MUST be `AgentBase.moments`.
+- `SUBAGENT_START` and `SUBAGENT_STOP` MUST be moments a hook is told about rather than ones it
+  may answer: no backend here waits to be told whether it may start an agent of its own, so a
+  refusal would be a verdict that goes nowhere. They MUST be named only on the backends whose
+  streams say when one starts and when it comes back, so that a hook hung where nothing would
+  ever fire is refused where it is hung.
 - A hook that raises MUST have said nothing, as a watcher that raises has: a flow MUST NOT fail
   because something hung off it did. `Stopped` is the one thing it MUST raise out of the turn,
   since a run ended by hand has to read as ended by hand.
@@ -492,12 +507,135 @@ class CommandSessionBase(SessionBase):
 - Every session that is not one command per turn MUST derive from `SessionBase` instead, so
   that a backend driven another way inherits none of this.
 
+## `tools.py`
+
+```python
+@dataclass(frozen=True, slots=True)
+class Tool:
+    name: str
+    about: str
+    call: Callable[..., Any]
+    takes: type[BaseModel] | None = None
+
+
+class Toolbox:
+    def offers(self, whose: int, tools: Iterable[Tool]) -> None: ...
+
+    def offered(self) -> tuple[Tool, ...]: ...
+
+    def empty(self) -> bool: ...
+
+    def address(self) -> str: ...
+
+    def command(self) -> list[str]: ...
+
+    def close(self) -> None: ...
+
+
+def serve(line: str, offered: Callable[[], tuple[Tool, ...]]) -> dict[str, Any] | None: ...
+```
+
+Callbacks of the flow's own, handed to a coding agent as tools it may reach for -- which is the
+other direction from driving one, and the thing that lets an agent call a flow.
+
+- The callback MUST run in the process the flow is in. That is the whole of what this is for: a
+  tool server started as a program of its own would be a subprocess with none of the flow's
+  variables in it, and a flow's own function is what a tool is meant to be. What a backend is
+  handed MUST therefore be a command that relays its pipe back to this process rather than one
+  that answers for itself.
+- What a tool takes MUST be a model and nothing else, for the reason a turn held to a shape is
+  asked with one: the fields, their types, which are required and the line each was declared
+  with are already in it, so nothing about the arguments is said twice.
+- The road MUST be the Model Context Protocol, that being the one way every one of these CLIs
+  already takes a tool it was not shipped with. Only what a client actually calls MUST be
+  answered -- saying hello, saying what there is, and calling one -- and a message with no id
+  MUST NOT be answered at all, the protocol having nowhere to put the answer.
+- Nothing MUST be started until something is offered. An agent whose flow hands it no callbacks
+  MUST have no socket, no thread and no bridge, and its turns MUST be the turns they always
+  were.
+- The socket MUST be somewhere only this user may reach: it is a way into this process, and one
+  anybody could connect to is a way in for anybody.
+- A callback that raises MUST be answered to the agent as the tool having failed, in words it
+  can act on, and MUST NOT be raised out of the turn: a flow must not end because a model called
+  one of its tools wrongly, and a model that reads what went wrong is one that can call it
+  again correctly.
+- What is offered MUST be the agent's rather than one conversation's, since a CLI is told about
+  its tools where it is started and some of these are started once per agent. Two conversations
+  offering a tool of one name are offering one tool. Which conversation offered what MUST still
+  be kept, so that one which stops offering takes only its own back.
+- A session MUST say which callbacks it is offering and MUST take being told, from its next turn
+  on -- the same shape a flow's skills have, and for the same reason. A backend with no way of
+  being given a tool it was not shipped with MUST refuse one where it is offered rather than
+  quietly never offering it, and MUST say beforehand which it is on the class.
+- Nothing of the person at this machine's own configuration MUST be written to do it. Their own
+  tool servers are theirs, and what this flow offers MUST go away with this flow.
+
+## `board.py`
+
+```python
+ANYONE, USER, FLOW = "both", "user", "flow"
+
+
+class Refused(PermissionError): ...
+
+
+@dataclass(frozen=True, slots=True)
+class Item:
+    key: str
+    value: str = ""
+    about: str = ""
+    whose: str = ANYONE
+    at: float = ...
+    by: str = FLOW
+
+
+class Board:
+    def items(self) -> tuple[Item, ...]: ...
+
+    def get(self, key: str, otherwise: str = "") -> str: ...
+
+    def held(self, key: str) -> Item | None: ...
+
+    def put(self, key: str, value: str, *, about=None, whose=None, by=FLOW) -> Item: ...
+
+    def drop(self, key: str, *, by: str = FLOW) -> bool: ...
+
+    def moves(self, key: str, *, to: str, by: str = FLOW) -> Item: ...
+
+    def watch(self, listener: Callable[[Board], None]) -> None: ...
+```
+
+What a flow and the person at the prompt both write on, and neither waits at.
+
+- A question MUST go on stopping the turn it was asked in. This MUST NOT: it is for everything
+  a run needs from a person that is not a question -- what there is to do next, how far through
+  it is, what somebody thought of while it was running -- and a flow reading it MUST never be
+  held up, nor a person changing it.
+- It MUST be a handful of named lines and nothing more. What `todo`, `doing` and `done` mean is
+  the flow's to decide, so no queue, no status and no ordering MUST be written down here: a
+  board that knew what an issue was would be a board every flow had to agree with.
+- A line MUST say whose it is, and the other side MUST be refused where it writes rather than
+  quietly ignored: a flow writing down how far through it is must not have that edited
+  underneath it, and a person's list of what they want next must not be rewritten by the thing
+  meant to be reading it.
+- Writing a value MUST keep what the line is for. What it is for is said once, where the line
+  was made.
+- It MUST be held by the person rather than by the flow. A flow is a function that returns, and
+  the board outlives any one turn of it.
+- It MUST say when a line moves, so that whatever is showing it draws again -- and a watcher
+  that raises MUST have said nothing, in the way a watcher of an agent has.
+- What is read out MUST be a copy taken whole: a flow reading the board while somebody types on
+  it must read one moment of it rather than four moments of four lines.
+
 ## `human.py`
 
 The person at the prompt, driven as an agent: `HumanAgent` and `HumanSession`.
 
 - They MUST be made by whatever drives the flow rather than by the flow, and MUST NOT be among
   the agents a flow is configured with: nobody chooses what the person runs.
+- They MUST carry the board, which is the other half of talking to them: a question stops the
+  turn until it is answered and the board stops nothing at all. It MUST be theirs rather than
+  the flow's, for the reason it is written down in `board.py`.
 - A turn of theirs MUST NOT be bracketed by the `begins` and `ends` that say whose turn it is.
   The person takes no turn of a model, and counting it would put them in the graph of who
   handed to whom and spin a clock at them while they thought.

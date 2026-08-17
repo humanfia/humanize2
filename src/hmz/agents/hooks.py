@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "EVERYWHERE",
+    "SUBAGENTS",
     "Hook",
     "Hooks",
     "Hung",
@@ -57,6 +58,12 @@ class Moment(StrEnum):
     USER_PROMPT_SUBMIT = "UserPromptSubmit"
     #: The agent has reached for a tool.
     PRE_TOOL_USE = "PreToolUse"
+    #: The agent has started an agent of its own, which is what these CLIs call a subagent.
+    #: Refusing it is not a thing a backend waits to be told, so it is a moment to be told
+    #: about rather than one to answer.
+    SUBAGENT_START = "SubagentStart"
+    #: One of those has finished.
+    SUBAGENT_STOP = "SubagentStop"
     #: The backend is asking whether a tool may run. Refusing it means the tool does not.
     PERMISSION_REQUEST = "PermissionRequest"
     #: The agent has stopped to ask its user something.
@@ -70,7 +77,17 @@ class Moment(StrEnum):
 #: The moments a turn passes through wherever it is run, which is every backend driven here:
 #: they are read off the turn itself rather than out of anything the backend offers. What is
 #: not among them is a moment only some backends reach, and is named on the agents that do.
-EVERYWHERE = frozenset(Moment) - {Moment.PERMISSION_REQUEST}
+EVERYWHERE = frozenset(Moment) - {
+    Moment.PERMISSION_REQUEST,
+    Moment.SUBAGENT_START,
+    Moment.SUBAGENT_STOP,
+}
+
+#: The two a backend reaches only where it says which of its tool calls start an agent of
+#: their own. Named together because they are one thing to be told: a fleet under a turn is
+#: visible or it is not, and a backend that says one and not the other would be one whose
+#: subagents never finish.
+SUBAGENTS = frozenset({Moment.SUBAGENT_START, Moment.SUBAGENT_STOP})
 
 
 class Unhooked(ValueError):  # noqa: N818  -- what the moment is here, not what went wrong
@@ -96,8 +113,12 @@ class Occasion:
       session: The backend's id for the conversation, or "" before the backend has said one.
       prompt: What the agent is about to be told, for the moments that are about to tell it
         something.
-      tool: What the agent reached for, for the moments about a tool.
-      about: What it reached for it with, as one line -- the path, the command, the query.
+      tool: What the agent reached for, for the moments about a tool. For the moments about
+        an agent of its own it is what that agent is called, as its backend named it.
+      about: What it reached for it with, as one line -- the path, the command, the query. For
+        an agent of its own it is what that agent was asked to do.
+      under: The backend's own id for the agent this is about, for the moments about one, so
+        that the one that started and the one that finished read as one agent.
       input: What the tool was called with, where the backend says. Empty where it does not.
       said: What the agent said last, which is the answer a turn ended on.
       again: How many times a hook has already sent this turn on rather than let it stop, so
@@ -110,6 +131,7 @@ class Occasion:
     prompt: str = ""
     tool: str = ""
     about: str = ""
+    under: str = ""
     input: Mapping[str, Any] = field(default_factory=dict[str, Any])
     said: str = ""
     again: int = 0

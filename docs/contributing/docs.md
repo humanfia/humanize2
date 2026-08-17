@@ -147,7 +147,7 @@ Four things they are all held to:
   `ALLOWED` table in `tests/test_layering.py`; every box in `theme/flows.ts` is a turn a flow
   really takes; `HmzBackends` is `hmz/backends.py` and which
   session base each agent class derives from; `HmzAccounts`' waits are the formulas in
-  `providers/retry.py`; every agent on `HmzOrchestra` is spelled the way `hmz exec -a` would
+  `fallbacks.py`; every agent on `HmzOrchestra` is spelled the way `hmz exec -a` would
   take it. A diagram that drifts from those is a diagram that lies to a reader.
 - **A simulation is not dressed up as a recording.** `HmzOrchestra`, the feature diagrams and
   the flow shapes are drawn; the gallery below them is what the real thing looks like, and says

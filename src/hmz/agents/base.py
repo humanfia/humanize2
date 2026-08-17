@@ -26,6 +26,7 @@ from typing import IO, TYPE_CHECKING, Any, ClassVar, Literal, Protocol, Self, ov
 from .event import Event, Failed, Question, Stopped, Unrecoverable, Usage, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
 from .skills import Loaded, mount, unmount
+from .tools import Tool, Toolbox
 
 if TYPE_CHECKING:
     import asyncio
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
+    from hmz.backends import Profile
     from hmz.coganchor import AnchorConfig
     from hmz.machines import MachineConfig
     from hmz.providers import Provider
@@ -370,6 +372,12 @@ class SessionBase(ABC):
     #: where the model is still free to answer around it.
     shapes: ClassVar[bool] = False
 
+    #: Whether this backend can be given a tool it was not shipped with, for the length of a
+    #: session and without writing anything of the person at this machine's. False for one
+    #: with no way of being told, whose sessions refuse a callback rather than quietly never
+    #: offering it -- a tool the model never sees is a flow that does not do what it says.
+    takes_tools: ClassVar[bool] = False
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:
@@ -392,6 +400,11 @@ class SessionBase(ABC):
         #: far as writing the tests wants the skill about writing them and no longer wants
         #: the eight about reading the codebase, and it is the same conversation either way.
         self._skills: tuple[str, ...] | None = None
+        #: The flow's own callbacks this conversation is putting in front of the agent, which
+        #: it may say again between any two turns. Held here as well as in the agent's
+        #: toolbox so that a session can say what it is offering without asking the agent
+        #: what everything else is offering too.
+        self._tools: tuple[Tool, ...] = ()
         #: And which of them are actually down in the workspace now, or None while none are.
         #: The two differ for exactly as long as it takes the next turn to start, which is
         #: where what was asked for is put where the backend reads it.
@@ -487,6 +500,41 @@ class SessionBase(ABC):
             the rest rather than a turn that will not run.
         """
         self._skills = None if skills is None else tuple(dict.fromkeys(skills))
+
+    @property
+    def tools(self) -> tuple[Tool, ...]:
+        """The flow's own callbacks this conversation is putting in front of the agent."""
+        return self._tools
+
+    def offers(self, tools: Iterable[Tool] | None) -> None:
+        """Says which callbacks of the flow's the agent may reach for, from the next turn on.
+
+        A callback is a function of the flow's own, and the agent reaching for it is that
+        function running here -- in this process, on the thread serving the call -- with what
+        it answers going back to the model as the tool's result. Which is what makes an agent
+        able to start a flow: the callback is the flow's code, so it may do whatever the flow
+        may do.
+
+        Said on the conversation rather than on the agent because that is where a flow is
+        when it has something to offer: a loop that has just worked out what its agent may
+        need says so between two turns. What the CLI is actually told is the agent's, though
+        -- some of these are one process per agent -- so two conversations offering a tool of
+        one name are offering one tool.
+
+        Args:
+          tools: The callbacks, or None to take back whatever this conversation was offering.
+
+        Raises:
+          NotImplementedError: If this backend has no way of being given a tool it was not
+            shipped with. A callback quietly never offered is a flow that quietly does not do
+            what it says, so it is refused where it is said.
+        """
+        if tools and not type(self).takes_tools:
+            raise NotImplementedError(
+                f"{self._agent.backend} has no way of being given a tool of a flow's own"
+            )
+        self._tools = () if tools is None else tuple(tools)
+        self._agent.toolbox.offers(id(self), self._tools)
 
     @property
     def id(self) -> str:
@@ -812,6 +860,20 @@ class SessionBase(ABC):
                     if event.kind == "tool":
                         named, _, about = event.text.partition(" ")
                         self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
+                    elif event.kind in ("subagent", "subagent-ends"):
+                        # An agent this one started of its own, bracketed the way a turn is:
+                        # a fleet under a turn is something a flow may want a word about, and
+                        # the id is what makes the one that started and the one that ended
+                        # one agent rather than two lines.
+                        named, _, about = event.text.partition(" ")
+                        self._fire(
+                            Moment.SUBAGENT_START
+                            if event.kind == "subagent"
+                            else Moment.SUBAGENT_STOP,
+                            tool=named,
+                            about=about,
+                            under=event.whose,
+                        )
                     yield event
                 # Heard whether or not it is passed on, because what a turn cost is on it.
                 self._heard(answered)
@@ -832,10 +894,11 @@ class SessionBase(ABC):
 
         A turn fails for two kinds of reason and only one of them is worth another try: a
         gateway that answered 503, a subscription that said "too many requests", a socket
-        that closed mid-stream are the same call away from working. So an account says how
-        many times a turn under it is tried again and how long to wait between tries, and
-        what to carry on under once those are spent -- and each account names the next, so
-        what a turn walks is a chain rather than a single second place.
+        that closed mid-stream are the same call away from working. So the place this agent
+        runs at says how many times a turn there is tried again and how long to wait between
+        tries -- `hmz.fallbacks`, which is the layer between an agent and its accounts -- and
+        each account names the next, so what a turn walks is a chain of accounts before it is
+        a step to somewhere else.
 
         Which kind it was is the backend's to say, since only the backend knows what its own
         failure means, and it says the second kind by raising `Unrecoverable`. Nothing here
@@ -862,9 +925,11 @@ class SessionBase(ABC):
               that failed for a reason no other try could come out differently on is a turn
               that has failed, and trying it again is a loop rather than a recovery.
         """
-        from hmz import providers
-        from hmz.providers import retry
+        from hmz import fallbacks, providers
 
+        # How this place is tried again, read once for the whole walk: it is a file, and a
+        # turn that failed under four accounts must not read it four times.
+        again_ = fallbacks.tried(self._agent.spec)
         last: subprocess.CalledProcessError | None = None
         # Which accounts this turn has been under, so that a chain read again between two of
         # them -- another session of this agent moved it, somebody rewrote a fallback -- is
@@ -876,23 +941,23 @@ class SessionBase(ABC):
                 break
             tried.add(account.name)
             since = time.monotonic()
-            for attempt in range(1, account.retries + 2):
+            for attempt in range(1, again_.tries + 2):
                 if self._agent._stopped:
                     raise Stopped(f"{self._agent.id} was stopped")
-                waiting = retry.waits(account.policy, attempt)
+                waiting = fallbacks.waits(again_.policy, attempt)
                 if attempt > 1:
                     # Checked before the wait rather than after it, so that a turn is never
                     # started knowing the time it was given is already spent.
                     if (
-                        account.timeout
-                        and time.monotonic() - since + waiting > account.timeout
+                        again_.timeout
+                        and time.monotonic() - since + waiting > again_.timeout
                     ):
                         break
                     self._heard(
                         Event(
                             kind="tool",
                             text=f"{self._agent.backend} failed; trying again in "
-                            f"{waiting:.0f}s ({attempt - 1} of {account.retries})",
+                            f"{waiting:.0f}s ({attempt - 1} of {again_.tries})",
                         )
                     )
                     time.sleep(waiting)
@@ -1043,6 +1108,7 @@ class SessionBase(ABC):
         called: Mapping[str, Any] | None = None,
         said: str = "",
         again: int = 0,
+        under: str = "",
     ) -> Verdict:
         """Tells whatever is hung on one of this agent's moments that it has arrived.
 
@@ -1054,6 +1120,8 @@ class SessionBase(ABC):
           called: What the tool was called with, where the backend says.
           said: What the agent said last.
           again: How many times this turn has already been sent on rather than let stop.
+          under: The backend's own id for the agent this one started, where the moment is
+            about one.
 
         Returns:
           What the hooks said, which is nothing at all where none is hung.
@@ -1066,6 +1134,7 @@ class SessionBase(ABC):
                 prompt=prompt,
                 tool=tool,
                 about=about,
+                under=under,
                 input=called or {},
                 said=said,
                 again=again,
@@ -1159,6 +1228,10 @@ class SessionBase(ABC):
             self._ended = True
             self._fire(Moment.SESSION_END)
         self._shut()
+        # And whatever this conversation was offering the agent: a callback that outlived the
+        # conversation offering it would be one the flow can no longer see the point of.
+        if self._tools:
+            self.offers(None)
         if self._moved_to is not None:
             # And the conversation this one moved to, which is this conversation carried on
             # somewhere else: it ends when this one does.
@@ -1942,46 +2015,87 @@ class StreamSessionBase(SessionBase):
         """
 
 
-def _built(spec: str) -> AgentBase | Literal[False]:
-    """One agent, made from the spec a fallback names it by.
+def _built(place: str, like: AgentBase) -> AgentBase | Literal[False]:
+    """One agent to stand in at a place, configured as the agent that could not run was.
+
+    A step is written between two places rather than between two agents: what failed is the
+    CLI, the account and the model, and everything else about the agent -- how hard it thinks,
+    what it may reach for, whether it may search the web, where its turns land -- is what that
+    agent *is*, settled where it was made. So it comes across the step rather than being
+    written down again beside it.
 
     Made here rather than by whatever wrote the step down, because it is made at the moment a
-    turn has nowhere left to go: a chain of four agents that were all started when the run was
+    turn has nowhere left to go: a chain of four places that were all started when the run was
     would be three CLIs held open for a failure that never came.
 
     Args:
-      spec: The agent, as `CLI[@ACCOUNT]/MODEL:EFFORT`.
+      place: Where the turn goes, as `CLI[@ACCOUNT]/MODEL`.
+      like: The agent that could not run, which is what the one taking over is configured as.
 
     Returns:
-      The agent, or False for a spec that no longer names one -- a CLI nobody has installed
-      here, a step written down against a backend that has gone. A turn then fails the way it
-      failed before anybody wrote a step down, which is the answer that says what went wrong
-      rather than the one about the step.
+      The agent, or False for a place that no longer names one -- a CLI nobody has installed
+      here, a step written down against a backend that has gone, one that cannot be told
+      something this agent was told. A turn then fails the way it failed before anybody wrote
+      a step down, which is the answer that says what went wrong rather than the one about
+      the step.
     """
-    from hmz import backends
+    from dataclasses import fields, replace
+
+    from hmz import backends, fallbacks
 
     from . import driver
+    from .config import AgentConfig as Common
 
-    try:
-        profile, model, effort, _tier, provider, may, searches, held = backends.read(
-            spec
-        )
-        kind, config = driver(profile.name)
-    except (ValueError, KeyError):
+    said = fallbacks.reads(place)
+    backend, _, model = said.partition("/")
+    backend, _, provider = backend.partition("@")
+    profile = backends.named(backend)
+    if not said or profile is None:
         return False
-    extra: dict[str, Any] = {}
-    if may is not None:
-        extra["permission"] = may
-    if searches is not None:
-        extra["web_search"] = searches
-    if held and profile.name == "codex":
-        extra["overrides"] = held
-    elif held:
-        extra["allowed_tools"] = tuple(value for _key, value in held)
     try:
-        return kind(config(model=model, effort=effort, provider=provider, **extra))
+        kind, config = driver(profile.name)
+    except KeyError:
+        return False
+    # The common settings alone: an agent is what it was made as, and what one backend was
+    # told in its own vocabulary -- a codex override, a rule Claude reads as an allowed tool
+    # -- says nothing to the CLI taking the turn over.
+    common = replace(
+        Common(**{one.name: getattr(like.config, one.name) for one in fields(Common)}),
+        model=model,
+        effort=_rung(backends.named(like.backend), profile, like.effort),
+        provider=provider,
+    )
+    try:
+        return kind(
+            config(**{one.name: getattr(common, one.name) for one in fields(common)})
+        )
     except (ValueError, TypeError):
         return False
+
+
+def _rung(was: Profile | None, now: Profile, effort: str) -> str:
+    """How hard the agent taking a turn over thinks, in the words its own backend has.
+
+    A word the backend already has is left alone, which is what happens between the CLIs that
+    name their rungs the same way. Where it has not got that word, every ladder here is
+    written hardest first, so the rung is how far down from the top it was: an agent thinking
+    as hard as its CLI could goes on doing so, and one three rungs down goes three rungs down
+    whatever the CLI taking over calls them. A ladder that is shorter stops at its own bottom.
+
+    Args:
+      was: The backend the agent that could not run was, or None for one nothing here knows.
+      now: The backend the turn is moving to.
+      effort: The word that agent was thinking at.
+
+    Returns:
+      A word `now` has, or the one it was given for a backend that lists none -- one whose
+      model carries its own effort is refused a word beside the name anyway.
+    """
+    if not now.efforts or effort in now.efforts or effort in now.beyond:
+        return effort
+    ladder = was.efforts if was is not None else ()
+    at = ladder.index(effort) if effort in ladder else 0
+    return now.efforts[min(at, len(now.efforts) - 1)]
 
 
 class AgentBase(ABC):
@@ -2092,11 +2206,29 @@ class AgentBase(ABC):
         #: The rest of that chain, for an agent that is itself a stand-in, or None for one
         #: that has not been told and reads it off what is written down.
         self._beyond: tuple[str, ...] | None = None
+        #: The flow's own callbacks this agent's conversations are offering, and the socket
+        #: they are served on. The agent's rather than a session's because a CLI is told
+        #: about its tools where it is started, and some of these are started once per agent.
+        #: Nothing is served until something is offered.
+        self._toolbox = Toolbox()
+        # What is serving them goes when the agent does, and at exit for one held to the end:
+        # a socket nothing is behind is a socket nothing can answer on.
+        weakref.finalize(self, self._toolbox.close)
 
     @property
     def id(self) -> str:
         """What this agent is called, and what a trace groups its sessions under."""
         return self._id
+
+    @property
+    def toolbox(self) -> Toolbox:
+        """The flow's own callbacks this agent's conversations are offering, as one list.
+
+        Nothing is started until one of them offers something: an agent whose flow hands it
+        no callbacks has no socket, no thread and no bridge, and its turns are the turns they
+        always were.
+        """
+        return self._toolbox
 
     def runs_on(self, machine: MachineConfig | None) -> None:
         """Puts this agent's turns on the machine the flow said they land on.
@@ -2513,17 +2645,19 @@ class AgentBase(ABC):
 
     @property
     def spec(self) -> str:
-        """This agent as a command line names it: `CLI[@ACCOUNT]/MODEL:EFFORT`.
+        """Where this agent runs, as a step names it: `CLI[@ACCOUNT]/MODEL`.
+
+        Three things and no more, because those are what a turn can fail for having named. How
+        hard it thinks and what it may reach for are what this agent *is* rather than where it
+        runs, and a step is not written about them.
 
         The account it was configured with rather than the one it has moved to, since that is
-        what somebody wrote down when they said where this agent falls back to: an agent that
-        walked its own accounts and ran out is still the agent they meant.
+        what somebody wrote down when they said where this place falls back to: an agent that
+        walked its own accounts and ran out is still at the place they meant.
         """
         from hmz import fallbacks
 
-        return fallbacks.spec(
-            self.backend, self._config.model, self.effort, self._config.provider
-        )
+        return fallbacks.spec(self.backend, self._config.model, self._config.provider)
 
     def stands_in(self) -> AgentBase | None:
         """The agent that takes this one's turns, once this one has nowhere left to run.
@@ -2557,7 +2691,7 @@ class AgentBase(ABC):
             )
             # Written down as "nothing", so that an agent with nowhere to go is asked once
             # rather than once a turn: reading the chain is reading a file.
-            self._stands_in = made = _built(walked[0]) if walked else False
+            self._stands_in = made = _built(walked[0], self) if walked else False
             if made:
                 made.loads(self._loads)
                 made.cycle = self.cycle
@@ -2688,8 +2822,35 @@ class AgentBase(ABC):
         private = tuple(provider.env) if provider is not None else ()
         anchor = self.anchor
         if anchor is not None:
-            return anchor.command(argv, swaps=swaps, private=private, chdir=cwd)
+            return self._reaching(anchor).command(
+                argv, swaps=swaps, private=private, chdir=cwd
+            )
         return provider.command(argv) if provider is not None else argv
+
+    def _reaching(self, anchor: AnchorConfig) -> AnchorConfig:
+        """The anchor, plus whatever a turn under it has to be able to reach on this machine.
+
+        Which is the bridge to the flow's own callbacks, for an agent that is offering any:
+        the socket it carries lines to is in *this* process, so the program that carries them
+        has to run here. Everything a CLI spawns under an anchor goes to the target unless it
+        is named, and a bridge started there would find no socket and no humanize.
+
+        Args:
+          anchor: Where this agent's turns land.
+
+        Returns:
+          It, or a copy naming the bridge as a program that runs here. The socket itself needs
+          no naming: it is outside the workspace, and what is outside the workspace is this
+          machine's already.
+        """
+        from dataclasses import replace
+
+        if self._toolbox.empty():
+            return anchor
+        held = self._toolbox.command()[0]
+        if held in anchor.local_execs:
+            return anchor
+        return replace(anchor, local_execs=(*anchor.local_execs, held))
 
     @property
     def sessions(self) -> list[SessionBase]:

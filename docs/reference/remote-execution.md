@@ -91,8 +91,8 @@ the agent once it exits, and when the session ends nothing it started is left ru
 
 - The agent's own runtime executables and re-execs. For an npm-installed Codex, that includes
   Node, the native CLI and its code-mode host.
-- Its state directory. All eleven known CLIs are known by name — `agy`, `claude`, `codex`,
-  `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen`, `zcode` — as is humanize's own
+- Its state directory. All twelve known CLIs are known by name — `agy`, `claude`, `codex`,
+  `cursor`, `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen`, `zcode` — as is humanize's own
   `~/.humanize`; any other agent keeping state inside the workspace has to be named with
   `--local-path`.
 - Anything named as a local path (`--local-path`) or a local program (`--local-exec`).

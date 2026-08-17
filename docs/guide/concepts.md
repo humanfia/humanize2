@@ -13,9 +13,9 @@ run of a flow is a **cycle**; an agent's turns land on a **machine** and may run
 ## Backend
 
 A coding agent CLI that is installed on this machine and that humanize knows how to drive.
-There are eleven: `agy` (Antigravity CLI), `claude` (Claude Code), `codex`, `dsh` (DeepSeek
-Harness), `grok` (Grok Build), `kimi` (Kimi Code), `mimo` (mimocode), `opencode`, `pi`, `qwen`
-(Qwen Code) and `zcode` (ZCode). You can also add any CLI of your own that speaks the [Agent
+There are twelve: `agy` (Antigravity CLI), `claude` (Claude Code), `codex`, `cursor` (Cursor
+Agent), `dsh` (DeepSeek Harness), `grok` (Grok Build), `kimi` (Kimi Code), `mimo` (mimocode),
+`opencode`, `pi`, `qwen` (Qwen Code) and `zcode` (ZCode). You can also add any CLI of your own that speaks the [Agent
 Client Protocol](/reference/agents#a-cli-of-your-own), at `/providers`.
 
 humanize does not talk to a model provider. It drives the CLI you already have, logged in the

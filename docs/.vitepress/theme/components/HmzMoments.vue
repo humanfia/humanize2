@@ -35,6 +35,20 @@ const MOMENTS: Moment[] = [
     everywhere: true,
   },
   {
+    name: 'SubagentStart',
+    about: 'the agent has started an agent of its own',
+    carries: 'tool · about · under',
+    refusable: '',
+    everywhere: false,
+  },
+  {
+    name: 'SubagentStop',
+    about: 'one of those has come back',
+    carries: 'tool · about · under',
+    refusable: '',
+    everywhere: false,
+  },
+  {
     name: 'PermissionRequest',
     about: 'the backend is asking whether a tool may run',
     carries: 'tool · about · input',

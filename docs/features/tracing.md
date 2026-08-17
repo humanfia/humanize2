@@ -96,7 +96,7 @@ about the backend, kept where every other fact about it is.
 Several more write a log humanize reads *as a run happens*, which is where the running cost and
 rate come from. And a backend that keeps its conversation in a database — rows rather than
 files, with protobuf payloads — has nothing to read either way: no slices afterwards, and no
-tally while it runs. Which of them is which is on [Eleven CLIs, one agent](/features/backends).
+tally while it runs. Which of them is which is on [Twelve CLIs, one agent](/features/backends).
 
 ## Where the detail is
 

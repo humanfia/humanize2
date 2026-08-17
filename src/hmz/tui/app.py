@@ -99,7 +99,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from hmz.agents import AgentBase, Event, Question, SessionBase
+    from hmz.agents import AgentBase, Board, Event, Question, SessionBase
     from hmz.flows import Place
 
 #: What the editor understands, named as opencode names them, one step along: what answers
@@ -1706,31 +1706,61 @@ class Humanize(App[None]):
                 self._models,
                 self._monitor,
                 self._config,
-                drawn=self._boxes(),
+                drawn=self._boxes,
                 reading=self._attached,
+                board=self._board,
             )
         )
         if reading is not None:
             self._now_reading(reading)
             self._draw()
 
-    def _boxes(self) -> list[Drawn]:
-        """The agents of the run as the diagram draws them, in the order the flow takes them.
+    def _board(self) -> Board | None:
+        """The board this run has, or None for one whose flow does not talk to the person.
+
+        The person's rather than the flow's: a flow is a function that returns, and the board
+        outlives any one turn of it -- so it is held by the one agent of a run that nobody
+        chose and nothing takes a turn of.
 
         Returns:
-          One apiece, and nothing at all with no flow running -- which is a sheet about what
-          is set up rather than about what it is doing.
+          The board, or None where the flow being run declares no person.
+        """
+        from hmz.agents import HumanAgent
+
+        held = self._agents or self._ran
+        return next(
+            (one.board for one in held if isinstance(one, HumanAgent)),
+            None,
+        )
+
+    def _boxes(self) -> list[Drawn]:
+        """The agents that have worked, as the diagram draws them, in the flow's own order.
+
+        The ones that have worked rather than the ones the flow declares. A flow may drive
+        ten agents and reach three of them, and seven boxes that have never done anything are
+        seven rows saying nothing -- the diagram is what the run *is doing*, and a flow is a
+        Python file that may never take the branch the other seven are on. Each appears as
+        its first turn starts and stays for the rest of the run, which is what makes this a
+        picture of the run growing rather than a list of what was configured.
+
+        Returns:
+          One per agent that has taken a turn, in the order the flow takes them, and nothing
+          at all before the first turn of a run -- which is a sheet about what is set up
+          rather than about what it is doing.
         """
         named = self._named_by
+        shape = self._monitor.shape()
         return [
             Drawn(
                 who=agent.id,
                 named=named[at] if at < len(named) else "",
                 runs=self._models[at].spec if at < len(self._models) else "",
-                working=any(one in self._working for one in agent.sessions),
+                working=working,
                 reading=agent.id == self._attached,
             )
             for at, agent in enumerate(self._driven())
+            if (working := any(one in self._working for one in agent.sessions))
+            or shape.turns.get(agent.id, 0)
         ]
 
     @on(Editor.Sent)
@@ -2506,11 +2536,11 @@ class Humanize(App[None]):
 
     @work
     async def action_fallback(self) -> None:
-        """Opens where a turn goes when what was taking it cannot, which is `/fallback`.
+        """Opens where a turn goes when the place taking it cannot, which is `/fallback`.
 
-        Its own menu rather than a row of the accounts, because half of it is not about
-        accounts at all: an agent that has nowhere left to run falls back to a whole other
-        agent, and that is written between the two rather than on either.
+        Its own menu rather than a row of the accounts, because it is not about accounts: a
+        place is a CLI, an account and a model, and a turn with nowhere left to run is taken
+        at another place entirely -- written between the two rather than on either.
 
         Not refused while a flow runs, as the accounts are not: what is written down here is
         read by a turn that has failed, so a step added now is one the next failure walks.
@@ -2721,7 +2751,7 @@ class Humanize(App[None]):
             self.show("hmz: a flow is already running", "red")
             return
         try:
-            path, chosen, task, _ = flow_and_agents(argv)
+            path, chosen, task, _, container = flow_and_agents(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
         try:
@@ -2736,7 +2766,9 @@ class Humanize(App[None]):
             # through this interface like everything else. How the flow itself is set up
             # goes with them: it is a setting of the flow rather than of any agent, so it
             # is not on the line that says what each of them runs.
-            runner = Runner(path, chosen, self._config, resume=resume)
+            runner = Runner(
+                path, chosen, self._config, resume=resume, container=container
+            )
         except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
             self.show(f"hmz: {why}", "red")
             return
@@ -2915,6 +2947,24 @@ class Humanize(App[None]):
                 f"{_DOT}{escape(short(agent.id))}[/]",
                 packs=False,
             )
+        elif event.kind in ("subagent", "subagent-ends"):
+            # An agent this one started of its own. Counted whether or not the details are
+            # being shown, since `/status` draws the fleet under the agent that started it
+            # and a fleet nobody counted would be an agent working with nothing under it.
+            named, _, about = event.text.partition(" ")
+            if event.kind == "subagent":
+                self._monitor.started(agent.id, event.whose, about or named)
+            else:
+                self._monitor.finished(agent.id, event.whose, about or named)
+            if self._details:
+                self._on_screen(
+                    self._part,
+                    whose,
+                    f"[$secondary]{_SAID}[/] {escape(named)}"
+                    f"[dim]({escape(about)}) "
+                    f"{'started' if event.kind == 'subagent' else 'done'}[/]",
+                    packs=True,
+                )
         elif event.kind == "tool" and self._details:
             # The tool on the bullet, what it came back with under it -- Claude Code's shape.
             named, _, about = escape(event.text).partition(" ")

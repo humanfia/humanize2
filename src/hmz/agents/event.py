@@ -207,11 +207,17 @@ class Event:
       kind: What was said. `text` is the agent talking, `reasoning` is it thinking aloud,
         `tool` is it using one, and `result` is the answer the turn ends on -- exactly one
         of which closes a turn. `failed` closes it the other way, carrying what went wrong
-        in place of an answer. A watcher sees four more: `begins` and `ends`, which bracket
-        the turn itself, `asks`, which is the agent stopping to ask its user something, and
+        in place of an answer. A watcher sees five more: `begins` and `ends`, which bracket
+        the turn itself, `asks`, which is the agent stopping to ask its user something,
         `took`, which is the agent saying that a word put into the turn is now in front of
-        it -- carrying that word, so that whoever said it knows which one landed.
-      text: The words themselves, ready to be shown.
+        it -- carrying that word, so that whoever said it knows which one landed -- and
+        `subagent` and `subagent-ends`, which bracket an agent this one started of its own.
+      text: The words themselves, ready to be shown. For a `subagent` it is what the agent
+        under this one is called and what it was asked to do.
+      whose: Which of a turn's several things this is about, where a turn has several going
+        at once: the backend's own id for a subagent, so that the one that started and the
+        one that ended read as one agent. Empty for everything else, a turn having one of
+        each of those.
       tokens: What the turn cost, as tokens spent per model. Only a `result` carries it, and
         only from a backend that says.
       spent: The same cost, by the kind of token it went on rather than by model -- what a
@@ -221,6 +227,7 @@ class Event:
 
     kind: str
     text: str
+    whose: str = ""
     tokens: Mapping[str, int] = field(default_factory=dict[str, int])
     spent: Usage = field(default_factory=Usage)
 

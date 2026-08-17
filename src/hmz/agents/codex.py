@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from .base import AgentBase, SessionBase
 from .config import PERMISSIONS, AgentConfig
 from .event import Event, Failed, Question, Usage, say
-from .hooks import EVERYWHERE, Moment, Occasion
+from .hooks import EVERYWHERE, SUBAGENTS, Moment, Occasion
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -186,6 +186,13 @@ _ABOUT = {
     "subAgentActivity": "agentPath",
     "webSearch": "query",
 }
+
+#: The item that is an agent of codex's own rather than a tool it ran. Read off the item's own
+#: kind rather than off what it is shown as: `dynamicToolCall` and `mcpToolCall` are shown as
+#: `Task` too, and neither of them has agents under it. `subAgentActivity` is not here either
+#: -- it is what one of these says while it works rather than one of them starting, and a row
+#: per activity would be a fleet of one agent drawn as ten.
+_FLEET = ("collabAgentToolCall",)
 
 #: What the items every other backend also has are called there, so that one flow's transcript
 #: reads as one transcript -- and so an interface picks the icon it picks for that tool anywhere
@@ -508,6 +515,18 @@ class _AppServer:
                                 thought = " ".join(str(part) for part in parts)
                                 if thought.strip():
                                     yield Event(kind="reasoning", text=thought)
+                            elif kind in _FLEET:
+                                # An agent of its own rather than a tool it ran: both ends of
+                                # it are said, since what is under this turn is a fleet and a
+                                # fleet that never finished would read as one still working.
+                                about = str(item.get(_ABOUT.get(kind, "")) or "")
+                                yield Event(
+                                    kind="subagent-ends" if done else "subagent",
+                                    text=f"{_CALLED.get(kind, kind)} {about}".strip()[
+                                        :120
+                                    ],
+                                    whose=str(marked or ""),
+                                )
                             elif kind not in (*_TALKING, *_OURS) and not twice:
                                 # Every other item is the agent reaching for something, and
                                 # every one of them is shown: a turn spends its minutes here,
@@ -937,6 +956,10 @@ class CodexSession(SessionBase):
     #: in it, so the shape is asked for where the turn is started rather than in the prompt.
     shapes: ClassVar[bool] = True
 
+    #: An app server takes a tool server as a `-c` of its own, so a flow's own callbacks
+    #: reach this turn without a line being written into anybody's `config.toml`.
+    takes_tools: ClassVar[bool] = True
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:
@@ -1106,7 +1129,9 @@ class CodexAgent(AgentBase):
     never asked, and a hook hung on that moment never fires.
     """
 
-    moments: ClassVar[frozenset[Moment]] = EVERYWHERE | {Moment.PERMISSION_REQUEST}
+    moments: ClassVar[frozenset[Moment]] = (
+        EVERYWHERE | SUBAGENTS | {Moment.PERMISSION_REQUEST}
+    )
 
     service_tiers = ("default", "fast")
 
@@ -1125,6 +1150,10 @@ class CodexAgent(AgentBase):
         #: Which account the server up now was started as, so that an agent which has fallen
         #: back starts another rather than going on talking to one signed in as somebody else.
         self._server_as = ""
+        #: Whether the server now up was started knowing about the flow's own callbacks: an
+        #: app server is told about its tool servers where it is started, so one that was
+        #: started without them has never heard of them.
+        self._server_tools = False
         self._serving = threading.Lock()
 
     def disable_goals(self) -> None:
@@ -1156,10 +1185,14 @@ class CodexAgent(AgentBase):
         with (
             self._serving
         ):  # two sessions of one agent share the server rather than start two
-            if self._server is not None and self._server_as != self.node().name:
-                # Started as an account this agent has since left. Let go of rather than
-                # taken down: a turn on another thread may still be talking to it, and it is
-                # stopped by its own finalizer when the agent is collected either way.
+            offering = not self.toolbox.empty()
+            if self._server is not None and (
+                self._server_as != self.node().name or self._server_tools != offering
+            ):
+                # Started as an account this agent has since left, or before the flow put a
+                # callback of its own in front of it. Let go of rather than taken down: a
+                # turn on another thread may still be talking to it, and it is stopped by its
+                # own finalizer when the agent is collected either way.
                 self._server, self._server_as = None, ""
             if self._server is None:
                 argv = ["codex", "app-server"]
@@ -1180,13 +1213,25 @@ class CodexAgent(AgentBase):
                     # window asked for here is this agent's, and the user's config.toml is
                     # left exactly as it was.
                     argv += ["-c", f"{key}={value}"]
+                if offering:
+                    # The flow's own callbacks, as the one thing Codex takes a tool it was
+                    # not shipped with on. Scoped to this server for the reason the overrides
+                    # are: nothing of the user's `config.toml` is written, and no other Codex
+                    # they are running is told about a tool that belongs to this flow.
+                    held = self.toolbox.command()
+                    argv += [
+                        "-c",
+                        f"mcp_servers.humanize.command={json.dumps(held[0])}",
+                        "-c",
+                        f"mcp_servers.humanize.args={json.dumps(held[1:])}",
+                    ]
                 # Read before the environment is built out of it: a fallback landing
                 # between the two reads would name the account this server is *not* signed
                 # into, and a server that believes it is already elsewhere is one nothing ever
                 # starts again.
                 account = self.node().name
                 self._server = _AppServer(self.spawned(argv), self._environ())
-                self._server_as = account
+                self._server_as, self._server_tools = account, offering
                 self._server._held.append(weakref.ref(self))
                 # Held by the finalizer alone, which is what takes the server down: when the
                 # agent is collected, and at exit for one held to the end.

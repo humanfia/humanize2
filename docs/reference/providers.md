@@ -204,7 +204,6 @@ hmz providers add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] [--also
 hmz providers login <cli>/<name> [-s VAR=VALUE]...
 hmz providers show <cli>/[<name>]
 hmz providers falls-back <cli>/[<name>] [<name>]
-hmz providers retry <cli>/[<name>] [-n <tries>] [-p <policy>] [-t <seconds>]
 hmz providers remove <cli>/<name>
 ```
 
@@ -213,8 +212,8 @@ directory, so it is letters, digits, dot, dash and underscore, starting with a l
 
 `<cli>/` — a backend and no name at all — is **the account this machine is already signed
 into**: an account of every backend, which humanize did not make and keeps no credentials for.
-`show`, `falls-back` and `retry` take it; `add`, `login` and `remove` refuse it, there being
-nothing to make, sign in or take away.
+`show` and `falls-back` take it; `add`, `login` and `remove` refuse it, there being nothing to
+make, sign in or take away.
 
 | Command | |
 | --- | --- |
@@ -222,9 +221,8 @@ nothing to make, sign in or take away.
 | `ways` | How that backend can be signed into: each way, what it asks for, and what it runs. |
 | `add` | Makes one. `-w` chooses the way — the backend's first when nothing says otherwise, which is `login` for the CLIs that sign in and `key` for `dsh` — and `-s` answers one of its questions on the line rather than being asked. Then it runs the way's own command, unless `--no-login` says only to write it down. `--also` writes the same account down for the backends it names, comma separated, or for every one it could be run as with `all`. |
 | `login` | Signs an existing one in again, by the way it was made with. For a way that has nothing to run, `add` it again instead. |
-| `show` | What one holds: the way, when it was made, where it is kept, what it falls back to, how a failed turn under it is tried again, the **names** of the variables it sets, which paths a turn under it is given instead of which, and an `also runs` line per [other backend](#one-account-several-clis) that could be run as it. |
-| `falls-back` | Says which account of that CLI a turn carries on under when this one fails, or — with nothing after it — that this one is the end of the line. |
-| `retry` | Says how a failed turn under it is tried again before the chain moves on: `-n` how many times over, `-p` which wait, `-t` the longest the whole of it may go on for. |
+| `show` | What one holds: the way, when it was made, where it is kept, what it falls back to, the **names** of the variables it sets, which paths a turn under it is given instead of which, and an `also runs` line per [other backend](#one-account-several-clis) that could be run as it. |
+| `falls-back` | Says which account of that CLI a turn carries on under when this one fails, or — with nothing after it — that this one is the end of the line. How many times over a failed turn is taken again first is [`hmz fallback retry`](/guide/fallback), that being a thing about the place rather than the account. |
 | `remove` | Takes it away, credentials and all. |
 
 Whatever a way asks that the line did not answer is asked at the terminal, and a secret is not
@@ -391,7 +389,6 @@ from hmz import providers
 held = providers.find("claude", "subscription")
 providers.chain(held)                       # [subscription, key, gateway]
 providers.points("claude", "", "subscription")   # "" is the machine's own account
-providers.retrying("claude", "key", 3, "exponential-jitter", 120.0)
 providers.alone("claude")                   # where what is said about the machine's own is kept
 ```
 

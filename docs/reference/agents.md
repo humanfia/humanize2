@@ -28,6 +28,7 @@ name the interface shows. The classes keep the product's own full name.
 | `agy` | `AntigravityCLIAgent` | `AntigravityCLIAgentConfig` | `AntigravityCLISession` |
 | `claude` | `ClaudeCodeAgent` | `ClaudeCodeAgentConfig` | `ClaudeCodeSession` |
 | `codex` | `CodexAgent` | `CodexAgentConfig` | `CodexSession` |
+| `cursor` | `CursorAgent` | `CursorAgentConfig` | `CursorSession` |
 | `dsh` | `DshAgent` | `DshAgentConfig` | `DshSession` |
 | `grok` | `GrokBuildAgent` | `GrokBuildAgentConfig` | `GrokBuildSession` |
 | `kimi` | `KimiCodeCLIAgent` | `KimiCodeCLIAgentConfig` | `KimiCodeCLISession` |
@@ -42,24 +43,23 @@ name the interface shows. The classes keep the product's own full name.
 ## When an account goes down
 
 A key gets revoked, a gateway starts refusing, a subscription runs out of quota — and what a
-flow would otherwise see is a turn that failed. Two things happen first, and both are said on
-the account rather than on the agent: it is the account that goes down, and whichever agent
-was running under one when it did is the agent that needs somewhere else to run.
+flow would otherwise see is a turn that failed. Two things happen first.
 
-**It is tried again.** An account says how many times over a failed turn is taken again, how
-long to wait between tries, and how long the whole of that may go on for:
+**It is tried again.** How many times over a failed turn is taken again, how long to wait
+between tries, and how long the whole of that may go on for are said about the **place** the
+turn runs at — the CLI, the account and the model — rather than about the credentials:
 
 ```sh
-hmz providers retry claude/mine -n 3 -p exponential-jitter -t 120
+hmz fallback retry claude@mine/claude-opus-5 3 -p exponential-jitter -t 120
 ```
 
 Nothing is retried by default — a turn is taken once, as it always was — because a prompt the
-model refused is the same refusal every time, and only you know which of your accounts fails
-the other way. The waits are the ones everybody uses: `none`, `constant`, `linear`,
-`exponential`, `exponential-jitter` (full jitter, which is what keeps a flow's agents from all
-coming back on the same second) and `fibonacci`.
+model refused is the same refusal every time, and only you know which of your places fails the
+other way. The waits are the ones everybody uses: `none`, `constant`, `linear`, `exponential`,
+`exponential-jitter` (full jitter, which is what keeps a flow's agents from all coming back on
+the same second) and `fibonacci`.
 
-**Some failures are taken once whatever the account says.** A backend that knows its own
+**Some failures are taken once whatever the step says.** A backend that knows its own
 failure cannot come out differently says so by raising `hmz.agents.Unrecoverable`, and that
 one is neither retried nor carried to the next account in the chain. A conversation longer
 than the model's context window is that long again on the next try; a backend that will not
@@ -68,8 +68,9 @@ account set to retry would otherwise take those on its own schedule for as long 
 left the flow running. It is a `subprocess.CalledProcessError` like every other failed turn,
 so a flow that catches turns catches it.
 
-**Then the chain moves on.** Each account names the one to carry on under when it has failed,
-and that one names the next:
+**Then the chain moves on.** This half is said on the account rather than on the agent: it is
+the account that goes down, and each account names the one to carry on under when it has
+failed, and that one names the next:
 
 ```sh
 hmz providers falls-back claude/subscription key
@@ -77,8 +78,7 @@ hmz providers falls-back claude/key gateway
 ```
 
 so a subscription that runs out falls to a key, and a key that is refused falls to a gateway.
-`/providers`, cursor on the account, then **enter**: *falls back to* asks the same thing, and
-*how it is tried again* asks the other.
+`/providers`, cursor on the account, then **enter**: *falls back to* asks the same thing.
 
 **An agent with no account has a chain too.** The account this machine is already signed into
 is an account here as well — `claude/`, a backend and no name at all — so it is where the
@@ -86,7 +86,6 @@ chain of an agent nobody configured begins:
 
 ```sh
 hmz providers falls-back claude/ spare     # your own login, then the key
-hmz providers retry claude/ -n 2
 ```
 
 It is an account for that purpose and nothing else: humanize did not make it, keeps no
@@ -95,29 +94,29 @@ the environment, nothing taken out of it, no path answered by another. Nothing m
 *to* it, either: an agent that is to try it is an agent given no account, which is where its
 chain already starts.
 
-## When the agent has nowhere left to run
+## When the place has nowhere left to run
 
 Some failures no account answers. The model was retired this morning, the CLI will not start,
 the region has gone dark, the rate limit is on the whole account rather than on one request.
 Another key for the same backend is another way of asking the same thing that is not there.
 
-What answers those is another agent, and it is written down
-[between the two](/guide/fallback) rather than on either:
+What answers those is another **place** — a CLI, an account and a model — and it is written
+down [between the two](/guide/fallback) rather than on either:
 
 ```sh
-hmz fallback add claude@work/claude-opus-5:high codex@key/gpt-5.6-sol:high
+hmz fallback add claude@work/claude-opus-5 codex@key/gpt-5.6-sol
 ```
 
 ```python
-agent.spec          # 'claude@work/claude-opus-5:high' -- how a fallback names it
+agent.spec          # 'claude@work/claude-opus-5' -- the place it runs at
 agent.stands_in()   # the agent that takes its turns, or None where nothing was written down
 ```
 
 It is the last thing a turn tries, after the retries and after the account chain, and the
 reason is the conversation. No backend takes another backend's session id, so the turn that
-moves is taken in a **new session** of the agent it moved to — carrying the skills the flow
-gave the agent it left, and answering back through the session that asked, so the flow sees
-one turn either way.
+moves is taken in a **new session** at the place it moved to — by an agent configured exactly
+as the one it left, carrying that agent's effort, its permission rung and the flow's skills,
+and answering back through the session that asked, so the flow sees one turn either way.
 
 That session is opened once and held for as long as the one that asked for it, and ends when
 it does. The conversation is lost at the move and not every turn after it: a stateful loop
@@ -164,6 +163,12 @@ think, so neither is offered: both rows read `as configured`, and the agent runs
 installed it set it up. It cannot be steered mid-turn either — every agent spells that
 extension its own way — and it has no goal feature, no permission rungs and no logs for
 `hmz trace collect` to read.
+
+`cursor` names one out of its own catalogue — `cursor-agent --list-models` prints them — and
+its models take their parameters in brackets after the name, which is where humanize writes the
+effort and the service tier: `composer-2.5[effort=high,fast=false]`. A model already written
+with a bracket of its own is passed exactly as it was written, so a flow that wanted
+`claude-opus-4-8[context=1m,effort=high]` gets it.
 
 `pi`, `opencode`, `mimo` and `zcode` name a model as `provider/id` — `openai-codex/gpt-5.5`,
 `opencode/big-pickle`, `xiaomi/mimo-v2.5`, `zai/glm-5.3` — because a model there belongs to the
@@ -262,7 +267,7 @@ different things.
 | `qwen` | `--exclude-tools web_search,web_fetch` when off |
 | `opencode`, `mimo` | `webfetch: deny` in its permission table when off |
 | `zcode` | `WebSearch` and `WebFetch` in the session's `toolDenylist` when off |
-| `agy`, `dsh`, `kimi`, `pi` | no way of being told — off is refused |
+| `agy`, `cursor`, `dsh`, `kimi`, `pi` | no way of being told — off is refused |
 
 A backend with no way of being told **refuses it off**, wherever the config arrives — where the
 agent is made, and where one already running is set up as something else. An agent that quietly
@@ -632,6 +637,8 @@ on the **agent**, so one covers every session it holds, and hanging one mid-run 
 | `SESSION_START` | a session is about to take its first turn | — |
 | `USER_PROMPT_SUBMIT` | a prompt is about to go to the agent | `refused` skips the turn; `adds` goes into the prompt |
 | `PRE_TOOL_USE` | the agent has reached for a tool | — |
+| `SUBAGENT_START` | the agent has started an agent of its own | — |
+| `SUBAGENT_STOP` | one of those has come back | — |
 | `PERMISSION_REQUEST` | the backend is asking whether a tool may run | `refused` denies it, with `because` as the reason |
 | `NOTIFICATION` | the agent has stopped to ask its user something | — |
 | `STOP` | a turn has ended | `refused` sends the agent on, with `because` as the next prompt |
@@ -648,9 +655,27 @@ def keep_going(occasion: Occasion) -> Verdict | None:
     return None
 ```
 
-A hook is told an `Occasion` — `moment`, `agent`, `session`, `prompt`, `tool`, `about`, `input`,
-`said`, `again` — and answers with a `Verdict` or with `None`, which says nothing. Two hooks on
-one moment are one verdict: refused if either refused, and adding everything either added.
+A hook is told an `Occasion` — `moment`, `agent`, `session`, `prompt`, `tool`, `about`, `under`,
+`input`, `said`, `again` — and answers with a `Verdict` or with `None`, which says nothing. Two
+hooks on one moment are one verdict: refused if either refused, and adding everything either
+added.
+
+The two moments about a **fleet** are the agents an agent starts of its own — Claude's `Task`,
+Codex's collab agent, Cursor's task tool. `tool` is what that agent is called, `about` is what
+it was asked to do, and `under` is the backend's own id for it, which is what pairs the one
+that started with the one that came back:
+
+```python
+def counted(occasion: Occasion) -> None:
+    started[occasion.under] = occasion.about
+
+agent.hooks.on(Moment.SUBAGENT_START, counted)
+```
+
+They are told rather than answered: no backend here waits to be told whether it may start one,
+so a refusal would be a verdict that goes nowhere. The same events reach a watcher as
+`subagent` and `subagent-ends`, and the interface draws them
+[under the agent that started them](/guide/status).
 
 A hook that raises has said nothing. A flow must not fail because something hung off it did —
 with one exception: a hook that drove an agent which has been [stopped](#stopping) lets
@@ -661,18 +686,26 @@ with one exception: a hook that drove an agent which has been [stopped](#stoppin
 `agent.moments` is what this one runs, and `hooks.on` refuses a moment that is not in it —
 where the hook is hung, rather than by quietly never firing.
 
-| Moment | Claude Code | Codex | Kimi Code | ZCode | you |
-| --- | --- | --- | --- | --- | --- |
-| everything above except `PERMISSION_REQUEST` | yes | yes | yes | yes | no |
-| `PERMISSION_REQUEST` | yes | yes | no | yes | no |
+| Moment | Claude Code | Codex | Cursor | Kimi Code | ZCode | you |
+| --- | --- | --- | --- | --- | --- | --- |
+| everything above except the three below | yes | yes | yes | yes | yes | no |
+| `PERMISSION_REQUEST` | yes | yes | no | no | yes | no |
+| `SUBAGENT_START`, `SUBAGENT_STOP` | yes | yes | yes | no | no | no |
 
 Claude Code, Codex and ZCode ask before they use a tool — Claude over the same stream the turn
 is read from, Codex and ZCode each through the app server it is driven over — and wait for
 the answer, so those are the three backends here where a refusal reaches the agent. It
 also wants the [`auto` rung](#what-an-agent-may-do), which is the one setting under which any
 of them asks at all. The rest are driven unattended, which is what a flow watching its agent
-rather than gating it means. `HumanAgent` runs none of them: a moment is a point in a turn of
-a model, and the person takes no such turn.
+rather than gating it means.
+
+Claude Code, Codex and Cursor each say on the stream a turn is read from when they start an
+agent of their own and when that one comes back, so those are the three where a fleet is
+visible. The rest either have none or do not say, and a hook hung on it there is refused where
+it is hung.
+
+`HumanAgent` runs none of them: a moment is a point in a turn of a model, and the person takes
+no such turn.
 
 A flow says which moments it needs where it declares the agents it drives, and is refused before
 its first turn if it was given one that cannot run them — see
@@ -732,8 +765,9 @@ sessions under:
 
 ```python
 agent.id       # the name you gave it, the name the flow calls it, or one nothing else answers to
-agent.backend  # "agy", "claude", "codex", "dsh", "grok", "kimi", "mimo", "opencode",
-               # "pi", "qwen", "zcode" — or whatever an ACP CLI of your own was added under
+agent.backend  # "agy", "claude", "codex", "cursor", "dsh", "grok", "kimi", "mimo",
+               # "opencode", "pi", "qwen", "zcode" — or whatever an ACP CLI of your own
+               # was added under
 agent.opened   # the backend's id for every session this agent ever opened, oldest first
 agent.sessions # the ones somebody still holds
 agent.config   # what it runs at
@@ -817,6 +851,7 @@ before the runtime starts unless its effort is `max`, `high` or `off`.
 | `agy` | `low`, `medium`, `high` |
 | `claude` | `low`, `medium`, `high`, `xhigh`, `max`, and `ultracode` |
 | `codex` | `low`, `medium`, `high`, `xhigh`, and `max`/`ultra` on the models that take them |
+| `cursor` | `low`, `medium`, `high` — written into the model rather than sent beside it |
 | `dsh` | `off`, `high`, `max` |
 | `grok` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` — the levels the model itself advertises |
 | `kimi` | `low`, `medium`, `high`, `max`, each also as `swarm…` |
@@ -941,14 +976,16 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 
 ## What each backend can do
 
-| | `agy` | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Driven through | its command line, one run per turn | its command line, held open | its app server | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, one run per turn | its command line, one run per turn | its app server |
-| [`interject`](#talking-to-a-turn-already-running) | no — a run per turn has ended | yes — answered within the same turn | yes — a steer on the running turn | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended | no — a run per turn has ended | no — a second prompt is refused while one is running |
-| [`pursue`](#goals) | no | yes | yes | yes | no | yes | no | no | no | yes |
-| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | yes |
-| A turn held to a shape | `--json-schema` | `--json-schema` | `outputSchema` | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt |
-| Sub-agents in a trace | no | yes | yes | no | no | yes | no | no | no | no |
+| | `agy` | `claude` | `codex` | `cursor` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Driven through | its command line, one run per turn | its command line, held open | its app server | its command line, one run per turn | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, one run per turn | its command line, one run per turn | its app server |
+| [`interject`](#talking-to-a-turn-already-running) | no — a run per turn has ended | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended | no — a run per turn has ended | no — a second prompt is refused while one is running |
+| [`pursue`](#goals) | no | yes | yes | no | yes | no | yes | no | no | no | yes |
+| [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | no | yes |
+| [`SubagentStart`/`SubagentStop`](#not-every-backend-runs-every-moment) | no | yes | yes | yes | no | no | no | no | no | no | no |
+| [Callbacks as tools](#callbacks-of-the-flow-s-own) | no | `--mcp-config` | `-c mcp_servers…` | no | no | no | no | no | no | no | no |
+| A turn held to a shape | `--json-schema` | `--json-schema` | `outputSchema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt |
+| Sub-agents in a trace | no | yes | yes | no | no | no | yes | no | no | no | no |
 
 DeepSeek Harness currently accepts only `permission="bypass"`. Its preview
 SDK exposes neither a per-session sandbox/approval control nor exact per-agent skill selection;
@@ -1036,12 +1073,12 @@ interface it is the `permission` row of the sheet an agent is set up on, stepped
 Every backend has a ladder of its own and none of them has the same four rungs, so each driver
 reaches for whichever of its own settings says the same thing:
 
-| Rung | `agy` | `claude` | `codex` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `read-only` | refused | `plan` mode | `read-only` sandbox | — | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied | `plan` mode |
-| `workspace-write` | refused | `acceptEdits` mode | `workspace-write` sandbox | — | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied | `edit` mode |
-| `auto` | `--dangerously-skip-permissions` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | — | — | — | nothing denied | `build` mode, which asks before a tool with side effects |
-| `bypass` | `--dangerously-skip-permissions` | `bypassPermissions` | `danger-full-access` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — | `yolo` mode |
+| Rung | `agy` | `claude` | `codex` | `cursor` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `read-only` | refused | `plan` mode | `read-only` sandbox | `--mode plan` | — | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied | `plan` mode |
+| `workspace-write` | refused | `acceptEdits` mode | `workspace-write` sandbox | `--sandbox enabled` | — | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied | `edit` mode |
+| `auto` | `--dangerously-skip-permissions` | Claude's own `auto` mode | `workspace-write`, approvals on request | `--auto-review`, its own classifier | — | — | — | — | — | nothing denied | `build` mode, which asks before a tool with side effects |
+| `bypass` | `--dangerously-skip-permissions` | `bypassPermissions` | `danger-full-access` | `--force --sandbox disabled` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — | `yolo` mode |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one. Where a backend cannot tell two rungs apart it says so
@@ -1123,12 +1160,73 @@ a project's own skills for as long as the session lives, and taken away again af
 | --- | --- |
 | `claude` | `.claude/skills/` in the workspace |
 | `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen`, `zcode` | `.agents/skills/`, the directory more than one of these agreed to read |
+| `cursor` | `.cursor/skills/` in the workspace |
 | `agy`, `dsh`, `pi` | — none: none of them reads such a directory the way humanize drives it |
 
 A project's own skill of that name wins: a flow does not write over what the project keeps.
 They go into the workspace on this machine, so an agent [whose turns land
 elsewhere](#where-the-turns-land) is given them only where that machine reads this directory —
 a container that was handed this workspace does; one across a network keeps its own.
+
+## Callbacks of the flow's own
+
+A flow drives an agent by saying things to it. **Tools are the other direction**: a function
+the flow wrote, put in front of the agent, so that the agent reaching for it is the flow's own
+code running — in the flow's process, with the flow's variables — and what it answers is what
+the agent reads back.
+
+```python
+from pydantic import BaseModel, Field
+from hmz.agents import Tool
+
+
+class Reviewing(BaseModel):
+    path: str = Field(description="the file to have read")
+
+
+session = agent.new()
+session.offers(
+    [
+        Tool(
+            name="review",
+            about="have the reviewer read a file and say what is wrong with it",
+            takes=Reviewing,
+            call=lambda said: reviewer(f"review {said.path}"),
+        )
+    ]
+)
+session("write the parser, and have your work reviewed before you stop")
+```
+
+Which is what makes an agent able to **call a flow**: a callback whose body is
+`load("official/rlar")(agents, said.task)` is an agent that starts a loop of its own and waits
+for what it comes to, and nothing about that is written into any backend.
+
+| | |
+| --- | --- |
+| `name` | what the agent calls it |
+| `about` | what it is for, said to the model — the whole of what it knows about when to reach for it |
+| `takes` | a pydantic model of what it is called with, or `None` for a tool that takes nothing. The model is the whole of what the agent is told: its fields, their types, which are required and each description are already in it |
+| `call` | what to run — given the model, and nothing where `takes` is `None`. What it answers goes back as text; `None` is a tool that did something |
+
+`session.offers(None)` takes them back. It is said on a **conversation**, because that is where
+a flow is when it has something to offer — but a CLI is told about its tools where it is
+started, and some of these are started once per agent, so what is actually offered is the
+agent's: two conversations offering a tool of one name are offering one tool.
+
+The road between the two is the **Model Context Protocol**, that being the one way every one of
+these CLIs takes a tool it was not shipped with. What a backend is handed is a command to run —
+`hmz tools --at <socket>` — which relays its pipe back to the flow's process. Nothing is
+started until something is offered: an agent whose flow hands it no callbacks has no socket, no
+thread and no bridge.
+
+**A callback that raises is the tool failing, not the flow.** The model is told what went
+wrong, in words, and may call it again correctly; a flow must not end because a model called
+one of its tools wrongly.
+
+`session.takes_tools` is `False` on a backend with no way of being told, and `offers` raises
+`NotImplementedError` there rather than quietly never offering it — see
+[what each backend can do](#what-each-backend-can-do).
 
 ## Where the turns land
 

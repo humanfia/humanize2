@@ -16,6 +16,7 @@ from .base import (
     SessionBase,
     StreamSessionBase,
 )
+from .board import ANYONE, FLOW, USER, WHOSE, Board, Item, Refused
 from .claude import ClaudeCodeAgent, ClaudeCodeAgentConfig, ClaudeCodeSession
 from .codex import CodexAgent, CodexAgentConfig, CodexSession
 from .config import (
@@ -29,16 +30,28 @@ from .config import (
     anchored,
     isolated,
 )
+from .cursor import CursorAgent, CursorAgentConfig, CursorSession
 from .dsh import DshAgent, DshAgentConfig, DshSession
 from .event import Event, Failed, Question, Stopped, Unrecoverable, Usage
 from .grok import GrokBuildAgent, GrokBuildAgentConfig, GrokBuildSession
-from .hooks import EVERYWHERE, Hook, Hooks, Hung, Moment, Occasion, Unhooked, Verdict
+from .hooks import (
+    EVERYWHERE,
+    SUBAGENTS,
+    Hook,
+    Hooks,
+    Hung,
+    Moment,
+    Occasion,
+    Unhooked,
+    Verdict,
+)
 from .human import HumanAgent, HumanSession
 from .kimi import SWARM, KimiCodeCLIAgent, KimiCodeCLIAgentConfig, KimiCodeCLISession
 from .mimo import MimoCodeAgent, MimoCodeAgentConfig, MimoCodeSession
 from .opencode import OpencodeAgent, OpencodeAgentConfig, OpencodeSession
 from .pi import PiAgent, PiAgentConfig, PiSession
 from .qwen import QwenCodeAgent, QwenCodeAgentConfig, QwenCodeSession
+from .tools import Tool, Toolbox
 from .zcode import ZcodeAgent, ZcodeAgentConfig, ZcodeSession
 
 #: What each coding agent CLI is driven by here, under the name a command line calls it.
@@ -49,6 +62,7 @@ DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
     "agy": (AntigravityCLIAgent, AntigravityCLIAgentConfig),
     "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
     "codex": (CodexAgent, CodexAgentConfig),
+    "cursor": (CursorAgent, CursorAgentConfig),
     "dsh": (DshAgent, DshAgentConfig),
     "grok": (GrokBuildAgent, GrokBuildAgentConfig),
     "kimi": (KimiCodeCLIAgent, KimiCodeCLIAgentConfig),
@@ -85,11 +99,16 @@ def driver(backend: str) -> tuple[type[AgentBase], type[AgentConfig]]:
 
 
 __all__ = [
+    "ANYONE",
     "DRIVEN",
     "EVERYWHERE",
+    "FLOW",
     "PERMISSIONS",
     "SERVICE_TIERS",
+    "SUBAGENTS",
     "SWARM",
+    "USER",
+    "WHOSE",
     "WINDOW",
     "AcpAgent",
     "AcpAgentConfig",
@@ -100,6 +119,7 @@ __all__ = [
     "AntigravityCLIAgent",
     "AntigravityCLIAgentConfig",
     "AntigravityCLISession",
+    "Board",
     "ClaudeCodeAgent",
     "ClaudeCodeAgentConfig",
     "ClaudeCodeSession",
@@ -107,6 +127,9 @@ __all__ = [
     "CodexAgentConfig",
     "CodexSession",
     "CommandSessionBase",
+    "CursorAgent",
+    "CursorAgentConfig",
+    "CursorSession",
     "DshAgent",
     "DshAgentConfig",
     "DshSession",
@@ -122,6 +145,7 @@ __all__ = [
     "HumanSession",
     "Hung",
     "Isolated",
+    "Item",
     "KimiCodeCLIAgent",
     "KimiCodeCLIAgentConfig",
     "KimiCodeCLISession",
@@ -141,10 +165,13 @@ __all__ = [
     "QwenCodeAgent",
     "QwenCodeAgentConfig",
     "QwenCodeSession",
+    "Refused",
     "Remote",
     "SessionBase",
     "Stopped",
     "StreamSessionBase",
+    "Tool",
+    "Toolbox",
     "Unhooked",
     "Unrecoverable",
     "Usage",

@@ -8,7 +8,6 @@
 ├── _trace.py
 ├── login.py
 ├── redirect.py
-├── retry.py
 └── store.py
 ```
 
@@ -34,9 +33,6 @@ class Provider:
     args: tuple[str, ...]
     made: str
     fallback: str
-    retries: int
-    policy: str
-    timeout: float
 
     @property
     def at(self) -> Path: ...
@@ -53,11 +49,6 @@ def alone(cli: str) -> Path: ...
 
 
 def points(cli: str, name: str, at: str) -> bool: ...
-
-
-def retrying(
-    cli: str, name: str, retries: int, policy: str, timeout: float
-) -> bool: ...
 ```
 
 - One provider MUST be one directory, under `~/.humanize/providers/<cli>/<name>/`, holding what
@@ -126,14 +117,10 @@ def retrying(
   nobody configured with an account a chain at all. It MUST NOT end there: `""` in the
   fallback position is the end of the line, and an agent that is to try that account is an
   agent given no account, which is where its chain already starts.
-- An account MUST also say how a turn under it is tried again before the chain moves on: how
-  many times over, how long to wait between tries and how long the whole of it may go on for.
-  Nothing MUST be retried by default -- a turn is taken once, as it always was -- since a
-  prompt the model refused is the same refusal every time and only the caller knows which of
-  its accounts fails the other way.
-- The waits MUST be the ones everybody uses under the names everybody uses them by, and none
-  MUST be invented here. The time an account was given MUST be checked before a wait rather
-  than after it, so that a turn is never started knowing it is already spent.
+- How many times over a failed turn is taken again before the chain moves on MUST NOT be said
+  here. That is a thing about the place a turn runs at -- the CLI, the account and the model --
+  rather than about the credentials it runs with, and `hmz.fallbacks` is the one place both it
+  and where the turn goes next are written. Two places saying it would be two places to drift.
 
 ## `redirect.py` / `_trace.py`
 
@@ -197,27 +184,3 @@ def sign_in(
   writing its credentials file expects the directory it keeps its own in to be there.
 - Nothing here MUST print a secret. What was typed MUST NOT be echoed, and what is shown of a
   provider MUST be the names of the variables it sets and never their values.
-
-## `retry.py`
-
-```python
-@dataclass(frozen=True, slots=True)
-class Policy:
-    name: str
-    about: str
-
-
-POLICIES: tuple[Policy, ...]
-
-
-def waits(policy: str, attempt: int, base: float = BASE) -> float: ...
-```
-
-- What each policy is MUST be written down once, here, and MUST be the shapes every one of
-  these services documents: no wait, a constant one, a linear one, exponential backoff, that
-  with full jitter, and Fibonacci. A name that is not one of them MUST wait the way the
-  default does rather than not at all: a setting nobody recognises MUST NOT become a loop that
-  hammers whatever has just failed.
-- No single wait MUST be longer than a turn, however far the backoff has climbed.
-- The default MUST be exponential backoff with jitter, that being what keeps a flow's agents
-  from all coming back on the same second.

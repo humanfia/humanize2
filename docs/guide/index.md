@@ -25,6 +25,7 @@ These are for looking things up. If you have not used humanize before, the
 | [Many conversations at once](/guide/conversations) | One transcript, **tab** between the agents that are working |
 | [Showing the working](/guide/details) | `/details`: tool calls and thinking, or only what the agent says |
 | [The shape of a run](/guide/status) | `/status`: who is working, who handed to whom, what it cost |
+| [The mission board](/guide/board) | Lines you and the flow both write on, and neither waits at |
 | [Being away](/guide/afk) | `/afk`: whether an agent may stop and ask you something |
 | [Falling back](/guide/fallback) | `/fallback`: where a turn goes when what was taking it cannot |
 | [Completion](/guide/completion) | What a half-typed line could become, under the editor |
@@ -44,6 +45,7 @@ These are for looking things up. If you have not used humanize before, the
 | [Questions](/guide/questions) | An agent stopping mid-turn to ask its user something |
 | [Answers in a shape](/guide/shapes) | A turn that answers with a pydantic model instead of prose |
 | [Hooks](/guide/hooks) | Python callables hung on the moments of a turn |
+| [Callbacks as tools](/guide/tools) | Functions of the flow's own, put in front of the agent |
 | [Cost and rate](/guide/tally) | What has been spent, how fast, and how hard it is thinking |
 | [The person as an agent](/guide/human-agent) | You, driven by a flow like any other agent |
 | [Reporting](/guide/reporting) | What humanize sends its developers, and how to say no |

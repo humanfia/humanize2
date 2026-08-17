@@ -10,16 +10,16 @@ Which is what lets one flow drive two agents of the same CLI as two different ac
 same time: two Claude Codes, one on an Anthropic subscription and one on somebody's gateway,
 each refreshing its own token and neither able to see the other's.
 
-An account also says what happens when it is the one that goes down: how many times a turn
-under it is tried again and how long to wait between tries, and which account to carry on
-under once those are spent. Each naming the next is a chain -- subscription, then key, then
-gateway -- walked inside the session that was running, so a run does not end on the minute one
-vendor did.
+An account also says which account to carry on under when it is the one that goes down. Each
+naming the next is a chain -- subscription, then key, then gateway -- walked inside the
+session that was running, so a run does not end on the minute one vendor did. How many times
+over a turn is tried before that chain moves on is not written here: that is a thing about the
+place a turn runs at rather than about the credentials it runs with, and `hmz.fallbacks` is
+where it is said.
 """
 
 from __future__ import annotations
 
-from . import retry
 from .store import (
     ENV,
     LOCAL,
@@ -36,7 +36,6 @@ from .store import (
     providers,
     ready,
     remove,
-    retrying,
     serves,
     ways,
     where,
@@ -58,8 +57,6 @@ __all__ = [
     "providers",
     "ready",
     "remove",
-    "retry",
-    "retrying",
     "serves",
     "ways",
     "where",

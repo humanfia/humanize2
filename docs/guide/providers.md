@@ -163,7 +163,6 @@ hmz providers add <cli>/<name>       # make one: -w <way>, -s VAR=VALUE, --no-lo
 hmz providers login <cli>/<name>     # sign an existing one in again
 hmz providers show <cli>/<name>      # what it holds — never what the values are
 hmz providers falls-back <cli>/<name> [<name>]   # which account a failed turn carries on under
-hmz providers retry <cli>/<name> -n 3 -p exponential-jitter -t 120
 hmz providers remove <cli>/<name>    # take it away, credentials and all
 ```
 
@@ -337,12 +336,9 @@ An account says what happens when it is the one that fails. Both halves are writ
 it rather than on any agent, because it is the account that goes down, and whichever agent was
 running under one when it did is the agent that needs somewhere else to run.
 
-**Tried again.** How many times over, how long to wait between tries, and how long the whole of
-it may go on for.
-
-Nothing is retried by default. A prompt the model refused is the same refusal every time, and
-only you know which of your accounts fails the other way. The waits are the ones everybody
-uses: `none`, `constant`, `linear`, `exponential`, `exponential-jitter` and `fibonacci`.
+**Tried again first.** How many times over a failed turn is taken again is not written on the
+account: it is a thing about the place the turn runs at rather than about the credentials it
+runs with, so it is said in [`/fallback`](/guide/fallback). Nothing is retried by default.
 
 **Then the chain.** Each account names the one to carry on under, and that one names the next:
 
@@ -356,7 +352,6 @@ name at all. It is where the chain of an agent nobody gave an account begins:
 
 ```sh
 hmz providers falls-back claude/ subscription
-hmz providers retry claude/ -n 2
 ```
 
 So a flow you never configured an account for still has somewhere to go. Nothing may fall back

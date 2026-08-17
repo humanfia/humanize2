@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from hmz import models
-from hmz.backends import profiles, program, speaking
+from hmz.backends import named, profiles, program, speaking
 
 if TYPE_CHECKING:
     from hmz.backends import Model
@@ -71,7 +71,10 @@ def _is_installed(backend: str) -> bool:
     # A CLI somebody added is started by the command they gave rather than by its own name.
     if (added := speaking().get(backend)) is not None:
         return bool(added) and program(added[0]) is not None
-    return program(backend) is not None
+    # And one humanize drives is started by the command it is installed as, which is its own
+    # name unless its profile says otherwise.
+    profile = named(backend)
+    return program(profile.runs() if profile is not None else backend) is not None
 
 
 def ready_to_open(backend: str, where: Path) -> bool:

@@ -2,10 +2,10 @@
 pageClass: hmz-feature
 ---
 
-# Eleven CLIs, one agent
+# Twelve CLIs, one agent
 
 humanize never talks to a model provider. It drives the coding agent CLI you already have,
-logged in the way you already log in — eleven of them, plus anything that speaks the Agent
+logged in the way you already log in — twelve of them, plus anything that speaks the Agent
 Client Protocol. There is no API key for it to hold.
 
 The one exception ships inside it: DeepSeek Harness arrives with humanize, because it has no

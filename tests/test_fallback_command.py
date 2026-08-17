@@ -1,4 +1,4 @@
-"""`hmz fallback` -- the steps between agents, said as arguments rather than walked.
+"""`hmz fallback` -- the steps between places, said as arguments rather than walked.
 
 The store itself is `hmz.fallbacks`, and what a turn does with it is checked where the agents
 are. What is checked here is the line: that it is the same file `/fallback` keeps, that what
@@ -9,12 +9,9 @@ to read one.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import pytest
 
 from hmz import cli, fallbacks
-
-if TYPE_CHECKING:
-    import pytest
 
 
 def run(*argv: str) -> int:
@@ -24,40 +21,38 @@ def run(*argv: str) -> int:
 
 def test_one_written_down_is_one_the_interface_would_find() -> None:
     """One place a thing is kept is one place it is kept, whichever way somebody reached it."""
-    assert run("add", "claude/claude-opus-5:high", "codex/gpt-5.6-sol:high") == 0
+    assert run("add", "claude/claude-opus-5", "codex/gpt-5.6-sol") == 0
 
     assert fallbacks.falls() == [
-        fallbacks.Falls("claude/claude-opus-5:high", "codex/gpt-5.6-sol:high")
+        fallbacks.Falls("claude/claude-opus-5", "codex/gpt-5.6-sol")
     ]
 
 
-def test_an_account_is_part_of_which_agent_this_is() -> None:
-    """Two agents of one CLI at one model on two accounts are two things to say."""
-    assert (
-        run("add", "claude@work/claude-opus-5:high", "codex@key/gpt-5.6-sol:high") == 0
-    )
+def test_a_place_is_three_things_and_the_account_is_one_of_them() -> None:
+    """Two agents of one CLI at one model on two accounts are two places to say."""
+    assert run("add", "claude@work/claude-opus-5", "codex@key/gpt-5.6-sol") == 0
 
-    assert fallbacks.chain("claude@work/claude-opus-5:high") == [
-        "claude@work/claude-opus-5:high",
-        "codex@key/gpt-5.6-sol:high",
+    assert fallbacks.chain("claude@work/claude-opus-5") == [
+        "claude@work/claude-opus-5",
+        "codex@key/gpt-5.6-sol",
     ]
-    # And the same agent as this machine is signed in is a different agent.
-    assert fallbacks.chain("claude/claude-opus-5:high") == ["claude/claude-opus-5:high"]
+    # And the same CLI at the same model as this machine is signed in is another place.
+    assert fallbacks.chain("claude/claude-opus-5") == ["claude/claude-opus-5"]
 
 
 def test_what_one_line_wrote_the_next_reads_back(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """A listing is what there is, one step a line, in the order they were written."""
-    run("add", "claude/a:high", "codex/b:high")
-    run("add", "codex/b:high", "dsh/c:high")
+    run("add", "claude/a", "codex/b")
+    run("add", "codex/b", "dsh/c")
     capsys.readouterr()
 
     assert run("list") == 0
 
     assert capsys.readouterr().out.splitlines() == [
-        "claude/a:high  ->  codex/b:high",
-        "codex/b:high  ->  dsh/c:high",
+        "claude/a  ->  falls back to codex/b",
+        "codex/b  ->  falls back to dsh/c",
     ]
 
 
@@ -65,24 +60,24 @@ def test_the_walk_is_what_is_shown_rather_than_the_one_step(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Because the walk is what a failed turn actually does."""
-    run("add", "claude/a:high", "codex/b:high")
-    run("add", "codex/b:high", "dsh/c:high")
+    run("add", "claude/a", "codex/b")
+    run("add", "codex/b", "dsh/c")
     capsys.readouterr()
 
-    assert run("show", "claude/a:high") == 0
+    assert run("show", "claude/a") == 0
 
     assert capsys.readouterr().out.splitlines() == [
-        "1. claude/a:high",
-        "2. codex/b:high",
-        "3. dsh/c:high",
+        "1. claude/a",
+        "2. codex/b",
+        "3. dsh/c",
     ]
 
 
-def test_an_agent_that_falls_back_nowhere_says_so(
+def test_a_place_that_falls_back_nowhere_says_so(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """An empty answer that explains nothing reads as a command that did not work."""
-    assert run("show", "claude/a:high") == 0
+    assert run("show", "claude/a") == 0
 
     said = capsys.readouterr().out
     assert "falls back nowhere" in said
@@ -101,35 +96,74 @@ def test_a_step_nothing_can_be_made_of_is_refused_where_it_is_written(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Rather than found by the turn that needed it, an hour into a loop."""
-    assert run("add", "nothing-is-called-this/a:high", "codex/b:high") == 1
-    assert "is not an agent" in capsys.readouterr().err
+    assert run("add", "nothing-is-called-this/a", "codex/b") == 1
+    assert "is not a place" in capsys.readouterr().err
 
-    assert run("add", "claude/a:high", "claude/a:high") == 1
+    assert run("add", "claude/a", "claude/a") == 1
     assert "cannot fall back to itself" in capsys.readouterr().err
 
-    assert run("show", "nothing-is-called-this/a:high") == 1
+    assert run("show", "nothing-is-called-this/a") == 1
     assert "expected CLI" in capsys.readouterr().err
 
     assert fallbacks.falls() == []
 
 
-def test_taking_one_away_is_an_agent_that_falls_back_nowhere_again(
+def test_taking_one_away_is_a_place_that_falls_back_nowhere_again(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """And taking away one that is not there says so rather than reporting success."""
-    run("add", "claude/a:high", "codex/b:high")
+    run("add", "claude/a", "codex/b")
     capsys.readouterr()
 
-    assert run("remove", "claude/a:high") == 0
+    assert run("remove", "claude/a") == 0
     assert fallbacks.falls() == []
 
-    assert run("remove", "claude/a:high") == 1
+    assert run("remove", "claude/a") == 1
     assert "nothing written down" in capsys.readouterr().err
 
 
 def test_writing_one_again_says_the_new_thing_and_not_both() -> None:
-    """One agent has one place to go: a chain that forked would be one nothing can walk."""
-    run("add", "claude/a:high", "codex/b:high")
-    run("add", "claude/a:high", "dsh/c:high")
+    """One place has one place to go: a chain that forked would be one nothing can walk."""
+    run("add", "claude/a", "codex/b")
+    run("add", "claude/a", "dsh/c")
 
-    assert fallbacks.chain("claude/a:high") == ["claude/a:high", "dsh/c:high"]
+    assert fallbacks.chain("claude/a") == ["claude/a", "dsh/c"]
+
+
+def test_how_often_a_failed_turn_is_taken_again_is_said_on_the_same_command(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """One thing went wrong, so one command says both what to try and where to go."""
+    assert run("retry", "claude/a", "3", "-p", "exponential", "-t", "90") == 0
+
+    said = fallbacks.tried("claude/a")
+    assert (said.tries, said.policy, said.timeout) == (3, "exponential", 90.0)
+    assert "tried 3 more times, exponential, up to 90s" in capsys.readouterr().out
+
+    # And it is on the listing beside where the turn goes next, both being one answer.
+    run("add", "claude/a", "codex/b")
+    capsys.readouterr()
+    assert run("list") == 0
+    assert (
+        "claude/a  ->  3 more tries, exponential, up to 90s; falls back to codex/b"
+        in capsys.readouterr().out
+    )
+
+
+def test_tries_written_against_a_place_that_goes_nowhere_are_still_kept() -> None:
+    """Trying again is worth having on its own: not every place has somewhere to go."""
+    assert run("retry", "claude/a", "2") == 0
+
+    assert fallbacks.tried("claude/a").tries == 2
+    assert fallbacks.chain("claude/a") == ["claude/a"]
+
+
+def test_a_policy_nobody_has_is_refused_where_it_was_typed(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A setting to correct rather than a turn that waits some way nobody asked for."""
+    with pytest.raises(SystemExit):
+        run("retry", "claude/a", "1", "-p", "nonesuch")
+
+    assert "invalid choice" in capsys.readouterr().err
+    assert fallbacks.falls() == []

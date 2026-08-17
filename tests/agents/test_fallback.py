@@ -1,11 +1,12 @@
 """The chain of accounts a turn walks when one of them goes down, and the tries along it.
 
 A provider goes down -- a key revoked, a gateway refusing, a subscription out of quota -- and
-what a flow sees is a turn that failed. Each account says how many times a turn under it is
-tried again, how long to wait between tries, and which account to carry on under once those
-are spent; each of those names the next, so what a turn walks is a chain. What is checked here
-is that it is walked in order, inside the conversation that was running, that a loop in it
-ends, and that an agent with nowhere to go still fails the way it always did.
+what a flow sees is a turn that failed. Each account names which account to carry on under, so
+what a turn walks is a chain; how many times over the turn is taken again before it moves is a
+thing about the place it is running at rather than about the credentials, so that is written
+in `hmz.fallbacks`. What is checked here is that the chain is walked in order, inside the
+conversation that was running, that a loop in it ends, and that an agent with nowhere to go
+still fails the way it always did.
 """
 
 from __future__ import annotations
@@ -15,9 +16,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends, providers
+from hmz import backends, fallbacks, providers
 from hmz.agents import AgentConfig
-from hmz.providers import retry
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
@@ -96,11 +96,11 @@ def test_a_turn_with_nowhere_to_fall_back_to_fails_as_it_always_did(
         _agent("main").new()(_FLAKY_AS_SCRIPT)
 
 
-def test_an_account_is_tried_again_before_the_chain_moves_on(
+def test_a_place_is_tried_again_before_the_chain_moves_on(
     accounts: None, tmp_path: Path
 ) -> None:
     """A gateway that answered 503 is the same call away from working, so it gets one."""
-    providers.retrying("shell", "main", 2, "none", 0.0)
+    fallbacks.retrying("shell@main/m", 2, "none", 0.0)
     providers.points("shell", "main", "spare")
     tally = tmp_path / "tries.txt"
     agent = _agent("main")
@@ -117,7 +117,7 @@ def test_the_tries_stop_when_the_time_they_were_given_is_spent(
     accounts: None, tmp_path: Path
 ) -> None:
     """Checked before the wait, so a turn is never started knowing it is already past."""
-    providers.retrying("shell", "main", 5, "constant", 0.5)
+    fallbacks.retrying("shell@main/m", 5, "constant", 0.5)
     tally = tmp_path / "tries.txt"
 
     with pytest.raises(subprocess.CalledProcessError):
@@ -136,7 +136,7 @@ def test_an_agent_as_this_machine_is_signed_in_is_on_an_account_too(
 
     (only,) = agent.walks()
     assert only.name == ""  # the account this machine is signed into
-    assert only.retries == 0  # and nothing written down about it, so tried once
+    assert not fallbacks.tried(agent.spec).tries  # nothing written down, so tried once
     # Which is not an account anything is run *under*: nothing is added to the environment,
     # nothing is taken out of it, and no path is answered by another.
     assert agent.provider is None
@@ -162,11 +162,11 @@ def test_the_chain_of_an_agent_nobody_gave_an_account_starts_at_this_machines(
     assert [one.name for one in agent.walks()] == ["spare"]
 
 
-def test_the_machines_own_account_is_tried_again_before_the_chain_moves_on(
+def test_the_place_an_unaccounted_agent_runs_at_is_tried_again_too(
     accounts: None, tmp_path: Path
 ) -> None:
-    """The tries are written down against it, as they are against any other account."""
-    providers.retrying("shell", providers.LOCAL, 2, "none", 0.0)
+    """The tries are written against the place, and a place with no account is a place."""
+    fallbacks.retrying("shell/m", 2, "none", 0.0)
     providers.points("shell", providers.LOCAL, "spare")
     tally = tmp_path / "tries.txt"
 
@@ -192,16 +192,10 @@ def test_what_is_written_down_about_this_machines_account_outlives_the_run(
     stray file among the accounts either: this is not one of the accounts humanize made.
     """
     providers.points("shell", providers.LOCAL, "spare")
-    providers.retrying("shell", providers.LOCAL, 1, "constant", 30.0)
 
     held = providers.find("shell", providers.LOCAL)
     assert held is not None
-    assert (held.fallback, held.retries, held.policy, held.timeout) == (
-        "spare",
-        1,
-        "constant",
-        30.0,
-    )
+    assert held.fallback == "spare"
     assert providers.alone("shell").is_file()
     assert not providers.alone("shell").is_relative_to(providers.where("shell", "main"))
     # And it is not one of the accounts: those are the ones somebody made.
@@ -223,29 +217,25 @@ def test_nothing_may_fall_back_to_the_account_this_machine_is_signed_into(
 
 def test_the_waits_are_the_ones_everybody_uses() -> None:
     """Each under the name it is known by, and none of them invented here."""
-    assert [retry.waits("constant", at) for at in (1, 2, 3, 4)] == [0.0, 1.0, 1.0, 1.0]
-    assert [retry.waits("linear", at) for at in (1, 2, 3, 4)] == [0.0, 1.0, 2.0, 3.0]
-    assert [retry.waits("exponential", at) for at in (1, 2, 3, 4)] == [
-        0.0,
-        1.0,
-        2.0,
-        4.0,
-    ]
-    assert [retry.waits("fibonacci", at) for at in (1, 2, 3, 4, 5)] == [
+    waits = fallbacks.waits
+    assert [waits("constant", at) for at in (1, 2, 3, 4)] == [0.0, 1.0, 1.0, 1.0]
+    assert [waits("linear", at) for at in (1, 2, 3, 4)] == [0.0, 1.0, 2.0, 3.0]
+    assert [waits("exponential", at) for at in (1, 2, 3, 4)] == [0.0, 1.0, 2.0, 4.0]
+    assert [waits("fibonacci", at) for at in (1, 2, 3, 4, 5)] == [
         0.0,
         1.0,
         1.0,
         2.0,
         3.0,
     ]
-    assert [retry.waits("none", at) for at in (1, 2, 3)] == [0.0, 0.0, 0.0]
+    assert [waits("none", at) for at in (1, 2, 3)] == [0.0, 0.0, 0.0]
     # Full jitter is anywhere up to the exponential wait, which is what keeps a flow's agents
     # from all coming back on the same second.
-    assert all(0.0 <= retry.waits("exponential-jitter", 4) <= 4.0 for _ in range(20))
+    assert all(0.0 <= waits("exponential-jitter", 4) <= 4.0 for _ in range(20))
     # However far it climbs, no single wait is longer than a turn.
-    assert retry.waits("exponential", 40) == retry.CEILING
+    assert waits("exponential", 40) == fallbacks.CEILING
     # A policy nobody recognises waits the way the default does rather than not at all.
-    assert 0.0 <= retry.waits("nonesuch", 3) <= 2.0
+    assert 0.0 <= waits("nonesuch", 3) <= 2.0
 
 
 def test_a_policy_that_is_not_one_is_refused_where_it_is_written(
@@ -253,9 +243,9 @@ def test_a_policy_that_is_not_one_is_refused_where_it_is_written(
 ) -> None:
     """A setting to correct, rather than a turn that finds out about it hours in."""
     with pytest.raises(ValueError, match="is not a retry policy"):
-        providers.retrying("shell", "main", 1, "nonesuch", 0.0)
+        fallbacks.retrying("shell/m", 1, "nonesuch", 0.0)
     with pytest.raises(ValueError, match="not debts"):
-        providers.retrying("shell", "main", -1, "constant", 0.0)
+        fallbacks.retrying("shell/m", -1, "constant", 0.0)
 
 
 #: The same, for an agent on the account this machine is signed into: there is no `WHOSE` in
@@ -339,7 +329,7 @@ def test_a_turn_stopped_between_tries_is_stopped(accounts: None) -> None:
 
     from hmz.agents import Stopped
 
-    providers.retrying("shell", "main", 3, "constant", 0.0)
+    fallbacks.retrying("shell@main/m", 3, "constant", 0.0)
     providers.points("shell", "main", "spare")
     agent = _agent("main")
     session = agent.new()

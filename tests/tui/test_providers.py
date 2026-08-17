@@ -78,9 +78,9 @@ async def _no_copies(app: Humanize, driver: Pilot[None]) -> None:
 async def _doing(app: Humanize, driver: Pilot[None], held: str) -> None:
     """Opens what there is to do with the account under the cursor, and picks one of them.
 
-    Which is what enter on an account is now: four questions about it -- correct it, sign it
-    in again, where it falls back to, how it is tried again -- rather than four letter keys
-    on the list of accounts.
+    Which is what enter on an account is now: three questions about it -- correct it, sign it
+    in again, where it falls back to -- rather than three letter keys on the list of
+    accounts.
 
     Args:
       app: The interface.
@@ -794,49 +794,6 @@ async def test_a_chain_pointed_at_an_account_the_same_save_takes_away_goes_nowhe
 
 
 @pytest.mark.timeout(60)
-async def test_how_one_is_tried_again_is_stepped_and_held_until_the_menu_is_saved() -> (
-    None
-):
-    """A gateway that answered 503 is the same call away from working, so it gets a try."""
-    from hmz.tui.pick import Retries
-
-    providers.add("codex", "work", way="key", env={"OPENAI_API_KEY": "k"})
-    app = Humanize()
-    async with app.run_test() as driver:
-        await driver.press(*"/providers")
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Providers), driver)
-        await until(
-            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
-        )
-
-        await _doing(app, driver, "tried")
-        await until(lambda: isinstance(app.screen, Retries), driver)
-        listing = app.screen.query_one("#choices", OptionList)
-        await until(lambda: bool(listing.options), driver)
-        assert [str(one.id) for one in listing.options] == ["=tries", "=policy", "=for"]
-
-        await driver.press("right")  # one try beyond the first
-        await driver.press("down", "right")  # and the wait after it stepped on one,
-        # which from the exponential backoff every one of these services documents is the
-        # next of the ones everybody uses.
-        await driver.pause()
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Providers), driver)
-        held = providers.find("codex", "work")
-        assert held is not None
-        assert held.retries == 0  # said, and held until the menu is saved
-
-        await keeps(app, driver)
-        await until(lambda: not isinstance(app.screen, Providers), driver)
-
-    tried = providers.find("codex", "work")
-    assert tried is not None
-    assert tried.retries == 1
-    assert tried.policy == "fibonacci"
-
-
-@pytest.mark.timeout(60)
 async def test_taking_an_account_away_says_what_went_with_it() -> None:
     """Credentials are what is going, and a line that said less would be understating it."""
     _account()
@@ -978,7 +935,7 @@ async def test_the_account_this_machine_is_signed_into_is_a_row_of_its_own() -> 
         assert [
             str(one.id or "").removeprefix("=")
             for one in app.screen.query_one("#choices", OptionList).options
-        ] == ["falls", "tried"]
+        ] == ["falls"]
         assert "keeps no credentials for it" in _under(app)
         await driver.press("escape")
         await until(lambda: isinstance(app.screen, Providers), driver)

@@ -244,12 +244,26 @@ under humanize's own home.
 
 ```python
 @dataclass(frozen=True, slots=True)
+class Policy:
+    name: str
+    about: str
+
+
+POLICIES: tuple[Policy, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Falls:
     spec: str
-    to: str
+    to: str = ""
+    tries: int = 0
+    policy: str = DEFAULT
+    timeout: float = 0.0
+
+    def says(self) -> bool: ...
 
 
-def spec(backend: str, model: str, effort: str, provider: str = "") -> str: ...
+def spec(backend: str, model: str, provider: str = "") -> str: ...
 
 
 def reads(said: str) -> str: ...
@@ -258,55 +272,96 @@ def reads(said: str) -> str: ...
 def falls() -> list[Falls]: ...
 
 
+def tried(said: str) -> Falls: ...
+
+
 def points(said: str, at: str) -> Falls: ...
+
+
+def retrying(said: str, tries: int, policy: str, timeout: float) -> Falls: ...
 
 
 def clear(said: str) -> bool: ...
 
 
 def chain(said: str) -> list[str]: ...
+
+
+def named(policy: str) -> Policy | None: ...
+
+
+def waits(policy: str, attempt: int, base: float = BASE) -> float: ...
 ```
 
-Where a turn goes when the agent taking it cannot take it at all -- which is the other half of
-what `hmz.providers` writes on an account, and is a layer of its own because it is about
-neither of the two agents on its own.
+The layer between an agent and its accounts: where a turn goes when the place taking it cannot
+take it at all, and how many times over it is taken again first. A layer of its own because it
+is about neither of the two places on its own, and not `hmz.providers` because what it answers
+is not an account going down.
 
+- A place MUST be three things and no more: the CLI, the account it runs as, and the model it
+  runs, written `CLI[@ACCOUNT]/MODEL`. Those are what a turn can fail for having named. How
+  hard an agent thinks, what it may reach for, whether it may search the web and which of a
+  flow's skills it carries are what that agent *is* -- settled where it was made -- and MUST
+  NOT be part of a place: an agent that fell back would otherwise be reconfigured by a file
+  nobody meant as a configuration.
+- A step MUST be written between two places rather than on either. It is about neither on its
+  own -- it is what to do when this CLI, at this model, as this account, cannot run -- and two
+  agents of one CLI on one account at two models are two things to say, which an answer
+  written on the account could not say.
 - An account's chain and this MUST be two things and MUST stay two. An account that goes down
   is answered by another account of the same backend, inside the conversation that was
   running, with the same agent at the same model throughout; that is a thing about the
   account and MUST go on being written on it. A model retired, a CLI that will not start, a
   rate limit on the whole account rather than one request: none of those is answered by
-  another account, and what answers them MUST be another agent.
-- A step MUST be written between two agents rather than on either. It is about neither on its
-  own -- it is what to do when this CLI, at this model, at this effort, as this account,
-  cannot run -- and two agents of one CLI on one account at two models are two things to say,
-  which an answer written on the account could not say.
-- An agent MUST be named the way `-a` names one, and MUST be read through `hmz.backends`
-  rather than matched here: what may be written down is exactly what a command line takes,
-  and one spelling of it is what is written. A name no backend answers to MUST be refused
-  where it is written rather than found by the turn that needed it.
-- A step MUST NOT point at the agent it is written against, and a chain that comes round on
-  itself MUST end at the second sight of an agent: either would otherwise be a turn that
-  could never run out of places to go. One agent MUST have one place to go -- writing one
-  again MUST say the new thing and not both, a chain that forked being a chain nothing can
-  walk.
-- `chain` MUST answer with this agent first whether or not anything was written down about
+  another account, and what answers them MUST be another place.
+- How many times over a failed turn is taken again MUST be written here and nowhere else. It
+  is a thing about the place rather than about the credentials the turn ran with, and both it
+  and where the turn goes next are answers to the one thing that happened -- so one row says
+  both. Nothing MUST be retried by default: a turn is taken once, as it always was, since a
+  prompt the model refused is the same refusal every time and only the caller knows which of
+  its places fails the other way.
+- The waits MUST be the ones everybody uses under the names everybody uses them by, and none
+  MUST be invented here: no wait, a constant one, a linear one, exponential backoff, that with
+  full jitter, and Fibonacci. A name that is not one of them MUST wait the way the default
+  does rather than not at all, a setting nobody recognises MUST NOT become a loop that hammers
+  whatever has just failed, and no single wait MUST be longer than a turn however far the
+  backoff has climbed. The default MUST be exponential backoff with jitter, that being what
+  keeps a flow's agents from all coming back on the same second. The time a place was given
+  MUST be checked before a wait rather than after it, so that a turn is never started knowing
+  it is already spent.
+- A place's CLI MUST be read through `hmz.backends` rather than matched here: a name no
+  backend answers to MUST be refused where it is written rather than found by the turn that
+  needed it. A model MAY hold slashes of its own, so the first slash MUST be the one that
+  separates them. An effort written after a colon MUST be read past rather than refused: a
+  step written down before effort left this spelling is a step somebody still means.
+- A step MUST NOT point at the place it is written against, and a chain that comes round on
+  itself MUST end at the second sight of a place: either would otherwise be a turn that could
+  never run out of places to go. One place MUST have one place to go -- writing one again MUST
+  say the new thing and not both, a chain that forked being a chain nothing can walk.
+- `chain` MUST answer with this place first whether or not anything was written down about
   it, so that whoever walks one walks a list rather than a list and a special case.
 - What is written down MUST be read whole every time it is read: a chain is what a failed turn
   asks for, and the answer is the walk rather than the step. A file that cannot be read MUST
   hold nothing rather than end every run on the machine, and an entry naming a backend there
-  is none of MUST be read past.
+  is none of MUST be read past. An entry that says nothing at all -- no destination and no
+  tries -- MUST NOT be kept.
 - A turn MUST walk its account chain to the end before it walks this: the account chain keeps
   the conversation and this cannot, no backend taking another backend's session id. The turn
-  that moves MUST be taken in a new session of the agent it moved to, MUST carry the skills
+  that moves MUST be taken in a new session at the place it moved to, MUST carry the skills
   the flow gave the agent it left, and MUST be answered back through the session that asked --
   one turn is one turn, whoever took it. That session MUST be opened once and held for as
   long as the one that asked for it, and MUST end when it does: what the conversation was is
   lost at the move, and losing a second one every turn after it would be a stateful loop
   started over every round.
+- The agent standing in MUST be configured exactly as the agent that could not run was, less
+  what that backend was told in its own vocabulary: an override one CLI reads says nothing to
+  another. A rung the CLI taking over has no word for MUST become the rung at the same depth
+  of its own ladder, every ladder here being written hardest first. A setting the CLI taking
+  over cannot be told at all MUST make it no stand-in: a setting quietly ignored would be a
+  setting that lies, so the turn MUST fail the way it failed before anybody wrote a step down.
 - The agent standing in MUST be made at most once and kept, for the reason an account that has
-  moved stays moved: an agent that went down is not one to try again each turn. It MUST be
-  made only when a turn has nowhere left to go -- a chain of four agents all started when the
+  moved stays moved: a place that went down is not one to try again each turn. It MUST be
+  made only when a turn has nowhere left to go -- a chain of four places all started when the
   run was would be three CLIs held open for a failure that never came -- and MUST hold only
   the steps after its own, or a chain read from the top by each hop would walk the failed ones
   twice.
@@ -473,7 +528,8 @@ hmz [<command> [<args>...]]
 ## `hmz exec`
 
 ```shell
-hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] <task>
+hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...]
+         [--container <image>] <task>
 ```
 
 Runs a flow in the current directory, on the agents it is given.
@@ -491,6 +547,9 @@ Args:
   accepted written out as `cli=<cli>,model=<model>,effort=<effort>`, in any order, since a
   model or an effort that holds the punctuation the short form separates on has nowhere else
   to go. One `-a` MUST be one agent: a list in a single `-a` MUST NOT be split into several.
+- `--container <image>`: Run the whole of it in one container of that image, which is
+  `hmz.flows.contained`. A convenience rather than a second way of saying where an agent works:
+  it is said once, from outside, about all of them.
 - `<task>`: What the flow is to have the agents do, as the text itself.
 
 - `<cli>` MUST be one of `claude`, `codex` and `kimi`, each of which MUST also answer to the
@@ -508,6 +567,9 @@ Args:
   drives a different number than were given MUST be reported as a usage error, before any
   agent has run. Whatever else a flow does as it is imported is the flow's own, and MUST fail
   as it would anywhere.
+- A run put in a container MUST start one container for the whole of it and MUST take it down
+  however the run ends, and MUST NOT do either where none was asked for: reading a flow must
+  pull no image, and a run that never starts must leave nothing behind.
 
 ## `hmz trace`
 
@@ -667,3 +729,22 @@ turn under a provider is spawned as, and what a login run for one is spawned as.
   way to run something that is not humanize.
 - A line naming nothing to answer MUST be a usage error: a run with nothing to redirect is a
   supervisor started for no reason.
+
+## `hmz tools`
+
+```shell
+hmz tools --at <socket>
+```
+
+Carries the tool protocol between a coding agent and the flow whose callbacks it is: this
+process's standard input into the flow's socket, and the flow's answers back out again.
+
+- It MUST be a command of its own for the reason `hmz cred` is, the other way round: a CLI
+  takes a tool by starting a program, so there has to be a program. It MUST NOT be one of the
+  commands a listing shows and MUST NOT be documented as a way in.
+- It MUST do nothing but carry lines. The callback belongs in the process the flow is in, and
+  anything answered here would be a tool the flow never wrote.
+- Both directions MUST be carried at once, and the end of either MUST end the other: a CLI that
+  has closed its input must not leave this process reading a socket nobody will write to.
+- A socket that is not there MUST be a status rather than a crash: it is a flow that has ended,
+  and a CLI reads it as its tools being unavailable rather than as a turn that failed.

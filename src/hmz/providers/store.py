@@ -24,8 +24,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 from hmz import backends, home
 
-from . import retry
-
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -40,7 +38,6 @@ __all__ = [
     "find",
     "points",
     "providers",
-    "retrying",
     "serves",
     "ways",
     "where",
@@ -115,15 +112,10 @@ class Provider:
         agent: it is the account that goes down, and whichever agent was running under one
         when it did is the agent that needs somewhere else to run. Each account naming its
         own means a run walks a chain -- subscription, then key, then gateway -- rather than
-        having one place to go however many accounts there are.
-      retries: How many times a failed turn is tried again under this account before the
-        chain moves on, beyond the first try. Zero is the account as it comes: a turn is
-        taken once, and a failure is a failure.
-      policy: How long to wait between those tries, as :data:`hmz.providers.retry.POLICIES`
-        names them.
-      timeout: The longest the retrying under this account may go on for, in seconds, or 0.0
-        for as long as the tries take. It is checked before each wait, so a turn is never
-        started knowing it is already past.
+        having one place to go however many accounts there are. How many times over a turn
+        under one is tried before the chain moves on is not written here: that is a thing
+        about the place a turn runs at rather than about the credentials it runs with, and
+        `hmz.fallbacks` is where it is said.
     """
 
     cli: str
@@ -133,9 +125,6 @@ class Provider:
     args: tuple[str, ...] = ()
     made: str = ""
     fallback: str = ""
-    retries: int = 0
-    policy: str = retry.DEFAULT
-    timeout: float = 0.0
 
     @property
     def at(self) -> Path:
@@ -205,9 +194,6 @@ class Provider:
             "args": list(self.args),
             "made": self.made,
             "fallback": self.fallback,
-            "retries": self.retries,
-            "policy": self.policy,
-            "timeout": self.timeout,
         }
 
 
@@ -410,9 +396,6 @@ def _alone(cli: str) -> Provider:
         name=LOCAL,
         way="",
         fallback=str(held.get("fallback") or ""),
-        retries=int(_counted(held.get("retries"))),
-        policy=str(held.get("policy") or retry.DEFAULT),
-        timeout=_counted(held.get("timeout")),
     )
 
 
@@ -478,36 +461,6 @@ def points(cli: str, name: str, at: str) -> bool:
     return True
 
 
-def retrying(cli: str, name: str, retries: int, policy: str, timeout: float) -> bool:
-    """Says how a turn under one account is tried again when it fails.
-
-    Args:
-      cli: The backend it is for.
-      name: Which account, or :data:`LOCAL` for the one this machine is already signed into.
-      retries: How many tries beyond the first.
-      policy: How long to wait between them, as `hmz.providers.retry.POLICIES` names them.
-      timeout: The longest the retrying may go on for, in seconds, or 0.0 for no limit.
-
-    Returns:
-      Whether there was an account of that name to say it of.
-
-    Raises:
-      ValueError: If the policy is not one there is, or either number is negative.
-    """
-    found = find(cli, name)
-    if found is None:
-        return False
-    if retry.named(policy) is None:
-        raise ValueError(
-            f"{policy!r} is not a retry policy: "
-            f"{', '.join(one.name for one in retry.POLICIES)}"
-        )
-    if retries < 0 or timeout < 0:
-        raise ValueError("a number of tries and a timeout are both counts, not debts")
-    _write(replace(found, retries=retries, policy=policy, timeout=timeout))
-    return True
-
-
 def _write(provider: Provider) -> None:
     """Writes one account down again, whole, where it is kept.
 
@@ -522,12 +475,7 @@ def _write(provider: Provider) -> None:
         _writes(
             at,
             json.dumps(
-                {
-                    "fallback": provider.fallback,
-                    "retries": provider.retries,
-                    "policy": provider.policy,
-                    "timeout": provider.timeout,
-                },
+                {"fallback": provider.fallback},
                 indent=2,
             )
             + "\n",
@@ -608,9 +556,6 @@ def add(
         args=tuple(args),
         made=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         fallback=already.fallback if already is not None else "",
-        retries=already.retries if already is not None else 0,
-        policy=already.policy if already is not None else retry.DEFAULT,
-        timeout=already.timeout if already is not None else 0.0,
     )
     # The directory before the file: a login run under this provider writes into it, and
     # 0700 is what every one of these CLIs keeps its own credential directory at. A level at
@@ -721,31 +666,7 @@ def _read(cli: str, at: Path) -> Provider | None:
         fallback=str(held.get("fallback") or "")
         if isinstance(held.get("fallback"), str)
         else "",
-        retries=int(_counted(held.get("retries"))),
-        policy=str(held.get("policy") or retry.DEFAULT),
-        timeout=_counted(held.get("timeout")),
     )
-
-
-def _counted(said: Any) -> float:
-    """One number a provider was written down with, read as the count it is.
-
-    Args:
-      said: What the file holds, which is whatever somebody put there.
-
-    Returns:
-      It, never negative, and zero for anything that is not a number at all -- a file written
-      by hand is a file to read past rather than a reason to lose the account in it.
-    """
-    if not isinstance(said, (int, float)) or isinstance(said, bool):
-        return 0.0
-    held = float(said)
-    # A file written by hand may hold `.inf` or `.nan`, both of which YAML and JSON will
-    # happily give back and neither of which is a count: an account is read past rather than
-    # taken down by one.
-    if held != held or held in (float("inf"), float("-inf")):  # noqa: PLR0124 -- NaN is not NaN
-        return 0.0
-    return max(held, 0.0)
 
 
 def _directories(at: Path) -> list[Path]:

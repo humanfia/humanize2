@@ -90,6 +90,28 @@ Each question takes the road [a coding agent's own question](/guide/questions) t
 [`/afk`](/guide/afk) answers it the way it answers any other: nobody is there, and the
 questionnaire comes back as `None` under `suppress`.
 
+## The board: the half that does not wait
+
+Saying something to the person **stops the turn** until they answer. That is right for a
+question and wrong for everything else a run wants from them, so they carry a board as well:
+named lines the flow and the person both write on, drawn on [`/status`](/guide/status), where
+neither waits on the other.
+
+```python
+board = agents.human.board
+board.put("todo", task)                          # either of you writes this one
+board.put("doing", "nothing yet", whose="flow")  # the flow's; they read it
+
+while waiting := [one for one in board.get("todo").splitlines() if one.strip()]:
+    board.put("doing", waiting[0])
+    agents.builder(waiting[0], suppress=True)
+    board.put("todo", "\n".join(waiting[1:]))
+```
+
+A line whose `whose` is one side's is refused to the other where it writes rather than quietly
+ignored. Run where nobody is at a prompt, the board is still a board — the flow writes it and
+reads it, and nothing changes it from outside. See [The mission board](/guide/board).
+
 ## When another flow calls yours
 
 When a flow [calls another](/reference/flows#a-flow-that-calls-another-flow), it may hand it
@@ -104,4 +126,5 @@ load("chat")((assistant, agents.human), task)
 
 - [Questions](/guide/questions)
 - [Answers in a shape](/guide/shapes)
+- [The mission board](/guide/board)
 - [Flows › The person at the prompt](/reference/flows#the-person-at-the-prompt)

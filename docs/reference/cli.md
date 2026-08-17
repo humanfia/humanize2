@@ -52,13 +52,14 @@ hmz -f official/humanize1:rlcr -c setup.yaml
 Runs a [flow](/reference/flows) in the current directory, on the agents it is given.
 
 ```
-hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] <task>
+hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] [--container <image>] <task>
 ```
 
 | Argument | |
 | --- | --- |
 | `-f`, `--flow <flow>[:<name>]` | **Required.** The flow to drive: the name of one humanize ships, `<where>/<flow>` for one any other place holds — a [flowverse](/reference/flows#flowverses), or `local`/`user` for your own — or the path to a flow anywhere else. A file that holds [several flows](/reference/flows#several-flows-in-one-file) is said which, after a colon. See [where flows live](/reference/flows#where-flows-live). |
 | `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](/reference/flows#settings-of-the-flow-s-own). The flow's own model checks it before the first turn. |
+| `--container <image>` | Run the whole of it in one container of that image: every agent's turns land there, the project directory is mounted at the path it already has, and the flow reaches it through `hmz.flows.container()`. A place the flow itself declared `Isolated` keeps the container the flow named. See [Containers](/guide/containers#the-whole-run-in-one-container). |
 | `-a`, `--agent <spec>` | **Repeated once for each agent the flow drives**, in the order it takes them — so none at all for a flow whose only side is you, since nobody chooses what the person runs. |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
 
@@ -367,24 +368,22 @@ hmz providers add <cli>/<name> [-w|--way <way>] [-s|--set VAR=VALUE]... [--no-lo
 hmz providers login <cli>/<name> [-s|--set VAR=VALUE]...
 hmz providers show <cli>/[<name>]
 hmz providers falls-back <cli>/[<name>] [<name>]
-hmz providers retry <cli>/[<name>] [-n|--tries <n>] [-p|--policy <policy>] [-t|--timeout <seconds>]
 hmz providers remove <cli>/<name>
 ```
 
 A provider is named `<cli>/<name>` — `claude/deepseek` — wherever one is asked for, and
 `<cli>/` with no name is the account this machine is already signed into: an account of every
-backend, which nobody made and which `show`, `falls-back` and `retry` take. Naming no command
-at all lists them.
+backend, which nobody made and which `show` and `falls-back` take. Naming no command at all
+lists them.
 
 | Command | |
 | --- | --- |
-| `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, the variables it sets, and — where either is set — what it falls back to and how a failed turn under it is tried again. The account this machine is signed into is listed as `<cli>/  as local` wherever it has one of those. A `<cli>` no backend answers to exits 1 rather than listing everybody's. |
+| `list [<cli>]` | What providers there are, or one backend's: the name, the way it was made by, the variables it sets, and — where it is set — what it falls back to. The account this machine is signed into is listed as `<cli>/  as local` wherever it has one. A `<cli>` no backend answers to exits 1 rather than listing everybody's. |
 | `ways <cli>` | How that backend can be signed into: each way, what it asks for, and what it runs. |
 | `add <cli>/<name>` | Makes one, signs it in, and asks that CLI what it runs as it. `-w` chooses the way and defaults to the backend's first — `login` for the CLIs that sign in, `key` for `dsh`; `-s` answers one of the way's questions on the line rather than being asked, and repeats; `--no-login` writes it down without running the backend's own way in, and so without asking it anything either. `--also` writes the same account down for the backends it names, comma separated, under the same name and over one already there — or `all` for [every one it could be run as](/reference/providers#one-account-several-clis). A line that did not ask says it could have. |
 | `login <cli>/<name>` | Signs an existing one in again, by the way it was made with, and asks it again what it runs. Takes the same `-s`. |
-| `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, what it falls back to, how it is tried again, the names of the variables it sets, which paths a turn under it is given instead of which, and an `also runs` line per [other backend](/reference/providers#one-account-several-clis) that could be run as it. |
+| `show <cli>/<name>` | What one holds: the way, when it was made, where it is kept, what it falls back to, the names of the variables it sets, which paths a turn under it is given instead of which, and an `also runs` line per [other backend](/reference/providers#one-account-several-clis) that could be run as it. |
 | `falls-back <cli>/<name> [<name>]` | Says which account of that CLI a turn carries on under when this one fails, or, with nothing after it, that this one is the end of the line. Each account naming the next is what makes a chain. |
-| `retry <cli>/<name>` | Says how a failed turn under it is tried again before the chain moves on: `-n` how many times over, `-p` how long to wait between tries (`none`, `constant`, `linear`, `exponential`, `exponential-jitter`, `fibonacci`), `-t` the longest the whole of it may go on for. Nothing is retried by default. |
 | `remove <cli>/<name>` | Takes it away, credentials and all. |
 
 Whatever a way asks that the line did not answer is asked at the terminal, and a secret is not
@@ -404,7 +403,6 @@ hmz providers add claude/deepseek -w gateway -s ANTHROPIC_BASE_URL=https://api.d
 hmz providers add claude/shared -w key --also pi,opencode      # or --also all
 hmz providers ways codex
 hmz providers falls-back claude/anthropic deepseek
-hmz providers retry claude/anthropic -n 3 -p exponential-jitter -t 120
 hmz providers show claude/deepseek
 hmz providers remove claude/deepseek
 ```
@@ -413,30 +411,57 @@ hmz providers remove claude/deepseek
 
 ```sh
 hmz fallback list [-q|--quiet]
-hmz fallback show <cli>[@<account>]/<model>:<effort>
-hmz fallback add <cli>[@<account>]/<model>:<effort> <cli>[@<account>]/<model>:<effort>
-hmz fallback remove <cli>[@<account>]/<model>:<effort>
+hmz fallback show <cli>[@<account>]/<model>
+hmz fallback add <cli>[@<account>]/<model> <cli>[@<account>]/<model>
+hmz fallback retry <cli>[@<account>]/<model> <tries> [-p|--policy <policy>] [-t|--timeout <seconds>]
+hmz fallback remove <cli>[@<account>]/<model>
 ```
 
-Where a turn goes when the agent taking it cannot take it at all — a model retired, a CLI that
-will not start, a rate limit on the whole account rather than one request. Its own command
-rather than a line of `hmz providers`, because an account's chain is a thing about an account
-and this is about neither of the two agents it names.
+Where a turn goes when the **place** taking it cannot take it at all — a model retired, a CLI
+that will not start, a rate limit on the whole account rather than one request. The layer
+between an agent and its accounts: an account's chain is a thing about an account, and this is
+about neither of the two places it names.
 
-An agent is named exactly the way [`-a`](#writing-an-agent) names one. `show` prints the whole
-walk rather than the one step, since the walk is what a failed turn does.
+A place is three things and no more — the CLI, the account it runs as, and the model it runs.
+How hard the agent thinks and what it may reach for are what that agent *is*, and they come
+across a step unchanged. `show` prints the whole walk rather than the one step, since the walk
+is what a failed turn does.
+
+| Command | |
+| --- | --- |
+| `list` | Every step: the place, how often a failed turn there is taken again, and where it goes once those are spent. `-q` prints the place alone. |
+| `show <place>` | The whole walk from that place, in the order a turn tries them. |
+| `add <place> <place>` | Says where the first one's turns go when it cannot run. |
+| `retry <place> <tries>` | Says how many goes beyond the first a failed turn there gets before the step is taken: `-p` how long to wait between them (`none`, `constant`, `linear`, `exponential`, `exponential-jitter`, `fibonacci`), `-t` the longest the whole of it may go on for. Nothing is retried by default. |
+| `remove <place>` | Takes the whole step away, tries and destination alike. |
 
 ```sh
-hmz fallback add claude/claude-opus-5:high codex/gpt-5.6-sol:high
-hmz fallback add claude@work/claude-opus-5:high codex@key/gpt-5.6-sol:high
-hmz fallback show claude/claude-opus-5:high
-hmz fallback remove claude/claude-opus-5:high
+hmz fallback add claude/claude-opus-5 codex/gpt-5.6-sol
+hmz fallback add claude@work/claude-opus-5 codex@key/gpt-5.6-sol
+hmz fallback retry claude/claude-opus-5 3 -p exponential-jitter -t 120
+hmz fallback show claude/claude-opus-5
+hmz fallback remove claude/claude-opus-5
 ```
 
-An agent cannot fall back to itself, one agent has one place to go, and a chain that comes
-round on itself ends at the second sight of an agent. The same steps are in the interface at
+A place cannot fall back to itself, one place has one place to go, and a chain that comes
+round on itself ends at the second sight of a place. The same steps are in the interface at
 [`/fallback`](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken), and what they mean is
 [Falling back](/guide/fallback).
+
+## `hmz tools`
+
+```sh
+hmz tools --at <socket>
+```
+
+Carries the tool protocol between a coding agent and the flow whose
+[callbacks](/guide/tools) it is: it reads its stdin into the flow's socket and the flow's
+answers back out to its stdout, and does nothing else.
+
+**Not a command anybody types.** A CLI takes a tool by starting a program, so there is a
+program — the same reason `hmz cred` exists. humanize spawns it and tells the backend to run
+it; a socket that is not there exits 1, which the CLI reads as tools being unavailable rather
+than as a turn that failed.
 
 ## Environment variables
 

@@ -201,8 +201,16 @@ or wake something up instead:
 agent.hooks.on(Moment.NOTIFICATION, lambda occasion: ring_a_bell(occasion.said))
 ```
 
+## When the answer is not worth stopping for
+
+A question stops the turn until it is answered. For everything a run wants from you that is
+not one thing it cannot decide — what there is to do next, how far through it is, the thing you
+thought of while it was running — there is [the mission board](/guide/board) instead: named
+lines on `/status` that either of you changes whenever you like, and neither waits at.
+
 ## See also
 
+- [The mission board](/guide/board)
 - [Side questions](/guide/btw)
 - [Being away](/guide/afk)
 - [Answers in a shape](/guide/shapes)

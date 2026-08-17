@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Twelve ways of running a coding agent, and what each of them can actually be asked for.
+// Thirteen ways of running a coding agent, and what each of them can actually be asked for.
 // The rows are `hmz/backends.py` and the classes in `hmz/agents/`: which session base a
 // backend derives from is what decides whether it can be talked to mid-turn, `shapes` is
 // whether it can be held to a schema, and a `_pursue` of its own is whether it has a goal.
@@ -53,6 +53,18 @@ const BACKENDS: Backend[] = [
     logs: 'read back',
     skills: 'four places, the shared one included',
     note: 'Its models differ from each other: one takes “ultra” and the one beside it does not, so the ladder is narrowed per model by what the backend itself says when it is asked what it runs.',
+  },
+  {
+    name: 'cursor',
+    called: 'Cursor Agent',
+    driven: 'command',
+    efforts: ['high', 'medium', 'low'],
+    steer: 'no',
+    shape: 'asked in the prompt',
+    goal: false,
+    logs: 'none to read',
+    skills: 'its own, and the project’s',
+    note: 'It has no flag for a rung: its models are parameterized, so how hard it thinks and how quickly it is served are written into the model itself — “composer-2.5[effort=high,fast=false]”. A model already spelled with a bracket is passed exactly as it was written.',
   },
   {
     name: 'dsh',

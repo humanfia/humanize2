@@ -20,9 +20,16 @@ somewhere under a home directory.
 `PreToolUse` here is `PreToolUse` there. A flow written against one backend reads against the
 others and against their own documentation.
 
-Not every backend reaches every moment — the one about a permission being asked for is the one
-that differs — so an agent says which it runs, and a flow says which it needs where it declares
-the agents it drives.
+Not every backend reaches every moment. Three differ: the one about a permission being asked
+for, which only the backends that actually wait to be told have, and the two about **an agent
+this one started of its own** — Claude's `Task`, Codex's collab agent, Cursor's task tool — which
+only the backends that say so on the stream a turn is read from have. So an agent says which it
+runs, and a flow says which it needs where it declares the agents it drives.
+
+The two about a fleet are told rather than answered: no backend here waits to be told whether
+it may start one, so a refusal would be a verdict that goes nowhere. What they carry is what
+that agent is called, what it was asked to do, and the backend's own id for it — which is what
+pairs the one that started with the one that came back.
 
 ## What a hook is told
 

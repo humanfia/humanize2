@@ -502,15 +502,47 @@ adjusted rather than chosen.
   one agent after another. A handover the boxes have no arrow for MUST be said under the
   diagram rather than drawn: a line crossing the page from the first box to the fourth is a
   line nothing in a terminal draws readably.
+- An agent that has not taken a turn MUST NOT be drawn, and one MUST appear as its first turn
+  starts. A flow may declare ten agents and reach three of them -- it is a Python file, and it
+  may never take the branch the other seven are on -- so what is drawn MUST be what the run is
+  *doing* rather than a list of what was configured. Which agents there are MUST therefore be
+  asked again as the sheet is redrawn rather than settled when it opened, or a box would appear
+  only to whoever closed the sheet and opened it again.
+- An agent one of them started of its own MUST be drawn under the box of the agent that
+  started it, without a box of its own, marked as still going or as come back. It is not an
+  agent of the flow -- nobody chose what it runs, nothing can be said to it and it has no
+  transcript -- so it MUST NOT be a row anything attaches to, and its mark MUST differ from
+  the one a flow's own agents wear: a box round it would say it was another agent to read. A
+  fleet too long to draw MUST be cut, with a line saying how many were left off.
 - Which agents are working MUST be marked on the boxes, and MUST move as they do. It is the
   one thing on this sheet that changes by itself, and the reason somebody opened it.
 - Enter or a click on a box MUST read that agent, whether or not it is working. `tab` is held
-  to the ones working, so this is the one place an agent that has stopped -- or has not
-  started -- is reached. The first row MUST be the transcript every agent's work appears on,
-  which is the way back to watching the flow rather than one agent of it.
+  to the ones working, so this is the one place an agent that has stopped is reached. The first
+  row MUST be the transcript every agent's work appears on, which is the way back to watching
+  the flow rather than one agent of it.
 - The agents of the last run MUST still be drawn once it is over. Their transcripts are still
   on the screen and still worth reading back, and a run that has just ended is the one
   somebody wants to look at.
+
+### The board
+
+- The board a flow and the person both write on MUST be drawn on this sheet, under the
+  diagram, for a run whose flow talks to the person. It is about the run -- what there is left
+  to do belongs beside how far through the run is -- and a board somebody has to go and open is
+  a board nobody reads.
+- It MUST be changed here without anything waiting: a line typed onto it MUST be there the
+  moment it is typed, and the flow MUST go on running throughout. That is what tells it from a
+  question, which stops the turn it was asked in until it is answered.
+- Each line MUST say what it is called and what it says, and one that is the flow's own MUST
+  say so and MUST NOT be opened for editing: a flow writing down how far through it is must not
+  have that edited underneath it. Refusing MUST be said where the key was pressed rather than
+  by doing nothing.
+- Putting a line up, changing one and taking one away MUST be the keys the rest of the
+  interface uses for those: a letter to add, enter to change what is under the cursor, and the
+  taking-away key pressed twice.
+- Nothing here MUST be held until the sheet is left. This is not a menu: the flow may be
+  reading the board on the next line it runs, and a line held back would be one the flow was
+  never told about.
 
 ### What humanize remembers
 

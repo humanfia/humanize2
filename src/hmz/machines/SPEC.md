@@ -7,12 +7,14 @@
 ├── __init__.py
 ├── anchored.py
 ├── base.py
-└── docker.py
+├── docker.py
+└── mapped.py
 ```
 
 ## `__init__.py`
 
-Expose `MachineBase`, `MachineConfig`, and all machine and machine config classes.
+Expose `MachineBase`, `MachineConfig`, `Mapped`, `Ran`, and all machine and machine config
+classes.
 
 ## `base.py`
 
@@ -73,3 +75,53 @@ class Dummy(MachineBase): ...
   so the workspace stays that user's. What is isolated MUST be the tools a command finds and
   not the work: the agent goes on running here, with its own credentials and its own
   trajectory, and only what it does reaches the container.
+
+## `mapped.py`
+
+```python
+@dataclass(frozen=True, slots=True)
+class Ran:
+    argv: tuple[str, ...]
+    status: int
+    output: str
+
+    @property
+    def ok(self) -> bool: ...
+
+
+class Mapped:
+    def __init__(self, anchor: AnchorConfig): ...
+
+    @property
+    def workspace(self) -> str: ...
+
+    def read_text(self, path: str, encoding: str = "utf-8") -> str: ...
+
+    def write_text(self, path: str, said: str, ...) -> None: ...
+
+    def listdir(self, path: str = "") -> list[str]: ...
+
+    def exists(self, path: str) -> bool: ...
+
+    def mkdir(self, path: str, *, parents: bool = True) -> None: ...
+
+    def remove(self, path: str) -> None: ...
+
+    def run(self, argv: Sequence[str] | str, *, cwd: str = "", env=None) -> Ran: ...
+
+    def close(self) -> None: ...
+```
+
+The workspace on the machine a run lands on, as the flow's own code reaches it.
+
+- An agent under a machine is answered for without being told; the flow driving it is not, being
+  this process running Python. So what the flow wants of that machine MUST be asked for rather
+  than intercepted: a supervisor round the process a flow is running in would be a supervisor
+  round the interface, the other agents and everything else in it.
+- It MUST be the same road a turn takes, so that a file written here is a file the next turn
+  reads.
+- The connection MUST be opened when a flow first asks and held for the rest of the run: it is
+  the handshake an anchored turn opens, and one per read would be a handshake per line of a
+  file.
+- A path MUST be taken as the machine names it or relative to the workspace, those being the
+  same path for a container handed the project directory at the path it already had.

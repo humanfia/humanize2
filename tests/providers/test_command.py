@@ -387,36 +387,6 @@ def test_a_chain_that_goes_nowhere_is_refused_where_it_was_typed(
     assert "no claude account called 'nonesuch'" in capsys.readouterr().err
 
 
-def test_how_an_account_is_tried_again_is_said_from_a_command_line(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """How many tries, how long to wait between them, and how long the whole may go on."""
-    providers.add("claude", "mine", env={"ANTHROPIC_API_KEY": "k"})
-
-    assert run("retry", "claude/mine", "-n", "3", "-p", "exponential", "-t", "90") == 0
-
-    held = providers.find("claude", "mine")
-    assert held is not None
-    assert (held.retries, held.policy, held.timeout) == (3, "exponential", 90.0)
-    assert "tried 3 more times, exponential" in capsys.readouterr().out
-    # And what it is is what `show` says about it.
-    assert run("show", "claude/mine") == 0
-    said = capsys.readouterr().out
-    assert "tried       3 more times, exponential, for up to 90s" in said
-    assert "falls to    nowhere" in said
-
-
-def test_a_policy_nobody_has_is_refused_where_it_was_typed(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """A setting to correct rather than a turn that waits some way nobody asked for."""
-    providers.add("claude", "mine", env={"ANTHROPIC_API_KEY": "k"})
-
-    assert run("retry", "claude/mine", "-n", "1", "-p", "nonesuch") == 1
-
-    assert "is not a retry policy" in capsys.readouterr().err
-
-
 def test_the_account_this_machine_is_signed_into_is_said_as_a_cli_and_no_name(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -424,11 +394,10 @@ def test_the_account_this_machine_is_signed_into_is_said_as_a_cli_and_no_name(
     providers.add("claude", "spare", env={"ANTHROPIC_API_KEY": "s"})
 
     assert run("falls-back", "claude/", "spare") == 0
-    assert run("retry", "claude/", "-n", "2", "-p", "constant") == 0
 
     held = providers.find("claude", providers.LOCAL)
     assert held is not None
-    assert (held.fallback, held.retries, held.policy) == ("spare", 2, "constant")
+    assert held.fallback == "spare"
     said = capsys.readouterr().out
     assert "claude, as this machine is signed in, falls back to spare" in said
 
@@ -436,7 +405,6 @@ def test_the_account_this_machine_is_signed_into_is_said_as_a_cli_and_no_name(
     shown = capsys.readouterr().out
     assert "way         as this machine is signed in" in shown
     assert "falls to    spare" in shown
-    assert "tried       2 more times, constant" in shown
 
 
 def test_the_machines_own_account_is_not_one_to_make_or_take_away(

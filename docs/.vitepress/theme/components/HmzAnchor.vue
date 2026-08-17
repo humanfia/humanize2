@@ -56,7 +56,7 @@ const CALLS: Call[] = [
     by: 'the agent',
     route: 'here',
     where: 'local',
-    note: 'Its state directory stays here. All eleven known CLIs are known by name.',
+    note: 'Its state directory stays here. All twelve known CLIs are known by name.',
   },
 ]
 

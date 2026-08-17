@@ -59,10 +59,50 @@ collected, and the workspace is left behind.
 The tester runs the suite in its own container, the builder fixes what it reports, and
 everything they produce lands in your workspace.
 
+## The whole run in one container
+
+The section above puts **one agent** in a container, which is what a flow says when only one
+place needs a toolchain of its own. When the answer is *all of them*, say it once from outside
+instead:
+
+```sh
+hmz exec -f ralph_loop --container python:3.12 -a claude/claude-opus-5:max "get the suite green"
+```
+
+One container is started for the run, **every** agent's turns land in it, and it goes when the
+run ends. One container rather than one apiece, which is the point: the agents are working on
+one thing, so what one of them writes is what the next one reads.
+
+The project directory is mounted at the path it already has, so the flow's own `open()` reads
+the same bytes a turn wrote. What a mounted directory does **not** answer for is a command: one
+the flow runs is run by this machine's shell against this machine's tools, which is the thing a
+container was reached for to avoid. So the flow asks:
+
+```python
+from hmz.flows import container, flow
+
+
+@flow
+def run(agents, task):
+    agents[0](task)
+    if (held := container()) is not None:
+        said = held.run(["python", "-m", "pytest", "-q"])   # in the container
+        held.write_text("last-run.txt", said.output)        # on the container's filesystem
+```
+
+`container()` answers `None` for a run on this machine, where a flow does what it always did.
+What it answers otherwise reads and writes and runs on the far end: `read_text`, `write_text`,
+`listdir`, `exists`, `mkdir`, `remove`, and `run`, which answers a `Ran` with `status`, `output`
+and `ok`. See [Machines › The workspace as the flow reaches it](/reference/machines).
+
+A place the **flow** declared `Isolated` is left where the flow put it — where an agent works is
+the flow's to say, and this is a convenience rather than a way round that. The person at the
+prompt is left alone too, taking no turn anywhere.
+
 ## From a flow
 
-This is the usual way. The flow writes the image beside the place, and nobody is asked
-anything:
+This is the usual way for one agent. The flow writes the image beside the place, and nobody is
+asked anything:
 
 ```python
 from typing import Annotated, NamedTuple

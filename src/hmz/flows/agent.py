@@ -31,7 +31,16 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from hmz.agents import AgentConfig, Event, Hooks, Moment, Question, Usage
+    from hmz.agents import (
+        AgentConfig,
+        Board,
+        Event,
+        Hooks,
+        Moment,
+        Question,
+        Tool,
+        Usage,
+    )
     from hmz.agents.base import Journal
     from hmz.agents.skills import Loaded
     from hmz.machines import MachineConfig
@@ -52,6 +61,11 @@ class Session(Protocol):
     #: fact of the backend, so it is written on the class -- a stand-in for one says it the
     #: same way, `shapes: ClassVar[bool] = True`.
     shapes: ClassVar[bool]
+
+    #: Whether this backend can be given a tool the flow wrote. A fact of the backend, said
+    #: the same way, so a flow that offers a callback can be written to ask first rather than
+    #: to catch the refusal.
+    takes_tools: ClassVar[bool]
 
     @property
     def id(self) -> str:
@@ -83,6 +97,30 @@ class Session(Protocol):
     @property
     def skills(self) -> tuple[str, ...]:
         """The flow's skills this conversation carries, by name, in the flow's own order."""
+        ...
+
+    @property
+    def tools(self) -> tuple[Tool, ...]:
+        """The flow's own callbacks this conversation is putting in front of the agent."""
+        ...
+
+    def offers(self, tools: Iterable[Tool] | None) -> None:
+        """Says which callbacks of the flow's the agent may reach for, from the next turn on.
+
+        A callback is a function of the flow's own, and the agent reaching for it is that
+        function running in the flow's process -- so a tool whose callback runs another flow
+        is an agent that can call a flow::
+
+            session.offers([Tool(name="review", about="have the reviewer read a file",
+                                 takes=Reviewing, call=lambda said: reviewer(said.path))])
+
+        Args:
+          tools: The callbacks, or None to take back whatever this conversation was offering.
+
+        Raises:
+          NotImplementedError: On a backend with no way of being given a tool it was not
+            shipped with, which `takes_tools` says of the class beforehand.
+        """
         ...
 
     def loads(self, skills: Iterable[str] | None) -> None:
@@ -523,6 +561,26 @@ class Person(Agent, Protocol):
     flow asks about this place. Run where nobody is at a prompt, it answers with nothing, and
     a flow written to stop when it is told nothing stops.
     """
+
+    @property
+    def board(self) -> Board:
+        r"""What the flow and the person both write on, and neither waits at.
+
+        The other half of talking to them. A question stops the turn until it is answered;
+        this stops nothing at all -- a handful of named lines kept beside the run and shown
+        where the run is shown, which the flow reads and writes whenever it likes and the
+        person changes whenever they like::
+
+            while waiting := person.board.get("todo").splitlines():
+                person.board.put("doing", waiting[0])
+                builder(waiting[0])
+                person.board.put("todo", "\n".join(waiting[1:]))
+
+        A line may be one side's alone -- `whose="flow"` for a note the person is to read and
+        not rewrite, `whose="user"` for one the flow is to read and not -- and the other side
+        is refused where it writes rather than quietly ignored.
+        """
+        ...
 
 
 if TYPE_CHECKING:

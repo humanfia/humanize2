@@ -107,47 +107,15 @@ def providers(argv: list[str]) -> int:
         help="the account of that CLI to carry on under, or nothing for the end of the line",
     )
 
-    trying = doing.add_parser(
-        "retry", help="say how a failed turn under one is tried again"
-    )
-    trying.add_argument(
-        "provider",
-        metavar="CLI/NAME",
-        help="the account, or `CLI/` for the one this machine is already signed into",
-    )
-    trying.add_argument(
-        "-n",
-        "--tries",
-        type=int,
-        default=0,
-        help="how many times over a failed turn is tried again, beyond the first",
-    )
-    trying.add_argument(
-        "-p",
-        "--policy",
-        default=_waits()[1],
-        help="how long to wait between tries: " + ", ".join(_waits()[0]),
-    )
-    trying.add_argument(
-        "-t",
-        "--timeout",
-        type=float,
-        default=0.0,
-        metavar="SECONDS",
-        help="the longest the trying again may go on for, or 0 for as long as it takes",
-    )
-
     args = parser.parse_args(argv)
     if args.doing in (None, "list"):
         return _list(getattr(args, "cli", ""))
     if args.doing == "ways":
         return _ways(args.cli)
     try:
-        # `claude/` is the account this machine is already signed into: a thing to show, to
-        # point somewhere and to say how to retry, and not one to make or take away.
-        cli, name = _named(
-            args.provider, made=args.doing not in ("show", "falls-back", "retry")
-        )
+        # `claude/` is the account this machine is already signed into: a thing to show
+        # and to point somewhere, and not one to make or take away.
+        cli, name = _named(args.provider, made=args.doing not in ("show", "falls-back"))
     except ValueError as why:
         parser.error(str(why))
     if args.doing == "show":
@@ -165,8 +133,6 @@ def providers(argv: list[str]) -> int:
         )
     if args.doing == "falls-back":
         return _falls_back(cli, name, args.at)
-    if args.doing == "retry":
-        return _retry(cli, name, args.tries, args.policy, args.timeout)
     return _again(cli, name, args.given)
 
 
@@ -189,34 +155,6 @@ def _falls_back(cli: str, name: str, at: str) -> int:
         else f"{whose} falls back to nowhere"
     )
     return 0
-
-
-def _retry(cli: str, name: str, tries: int, policy: str, timeout: float) -> int:
-    """Says how a failed turn under one account is tried again."""
-    from hmz import providers as held
-
-    try:
-        said = held.retrying(cli, name, tries, policy, timeout)
-    except ValueError as why:
-        print(f"hmz: {why}", file=sys.stderr)
-        return 1
-    if not said:
-        print(f"hmz: no provider {cli}/{name}", file=sys.stderr)
-        return 1
-    whose = f"{cli}/{name}" if name else f"{cli}, as this machine is signed in,"
-    print(
-        f"{whose} is tried {tries} more times, {policy}"
-        if tries
-        else f"{whose} is tried once"
-    )
-    return 0
-
-
-def _waits() -> tuple[tuple[str, ...], str]:
-    """What a turn may be waited over between tries, and the one an account starts on."""
-    from hmz.providers import retry
-
-    return tuple(one.name for one in retry.POLICIES), retry.DEFAULT
 
 
 def _named(said: str, *, made: bool = True) -> tuple[str, str]:
@@ -248,10 +186,10 @@ def _also(cli: str) -> list[Provider]:
       cli: The backend to list, or "" for all of them.
 
     Returns:
-      One per backend whose own sign-in has a chain or tries written down, since that is a
-      setting in force and a list that did not show it would be a list that hid one. Nothing
-      for the ones left as they come, which is every backend on a machine nobody has said
-      anything about them on.
+      One per backend whose own sign-in has a chain written down, since that is a setting
+      in force and a list that did not show it would be a list that hid one. Nothing for the
+      ones left as they come, which is every backend on a machine nobody has said anything
+      about them on.
     """
     from hmz import backends
     from hmz import providers as held
@@ -262,7 +200,7 @@ def _also(cli: str) -> list[Provider]:
         for profile in backends.profiles()
         if (wanted is None or profile.name == wanted.name)
         and (one := held.find(profile.name, held.LOCAL)) is not None
-        and (one.fallback or one.retries)
+        and one.fallback
     ]
 
 
@@ -279,7 +217,7 @@ def _list(cli: str) -> int:
         return 1
     found = held.providers(cli)
     # And the account this machine is signed into, wherever it says something about itself:
-    # a chain or a set of tries in force is a thing to see, and it is an account here too.
+    # a chain in force is a thing to see, and it is an account here too.
     mine = _also(cli)
     if not found and not mine:
         whose = f"no {cli} providers yet" if cli else "no providers yet"
@@ -291,8 +229,6 @@ def _list(cli: str) -> int:
         said = f"{provider.cli}/{provider.name}  {way:10} {variables}"
         if provider.fallback:
             said += f"  falls back to {provider.fallback}"
-        if provider.retries:
-            said += f"  {provider.retries} tries, {provider.policy}"
         print(said)
     return 0
 
@@ -327,15 +263,6 @@ def _show(cli: str, name: str) -> int:
     print(f"made        {provider.made or '-'}")
     print(f"kept in     {provider.at}")
     print(f"falls to    {provider.fallback or 'nowhere'}")
-    print(
-        "tried       "
-        + (
-            f"{provider.retries} more times, {provider.policy}"
-            + (f", for up to {provider.timeout:.0f}s" if provider.timeout else "")
-            if provider.retries
-            else "once"
-        )
-    )
     for variable in sorted(provider.env):
         # The names, never the values: this prints where a person can read it, and a key
         # printed once is a key in a scrollback.

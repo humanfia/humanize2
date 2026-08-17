@@ -39,7 +39,7 @@ from typing import (
 from hmz import telemetry
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Sequence
+    from collections.abc import Awaitable, Callable, Generator, Sequence
 
     from pydantic import BaseModel
 
@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from hmz.agents.base import Journal
     from hmz.agents.skills import Loaded
     from hmz.cycle import Sub
+    from hmz.machines import MachineBase, MachineConfig, Mapped
 
     from . import Flow as Marked
     from .agent import Agent, Driven
@@ -58,10 +59,13 @@ __all__ = [
     "Running",
     "carries",
     "configures",
+    "contained",
+    "container",
     "declares",
     "drives",
     "entered",
     "lands",
+    "lands_in",
     "left",
     "load",
     "resumes",
@@ -164,6 +168,108 @@ def left(one: Running) -> None:
     with _TELLING:
         _RUNNING[:] = [held for held in _RUNNING if held[0] is not one]
         _DRIVEN.pop(id(one), None)
+
+
+#: The container this run is in, or None for a run on this machine. One per process rather
+#: than one per flow: a flow that called another is one run, working in one place, and two
+#: containers under one run would be two workspaces the second flow could not see the first's
+#: work in. Set by `contained` while the run is being got ready and taken down when it ends.
+_INSIDE: list[tuple[MachineBase, MachineConfig, Mapped]] = []
+
+
+def container() -> Mapped | None:
+    """The container this run is working in, as the flow's own code reaches it.
+
+    A run may be put in a container of its own, which puts every one of its agents there: the
+    project directory is mounted at the path it already has, so a file the flow opens is the
+    same file a turn opened, and only the tools differ. What a mounted directory does not
+    answer for is a command -- one the flow runs is run by this machine's shell against this
+    machine's tools -- so that is what this is for::
+
+        if (held := flows.container()) is not None:
+            held.run(["pytest", "-q"])
+
+    Returns:
+      The workspace on the machine the run lands on, or None for a run on this machine --
+      where a flow does what it always did, since the tools it would reach for are this
+      machine's either way.
+    """
+    return _INSIDE[0][2] if _INSIDE else None
+
+
+@contextlib.contextmanager
+def contained(image: str, workspace: str = "") -> Generator[MachineConfig | None]:
+    """Puts a whole run in one container, for as long as the block lasts.
+
+    Which is the convenience it is: an agent may already be pointed at a machine one at a
+    time, and a run that wanted all of them in a container was a flow declaring `Isolated`
+    beside every place it drives. This is that said once, from outside the flow -- the
+    container is started here, every agent is pointed at it, and the flow's own reads,
+    writes and commands reach it through :func:`container`.
+
+    One container for the run rather than one per agent, which is the whole point: the agents
+    are working on one thing, so what one of them writes is what the next one reads.
+
+    Args:
+      image: The image to run, which needs a `python3` for coganchor's target half and
+        whatever else the run expects its agents to reach for. "" is a run on this machine,
+        which starts nothing at all.
+      workspace: The project directory to give it, defaulting to this one. It is the
+        directory itself that goes there rather than a copy, at the path it already has, so
+        the work outlives the container.
+
+    Yields:
+      The machine every agent of the run is to be pointed at, or None for a run on this
+      machine.
+
+    Raises:
+      FileNotFoundError: If there is no workspace to give it, or no `docker` to give it to.
+      RuntimeError: If the container cannot be started.
+    """
+    if not image:
+        yield None
+        return
+    from hmz.machines import AnchoredConfig, DockerConfig, Mapped
+
+    machine = DockerConfig(image=image, workspace=workspace or None).create()
+    # Started once and named by the anchor that reaches it, so that every agent of the run is
+    # pointed at the container that is already up rather than starting one apiece.
+    anchor = machine.start()
+    held = Mapped(anchor)
+    where_ = AnchoredConfig(anchor=anchor)
+    _INSIDE.append((machine, where_, held))
+    try:
+        yield where_
+    finally:
+        _INSIDE[:] = [one for one in _INSIDE if one[0] is not machine]
+        held.close()
+        machine.stop()
+
+
+def lands_in(agents: Sequence[Agent], where_: MachineConfig) -> None:
+    """Puts every agent of a run in the container the run is working in.
+
+    Over whatever each was configured with, because that is what asking for a run to be in a
+    container means: it is said once, from outside, about all of them. An agent the flow
+    itself put in a container of its own is left where the flow put it -- where an agent works
+    is the flow's to say, and this is a convenience rather than a way round that -- and so is
+    the person at the prompt, who takes no turn anywhere.
+
+    Args:
+      agents: The agents of the run, the person among them.
+      where_: The machine they are all to land on.
+
+    Raises:
+      RuntimeError: If one of them has already opened a conversation, which is a conversation
+        that cannot be moved.
+    """
+    from hmz.agents import HumanAgent
+    from hmz.machines import DockerConfig
+
+    for one in agents:
+        if isinstance(one, HumanAgent) or isinstance(one.config.machine, DockerConfig):
+            continue
+        cast("Driven", one).runs_on(where_)
 
 
 class Writing(NamedTuple):

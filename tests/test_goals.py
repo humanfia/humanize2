@@ -183,7 +183,9 @@ def test_exec_resolves_the_agent_place_suggestion_into_its_config(
 ) -> None:
     where = _written(tmp_path, GOALS_OFF, "goals_off")
 
-    _, agents, _, _ = flow_and_agents(["-f", where, "-a", "claude/m:low", "the task"])
+    _, agents, _, _, _ = flow_and_agents(
+        ["-f", where, "-a", "claude/m:low", "the task"]
+    )
 
     assert agents[0].config.goals is False
 

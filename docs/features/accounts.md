@@ -96,10 +96,11 @@ Some failures no account answers. The model was retired this morning; the CLI wi
 the region has gone dark; the rate limit is on the whole account rather than on one request.
 Another key for the same backend is another way of asking the same thing that is not there.
 
-What answers those is another **agent** — another CLI, another model, another effort — and that
-is written between the two agents rather than on either, because it is about neither on its
-own: it is what to do when *this* CLI, at *this* model, at *this* effort, as *this* account,
-cannot run. [`/fallback`](/guide/fallback) is where it is said.
+What answers those is another **place** — another CLI, another account, another model — and
+that is written between the two places rather than on either, because it is about neither on
+its own: it is what to do when *this* CLI, at *this* model, as *this* account, cannot run. How
+hard the agent thinks and what it may reach for are what that agent *is*, and come across the
+step unchanged. [`/fallback`](/guide/fallback) is where it is said.
 
 It is the second thing tried and not the first, and the reason is the conversation. No backend
 takes another backend's session id, so a turn that leaves its backend leaves the conversation
@@ -108,15 +109,19 @@ is walked to its end first; this is what is left after that. The flow sees one t
 
 ## How it waits
 
-An account also says how a turn under it is tried again before the chain moves on: how many
-times over, how long between tries, and how long the whole of it may go on for.
+Before either chain moves, the turn is taken again: how many times over, how long between
+tries, and how long the whole of it may go on for. Written against the **place** rather than
+against the account — the CLI, the account and the model together — because it is a thing about
+where the turn runs rather than about the credentials it runs with, and because it and where
+the turn goes next are answers to the one thing that happened. [`/fallback`](/guide/fallback)
+says both.
 
 **Nothing is retried by default.** A turn is taken once, as it always was: a prompt the model
-refused is the same refusal every time, and only the caller knows which of its accounts fails
+refused is the same refusal every time, and only the caller knows which of its places fails
 the other way. The waits are the ones everybody uses, under the names everybody uses them by,
 and none is invented here. No single wait is longer than a minute, however far the backoff has
-climbed, and the time an account was given is checked *before* a wait rather than after it — so
-a turn is never started knowing it is already spent.
+climbed, and the time a place was given is checked *before* a wait rather than after it — so a
+turn is never started knowing it is already spent.
 
 The default is exponential backoff with full jitter, which is what keeps a flow's agents from
 all coming back on the same second.
@@ -125,7 +130,8 @@ all coming back on the same second.
 
 The CLI as whoever is at this machine already runs it is an account here too, named by the
 empty string. humanize did not make it, keeps no credentials for it, cannot sign it in and
-cannot take it away — so the only things written down about it are what it does when it fails.
+cannot take it away — so the only thing written down about it is which account a turn under it
+carries on under when it fails.
 
 It answers no redirects and no variables, so a turn under it is exactly the turn an agent with
 no account has always taken: nothing added to the environment, nothing taken out of it, no path

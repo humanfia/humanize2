@@ -148,7 +148,7 @@ list appears under the editor with a line about each.
 | `/cycles` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/guide/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
-| `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent, marked as it works, with the handovers between them drawn as the arrows joining them. Enter reads an agent. **esc** opens it. |
+| `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent that has worked, marked as it works, with the handovers between them drawn as the arrows joining them, whatever each started of its own hanging under it, and [the board](/guide/board) below. Enter reads an agent or changes a line. **esc** opens it. |
 | `/btw` | `<question>` | Asks a side question about the running flow from a read-only snapshot of its progress. It runs in a separate session and never steers the flow. |
 | `/details` | `[on\|off]` | Shows or hides everything a turn did on the way to its answer: tool calls, thinking, and whatever a backend printed on its way past. One question — how much of the working to show — so one switch. **Off** to begin with. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
@@ -176,7 +176,7 @@ are watching is the flow.
 end. With ten agents going, what you are stepping between is the ones thinking right now, not
 the ones that have stopped. An agent between its turns is still read once you are on it — what
 you are reading is left where it is until you press one of these — but it is not stepped onto.
-Every agent there is can still be read from [`/status`](#how-the-run-is-going), which draws the
+Every agent that has worked can still be read from [`/status`](#how-the-run-is-going), which draws the
 whole flow: that is where the one that has stopped, or has not started, is picked out by name.
 
 **Every conversation of one agent is that agent's one transcript**, running on down it. A
@@ -249,11 +249,17 @@ them:
   │ ● builder · claude#a1b2                      │
   │ claude/claude-opus-5:high · 12 turns         │
   └──────────────────────────────────────────────┘
+    ├╴◆ Task read the tests
+    └╴◇ Task find the flaky one
       ↓ 6   ↑ 5
   ┌──────────────────────────────────────────────┐
   │ ○ reviewer · codex#c3d4                      │
   │ codex/gpt-5.6-sol:high · 5 turns             │
   └──────────────────────────────────────────────┘
+
+  Board · what you and the flow both write on
+    ◈ todo          write the parser
+    ◈ doing         write the parser · flow's
 
    Working:  builder
    Running:  431s
@@ -266,10 +272,27 @@ A handover between two agents the boxes did not put next to each other is said u
 diagram as `Also` rather than drawn: a line crossing the page from the first box to the fourth
 is a line nothing in a terminal draws readably.
 
+**A box appears as its agent takes its first turn**, and not before. A flow may declare ten
+agents and reach three of them, and seven boxes that have never done anything are seven rows
+saying nothing: the diagram is what the run *is doing* rather than a list of what was set up.
+Each stays for the rest of the run once it is there.
+
+**An agent one of them started of its own hangs off its box**, without a box of its own: `◆`
+for one still going, `◇` for one that has come back. It is a thing the agent above it is doing
+rather than an agent of the flow — nobody chose what it runs, nothing can be said to it and it
+has no transcript — so it is not a row to open, and a box round it would say otherwise. Only
+[the backends that say](/reference/agents#not-every-backend-runs-every-moment) draw one. A
+fleet too long to draw is cut, with a line saying how many were left off.
+
+**The board is under the diagram**, for a flow that talks to you: the named lines you and the
+flow both write on, and neither waits at. `a` puts one up — a name, then what it says — enter
+changes the one under the cursor, and `d` twice takes it off. A line the flow keeps to itself
+says so instead of opening an editor. See [The mission board](/guide/board).
+
 **Enter or a click on a box reads that agent** — whether or not it is working. tab is held to
-the ones thinking, so this is the one place an agent that has stopped, or has not started, is
-reached. The first row is the transcript every agent's work appears on, which is the way back
-to watching the flow rather than one agent of it.
+the ones thinking, so this is the one place an agent that has stopped is reached. The first row
+is the transcript every agent's work appears on, which is the way back to watching the flow
+rather than one agent of it.
 
 The agents of the last run are still drawn once it is over. Their transcripts are still on the
 screen and still worth reading back, and a run that has just ended is usually the one you want
@@ -804,47 +827,46 @@ than in the CLI's. What came of it is a line in the transcript.
 Nothing here is refused while a flow is running. An agent reads the account it was configured
 with once, so one made or taken away now is one the next run sees.
 
-The retry sheet answers in rungs rather than in numbers: the tries step through 0, 1, 2, 3, 5,
-8, 13 and 21, and the time the retrying is given through *as long as it takes*, 30s, 1m, 5m,
-15m and 1h. A text box for an integer is a text box to validate.
-
 The same accounts are on the command line as [`hmz providers`](/reference/providers#hmz-providers).
 
 ## Where a turn goes when it cannot be taken
 
-`/fallback` is two pages of one menu, because two different things are called falling back.
+`/fallback` is one page of steps between **places**. A place is a CLI, an account and a model,
+and it is what a turn can fail for having named — a model retired, a CLI that will not start, a
+rate limit on the whole account rather than one request. How hard the agent thinks and what it
+may reach for are what that agent *is*, so they are not asked here and come across a step
+unchanged.
 
-**Agents.** An agent that has nowhere left to run — a model retired, a CLI that will not
-start, a rate limit on the whole account rather than one request — falls back to a whole other
-agent. `a` chooses the one that cannot run and then the one that takes its turns, each on
-[the same sheet](#what-each-agent-is) a flow's agent is chosen on. `d` twice takes a step away.
-Enter on a row says where that agent's turns go instead.
+`a` chooses the place that cannot run and then the place that takes its turns, each as three
+questions: the CLI, one of its accounts, one of the models it says it runs. `d` twice takes a
+step away. Enter on a row asks the two things a step says — where its turns go, and how many
+times over a failed turn is taken again first.
 
-**Accounts.** **tab** turns to the account chains, which are the ones
-[`/providers`](#the-accounts-themselves) also reaches: enter says which account of the same CLI
-a turn under this one carries on under. Making an account and taking one away stay there, and
-the keys here say so rather than doing nothing.
+The retry sheet answers in rungs rather than in numbers: the tries step through 0, 1, 2, 3, 5,
+8, 13 and 21, and the time the retrying is given through *as long as it takes*, 30s, 1m, 5m,
+15m and 1h. A text box for an integer is a text box to validate.
 
-Both are held until the menu is saved on the way out, as everything on a menu is.
+An account falling back to another account of the same CLI is not here: that happens inside the
+conversation that was running, so it is a thing about the account, and it is on
+[`/providers`](#the-accounts-themselves).
+
+Everything is held until the menu is saved on the way out, as everything on a menu is.
 
 ```
   Fallback
 
-  Where a turn goes when what was taking it cannot. An agent falls back to a whole other
-  agent -- another CLI, model, effort or account -- in a session of its own, and is what is
-  left when a backend has nowhere to run. An account falls back to another account of the
-  same CLI, inside the conversation that was running.
+  Where a turn goes when the place taking it cannot take it at all. A place is a CLI, an
+  account and a model; the turn is taken again there as many times as this says, and then
+  in a session of its own at the place it falls back to.
 
-  Agents · Accounts   tab turns the page
+  ❯ 1. claude@work/claude-opus-5   3 more tries, exponential · falls back to codex@key/gpt-5.6-sol
+    2. codex@key/gpt-5.6-sol       falls back to dsh/deepseek-v4-flash
 
-  ❯ 1. claude@work/claude-opus-5:high     falls back to codex@key/gpt-5.6-sol:high
-    2. codex@key/gpt-5.6-sol:high         falls back to dsh/deepseek-v4-flash:high
-
-  Enter for where its turns go · a adds one · d twice takes one away · Esc to close
+  Enter for what happens · a adds one · d twice takes one away · Esc to close
 ```
 
-An agent cannot fall back to itself, and a chain that comes round on itself ends at the second
-sight of an agent. The same steps are on the command line as
+A place cannot fall back to itself, and a chain that comes round on itself ends at the second
+sight of a place. The same steps are on the command line as
 [`hmz fallback`](/reference/cli#hmz-fallback), and what they mean is
 [Falling back](/guide/fallback).
 

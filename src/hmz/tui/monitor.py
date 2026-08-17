@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-__all__ = ["Monitor", "Shape", "Spend", "short", "thousands"]
+__all__ = ["Monitor", "Shape", "Spend", "Under", "short", "thousands"]
 
 #: How far back the rate is measured. Five minutes is long enough to carry across the gaps a
 #: flow leaves -- a turn that thinks, a round it sleeps off, a commit it makes -- and short
@@ -61,6 +61,26 @@ def short(agent: str) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class Under:
+    """One agent a flow's own agent started of its own, which is what a subagent is.
+
+    Not an agent of the flow. Nobody chose what it runs, nothing can be said to it and it has
+    no transcript of its own -- it is a thing the agent above it is doing, and it is drawn as
+    one. What is known of it is what its backend said on the way past.
+
+    Attributes:
+      whose: The backend's own id for it, which is what pairs the one that started with the
+        one that ended.
+      about: What it was asked to do, as its backend said it.
+      working: Whether it is still going.
+    """
+
+    whose: str
+    about: str
+    working: bool = True
+
+
+@dataclass(frozen=True, slots=True)
 class Shape:
     """The directed graph of a run so far, taken whole so a reader never sees it mid-change.
 
@@ -73,11 +93,17 @@ class Shape:
       working: Which of them have a turn open right now.
       handovers: How often each agent handed on to each other agent, as the flow went from
         one to the next.
+      under: The agents each of them has started of its own, oldest first -- the ones still
+        going and the ones that have finished, since a fleet that vanished as it landed would
+        be a turn nobody could see the shape of afterwards.
     """
 
     turns: Mapping[str, int]
     working: frozenset[str]
     handovers: Mapping[tuple[str, str], int]
+    under: Mapping[str, tuple[Under, ...]] = field(
+        default_factory=dict[str, tuple[Under, ...]]
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +139,12 @@ class Monitor:
     )
     #: The model each agent runs at, so that spending can be named by model.
     models: dict[str, str] = field(default_factory=dict[str, str])
+    #: The agents each of them has started of its own, in the order they started, by the
+    #: backend's own id for each. A dict rather than a list: one ends by name, and a fleet of
+    #: forty would be a list searched forty times.
+    fleets: dict[str, dict[str, Under]] = field(
+        default_factory=dict[str, dict[str, Under]]
+    )
     #: Tokens spent per model, all told.
     spent: Counter[str] = field(default_factory=Counter[str])
     #: What each source says has been spent on each model so far. Two of them say: the
@@ -169,6 +201,37 @@ class Monitor:
             else:
                 self.working[agent] -= 1
             self._last = agent
+
+    def started(self, agent: str, whose: str, about: str) -> None:
+        """Notes that an agent has started an agent of its own.
+
+        Args:
+          agent: Whose fleet it is.
+          whose: The backend's own id for the one that started.
+          about: What it was asked to do.
+        """
+        with self._lock:
+            self.fleets.setdefault(agent, {})[whose] = Under(whose, about)
+
+    def finished(self, agent: str, whose: str, about: str = "") -> None:
+        """Notes that one of those has come back.
+
+        Kept rather than forgotten: a fleet that vanished as it landed would be a turn nobody
+        could see the shape of afterwards. One that ended without ever being seen to start --
+        a backend that says only the one half, a turn watched from part way through -- is
+        written down as having ended, since it did.
+
+        Args:
+          agent: Whose fleet it is.
+          whose: The backend's own id for the one that ended.
+          about: What it was asked to do, for one nothing saw start.
+        """
+        with self._lock:
+            held = self.fleets.setdefault(agent, {})
+            was = held.get(whose)
+            held[whose] = Under(
+                whose, was.about if was is not None else about, working=False
+            )
 
     def stops(self) -> None:
         """Notes that the run is over, which is what stops the clock the rate is read at."""
@@ -294,4 +357,9 @@ class Monitor:
                 turns=dict(self.turns),
                 working=frozenset(self.working),
                 handovers=dict(self.handovers),
+                under={
+                    agent: tuple(held.values())
+                    for agent, held in self.fleets.items()
+                    if held
+                },
             )

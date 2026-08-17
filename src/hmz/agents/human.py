@@ -24,6 +24,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, get_args, get_origin
 
 from .base import AgentBase, SessionBase
+from .board import Board
 from .config import AgentConfig
 from .event import Event, Question
 
@@ -307,6 +308,23 @@ class HumanAgent(AgentBase):
             for any other.
         """
         super().__init__(AgentConfig(model="human", effort=""), name=name)
+        #: The board this person and the flow both write on, which is the other half of
+        #: talking to them: a question stops the turn until it is answered, and this stops
+        #: nothing at all. Theirs rather than the flow's because the flow is a function that
+        #: returns and the board outlives any one turn of it.
+        self._board = Board()
+
+    @property
+    def board(self) -> Board:
+        """What the flow and the person both write on, and neither waits at.
+
+        A handful of named lines kept beside the run and shown where the run is shown: what
+        there is to do, how far through it is, what somebody thought of while it was
+        running. The flow reads and writes it whenever it likes and the person changes it
+        whenever they like, so neither is ever held up by the other -- which is what makes it
+        the place a run's work queue goes, and `asked` the place a question goes.
+        """
+        return self._board
 
     def _remade(self, config: AgentConfig, name: str | None) -> HumanAgent:  # noqa: ARG002
         """Another person, which is the same person: they are made rather than configured.
@@ -316,7 +334,8 @@ class HumanAgent(AgentBase):
           name: What to call them, or None for the name a person is made under.
 
         Returns:
-          The new agent.
+          The new agent. It is another person and so another board: what was on the first is
+          that run's, and a copy of it moving under both would be two boards saying one thing.
         """
         return type(self)(name=name or "human")
 

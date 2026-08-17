@@ -225,7 +225,8 @@ def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., st
         # Started as a turn of it is started, which is by name where PATH names one and by
         # the path it is installed at where it does not: a backend found somewhere this
         # machine's PATH does not name is still a backend to ask.
-        argv = [elsewhere(profile.name) or profile.name, *args]
+        command = profile.runs()
+        argv = [elsewhere(command) or command, *args]
         # Under the provider's own credential paths, which is the whole of what makes the
         # answer that account's rather than this machine's.
         done = subprocess.run(
@@ -540,6 +541,55 @@ def _grok(profile: Profile, run: Callable[..., str]) -> list[Model]:
     return found
 
 
+def _cursor(profile: Profile, run: Callable[..., str]) -> list[Model]:
+    """What Cursor Agent runs, which it prints under a heading with a tip under it.
+
+    One model a line -- the id, then the name a person reads behind a dash, and `(current)` or
+    `(default)` against the ones it is at now. The catalogue is the account's, so a run that is
+    not signed in says so where the list would be.
+
+    Args:
+      profile: Cursor Agent's own.
+      run: What puts the question.
+
+    Returns:
+      One per model it offers, each at the whole ladder: how hard a Cursor model thinks is a
+      parameter of the model rather than a property of it, and the list does not say which of
+      them take one. A model whose own name carries a rung is offered at that one alone, its
+      name being what it runs at -- `gpt-5-high` is not a model to ask for `low`.
+    """
+    found: list[Model] = []
+    for line in run(["--list-models"]).splitlines():
+        said = _plain(line).strip()
+        # A model line is the id, and then either nothing, the name a person reads behind a
+        # dash, or the brackets that mark the one it is at. The heading above the list and
+        # the tip below it are sentences, and a sentence is not a model.
+        name, _, rest = said.partition(" ")
+        if not name or (rest and not rest.startswith(("- ", "("))):
+            continue
+        carried = next(
+            (rung for rung in profile.efforts if name.endswith(f"-{rung}")), ""
+        )
+        found.append(Model(name, (carried,) if carried else profile.efforts))
+    return found
+
+
+#: What a CLI wraps a word in to colour it, which is not part of what the word says.
+_COLOURED = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain(said: str) -> str:
+    """One line with whatever colour a CLI put round it taken off.
+
+    Args:
+      said: The line, as it was printed.
+
+    Returns:
+      The words alone.
+    """
+    return _COLOURED.sub("", said)
+
+
 def _qwen(profile: Profile, _run: Callable[..., str]) -> list[Model]:
     """What Qwen Code runs, which is whatever the endpoint behind it serves.
 
@@ -725,6 +775,7 @@ _READING: dict[str, Callable[[Profile, Callable[..., str]], list[Model]]] = {
     "agy": _agy,
     "claude": _claude,
     "codex": _codex,
+    "cursor": _cursor,
     "dsh": _dsh,
     "grok": _grok,
     "kimi": _kimi,

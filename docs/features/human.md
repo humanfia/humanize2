@@ -52,6 +52,18 @@ So the flow gets nothing back, under the same suppression it would use for a tur
 and takes the same branch it takes for [an answer that was not the shape it asked
 for](/features/shapes). One branch, three reasons to take it.
 
+## And the half that does not wait
+
+Asking stops the turn. The **board** does not: a handful of named lines kept beside the run and
+drawn where the run is drawn, which the flow reads and writes whenever it likes and the person
+changes whenever they like. Neither is ever held up by the other.
+
+Which is what a run's work queue wants to be. You put more work up while the loop is going and
+the next round takes it; the loop writes down how far through it is and you read that without
+saying anything. A line may be one side's alone — a flow's note of its own progress, a person's
+list of what they want next — and the other side is refused where it writes rather than quietly
+ignored.
+
 ## Which is why it is one feature and not two
 
 An agent stopping mid-turn to ask its user something and a flow asking a person something are

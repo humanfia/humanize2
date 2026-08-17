@@ -68,9 +68,9 @@ def _exec(argv: list[str]) -> int:
     # If it has been answered yes, and never otherwise: a run with nobody at a terminal is a
     # run with nobody to ask, and silence is not an answer.
     telemetry.start()
-    path, agents, task, config = flow_and_agents(argv)
+    path, agents, task, config, container = flow_and_agents(argv)
     try:
-        runner = Runner(path, agents, config)
+        runner = Runner(path, agents, config, container=container)
     except NotAFlow as error:
         # A flow that is not there, or one that takes other agents than these, is a command
         # line that was wrong before anything ran, so it exits as argparse's own rejections
@@ -145,6 +145,20 @@ def _cred(argv: list[str]) -> int:
     from .cred import cred
 
     return cred(argv)
+
+
+def _tools(argv: list[str]) -> int:
+    """Carries the tool protocol between a coding agent and the flow whose callbacks it is.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      Zero once either end has gone, or one for a flow that is no longer there.
+    """
+    from .tools import tools
+
+    return tools(argv)
 
 
 def _agents(argv: list[str]) -> int:
@@ -338,9 +352,11 @@ COMMANDS = {
 #: A turn taken as an account runs the CLI with the paths it keeps its credentials at pointed
 #: into that account's directory, and the supervisor doing the pointing has to be a process of
 #: its own -- it forks the program and takes the signal handling with it, which a flow pumping
-#: turns from threads of its own has none to lend. So it is a command line because there is no
-#: other way to start a process, and not because it is a thing anybody types.
-_SPAWNED = {"cred": _cred}
+#: turns from threads of its own has none to lend. A flow's own callbacks are the same shape
+#: the other way round: a CLI takes a tool by starting a program, so there is a program, and it
+#: does nothing but carry the protocol back to the process the callbacks are in. Both are a
+#: command line because there is no other way to start a process, and neither is typed.
+_SPAWNED = {"cred": _cred, "tools": _tools}
 
 
 def main(argv: list[str] | None = None) -> int:
