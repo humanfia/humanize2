@@ -772,9 +772,7 @@ def test_a_finding_says_which_file_beside_the_entry_it_is_in(tmp_path: Path) -> 
         )
     )
     found = checked(at)
-    assert [(one.code, one.where.name) for one in found] == [
-        ("dead-loop", "helper.py")
-    ]
+    assert [(one.code, one.where.name) for one in found] == [("dead-loop", "helper.py")]
 
 
 def test_the_surface_is_the_interfaces_themselves() -> None:
@@ -805,9 +803,11 @@ ALLOWED_WARNINGS = {"rlar": {"unbounded-loop"}}
 def _swept() -> list[object]:
     """One parameter per flow humanize ships or the official flowverse holds now."""
     places = [("builtin", BUILTIN_AT)]
-    for verse in hmz.flows.flowverses():
-        if verse.name == hmz.flows.OFFICIAL and verse.fetched:
-            places.append((verse.name, hmz.flows.holds(verse)))
+    places.extend(
+        (verse.name, hmz.flows.holds(verse))
+        for verse in hmz.flows.flowverses()
+        if verse.name == hmz.flows.OFFICIAL and verse.fetched
+    )
     held: list[object] = []
     seen_official = False
     for whose, under in places:
