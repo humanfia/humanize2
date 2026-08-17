@@ -481,6 +481,12 @@ def apart(
       session: What is holding the run, which is what `/detach` lets go of and what draws
         the screen again for a terminal that has just arrived.
     """
+    # Here rather than only on the line that opens the interface: this is the one function
+    # that runs inside the process holding a run, and `hmz daemon start` reaches it without
+    # going past `_tui`. Textual reads the answer once, while it is imported, so it has to
+    # be settled before the interface below is reached.
+    _prepare_textual_terminal()
+
     from hmz.sdk import Hmz
     from hmz.tui import Humanize
 

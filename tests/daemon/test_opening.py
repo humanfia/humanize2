@@ -8,6 +8,7 @@ it opens in this process exactly as it always did.
 
 from __future__ import annotations
 
+import os
 import unittest.mock
 from typing import TYPE_CHECKING
 
@@ -100,6 +101,26 @@ def test_a_run_that_cannot_be_held_is_opened_here_instead(
     said = capsys.readouterr().err
     assert "cannot be held apart from the terminal" in said
     assert "no forking here" in said
+
+
+def test_a_held_run_is_opened_on_a_terminal_prepared_for_this_one(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The iTerm2 opt-out is the terminal's, so the process holding a run has to take it.
+
+    `hmz daemon start` reaches the interface without going past the line `hmz` itself takes,
+    and a run held without it pushes the keyboard protocol that loses IME-composed text at
+    the very terminal that cannot take it.
+    """
+    monkeypatch.setenv("TERM_PROGRAM", "iTerm.app")
+    monkeypatch.delenv("TMUX", raising=False)
+    monkeypatch.delenv("TEXTUAL_DISABLE_KITTY_KEY", raising=False)
+
+    with unittest.mock.patch("hmz.tui.Humanize") as opened:
+        cli.apart("", (), None, unittest.mock.Mock(spec=daemon.Held))
+
+    assert opened.called
+    assert os.environ["TEXTUAL_DISABLE_KITTY_KEY"] == "1"
 
 
 def test_the_interface_is_handed_what_is_holding_the_run(workspace: Path) -> None:
