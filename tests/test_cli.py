@@ -34,6 +34,7 @@ COMMANDS = [
     ("trace", set[str]()),
     ("anchor", {"coganchor"}),
     ("flowverses", set[str]()),
+    ("check", set[str]()),
     ("agents", set[str]()),
 ]
 

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from hmz.flows import Flowverse, Offer, Place, Running
+    from hmz.flows import Finding, Flowverse, Offer, Place, Running
 
 __all__ = ["Flows", "Flowverses"]
 
@@ -211,6 +211,39 @@ class Flows:
         from hmz.flows import wanted
 
         return wanted(named)
+
+    def check(
+        self, named: str | os.PathLike[str], *, static: bool = False
+    ) -> tuple[Finding, ...]:
+        """Reads a flow for what will not run, before anything runs it.
+
+        Two readings, in their order. The static one is pure `ast` over every file the
+        flow holds and executes nothing, which is the whole of what `static` keeps. The
+        second loads the flow and reads its live config model, in a subprocess held to a
+        clock -- and is left out where the first found an error: a flow that cannot run is
+        not one to run to find out more about.
+
+        Args:
+          named: The flow, by the name `-f` takes or by a path.
+          static: Only the reading that executes nothing.
+
+        Returns:
+          Every finding, the static reading's first and nothing said twice: a finding the
+          static reading already made is not repeated off the live model.
+        """
+        from pathlib import Path
+
+        from hmz.flows import ENTRY, checked, find, inside, proved
+
+        at = Path(find(str(named)))
+        whole = at.parent if at.name == ENTRY else at
+        found = list(checked(whole))
+        if static or any(one.severity == "error" for one in found):
+            return tuple(found)
+        proof = proved(whole, name=inside(str(named)), scenarios=())
+        said = {one.code for one in found}
+        found.extend(one for one in proof.findings if one.code not in said)
+        return tuple(found)
 
     def configures(self, named: str | os.PathLike[str]) -> type[BaseModel] | None:
         """What a flow can be set up with, or None for one that takes no setting up."""
