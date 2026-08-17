@@ -52,6 +52,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, overload
 
 from .agent import Agent, Driven, Person, Session
+from .checking import Finding, checked
 from .driving import (
     NotAFlow,
     Place,
@@ -127,6 +128,7 @@ __all__ = [
     "Driven",
     "Event",
     "Failed",
+    "Finding",
     "Flow",
     "Flowverse",
     "Goal",
@@ -156,6 +158,7 @@ __all__ = [
     "at",
     "backends",
     "carries",
+    "checked",
     "configures",
     "container",
     "drives",
