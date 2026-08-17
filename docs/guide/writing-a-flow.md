@@ -176,7 +176,15 @@ by taking its name. A file whose name starts with `_` is not a flow.
 
 ## Check your work
 
-Check which agents the flow declares.
+Check the flow itself, before anything runs it: a static reading that executes nothing, then
+the flow driven by stubs against a clock — including the world where the reviewer never says
+the work is done. See [Checking a flow](/guide/checking-flows).
+
+```sh
+hmz check local/twice
+```
+
+And check which agents the flow declares.
 
 ```python
 from hmz.flows import drives

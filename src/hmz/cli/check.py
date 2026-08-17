@@ -66,7 +66,7 @@ def check(argv: list[str]) -> int:
     )
     args = parser.parse_args(argv)
 
-    import os
+    from pathlib import Path
 
     from hmz.sdk import Hmz
 
@@ -75,7 +75,7 @@ def check(argv: list[str]) -> int:
     for named in args.flow:
         # A name nothing answers to is a line to correct, refused the way argparse refuses
         # one -- before anything is read, and for every name on the line at once.
-        if not os.path.isfile(flows.find(named)):
+        if not Path(flows.find(named)).is_file():
             parser.error(f"no flow called {named!r}")
         found.extend(flows.check(named, static=args.static))
     _said(found, as_json=args.as_json, flows=len(args.flow))
@@ -114,6 +114,8 @@ def _said(found: list[Finding], *, as_json: bool, flows: int) -> None:
         print(f"{one.where}:{one.line}: {one.severity}: {one.code}: {one.said}")
     errors = sum(one.severity == "error" for one in found)
     if found:
-        print(f"hmz check: {many(errors, 'error')}, {many(len(found) - errors, 'warning')}")
+        print(
+            f"hmz check: {many(errors, 'error')}, {many(len(found) - errors, 'warning')}"
+        )
     else:
         print(f"hmz check: nothing to say about {many(flows, 'flow')}")
