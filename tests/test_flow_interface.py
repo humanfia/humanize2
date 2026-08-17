@@ -11,7 +11,7 @@ interfaces are declared and is worth having said once where a run of the suite c
 from __future__ import annotations
 
 import ast
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 import pytest
 
@@ -20,7 +20,6 @@ from hmz.agents import HumanAgent
 from hmz.agents import Unrecoverable as AgentUnrecoverable
 from hmz.flows import BUILTIN_AT, Agent, Person, Session
 from hmz.flows import Unrecoverable as FlowUnrecoverable
-from hmz.flows.checking import surface
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -73,6 +72,28 @@ def test_an_unrecoverable_turn_is_the_same_exception_a_flow_can_catch() -> None:
     assert FlowUnrecoverable is AgentUnrecoverable
 
 
+def _members(protocol: type) -> set[str]:
+    """What one interface asks for, by name.
+
+    Args:
+      protocol: The interface.
+
+    Returns:
+      One name per member it declares, its own and whatever it is itself an interface of.
+      `__call__` is among them where it is declared, an agent and a session both being things
+      a flow calls; the rest of the dunders are Python's and are not part of the contract.
+    """
+    said: set[str] = set()
+    for one in protocol.__mro__:
+        if one in (object, Protocol):
+            continue
+        held = set(vars(one)) | set(getattr(one, "__annotations__", {}))
+        said.update(
+            name for name in held if not name.startswith("_") or name == "__call__"
+        )
+    return said
+
+
 def _answers(driver: object) -> set[str]:
     """What one driver has, by name.
 
@@ -100,7 +121,7 @@ def test_the_drivers_answer_to_what_a_flow_drives() -> None:
         (Person, person),
         (Session, person.new()),
     ):
-        missing = {one for one in surface(interface) if one not in _answers(driver)}
+        missing = {one for one in _members(interface) if one not in _answers(driver)}
         assert not missing, (
             f"{type(driver).__name__} does not answer to {interface.__name__}: {missing}"
         )

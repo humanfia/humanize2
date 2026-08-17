@@ -670,28 +670,6 @@ that can happen to a flowverse -- added, fetched again, taken away.
   that will not go -- MUST say so where it can be read and exit non-zero, and MUST leave the
   list as it was. None of those MUST reach whoever typed the line as a traceback.
 
-## `hmz check`
-
-```shell
-hmz check [--static] [--strict] [--json] <flow> [<flow>...]
-```
-
-Reads a flow for what will not run, before anything runs it.
-
-- The two readings MUST run in their order: the static one over every file the flow holds,
-  which MUST NOT import or execute anything of it -- the flow most worth checking is one
-  nobody has read -- and then the flow loaded and its live config model read. The second MUST
-  run only in a subprocess with a clock held over it, MUST NOT run where the first found an
-  error, and `--static` MUST leave it out altogether: a flow that cannot run is not one to
-  run to find out more about.
-- Every finding MUST print one a line -- the file, the line, the severity, the code and what
-  is wrong -- with a count under them, and `--json` MUST say the same as one JSON object a
-  line for a script to read. Everything wrong MUST be said at once rather than first-failure
-  first: a checker is asked so that one reading answers for the whole flow.
-- It MUST exit 0 for flows with nothing blocking -- warnings print and pass -- 1 where any
-  error was found, or any warning under `--strict`, and 2 for a line to correct or a name no
-  flow answers to, refused as argparse refuses one.
-
 ## `hmz agents`
 
 ```shell

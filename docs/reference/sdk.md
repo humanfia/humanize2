@@ -86,7 +86,6 @@ run.wait(timeout=60)
 | `find(named)` | The file one flow is written in. Raises `NotAFlow` for a name nothing answers to. |
 | `about(named)` | The line a flow says about itself. |
 | `places(named)` | Every agent it needs chosen for it, in the order it takes them. |
-| `check(named, static=False)` | Reads it for what will not run, before anything runs it: one finding per thing found, errors and warnings. `static=True` keeps to the reading that executes nothing. |
 | `configures(named)` | What it can be [set up with](/reference/flows#settings-of-the-flow-s-own), or `None`. |
 | `resumes(named)` | Whether it says it can be [picked up](/guide/resuming). |
 | `fork(named, into=None)` | Copies it into this project's own flows, whole. |

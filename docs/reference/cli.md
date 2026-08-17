@@ -277,39 +277,6 @@ to a shell on that machine — read [Security](/guide/security).
 hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 ```
 
-## `hmz check`
-
-```
-hmz check [--static] [--strict] [--json] FLOW [FLOW...]
-```
-
-Reads a flow for what will not run — before anything runs it. Two readings, in their order: a
-static one over every file the flow holds, which executes nothing and is safe to point at a
-flow nobody has read, and then the flow loaded — in a subprocess held to a clock — so its live
-config model is read too. A flow is named the way `-f` names one: `chat`, `official/rlar`, a
-path of your own.
-
-| Argument | |
-| --- | --- |
-| `--static` | Only the reading that executes nothing: do not load the flow at all. |
-| `--strict` | Exit non-zero on warnings too. |
-| `--json` | One JSON object per finding, one a line, for a script to read. |
-
-Each finding prints as `file:line: severity: code: what is wrong`, with a count under them.
-An error is a flow that cannot run, cannot be answered or cannot end — a loop nothing inside
-can end, a name the interfaces do not answer to, an import of humanize's own internals — and
-a warning is a flow that runs and may be regretted: a loop whose only way out is an agent's
-verdict, a shaped answer read without a guard, a config that takes anything.
-
-It exits `0` for flows with nothing blocking (warnings print and pass), `1` where any error
-was found — or any warning, under `--strict` — and `2` for a line to correct or a name no
-flow answers to.
-
-```sh
-hmz check official/rlar          # one warning: a loop only its reviewer ends
-hmz check --strict local/mine    # hold a flow of your own to the whole bar
-```
-
 ## `hmz flowverses`
 
 Where flows come from: a git repository with a `flows/` directory apiece, cloned under
@@ -612,7 +579,7 @@ into them.
 | | |
 | --- | --- |
 | `0` | It did what it was asked. |
-| `1` | It could not: the target could not be reached, the listener could not be started, there is no such provider, a turn could not be supervised, `hmz check` found something blocking. |
+| `1` | It could not: the target could not be reached, the listener could not be started, there is no such provider, a turn could not be supervised. |
 | `2` | The command line was wrong — argparse's own rejections, a flow that is not there or takes other agents, a malformed listen address, a non-loopback listener with no token. |
 | `130` | Interrupted. |
 | *the agent's own* | `hmz anchor` exits with the status of the program it ran, and `hmz providers add` with that of the login it ran. |

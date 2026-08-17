@@ -174,7 +174,6 @@ uv run pytest --run-agents          # also drives the real coding agent CLIs
 
 ## See also
 
-- [Checking a flow](/guide/checking-flows)
 - [Answers in a shape](/guide/shapes)
 - [config model](/guide/flow-settings)
 - [hook](/guide/hooks)
