@@ -405,8 +405,8 @@ def _compiled(
                 "unstatic-body",
                 where,
                 node.lineno,
-                "an atlas is compiled rather than awaited -- what takes time is a node, "
-                "and a node is where an `async def` goes",
+                "an atlas is compiled rather than awaited: the body is read and the "
+                "graph is what runs, so there is nothing here to wait for",
             )
         )
     if not _TAKES <= len(params) <= _AND_A_CONFIG:
@@ -430,6 +430,8 @@ def _compiled(
         if len(params) == _AND_A_CONFIG
         else ""
     )
+    if config:
+        found.extend(_settled(config, held, where, params[2].lineno))
     answers = "" if gives == NOTHING else gives
     wiring = _Wiring(
         whole=whole,
@@ -495,6 +497,41 @@ def _kind(
         )
     )
     return ""
+
+
+def _settled(config: str, held: _Held, where: Path, line: int) -> list[Finding]:
+    """Whether an atlas's config can be built by a run that was not set up.
+
+    A run may be started with nothing, and the body of an atlas has no way to say what to do
+    about that: `config or Config()` is work, and work is what a node is for. So a run
+    nobody set up is handed the model's own defaults -- and a model that cannot be built out
+    of its defaults is one such a run has no config for at all.
+
+    Args:
+      config: The model, by name.
+      held: What the flow's files declare.
+      where: The file, for a finding.
+      line: The line the config is declared on.
+
+    Returns:
+      An `unset-config` error per field the model refuses to be built without.
+    """
+    model = held.models.get(config)
+    if model is None:
+        return []
+    short = [one.name for one in _fields(model, held) if one.required]
+    if not short:
+        return []
+    return [
+        _said(
+            "unset-config",
+            where,
+            line,
+            f"{config} requires {', '.join(short)}, and a run that was not set up has "
+            "nothing to give -- an atlas is handed its config's own defaults, so every "
+            "field of one has to have a default",
+        )
+    ]
 
 
 def _agents(
@@ -1048,6 +1085,18 @@ class _Wiring:
         Returns:
           Its declaration, or None where the function's shapes cannot be read.
         """
+        if isinstance(held.node, ast.AsyncFunctionDef):
+            self.found.append(
+                _said(
+                    "unstatic-body",
+                    self.where,
+                    call.lineno,
+                    f"{called} is a coroutine, and the walk over a prophecy does not "
+                    "await -- a node answers with a shape, and one answering with a "
+                    "coroutine would hand the next node something no model is built from",
+                )
+            )
+            return None
         params = [*held.node.args.posonlyargs, *held.node.args.args]
         takes: _Takes = []
         for at, one in enumerate(params):

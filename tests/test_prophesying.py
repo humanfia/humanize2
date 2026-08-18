@@ -590,3 +590,37 @@ def run(agents: Agents, task: str) -> None:
     at = written(tmp_path, "one", HEAD + body)
 
     assert "sleeping-loop" in {one.code for one in checked(at)}
+
+
+def test_a_node_the_walk_cannot_await_is_refused(tmp_path: Path) -> None:
+    """A coroutine bound as an answer is what the next node cannot be built from."""
+    body = '''@mind
+async def slowly(agent: Agent, task: str) -> Draft:
+    """A node that is a coroutine."""
+    return Draft(text=task)
+
+
+@atlas
+def run(agents: Agents, task: str) -> None:
+    """Says it."""
+    draft = slowly(agents.writer, task)
+'''
+    assert "unstatic-body" in _codes(tmp_path, body)
+
+
+def test_a_config_a_run_may_not_be_set_up_with_has_defaults(tmp_path: Path) -> None:
+    """A body cannot write `config or Config()`, so the model has to stand in for itself."""
+    body = '''class Held(BaseModel):
+    """What it takes, and cannot be built without."""
+
+    model_config = {"extra": "forbid"}
+
+    rounds: int = Field(description="how many rounds, with nothing to fall back on")
+
+
+@atlas
+def run(agents: Agents, task: str, config: Held | None = None) -> None:
+    """Says it."""
+    draft = write(agents.writer, task)
+'''
+    assert "unset-config" in _codes(tmp_path, body)

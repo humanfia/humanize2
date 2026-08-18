@@ -14,7 +14,7 @@ import pytest
 
 from hmz.agents import AgentConfig
 from hmz.cycle import cycles, state
-from hmz.flows import PROPHECY, NotAFlow, kept, resumes
+from hmz.flows import PROPHECY, NotAFlow, configures, kept, resumes, wanted
 from hmz.flows.prophesying import prophesied
 from hmz.runner import Runner
 from hmz.sdk import Hmz
@@ -453,3 +453,107 @@ def test_a_supernode_answers_with_what_its_return_named(project: Path) -> None:
     # Two turns were taken, and what came back out is the first one's answer.
     assert (project / "ran.txt").read_text() == "start deepen deepen "
     assert (project / "out.txt").read_text() == "hello!"
+
+
+#: One that reads the config, to be run with and without being set up.
+BOUNDED = '''"""Reads what the run was set up with, or the defaults where it was not."""
+
+from pathlib import Path
+from typing import NamedTuple
+
+from pydantic import BaseModel, Field
+
+from hmz.flows import Agent, atlas, logic, mind
+
+
+class Agents(NamedTuple):
+    """Who it drives."""
+
+    writer: Agent
+
+
+class Config(BaseModel):
+    """What it takes."""
+
+    model_config = {"extra": "forbid"}
+
+    rounds: int = Field(default=2, description="how many rounds it may take")
+
+
+class Said(BaseModel):
+    """What flows."""
+
+    model_config = {"extra": "forbid"}
+
+    text: str = Field(description="the text")
+
+
+@mind
+def first(agent: Agent, task: str) -> Said:
+    """One turn."""
+    agent.new()("true")
+    return Said(text=task)
+
+
+@logic
+def bounded(said: Said, rounds: int) -> None:
+    """Writes down the bound it was handed."""
+    Path("rounds.txt").write_text(str(rounds))
+
+
+@atlas
+def run(agents: Agents, task: str, config: Config | None = None) -> None:
+    """Says it."""
+    said = first(agents.writer, task)
+    bounded(said, config.rounds)
+'''
+
+
+def test_a_run_nobody_set_up_is_handed_the_config_defaults(project: Path) -> None:
+    """The body has no way to make one, so the model stands in for itself."""
+    _write(project, "bounded", BOUNDED)
+
+    _run("bounded")
+
+    assert (project / "rounds.txt").read_text() == "2"
+
+
+def test_a_run_that_was_set_up_is_handed_what_it_was_set_up_with(project: Path) -> None:
+    """And the defaults are a fallback rather than a ceiling."""
+    _write(project, "bounded", BOUNDED)
+
+    Runner("bounded", [ShellAgent(CONFIG)], config={"rounds": 9}).run("go")
+
+    assert (project / "rounds.txt").read_text() == "9"
+
+
+def test_an_atlas_that_will_not_compile_is_refused_before_the_run_is_set_up(
+    project: Path,
+) -> None:
+    """Rather than from inside one that has pulled an image and opened a cycle."""
+    _write(
+        project,
+        "three",
+        THREE.replace("RERUN", "True").replace(
+            "    last(held)", "    for one in [1, 2]:\n        last(held)"
+        ),
+    )
+
+    with pytest.raises(NotAFlow, match="does not compile"):
+        Runner("three", [ShellAgent(CONFIG)])
+
+
+def test_reading_a_flow_does_not_compile_it(project: Path) -> None:
+    """A picker asks three questions of every flow, and an atlas must answer all three."""
+    _write(
+        project,
+        "three",
+        THREE.replace("RERUN", "True").replace(
+            "    last(held)", "    for one in [1, 2]:\n        last(held)"
+        ),
+    )
+
+    # It does not compile, and every one of these is answered off the entry point alone.
+    assert resumes("three") is True
+    assert configures("three") is None
+    assert [one.name for one in wanted("three")] == ["writer"]

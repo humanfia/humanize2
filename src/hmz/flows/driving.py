@@ -68,6 +68,7 @@ __all__ = [
     "lands_in",
     "left",
     "load",
+    "readies",
     "resumes",
     "running",
     "set_up",
@@ -620,11 +621,46 @@ class _Walked:
         Raises:
           NotAFlow: If the atlas does not compile, saying each reason on a line of its own.
         """
+        return self.ready()(*said)
+
+    def ready(self) -> Entry:
+        """Compiles the atlas, if this is the first thing to ask for it.
+
+        Returns:
+          The walk over the prophecy.
+
+        Raises:
+          NotAFlow: If the atlas does not compile, saying each reason on a line of its own.
+        """
         if self._walk is None:
             from .stepping import walking
 
             self._walk = walking(self._named, self._read, self._entry)
-        return self._walk(*said)
+        return self._walk
+
+
+def readies(run: Entry) -> Entry:
+    """Compiles whatever a flow has to have compiled before a run of it starts.
+
+    An atlas is compiled when something reaches for the run rather than when a flow is read,
+    so that asking what a flow drives, what it can be set up with or whether it can be picked
+    up neither pays for a reading of every file it holds nor is refused by one. The two
+    places that are about to run one ask here instead: a body that does not compile is then
+    refused where the run is being set up, rather than from inside a run that has already
+    pulled an image and opened a cycle.
+
+    Args:
+      run: What :func:`declares` answered with.
+
+    Returns:
+      The same thing, ready to be called.
+
+    Raises:
+      NotAFlow: If it is an atlas that does not compile.
+    """
+    if isinstance(run, _Walked):
+        run.ready()
+    return run
 
 
 def _settles(agent: Agent) -> Driven:
@@ -817,7 +853,9 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
         asked for rather than an hour into a loop -- and again at each call, for a flow that
         was rewritten into something that is no longer one.
     """
-    declares(flow)  # said now, so a name that is wrong is wrong where it was written
+    # Said now, so a name that is wrong -- or an atlas whose body will not compile -- is
+    # wrong where it was written rather than an hour into a loop.
+    readies(declares(flow)[0])
     named = str(flow)
     skill_policy = _INHERITED_SKILLS if inherit_skills else _ISOLATED_SKILLS
 

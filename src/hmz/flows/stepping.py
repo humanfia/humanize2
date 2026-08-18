@@ -114,12 +114,44 @@ def walking(
         # is always resumable: what a run of one has done is which of its nodes answered.
         state: dict[str, Any] = said[-1] if said else {}
         config = said[0] if len(said) > 1 else None
-        return _stepped(walked, inside, agents, task, config, state)
+        return _stepped(
+            walked, inside, agents, task, _set_up(walked, inside, config), state
+        )
 
     # Whatever the entry point was marked with, and not the two marks known today: both
     # `flow` and `atlas` set theirs into the function's own `__dict__`, which is exactly
     # what this copies -- so a third mark added later travels without this line moving.
     return functools.update_wrapper(running, entry, assigned=(), updated=("__dict__",))
+
+
+def _set_up(
+    prophecy: Prophecy, inside: Mapping[str, Any], config: BaseModel | None
+) -> BaseModel | None:
+    """What a run of an atlas is set up with, which is its defaults where nobody said.
+
+    An atlas's body has no way to make one: `config or Config()` is work, and work is what a
+    node is for. So the model's own defaults stand in, and the compiling refuses a config
+    that cannot be built out of them -- which is what makes this always answer with one.
+
+    Args:
+      prophecy: The compiled atlas, for the model it says it can be set up with.
+      inside: What running its file left behind, which is where that model is.
+      config: What the run was set up with, or None for one nobody set up.
+
+    Returns:
+      The config, and None for an atlas that takes no setting up.
+    """
+    from pydantic import BaseModel
+
+    if config is not None or not prophecy.config:
+        return config
+    model = inside.get(prophecy.config)
+    if not (isinstance(model, type) and issubclass(model, BaseModel)):
+        return None
+    try:
+        return model()
+    except Exception:  # noqa: BLE001 -- a model the compiling said could be built and now
+        return None  # cannot is a file rewritten under the run, not a run to end here
 
 
 def _shipped(under: Path, wanted: str) -> Prophecy | None:

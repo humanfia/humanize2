@@ -1233,6 +1233,9 @@ from hmz.flows import Agent, atlas, canonical, digest, logic, mind, prophesied, 
 `@mind` and `@logic` take `rerun=False` for a node a run picked up inside steps past rather
 than runs again; such a node answers with nothing.
 
+Neither an atlas nor a node may be `async def`: the walk does not await, and what waits for
+a model is a turn, which is what a `mind` already is.
+
 An atlas's entry point takes its agents as a `NamedTuple` of them, then the one thing it is
 called with — `str` for one a command line runs, a model for one that is only ever a
 supernode — and then, for one that says it can be set up, a config:
@@ -1241,6 +1244,10 @@ supernode — and then, for one that says it can be set up, a config:
 @atlas
 def run(agents: Agents, task: str, config: Config | None = None) -> None: ...
 ```
+
+Every field of that config needs a default: a run may be started without one, an atlas's body
+has no way to write `config or Config()`, so a run nobody set up is handed the model's own
+defaults.
 
 ### The body
 
@@ -1302,6 +1309,7 @@ do not block.
 | `skipped-answer` | `rerun=False` on a node that answers with something. |
 | `circular-atlas` | A supernode reaching back into a graph already being compiled. |
 | `dynamic-call` | An atlas importing `load`, which answers with a flow that may be anything. |
+| `unset-config` | A config with a field that has no default, which a run nobody set up cannot be handed. |
 | `stale-prophecy` | A shipped `prophecy.pkl` that is not what the source now compiles to. |
 
 ### Shipping one

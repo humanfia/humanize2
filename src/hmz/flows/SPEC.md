@@ -787,8 +787,16 @@ turns what it declared into the prophecy a run walks.
 - A body MUST hold only: one call per statement, bound to at most one name; an `if` and a
   `while` whose test reads a bound name or one field of it; a `return`; `pass`; and the
   docstring. Everything else -- arithmetic, a call inside a call, a comprehension, `try`,
-  `with`, `import`, `async` -- MUST be refused, each of them being a thing a node does and a
-  node being where it goes.
+  `with`, `import` -- MUST be refused, each of them being a thing a node does and a node
+  being where it goes.
+- A node MUST NOT be a coroutine, and neither MUST an atlas. The walk over a prophecy does
+  not await, so a node written `async def` would answer with a coroutine and hand the next
+  node something no model is built from. What waits is a turn, and a turn is what a mind
+  already is.
+- An atlas that says it can be set up MUST be able to be set up with nothing, every field of
+  its config having a default. A run may be started without one, and the body of an atlas
+  has no way to say what to do about that -- `config or Config()` is work, and work is what
+  a node is for -- so a run nobody set up MUST be handed the model's own defaults.
 - What flows along every edge MUST be checked before anything runs. A node's parameters and
   its answer MUST each name a shape, which MUST be a pydantic model the flow's own files
   declare or one of the plain kinds; and what arrives MUST be that shape, or a model holding
@@ -828,13 +836,14 @@ Running a prophecy: one node at a time, and picking a stopped run up where it le
 - An atlas's body MUST NOT be run. It is a declaration, and what runs MUST be the prophecy
   compiling it made -- which is what puts a run in a position to be stopped and started at
   all.
-- The compiling MUST happen before the first node runs, and MUST NOT happen where a flow is
-  only read. What a flow drives, what it can be set up with and whether it can be picked up
-  are questions its entry point's own annotation answers, and an atlas that had to be
-  compiled to be asked one of them would be an atlas a flow picker could not list -- and one
-  that does not compile would answer no rather than say why. A body that does not compile
-  MUST be refused where it is run, saying every reason at once, and every way of running a
-  flow MUST get both the compiling and the walking without knowing there are two kinds.
+- The compiling MUST happen where a run of a flow is being set up, and MUST NOT happen where
+  a flow is only read. What a flow drives, what it can be set up with and whether it can be
+  picked up are questions its entry point's own annotation answers, and an atlas that had to
+  be compiled to be asked one of them would be an atlas a flow picker could not list -- and
+  one that does not compile would answer no rather than say why. A body that does not compile
+  MUST be refused before the run has chosen anything, pulled anything or opened anything,
+  saying every reason at once; and every way of running a flow MUST get both the compiling
+  and the walking without knowing there are two kinds.
 - What a run has done MUST be the answers it has, written down as each arrives rather than
   when the run ends: a run worth picking up is one that was stopped or killed rather than one
   that ended tidily. Each MUST be written down against the node and the visit, since a loop is

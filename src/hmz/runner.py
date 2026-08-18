@@ -113,9 +113,13 @@ class Runner:
         """
         from .agents import HumanAgent
         from .cycle import resumed
-        from .flows.driving import NotAFlow, carries, declares, lands, set_up
+        from .flows.driving import NotAFlow, carries, declares, lands, readies, set_up
 
         run, places, make, setting, mark = declares(flow)
+        # Before anything is chosen or opened: an atlas whose body does not compile is a
+        # flow refused where the run is set up rather than from inside one that has already
+        # pulled an image and opened a cycle.
+        readies(run)
         if config is not None:
             config = set_up(flow, setting, config)
         asked = [place for place in places if not place.person]

@@ -127,7 +127,8 @@ if verdict.done and enough:  # a compound test is a decision a logic node makes
 
 The rest of the file is ordinary Python. Only the `@atlas` body is narrowed — a mind or a
 logic may do whatever a Python function may do, and is read by the same rules as any other
-flow's code.
+flow's code. One exception: a node may not be `async def`, since the walk over the graph does
+not await. What waits for a model is a turn, and a `mind` already is one.
 
 ## What flows between nodes
 
