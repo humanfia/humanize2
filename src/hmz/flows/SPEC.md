@@ -7,7 +7,9 @@
 ├── __init__.py
 ├── agent.py
 ├── builtin
+├── checking.py
 ├── driving.py
+├── proving.py
 ├── skills.py
 └── verses.py
 ```
@@ -164,8 +166,9 @@ def __getattr__(name: str) -> object: ...
   flow -- one phase of a thing, an engine two flows share -- is a flow to call by name and not
   a flow to start, and one that appeared in the picker would be a line nobody can act on.
 - This module MUST be everything a flow imports, which is the interfaces beside it, the mark,
-  the finding, the calling, and what is written down in another layer handed through: the
-  vocabulary a turn is described in, the facts about the CLIs and what each of them runs, and
+  the finding, the calling, the checking, and what is written down in another layer handed
+  through: the vocabulary a turn is described in, the facts about the CLIs and what each of
+  them runs, and
   where humanize keeps what outlives a run. What is handed through MUST be the same object the
   layer it is written in holds, so that a flow and humanize are talking about one thing.
 - What is handed through MUST be fetched when it is asked for. Importing this module MUST cost
@@ -427,6 +430,119 @@ run another. `hmz.runner` asks this and then opens a cycle around the answer.
 - `set_up` MUST read a config back through the model this reading of the flow declared rather
   than take one as it comes: a flow is loaded by running its file, so the class it declared last
   time is a stranger to the class it declares this time, and what survives that is the fields.
+
+## `checking.py`
+
+```python
+class Finding(NamedTuple):
+    code: str
+    severity: Literal["error", "warning"]
+    where: Path
+    line: int
+    said: str
+
+
+def checked(flow: str | os.PathLike[str]) -> tuple[Finding, ...]: ...
+
+
+def surface(protocol: type) -> frozenset[str]: ...
+
+
+def offered() -> frozenset[str]: ...
+```
+
+The static read of a flow's legality: what will not run, said before anything runs it.
+`driving.py` refuses a flow as it loads it, and loading a flow means running its file -- so
+this is the reading for a flow nobody has read yet, generated or fetched or forked, and it is
+the first of two: what only running the file can show is `proving.py`'s, in a process of its
+own.
+
+- `checked` MUST NOT import or execute anything of the flow it reads. It is pointed at
+  untrusted code -- that is what it is for -- and a checker that ran what it was checking
+  would be the attack it exists to catch. Every file the flow's directory holds MUST be read,
+  except what is under its `skills/`, which is content for the agents rather than code.
+- It MUST answer with findings rather than raise, and every finding MUST carry a code, a
+  severity, a file and a line: a checker is asked so that everything wrong can be said at
+  once, and a finding that cannot say where it is is a finding nobody can act on.
+- `error` MUST be kept for a flow that cannot run, cannot be answered, or cannot end --
+  something no run of it survives -- and `warning` for a flow that runs and may be regretted.
+  A flow with no error findings MUST be one `driving.py` would load, as far as reading can
+  tell; nothing here MUST refuse a flow for style.
+- Every rule MUST be the proof of an absence, worked out one function at a time: no exit in
+  this loop, no bound in this function, no guard on this name. Nothing MUST claim an exit
+  reachable or a bound tight, and nothing MUST follow a value through a call -- a flow that
+  keeps its loop in one function and its bound in another is a flow this reading trusts,
+  since a rule that guessed further would refuse flows that run.
+- What an agent may be asked MUST be read off the interfaces in `agent.py` themselves, which
+  is `surface`, and what a flow may import MUST be read off this package's own tables, which
+  is `offered`: the checker states what the interface is, so a second copy of either would be
+  the drift it checks for.
+
+## `proving.py`
+
+```python
+class Scenario(NamedTuple):
+    name: str
+    verdict: bool | None
+    answer: str
+    climb: float = 100_000.0
+    turns: int = 200
+    seconds: float = 60.0
+
+
+NEVER_DONE: Scenario
+ALWAYS_DONE: Scenario
+SILENT: Scenario
+
+
+class Outcome(NamedTuple):
+    scenario: str
+    finished: bool
+    turns: int
+    said: str
+
+
+class Proof(NamedTuple):
+    findings: tuple[Finding, ...]
+    outcomes: tuple[Outcome, ...]
+
+
+def proved(
+    flow: str | os.PathLike[str],
+    *,
+    name: str = "",
+    config: Mapping[str, object] | None = None,
+    scenarios: tuple[Scenario, ...] = (NEVER_DONE, ALWAYS_DONE),
+) -> Proof: ...
+```
+
+The second of the two readings: the flow loaded and driven for real, by stubs, so that what
+only running the file can show is shown -- and shown in milliseconds, since every turn lands
+at once and costs what the scenario says.
+
+- The flow MUST be run in a process of its own, one per scenario, and the clock MUST be held
+  by the asking process: loading a flow means running its file, and a flow that hangs, spins
+  or corrupts what it touches must be able to be killed without taking the checker with it.
+  Nothing of the flow MUST execute in the asking process.
+- Every proof MUST end. A flow that takes turns is ended by the cap on them, one that takes
+  none by the clock, and which of the two it was MUST be said in the outcome: they are the
+  two ways a flow fails to stop, and the fix is different.
+- The stubs MUST claim every capability there is -- every moment, a goal feature, shapes,
+  tools -- since what is on trial is the flow and not the agents: refusing an agent that
+  cannot fill a place is the loading's job, done where the agents are real. Beneath the
+  claims they MUST be the real driver base classes, so that the hooks a flow hangs fire as
+  they would under a real backend, and a `Stop` hook that refuses is a counted turn.
+- A scenario MUST answer deterministically, whatever it is asked: every boolean field of a
+  shaped answer says its verdict, every string field says its answer, and a verdict of None
+  is a turn that answers nothing -- which is what a failed turn answers, so the silent
+  scenario is every guard tried at once. `NEVER_DONE` MUST be among the default scenarios:
+  the reviewer that never says done is the question every loop must have an answer to.
+- The world a proof runs in MUST sleep for free and MUST work in a scratch directory taken
+  away with the process: the rest a loop takes between rounds and the files it writes while
+  being proved are no part of its shape.
+- A flow the loading refuses MUST come back as a `refused-load` finding rather than a raise,
+  and the config rules MUST be run again on the model the loading actually resolved: a model
+  built out of the static reading's sight is still the one whoever sets the flow up meets.
 
 ## `verses.py`
 

@@ -52,6 +52,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, overload
 
 from .agent import Agent, Driven, Person, Session
+from .checking import Capability, Finding, briefed, catalogue, checked
 from .driving import (
     NotAFlow,
     Place,
@@ -65,6 +66,7 @@ from .driving import (
     running,
     wanted,
 )
+from .proving import ALWAYS_DONE, NEVER_DONE, SILENT, Outcome, Proof, Scenario, proved
 from .verses import (
     BUILTIN,
     FLOWS,
@@ -114,14 +116,18 @@ if TYPE_CHECKING:
     from hmz.backends import Model, Profile
 
 __all__ = [
+    "ALWAYS_DONE",
     "BUILTIN",
     "BUILTIN_AT",
     "ENTRY",
     "EVERYWHERE",
     "FLOWS",
     "LOCAL",
+    "MINE",
+    "NEVER_DONE",
     "OFFICIAL",
     "PERMISSIONS",
+    "SILENT",
     "SWARM",
     "USER",
     "WINDOW",
@@ -129,9 +135,11 @@ __all__ = [
     "AgentConfig",
     "AgentDefaults",
     "Board",
+    "Capability",
     "Driven",
     "Event",
     "Failed",
+    "Finding",
     "Flow",
     "Flowverse",
     "Goal",
@@ -146,13 +154,16 @@ __all__ = [
     "NotAFlow",
     "Occasion",
     "Offer",
+    "Outcome",
     "Person",
     "Place",
     "Profile",
+    "Proof",
     "Question",
     "Refused",
     "Remote",
     "Running",
+    "Scenario",
     "Session",
     "Stopped",
     "Tool",
@@ -163,7 +174,10 @@ __all__ = [
     "about",
     "at",
     "backends",
+    "briefed",
     "carries",
+    "catalogue",
+    "checked",
     "configures",
     "container",
     "drives",
@@ -183,6 +197,7 @@ __all__ = [
     "nearest",
     "offered",
     "offers",
+    "proved",
     "resumes",
     "running",
     "wanted",

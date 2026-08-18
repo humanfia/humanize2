@@ -223,6 +223,7 @@ export default defineConfig({
             { text: 'Settings of its own', link: '/guide/flow-settings' },
             { text: 'Many turns at once', link: '/guide/async-flows' },
             { text: 'A flow that calls a flow', link: '/guide/calling-flows' },
+            { text: 'Checking a flow', link: '/guide/checking-flows' },
             { text: 'Testing a flow', link: '/guide/testing-flows' },
             { text: 'Flowverses', link: '/guide/flowverses' },
           ],

@@ -160,6 +160,21 @@ def _flowverses(argv: list[str]) -> int:
     return flowverses(argv)
 
 
+def _check(argv: list[str]) -> int:
+    """Reads a flow for what will not run, before anything runs it.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      Zero for a flow with nothing blocking, one for one with something, or two for a
+      line to correct.
+    """
+    from .check import check
+
+    return check(argv)
+
+
 def _cred(argv: list[str]) -> int:
     """Runs a program whose credentials are kept somewhere other than where it looks.
 
@@ -552,6 +567,7 @@ COMMANDS = {
     ),
     "anchor": (_anchor, "run an agent here that acts on another machine"),
     "flowverses": (_flowverses, "the places flows come from"),
+    "check": (_check, "check a flow before anything runs it"),
     "agents": (_agents, "the agents written down under a name"),
     "providers": (_providers, "the accounts an agent may be run as"),
     "fallback": (
