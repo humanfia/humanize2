@@ -6,11 +6,14 @@
 .
 ├── __init__.py
 ├── agent.py
+├── atlas.py
 ├── builtin
 ├── checking.py
 ├── driving.py
+├── prophesying.py
 ├── proving.py
 ├── skills.py
+├── stepping.py
 └── verses.py
 ```
 
@@ -107,6 +110,9 @@ def inside(named_: str) -> str: ...
 def about(named_: str) -> str: ...
 
 
+def foretold(named_: str) -> str: ...
+
+
 def __getattr__(name: str) -> object: ...
 ```
 
@@ -137,6 +143,13 @@ def __getattr__(name: str) -> object: ...
   a path with the extension left off is how a single-file flow is written down everywhere a
   name is not, and one shape resolving where the other does not is a flow that is offered and
   cannot be run.
+- A flow's directory MAY hold the prophecy its atlas was already compiled to, beside the
+  entry point. Where there is one it MUST be what runs: the compiling is where an atlas is
+  refused, and a repository that has been through it has an answer worth carrying rather than
+  working out again at every run. What is beside it MUST still be there -- a prophecy names
+  the functions its nodes are, and those are in the flow's own Python -- so a directory
+  holding a prophecy and no entry point MUST NOT be a flow, the same way one holding neither
+  is not.
 - A flow MUST be found by name: the ones humanize ships by a bare name, and every other by the
   place it came from -- `official/rlar`, `local/scheduler`. The flows of your own MUST be a
   place like any other, so that one rule says what a flow is called and one list says where
@@ -543,6 +556,266 @@ at once and costs what the scenario says.
 - A flow the loading refuses MUST come back as a `refused-load` finding rather than a raise,
   and the config rules MUST be run again on the model the loading actually resolved: a model
   built out of the static reading's sight is still the one whoever sets the flow up meets.
+
+## `atlas.py`
+
+```python
+AGENTS: str
+CONFIG: str
+INPUT: str
+
+type Kind = Literal["mind", "logic", "atlas"]
+
+
+@dataclass(frozen=True, slots=True)
+class Atlas:
+    name: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class Marked:
+    kind: Kind
+    rerun: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class Sub:
+    named: str
+
+
+class Field(NamedTuple):
+    name: str
+    shape: str
+    required: bool
+
+
+class Shape(NamedTuple):
+    name: str
+    fields: tuple[Field, ...] = ()
+
+
+class Reads(NamedTuple):
+    reads: str
+    field: str = ""
+
+
+class When(NamedTuple):
+    reads: str
+    field: str
+    truth: bool
+
+
+class Node(NamedTuple):
+    at: str
+    kind: Kind
+    calls: str
+    takes: tuple[Reads, ...] = ()
+    binds: str = ""
+    gives: str = ""
+    rerun: bool = True
+    under: str = ""
+
+
+class Edge(NamedTuple):
+    out_of: str
+    into: str
+    when: When | None = None
+
+
+class Prophecy(NamedTuple):
+    name: str
+    takes: str
+    gives: str
+    agents: tuple[str, ...]
+    nodes: tuple[Node, ...]
+    edges: tuple[Edge, ...]
+    shapes: tuple[Shape, ...]
+    prophecies: tuple[Prophecy, ...] = ()
+
+    def node(self, at: str) -> Node | None: ...
+    def out_of(self, at: str) -> tuple[Edge, ...]: ...
+    def under(self, named: str) -> Prophecy | None: ...
+
+
+def atlas[**P, T](
+    call: Callable[P, T] | None = None,
+    /,
+    *,
+    name: str = "",
+    about: str = "",
+    skills: Iterable[str] = (),
+    selectable: bool = True,
+) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]: ...
+
+
+def mind[**P, T](
+    call: Callable[P, T] | None = None, /, *, rerun: bool = True
+) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]: ...
+
+
+def logic[**P, T](
+    call: Callable[P, T] | None = None, /, *, rerun: bool = True
+) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]: ...
+
+
+def sub(named: str) -> Sub: ...
+
+
+def canonical(prophecy: Prophecy) -> str: ...
+
+
+def digest(prophecy: Prophecy) -> str: ...
+
+
+def kept(prophecy: Prophecy) -> bytes: ...
+
+
+def told(said: bytes) -> Prophecy | None: ...
+```
+
+What an atlas is written in, and the prophecy it compiles to. A flow is a Python file that may
+branch any way it likes, and the one thing nothing can ask it is what it is about to do; an
+atlas is the other bargain, and this is the vocabulary of both halves.
+
+- An atlas MUST be a flow. It MUST carry everything `flow` marks a flow with as well as its
+  own mark, so that everything which already finds, lists, names, refuses and runs a flow goes
+  on doing so, and only what compiles one has to know there are two kinds. `atlas` MUST mark
+  rather than wrap, for the reason `flow` MUST.
+- An atlas MUST always be able to be picked up where the last run of it left off, and MUST say
+  so without being asked. A prophecy is a list of nodes with an answer apiece, so what a run of
+  one has done is something the run itself writes down -- and an atlas therefore MUST NOT be
+  handed a dict, and MUST NOT declare one: what an ordinary flow keeps by hand is what this
+  keeps by being a graph.
+- There MUST be two kinds of ordinary node and one that is a whole atlas. A `mind` MUST be a
+  turn taken by an agent and MUST be handed the agent the call site names; a `logic` MUST be
+  Python and MUST be handed no agent at all; an atlas reached by another atlas MUST be a
+  supernode, which is one node from outside and one prophecy from within.
+- A mind MUST have exactly one way out and a logic MAY have several. A branch is a decision,
+  and a decision nothing but a model made is a decision no reading of the flow can state, so
+  what a turn said MUST reach a branch by being read by a logic node.
+- A node MAY say that a run picked up inside it steps past it rather than running it again.
+  What a node says by saying nothing MUST be that it runs again: work cut off partway is work
+  that was not done. One that says otherwise MUST answer with nothing, since a run stepping
+  past it has no answer of its for what comes next to be missing.
+- An atlas MUST reach another atlas by `sub` and MUST reach an ordinary flow by nothing at
+  all. `load` answers with a flow that may be anything, and a prophecy with one of those in it
+  would be a graph with a hole where a node should be -- which is the one thing a prophecy is
+  for not having. What `sub` answers with MUST never be called: the body it is written in is
+  read rather than run, and a call MUST say so rather than do something surprising.
+- A prophecy MUST be canonical: two readings of the same atlas MUST answer with the same
+  bytes, and everything in one MUST be ordered by what it is rather than by where it was
+  written. A body reformatted, a comment added, or two nodes swapped where nothing depends on
+  the order MUST compile to the same text -- which is what makes `digest` worth writing down.
+- A node MUST be a call site rather than a function: a body that calls one thing twice is a
+  graph with two nodes in it, each with its own answer and its own place in the run. What a
+  node is called MUST be read off the body's shape rather than off a line number, so that a
+  file reformatted compiles to the prophecy it already was.
+- A node's arguments MUST be read by name rather than off the node that answered them: a body
+  may bind a name twice, which is what a loop is, and the second binding is what the next round
+  reads. The run's agents, what the atlas was called with and what it was set up with MUST be
+  named where a bound name would be, and MUST be spelled so that nothing a body may write
+  collides with them.
+- A prophecy MUST be writable and readable as bytes, for a flowverse that ships one. Reading
+  those bytes runs what they say, which is the trust a flowverse already has; what MUST be
+  added is the check that what came back is a prophecy at all, so that a file which is merely
+  corrupt is refused rather than walked.
+
+## `prophesying.py`
+
+```python
+class Prophesied(NamedTuple):
+    findings: tuple[Finding, ...]
+    prophecy: Prophecy | None
+
+
+def prophesied(
+    flow: str | os.PathLike[str],
+    *,
+    name: str = "",
+    whole: _Whole | None = None,
+    through: tuple[tuple[str, str], ...] = (),
+) -> Prophesied: ...
+```
+
+Compiling an atlas: the reading that holds a body to the narrower Python it is written in, and
+turns what it declared into the prophecy a run walks.
+
+- It MUST NOT import or execute anything of the atlas it reads, for the reason `checking.py`
+  MUST NOT: the atlas most worth compiling is one nobody has read yet, and a compiler that ran
+  what it was compiling would be the attack it exists to catch.
+- Every rule here MUST be an error, and every one of them MUST be decidable. That is the
+  bargain an atlas makes: `checking.py` proves absences one function at a time and warns where
+  it cannot be sure, and an atlas is written in the subset where there is nothing to be unsure
+  about. That reading's warnings MUST still come back over the node bodies and MUST NOT block:
+  a node body is ordinary Python and MUST be read as it.
+- The two readings MUST share one parsing and one set of rules. An atlas is a flow, and the
+  whole of what makes it one is read next door; a second copy of any of it here would be the
+  drift both readings exist to catch.
+- A body MUST hold only: one call per statement, bound to at most one name; an `if` and a
+  `while` whose test reads a bound name or one field of it; a `return`; `pass`; and the
+  docstring. Everything else -- arithmetic, a call inside a call, a comprehension, `try`,
+  `with`, `import`, `async` -- MUST be refused, each of them being a thing a node does and a
+  node being where it goes.
+- What flows along every edge MUST be checked before anything runs. A node's parameters and
+  its answer MUST each name a shape, which MUST be a pydantic model the flow's own files
+  declare or one of the plain kinds; and what arrives MUST be that shape, or a model holding
+  every field that shape requires at the same shape apiece. A name MUST keep the shape it was
+  first bound with, so that an edge which fits on the first round of a loop fits on every one.
+- An atlas MUST declare its agents as a NamedTuple of them and MUST NOT declare a plain tuple:
+  every turn in a prophecy names the agent it drives, and a place with no name is a turn
+  nothing can be pointed at. A mind MUST be handed one of them and a supernode all of them,
+  and neither MUST be handed anything else.
+- A branch MUST follow a node, and MUST NOT follow another branch: an `elif`, or an arm with
+  nothing in it, is two decisions carried on one edge. A loop MUST leave exactly one node,
+  which is its head -- what the test reads, answered again each round -- and the body MUST
+  bind at least one name that head reads, else nothing in the loop can change what it says and
+  the loop never ends.
+- A supernode MUST be compiled into the prophecy reaching for it, and one that reaches back
+  into an atlas already being compiled MUST be refused. Which atlas a name means MUST be
+  settled by where it is declared and what it is called there rather than by how it was
+  spelled, since one atlas is `deeper` beside it and `flow:deeper` from anywhere else -- and a
+  check that compared spellings would follow that forever.
+- Where the flow's own directory ships a prophecy, whether it is still the one this source
+  compiles to MUST be said. A run walks the shipped one, so a shipped prophecy that has
+  drifted is a flow that does one thing and reads as another.
+
+## `stepping.py`
+
+```python
+def walking(
+    flow: str | os.PathLike[str], inside: Mapping[str, Any], entry: Entry
+) -> Entry: ...
+```
+
+Running a prophecy: one node at a time, and picking a stopped run up where it left off.
+
+- An atlas's body MUST NOT be run. It is a declaration, and what runs MUST be the prophecy
+  compiling it made -- which is what puts a run in a position to be stopped and started at
+  all.
+- The compiling MUST happen where a flow is loaded rather than where it is run, and a body
+  that does not compile MUST be refused there, saying every reason at once. Every way of
+  running a flow MUST get both the compiling and the walking without knowing there are two
+  kinds of flow.
+- What a run has done MUST be the answers it has, written down as each arrives rather than
+  when the run ends: a run worth picking up is one that was stopped or killed rather than one
+  that ended tidily. Each MUST be written down against the node and the visit, since a loop is
+  one node visited again and a round that overwrote the last round's answer would be a run
+  nothing could be picked up inside a loop.
+- Picking a run up MUST be walking the same prophecy over the same answers until it reaches
+  the visit that has none, and what happens there MUST be what that node says: run again by
+  default, stepped past where the node says so.
+- A run MUST be picked up into the same prophecy or not at all. What was written down MUST be
+  written down against the digest, and a run whose prophecy has moved MUST start from the top:
+  an atlas rewritten between two runs is a different graph whose nodes happen to share their
+  names, and carrying on into it would be a run resuming into somewhere it has never been.
+- A supernode MUST be walked as the prophecy it is, in the run around it, and its own nodes
+  MUST be written down beneath the visit it is: two graphs, one run, and each node with a line
+  of its own. One reached by name MUST be read at the call rather than held, for the reason a
+  called flow is read at the call.
+- Where the flow's own directory ships a prophecy for the atlas being run, that prophecy MUST
+  be what runs rather than one compiled again. One that cannot be read back MUST be refused
+  rather than compiled again: what a flowverse shipped is what it meant to be run, and
+  quietly running something else is the one thing shipping it was meant to rule out.
 
 ## `verses.py`
 

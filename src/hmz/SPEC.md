@@ -673,7 +673,7 @@ that can happen to a flowverse -- added, fetched again, taken away.
 ## `hmz check`
 
 ```shell
-hmz check [--static] [--strict] [--json] <flow> [<flow>...]
+hmz check [--static] [--strict] [--json] [--prophecy | --ship] <flow> [<flow>...]
 ```
 
 Reads a flow for what will not run, before anything runs it.
@@ -691,6 +691,11 @@ Reads a flow for what will not run, before anything runs it.
 - It MUST exit 0 for flows with nothing blocking -- warnings print and pass -- 1 where any
   error was found, or any warning under `--strict`, and 2 for a line to correct or a name no
   flow answers to, refused as argparse refuses one.
+- What an atlas compiles to MUST be sayable from here, since the line that checks a flow is
+  the line that has just read it: `--prophecy` MUST print the canonical prophecy in place of
+  the findings, and `--ship` MUST write it into the flow's own directory for every run of it
+  from then on to walk. The two MUST NOT be given together, and a name that is not an atlas
+  that compiles MUST be said and MUST exit non-zero.
 
 ## `hmz agents`
 

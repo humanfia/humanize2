@@ -197,9 +197,13 @@ def _shipped(whole: _Whole, prophecy: Prophecy) -> list[Finding]:
       A `stale-prophecy` error where the two differ, and nothing where they agree or where
       the flow ships none.
     """
-    from . import PROPHECY
+    from . import ENTRY, PROPHECY
     from .atlas import told
 
+    # Beside the entry point, which means the flow's own directory: a flow that is a single
+    # file has none, and what is beside such a flow is the other flows.
+    if whole.entry.name != ENTRY:
+        return []
     at = whole.entry.parent / PROPHECY
     if not at.is_file():
         return []
@@ -1016,12 +1020,7 @@ class _Wiring:
             read, mark = beside
             if self._circular(call, named, _who(read.where, mark.name)):
                 return None
-            made, found = _compiled(
-                self.whole._replace(entered=read, compiled=True),
-                mark,
-                named,
-                self.through,
-            )
+            made, found = _compiled(self.whole, mark, named, self.through)
             self.found.extend(found)
             return made
         from . import ENTRY, find, inside

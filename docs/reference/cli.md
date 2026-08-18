@@ -280,7 +280,7 @@ hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 ## `hmz check`
 
 ```
-hmz check [--static] [--strict] [--json] FLOW [FLOW...]
+hmz check [--static] [--strict] [--json] [--prophecy | --ship] FLOW [FLOW...]
 ```
 
 Reads a flow for what will not run — before anything runs it. Two readings, in their order: a
@@ -294,6 +294,8 @@ path of your own.
 | `--static` | Only the reading that executes nothing: do not load the flow at all. |
 | `--strict` | Exit non-zero on warnings too. |
 | `--json` | One JSON object per finding, one a line, for a script to read. |
+| `--prophecy` | Print what each [atlas](/guide/atlas) compiles to instead of what is wrong with it. |
+| `--ship` | Write each atlas's prophecy into its own directory, for runs of it to walk. |
 
 Each finding prints as `file:line: severity: code: what is wrong`, with a count under them.
 An error is a flow that cannot run, cannot be answered or cannot end — a loop nothing inside
@@ -305,9 +307,17 @@ It exits `0` for flows with nothing blocking (warnings print and pass), `1` wher
 was found — or any warning, under `--strict` — and `2` for a line to correct or a name no
 flow answers to.
 
+An [atlas](/guide/atlas) gets the stricter reading of the two automatically, its body being a
+declaration rather than a program. `--prophecy` prints the graph that reading compiled, one
+line of canonical JSON; `--ship` writes it to `<flow>/prophecy.pkl`, which every run of that
+flow walks from then on. The two cannot be given together, and a name that is not an atlas
+that compiles exits non-zero.
+
 ```sh
 hmz check official/rlar          # one warning: a loop only its reviewer ends
 hmz check --strict local/mine    # hold a flow of your own to the whole bar
+hmz check --prophecy local/mine  # the graph it compiles to, for a diff to read
+hmz check --ship local/mine      # and beside the flow, for runs of it to walk
 ```
 
 ## `hmz flowverses`

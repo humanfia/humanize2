@@ -192,8 +192,17 @@ from hmz.flows import drives
 drives("twice")       # the names of the agents it declares
 ```
 
+## A flow whose shape is known before it runs
+
+Everything above is a flow: a Python file that may branch any way it likes, and whose shape is
+whatever it does. Where the shape is known in advance — a pipeline of phases, a review loop
+meant to run for a week — an [atlas](/guide/atlas) is the stricter bargain. Its body is a
+declaration rather than a program, compiled into a graph before the first turn, so it is
+checked whole up front and a run of one is picked up node by node rather than started again.
+
 ## See also
 
+- [An atlas](/guide/atlas)
 - [Read the run back](/guide/tracing)
 - [Flowverses](/guide/flowverses)
 - [Loops](/guide/loops)

@@ -1213,6 +1213,113 @@ briefed()     # the same, rendered as one page to steer by
 Read off the live interface at call time — the moments off the enum, the backend sets off
 the driver classes' own declarations — so what it promises is what this installation serves.
 
+## An atlas
+
+An atlas is a flow whose body is read rather than run: a narrower Python, compiled before
+anything happens into a **prophecy** — the graph of what the run will do. The guide is
+[An atlas](/guide/atlas); this is the surface.
+
+```python
+from hmz.flows import Agent, atlas, canonical, digest, logic, mind, prophesied, sub
+```
+
+| Mark | What it makes |
+| --- | --- |
+| `@atlas` | A flow whose body is a declaration. Takes everything `@flow` takes but `resumable`, which is always on. |
+| `@mind` | A node that is one turn, handed the agent its call site names. Exactly one way out. |
+| `@logic` | A node that is Python and drives nothing. May have several ways out. |
+| `sub("official/x")` | The atlas one supernode is, by the name `-f` takes. |
+
+`@mind` and `@logic` take `rerun=False` for a node a run picked up inside steps past rather
+than runs again; such a node answers with nothing.
+
+An atlas's entry point takes its agents as a `NamedTuple` of them, then the one thing it is
+called with — `str` for one a command line runs, a model for one that is only ever a
+supernode — and then, for one that says it can be set up, a config:
+
+```python
+@atlas
+def run(agents: Agents, task: str, config: Config | None = None) -> None: ...
+```
+
+### The body
+
+One node per statement; the branches between them are the edges. Nothing else:
+
+| | |
+| --- | --- |
+| `x = call(a, b)` | one node, bound to `x` |
+| `call(a, b)` | one node whose answer nothing takes |
+| `if x:` / `if not x.field:` | a node's several ways out |
+| `while x:` / `while not x.field:` | that, with an edge back to the node the test reads |
+| `return` / `return x` | the end of the run |
+| `pass`, the docstring | nothing |
+
+Arguments are names the body bound, one field read off one of them, or `agents.<name>`, the
+name the entry point gave what it is called with, or the name it gave its config.
+
+### The prophecy
+
+```python
+from hmz.flows import canonical, digest, prophesied
+
+held = prophesied(".humanize/flows/mine")
+if held.prophecy is not None:
+    print(canonical(held.prophecy), digest(held.prophecy))
+```
+
+`prophesied` answers with `(findings, prophecy)`, the prophecy being None where anything was
+an error. A `Prophecy` holds its `name`, what it `takes` and `gives`, the `agents` it drives,
+its `nodes`, its `edges`, the `shapes` that flow along them, and one `Prophecy` per supernode
+under it. A `Node` carries `at` (its id — the callee, and `:2`, `:3` for the second and third
+call to it), `kind`, `calls`, `takes`, `binds`, `gives`, `rerun` and `under`. An `Edge`
+carries `out_of`, `into` and a `When` or None; `""` is the way in at one end and the way out
+at the other.
+
+`canonical` is one line of JSON with everything ordered by what it is rather than where it was
+written, so two readings of one atlas are the same bytes; `digest` is what a run picked up
+again checks itself against.
+
+### What an atlas is refused for
+
+Every one of these is an error, and every one is decidable — which is the bargain the narrower
+Python makes. The warnings in the table above still come back over the node bodies, and still
+do not block.
+
+| Code | What it found |
+| --- | --- |
+| `not-an-atlas` | Nothing marked `@atlas`, or a `sub()` naming a flow that is not one. |
+| `unstatic-body` | A statement the body may not hold — work, a call inside a call, `elif`, `try`, `async`, a graph with no nodes. |
+| `unshaped-node` | A node parameter or answer annotated with something that is no shape. |
+| `shape-mismatch` | What flows along an edge is not what the far end takes, or a name bound twice at two shapes. |
+| `unbound-read` | A body reads a name nothing has bound. |
+| `branching-mind` | A branch hung off a turn, which has one way out. |
+| `dead-loop` | A loop whose body changes nothing its head reads. |
+| `unnamed-agents` | Agents declared as a plain tuple, so a turn cannot name the one it drives. |
+| `unknown-agent` | `agents.x` the flow does not drive, or a supernode driving one it has not got. |
+| `unagented-node` | A logic handed an agent, or a mind handed none. |
+| `skipped-answer` | `rerun=False` on a node that answers with something. |
+| `circular-atlas` | A supernode reaching back into a graph already being compiled. |
+| `dynamic-call` | An atlas importing `load`, which answers with a flow that may be anything. |
+| `stale-prophecy` | A shipped `prophecy.pkl` that is not what the source now compiles to. |
+
+### Shipping one
+
+A flow's directory may hold `prophecy.pkl` beside its entry point, and where it does that is
+what runs rather than the atlas compiled again:
+
+```python
+from hmz.sdk import Hmz
+
+Hmz().flows.foretell("official/review")   # writes the prophecy beside the flow
+Hmz().flows.prophecy("official/review")   # reads what the source compiles to
+```
+
+or [`hmz check --ship`](/reference/cli#hmz-check) from a command line. The flow's own Python
+still has to be there: a prophecy names the functions its nodes are. Reading a shipped
+prophecy runs what its bytes say, which is the trust a [flowverse](/guide/security) already
+has.
+
 ## Testing a flow
 
 A flow is a function, so drive it with something that is not a coding agent:

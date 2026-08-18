@@ -171,6 +171,13 @@ This is what makes a week of stops and starts readable afterwards. Each stretch 
 its own sessions, its own trace and its own end, rather than one enormous cycle claiming to
 have begun on Monday.
 
+## An atlas picks itself up
+
+A flow keeps what it wants to carry by hand, which is the whole of this page. An
+[atlas](/guide/atlas) does not have to: its body is compiled into a graph, every node's answer
+is written down as it arrives, and picking a run up is walking that graph over the answers it
+already has until it reaches the node that has none.
+
 ## See also
 
 - [Tracing](/guide/tracing) — what else a run writes down, and reading one back

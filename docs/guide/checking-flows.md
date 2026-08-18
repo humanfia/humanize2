@@ -79,3 +79,14 @@ hmz check --json local/mine | jq -r .code
 - [Checking a flow](/reference/flows#checking-a-flow) — the library API and the rule table
 - [Testing a flow](/guide/testing-flows) — driving a flow with stand-ins of your own
 - [Writing a flow](/guide/writing-a-flow)
+
+## An atlas is read more strictly
+
+A flow marked [`@atlas`](/guide/atlas) gets the stricter of the two readings automatically:
+its body is a declaration rather than a program, so `hmz check` compiles it and holds every
+edge, every branch and every shape to what a graph can be held to. `--prophecy` prints the
+graph it compiled; `--ship` writes it beside the flow for runs of it to walk.
+
+```sh
+hmz check --prophecy local/mine
+```
