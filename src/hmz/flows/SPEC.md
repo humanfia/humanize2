@@ -806,6 +806,13 @@ turns what it declared into the prophecy a run walks.
   every turn in a prophecy names the agent it drives, and a place with no name is a turn
   nothing can be pointed at. A mind MUST be handed one of them and a supernode all of them,
   and neither MUST be handed anything else.
+- A loop's body MUST NOT end with the node the loop reads again. The edge back runs the head,
+  so a body that repeats it runs it twice a round and throws the body's answer away -- and a
+  node with an effect would have it twice with nothing said.
+- One thing wrong in a body MUST be one finding. What a refused statement would have bound
+  MUST be read as spoilt rather than as unbound, and a body with no nodes in it MUST be said
+  only where nothing else was: a reader given four findings for one mistake has three to work
+  out are consequences.
 - A branch MUST follow a node, and MUST NOT follow another branch: an `elif`, or an arm with
   nothing in it, is two decisions carried on one edge. A loop MUST leave exactly one node,
   which is its head -- what the test reads, answered again each round -- and the body MUST

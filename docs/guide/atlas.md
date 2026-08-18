@@ -160,6 +160,16 @@ write → review → settled ──[done]──▶ (end)
 A loop whose body changes nothing the head reads would answer the same thing every round, and
 is refused as a `dead-loop` rather than run for a week.
 
+Don't write the head again at the bottom of the body. It is the natural Python and the wrong
+graph — the edge back runs the head anyway, so the copy would run first and have its answer
+thrown away. `twice-round` refuses it:
+
+```
+…/__init__.py:71: error: twice-round: the body of this loop ends with settled, which is what
+the loop reads again each round -- so it would run twice a round and the body's answer be
+thrown away; take it out of the body
+```
+
 ## Stopping and starting
 
 An atlas can always be picked up where the last run of it left off, and says so without being

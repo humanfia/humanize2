@@ -674,6 +674,9 @@ class _Wiring:
         self.bound: dict[str, str] = {}
         #: How many nodes each callee has been so far, for the id the next one gets.
         self.seen: dict[str, int] = {}
+        #: The names a refused statement would have bound. Nothing is known about what they
+        #: hold, and reading one is not a second mistake: it is the first one, further down.
+        self.spoilt: set[str] = set()
         #: Every shape anything in this prophecy carries, for the shapes it is written with.
         self.carried: set[str] = {one for one in (takes, gives, config) if one}
 
@@ -699,7 +702,9 @@ class _Wiring:
                 )
                 break
             self.edges.append(Edge(out_of, "", when))
-        if not self.nodes:
+        # Only where nothing else was wrong: a body whose one statement was refused has no
+        # nodes *because* of that, and saying both is saying one thing twice.
+        if not self.nodes and not self.found:
             self.found.append(
                 _said(
                     "unstatic-body",
@@ -729,7 +734,12 @@ class _Wiring:
                 self._refuse(one, "nothing here can run: the atlas ends above it")
                 return []
             if isinstance(one, ast.Assign) and isinstance(one.value, ast.Call):
-                loose = self._call(one.value, self._target(one), loose)
+                binds, held = self._target(one), len(self.nodes)
+                loose = self._call(one.value, binds, loose)
+                if binds and len(self.nodes) == held:
+                    # The call was refused, so the name it would have bound holds nothing:
+                    # reading it below is this same mistake again rather than another.
+                    self.spoilt.add(binds)
             elif isinstance(one, ast.Expr) and isinstance(one.value, ast.Call):
                 loose = self._call(one.value, "", loose)
             elif isinstance(one, ast.If):
@@ -852,11 +862,44 @@ class _Wiring:
             )
             return loose
         opens: _Loose = [(head, When(*said, truth))]
-        for out_of, when in self._block(node.body, opens):
+        inside = self._block(node.body, opens)
+        self._twice(node, head, inside)
+        for out_of, when in inside:
             self.edges.append(Edge(out_of, head, when))
         self._endless(node, head)
         ends: _Loose = [(head, When(*said, not truth))]
         return ends
+
+    def _twice(self, node: ast.While, head: str, inside: _Loose) -> None:
+        """Whether a loop's body ends with the very node the loop reads again.
+
+        Writing the head again at the bottom of the body is the natural Python and the wrong
+        graph: the edge back goes to the head, so the head answers again anyway. The body's
+        copy would run first, its answer would be thrown away, and a node with an effect --
+        a line written, a message sent -- would have it twice a round with nothing said.
+
+        Args:
+          node: The loop.
+          head: The node it reads again, by node id.
+          inside: The ends the body left open.
+        """
+        above = self._above(head)
+        if above is None:
+            return
+        for out_of, _ in inside:
+            last = self._above(out_of)
+            if last is not None and last.calls == above.calls:
+                self.found.append(
+                    _said(
+                        "twice-round",
+                        self.where,
+                        node.lineno,
+                        f"the body of this loop ends with {above.calls}, which is what the "
+                        "loop reads again each round -- so it would run twice a round and "
+                        "the body's answer be thrown away; take it out of the body",
+                    )
+                )
+                return
 
     def _endless(self, node: ast.While, head: str) -> None:
         """Whether one loop's head can ever answer differently, which is whether it ends.
@@ -912,14 +955,15 @@ class _Wiring:
             return None
         shape = self._shape_of(read)
         if shape is None:
-            self.found.append(
-                _said(
-                    "unbound-read",
-                    self.where,
-                    test.lineno,
-                    f"nothing here has bound {_names(read)}",
+            if read.reads not in self.spoilt:
+                self.found.append(
+                    _said(
+                        "unbound-read",
+                        self.where,
+                        test.lineno,
+                        f"nothing here has bound {_names(read)}",
+                    )
                 )
-            )
             return None
         if not shape:
             self.found.append(
@@ -1345,14 +1389,15 @@ class _Wiring:
             return self._agented(call, called, param, shape, read)
         given = self._shape_of(read)
         if given is None:
-            self.found.append(
-                _said(
-                    "unbound-read",
-                    self.where,
-                    call.lineno,
-                    f"nothing here has bound {_names(read)}",
+            if read.reads not in self.spoilt:
+                self.found.append(
+                    _said(
+                        "unbound-read",
+                        self.where,
+                        call.lineno,
+                        f"nothing here has bound {_names(read)}",
+                    )
                 )
-            )
             return False
         if not given or not _same(given, shape, self.held):
             self.found.append(
@@ -1487,8 +1532,25 @@ class _Wiring:
         return called if at == 1 else f"{called}:{at}"
 
     def _refuse(self, node: ast.stmt | ast.expr, said: str) -> None:
-        """Says one thing the body holds that the subset an atlas is written in does not."""
+        """Says one thing the body holds that the subset an atlas is written in does not.
+
+        Whatever the refused statement would have bound is remembered as spoilt, so that
+        reading it further down is not reported as a mistake of its own: one thing wrong in
+        a body is one finding, and a reader given four for it has three to work out are
+        consequences.
+
+        Args:
+          node: The statement or expression being refused.
+          said: What is wrong with it.
+        """
         self.found.append(_said("unstatic-body", self.where, node.lineno, said))
+        self.spoilt.update(
+            one.id
+            for held in ast.walk(node)
+            if isinstance(held, ast.Assign)
+            for one in held.targets
+            if isinstance(one, ast.Name)
+        )
 
 
 # ---------------------------------------------------------------------------------------

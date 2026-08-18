@@ -1310,6 +1310,7 @@ do not block.
 | `circular-atlas` | A supernode reaching back into a graph already being compiled. |
 | `dynamic-call` | An atlas importing `load`, which answers with a flow that may be anything. |
 | `unset-config` | A config with a field that has no default, which a run nobody set up cannot be handed. |
+| `twice-round` | A loop body ending with the node the loop reads again, which would run it twice a round. |
 | `stale-prophecy` | A shipped `prophecy.pkl` that is not what the source now compiles to. |
 
 ### Shipping one

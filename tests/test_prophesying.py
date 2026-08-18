@@ -624,3 +624,37 @@ def run(agents: Agents, task: str, config: Held | None = None) -> None:
     draft = write(agents.writer, task)
 '''
     assert "unset-config" in _codes(tmp_path, body)
+
+
+def test_a_loop_body_that_ends_with_the_node_it_reads_is_refused(
+    tmp_path: Path,
+) -> None:
+    """The edge back runs the head again, so writing it twice is running it twice."""
+    body = '''@atlas
+def run(agents: Agents, task: str) -> None:
+    """Says it."""
+    draft = write(agents.writer, task)
+    verdict = judge(draft)
+    while not verdict.done:
+        draft = write(agents.writer, task)
+        verdict = judge(draft)
+'''
+    assert "twice-round" in _codes(tmp_path, body)
+
+
+def test_one_thing_wrong_in_a_body_is_one_finding(tmp_path: Path) -> None:
+    """A name a refused statement would have bound is that mistake again, not another."""
+    body = '''@atlas
+def run(agents: Agents, task: str) -> None:
+    """A body the subset does not allow."""
+    for one in [1, 2]:
+        draft = write(agents.writer, task)
+    verdict = judge(draft)
+    while not verdict.done:
+        draft = write(agents.writer, task)
+'''
+    said = _codes(tmp_path, body)
+
+    # The `for`, and nothing about the names it would have bound, nor about the body
+    # having no nodes in it -- both of which follow from it rather than stand beside it.
+    assert said == ["unstatic-body"]
