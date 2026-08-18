@@ -36,6 +36,7 @@ SEVERITY = {
     "stateless-resume": "error",
     "unbounded-loop": "warning",
     "unguarded-answer": "warning",
+    "unknown-verdict": "warning",
     "unsaid-moment": "warning",
     "loose-config": "warning",
     "unsaid-field": "warning",
@@ -484,6 +485,108 @@ def run(agents: tuple[Agent], task: str) -> None:
 """,
         CLEAN,
         id="unguarded-answer-edge-guarded",
+    ),
+    pytest.param(
+        DOC
+        + """
+from typing import Literal
+
+from hmz.flows import Agent, flow
+from pydantic import BaseModel, Field
+
+class Review(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    verdict: Literal["done", "redo"] = Field(description="how the round went")
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    review = agents[0](task, suppress=True, schema=Review)
+    if review and review.verdict == "DONE":
+        return
+""",
+        {"unknown-verdict"},
+        id="unknown-verdict",
+    ),
+    pytest.param(
+        DOC
+        + """
+from typing import Literal
+
+from hmz.flows import Agent, flow
+from pydantic import BaseModel, Field
+
+class Review(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    verdict: Literal["done", "redo"] = Field(description="how the round went")
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    review = agents[0](task, suppress=True, schema=Review)
+    if review and review.verdict in ("done", "OOPS"):
+        return
+""",
+        {"unknown-verdict"},
+        id="unknown-verdict-a-dead-member",
+    ),
+    pytest.param(
+        DOC
+        + """
+from typing import Literal
+
+from hmz.flows import Agent, flow
+from pydantic import BaseModel, Field
+
+class Review(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    verdict: Literal["done", "redo"] = Field(description="how the round went")
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    review = agents[0](task, suppress=True, schema=Review)
+    if review and review.verdict == "done":
+        return
+""",
+        CLEAN,
+        id="unknown-verdict-edge-a-value-the-shape-offers",
+    ),
+    pytest.param(
+        DOC
+        + """
+from hmz.flows import Agent, flow
+from pydantic import BaseModel, Field
+
+class Review(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    verdict: str = Field(description="how the round went, in its own words")
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    review = agents[0](task, suppress=True, schema=Review)
+    if review and review.verdict == "DONE":
+        return
+""",
+        CLEAN,
+        id="unknown-verdict-edge-a-field-left-open",
+    ),
+    pytest.param(
+        DOC
+        + """
+from _shapes import Review
+
+from hmz.flows import Agent, flow
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    review = agents[0](task, suppress=True, schema=Review)
+    if review and review.verdict == "DONE":
+        return
+""",
+        CLEAN,
+        id="unknown-verdict-edge-a-shape-declared-elsewhere",
     ),
     pytest.param(
         DOC

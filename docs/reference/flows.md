@@ -1164,6 +1164,7 @@ that cannot run, cannot be answered, or cannot end — something no run of it su
 | `stateless-resume` | error | `@flow(resumable=True)` with nowhere to be handed its state. |
 | `unbounded-loop` | warning | Every way out of a loop waits on an agent's verdict, and the function holds no bound of its own. |
 | `unguarded-answer` | warning | A field read off a suppressed, shaped answer nothing tested against `None`. |
+| `unknown-verdict` | warning | An answer's field compared against a value its shape does not offer, so the comparison can never be what it reads as. |
 | `unsaid-moment` | warning | A hook hung on a moment only some backends run that no place declares. |
 | `loose-config` | warning | A config whose `model_config` neither forbids extras nor freezes. |
 | `unsaid-field` | warning | A config field without a `Field(description=...)`. |

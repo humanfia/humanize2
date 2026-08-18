@@ -381,6 +381,13 @@ def _root(node: ast.expr) -> str:
     return node.id if isinstance(node, ast.Name) else ""
 
 
+def _tip(node: ast.expr) -> str:
+    """The name at the tip of one dotted expression -- `Literal` of `typing.Literal`."""
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return node.id if isinstance(node, ast.Name) else ""
+
+
 def _moments_in(annotation: ast.expr, read: _Read) -> set[str]:
     """Every moment one annotation names, which is a place saying what it needs."""
     return {
@@ -797,6 +804,9 @@ class _Answer(NamedTuple):
     shaped: bool
     suppressed: bool
     line: int
+    #: The name of the shape the turn was held to, where it was named plainly -- "" for a
+    #: turn held to no shape, or to one written some way this reading does not follow.
+    model: str = ""
 
 
 @dataclass
@@ -1211,6 +1221,7 @@ def _called(value: ast.Call, scope: _Scope) -> frozenset[str] | _Crew | _Answer 
                 for one in value.keywords
             ),
             line=value.lineno,
+            model=_shaped_as(value),
         )
     if isinstance(func, ast.Attribute) and func.attr in {"aturn", "pursue", "apursue"}:
         asked = _valued(func.value, scope)
@@ -1224,8 +1235,17 @@ def _called(value: ast.Call, scope: _Scope) -> frozenset[str] | _Crew | _Answer 
                     for one in value.keywords
                 ),
                 line=value.lineno,
+                model=_shaped_as(value),
             )
     return None
+
+
+def _shaped_as(value: ast.Call) -> str:
+    """The name of the shape one turn is held to, where the call names it plainly."""
+    for keyword in value.keywords:
+        if keyword.arg == "schema" and isinstance(keyword.value, ast.Name):
+            return keyword.value.id
+    return ""
 
 
 #: The comparisons that read as a bound: a count against something, ordered.
@@ -1260,6 +1280,7 @@ def _expression(node: ast.expr, scope: _Scope) -> None:
             for side in [node.left, *node.comparators]
         ):
             scope.bounded = True
+        _never(node, scope)
         _guards(node, scope)
         for one in [node.left, *node.comparators]:
             _expression(one, scope)
@@ -1387,6 +1408,149 @@ def _asked(node: ast.Attribute, scope: _Scope) -> None:
             f"on {what}, and a name that is not there fails at the first turn",
         )
     )
+
+
+#: The comparisons that ask whether a value is exactly one of some others.
+_BY_VALUE = (ast.Eq, ast.NotEq, ast.In, ast.NotIn)
+
+
+def _never(node: ast.Compare, scope: _Scope) -> None:
+    """One comparison read against the shape behind it, for a value no answer holds.
+
+    `review.verdict == "DONE"` over `Literal["done", "redo"]` is a guard that never opens,
+    and `!= "DONE"` one that never shuts: either way the flow steers by a value the shape
+    cannot answer with. Said only where everything is certain -- the answer's shape is a
+    model this same file declares, the field spells its values out, and the other side is
+    constants -- so a shape read from elsewhere is let be rather than guessed at.
+    """
+    if len(node.ops) != 1 or not isinstance(node.ops[0], _BY_VALUE):
+        return
+    membership = isinstance(node.ops[0], (ast.In, ast.NotIn))
+    pairs = [(node.left, node.comparators[0])]
+    if not membership:
+        # `"done" == review.verdict` reads the same either way round; `"d" in x` does not.
+        pairs.append((node.comparators[0], node.left))
+    for asked, against in pairs:
+        if not (isinstance(asked, ast.Attribute) and isinstance(asked.value, ast.Name)):
+            continue
+        answer = scope.answers.get(asked.value.id)
+        if answer is None or not answer.model:
+            continue
+        held = _offered(answer.model, scope.read, asked.attr, set())
+        values = _values_of(against, membership=membership)
+        if held is None or values is None:
+            return
+        offers = ", ".join(repr(one) for one in sorted(held, key=repr))
+        for value in values:
+            if value not in held:
+                scope.findings.append(
+                    Finding(
+                        "unknown-verdict",
+                        "warning",
+                        scope.read.where,
+                        node.lineno,
+                        f"no answer holds {value!r} at {asked.attr!r} -- the shape "
+                        f"offers {offers}, and a comparison against a value it cannot "
+                        "hold reads as a guard and guards nothing",
+                    )
+                )
+        return
+
+
+def _offered(
+    model: str, read: _Read, field_name: str, seen: set[str]
+) -> frozenset[object] | None:
+    """Every value one field of a model may hold, read off the model's own words.
+
+    Follows local bases the way the strictness rule does -- a field a model inherits is as
+    much its shape as one it declares.
+
+    Args:
+      model: The model's name.
+      read: The file, whose models are the only ones read.
+      field_name: The field asked about.
+      seen: The models already walked, which stops a circular inheritance.
+
+    Returns:
+      The values, or None where the model or the field is not here, or the field's
+      annotation does not spell its values out.
+    """
+    if model in seen or model not in read.models:
+        return None
+    seen.add(model)
+    declared = read.models[model]
+    for node in declared.body:
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == field_name
+        ):
+            return _options_in(node.annotation)
+    for base in declared.bases:
+        if isinstance(base, ast.Name):
+            held = _offered(base.id, read, field_name, seen)
+            if held is not None:
+                return held
+    return None
+
+
+def _options_in(annotation: ast.expr | None) -> frozenset[object] | None:
+    """Every value one annotation admits, where it spells them all out.
+
+    `Literal` through and through -- unions, `Optional` and `Annotated` read through --
+    or None for anything open: a field that may hold a plain `str` is a field any
+    comparison against is an honest one.
+    """
+    said = _unquoted(annotation)
+    if said is None:
+        return None
+    if isinstance(said, ast.Constant) and said.value is None:
+        return frozenset({None})
+    if isinstance(said, ast.BinOp) and isinstance(said.op, ast.BitOr):
+        left = _options_in(said.left)
+        right = _options_in(said.right)
+        if left is None or right is None:
+            return None
+        return left | right
+    if not isinstance(said, ast.Subscript):
+        return None
+    head = _tip(said.value)
+    parts = _elements(said.slice)
+    if head == "Literal":
+        options: set[object] = set()
+        for part in parts:
+            if not isinstance(part, ast.Constant):
+                return None
+            options.add(part.value)
+        return frozenset(options)
+    if head == "Annotated" and parts:
+        return _options_in(parts[0])
+    if head == "Optional" and parts:
+        inner = _options_in(parts[0])
+        return None if inner is None else inner | {None}
+    if head == "Union":
+        gathered: frozenset[object] = frozenset()
+        for part in parts:
+            inner = _options_in(part)
+            if inner is None:
+                return None
+            gathered |= inner
+        return gathered
+    return None
+
+
+def _values_of(node: ast.expr, *, membership: bool) -> list[object] | None:
+    """The constant values one side of a comparison holds, or None where it is not sure."""
+    if not membership:
+        return [node.value] if isinstance(node, ast.Constant) else None
+    if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        values: list[object] = []
+        for elt in node.elts:
+            if not isinstance(elt, ast.Constant):
+                return None
+            values.append(elt.value)
+        return values
+    return None
 
 
 # ---------------------------------------------------------------------------------------
