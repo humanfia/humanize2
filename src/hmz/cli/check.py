@@ -147,17 +147,9 @@ def _said(found: list[Finding], *, as_json: bool, flows: int) -> None:
         import json
 
         for one in found:
-            print(
-                json.dumps(
-                    {
-                        "code": one.code,
-                        "severity": one.severity,
-                        "where": str(one.where),
-                        "line": one.line,
-                        "said": one.said,
-                    }
-                )
-            )
+            # Off the tuple itself rather than field by field, so a field added to a
+            # finding later is a field a script reading this is handed.
+            print(json.dumps(one._asdict() | {"where": str(one.where)}))
         return
     from . import many
 

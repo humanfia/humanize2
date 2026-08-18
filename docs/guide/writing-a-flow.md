@@ -177,8 +177,9 @@ by taking its name. A file whose name starts with `_` is not a flow.
 ## Check your work
 
 Check the flow itself, before anything runs it: a static reading that executes nothing, then
-the flow driven by stubs against a clock — including the world where the reviewer never says
-the work is done. See [Checking a flow](/guide/checking-flows).
+the flow loaded in a subprocess held to a clock. Driving it with stubs — including the world
+where the reviewer never says the work is done — is `proved()`, a call of your own. See
+[Checking a flow](/guide/checking-flows).
 
 ```sh
 hmz check local/twice

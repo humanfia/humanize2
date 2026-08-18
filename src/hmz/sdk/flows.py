@@ -246,9 +246,12 @@ class Flows:
         )
         if static or any(one.severity == "error" for one in found):
             return tuple(found)
+        # By what each said and not by its code alone: the two readings make the same
+        # findings about different fields, and one dropped for sharing a code with another
+        # is a field nothing ever mentions.
         proof = proved(whole, name=inside(str(named)), scenarios=())
-        said = {one.code for one in found}
-        found.extend(one for one in proof.findings if one.code not in said)
+        said = {(one.code, one.said) for one in found}
+        found.extend(one for one in proof.findings if (one.code, one.said) not in said)
         return tuple(found)
 
     def prophecy(self, named: str | os.PathLike[str]) -> Prophecy | None:

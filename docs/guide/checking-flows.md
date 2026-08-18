@@ -1,7 +1,8 @@
 # Checking a flow
 
 Check a flow before anything runs it: a static reading that executes nothing, then the flow
-driven by stubs against a clock. Together they catch the mistakes that otherwise surface
+loaded in a subprocess held to a clock — and, when you ask for it, driven by stubs through the
+worlds worth asking of a loop. Together they catch the mistakes that otherwise surface
 hours into a run — the loop nothing can end, the field read off an answer that failed, the
 name the interface does not answer to.
 
@@ -44,11 +45,12 @@ wrote, one fetched off the internet, one about to be forked:
 hmz check --static somebody-elses/flow
 ```
 
-## The reading that runs it against the worst day
+## The reading that loads it, and the one that drives it
 
 Without `--static`, the flow is also loaded — in a subprocess held to a clock, never in your
-process — and its live config model is read. The same machinery is a library, and the
-scenarios are the questions worth asking of a loop:
+process — and its live config model is read. That is what the command does. Driving the flow
+against the worlds worth asking of a loop is the same machinery as a library, and is a call of
+your own:
 
 ```python
 from hmz.flows import NEVER_DONE, SILENT, proved

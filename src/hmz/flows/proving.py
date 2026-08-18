@@ -293,6 +293,20 @@ def _rested(seconds: float) -> None:
     del seconds
 
 
+async def _rested_for(seconds: float, result: Any = None) -> Any:
+    """The same for a flow that rests the async way, which `asyncio.sleep` is.
+
+    Args:
+      seconds: How long the flow meant to wait, which the proof does not.
+      result: What `asyncio.sleep` answers with, which it hands back untouched.
+
+    Returns:
+      That same thing, at once.
+    """
+    del seconds
+    return result
+
+
 class _Enough(BaseException):
     """The turn cap, raised past everything a flow catches: a proof is over when it is.
 
@@ -327,6 +341,7 @@ def _driven(flow: str, spec: dict[str, Any]) -> dict[str, Any]:
       What the parent folds into the proof: `refused` for a flow that would not load,
       `findings` off the live config model, and how driving it went.
     """
+    import asyncio
     import time
 
     from .driving import NotAFlow, declares, set_up
@@ -336,6 +351,9 @@ def _driven(flow: str, spec: dict[str, Any]) -> dict[str, Any]:
     # five seconds a round is not five hundred seconds more legal than one that does not.
     # Patched before the flow is even loaded, so a `from time import sleep` reads this one.
     time.sleep = _rested
+    # And the other spelling of it: an async flow rests with `asyncio.sleep`, and one left
+    # sleeping would be reported as a flow that cannot end when it was only resting.
+    asyncio.sleep = _rested_for
 
     named = f"{flow}:{spec['name']}" if spec["name"] else flow
     scenario = Scenario(**spec["scenario"]) if spec["scenario"] else None

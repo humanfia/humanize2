@@ -225,7 +225,7 @@ def mind[**P, T](
 
         @mind
         def write(agent: Agent, task: str) -> Draft:
-            return agent(f"draft this: {task}", shape=Draft)
+            return agent(f"draft this: {task}", schema=Draft)
 
     It has exactly one way out. What a model said is not a decision until something read it,
     so a branch is hung off a logic node and never off this: a prophecy that branched on a
@@ -506,6 +506,8 @@ class Prophecy(NamedTuple):
       takes: The shape the flow is called with, which is `str` for one a command line runs
         and a model for one that is only ever a supernode.
       gives: The shape it answers with, and "" for one that answers with nothing.
+      config: The shape it is set up with, and "" for one that takes no setting up -- which
+        every supernode is, what is set up being the run rather than a node of it.
       agents: What the atlas calls each of the agents it drives, in the order it takes them.
       nodes: Every node, by node id.
       edges: Every way from one node to another, the way in and the way out included.
@@ -631,27 +633,57 @@ def kept(prophecy: Prophecy) -> bytes:
     return pickle.dumps(prophecy, protocol=_PROTOCOL)
 
 
+#: The only classes a shipped prophecy is allowed to name. A pickle says which class to
+#: build as it goes, and the reader that took it at its word would run whatever the file
+#: asked for -- which the static reading of a flow, whose whole promise is that it executes
+#: nothing, must not do for a file it found in a directory it was pointed at.
+_SHAPES = frozenset({"Edge", "Field", "Node", "Prophecy", "Reads", "Shape", "When"})
+
+
 def told(said: bytes) -> Prophecy | None:
     """One shipped prophecy read back, or None where those bytes are not one.
 
     Note:
-      Reading this runs what the bytes say, which is what reading a pickle is. That is the
-      trust a flowverse already has: a flow is a directory of Python and reading one means
-      running it, so a repository shipping a prophecy is a repository already trusted with
-      this machine. What this adds is the check that what came back is a prophecy, so that
-      a file which is merely corrupt is refused rather than walked.
+      Nothing but a prophecy is built. A pickle names the class to build at every step, so
+      one read as it comes runs whatever the file names -- and this file is read by the
+      static reading of a flow, which is pointed at code nobody has read and promises to
+      execute none of it. So the classes are held to this module's own tuples, and bytes
+      naming anything else are bytes that are not a prophecy.
 
     Args:
       said: The bytes.
 
     Returns:
       The prophecy, or None for bytes that are not one -- truncated, written by something
-      else, or written by a humanize whose prophecies had another shape.
+      else, written by a humanize whose prophecies had another shape, or naming a class no
+      prophecy is made of.
     """
+    import io
     import pickle
+    import sys as running
+
+    class _Only(pickle.Unpickler):
+        """An unpickler that builds this module's own tuples and refuses everything else."""
+
+        def find_class(self, module: str, name: str) -> Any:
+            """Refuses every class a prophecy is not made of.
+
+            Args:
+              module: The module the bytes name.
+              name: The class in it they name.
+
+            Returns:
+              The class, for the tuples a prophecy is made of.
+
+            Raises:
+              UnpicklingError: For anything else, which is what makes reading this safe.
+            """
+            if module == __name__ and name in _SHAPES:
+                return getattr(running.modules[__name__], name)
+            raise pickle.UnpicklingError(f"a prophecy is not made of {module}.{name}")
 
     try:
-        held = pickle.loads(said)  # noqa: S301 -- the note above: a flowverse is trusted
+        held = _Only(io.BytesIO(said)).load()
     except Exception:  # noqa: BLE001 -- anything a pickle raises is a file that is not one
         return None
     if not isinstance(held, Prophecy):

@@ -68,7 +68,6 @@ from .atlas import (
     sub,
     told,
 )
-from .checking import Capability, Finding, briefed, catalogue, checked
 from .driving import (
     NotAFlow,
     Place,
@@ -82,8 +81,6 @@ from .driving import (
     running,
     wanted,
 )
-from .prophesying import Prophesied, is_atlas, prophesied
-from .proving import ALWAYS_DONE, NEVER_DONE, SILENT, Outcome, Proof, Scenario, proved
 from .verses import (
     BUILTIN,
     FLOWS,
@@ -131,6 +128,18 @@ if TYPE_CHECKING:
         Verdict,
     )
     from hmz.backends import Model, Profile
+
+    from .checking import Capability, Finding, briefed, catalogue, checked
+    from .prophesying import Prophesied, is_atlas, prophesied
+    from .proving import (
+        ALWAYS_DONE,
+        NEVER_DONE,
+        SILENT,
+        Outcome,
+        Proof,
+        Scenario,
+        proved,
+    )
 
 __all__ = [
     "ALWAYS_DONE",
@@ -248,8 +257,25 @@ __all__ = [
 _MODULES = ("backends", "models")
 
 #: And the names a flow imports from here that are written down elsewhere: the vocabulary a
-#: turn is described in, and where humanize keeps what outlives a run.
+#: turn is described in, where humanize keeps what outlives a run, and the two readings of a
+#: flow -- which are thousands of lines of `ast` apiece and are asked for by the one command
+#: that checks a flow rather than by anything that lists, finds or runs one.
 _ELSEWHERE = {
+    "ALWAYS_DONE": "hmz.flows.proving",
+    "Capability": "hmz.flows.checking",
+    "Finding": "hmz.flows.checking",
+    "NEVER_DONE": "hmz.flows.proving",
+    "Outcome": "hmz.flows.proving",
+    "Proof": "hmz.flows.proving",
+    "Prophesied": "hmz.flows.prophesying",
+    "SILENT": "hmz.flows.proving",
+    "Scenario": "hmz.flows.proving",
+    "briefed": "hmz.flows.checking",
+    "catalogue": "hmz.flows.checking",
+    "checked": "hmz.flows.checking",
+    "is_atlas": "hmz.flows.prophesying",
+    "prophesied": "hmz.flows.prophesying",
+    "proved": "hmz.flows.proving",
     "AgentConfig": "hmz.agents",
     "Board": "hmz.agents",
     "AgentDefaults": "hmz.agents",

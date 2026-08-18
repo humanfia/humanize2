@@ -150,12 +150,19 @@ def prophesied(
             ),
             None,
         )
-    found = list(_rules(whole))
-    for read in whole.read:
-        found.extend(_dynamic(read))
+    rules = _rules(whole)
     mark = next(
         (one for one in whole.entered.marks if one.atlas and one.name == name), None
     )
+    if mark is None and any(one.name == name for one in whole.entered.marks):
+        # A flow of this file's, and an ordinary one: a file holds several flows and the
+        # reading each gets is its own. So the one asked for gets the reading that reads a
+        # body as a program, which is the reading it would have got had the file beside it
+        # held no atlas at all.
+        return Prophesied(rules, None)
+    found = list(rules)
+    for read in whole.read:
+        found.extend(_dynamic(read))
     if mark is None:
         held = sorted(one.name for one in whole.entered.marks if one.atlas)
         found.append(
@@ -172,10 +179,14 @@ def prophesied(
         whole, _gathered(whole), mark, name or _stem(whole), through
     )
     found.extend(said)
-    if prophecy is not None:
-        found.extend(_shipped(whole, prophecy))
     if any(one.severity == "error" for one in found):
         return Prophesied(tuple(found), None)
+    # After the gate rather than before it: what a flow ships is a fact about the file
+    # beside the source and not about the source, so saying the two have drifted apart must
+    # not take away the graph the source compiled to -- shipping that graph again is the
+    # one thing that answers the finding, and it is the one thing this would refuse.
+    if prophecy is not None:
+        found.extend(_shipped(whole, prophecy))
     return Prophesied(tuple(found), prophecy)
 
 
@@ -504,7 +515,11 @@ def _agents(
     Returns:
       One name per agent, in the order the flow takes them.
     """
-    crew = held.crews.get(_root(param.annotation) if param.annotation else "")
+    # Read through its quoting, as every other annotation here is: a crew declared
+    # below the atlas that drives it is named in a string, and a name in a string is
+    # still the name it is.
+    written = _unquoted(param.annotation)
+    crew = held.crews.get(_root(written) if written is not None else "")
     if crew is None:
         found.append(
             _said(
@@ -708,7 +723,10 @@ class _Wiring:
                     "thing a logic node reads",
                 )
                 return
-            answers = node.value.id
+            # Through the same table a read goes through: what the entry point calls its
+            # own arguments is not what the run holds them under, so an atlas that answers
+            # with what it was called with names `@input` here as every other read does.
+            answers = self.names.get(node.value.id, node.value.id)
             given = self._shape_of(Reads(answers)) or NOTHING
         if given != (self.gives or NOTHING):
             self.found.append(
@@ -739,7 +757,19 @@ class _Wiring:
         said, truth = read
         taken: _Loose = [(out_of, When(*said, truth)) for out_of, _ in loose]
         otherwise: _Loose = [(out_of, When(*said, not truth)) for out_of, _ in loose]
-        return [*self._block(node.body, taken), *self._block(node.orelse, otherwise)]
+        # One arm at a time, each starting from what was bound above it: a name one arm
+        # binds is a name the other path arrives without, and a node below the branch that
+        # read it would be handed nothing on that path.
+        was = dict(self.bound)
+        held = self._block(node.body, taken)
+        then, self.bound = self.bound, dict(was)
+        other = self._block(node.orelse, otherwise)
+        # And below the branch, only what both arms bound and bound the same: everything
+        # else is a name that holds something on one way here and nothing on the other.
+        self.bound = {
+            name: shape for name, shape in then.items() if self.bound.get(name) == shape
+        }
+        return [*held, *other]
 
     def _loop(self, node: ast.While, loose: _Loose) -> _Loose:
         """A `while`, which is a branch with an edge back to the node it reads.
@@ -772,6 +802,18 @@ class _Wiring:
             return loose
         head = loose[0][0]
         said, truth = read
+        # And the node above it is the one it reads again: the loop's edge goes back there,
+        # so a `while` whose guard that node does not answer is a guard no round can change
+        # -- a loop with no way out, compiled from a body that reads as though it had one.
+        above = self._above(head)
+        if above is None or above.binds != said.reads:
+            self._refuse(
+                node,
+                f"a loop reads again the node above it, and this reads {_names(said)}, "
+                f"which {head or 'nothing yet'} does not answer -- put the node that "
+                "answers it directly above the loop, so each round asks it again",
+            )
+            return loose
         opens: _Loose = [(head, When(*said, truth))]
         for out_of, when in self._block(node.body, opens):
             self.edges.append(Edge(out_of, head, when))
@@ -816,7 +858,12 @@ class _Wiring:
           What the branch reads, and whether the first way out is the one taken when that
           reads as true. None where the branch is refused.
         """
-        said = test.operand if isinstance(test, ast.UnaryOp) else test
+        # `not` and nothing else: every other unary operator is work -- `~x` is falsy where
+        # `x` is truthy -- and one read as though it were the name under it would be a graph
+        # that branches the other way from the body it was compiled from.
+        said: ast.expr = (
+            test.operand if isinstance(test, ast.UnaryOp) and _is_not(test) else test
+        )
         truth = not _is_not(test)
         read = self._reads(said)
         if read is None:
@@ -826,13 +873,26 @@ class _Wiring:
                 " is work, and work is what a logic node is for",
             )
             return None
-        if self._shape_of(read) is None:
+        shape = self._shape_of(read)
+        if shape is None:
             self.found.append(
                 _said(
                     "unbound-read",
                     self.where,
                     test.lineno,
                     f"nothing here has bound {_names(read)}",
+                )
+            )
+            return None
+        if not shape:
+            self.found.append(
+                _said(
+                    "shape-mismatch",
+                    self.where,
+                    test.lineno,
+                    f"{_names(read)} holds nothing -- the node that bound it answers with "
+                    "nothing at all, so a branch reading it is one way out taken every "
+                    "round and one taken never",
                 )
             )
             return None
@@ -900,6 +960,17 @@ class _Wiring:
                 call,
                 "a node is handed its arguments in order, by name -- no keywords and "
                 "nothing unpacked, so that what flows along each edge is one thing",
+            )
+            return loose
+        if binds in self.names:
+            # What the entry point calls its own arguments is what the run holds the task,
+            # the agents and the config under, and a body binding one of those names would
+            # be a node whose answer nothing below it could read: every read of that name
+            # goes on answering with what the atlas was called with.
+            self._refuse(
+                call,
+                f"{binds} is what this atlas was called with -- bind the answer to a name "
+                "of its own, so that what reads it reads the node and not the run",
             )
             return loose
         declared = self._declared(call, called)
@@ -1483,7 +1554,12 @@ def _required(value: ast.expr | None, held: _Held) -> bool:
     """
     if value is None:
         return True
-    if isinstance(value, ast.Call) and _root(value.func) in held.fields:
+    # By what it is called at the tip: `Field(...)` is what a flow writes, and
+    # `pydantic.Field(...)` is the same call reached the other way -- one read at the
+    # root would be the module's name and would read every field as one with a default.
+    if isinstance(value, ast.Call) and (
+        _root(value.func) in held.fields or _tip(value.func) == "Field"
+    ):
         named = {one.arg for one in value.keywords}
         return not (value.args or named & {"default", "default_factory"})
     return False

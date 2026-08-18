@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from .atlas import AGENTS, CONFIG, INPUT, Node, Reads, digest, shipped
+from .atlas import AGENTS, ATLAS, CONFIG, INPUT, Node, Reads, digest, shipped
 
 if TYPE_CHECKING:
     import os
@@ -47,6 +47,11 @@ __all__ = ["walking"]
 _PROPHECY = "prophecy"
 _AT = "at"
 _DONE = "done"
+
+#: And that the run reached the way out. What a run has done is kept for whoever reads it
+#: back, so a finished one cannot be told from a stopped one by what it holds -- and the next
+#: run of the flow, handed that, would walk every answer it already had and do no work at all.
+_OVER = "over"
 
 #: What one visit to a node is written down under: the node, and how many times the run has
 #: been through it -- a loop is one node visited again, and a round whose answer overwrote
@@ -217,10 +222,12 @@ def _stepped(
       Whatever the prophecy answers with, and None for one that answers with nothing.
     """
     written = digest(prophecy)
-    if state.get(_PROPHECY) != written:
+    if state.get(_PROPHECY) != written or state.get(_OVER):
         # A different prophecy: the atlas was rewritten between the two runs, so what the
         # last one did, it did somewhere else. Cleared rather than merged, since a node
-        # that kept its name is not thereby the node it was.
+        # that kept its name is not thereby the node it was. And the same for a run that
+        # reached the way out: it is a run to read back rather than one to pick up, and
+        # picking it up would be a run with an answer for every node and nothing to do.
         state.clear()
         state[_PROPHECY] = written
     walk = _Walk(
@@ -232,7 +239,12 @@ def _stepped(
         under="",
         beside={},
     )
-    return _walked(walk, given, config)
+    answered = _walked(walk, given, config)
+    # Written down as finished rather than emptied: what a run did is what whoever reads it
+    # back is after, and the next run of the flow is what must not be handed it.
+    state[_OVER] = True
+    _saved(state)
+    return answered
 
 
 def _walked(walk: _Walk, given: Any, config: BaseModel | None) -> Any:
@@ -312,8 +324,11 @@ def _answered(walk: _Walk, bound: dict[str, Any], node: Node, held: str) -> Any:
         return None
     # Written down before the node runs and saved once: `State` saves itself as it is
     # written into, and what goes into `kept` below is a change inside a value it holds and
-    # cannot see -- which is the one that has to ask.
-    walk.state[_AT] = held
+    # cannot see -- which is the one that has to ask. Where a run stopped is the node that
+    # was running, so a supernode writes nothing here: the nodes under it write themselves,
+    # and one of theirs overwritten by this would be a run picked up past what it stopped in.
+    if node.kind != "atlas":
+        walk.state[_AT] = held
     answered = _ran(walk, bound, node, held)
     walk.kept[held] = _written(answered)
     _saved(walk.state)
@@ -376,10 +391,13 @@ def _supernode(walk: _Walk, node: Node, held: str, said: list[Any]) -> Any:
         )
     # Beside it or elsewhere: a supernode of this flow's own is in the file this prophecy
     # was compiled from, and one reached by name is a flow of its own, run to be read as any
-    # flow is. Read once for the run rather than once a visit: the graph was settled before
-    # the run started, and a file re-read between two rounds of a loop would be new code
-    # running under a shape that had already been agreed.
-    if node.calls in walk.inside:
+    # flow is. Told apart by the mark rather than by the name being one this file holds:
+    # `inner = sub("inner")` binds that name here too, and a membership test would read a
+    # flow of its own as one beside it and walk its nodes against the wrong file. Read once
+    # for the run rather than once a visit: the graph was settled before the run started,
+    # and a file re-read between two rounds of a loop would be new code running under a
+    # shape that had already been agreed.
+    if getattr(walk.inside.get(node.calls), ATLAS, None) is not None:
         beside = walk.inside
     elif node.calls not in walk.beside:
         walk.beside[node.calls] = beside = loaded(find(node.calls))

@@ -57,7 +57,7 @@ class Verdict(BaseModel):
 @mind
 def write(agent: Agent, task: str) -> Draft:
     """One turn of writing."""
-    return agent(task, shape=Draft)
+    return agent(task, schema=Draft)
 
 
 @logic

@@ -460,7 +460,10 @@ def _collected(read: _Read, body: list[ast.stmt], *, type_checking: bool) -> Non
             _named_sub(read, targets, node.value)
         elif isinstance(node, ast.ClassDef) and not type_checking:
             read.bound.add(node.name)
-            bases = {_root(base) for base in node.bases}
+            # By what each base is called at the tip: `pydantic.BaseModel` and
+            # `typing.NamedTuple` are the same two classes reached the other way, and
+            # one read at the root would be the module's name and neither of them.
+            bases = {_tip(base) for base in node.bases}
             if "NamedTuple" in bases:
                 read.crews[node.name] = node
             elif "BaseModel" in bases or bases & set(read.models):
@@ -807,6 +810,13 @@ def _kept(mark: _Mark, read: _Read, state: str) -> Iterator[Finding]:
         elif isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store):
             if _root(node.value) in held:
                 wrote = wrote or node.lineno
+        elif isinstance(node, ast.Delete):
+            # `del state[what]` is the same thing said the other way round: a flow that
+            # emptied what it kept is a flow the next run here opens on nothing.
+            cleared = cleared or any(
+                isinstance(one, ast.Subscript) and _root(one.value) in held
+                for one in node.targets
+            )
         elif (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
@@ -814,7 +824,7 @@ def _kept(mark: _Mark, read: _Read, state: str) -> Iterator[Finding]:
         ):
             if node.func.attr in {"update", "setdefault"}:
                 wrote = wrote or node.lineno
-            elif node.func.attr == "clear":
+            elif node.func.attr in {"clear", "pop", "popitem"}:
                 cleared = True
     if wrote and not cleared:
         yield Finding(
@@ -1560,15 +1570,21 @@ def _guards(test: ast.expr, scope: _Scope) -> None:
     either way round. Noted wherever it appears rather than matched to a branch: what the
     warning is for is the answer nobody tested at all.
     """
+    # Through the walrus, which is how the answer and the guard over it are written on one
+    # line -- `if (said := agent(..., schema=X)) is not None:` -- and reading it as work
+    # rather than as a name would be a warning about a flow that guarded exactly right.
+    test = _named(test)
     if isinstance(test, ast.Name):
         scope.guarded.add(test.id)
-    elif isinstance(test, ast.UnaryOp) and isinstance(test.operand, ast.Name):
-        scope.guarded.add(test.operand.id)
+    elif isinstance(test, ast.UnaryOp):
+        held = _named(test.operand)
+        if isinstance(held, ast.Name):
+            scope.guarded.add(held.id)
     elif isinstance(test, ast.BoolOp):
         for one in test.values:
             _guards(one, scope)
     elif isinstance(test, ast.Compare):
-        sides = [test.left, *test.comparators]
+        sides = [_named(one) for one in (test.left, *test.comparators)]
         against_none = any(
             isinstance(side, ast.Constant) and side.value is None for side in sides
         )
@@ -1576,6 +1592,19 @@ def _guards(test: ast.expr, scope: _Scope) -> None:
             for side in sides:
                 if isinstance(side, ast.Name):
                     scope.guarded.add(side.id)
+
+
+def _named(node: ast.expr) -> ast.expr:
+    """One test with the walrus around it taken off, which is the name it binds.
+
+    Args:
+      node: The test, or one side of it.
+
+    Returns:
+      The name a `:=` binds, and the node itself where there is no `:=` -- so that an answer
+      bound and tested on one line reads as the name it was bound to.
+    """
+    return node.target if isinstance(node, ast.NamedExpr) else node
 
 
 def _asked(node: ast.Attribute, scope: _Scope) -> None:

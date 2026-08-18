@@ -49,13 +49,13 @@ class Verdict(BaseModel):
 @mind
 def write(agent: Agent, task: str) -> Draft:
     """One turn of writing."""
-    return agent(task, shape=Draft)
+    return agent(task, schema=Draft)
 
 
 @mind
 def review(agent: Agent, draft: Draft) -> Verdict:
     """One turn of reviewing."""
-    return agent(f"review this:\n\n{draft.text}", shape=Verdict)
+    return agent(f"review this:\n\n{draft.text}", schema=Verdict)
 
 
 @logic
@@ -78,7 +78,7 @@ def run(agents: Agents, task: str) -> None:
 It is run exactly as any other flow is:
 
 ```sh
-hmz exec -f review_loop -a writer=claude/sonnet:high -a reviewer=codex/gpt-5.6-sol "$(cat TASK.md)"
+hmz exec -f review_loop -a claude/sonnet:high -a codex/gpt-5.6-sol "$(cat TASK.md)"
 ```
 
 ## The two kinds of node
