@@ -69,3 +69,39 @@ def test_codex_node_package_keeps_its_whole_runtime_local(
     assert str(host) in resolved.local_programs
     assert str(work_helper) not in resolved.local_programs
     assert str(launcher) in resolved.local_programs
+
+
+def test_an_npm_shebang_keeps_the_whole_search_for_its_interpreter_local(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``env`` searches ``PATH`` an ``execve`` at a time, and the first one decides.
+
+    A candidate that does not exist here is not the agent's own by name, so it would be run
+    on the target -- where the name does resolve, and the agent itself ends up running.
+    """
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    node = executable(tmp_path / "node-bin" / "node")
+    monkeypatch.setenv("PATH", f"{empty}:{node.parent}")
+    script = executable(tmp_path / "bin" / "kimi", b"#!/usr/bin/env node\n")
+
+    resolved = resolve([str(script)])
+
+    assert str(node) in resolved.local_programs
+    assert (
+        str(empty / "node") in resolved.local_programs
+    )  # tried first, and refused here
+
+
+def test_a_program_the_agent_keeps_in_its_own_state_directory_runs_here(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Grok installs its native binary under ``~/.grok`` and re-execs it."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    native = executable(tmp_path / ".grok" / "bin" / "grok-1.0.13")
+    launcher = executable(tmp_path / "bin" / "grok", b"#!/usr/bin/env node\n")
+
+    resolved = resolve([str(launcher)])
+
+    assert str(tmp_path / ".grok") in resolved.local_programs
+    assert any(str(native).startswith(one) for one in resolved.local_programs)
