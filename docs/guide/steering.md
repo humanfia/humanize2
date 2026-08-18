@@ -85,6 +85,11 @@ does. Between two turns there is nothing there to hear, so `interject` raises `R
 until the next turn opens. An anchored Codex keeps one app server for the life of the agent and
 can be steered throughout, at the cost of that same guarantee.
 
+A turn is steered on the server it is running on, not on whichever one the agent holds when you
+type. The two are the same unless something moved underneath — another account, or a change to
+the [callbacks](/guide/tools) the agent offers, either of which starts a fresh server — and a
+line sent to a server that never ran the turn would be a line the turn never hears.
+
 ## From Python
 
 `session.interject` sends a line from Python:

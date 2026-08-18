@@ -58,6 +58,12 @@ class _Running:
 
     thread: str | None = None
     turn: str | None = None
+    #: The server this turn is being taken on, bound where the turn starts rather than asked
+    #: for again when there is a word to put in. The agent's server is let go of and started
+    #: again whenever what it was started knowing has moved -- another account, another list
+    #: of the flow's callbacks, said by any session of the agent -- and a steer aimed at the
+    #: one that replaced it names a thread and a turn that server has never heard of.
+    on: _AppServer | None = None
     #: The session's own book of words put into this turn, asked whenever one comes back
     #: around: the server holds every session of the agent, so the turn loop has no other way
     #: to know whose word it is reading.
@@ -995,17 +1001,23 @@ class CodexSession(SessionBase):
           subprocess.CalledProcessError: If the turn was refused, or the server stopped.
         """
         with self._lock:  # a conversation is a sequence: one turn at a time
-            thread = self._thread()
+            # Read once and held for the whole turn: asking the agent for its server again
+            # may be starting another one, and the thread this turn is on is the first one's.
+            server = self._agent.server
+            thread = self._thread(server)
             # Known before the turn starts, so a word put in has a thread to name even though
             # the session is only opened once the turn has landed. The book goes with it: the
             # server reads every session's stream, and only this one knows what it put in.
+            # The server too, so a steer goes to the one running this rather than to whichever
+            # is the agent's by the time somebody types.
+            self._running.on = server
             self._running.thread = thread
             self._running.took = self.took
             self._running.spends = self._spends
             said = ""
             spent: Mapping[str, int] = {}
             costing = Usage()
-            for event in self._agent.server.turn(
+            for event in server.turn(
                 {
                     "threadId": thread,
                     "input": [{"type": "text", "text": prompt}],
@@ -1016,7 +1028,7 @@ class CodexSession(SessionBase):
                         if schema is not None
                         else {}
                     ),
-                    **self._agent.server.permitted(
+                    **server.permitted(
                         self._agent.config.permission,
                         self._agent.config.service_tier,
                     ),
@@ -1054,22 +1066,27 @@ class CodexSession(SessionBase):
           RuntimeError: If no turn is running, so there is none for the server to steer.
         """
         running = self._running
-        if running.turn is None or running.thread is None:
+        if running.turn is None or running.thread is None or running.on is None:
             raise RuntimeError("no turn is running to be talked to")
         ticket = self.steering(text)
         try:
-            self._agent.server.steer(running.thread, running.turn, text, ticket)
+            # The server the turn is on rather than the agent's now: they are the same one
+            # unless something moved under it, and that is the case this is for.
+            running.on.steer(running.thread, running.turn, text, ticket)
         except BaseException:
             self.took(ticket)
             raise
 
-    def _thread(self) -> str:
+    def _thread(self, server: _AppServer) -> str:
         """The thread this session is, started or picked back up as needed.
+
+        Args:
+          server: The server to start it on, bound by the caller: a thread started on one
+            server and a turn taken on another are a turn naming a thread nobody has.
 
         Returns:
           The thread's id, which is also the session's.
         """
-        server = self._agent.server
         rung = server.permitted(
             self._agent.config.permission, self._agent.config.service_tier
         )
@@ -1105,7 +1122,7 @@ class CodexSession(SessionBase):
         with self._lock:  # a conversation is a sequence: one turn at a time
             server = self._agent.server
             config = self._agent.config
-            thread = self._thread()
+            thread = self._thread(server)
             server.call("thread/goal/set", {"threadId": thread, "objective": objective})
             answer = server.pursue(
                 {

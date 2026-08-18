@@ -431,11 +431,15 @@ adjusted rather than chosen.
   rather than chosen from: which account an agent runs as is asked where that agent is set up.
   `a` MUST make one and `d` twice MUST take one away.
 - What else can be done to one account -- correcting what it holds, signing it in again,
-  saying which account it falls back to, saying how a failed turn under it is tried again --
-  MUST be a menu opened with enter on the account it is about, rather than a letter apiece on
-  the list. Four questions about one row is a menu; four letters that have to be read off the
-  bottom of the screen are four keys nobody presses, while enter -- which every list already
-  means -- did one of them.
+  saying which account it falls back to -- MUST be a menu opened with enter on the account it
+  is about, rather than a letter apiece on the list. Three questions about one row is a menu;
+  three letters that have to be read off the bottom of the screen are three keys nobody
+  presses, while enter -- which every list already means -- did one of them.
+- How often a failed turn under it is taken again MUST NOT be among them: that is a thing about
+  the place a turn runs at rather than about the credentials it runs with, and `/fallback` is
+  the menu it is said on. An account still holding what was written down before it moved MUST
+  say so under the list, and MUST be a row to reach that line from even where nothing else
+  would have given it one.
 - Writing down a CLI of your own MUST be a row of the list of backends a new account is for,
   rather than a key of the accounts menu: it answers `which CLI`, which is the question that
   sheet is asking, and it is reached at the moment somebody finds out that the agent they
@@ -458,9 +462,6 @@ adjusted rather than chosen.
 - Where an account falls back to MUST be chosen from that CLI's own other accounts, and MUST
   offer the end of the line first: each account naming the next is what makes a chain, and an
   account cannot fall back to itself.
-- How an account is tried again MUST be three rungs stepped where they stand -- how many
-  tries, which wait, and how long the whole may go on for -- rather than three numbers to
-  type: a text box for an integer is a text box to validate.
 - A row MUST say the name, the way it was made by and the variables it sets. Their names and
   never a value: this is drawn where somebody can read it, and a key on a screen is a key in a
   photograph. A secret MUST NOT be read back onto the screen to be corrected -- it is typed
@@ -485,6 +486,11 @@ adjusted rather than chosen.
   and a saved agent are chosen on: an agent is one thing to choose -- a CLI, an account, a
   model at an effort -- and a second way of choosing one would be a second thing to keep
   right. An agent that would fall back to itself MUST be refused where it is said.
+- How a place is tried again before it falls back MUST be three rungs stepped where they stand
+  -- how many tries, which wait, and how long the whole may go on for -- rather than three
+  numbers to type: a text box for an integer is a text box to validate. It MUST be said here
+  rather than on an account, one row saying both what happens when a turn fails and how often
+  it is taken again first, since both are answers to the one thing that happened.
 - The accounts page MUST be the same store `/providers` walks, and its keys MUST say so: an
   account is made and taken away there, and this page is where it is said what one falls back
   to. A key that did nothing MUST say why rather than do nothing.

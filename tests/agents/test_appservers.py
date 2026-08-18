@@ -28,6 +28,7 @@ from hmz.agents import (
     Event,
     KimiCodeCLIAgent,
     KimiCodeCLIAgentConfig,
+    Tool,
 )
 from hmz.agents import codex as appservers
 
@@ -647,6 +648,41 @@ def test_codex_runs_an_ordinary_turn_on_the_thread(codex: _FakeServer) -> None:
     assert "thread/goal/set" not in called  # an ordinary turn sets no goal
     assert session.id == "thread_fake"
     assert agent.opened == ["thread_fake"]
+
+
+@pytest.mark.timeout(60)
+def test_a_word_put_in_goes_to_the_server_the_turn_is_running_on(
+    codex: _FakeServer,
+) -> None:
+    """The agent's server is not the one to ask for once a turn is already on one.
+
+    It is let go of and started again whenever what it was started knowing has moved, and a
+    sibling conversation changing what the agent offers is enough to move it. A steer aimed
+    at whichever server is the agent's by the time somebody types would name a thread and a
+    turn that server has never heard of, and the turn under way would never hear the word.
+    """
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high"))
+    session = agent.new()
+    sibling = agent.new()
+    moved: list[bool] = []
+
+    def moves_it_then_puts_a_word_in() -> None:
+        for _ in range(200):
+            if session._running.turn is not None:
+                # What the agent offers has moved, so the next read of its server is another
+                # server -- one that has never heard of the thread this turn is on.
+                sibling.offers(
+                    [Tool(name="delegate", about="hand it on", call=lambda: "handed")]
+                )
+                moved.append(agent.server is not session._running.on)
+                session.interject("go on")
+                return
+            time.sleep(0.02)
+
+    threading.Thread(target=moves_it_then_puts_a_word_in, daemon=True).start()
+
+    assert session("do the task") == "steered:go on"
+    assert moved == [True]  # the server really did move under the running turn
 
 
 def test_codex_can_be_talked_to_while_a_turn_is_running(codex: _FakeServer) -> None:
