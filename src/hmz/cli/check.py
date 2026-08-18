@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hmz.flows import Finding
+    from hmz.sdk.flows import Flows
 
 __all__ = ["check"]
 
@@ -89,7 +90,7 @@ def check(argv: list[str]) -> int:
         if not Path(flows.find(named)).is_file():
             parser.error(f"no flow called {named!r}")
     if args.prophecy or args.ship:
-        return _foretold(args.flow, ship=args.ship)
+        return _foretold(flows, args.flow, ship=args.ship)
     found: list[Finding] = []
     for named in args.flow:
         found.extend(flows.check(named, static=args.static))
@@ -99,11 +100,12 @@ def check(argv: list[str]) -> int:
     return 1 if errors or (args.strict and warned) else 0
 
 
-def _foretold(flows: list[str], *, ship: bool) -> int:
+def _foretold(held: Flows, flows: list[str], *, ship: bool) -> int:
     """Prints or writes what each atlas on the line compiles to.
 
     Args:
-      flows: The flows, by the names the line gave.
+      held: The flows, as the one object every way in asks.
+      flows: The flows to read, by the names the line gave.
       ship: Whether to write each prophecy into its flow's own directory rather than print
         it.
 
@@ -112,9 +114,7 @@ def _foretold(flows: list[str], *, ship: bool) -> int:
       an atlas, or is one that the reading refused.
     """
     from hmz.flows import NotAFlow, canonical
-    from hmz.sdk import Hmz
 
-    held = Hmz().flows
     worst = 0
     for named in flows:
         if ship:

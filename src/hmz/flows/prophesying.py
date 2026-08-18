@@ -46,6 +46,7 @@ from .atlas import (
     INPUT,
     Edge,
     Field,
+    Kind,
     Node,
     Prophecy,
     Reads,
@@ -60,14 +61,16 @@ from .atlas import (
 # package sharing what one of them wrote down -- not a second copy of it, kept here to drift.
 from .checking import (
     Finding,
+    _annotated,  # pyright: ignore[reportPrivateUsage]
     _elements,  # pyright: ignore[reportPrivateUsage]
     _Mark,  # pyright: ignore[reportPrivateUsage]
-    _names_in,  # pyright: ignore[reportPrivateUsage]
     _Node,  # pyright: ignore[reportPrivateUsage]
+    _parsed,  # pyright: ignore[reportPrivateUsage]
     _Read,  # pyright: ignore[reportPrivateUsage]
     _root,  # pyright: ignore[reportPrivateUsage]
     _rules,  # pyright: ignore[reportPrivateUsage]
     _tip,  # pyright: ignore[reportPrivateUsage]
+    _unquoted,  # pyright: ignore[reportPrivateUsage]
     _Whole,  # pyright: ignore[reportPrivateUsage]
     _whole,  # pyright: ignore[reportPrivateUsage]
 )
@@ -75,9 +78,7 @@ from .checking import (
 if TYPE_CHECKING:
     import os
 
-    from .atlas import Kind
-
-__all__ = ["Prophesied", "prophesied"]
+__all__ = ["Prophesied", "is_atlas", "named_as", "prophesied"]
 
 #: The shapes an atlas may carry that are not models: the plain kinds a node may take and
 #: answer with. Anything else has fields, and a thing with fields is a model -- so that what
@@ -149,13 +150,7 @@ def prophesied(
             ),
             None,
         )
-    # The bodies an atlas compiles are declarations rather than programs, so the rules that
-    # read a body as a program are not run over them: an `if` with no `elif` is a branch
-    # here, and a `while` with no `break` is an edge back to a node.
-    declared = frozenset(
-        one.node.name for read in whole.read for one in read.marks if one.atlas
-    )
-    found = list(_rules(whole, declared))
+    found = list(_rules(whole))
     for read in whole.read:
         found.extend(_dynamic(read))
     mark = next(
@@ -173,7 +168,9 @@ def prophesied(
             )
         )
         return Prophesied(tuple(found), None)
-    prophecy, said = _compiled(whole, mark, name or _stem(whole), through)
+    prophecy, said = _compiled(
+        whole, _gathered(whole), mark, name or _stem(whole), through
+    )
     found.extend(said)
     if prophecy is not None:
         found.extend(_shipped(whole, prophecy))
@@ -194,44 +191,41 @@ def _shipped(whole: _Whole, prophecy: Prophecy) -> list[Finding]:
       prophecy: What the source compiles to now.
 
     Returns:
-      A `stale-prophecy` error where the two differ, and nothing where they agree or where
-      the flow ships none.
+      A `stale-prophecy` error where the two differ, and nothing where they agree, where the
+      flow ships none, or where what it ships is another of the atlases its file holds.
     """
-    from . import ENTRY, PROPHECY
-    from .atlas import told
+    from . import ENTRY
+    from .atlas import shipped
 
     # Beside the entry point, which means the flow's own directory: a flow that is a single
     # file has none, and what is beside such a flow is the other flows.
-    if whole.entry.name != ENTRY:
-        return []
-    at = whole.entry.parent / PROPHECY
-    if not at.is_file():
-        return []
-    held = told(at.read_bytes())
-    if held is not None and held.name != prophecy.name:
-        return []
+    held = shipped(whole.entry.parent) if whole.entry.name == ENTRY else None
     if held is None:
+        return []
+    if held.prophecy is None:
         return [
             _said(
                 "stale-prophecy",
-                at,
+                held.at,
                 0,
                 "the prophecy shipped here cannot be read back -- compile the atlas again, "
                 "or take the file away and let each run compile it",
             )
         ]
-    if digest(held) != digest(prophecy):
-        return [
-            _said(
-                "stale-prophecy",
-                at,
-                0,
-                f"the prophecy shipped here is {digest(held)} and this source compiles to "
-                f"{digest(prophecy)} -- a run walks the shipped one, so the flow does one "
-                "thing and reads as another",
-            )
-        ]
-    return []
+    if held.prophecy.name != prophecy.name:
+        return []
+    was, now = digest(held.prophecy), digest(prophecy)
+    if was == now:
+        return []
+    return [
+        _said(
+            "stale-prophecy",
+            held.at,
+            0,
+            f"the prophecy shipped here is {was} and this source compiles to {now} -- a "
+            "run walks the shipped one, so the flow does one thing and reads as another",
+        )
+    ]
 
 
 def _dynamic(read: _Read) -> list[Finding]:
@@ -266,12 +260,50 @@ def _dynamic(read: _Read) -> list[Finding]:
     ]
 
 
+def is_atlas(flow: str | os.PathLike[str]) -> bool:
+    """Whether one flow is an atlas, which is what says which reading it gets.
+
+    Read off the entry point alone rather than off everything the flow holds: the mark that
+    says so is on a function in that file, and whoever is asking has a choice to make before
+    paying for the whole reading.
+
+    Args:
+      flow: The flow: its directory, or the Python file a single-file one is.
+
+    Returns:
+      Whether anything in its entry point is marked `@atlas`. False for a flow that is not
+      there, or will not parse -- which is a flow the other reading has plenty to say about.
+    """
+    from . import ENTRY
+
+    at = Path(flow)
+    entry = at / ENTRY if at.is_dir() else at
+    if not entry.is_file():
+        return False
+    read = _parsed(entry)
+    return not isinstance(read, Finding) and any(one.atlas for one in read.marks)
+
+
+def named_as(under: Path, inside_: str = "") -> str:
+    """What one atlas is called, given where its flow is and which of them was asked for.
+
+    Args:
+      under: The flow's own directory, or the file a single-file flow is.
+      inside_: Which of the atlases the file holds was asked for, and "" for the one it
+        holds under its own name.
+
+    Returns:
+      The name that prophecy carries, which is what a shipped one is matched against.
+    """
+    return inside_ or (under.stem if under.is_file() else under.name)
+
+
 def _stem(whole: _Whole) -> str:
     """What the atlas a file holds under its own name is called, which is the file's."""
     from . import ENTRY
 
     at = whole.entry
-    return at.parent.name if at.name == ENTRY else at.stem
+    return named_as(at.parent if at.name == ENTRY else at)
 
 
 # ---------------------------------------------------------------------------------------
@@ -292,7 +324,8 @@ class _Held(NamedTuple):
       nodes: The functions marked `@mind` or `@logic`, by name.
       atlases: The functions marked `@atlas`, by name, each beside the file it is in.
       subs: The atlases of other files this one named, `<local name>: <flow>` apiece.
-      protos: The local names of the flow-facing interfaces, which is how an agent reads.
+      protos: The local name of each flow-facing interface, which is how an agent reads.
+      fields: The local names of pydantic's `Field`, for reading whether one is required.
     """
 
     models: dict[str, ast.ClassDef]
@@ -300,7 +333,8 @@ class _Held(NamedTuple):
     nodes: dict[str, _Node]
     atlases: dict[str, tuple[_Read, _Mark]]
     subs: dict[str, str]
-    protos: set[str]
+    protos: dict[str, str]
+    fields: set[str]
 
 
 def _gathered(whole: _Whole) -> _Held:
@@ -312,13 +346,14 @@ def _gathered(whole: _Whole) -> _Held:
     Returns:
       The declarations, by name.
     """
-    held = _Held({}, {}, {}, {}, {}, set())
+    held = _Held({}, {}, {}, {}, {}, {}, set())
     for read in whole.read:
         held.models.update(read.models)
         held.crews.update(read.crews)
         held.nodes.update(read.nodes)
         held.subs.update(read.subs)
         held.protos.update(read.proto)
+        held.fields.update(read.field_alias)
         for mark in read.marks:
             if mark.atlas:
                 held.atlases[mark.node.name] = (read, mark)
@@ -331,12 +366,17 @@ def _gathered(whole: _Whole) -> _Held:
 
 
 def _compiled(
-    whole: _Whole, mark: _Mark, named: str, through: tuple[tuple[str, str], ...]
+    whole: _Whole,
+    held: _Held,
+    mark: _Mark,
+    named: str,
+    through: tuple[tuple[str, str], ...],
 ) -> tuple[Prophecy | None, list[Finding]]:
     """One atlas's entry point read, and its body walked into a prophecy.
 
     Args:
       whole: The parsed files.
+      held: What those files declare, gathered across them.
       mark: The atlas being compiled.
       named: What to call the prophecy, which is the name the flow is asked for by.
       through: The atlases this one is inside, for the supernode that reaches back.
@@ -345,7 +385,6 @@ def _compiled(
       The prophecy, or None where the reading refused it, and everything the reading found.
     """
     where = next((one.where for one in whole.read if mark in one.marks), whole.entry)
-    held = _gathered(whole)
     found: list[Finding] = []
     node = mark.node
     params = [*node.args.posonlyargs, *node.args.args]
@@ -380,13 +419,14 @@ def _compiled(
         if len(params) == _AND_A_CONFIG
         else ""
     )
+    answers = "" if gives == NOTHING else gives
     wiring = _Wiring(
         whole=whole,
         held=held,
         where=where,
         agents=agents,
         takes=takes,
-        gives="" if gives == NOTHING else gives,
+        gives=answers,
         config=config,
         names={params[0].arg: AGENTS, params[1].arg: INPUT}
         | ({params[2].arg: CONFIG} if len(params) == _AND_A_CONFIG else {}),
@@ -400,7 +440,7 @@ def _compiled(
         Prophecy(
             name=named,
             takes=takes,
-            gives=wiring.gives,
+            gives=answers,
             config=config,
             agents=agents,
             nodes=tuple(wiring.nodes),
@@ -481,7 +521,7 @@ def _agents(
     for one in crew.body:
         if not isinstance(one, ast.AnnAssign) or not isinstance(one.target, ast.Name):
             continue
-        if not _names_in(one.annotation) & held.protos:
+        if not _annotated(one.annotation, held.protos):
             found.append(
                 _said(
                     "unknown-agent",
@@ -509,9 +549,24 @@ type _Loose = list[tuple[str, When | None]]
 #: the shape it holds, which may be one of the two agent kinds instead.
 type _Takes = list[tuple[str, str]]
 
-#: One node's declaration: what kind it is, what it takes, what it answers with, whether a
-#: run picked up inside it runs it again, and -- for a supernode -- the prophecy it is.
-type _Declared = tuple["Kind", _Takes, str, bool, str]
+
+class _Declared(NamedTuple):
+    """What one thing a body calls is, read off wherever it is declared.
+
+    Attributes:
+      kind: Which of the three kinds of node it is.
+      takes: Its parameters, as `(name, shape)` pairs, where the shape may be one of the two
+        agent kinds instead.
+      gives: The shape it answers with, and "" for one that answers with nothing.
+      rerun: Whether a run picked up inside it runs it again, or steps past it.
+      under: For a supernode, the prophecy it is, by name. "" for every other node.
+    """
+
+    kind: Kind
+    takes: _Takes
+    gives: str
+    rerun: bool
+    under: str = ""
 
 
 class _Wiring:
@@ -654,7 +709,7 @@ class _Wiring:
                 )
                 return
             answers = node.value.id
-            given = self._shape_of((answers, "")) or NOTHING
+            given = self._shape_of(Reads(answers)) or NOTHING
         if given != (self.gives or NOTHING):
             self.found.append(
                 _said(
@@ -681,11 +736,9 @@ class _Wiring:
         read = self._branched(node.test, loose)
         if read is None:
             return loose
-        reads, field, truth = read
-        taken: _Loose = [(out_of, When(reads, field, truth)) for out_of, _ in loose]
-        otherwise: _Loose = [
-            (out_of, When(reads, field, not truth)) for out_of, _ in loose
-        ]
+        said, truth = read
+        taken: _Loose = [(out_of, When(*said, truth)) for out_of, _ in loose]
+        otherwise: _Loose = [(out_of, When(*said, not truth)) for out_of, _ in loose]
         return [*self._block(node.body, taken), *self._block(node.orelse, otherwise)]
 
     def _loop(self, node: ast.While, loose: _Loose) -> _Loose:
@@ -718,13 +771,12 @@ class _Wiring:
         if read is None:
             return loose
         head = loose[0][0]
-        reads, field, truth = read
-        opens: _Loose = [(head, When(reads, field, truth))]
-        inside = self._block(node.body, opens)
-        for out_of, when in inside:
+        said, truth = read
+        opens: _Loose = [(head, When(*said, truth))]
+        for out_of, when in self._block(node.body, opens):
             self.edges.append(Edge(out_of, head, when))
         self._endless(node, head)
-        ends: _Loose = [(head, When(reads, field, not truth))]
+        ends: _Loose = [(head, When(*said, not truth))]
         return ends
 
     def _endless(self, node: ast.While, head: str) -> None:
@@ -741,7 +793,7 @@ class _Wiring:
             for one in said.targets
             if isinstance(one, ast.Name)
         }
-        reading = next((one for one in self.nodes if one.at == head), None)
+        reading = self._above(head)
         if reading is not None and not wrote & {one.reads for one in reading.takes}:
             self.found.append(
                 _said(
@@ -753,7 +805,7 @@ class _Wiring:
                 )
             )
 
-    def _branched(self, test: ast.expr, loose: _Loose) -> tuple[str, str, bool] | None:
+    def _branched(self, test: ast.expr, loose: _Loose) -> tuple[Reads, bool] | None:
         """What one branch reads, and whether the nodes above it may be branched on.
 
         Args:
@@ -761,8 +813,8 @@ class _Wiring:
           loose: The ends arriving at the branch.
 
         Returns:
-          The name read, the field read off it, and whether the first way out is the one
-          taken when that reads as true. None where the branch is refused.
+          What the branch reads, and whether the first way out is the one taken when that
+          reads as true. None where the branch is refused.
         """
         said = test.operand if isinstance(test, ast.UnaryOp) else test
         truth = not _is_not(test)
@@ -810,7 +862,7 @@ class _Wiring:
                     )
                 )
                 return None
-        return (*read, truth)
+        return read, truth
 
     def _above(self, at: str) -> Node | None:
         """The node of that id, or None for the way into the prophecy."""
@@ -928,9 +980,7 @@ class _Wiring:
         params = [*held.node.args.posonlyargs, *held.node.args.args]
         takes: _Takes = []
         for at, one in enumerate(params):
-            agent = bool(
-                one.annotation and _names_in(one.annotation) & self.held.protos
-            )
+            agent = bool(_annotated(one.annotation, self.held.protos))
             if agent and at == 0 and held.kind == "mind":
                 takes.append((one.arg, ONE_AGENT))
                 continue
@@ -984,7 +1034,9 @@ class _Wiring:
             )
             return None
         kind: Kind = "mind" if held.kind == "mind" else "logic"
-        return kind, takes, "" if gives == NOTHING else gives, held.rerun, ""
+        return _Declared(
+            kind, takes, "" if gives == NOTHING else gives, rerun=held.rerun
+        )
 
     def _supernode(self, call: ast.Call, called: str) -> _Declared | None:
         """One supernode: a whole atlas, compiled into the prophecy reaching for it.
@@ -1028,12 +1080,12 @@ class _Wiring:
                 )
             )
             return None
-        return (
+        return _Declared(
             "atlas",
             [("agents", THE_AGENTS), ("said", under.takes)],
             under.gives,
-            True,
-            named,
+            rerun=True,
+            under=named,
         )
 
     def _under(self, call: ast.Call, called: str, named: str) -> Prophecy | None:
@@ -1052,7 +1104,7 @@ class _Wiring:
             read, mark = beside
             if self._circular(call, named, _who(read.where, mark.name)):
                 return None
-            made, found = _compiled(self.whole, mark, named, self.through)
+            made, found = _compiled(self.whole, self.held, mark, named, self.through)
             self.found.extend(found)
             return made
         from . import ENTRY, find, inside
@@ -1151,11 +1203,11 @@ class _Wiring:
                 return None
             if not self._fits(call, called, param, shape, read):
                 return None
-            reads.append(Reads(*read))
+            reads.append(read)
         return reads
 
     def _fits(
-        self, call: ast.Call, called: str, param: str, shape: str, read: tuple[str, str]
+        self, call: ast.Call, called: str, param: str, shape: str, read: Reads
     ) -> bool:
         """Whether what flows into one parameter is what that parameter takes.
 
@@ -1196,7 +1248,7 @@ class _Wiring:
         return True
 
     def _agented(
-        self, call: ast.Call, called: str, param: str, shape: str, read: tuple[str, str]
+        self, call: ast.Call, called: str, param: str, shape: str, read: Reads
     ) -> bool:
         """Whether what flows into an agent's place is one of the run's own agents.
 
@@ -1238,7 +1290,7 @@ class _Wiring:
 
     # -- the names a body binds and reads --------------------------------------------
 
-    def _reads(self, node: ast.expr) -> tuple[str, str] | None:
+    def _reads(self, node: ast.expr) -> Reads | None:
         """One name a body reads, and the field read off it.
 
         Args:
@@ -1249,12 +1301,12 @@ class _Wiring:
           this is not a name at all.
         """
         if isinstance(node, ast.Name):
-            return (self.names.get(node.id, node.id), "")
+            return Reads(self.names.get(node.id, node.id))
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-            return (self.names.get(node.value.id, node.value.id), node.attr)
+            return Reads(self.names.get(node.value.id, node.value.id), node.attr)
         return None
 
-    def _shape_of(self, read: tuple[str, str]) -> str | None:
+    def _shape_of(self, read: Reads) -> str | None:
         """What one name, or one field of it, holds.
 
         Args:
@@ -1338,16 +1390,17 @@ def _shape(annotation: ast.expr | None, held: _Held) -> str | None:
     """
     if annotation is None:
         return None
+    if isinstance(annotation, ast.Constant) and annotation.value is None:
+        return NOTHING
+    # A quoted annotation is the annotation: a flow written under `from __future__ import
+    # annotations` and one written without it declare the same node.
+    said = _unquoted(annotation)
+    if said is None:
+        return None
+    if said is not annotation:
+        return _shape(said, held)
+    annotation = said
     if isinstance(annotation, ast.Constant):
-        if annotation.value is None:
-            return NOTHING
-        # A quoted annotation is the annotation: a flow written under `from __future__
-        # import annotations` and one written without it declare the same node.
-        if isinstance(annotation.value, str):
-            try:
-                return _shape(ast.parse(annotation.value, mode="eval").body, held)
-            except SyntaxError:
-                return None
         return None
     if isinstance(annotation, ast.BinOp) and isinstance(annotation.op, ast.BitOr):
         sides = [_shape(annotation.left, held), _shape(annotation.right, held)]
@@ -1412,15 +1465,25 @@ def _fields(model: ast.ClassDef, held: _Held) -> list[Field]:
         if name.startswith("_") or _root(one.annotation) == "ClassVar":
             continue
         said = [was for was in said if was.name != name]
-        said.append(Field(name, _wrote(one.annotation), required=_required(one.value)))
+        said.append(
+            Field(name, _wrote(one.annotation), required=_required(one.value, held))
+        )
     return said
 
 
-def _required(value: ast.expr | None) -> bool:
-    """Whether a field with that default refuses to be built without being given one."""
+def _required(value: ast.expr | None, held: _Held) -> bool:
+    """Whether a field with that default refuses to be built without being given one.
+
+    Args:
+      value: What the field was declared with, and None where it was declared with nothing.
+      held: What the flow's files declare, for what each of them calls pydantic's `Field`.
+
+    Returns:
+      Whether a model of it cannot be built without being handed one.
+    """
     if value is None:
         return True
-    if isinstance(value, ast.Call) and _tip(value.func) == "Field":
+    if isinstance(value, ast.Call) and _root(value.func) in held.fields:
         named = {one.arg for one in value.keywords}
         return not (value.args or named & {"default", "default_factory"})
     return False
@@ -1484,7 +1547,7 @@ def _is_not(node: ast.expr) -> bool:
     return isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not)
 
 
-def _names(read: tuple[str, str]) -> str:
+def _names(read: Reads) -> str:
     """How one name and the field read off it read in a finding."""
     reads, field = read
     said = {

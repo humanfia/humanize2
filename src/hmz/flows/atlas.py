@@ -56,9 +56,11 @@ into it would be a run resuming into somewhere it had never been.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, NamedTuple, overload
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, overload
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Callable, Iterable
 
 __all__ = [
@@ -73,6 +75,7 @@ __all__ = [
     "Prophecy",
     "Reads",
     "Shape",
+    "Shipped",
     "Sub",
     "When",
     "atlas",
@@ -81,6 +84,7 @@ __all__ = [
     "kept",
     "logic",
     "mind",
+    "shipped",
     "sub",
     "told",
 ]
@@ -235,12 +239,7 @@ def mind[**P, T](
     Returns:
       The function, unchanged but for what it now says about itself.
     """
-
-    def marks(said: Callable[P, T]) -> Callable[P, T]:
-        setattr(said, MARKED, Marked("mind", rerun=rerun))
-        return said
-
-    return marks if call is None else marks(call)
+    return _noded("mind", call, rerun=rerun)
 
 
 @overload
@@ -276,9 +275,29 @@ def logic[**P, T](
     Returns:
       The function, unchanged but for what it now says about itself.
     """
+    return _noded("logic", call, rerun=rerun)
+
+
+def _noded[**P, T](
+    kind: Kind, call: Callable[P, T] | None, *, rerun: bool
+) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]:
+    """Marks one function as a node, whichever of the two kinds it is.
+
+    What the two marks share is the whole of how a decorator written bare and one written
+    with arguments are told apart, which is a protocol worth having in one place rather than
+    two: what differs between them is which kind it is, and what each says for itself.
+
+    Args:
+      kind: Which kind of node the mark makes it.
+      call: The function, where the mark was written with no arguments at all.
+      rerun: Whether a run picked up inside it runs it again.
+
+    Returns:
+      The function where there was one, and something to mark one where there was not.
+    """
 
     def marks(said: Callable[P, T]) -> Callable[P, T]:
-        setattr(said, MARKED, Marked("logic", rerun=rerun))
+        setattr(said, MARKED, Marked(kind, rerun=rerun))
         return said
 
     return marks if call is None else marks(call)
@@ -560,56 +579,26 @@ def canonical(prophecy: Prophecy) -> str:
     return json.dumps(_written(prophecy), sort_keys=True, ensure_ascii=False)
 
 
-def _written(prophecy: Prophecy) -> dict[str, object]:
+def _written(prophecy: Prophecy) -> dict[str, Any]:
     """One prophecy as the plain objects :func:`canonical` writes out.
+
+    Read off the tuples themselves rather than field by field: everything here is a
+    NamedTuple, so a field added to one later is a field the canonical text carries and the
+    digest sees -- where a hand-written list of them would drop it without saying so, and
+    two prophecies that differ would hash the same.
 
     Args:
       prophecy: The compiled atlas.
 
     Returns:
-      Its nodes by id, its edges in order, its shapes by name and its sub-prophecies by name --
-      each sorted, since the order a body happens to be written in is not part of what the
-      atlas is.
+      Its nodes by id, its edges in order, its shapes by name and the prophecies under it by
+      name -- each sorted, since the order a body happens to be written in is not part of
+      what the atlas is.
     """
-    return {
-        "name": prophecy.name,
-        "takes": prophecy.takes,
-        "gives": prophecy.gives,
-        "config": prophecy.config,
-        "agents": list(prophecy.agents),
-        "nodes": [
-            {
-                "at": one.at,
-                "kind": one.kind,
-                "calls": one.calls,
-                "takes": [[read.reads, read.field] for read in one.takes],
-                "binds": one.binds,
-                "gives": one.gives,
-                "rerun": one.rerun,
-                "under": one.under,
-            }
-            for one in sorted(prophecy.nodes)
-        ],
-        "edges": [
-            {
-                "out_of": one.out_of,
-                "into": one.into,
-                "when": None
-                if one.when is None
-                else [one.when.reads, one.when.field, one.when.truth],
-                "answers": one.answers,
-            }
-            for one in sorted(prophecy.edges, key=_ordered)
-        ],
-        "shapes": [
-            {
-                "name": one.name,
-                "fields": [
-                    [held.name, held.shape, held.required] for held in one.fields
-                ],
-            }
-            for one in sorted(prophecy.shapes)
-        ],
+    return prophecy._asdict() | {
+        "nodes": [one._asdict() for one in sorted(prophecy.nodes)],
+        "edges": [one._asdict() for one in sorted(prophecy.edges, key=_ordered)],
+        "shapes": [one._asdict() for one in sorted(prophecy.shapes)],
         "prophecies": [
             _written(one)
             for one in sorted(prophecy.prophecies, key=lambda one: one.name)
@@ -617,17 +606,9 @@ def _written(prophecy: Prophecy) -> dict[str, object]:
     }
 
 
-def _ordered(edge: Edge) -> tuple[str, str, str, str, bool, str]:
+def _ordered(edge: Edge) -> tuple[str, str, tuple[str, str, bool], str]:
     """One edge as something two of them can be sorted by, an absent guard and all."""
-    when = edge.when
-    return (
-        edge.out_of,
-        edge.into,
-        "" if when is None else when.reads,
-        "" if when is None else when.field,
-        when is not None and when.truth,
-        edge.answers,
-    )
+    return (edge.out_of, edge.into, edge.when or ("", "", False), edge.answers)
 
 
 #: What a shipped prophecy is written with. Fixed rather than highest, so that the same
@@ -683,6 +664,43 @@ def told(said: bytes) -> Prophecy | None:
         # one to walk.
         return None
     return held
+
+
+class Shipped(NamedTuple):
+    """What one flow's own directory ships beside its entry point.
+
+    Attributes:
+      at: The file it is in, which is `prophecy.pkl` beside the flow.
+      prophecy: What it says, and None for bytes that are not a prophecy at all -- which is
+        a file to compile again rather than a graph to guess at. Every reader of a shipped
+        prophecy decides that for itself: one refuses the run, one says so as a finding.
+    """
+
+    at: Path
+    prophecy: Prophecy | None
+
+
+def shipped(under: str | os.PathLike[str]) -> Shipped | None:
+    """The prophecy one flow's own directory ships, where it ships one.
+
+    The one place `prophecy.pkl` is opened. Where it is, whether it is there, and what it
+    takes to read it back are one rule rather than one per reader -- and what to do about a
+    file that will not read back is each reader's own, since a run refuses and a checking
+    says so.
+
+    Args:
+      under: The flow's own directory. A flow that is a single file has none, and passing
+        the file is answered the same way as passing a directory with nothing in it.
+
+    Returns:
+      Where it is and what it says, or None where the flow ships nothing.
+    """
+    from . import PROPHECY
+
+    at = Path(under) / PROPHECY
+    if not at.is_file():
+        return None
+    return Shipped(at, told(at.read_bytes()))
 
 
 def digest(prophecy: Prophecy) -> str:

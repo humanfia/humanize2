@@ -478,7 +478,7 @@ def declares(
     wanted = inside(named)
     # Resolved here rather than by whoever is starting one, so that a name works wherever a
     # flow is named -- a command line, an interface, a `Runner` written by hand.
-    flow = find(str(flow))
+    flow = find(named)
     # The same test `find` applies, and for the same reason: a place that cannot be read
     # holds no flow, which `Path.is_file` would raise about rather than answer.
     if not os.path.isfile(flow):  # noqa: PTH113
@@ -558,8 +558,8 @@ def _compiled(named: str, read: dict[str, Any], run: Entry) -> Entry:
     An atlas is a flow whose body is a declaration: what it says is compiled before anything
     runs, and what runs is the prophecy that compiling made. So the entry point itself is
     never called, and what everything else holds is the walk over the prophecy instead --
-    read here, where a flow is loaded, so that every way of running one gets both the
-    checking and the walking without knowing there are two kinds of flow.
+    swapped here, where a flow is loaded, so that every way of running one gets both the
+    compiling and the walking without knowing there are two kinds of flow.
 
     Args:
       named: The flow, as it was asked for.
@@ -568,17 +568,63 @@ def _compiled(named: str, read: dict[str, Any], run: Entry) -> Entry:
 
     Returns:
       The entry point for an ordinary flow, and the walk for an atlas.
-
-    Raises:
-      NotAFlow: If the atlas does not compile, which is a flow refused where it is named.
     """
     from .atlas import ATLAS
 
     if getattr(run, ATLAS, None) is None:
         return run
-    from .stepping import walking
+    return _Walked(named, read, run)
 
-    return walking(named, read, run)
+
+class _Walked:
+    """An atlas's entry point, compiled when the run reaches it and not before.
+
+    :func:`declares` is asked by everything that wants to know what a flow says as well as by
+    the two places that run one: how many agents it drives, what it can be set up with,
+    whether it can be picked up. Every one of those is answered off the entry point's own
+    annotation, and compiling the atlas to answer them would mean reading every file the flow
+    holds -- and, for one that does not compile, refusing a question the flow can answer. A
+    flow picker asking whether an atlas can be picked up would then be told no.
+
+    So the compiling waits for the call, which is still before the first node runs: an atlas
+    is a flow checked before anything happens rather than one checked before anything is
+    read. Once compiled it is held, since this is one run of one flow.
+    """
+
+    def __init__(self, named: str, read: dict[str, Any], entry: Entry) -> None:
+        """Holds what it takes to compile one atlas, for the moment something runs it.
+
+        Args:
+          named: The flow, as it was asked for.
+          read: What running its file left behind.
+          entry: The atlas's own entry point, which is never called.
+        """
+        self._named = named
+        self._read = read
+        self._entry = entry
+        self._walk: Entry | None = None
+        # What the entry point was marked with, so that whatever reads a flow off what
+        # `declares` answered reads what it would have read off the entry point itself.
+        self.__dict__.update(entry.__dict__)
+
+    def __call__(self, *said: Any) -> Awaitable[None] | None:
+        """Runs the atlas, compiling it first if this is the first call.
+
+        Args:
+          said: What any flow is called with -- the agents, the task, the config for one
+            that takes one, and the dict a resumable flow is handed.
+
+        Returns:
+          Whatever the prophecy answers with.
+
+        Raises:
+          NotAFlow: If the atlas does not compile, saying each reason on a line of its own.
+        """
+        if self._walk is None:
+            from .stepping import walking
+
+            self._walk = walking(self._named, self._read, self._entry)
+        return self._walk(*said)
 
 
 def _settles(agent: Agent) -> Driven:

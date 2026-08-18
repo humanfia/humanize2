@@ -796,10 +796,13 @@ Running a prophecy: one node at a time, and picking a stopped run up where it le
 - An atlas's body MUST NOT be run. It is a declaration, and what runs MUST be the prophecy
   compiling it made -- which is what puts a run in a position to be stopped and started at
   all.
-- The compiling MUST happen where a flow is loaded rather than where it is run, and a body
-  that does not compile MUST be refused there, saying every reason at once. Every way of
-  running a flow MUST get both the compiling and the walking without knowing there are two
-  kinds of flow.
+- The compiling MUST happen before the first node runs, and MUST NOT happen where a flow is
+  only read. What a flow drives, what it can be set up with and whether it can be picked up
+  are questions its entry point's own annotation answers, and an atlas that had to be
+  compiled to be asked one of them would be an atlas a flow picker could not list -- and one
+  that does not compile would answer no rather than say why. A body that does not compile
+  MUST be refused where it is run, saying every reason at once, and every way of running a
+  flow MUST get both the compiling and the walking without knowing there are two kinds.
 - What a run has done MUST be the answers it has, written down as each arrives rather than
   when the run ends: a run worth picking up is one that was stopped or killed rather than one
   that ended tidily. Each MUST be written down against the node and the visit, since a loop is
@@ -814,8 +817,9 @@ Running a prophecy: one node at a time, and picking a stopped run up where it le
   names, and carrying on into it would be a run resuming into somewhere it has never been.
 - A supernode MUST be walked as the prophecy it is, in the run around it, and its own nodes
   MUST be written down beneath the visit it is: two graphs, one run, and each node with a line
-  of its own. One reached by name MUST be read at the call rather than held, for the reason a
-  called flow is read at the call.
+  of its own. A flow reached by name MUST be read once for the run rather than once a visit:
+  the shape was settled before anything ran, and a file re-read between two rounds of a loop
+  would be new code running under a graph already agreed.
 - Where the flow's own directory ships a prophecy for the atlas being run, that prophecy MUST
   be what runs rather than one compiled again. One that cannot be read back MUST be refused
   rather than compiled again: what a flowverse shipped is what it meant to be run, and

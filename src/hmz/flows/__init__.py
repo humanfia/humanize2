@@ -57,12 +57,14 @@ from .atlas import (
     Node,
     Prophecy,
     Shape,
+    Shipped,
     atlas,
     canonical,
     digest,
     kept,
     logic,
     mind,
+    shipped,
     sub,
     told,
 )
@@ -80,7 +82,7 @@ from .driving import (
     running,
     wanted,
 )
-from .prophesying import Prophesied, prophesied
+from .prophesying import Prophesied, is_atlas, prophesied
 from .proving import ALWAYS_DONE, NEVER_DONE, SILENT, Outcome, Proof, Scenario, proved
 from .verses import (
     BUILTIN,
@@ -186,6 +188,7 @@ __all__ = [
     "Scenario",
     "Session",
     "Shape",
+    "Shipped",
     "Stopped",
     "Tool",
     "Unhooked",
@@ -216,6 +219,7 @@ __all__ = [
     "holds",
     "home",
     "inside",
+    "is_atlas",
     "kept",
     "load",
     "loaded",
@@ -227,8 +231,10 @@ __all__ = [
     "offers",
     "prophesied",
     "proved",
+    "reading",
     "resumes",
     "running",
+    "shipped",
     "sub",
     "told",
     "wanted",
@@ -796,6 +802,28 @@ def find(named_: str) -> str:
     return at_
 
 
+def reading(named_: str) -> str:
+    """What to point a reading of one flow at, which is not always what runs it.
+
+    A flow is a directory or a single file, and the two readings of one -- the checking and
+    the compiling -- take the whole of it either way: the directory where there is one, so
+    that what the entry point imports beside it is read too, and the file where there is
+    not. :func:`find` answers with the entry point instead, that being what is run.
+
+    Args:
+      named_: A flow's name, as :func:`find` takes it.
+
+    Returns:
+      The path to read: the flow's own directory, or the file a single-file flow is. A name
+      nothing answers to comes back as :func:`find` left it, so whatever asked hears about
+      it where it looks rather than here.
+    """
+    found_ = find(named_)
+    if os.path.isfile(found_) and os.path.basename(found_) == ENTRY:
+        return os.path.dirname(found_)
+    return found_
+
+
 def foretold(named_: str) -> str:
     """Where the prophecy one flow ships is, for a flow that ships one.
 
@@ -815,11 +843,11 @@ def foretold(named_: str) -> str:
       The path to it, and "" for a flow that ships none -- which is every flow that is not
       an atlas, and most atlases.
     """
+    from .atlas import shipped
+
     beside = at(named_)
-    if not beside:
-        return ""
-    held = os.path.join(beside, PROPHECY)
-    return held if os.path.isfile(held) else ""
+    held = shipped(beside) if beside else None
+    return "" if held is None else str(held.at)
 
 
 def at(named_: str) -> str:

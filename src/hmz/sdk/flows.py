@@ -227,17 +227,23 @@ class Flows:
           named: The flow, by the name `-f` takes or by a path.
           static: Only the reading that executes nothing.
 
+        An atlas gets the stricter of the two static readings, which is the compiling: its
+        body is a declaration rather than a program. It is chosen here rather than deeper
+        down because this is where both halves of the name are held, and which of the
+        atlases a file holds was asked for is half of it.
+
         Returns:
           Every finding, the static reading's first and nothing said twice: a finding the
           static reading already made is not repeated off the live model.
         """
-        from pathlib import Path
+        from hmz.flows import checked, inside, is_atlas, prophesied, proved, reading
 
-        from hmz.flows import ENTRY, checked, find, inside, proved
-
-        at = Path(find(str(named)))
-        whole = at.parent if at.name == ENTRY else at
-        found = list(checked(whole))
+        whole = reading(str(named))
+        found = list(
+            prophesied(whole, name=inside(str(named))).findings
+            if is_atlas(whole)
+            else checked(whole)
+        )
         if static or any(one.severity == "error" for one in found):
             return tuple(found)
         proof = proved(whole, name=inside(str(named)), scenarios=())
@@ -260,13 +266,9 @@ class Flows:
           The prophecy, or None for a flow that is not an atlas or does not compile --
           which :meth:`check` says the reasons for.
         """
-        from pathlib import Path
+        from hmz.flows import inside, prophesied, reading
 
-        from hmz.flows import ENTRY, find, inside, prophesied
-
-        at = Path(find(str(named)))
-        whole = at.parent if at.name == ENTRY else at
-        return prophesied(whole, name=inside(str(named))).prophecy
+        return prophesied(reading(str(named)), name=inside(str(named))).prophecy
 
     def foretell(self, named: str | os.PathLike[str]) -> str:
         """Compiles an atlas and writes the prophecy into its own directory.
@@ -289,18 +291,20 @@ class Flows:
         """
         from pathlib import Path
 
-        from hmz.flows import ENTRY, PROPHECY, NotAFlow, find, kept
+        from hmz.flows import PROPHECY, NotAFlow, at, kept
 
         held = self.prophecy(named)
         if held is None:
             raise NotAFlow(f"{named}: not an atlas that compiles -- hmz check says why")
-        at = Path(find(str(named)))
-        if at.name != ENTRY:
+        # "" for a flow that is a single file, which has no directory of its own: what is
+        # beside such a flow is the other flows, and none of it came with this one.
+        beside = at(str(named))
+        if not beside:
             raise NotAFlow(
                 f"{named}: a flow that is one file has no directory to ship a prophecy "
                 "in -- make it a directory with an __init__.py in it"
             )
-        into = at.parent / PROPHECY
+        into = Path(beside) / PROPHECY
         into.write_bytes(kept(held))
         return str(into)
 

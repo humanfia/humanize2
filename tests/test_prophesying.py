@@ -553,3 +553,40 @@ def run(agents: Agents, task: str) -> None:
     again = inner(agents, draft)
 '''
     assert "shape-mismatch" in _codes(tmp_path, body)
+
+
+def test_the_atlas_a_name_asks_for_is_the_one_that_is_read(tmp_path: Path) -> None:
+    """A file may hold several, and `official/review:pass` is which of them was meant."""
+    body = '''@atlas(name="pass")
+def only(agents: Agents, task: str) -> None:
+    """The only atlas the file holds, and it has a name of its own."""
+    draft = write(agents.writer, task)
+'''
+    at = written(tmp_path, "one", HEAD + body)
+
+    assert prophesied(at, name="pass").prophecy is not None
+    # And the file's own name asks for one it does not hold, which it says and lists.
+    said = prophesied(at).findings
+    assert [one.code for one in said] == ["not-an-atlas"]
+    assert "'pass'" in said[0].said
+
+
+def test_python_beside_an_atlas_is_read_as_python(tmp_path: Path) -> None:
+    """The bodies left out are the ones compiled, and not everything spelled like one."""
+    body = '''class Helper:
+    """Something beside the atlas with a method the atlas's name also uses."""
+
+    def run(self) -> None:
+        """A loop nothing inside can end, which is a thing to be told about."""
+        while True:
+            pass
+
+
+@atlas
+def run(agents: Agents, task: str) -> None:
+    """Says it."""
+    draft = write(agents.writer, task)
+'''
+    at = written(tmp_path, "one", HEAD + body)
+
+    assert "sleeping-loop" in {one.code for one in checked(at)}

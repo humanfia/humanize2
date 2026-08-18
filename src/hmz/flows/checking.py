@@ -31,7 +31,7 @@ from .agent import Agent, Driven, Person, Session
 
 if TYPE_CHECKING:
     import os
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
 __all__ = [
     "Capability",
@@ -146,6 +146,10 @@ class _Whole(NamedTuple):
         parse, a directory that holds no flow.
       compiled: Whether the entry point holds an atlas, which is a flow to compile rather
         than a flow to read as a program.
+      declared: The bodies an atlas compiles, by the identity of the `ast` node each is.
+        By identity rather than by name: a class beside an atlas with a method of the same
+        name is ordinary Python, and one skipped for sharing a spelling is one nothing
+        reads at all.
     """
 
     entry: Path
@@ -153,6 +157,7 @@ class _Whole(NamedTuple):
     entered: _Read | None
     found: list[Finding]
     compiled: bool
+    declared: frozenset[int]
 
 
 def _whole(flow: str | os.PathLike[str]) -> _Whole:
@@ -195,6 +200,7 @@ def _whole(flow: str | os.PathLike[str]) -> _Whole:
                 )
             ],
             compiled=False,
+            declared=frozenset(),
         )
 
     found: list[Finding] = []
@@ -207,16 +213,27 @@ def _whole(flow: str | os.PathLike[str]) -> _Whole:
             read.append(held)
     entered = next((one for one in read if one.where == entry), None)
     compiled = entered is not None and any(one.atlas for one in entered.marks)
-    return _Whole(entry, read, entered, found, compiled=compiled)
+    return _Whole(
+        entry,
+        read,
+        entered,
+        found,
+        compiled=compiled,
+        declared=frozenset(
+            id(one.node) for said in read for one in said.marks if one.atlas
+        ),
+    )
 
 
-def _rules(whole: _Whole, skip: frozenset[str] = frozenset()) -> tuple[Finding, ...]:
+def _rules(whole: _Whole) -> tuple[Finding, ...]:
     """Every rule that reads a flow as a program, run over the files that parsed.
+
+    What an atlas compiles is left out: those bodies are declarations rather than programs,
+    and would be refused as both -- an `if` with no `elif` is a branch there, and a `while`
+    with no `break` is an edge back to a node.
 
     Args:
       whole: What :func:`_whole` read.
-      skip: Functions not to read as ordinary Python -- the bodies an atlas compiles, which
-        are declarations rather than programs and would be refused as both.
 
     Returns:
       One finding per thing found, in file order.
@@ -256,7 +273,7 @@ def _rules(whole: _Whole, skip: frozenset[str] = frozenset()) -> tuple[Finding, 
         found.extend(_imports(one))
         found.extend(_marks(one))
         found.extend(_hooks(one, declared))
-        found.extend(_functions(one, asks, skip))
+        found.extend(_functions(one, asks, whole.declared))
     return tuple(found)
 
 
@@ -1034,15 +1051,15 @@ class _Scope:
 
 
 def _functions(
-    read: _Read, asks: _Asks, skip: frozenset[str] = frozenset()
+    read: _Read, asks: _Asks, skip: frozenset[int] = frozenset()
 ) -> Iterator[Finding]:
     """Reads every function in one file for what it asks and how its loops end.
 
     Args:
       read: The file.
       asks: The interface surfaces, shared across the files of one checking.
-      skip: Functions not to read -- the bodies an atlas compiles, which are declarations
-        rather than programs.
+      skip: Functions not to read, by the identity of the `ast` node each is -- the bodies
+        an atlas compiles, which are declarations rather than programs.
 
     Yields:
       The findings, function by function.
@@ -1056,11 +1073,11 @@ def _defined(
     read: _Read,
     asks: _Asks,
     inherited: dict[str, frozenset[str] | _Crew],
-    skip: frozenset[str] = frozenset(),
+    skip: frozenset[int] = frozenset(),
 ) -> Iterator[Finding]:
     """One top-level statement, read for the functions in it."""
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        if node.name not in skip:
+        if id(node) not in skip:
             yield from _function(node, read, asks, inherited)
     elif isinstance(node, ast.ClassDef):
         for held in node.body:
@@ -1089,7 +1106,7 @@ def _function(
     params = [*args.posonlyargs, *args.args, *args.kwonlyargs]
     for param in params:
         scope.forgot(param.arg)
-        kind = _annotated(param.annotation, read)
+        kind = _annotated(param.annotation, read.proto)
         crew = _crewed(param.annotation, read) if not kind else None
         if kind:
             scope.bindings[param.arg] = kind
@@ -1115,20 +1132,34 @@ def _function(
         yield from _loops(node, scope)
 
 
-def _annotated(annotation: ast.expr | None, read: _Read) -> frozenset[str] | None:
-    """What kinds of driven thing one annotation says a name is, or None for no answer."""
+def _annotated(
+    annotation: ast.expr | None, proto: Mapping[str, str]
+) -> frozenset[str] | None:
+    """What kinds of driven thing one annotation says a name is, or None for no answer.
+
+    Asked of the interface names rather than of a whole file, so that the compiling next
+    door -- which gathers those names across every file a flow holds -- asks this one
+    reading rather than a looser one of its own.
+
+    Args:
+      annotation: The annotation.
+      proto: The local name of each flow-facing interface, as this flow imports them.
+
+    Returns:
+      One name per interface it says the thing is, and None where it says nothing.
+    """
     said = _unquoted(annotation)
     if said is None:
         return None
     if isinstance(said, ast.Subscript) and _root(said.value) == "Annotated":
         first = next(iter(_elements(said.slice)), None)
-        return _annotated(first, read)
+        return _annotated(first, proto)
     if isinstance(said, ast.Subscript) and _root(said.value) == "Optional":
         first = next(iter(_elements(said.slice)), None)
-        return _annotated(first, read)
+        return _annotated(first, proto)
     if isinstance(said, ast.BinOp) and isinstance(said.op, ast.BitOr):
-        left = _annotated(said.left, read)
-        right = _annotated(said.right, read)
+        left = _annotated(said.left, proto)
+        right = _annotated(said.right, proto)
         if left is None and right is None:
             return None
         # `Agent | None` is an agent to be guarded; `Agent | Session` is either, and is
@@ -1136,8 +1167,8 @@ def _annotated(annotation: ast.expr | None, read: _Read) -> frozenset[str] | Non
         return (left or frozenset()) | (right or frozenset())
     if isinstance(said, ast.Constant) and said.value is None:
         return frozenset()
-    if isinstance(said, ast.Name) and said.id in read.proto:
-        return frozenset({read.proto[said.id]})
+    if isinstance(said, ast.Name) and said.id in proto:
+        return frozenset({proto[said.id]})
     return None
 
 
@@ -1153,7 +1184,7 @@ def _crewed(annotation: ast.expr | None, read: _Read) -> _Crew | None:
         return None
     if isinstance(said, ast.Name) and said.id in read.crews:
         fields = [
-            (node.target.id, _annotated(node.annotation, read))
+            (node.target.id, _annotated(node.annotation, read.proto))
             for node in read.crews[said.id].body
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
         ]
@@ -1162,7 +1193,7 @@ def _crewed(annotation: ast.expr | None, read: _Read) -> _Crew | None:
         return None
     if isinstance(said, ast.Subscript) and _root(said.value) == "tuple":
         kinds = tuple(
-            _annotated(one, read)
+            _annotated(one, read.proto)
             for one in _elements(said.slice)
             if not (isinstance(one, ast.Constant) and one.value is Ellipsis)
         )
@@ -1213,7 +1244,7 @@ def _statements(body: list[ast.stmt], scope: _Scope, read: _Read, asks: _Asks) -
                 _expression(node.value, scope)
             if isinstance(node.target, ast.Name):
                 scope.forgot(node.target.id)
-                kind = _annotated(node.annotation, scope.read)
+                kind = _annotated(node.annotation, scope.read.proto)
                 if kind:
                     scope.bindings[node.target.id] = kind
                 elif node.value is not None:
