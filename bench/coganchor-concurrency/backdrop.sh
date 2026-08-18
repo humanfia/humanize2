@@ -15,7 +15,15 @@ ROOT=$(cd "$TMP/../.." && pwd)
 MODEL_PORT=${MODEL_PORT:-18081}
 TARGET_PORT=${TARGET_PORT:-18090}
 SLOTS=${SLOTS:-192}
-AB=${AGENT_BIN:-$(dirname "$(command -v kimi)")}
+# Where the agent CLIs are. `command -v` only finds them if this shell already has them on
+# PATH, which it need not; $AGENT_BIN says so outright.
+AB=${AGENT_BIN:-}
+if [ -z "$AB" ]; then
+  _kimi=$(command -v kimi || true)
+  [ -n "$_kimi" ] && AB=$(dirname "$_kimi")
+fi
+AB=${AB:-$HOME/.local/agents/bin}
+[ -x "$AB/kimi" ] || { echo "no kimi under $AB; set AGENT_BIN"; exit 1; }
 
 stop() {
   for pid in $(pgrep -f "standin_model[.]py" || true); do kill "$pid" 2>/dev/null || true; done
