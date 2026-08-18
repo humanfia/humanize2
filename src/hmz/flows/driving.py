@@ -472,9 +472,10 @@ def declares(
     """
     from . import find, inside, loaded
 
+    named = str(flow)
     # Which of the file's flows was asked for, before the name is resolved to a file: a file
     # may hold several, and `humanize1:gen-plan` is one of them.
-    wanted = inside(str(flow))
+    wanted = inside(named)
     # Resolved here rather than by whoever is starting one, so that a name works wherever a
     # flow is named -- a command line, an interface, a `Runner` written by hand.
     flow = find(str(flow))
@@ -528,7 +529,7 @@ def declares(
     ):
         kinds = _kinds(declared, run)
         return (
-            run,
+            _compiled(named, read, run),
             tuple(_place(at, kinds.get(at)) for at in fields),
             declared._make,
             _setting(run, hinted),
@@ -543,12 +544,41 @@ def declares(
             "flow drives -- or with a NamedTuple of them, which also says what each is for"
         )
     return (
-        run,
+        _compiled(named, read, run),
         tuple(_place("", kind) for kind in declares),
         tuple,
         _setting(run, hinted),
         _marked(run),
     )
+
+
+def _compiled(named: str, read: dict[str, Any], run: Entry) -> Entry:
+    """One flow's entry point, or -- for an atlas -- something that runs its prophecy.
+
+    An atlas is a flow whose body is a declaration: what it says is compiled before anything
+    runs, and what runs is the prophecy that compiling made. So the entry point itself is
+    never called, and what everything else holds is the walk over the prophecy instead --
+    read here, where a flow is loaded, so that every way of running one gets both the
+    checking and the walking without knowing there are two kinds of flow.
+
+    Args:
+      named: The flow, as it was asked for.
+      read: What running its file left behind.
+      run: Its entry point.
+
+    Returns:
+      The entry point for an ordinary flow, and the walk for an atlas.
+
+    Raises:
+      NotAFlow: If the atlas does not compile, which is a flow refused where it is named.
+    """
+    from .atlas import ATLAS
+
+    if getattr(run, ATLAS, None) is None:
+        return run
+    from .stepping import walking
+
+    return walking(named, read, run)
 
 
 def _settles(agent: Agent) -> Driven:

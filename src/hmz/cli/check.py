@@ -64,6 +64,18 @@ def check(argv: list[str]) -> int:
         dest="as_json",
         help="one JSON object per finding, one a line, for a script to read",
     )
+    said = parser.add_mutually_exclusive_group()
+    said.add_argument(
+        "--prophecy",
+        action="store_true",
+        help="print what each atlas compiles to instead of what is wrong with it",
+    )
+    said.add_argument(
+        "--ship",
+        action="store_true",
+        help="write each atlas's prophecy into its own directory, for runs to walk "
+        "instead of compiling it again",
+    )
     args = parser.parse_args(argv)
 
     from pathlib import Path
@@ -71,17 +83,56 @@ def check(argv: list[str]) -> int:
     from hmz.sdk import Hmz
 
     flows = Hmz().flows
-    found: list[Finding] = []
     for named in args.flow:
         # A name nothing answers to is a line to correct, refused the way argparse refuses
         # one -- before anything is read, and for every name on the line at once.
         if not Path(flows.find(named)).is_file():
             parser.error(f"no flow called {named!r}")
+    if args.prophecy or args.ship:
+        return _foretold(args.flow, ship=args.ship)
+    found: list[Finding] = []
+    for named in args.flow:
         found.extend(flows.check(named, static=args.static))
     _said(found, as_json=args.as_json, flows=len(args.flow))
     errors = sum(one.severity == "error" for one in found)
     warned = len(found) - errors
     return 1 if errors or (args.strict and warned) else 0
+
+
+def _foretold(flows: list[str], *, ship: bool) -> int:
+    """Prints or writes what each atlas on the line compiles to.
+
+    Args:
+      flows: The flows, by the names the line gave.
+      ship: Whether to write each prophecy into its flow's own directory rather than print
+        it.
+
+    Returns:
+      Zero where every one of them compiled, and one where any did not: a name that is not
+      an atlas, or is one that the reading refused.
+    """
+    from hmz.flows import NotAFlow, canonical
+    from hmz.sdk import Hmz
+
+    held = Hmz().flows
+    worst = 0
+    for named in flows:
+        if ship:
+            try:
+                print(f"{named}: {held.foretell(named)}")
+            except NotAFlow as why:
+                print(f"hmz check: {why}")
+                worst = 1
+            continue
+        prophecy = held.prophecy(named)
+        if prophecy is None:
+            print(
+                f"hmz check: {named} is not an atlas that compiles -- drop --prophecy"
+            )
+            worst = 1
+            continue
+        print(canonical(prophecy))
+    return worst
 
 
 def _said(found: list[Finding], *, as_json: bool, flows: int) -> None:

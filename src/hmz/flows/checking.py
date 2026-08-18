@@ -31,7 +31,7 @@ from .agent import Agent, Driven, Person, Session
 
 if TYPE_CHECKING:
     import os
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Sequence
 
 __all__ = [
     "Capability",
@@ -116,12 +116,53 @@ def checked(flow: str | os.PathLike[str]) -> tuple[Finding, ...]:
     is safe to point at a flow nobody has read: what running the file would refuse is the
     second reading, :mod:`hmz.flows.proving`, which runs it in a process of its own.
 
+    A flow marked `@atlas` gets the stricter reading rather than this one, which is
+    :func:`hmz.flows.prophesying.prophesied`: an atlas is a flow whose body is compiled, so the
+    rules that read a body as a program would be reading it as something it is not.
+
     Args:
       flow: The flow: its directory, or the Python file a single-file flow is.
 
     Returns:
       One finding per thing found, in file order, and nothing at all for a flow this reading
       has nothing to say about -- which is not a proof, only a reading with nothing to say.
+    """
+    whole = _whole(flow)
+    if whole.compiled:
+        from .prophesying import prophesied
+
+        return prophesied(flow, whole=whole).findings
+    return _rules(whole)
+
+
+class _Whole(NamedTuple):
+    """One flow's files, parsed: what both readings start from.
+
+    Attributes:
+      entry: Where the flow's entry point is.
+      read: One per file that parsed, in file order.
+      entered: The entry point's own file, or None where it could not be read.
+      found: What reading the files found before any rule ran -- a file that will not
+        parse, a directory that holds no flow.
+      compiled: Whether the entry point holds an atlas, which is a flow to compile rather
+        than a flow to read as a program.
+    """
+
+    entry: Path
+    read: list[_Read]
+    entered: _Read | None
+    found: list[Finding]
+    compiled: bool
+
+
+def _whole(flow: str | os.PathLike[str]) -> _Whole:
+    """Parses every Python file one flow holds, and says which kind of flow it is.
+
+    Args:
+      flow: The flow: its directory, or the Python file a single-file flow is.
+
+    Returns:
+      The files and what parsing them found. Nothing is imported and nothing is executed.
     """
     from . import ENTRY
 
@@ -140,14 +181,20 @@ def checked(flow: str | os.PathLike[str]) -> tuple[Finding, ...]:
         entry = at
         files = [at] if at.is_file() else []
     if not entry.is_file():
-        return (
-            Finding(
-                "not-a-flow",
-                "error",
-                at,
-                0,
-                "no flow to read: a flow is a directory with an __init__.py in it",
-            ),
+        return _Whole(
+            entry,
+            [],
+            None,
+            [
+                Finding(
+                    "not-a-flow",
+                    "error",
+                    at,
+                    0,
+                    "no flow to read: a flow is a directory with an __init__.py in it",
+                )
+            ],
+            compiled=False,
         )
 
     found: list[Finding] = []
@@ -158,15 +205,30 @@ def checked(flow: str | os.PathLike[str]) -> tuple[Finding, ...]:
             found.append(held)
         else:
             read.append(held)
-
-    marked = any(one.marks for one in read)
     entered = next((one for one in read if one.where == entry), None)
-    if entered is not None and not marked:
+    compiled = entered is not None and any(one.atlas for one in entered.marks)
+    return _Whole(entry, read, entered, found, compiled=compiled)
+
+
+def _rules(whole: _Whole, skip: frozenset[str] = frozenset()) -> tuple[Finding, ...]:
+    """Every rule that reads a flow as a program, run over the files that parsed.
+
+    Args:
+      whole: What :func:`_whole` read.
+      skip: Functions not to read as ordinary Python -- the bodies an atlas compiles, which
+        are declarations rather than programs and would be refused as both.
+
+    Returns:
+      One finding per thing found, in file order.
+    """
+    found = list(whole.found)
+    entered = whole.entered
+    if entered is not None and not any(one.marks for one in whole.read):
         found.append(
             Finding(
                 "not-a-flow",
                 "error",
-                entry,
+                whole.entry,
                 0,
                 "nothing in it is marked @flow() -- a flow is a function marked with it, "
                 "which is how a file says which of the functions in it is one",
@@ -177,7 +239,7 @@ def checked(flow: str | os.PathLike[str]) -> tuple[Finding, ...]:
             Finding(
                 "unsaid-flow",
                 "warning",
-                entry,
+                whole.entry,
                 0,
                 "the flow says nothing about itself -- the first line of this file's "
                 "docstring is what every list of flows shows for it",
@@ -186,13 +248,15 @@ def checked(flow: str | os.PathLike[str]) -> tuple[Finding, ...]:
 
     # What the flow declared about moments anywhere in its files, for the hooks it hangs:
     # a place annotated in the entry point covers a hook hung in the module beside it.
-    declared = frozenset(moment for one in read for moment in one.moments_declared)
+    declared = frozenset(
+        moment for one in whole.read for moment in one.moments_declared
+    )
     asks = _Asks()
-    for one in read:
+    for one in whole.read:
         found.extend(_imports(one))
         found.extend(_marks(one))
         found.extend(_hooks(one, declared))
-        found.extend(_functions(one, asks))
+        found.extend(_functions(one, asks, skip))
     return tuple(found)
 
 
@@ -218,17 +282,47 @@ _PROTOCOLS = {
     "Driven": "driven",
 }
 
+#: The two marks that make a function a node of a prophecy, by the name `hmz.flows` offers
+#: each under.
+_NODES = ("mind", "logic")
+
 #: What an element of a plain tuple of agents may still be asked by name: the tuple's own
 #: two methods. A named place is a field of the NamedTuple the flow declared instead.
 _OF_A_TUPLE = frozenset({"count", "index"})
 
 
 class _Mark(NamedTuple):
-    """One function a file marked with `@flow`, and what the mark said."""
+    """One function a file marked as a flow, and what the mark said.
+
+    Attributes:
+      node: The function.
+      name: What the mark called it inside its file, and "" for the one the file holds
+        under its own name.
+      resumable: Whether it says it can be picked up where the last run of it left off,
+        which an atlas always says.
+      atlas: Whether it was marked `@atlas` rather than `@flow` -- a flow whose body is
+        read rather than run, and which `prophesying.py` compiles.
+    """
 
     node: ast.FunctionDef | ast.AsyncFunctionDef
     name: str
     resumable: bool
+    atlas: bool = False
+
+
+class _Node(NamedTuple):
+    """One function a file marked `@mind` or `@logic`, and what the mark said.
+
+    Attributes:
+      node: The function, which is what its parameters and its answer are read off.
+      kind: Which of the two it is.
+      rerun: Whether a run picked up again runs it again where the last one stopped inside
+        it, or steps past it.
+    """
+
+    node: ast.FunctionDef | ast.AsyncFunctionDef
+    kind: str
+    rerun: bool
 
 
 @dataclass
@@ -241,6 +335,14 @@ class _Read:
     flow_alias: set[str] = field(default_factory=set[str])
     moment_alias: set[str] = field(default_factory=set[str])
     field_alias: set[str] = field(default_factory=set[str])
+    #: And of :func:`hmz.flows.atlas`, :func:`hmz.flows.sub` and :func:`hmz.flows.load`:
+    #: the mark that says a flow is compiled, the one way an atlas reaches another, and the
+    #: one way an ordinary flow does -- which is the call an atlas may not write.
+    atlas_alias: set[str] = field(default_factory=set[str])
+    sub_alias: set[str] = field(default_factory=set[str])
+    load_alias: set[str] = field(default_factory=set[str])
+    #: Local name -> which kind of node, for `mind` and `logic` as this file imports them.
+    node_alias: dict[str, str] = field(default_factory=dict[str, str])
     #: Local name -> which interface, for every flow-facing interface the file imports.
     proto: dict[str, str] = field(default_factory=dict[str, str])
     #: The NamedTuple and pydantic model classes the file itself declares.
@@ -253,6 +355,12 @@ class _Read:
     marks: list[_Mark] = field(default_factory=list["_Mark"])
     #: Every `Moment.X` written inside an annotation, which is a flow declaring a need.
     moments_declared: set[str] = field(default_factory=set[str])
+    #: The functions this file marked `@mind` or `@logic`, by the name it declares each
+    #: under, and what each mark said.
+    nodes: dict[str, _Node] = field(default_factory=dict[str, "_Node"])
+    #: And the atlases of other files it named, `<local name>: <flow>` apiece, which is a
+    #: module-level `review = sub("official/review")`.
+    subs: dict[str, str] = field(default_factory=dict[str, str])
 
 
 def _parsed(where: Path) -> _Read | Finding:
@@ -306,6 +414,14 @@ def _collected(read: _Read, body: list[ast.stmt], *, type_checking: bool) -> Non
                 read.bound.add(bound)
                 if alias.name == "flow":
                     read.flow_alias.add(bound)
+                elif alias.name == "atlas":
+                    read.atlas_alias.add(bound)
+                elif alias.name == "sub":
+                    read.sub_alias.add(bound)
+                elif alias.name == "load":
+                    read.load_alias.add(bound)
+                elif alias.name in _NODES:
+                    read.node_alias[bound] = alias.name
                 elif alias.name == "Moment":
                     read.moment_alias.add(bound)
                 elif alias.name in _PROTOCOLS:
@@ -324,6 +440,7 @@ def _collected(read: _Read, body: list[ast.stmt], *, type_checking: bool) -> Non
         elif isinstance(node, (ast.Assign, ast.AnnAssign)) and not type_checking:
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             read.bound.update(one.id for one in targets if isinstance(one, ast.Name))
+            _named_sub(read, targets, node.value)
         elif isinstance(node, ast.ClassDef) and not type_checking:
             read.bound.add(node.name)
             bases = {_root(base) for base in node.bases}
@@ -337,6 +454,9 @@ def _collected(read: _Read, body: list[ast.stmt], *, type_checking: bool) -> Non
             mark = _marked(node, read)
             if mark is not None and not type_checking:
                 read.marks.append(mark)
+            held = _noded(node, read)
+            if held is not None and not type_checking:
+                read.nodes[node.name] = held
         elif isinstance(node, ast.If):
             under = type_checking or _root(node.test) == "TYPE_CHECKING"
             _collected(read, node.body, type_checking=under)
@@ -345,8 +465,37 @@ def _collected(read: _Read, body: list[ast.stmt], *, type_checking: bool) -> Non
             _collected(read, node.body, type_checking=type_checking)
 
 
+def _named_sub(
+    read: _Read, targets: Sequence[ast.expr], value: ast.expr | None
+) -> None:
+    """Records `review = sub("official/review")`, which is one supernode named.
+
+    Args:
+      read: What is being collected into.
+      targets: What the statement assigns to.
+      value: What it assigns, which is only ever read where it is that call.
+    """
+    if not (
+        isinstance(value, ast.Call)
+        and isinstance(value.func, ast.Name)
+        and value.func.id in read.sub_alias
+        and len(value.args) == 1
+        and isinstance(value.args[0], ast.Constant)
+        and isinstance(value.args[0].value, str)
+    ):
+        return
+    for one in targets:
+        if isinstance(one, ast.Name):
+            read.subs[one.id] = value.args[0].value
+
+
 def _marked(node: ast.FunctionDef | ast.AsyncFunctionDef, read: _Read) -> _Mark | None:
     """The mark on one function, where it carries one.
+
+    Both marks: `@flow` and `@atlas` both make a function a flow, and everything that reads
+    a flow off a file reads both -- an atlas that was invisible here would be a flow nothing
+    could list, name or refuse. Which of the two it was is on the mark, for the one reading
+    that has to know.
 
     Args:
       node: The function.
@@ -356,21 +505,51 @@ def _marked(node: ast.FunctionDef | ast.AsyncFunctionDef, read: _Read) -> _Mark 
       The mark, or None for a function that is not a flow.
     """
     for one in node.decorator_list:
-        if isinstance(one, ast.Name) and one.id in read.flow_alias:
-            return _Mark(node, "", resumable=False)
-        if (
-            isinstance(one, ast.Call)
-            and isinstance(one.func, ast.Name)
-            and one.func.id in read.flow_alias
-        ):
-            name = ""
-            resumable = False
+        called = one.func if isinstance(one, ast.Call) else one
+        if not isinstance(called, ast.Name):
+            continue
+        atlas = called.id in read.atlas_alias
+        if not atlas and called.id not in read.flow_alias:
+            continue
+        if not isinstance(one, ast.Call):
+            return _Mark(node, "", resumable=atlas, atlas=atlas)
+        name = ""
+        # An atlas can always be picked up: a prophecy is a list of nodes with an answer
+        # apiece, so what a run of one has done is something the run writes down itself.
+        resumable = atlas
+        for said in one.keywords:
+            if said.arg == "name" and isinstance(said.value, ast.Constant):
+                name = str(said.value.value)
+            elif (
+                said.arg == "resumable"
+                and not atlas
+                and isinstance(said.value, ast.Constant)
+            ):
+                resumable = bool(said.value.value)
+        return _Mark(node=node, name=name, resumable=resumable, atlas=atlas)
+    return None
+
+
+def _noded(node: ast.FunctionDef | ast.AsyncFunctionDef, read: _Read) -> _Node | None:
+    """The `@mind` or `@logic` mark on one function, where it carries one.
+
+    Args:
+      node: The function.
+      read: The file it is in, for what the decorator is called there.
+
+    Returns:
+      What the mark said, or None for a function that is not a node.
+    """
+    for one in node.decorator_list:
+        called = one.func if isinstance(one, ast.Call) else one
+        if not isinstance(called, ast.Name) or called.id not in read.node_alias:
+            continue
+        rerun = True
+        if isinstance(one, ast.Call):
             for said in one.keywords:
-                if said.arg == "name" and isinstance(said.value, ast.Constant):
-                    name = str(said.value.value)
-                elif said.arg == "resumable" and isinstance(said.value, ast.Constant):
-                    resumable = bool(said.value.value)
-            return _Mark(node=node, name=name, resumable=resumable)
+                if said.arg == "rerun" and isinstance(said.value, ast.Constant):
+                    rerun = bool(said.value.value)
+        return _Node(node=node, kind=read.node_alias[called.id], rerun=rerun)
     return None
 
 
@@ -502,7 +681,10 @@ def _marks(read: _Read) -> Iterator[Finding]:
             )
         named.add(mark.name)
         yield from _sized(mark, read)
-        yield from _resumes(mark, read)
+        # An atlas is resumable without taking a dict to be resumed with: what a run of one
+        # has done is which of its nodes have answered, which the run writes down itself.
+        if not mark.atlas:
+            yield from _resumes(mark, read)
         for model in _settings(mark.node, read):
             if model not in configured:
                 configured.add(model)
@@ -851,18 +1033,22 @@ class _Scope:
         self.answers.pop(name, None)
 
 
-def _functions(read: _Read, asks: _Asks) -> Iterator[Finding]:
+def _functions(
+    read: _Read, asks: _Asks, skip: frozenset[str] = frozenset()
+) -> Iterator[Finding]:
     """Reads every function in one file for what it asks and how its loops end.
 
     Args:
       read: The file.
       asks: The interface surfaces, shared across the files of one checking.
+      skip: Functions not to read -- the bodies an atlas compiles, which are declarations
+        rather than programs.
 
     Yields:
       The findings, function by function.
     """
     for node in read.tree.body:
-        yield from _defined(node, read, asks, {})
+        yield from _defined(node, read, asks, {}, skip)
 
 
 def _defined(
@@ -870,16 +1056,18 @@ def _defined(
     read: _Read,
     asks: _Asks,
     inherited: dict[str, frozenset[str] | _Crew],
+    skip: frozenset[str] = frozenset(),
 ) -> Iterator[Finding]:
     """One top-level statement, read for the functions in it."""
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        yield from _function(node, read, asks, inherited)
+        if node.name not in skip:
+            yield from _function(node, read, asks, inherited)
     elif isinstance(node, ast.ClassDef):
         for held in node.body:
-            yield from _defined(held, read, asks, inherited)
+            yield from _defined(held, read, asks, inherited, skip)
     elif isinstance(node, ast.If):
         for held in [*node.body, *node.orelse]:
-            yield from _defined(held, read, asks, inherited)
+            yield from _defined(held, read, asks, inherited, skip)
 
 
 def _function(

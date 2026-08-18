@@ -52,6 +52,20 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, overload
 
 from .agent import Agent, Driven, Person, Session
+from .atlas import (
+    Edge,
+    Node,
+    Prophecy,
+    Shape,
+    atlas,
+    canonical,
+    digest,
+    kept,
+    logic,
+    mind,
+    sub,
+    told,
+)
 from .checking import Capability, Finding, briefed, catalogue, checked
 from .driving import (
     NotAFlow,
@@ -66,6 +80,7 @@ from .driving import (
     running,
     wanted,
 )
+from .prophesying import Prophesied, prophesied
 from .proving import ALWAYS_DONE, NEVER_DONE, SILENT, Outcome, Proof, Scenario, proved
 from .verses import (
     BUILTIN,
@@ -127,6 +142,7 @@ __all__ = [
     "NEVER_DONE",
     "OFFICIAL",
     "PERMISSIONS",
+    "PROPHECY",
     "SILENT",
     "SWARM",
     "USER",
@@ -137,6 +153,7 @@ __all__ = [
     "Board",
     "Capability",
     "Driven",
+    "Edge",
     "Event",
     "Failed",
     "Finding",
@@ -151,6 +168,7 @@ __all__ = [
     "Item",
     "Model",
     "Moment",
+    "Node",
     "NotAFlow",
     "Occasion",
     "Offer",
@@ -159,12 +177,15 @@ __all__ = [
     "Place",
     "Profile",
     "Proof",
+    "Prophecy",
+    "Prophesied",
     "Question",
     "Refused",
     "Remote",
     "Running",
     "Scenario",
     "Session",
+    "Shape",
     "Stopped",
     "Tool",
     "Unhooked",
@@ -173,33 +194,43 @@ __all__ = [
     "Verdict",
     "about",
     "at",
+    "atlas",
     "backends",
     "briefed",
+    "canonical",
     "carries",
     "catalogue",
     "checked",
     "configures",
     "container",
+    "digest",
     "drives",
     "entry",
     "find",
     "flow",
     "flowverses",
+    "foretold",
     "fork",
     "found",
     "held",
     "holds",
     "home",
     "inside",
+    "kept",
     "load",
     "loaded",
+    "logic",
+    "mind",
     "models",
     "nearest",
     "offered",
     "offers",
+    "prophesied",
     "proved",
     "resumes",
     "running",
+    "sub",
+    "told",
     "wanted",
 ]
 
@@ -282,6 +313,12 @@ BUILTIN_AT = Path(__file__).parent / "builtin"
 #: What a flow's directory holds the flow itself in. The rest of the directory is what it
 #: imports and the `skills/` it brings, so the entry point is named rather than guessed.
 ENTRY = "__init__.py"
+
+#: And what an atlas's directory may hold the prophecy it was already compiled to in. A
+#: flowverse that ships one ships the graph its flow was checked into, and that graph is
+#: what runs: the compiling is where an atlas is refused, and a repository which has been
+#: through it once has an answer worth carrying rather than working out again.
+PROPHECY = "prophecy.pkl"
 
 #: What a flow's own name is separated from the one inside it by. A flow that holds one flow
 #: is named by itself; one that holds three names each of them after it.
@@ -757,6 +794,32 @@ def find(named_: str) -> str:
         if os.path.isfile(shape):
             return os.path.realpath(shape)
     return at_
+
+
+def foretold(named_: str) -> str:
+    """Where the prophecy one flow ships is, for a flow that ships one.
+
+    An atlas is compiled before it runs, and a flowverse may ship what compiling it came
+    to: `prophecy.pkl`, beside the entry point, holding the graph the atlas was read into.
+    Where there is one it is what runs -- the compiling having already happened, in the
+    repository the flow came from, over the source that repository holds.
+
+    What is beside it still matters. A prophecy names the functions its nodes are, and
+    those are in the flow's own Python: a directory holding a prophecy and no entry point
+    is not a flow, the same way a directory holding neither is not one.
+
+    Args:
+      named_: A flow's name, as :func:`find` takes it.
+
+    Returns:
+      The path to it, and "" for a flow that ships none -- which is every flow that is not
+      an atlas, and most atlases.
+    """
+    beside = at(named_)
+    if not beside:
+        return ""
+    held = os.path.join(beside, PROPHECY)
+    return held if os.path.isfile(held) else ""
 
 
 def at(named_: str) -> str:
