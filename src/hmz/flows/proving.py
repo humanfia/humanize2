@@ -593,8 +593,13 @@ def _filled(kind: Any, field: Any, scenario: Scenario) -> Any:
     Returns:
       The value.
     """
+    from typing import Annotated
+
     from pydantic import BaseModel
 
+    if get_origin(kind) is Annotated:
+        # The constraints ride along in the field itself; what is answered is the type.
+        return _filled(get_args(kind)[0], field, scenario)
     for said in _unioned(kind):
         if said is bool:
             return scenario.verdict
@@ -608,7 +613,13 @@ def _filled(kind: Any, field: Any, scenario: Scenario) -> Any:
         if said in (int, float):
             return 0
         if get_origin(said) in (list, tuple, set, frozenset):
-            return []
+            # As many as the field says it takes at the least, each made the same way:
+            # a shape that requires three lanes is answered with three, not refused.
+            fewest = 0
+            for bound in getattr(field, "metadata", None) or ():
+                fewest = max(fewest, getattr(bound, "min_length", 0) or 0)
+            inner = next(iter(get_args(said)), None)
+            return [_filled(inner, None, scenario) for _ in range(fewest)]
         if get_origin(said) is dict:
             return {}
         if isinstance(said, type) and issubclass(said, BaseModel):

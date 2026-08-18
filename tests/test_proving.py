@@ -382,3 +382,19 @@ def test_a_shape_nothing_can_be_fabricated_for_answers_nothing() -> None:
     assert _said(Shaped, SILENT) == ""
     assert _said(None, SILENT) == ""
     assert _said(None, ALWAYS_DONE) == ALWAYS_DONE.answer
+
+
+def test_a_list_that_takes_at_least_some_is_answered_with_that_many() -> None:
+    from typing import Annotated
+
+    class Planned(BaseModel):
+        lanes: list[Nested] = Field(min_length=3)
+        tags: list[Annotated[str, Field(min_length=1)]] = Field(min_length=1)
+        loose: list[str]
+
+    made = _made(Planned, NEVER_DONE)
+    held = Planned.model_validate(made)
+    assert len(held.lanes) == 3
+    assert held.lanes[0] == Nested(said=NEVER_DONE.answer, fine=False)
+    assert held.tags == [NEVER_DONE.answer]
+    assert held.loose == []
