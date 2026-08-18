@@ -89,8 +89,16 @@ import sys
 print("\\x1b[1mAvailable models\\x1b[0m")
 print()
 print("\\x1b[36mcomposer-2.5\\x1b[0m \\x1b[2m- Composer 2.5\\x1b[0m \\x1b[2m(default)\\x1b[0m")
+print("gpt-5 - GPT-5")
 print("gpt-5-high - GPT-5 (high)")
+print("gpt-5-fast - GPT-5 (fast)")
+print("gpt-5-low-fast - GPT-5 (low, fast)")
+print("gpt-5-high-fast - GPT-5 (high, fast)")
 print("claude-opus-4-8 (current)")
+print("sonnet-4.5-thinking - Claude Sonnet 4.5 (thinking)")
+print("grok-code-fast-1")
+print("cheetah")
+print("auto")
 print()
 print("Tip: use $ agent --model <id>")
 """
@@ -264,27 +272,64 @@ def test_a_turn_that_failed_says_so_rather_than_answering_with_it(
     assert "the model refused" in str(raised.value)
 
 
-def test_what_it_runs_is_read_off_its_own_listing(
-    asking: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The heading above the list and the tip below it are sentences, not models."""
+@pytest.fixture
+def listing(asking: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A stand-in `cursor-agent` with a catalogue on it, and a home to keep the answer in."""
     binaries = tmp_path / "bin"
     binaries.mkdir()
     _install(binaries, _LISTED, tmp_path / "listed.jsonl")
     monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "home"))
 
+
+def test_what_it_runs_is_read_off_its_own_listing(listing: None) -> None:
+    """The heading above the list and the tip below it are sentences, not models."""
     found = models.ask("cursor")
 
     assert [one.name for one in found] == [
         "composer-2.5",
+        "gpt-5",
         "gpt-5-high",
+        "gpt-5-fast",
+        "gpt-5-low-fast",
+        "gpt-5-high-fast",
         "claude-opus-4-8",
+        "sonnet-4.5-thinking",
+        "grok-code-fast-1",
+        "cheetah",
+        "auto",
     ]
-    # A model whose own name carries a rung runs at that one: `gpt-5-high` is not a model to
-    # ask for `low`. One that carries none takes the whole ladder, the rung being a parameter.
-    assert found[0].efforts == ("high", "medium", "low")
-    assert found[1].efforts == ("high",)
+
+
+#: Cursor's whole ladder, which is what a model is offered at when its own name says nothing
+#: about how hard it thinks: the rung is a parameter of the model rather than a property of it.
+_LADDER = ("high", "medium", "low")
+
+#: What each model in that listing is offered at, and why it is that rather than the other.
+_OFFERED = {
+    "composer-2.5": _LADDER,
+    "gpt-5": _LADDER,
+    "gpt-5-high": ("high",),
+    # `fast` is the service a turn runs on and not a rung, so the first of these two is still
+    # the whole ladder and the second is `low` with that service written behind it.
+    "gpt-5-fast": _LADDER,
+    "gpt-5-low-fast": ("low",),
+    "gpt-5-high-fast": ("high",),
+    "claude-opus-4-8": _LADDER,
+    # `thinking` is what the model is, `1` is which one it is, and `auto` is Cursor choosing:
+    # a name is only pinned by a word that is one of Cursor's own three rungs.
+    "sonnet-4.5-thinking": _LADDER,
+    "grok-code-fast-1": _LADDER,
+    "cheetah": _LADDER,
+    "auto": _LADDER,
+}
+
+
+def test_a_model_is_offered_at_the_rung_its_own_name_carries(listing: None) -> None:
+    """A rung is a word of the name wherever it falls in it: `gpt-5-low-fast` runs at `low`."""
+    found = models.ask("cursor")
+
+    assert {one.name: one.efforts for one in found} == _OFFERED
 
 
 def test_web_search_cannot_be_switched_off_and_is_refused_rather_than_ignored() -> None:

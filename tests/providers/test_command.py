@@ -12,6 +12,7 @@ a script has to say everything it means on the line.
 from __future__ import annotations
 
 import io
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -481,3 +482,137 @@ def test_what_else_an_account_could_run_is_shown_where_it_is_read(
     said = capsys.readouterr().out
     assert "also runs   pi" in said
     assert "also runs   opencode" in said
+
+
+def _tries(provider: providers.Provider, tries: int, timeout: float = 0.0) -> None:
+    """Puts tries back into one account's file, as a line run before they moved left them.
+
+    Written by hand because nothing writes them any more: how often a failed turn is taken
+    again is a thing about a place now, so the store neither reads these keys nor keeps them.
+
+    Args:
+      provider: The account, or the machine's own for a name of "".
+      tries: How many were written down.
+      timeout: The cap that was written down beside them, or 0.0 for none.
+    """
+    at = (
+        providers.alone(provider.cli)
+        if not provider.name
+        else provider.at / "provider.json"
+    )
+    at.parent.mkdir(parents=True, exist_ok=True)
+    held: dict[str, object] = (
+        json.loads(at.read_text(encoding="utf-8")) if at.exists() else {}
+    )
+    at.write_text(
+        json.dumps(
+            {
+                **held,
+                "retries": tries,
+                "policy": "exponential-jitter",
+                "timeout": timeout,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+#: What the notice says to type for an account of that name holding those tries. The model is
+#: spelled the way `hmz fallback --help` spells it, which is a word a shell reads as one.
+_RETYPED = "hmz fallback retry claude@mine/MODEL 3 -p exponential-jitter"
+
+
+def test_tries_written_down_before_they_moved_say_where_they_are_said_now(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A setting that stopped being read without a word is one somebody goes on believing in."""
+    _tries(providers.add("claude", "mine", env={"ANTHROPIC_API_KEY": KEY}), 3)
+    capsys.readouterr()
+
+    assert run("show", "claude/mine") == 0
+
+    shown = capsys.readouterr().out
+    assert "no longer read" in shown
+    # Named as a place rather than as an account: the model is the part an account never had,
+    # which is why nothing could have carried these over by itself.
+    assert _RETYPED in shown
+
+    assert run("list") == 0
+
+    assert _RETYPED in capsys.readouterr().out
+
+
+def test_the_machines_own_account_says_where_its_tries_went_and_is_listed_for_it(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """It is an account here too, and one nothing else would have said a word about."""
+    held = providers.find("claude", providers.LOCAL)
+    assert held is not None
+    _tries(held, 2)
+
+    assert run("show", "claude/") == 0
+
+    assert (
+        "hmz fallback retry claude/MODEL 2 -p exponential-jitter"
+        in capsys.readouterr().out
+    )
+
+    assert run("list") == 0
+
+    listed = capsys.readouterr().out
+    assert "claude/  " in listed
+    assert "hmz fallback retry claude/MODEL 2 -p exponential-jitter" in listed
+
+
+def test_the_line_it_says_to_type_is_a_line_that_command_takes(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A notice against a setting nobody could act on would be a second of the same thing.
+
+    So everything that was written down goes into it -- the wait between tries and the cap on
+    how long they go on, not only the count -- and the whole of it is a line that runs.
+    """
+    from hmz.cli.fallback import fallback
+
+    _tries(providers.add("claude", "mine", env={"ANTHROPIC_API_KEY": KEY}), 3, 120.0)
+    capsys.readouterr()
+
+    assert run("show", "claude/mine") == 0
+
+    said = capsys.readouterr().out
+    assert f"{_RETYPED} -t 120" in said
+    (line,) = [one for one in said.splitlines() if "hmz fallback retry" in one]
+    typed = line[line.index("`") + 1 : line.rindex("`")].split()
+
+    assert fallback(typed[2:]) == 0
+
+    capsys.readouterr()
+    assert fallback(["list"]) == 0
+    listed = capsys.readouterr().out
+    assert "claude@mine/MODEL" in listed
+    assert "3 more tries, exponential-jitter, up to 120s" in listed
+
+
+def test_the_file_the_notice_reads_is_the_file_the_store_writes() -> None:
+    """Both spell it, and the one that would go quiet on a rename is the notice.
+
+    It cannot be asked of the store: what is read is exactly the key the store stopped
+    reading, so the store is the wrong thing to ask for the file it is in. Pinned instead.
+    """
+    from hmz.cli import providers as command
+    from hmz.providers import store
+
+    assert command._HELD == store._HELD
+
+
+def test_an_account_that_never_had_tries_says_nothing_about_them(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Which is every account made since, and a notice on one of those would be noise."""
+    providers.add("claude", "mine", env={"ANTHROPIC_API_KEY": KEY})
+    capsys.readouterr()
+
+    assert run("show", "claude/mine") == 0
+    assert run("list") == 0
+
+    assert "hmz fallback retry" not in capsys.readouterr().out

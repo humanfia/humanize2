@@ -456,6 +456,12 @@ class SessionBase(ABC):
         #: put in the workspace goes with it, so it is a finalizer rather than a line in
         #: `close`: a Ralph loop drops a session a turn and closes none of them.
         self._unmounting: Callable[[], None] | None = None
+        #: What takes back what this session offered the agent, once it has offered anything,
+        #: and None for one that never has -- a session that offers nothing pays for none of
+        #: this. A finalizer for the reason the unmounting is one: a loop that opens a session
+        #: a round and drops it closes none of them, and a callback still in front of the
+        #: model after the round that wrote it is one the flow can no longer see the point of.
+        self._unoffering: Callable[[], None] | None = None
         #: Whether a turn of this session is running now. Read by `close`, which is what a stop
         #: reaches and so is called from another thread while a turn is under way: what the
         #: turn is working by is not taken away underneath it.
@@ -534,7 +540,17 @@ class SessionBase(ABC):
                 f"{self._agent.backend} has no way of being given a tool of a flow's own"
             )
         self._tools = () if tools is None else tuple(tools)
-        self._agent.toolbox.offers(id(self), self._tools)
+        box = self._agent.toolbox
+        if self._tools and self._unoffering is None:
+            # Registered the first time anything is said and not before: the toolbox is keyed
+            # by a number this session answers to for as long as it is alive, so what takes
+            # the entry back has to be whatever runs when it stops being alive -- a flow that
+            # opens a session a round and drops it closes none of them, and an entry nobody
+            # takes back is a callback the agent goes on being offered by a conversation that
+            # is over. It runs while this session is still being taken apart, which is before
+            # its number can be handed to another one.
+            self._unoffering = weakref.finalize(self, box.offers, id(self), ())
+        box.offers(id(self), self._tools)
 
     @property
     def id(self) -> str:
@@ -1005,7 +1021,7 @@ class SessionBase(ABC):
         # rather than on either, and is the second thing tried because it is the one that
         # cannot carry the conversation: no backend takes another backend's session id.
         stood_in = self._agent.stands_in()
-        if stood_in is not None:
+        if stood_in is not None and self._may_stand_in(stood_in):
             self._heard(
                 Event(
                     kind="tool",
@@ -1018,6 +1034,50 @@ class SessionBase(ABC):
         if last is None:  # nothing ran at all, which is nothing this can raise about
             raise RuntimeError("no account to take the turn under")
         raise last
+
+    def _moving_to(self, stood_in: AgentBase) -> SessionBase:
+        """The conversation of the stand-in that this one's turns are taken in.
+
+        Opened once and held, for as long as this session is: what this conversation was is
+        lost at the move, and a second one lost every turn after it would be a stateful loop
+        started over every round. Opening one starts no process and says nothing to any
+        backend, so it is opened to ask what it can be told as readily as to take a turn.
+
+        Args:
+          stood_in: The agent taking the turn.
+
+        Returns:
+          The session, which works where this one works and goes when this one goes.
+        """
+        if self._moved_to is None:
+            self._moved_to = stood_in.new(self._cwd)
+        return self._moved_to
+
+    def _may_stand_in(self, stood_in: AgentBase) -> bool:
+        """Whether the turn may be moved there, given what is in front of the model here.
+
+        The agent made for a step already answers for the settings it was configured with: one
+        the CLI taking over cannot be told at all is no stand-in. The flow's own callbacks are
+        not among those -- they are offered on the conversation, between two turns, long after
+        the step was read -- and a backend with no way of being given one would take the turn
+        with none of them in front of the model. A callback quietly never offered is a flow
+        that quietly does not do what it says, so there is nowhere to carry on to and the turn
+        fails where it failed.
+
+        What is asked is the agent's list rather than this conversation's own, because that is
+        what the model is actually looking at: a backend is told about its tools where it is
+        started, and some are started once per agent, so a conversation offering none still
+        has a sibling's callbacks in front of it.
+
+        Args:
+          stood_in: The agent that would take the turn.
+
+        Returns:
+          Whether the turn may go there, which is everything except a turn taken with
+          callbacks in front of it moving to a backend that takes none.
+        """
+        offered = self._agent.toolbox.offered()
+        return not offered or type(self._moving_to(stood_in)).takes_tools
 
     def _instead(
         self,
@@ -1038,9 +1098,10 @@ class SessionBase(ABC):
         agents is this called once and then once again inside it. It cannot come round: the
         agent that stood in was built holding only the steps after its own.
 
-        Opened once and held, for as long as this session is: what this conversation was is
-        lost at the move, and a second one lost every turn after it would be a stateful loop
-        started over every round. It works where this one works, and goes when this one goes.
+        Taken in the one session this conversation moves to, which is opened once and held for
+        as long as this one is: :meth:`_moving_to`. What the flow put in front of this turn
+        goes with it -- the skills this conversation carries and the callbacks the agent is
+        offering -- since it is this conversation's turn wherever it is taken.
 
         Args:
           stood_in: The agent taking the turn.
@@ -1052,14 +1113,19 @@ class SessionBase(ABC):
         Yields:
           What the stand-in said, in the order it said it.
         """
-        if self._moved_to is None:
-            self._moved_to = stood_in.new(self._cwd)
-        session = self._moved_to
+        session = self._moving_to(stood_in)
         session._shaping = schema
         # The flow's skills go with the turn: the stand-in was made carrying them, and a
         # session of it puts them where its own backend reads them, which is not where this
         # one's does. Whichever of them this session carries, since it is this session's turn.
         session.loads(self._skills)
+        # And so do the flow's own callbacks: a turn taken with none of them in front of the
+        # model would be the flow losing what it offered by being moved. The agent's list
+        # rather than this conversation's own, since that is what the model was looking at --
+        # a backend told about its tools once per agent has a sibling's offer in front of it
+        # too. Nothing at all where nothing is offered, and a turn with any in front of it is
+        # only ever moved somewhere they can go.
+        session.offers(self._agent.toolbox.offered())
         session._mounts()
         yield from session._falling_back(prompt, schema=schema)
 
@@ -1230,8 +1296,17 @@ class SessionBase(ABC):
         self._shut()
         # And whatever this conversation was offering the agent: a callback that outlived the
         # conversation offering it would be one the flow can no longer see the point of.
-        if self._tools:
-            self.offers(None)
+        # Calling the finalizer is what takes them back, so that a session closed by hand and
+        # one merely let go of come to the same thing -- once, whichever gets there first.
+        if self._unoffering is not None:
+            self._unoffering()
+            self._unoffering = None
+            self._tools = ()
+            # And once more with the finalizer detached, since `close` is reached from
+            # another thread while this one may be offering: a list landing between the two
+            # lines above would otherwise be an entry with nothing left to take it back.
+            # Offering after this has returned is offering afresh, which registers its own.
+            self._agent.toolbox.offers(id(self), ())
         if self._moved_to is not None:
             # And the conversation this one moved to, which is this conversation carried on
             # somewhere else: it ends when this one does.

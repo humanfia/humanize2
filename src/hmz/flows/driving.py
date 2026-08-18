@@ -176,6 +176,17 @@ def left(one: Running) -> None:
 #: work in. Set by `contained` while the run is being got ready and taken down when it ends.
 _INSIDE: list[tuple[MachineBase, MachineConfig, Mapped]] = []
 
+#: Held over every look at the list above and every change to it, so that one run at a time
+#: is settled rather than raced: two started at once would otherwise both have found nothing
+#: there and gone ahead. Held for the look and not for the bringing up, which is a pull of
+#: minutes -- the image below is what says the place is taken while that is going on.
+_ENTERING = threading.Lock()
+
+#: The image of a container that is on its way up, for as long as that takes. A run is in one
+#: from the moment another would have to wait for it rather than from the moment it answers,
+#: so that the second of two is refused at once instead of at the end of the first's pull.
+_COMING: list[str] = []
+
 
 def container() -> Mapped | None:
     """The container this run is working in, as the flow's own code reaches it.
@@ -208,7 +219,10 @@ def contained(image: str, workspace: str = "") -> Generator[MachineConfig | None
     writes and commands reach it through :func:`container`.
 
     One container for the run rather than one per agent, which is the whole point: the agents
-    are working on one thing, so what one of them writes is what the next one reads.
+    are working on one thing, so what one of them writes is what the next one reads. And one
+    at a time in a process for the same reason, the container being the process's own rather
+    than any one run's: two started at once with an image between them would be two runs
+    reaching for one container, so the second is refused rather than handed the first's.
 
     Args:
       image: The image to run, which needs a `python3` for coganchor's target half and
@@ -224,24 +238,41 @@ def contained(image: str, workspace: str = "") -> Generator[MachineConfig | None
 
     Raises:
       FileNotFoundError: If there is no workspace to give it, or no `docker` to give it to.
-      RuntimeError: If the container cannot be started.
+      RuntimeError: If a run of this process is in a container already, or if the container
+        cannot be started.
     """
     if not image:
         yield None
         return
     from hmz.machines import AnchoredConfig, DockerConfig, Mapped
 
-    machine = DockerConfig(image=image, workspace=workspace or None).create()
-    # Started once and named by the anchor that reaches it, so that every agent of the run is
-    # pointed at the container that is already up rather than starting one apiece.
-    anchor = machine.start()
-    held = Mapped(anchor)
-    where_ = AnchoredConfig(anchor=anchor)
-    _INSIDE.append((machine, where_, held))
+    with _ENTERING:
+        if _INSIDE or _COMING:
+            raise RuntimeError(
+                "a run of this process is in a container already, and the container is "
+                "the process's rather than any one run's -- so a second run started beside "
+                "it would be reaching for the first's"
+            )
+        _COMING.append(image)
+    try:
+        machine = DockerConfig(image=image, workspace=workspace or None).create()
+        # Started once and named by the anchor that reaches it, so that every agent of the
+        # run is pointed at the container that is already up rather than starting one apiece.
+        anchor = machine.start()
+        held = Mapped(anchor)
+        where_ = AnchoredConfig(anchor=anchor)
+    except BaseException:
+        with _ENTERING:
+            _COMING.clear()
+        raise
+    with _ENTERING:
+        _INSIDE.append((machine, where_, held))
+        _COMING.clear()
     try:
         yield where_
     finally:
-        _INSIDE[:] = [one for one in _INSIDE if one[0] is not machine]
+        with _ENTERING:
+            _INSIDE[:] = [one for one in _INSIDE if one[0] is not machine]
         held.close()
         machine.stop()
 
@@ -957,6 +988,13 @@ def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
     and the machine is the flow's own -- a container of the image it named, which nobody else
     has any say in.
 
+    A whole run put in a container from outside is none of those three: it was said once,
+    about every agent, by whoever started the run, and an agent standing in it was pointed
+    nowhere by anybody. So a place that says nothing takes one, and goes on refusing the
+    machine somebody actually chose for it. A place that says `Isolated` does not: that flow
+    named an image of its own, and being handed the run's container instead is being pointed
+    at a machine, which is what it says nobody may do.
+
     Args:
       flow: The flow, for what a refusal says.
       agent: The agent filling the place.
@@ -980,7 +1018,11 @@ def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
         except RuntimeError as opened:
             raise NotAFlow(f"{flow}: {called} {opened}") from opened
         return
-    if place.where is None and agent.config.machine is not None:
+    # The container the whole run works in, which is a convenience rather than a second way
+    # of saying where an agent works -- so a flow this one called must not read it as one.
+    # By identity, since what is exempt is that container and not the idea of a machine.
+    inside = bool(_INSIDE) and agent.config.machine is _INSIDE[0][1]
+    if place.where is None and agent.config.machine is not None and not inside:
         raise NotAFlow(
             f"{flow}: {called} runs on this machine -- this flow does not say it works "
             "anywhere else, so it cannot be pointed at one"

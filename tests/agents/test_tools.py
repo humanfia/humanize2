@@ -8,21 +8,31 @@ flow can reach.
 
 from __future__ import annotations
 
+import gc
 import json
 import os
 import subprocess
 import sys
 import threading
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import BaseModel, Field
 
-from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig, Tool, Toolbox
+from hmz.agents import (
+    ClaudeCodeAgent,
+    ClaudeCodeAgentConfig,
+    CodexAgent,
+    CodexAgentConfig,
+    Tool,
+    Toolbox,
+)
+from hmz.agents import codex as appservers
 from hmz.agents.tools import PROTOCOL, serve
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from hmz.agents import AgentConfig
@@ -47,6 +57,19 @@ def _tool(seen: list[Asked]) -> Tool:
         about="hand a task to another flow and wait for what it comes to",
         takes=Asked,
         call=called,
+    )
+
+
+def _another(named: str) -> Tool:
+    """A second callback, under a name of its own, built afresh each time it is asked for.
+
+    Which is what an ordinary flow does: the tools it offers before a turn are the tools it
+    just wrote down, so two turns offering the same thing are offering two objects.
+    """
+    return Tool(
+        name=named,
+        about="hand the work back to whoever asked for it",
+        call=lambda: "handed back",
     )
 
 
@@ -162,6 +185,69 @@ def test_two_conversations_offering_one_name_are_offering_one_tool() -> None:
         assert [one.name for one in box.offered()] == ["delegate", "other"]
     finally:
         box.close()
+
+
+def _says(said: str) -> Tool:
+    """One round's callback, closing over what that round would answer with."""
+    return Tool(name="review", about="read what this round wrote", call=lambda: said)
+
+
+def test_a_conversation_let_go_of_takes_back_what_it_was_offering() -> None:
+    """A loop that opens a session a round and drops it closes none of them.
+
+    So the taking back cannot be a line in `close`: a callback still in front of the agent
+    after the conversation that offered it is over is one the flow can no longer see the point
+    of -- and an agent that goes on being offered something is an agent every later turn of
+    which is started knowing about it.
+    """
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-5", effort="high"))
+    session = agent.new()
+    session.offers([_tool([])])
+    assert not agent.toolbox.empty()
+
+    del session
+    gc.collect()
+
+    assert agent.toolbox.empty()
+    assert agent.toolbox.offered() == ()
+
+
+def test_a_round_that_is_over_stops_answering_for_the_one_that_replaced_it() -> None:
+    """Two conversations offering one name are offering one tool, and it is the live one's.
+
+    Which is what a loop offering a callback per round is: each round's closes over that
+    round. A round that is over going on being offered would have the agent reach for the
+    first one anybody wrote, an hour after the state it closed over stopped being true.
+    """
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-5", effort="high"))
+    first = agent.new()
+    first.offers([_says("round 0")])
+    second = agent.new()  # the next round, opened before the one before it is let go of
+    second.offers([_says("round 1")])
+
+    del first
+    gc.collect()
+
+    (one,) = agent.toolbox.offered()
+    assert one.call() == "round 1"
+
+
+def test_a_conversation_closed_takes_them_back_once_however_often_it_is_closed() -> (
+    None
+):
+    """The close and the collection are one taking back, done by whichever gets there first."""
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-5", effort="high"))
+    session = agent.new()
+    session.offers([_tool([])])
+
+    session.close()
+    session.close()
+
+    assert agent.toolbox.empty()
+    assert session.tools == ()
+    # And a conversation that is spoken to again is one that may offer again.
+    session.offers([_tool([])])
+    assert not agent.toolbox.empty()
 
 
 #: A client that speaks the protocol down a pipe the way one of these CLIs does: it starts the
@@ -310,6 +396,108 @@ def test_offering_one_between_two_turns_starts_a_claude_that_knows_about_it(
     assert second[second.index("--resume") + 1] == session.id
 
 
+@pytest.mark.timeout(60)
+def test_swapping_one_callback_for_another_starts_a_claude_told_about_the_new_one(
+    claude: Path,
+) -> None:
+    """Claude reads what a tool server has once, so a list that moved is a list it never saw.
+
+    The tool that arrived would be nowhere on its list, and the one that left would still be
+    on it -- so reaching for that one comes back as there being no such tool. Silent both
+    ways, which is why what is compared is the list the process was told and not whether it
+    was told anything.
+    """
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-5", effort="high")
+    ).new()
+
+    session.offers([_tool([])])
+    session("first")
+    session.offers([_another("escalate")])
+    session("second")
+
+    first, second = _starts(claude)
+    assert "--mcp-config" in first
+    assert "--mcp-config" in second
+    # The same conversation, carried on: the process ended, not the session.
+    assert second[second.index("--resume") + 1] == session.id
+    # And what the new one enumerates is the offer as it stands: the one that arrived, and
+    # not the one that was taken back. Asked of the server the command line points at, which
+    # is where the process about to be started would ask it.
+    listed = serve(_sent("tools/list"), session._agent.toolbox.offered)
+    assert listed is not None
+    assert [one["name"] for one in listed["result"]["tools"]] == ["escalate"]
+    assert [one.name for one in session.tools] == ["escalate"]
+
+
+@pytest.mark.timeout(60)
+def test_offering_an_equal_list_again_leaves_the_claude_that_is_up_alone(
+    claude: Path,
+) -> None:
+    """A flow that writes its tools out before every turn is offering one list, not many.
+
+    Compared by what the tools are called rather than by which objects they are: a callback
+    is a closure, so two equal lists share no object and are not even equal as values, and a
+    process ended for that would be a process ended every turn of the flow.
+    """
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-5", effort="high")
+    ).new()
+
+    session.offers([_tool([]), _another("escalate")])
+    session("first")
+    session.offers([_another("escalate"), _tool([])])
+    session("second")
+
+    (argv,) = _starts(claude)
+    assert "--mcp-config" in argv
+
+
+@pytest.mark.timeout(60)
+def test_swapping_one_callback_for_another_starts_a_codex_server_told_about_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An app server enumerates its tool servers where it is started, exactly as Claude does.
+
+    It is the agent's rather than the session's, so what a changed offer costs here is every
+    live conversation of that agent going on in a server started afresh -- which is the price
+    of the model being told the truth about what it may reach for.
+    """
+    started: list[list[str]] = []
+
+    class _Recording:
+        """A stand-in app server, which writes down how it would have been started."""
+
+        def __init__(
+            self, argv: list[str], env: Mapping[str, str] | None = None
+        ) -> None:
+            del env
+            started.append(argv)
+            self._held: list[Any] = []
+
+        def stop(self) -> None:
+            """Nothing was started, so there is nothing to take down."""
+
+    monkeypatch.setattr(appservers, "_AppServer", _Recording)
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high"))
+    session = agent.new()
+    try:
+        session.offers([_tool([])])
+        assert agent.server is not None
+        session.offers([_another("escalate")])
+        assert agent.server is not None
+        # And the same offer written out again is the same offer: nothing moved, so the
+        # server holding this agent's conversations goes on holding them.
+        session.offers([_another("escalate")])
+        assert agent.server is not None
+    finally:
+        agent.toolbox.close()
+
+    first, second = started
+    assert any(one.startswith("mcp_servers.humanize.command=") for one in first)
+    assert any(one.startswith("mcp_servers.humanize.command=") for one in second)
+
+
 def test_a_backend_with_no_way_of_being_told_refuses_a_callback() -> None:
     """A tool the model never sees would be a flow that quietly does not do what it says."""
     from hmz.agents import AgentConfig as Config
@@ -396,7 +584,10 @@ def test_the_bridge_runs_here_for_an_agent_whose_turns_land_elsewhere() -> None:
     before = agent.anchor.local_execs
     assert agent._reaching(agent.anchor) is agent.anchor
 
-    agent.new().offers([_tool([])])
+    # Held for as long as the offer is asked about: what a conversation nobody holds any more
+    # was offering is taken back with it.
+    session = agent.new()
+    session.offers([_tool([])])
     try:
         held = agent.toolbox.command()[0]
         assert held not in before

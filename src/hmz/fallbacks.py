@@ -34,6 +34,7 @@ only a turn with nowhere left to go under its own backend leaves it.
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import tempfile
@@ -321,7 +322,8 @@ def retrying(said: str, tries: int, policy: str, timeout: float) -> Falls:
 
     Raises:
       ValueError: If the place cannot be read, the policy is not one there is, or either
-        number is negative. All three are a line to correct rather than something for the
+        number is one no waiting can be made of -- a negative, or seconds that are infinite
+        or not a number. All of them are a line to correct rather than something for the
         turn that needed it to find out about.
     """
     from_ = reads(said)
@@ -332,8 +334,16 @@ def retrying(said: str, tries: int, policy: str, timeout: float) -> Falls:
             f"{policy!r} is not a retry policy: "
             f"{', '.join(one.name for one in POLICIES)}"
         )
-    if tries < 0 or timeout < 0:
-        raise ValueError("tries and seconds are counts, not debts")
+    # `inf` and `nan` are both greater than nothing as far as `< 0` is concerned, and both
+    # go into the file as a bare `Infinity` or `NaN` -- a token JSON does not have, so a
+    # step written with one is a file no strict reader takes back. No limit at all is 0.0.
+    if (
+        tries < 0
+        or not math.isfinite(tries)
+        or not math.isfinite(timeout)
+        or timeout < 0
+    ):
+        raise ValueError("tries and seconds are counts, not debts or infinities")
     return _keeps(
         replace(
             tried(from_), spec=from_, tries=tries, policy=policy, timeout=float(timeout)
@@ -444,8 +454,12 @@ def _fibonacci(over: int) -> int:
 def _counted(said: object) -> int:
     """One count as it was written down, and none at all for anything that is not one."""
     try:
+        # OverflowError beside the rest because a file holds whatever somebody typed, and a
+        # number too big to be a count is one of the things they can type: `Infinity`, which
+        # `json` reads, and `1e400`, which is JSON and comes back as the same infinity. A
+        # count nothing can be made of is no count rather than the end of every run here.
         held = int(cast("int", said))
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return 0
     return max(held, 0)
 
@@ -453,10 +467,15 @@ def _counted(said: object) -> int:
 def _seconds(said: object) -> float:
     """One length of time as it was written down, and none at all for anything that is not."""
     try:
+        # And a 400-digit integer is the same hole from the other side: `float` will not
+        # take one either.
         held = float(cast("float", said))
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return 0.0
-    return max(held, 0.0)
+    # A limit of `inf` or `nan` is a limit that never arrives -- both are something rather
+    # than nothing, and neither is ever passed -- and `max` cannot floor a `nan`, which
+    # loses every comparison it is in. No limit at all is 0.0, as it is written everywhere.
+    return max(held, 0.0) if math.isfinite(held) else 0.0
 
 
 def _keeps(step: Falls) -> Falls:

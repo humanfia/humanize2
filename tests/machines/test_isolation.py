@@ -20,7 +20,7 @@ from hmz.agents import AgentConfig
 from hmz.coganchor import check
 from hmz.machines import AnchoredConfig, DockerConfig, MachineBase, MachineConfig
 from hmz.runner import Runner
-from tests.stubs import HereAnchor, ShellAgent
+from tests.stubs import HereAnchor, ShellAgent, written
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -294,6 +294,81 @@ def test_the_flow_reaches_the_container_only_while_the_run_is_in_one() -> None:
     from hmz.flows import container
 
     assert container() is None
+
+
+#: The flow a contained run is started at, which calls one whose place says nothing about
+#: where its agent works -- which is what every flow written before this said.
+CALLING = '''"""Calls a flow that says nothing about where its agent works."""
+
+from hmz.flows import Agent, flow, load
+
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    (agent,) = agents
+    agent.new()("hostname > calling.txt")
+    load("called")(agents, task)
+'''
+
+#: And the one it calls, which has its agent leave a mark saying where the turn ran.
+CALLED = '''"""The one that is called, driving the agents it was handed."""
+
+from hmz.flows import Agent, flow
+
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    (agent,) = agents
+    agent.new()("hostname > called.txt")
+'''
+
+
+def test_a_run_in_a_container_may_call_a_flow_that_says_where_nobody_works(
+    daemon: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A place that says nothing refuses a machine somebody chose, and this is not one.
+
+    The run's container was said once from outside, about every agent, by whoever started
+    the run -- so a called flow reading it as a machine anybody reached for would refuse
+    every flow written before there was such a thing, and name itself in the refusal.
+    """
+    monkeypatch.chdir(tmp_path)
+    written(tmp_path / ".humanize/flows", "calling", CALLING)
+    written(tmp_path / ".humanize/flows", "called", CALLED)
+    agent = ShellAgent(AgentConfig(model="m", effort="high"))
+
+    Runner("calling", [agent], container=IMAGE).run("go")
+
+    # The call went through, and its turn ran in the run's container rather than here --
+    # the same one the flow that called it was working in, which is the point of one
+    # container for the run: what the caller wrote is what the called flow reads.
+    called = (tmp_path / "called.txt").read_text().strip()
+    assert called != socket.gethostname()
+    assert called == (tmp_path / "calling.txt").read_text().strip()
+
+
+def test_a_second_run_in_a_container_is_refused_rather_than_handed_the_first(
+    daemon: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The container is the process's rather than the run's, so there is one to be in.
+
+    Two started at once would be two runs sharing a workspace neither was told about, and
+    the second of them reading the first's container back as its own.
+    """
+    from hmz.flows.driving import contained
+
+    monkeypatch.chdir(tmp_path)
+    with contained(IMAGE) as where_:
+        assert where_ is not None
+        with (
+            pytest.raises(RuntimeError, match="in a container already"),
+            contained(IMAGE),
+        ):
+            raise AssertionError  # never reached: the refusal is at the block's opening
+        # And a run on this machine is not a second run in a container: it starts nothing,
+        # so there is nothing for it to be reaching for.
+        with contained("") as none:
+            assert none is None
 
 
 def test_the_flow_reads_writes_and_runs_on_the_machine_the_run_lands_on(

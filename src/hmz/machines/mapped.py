@@ -20,6 +20,7 @@ which is why a file written here is a file the next turn reads.
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import io
 import os
@@ -166,9 +167,15 @@ class Mapped:
           target answers about a path without reading it: not there at all is the one answer
           that means no, and anything else -- a file where a directory was asked about, a
           permission -- is something being there.
+
+        Raises:
+          OSError: If the machine cannot be reached at all, which is not an answer about a
+            path: opening the connection is outside the guard below so that a target nobody
+            can talk to says so rather than saying every path exists.
         """
+        client, at = self._client_of(), self._at(path)
         try:
-            self._client_of().listdir(self._at(path))
+            client.listdir(at)
         except OSError as why:
             return why.errno != errno.ENOENT
         return True
@@ -232,13 +239,19 @@ class Mapped:
             done.set()
 
         client = self._client_of()
-        client.start_exec(
+        handle = client.start_exec(
             held,
             self._at(cwd) if cwd else self.workspace,
             dict(env or {}),
             wrote,
             ended,
         )
+        # Its input ends where it began, since nothing here can send it any: a command that
+        # reads to the end of one -- `cat`, a `git apply` with no file -- would otherwise wait
+        # for what cannot arrive, and the wait below has no end of its own. A channel that has
+        # already died is left to say so through `ended`, which is where the real error is.
+        with contextlib.suppress(OSError):
+            handle.close_stdin()
         done.wait()
         if went:
             raise went[0]
@@ -269,10 +282,23 @@ class Mapped:
             from hmz.coganchor.remote import RemoteClient
 
             target, workspace, export = self._anchor.mount()
-            self._link = transport.connect(target, [export], self._anchor.token)
-            self._client = RemoteClient(self._link.channel)
-            self._client.start(self._anchor.token)
-            self._workspace = workspace
+            link = transport.connect(target, [export], self._anchor.token)
+            client = RemoteClient(link.channel)
+            try:
+                client.start(self._anchor.token)
+            except BaseException:
+                # Held only once it is whole. A handshake that failed halfway is what every
+                # later ask reads as an open mapping -- an empty workspace, and a path that
+                # is there because asking about it failed -- so it is let go of here and the
+                # next ask connects again. The link is let go of whatever the client makes of
+                # being closed: it is the child process and the pipes, and leaking those is
+                # the very thing this handler is here to stop.
+                try:
+                    client.close()
+                finally:
+                    link.close()
+                raise
+            self._link, self._client, self._workspace = link, client, workspace
 
     def _client_of(self) -> RemoteClient:
         """The connection, opening it where nothing has yet."""

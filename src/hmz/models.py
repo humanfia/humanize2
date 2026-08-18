@@ -503,6 +503,8 @@ def _agy(profile: Profile, run: Callable[..., str]) -> list[Model]:
         if not columns or len(columns) < 2:  # noqa: PLR2004
             continue
         name = columns[0]
+        # The end of the name rather than a word of it, unlike Cursor's: these ids are the
+        # model and then the rung, `gemini-3.7-flash-high`, with nothing written after it.
         carried = next(
             (rung for rung in profile.efforts if name.endswith(f"-{rung}")), ""
         )
@@ -556,7 +558,8 @@ def _cursor(profile: Profile, run: Callable[..., str]) -> list[Model]:
       One per model it offers, each at the whole ladder: how hard a Cursor model thinks is a
       parameter of the model rather than a property of it, and the list does not say which of
       them take one. A model whose own name carries a rung is offered at that one alone, its
-      name being what it runs at -- `gpt-5-high` is not a model to ask for `low`.
+      name being what it runs at -- `gpt-5-high` is not a model to ask for `low`, and neither
+      is `gpt-5-low-fast`, which says the same thing with the service it runs on behind it.
     """
     found: list[Model] = []
     for line in run(["--list-models"]).splitlines():
@@ -567,9 +570,10 @@ def _cursor(profile: Profile, run: Callable[..., str]) -> list[Model]:
         name, _, rest = said.partition(" ")
         if not name or (rest and not rest.startswith(("- ", "("))):
             continue
-        carried = next(
-            (rung for rung in profile.efforts if name.endswith(f"-{rung}")), ""
-        )
+        # A rung is a word of the name rather than the end of it: `gpt-5-low-fast` is the
+        # `low` model asked for over the faster service, and `-fast` is not a rung.
+        words = name.split("-")
+        carried = next((rung for rung in profile.efforts if rung in words), "")
         found.append(Model(name, (carried,) if carried else profile.efforts))
     return found
 

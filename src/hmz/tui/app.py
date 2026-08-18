@@ -383,7 +383,39 @@ class Editor(TextArea):
             super().__init__()
             self.text = text
 
+    class Enters(Message, bubble=False):
+        """The enter, on its way back to the queue the keys pressed with it are in.
+
+        The editor's own and nobody else's: what came of it is `Sent`, and this is only how
+        it waits its turn behind them.
+        """
+
+    class Breaks(Message, bubble=False):
+        """The line break, waiting its turn behind the keys that arrived with it.
+
+        The same queue and for the same reason as `Enters`: a break applied ahead of the
+        characters typed before it would put the line's end in the wrong place, and the enter
+        that follows would send the two lines joined.
+        """
+
     def action_send(self) -> None:
+        """Puts the enter behind whatever else arrived in the same read of the terminal.
+
+        Bound with priority, so Textual matches it on the application's pump -- which is
+        ahead of the characters of that read, still queued at this editor. A terminal hands
+        over everything that has arrived since it was last read, so a pasted line, or one a
+        proxy writes in a single go, reaches here with the whole line still behind it. Acting
+        now would act on an editor nothing has been typed into: the line would land in the
+        prompt a moment later and the enter would be gone, which is a keypress to make again
+        for a person and a command that silently did nothing for anything driving this.
+        Posted rather than done, so what the handler reads is the characters of that read.
+        Only those: a key a binding resolves -- backspace, delete -- is resolved on the
+        application's pump too, so it lands ahead of this whatever order it was typed in.
+        """
+        self.post_message(self.Enters())
+
+    @on(Enters)
+    def _sends(self) -> None:
         """Takes what is offered, if anything is, and otherwise sends what is in the editor.
 
         Enter means over the offers what it means over any list: take the one under the
@@ -393,14 +425,30 @@ class Editor(TextArea):
         """
         listing = self.screen.query_one("#offers", OptionList)
         if listing.has_class("offering") and listing.highlighted is not None:
-            self.take(str(listing.get_option_at_index(listing.highlighted).id))
-            return
+            whole = str(listing.get_option_at_index(listing.highlighted).id)
+            # The list is filled from a message the application handles, so it can be a
+            # keystroke behind the editor. An offer that no longer finishes what is typed is
+            # not the one enter was pressed over, and the line goes as it stands instead.
+            if whole in offered(self.text, _OWN):
+                self.take(whole)
+                return
         said, self.text = self.text.strip(), ""
         if said:
             self.post_message(self.Sent(said))
 
     def action_newline(self) -> None:
-        """Breaks the line, which is what enter would do anywhere else."""
+        """Breaks the line, which is what enter would do anywhere else.
+
+        Behind the keys that arrived with it, exactly as `action_send` is: bound with
+        priority and so matched ahead of them, and a break put in ahead of the characters
+        typed before it is a line broken in the wrong place -- which the enter after it would
+        then send.
+        """
+        self.post_message(self.Breaks())
+
+    @on(Breaks)
+    def _breaks(self) -> None:
+        """Puts the break in, now that what was typed before it is in."""
         self.insert("\n")
 
     #: Whether what is in the editor was put there by walking what was typed here before,

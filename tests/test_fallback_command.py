@@ -11,12 +11,18 @@ from __future__ import annotations
 
 import pytest
 
-from hmz import cli, fallbacks
+from hmz import cli, fallbacks, home
 
 
 def run(*argv: str) -> int:
     """Carries out one `hmz fallback` line, as `hmz` itself would."""
     return cli.main(["fallback", *argv])
+
+
+def poisons(said: str) -> None:
+    """Puts exactly this in the file, which is what somebody editing it by hand does."""
+    home().mkdir(parents=True, exist_ok=True)
+    (home() / "fallbacks.json").write_text(said, encoding="utf-8")
 
 
 def test_one_written_down_is_one_the_interface_would_find() -> None:
@@ -167,3 +173,48 @@ def test_a_policy_nobody_has_is_refused_where_it_was_typed(
 
     assert "invalid choice" in capsys.readouterr().err
     assert fallbacks.falls() == []
+
+
+def test_seconds_no_waiting_can_be_made_of_are_refused_where_they_were_typed(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`inf` is a limit that never arrives and `nan` is not a length of time at all.
+
+    And neither is JSON: written down, they are a bare `Infinity` or `NaN` token, which is a
+    file the next reader of it may not be able to read. No limit at all is spelled `0`.
+    """
+    for said in ("inf", "nan", "1e309"):
+        assert run("retry", "claude/a", "3", "-t", said) == 1
+        assert "not debts or infinities" in capsys.readouterr().err
+
+    assert fallbacks.falls() == []
+    assert not (home() / "fallbacks.json").exists()
+
+
+def test_a_count_nothing_can_be_made_of_is_read_past_rather_than_ending_runs() -> None:
+    """Every failed turn on this machine reads this file, and `int` will not take an `inf`.
+
+    Which arrives two ways: a hand-written `Infinity`, and the `1e400` that is JSON anybody
+    would accept and comes back as the same infinity.
+    """
+    poisons(
+        '[{"spec": "claude/a", "to": "codex/b", "tries": Infinity},'
+        ' {"spec": "dsh/c", "to": "", "tries": 1e400}]'
+    )
+
+    # What could not be read is the number, so the step is still the step it names -- and a
+    # place left saying nothing at all is a place nothing was said about.
+    assert fallbacks.falls() == [fallbacks.Falls("claude/a", "codex/b")]
+    assert fallbacks.chain("claude/a") == ["claude/a", "codex/b"]
+    assert fallbacks.tried("dsh/c") == fallbacks.Falls("dsh/c")
+    assert run("list") == 0
+
+
+def test_a_limit_that_never_arrives_is_read_as_no_limit_at_all() -> None:
+    """A `nan` loses every comparison it is in, so a turn held to one is held to nothing."""
+    poisons(
+        '[{"spec": "claude/a", "to": "codex/b", "tries": 2, "timeout": NaN},'
+        f' {{"spec": "dsh/c", "to": "codex/b", "tries": 2, "timeout": 1{"0" * 400}}}]'
+    )
+
+    assert [one.timeout for one in fallbacks.falls()] == [0.0, 0.0]

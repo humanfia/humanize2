@@ -12,14 +12,28 @@ somebody sitting at a command line rather than about an account.
 
 from __future__ import annotations
 
+import json
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from hmz.providers import Provider
     from hmz.sdk import Accounts
 
 __all__ = ["providers"]
+
+#: What one account is written down in, and the key that used to be in it. How often a failed
+#: turn is taken again was once a thing about an account and is now a thing about a place --
+#: the CLI, the account and the model -- so `hmz.providers` stopped reading this and nothing
+#: reads it since. A file written before that move still holds it, and an account whose tries
+#: quietly stopped happening is worse than one that never had any: it is a setting somebody
+#: goes on believing in. So the file is read again as it stands, wherever an account is read.
+#: Spelled here rather than asked of the store, which is the thing that stopped reading it, and
+#: pinned to the store's own spelling by a test so a rename cannot quietly end the notice.
+_HELD = "provider.json"
+_TRIED = "retries"
+_WAITED = "policy"
+_LONGEST = "timeout"
 
 
 def providers(argv: list[str]) -> int:
@@ -190,6 +204,51 @@ def _accounts() -> Accounts:
     return Hmz().accounts
 
 
+def _tries_moved(provider: Provider) -> str:
+    """What to say about tries written on one account before they moved, or "" for none.
+
+    Args:
+      provider: The account. Its file is read as it stands rather than as the store parses
+        it, since what is being looked for is exactly the key the store stopped reading.
+
+    Returns:
+      One line saying the setting is no longer read here and naming what says it now, with
+      everything that was written down -- the number, the wait between them and the cap on
+      how long they go on -- carried into that line so it can be typed as it stands. "" for
+      an account that never had one, which is every account made since.
+    """
+    from hmz.providers import LOCAL, alone
+
+    at = alone(provider.cli) if provider.name == LOCAL else provider.at / _HELD
+    try:
+        said = json.loads(at.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    if not isinstance(said, dict):
+        return ""
+    held = cast("dict[str, Any]", said)
+    tries = held.get(_TRIED)
+    if not isinstance(tries, int) or isinstance(tries, bool) or tries < 1:
+        return ""
+    # As `hmz fallback` names a place: the account after an `@`, and nothing at all for the
+    # one this machine is signed into. The model is the part an account never had, which is
+    # why nothing could carry these over by itself -- so it is left as the command's own
+    # spelling of that argument rather than as anything a shell would try to read.
+    place = f"{provider.cli}@{provider.name}" if provider.name else provider.cli
+    line = f"hmz fallback retry {place}/MODEL {tries}"
+    policy = held.get(_WAITED)
+    if isinstance(policy, str) and policy:
+        line += f" -p {policy}"
+    longest = held.get(_LONGEST)
+    if (
+        isinstance(longest, (int, float))
+        and not isinstance(longest, bool)
+        and longest > 0
+    ):
+        line += f" -t {longest:g}"
+    return f"the tries written down here are no longer read: `{line}` is where that is said now"
+
+
 def _also(cli: str) -> list[Provider]:
     """The account this machine is signed into, where it says anything about itself.
 
@@ -198,9 +257,10 @@ def _also(cli: str) -> list[Provider]:
 
     Returns:
       One per backend whose own sign-in has a chain written down, since that is a setting
-      in force and a list that did not show it would be a list that hid one. Nothing for the
-      ones left as they come, which is every backend on a machine nobody has said anything
-      about them on.
+      in force and a list that did not show it would be a list that hid one, and one per
+      backend still holding the tries that moved, since a listing is where somebody finds
+      out. Nothing for the ones left as they come, which is every backend on a machine
+      nobody has said anything about them on.
     """
     from hmz import backends
     from hmz.providers import LOCAL
@@ -212,7 +272,7 @@ def _also(cli: str) -> list[Provider]:
         for profile in backends.profiles()
         if (wanted is None or profile.name == wanted.name)
         and (one := accounts.find(profile.name, LOCAL)) is not None
-        and one.fallback
+        and (one.fallback or _tries_moved(one))
     ]
 
 
@@ -241,6 +301,10 @@ def _list(cli: str) -> int:
         if provider.fallback:
             said += f"  falls back to {provider.fallback}"
         print(said)
+        # Under the row rather than after it: it is about the account above rather than
+        # another account, and a row this ran onto the end of would be a row nobody reads.
+        if moved := _tries_moved(provider):
+            print(f"  {moved}")
     return 0
 
 
@@ -283,6 +347,10 @@ def _show(cli: str, name: str) -> int:
         # What else this account is: a vendor's credential is the vendor's, and an account
         # that several backends could be run as is worth saying so about where it is read.
         print(f"also runs   {backend}")
+    # Last, and not as a field: a setting nothing reads any more is not one of the things
+    # this account holds, and reading it as one is how it went unnoticed in the first place.
+    if moved := _tries_moved(provider):
+        print(moved)
     return 0
 
 

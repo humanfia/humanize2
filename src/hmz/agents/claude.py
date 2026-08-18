@@ -202,9 +202,15 @@ class ClaudeCodeSession(StreamSessionBase):
         #: each: Claude ends one by answering that call, and what comes back names no tool,
         #: so what it was is remembered here until it does.
         self._fleet: dict[str, str] = {}
-        #: Whether the process now up was started knowing about the flow's own callbacks, so
-        #: that a session which starts offering some is answered by starting one that does.
-        self._offering: bool | None = None
+        #: Which of the flow's own callbacks the process now up was told about, by the names
+        #: it was told them under, so that a session whose offer changes between two turns is
+        #: answered by starting one that was told what this turn is offering.
+        self._offering: tuple[str, ...] | None = None
+        #: What the command line just built said they were, read once while it was built and
+        #: kept for the process it starts. Read once rather than twice: an offer landing from
+        #: a sibling session between the two reads would be written down as a name the process
+        #: was told about when the process was told nothing at all, and never asked again.
+        self._telling: tuple[str, ...] = ()
 
     @property
     def named(self) -> str | None:
@@ -266,7 +272,10 @@ class ClaudeCodeSession(StreamSessionBase):
         allowed_tools = getattr(self._agent.config, "allowed_tools", ())
         if allowed_tools:
             argv += ["--allowedTools", ",".join(allowed_tools)]
-        if not self._agent.toolbox.empty():
+        # Read once and kept, so that what the process is recorded as having been told is
+        # what this line actually tells it.
+        self._telling = self._offered()
+        if self._telling:
             # The flow's own callbacks, as the one thing Claude takes a tool it was not
             # shipped with on: a server on the command line rather than a line written into
             # anybody's settings file. Added to whatever the person at this machine has
@@ -311,21 +320,36 @@ class ClaudeCodeSession(StreamSessionBase):
         # And whatever was under the turn the last process was taking: it went with it.
         self._fleet = {}
         self._at = self.effort
-        self._offering = not self._agent.toolbox.empty()
+        self._offering = self._telling
+
+    def _offered(self) -> tuple[str, ...]:
+        """What a Claude started now would be told the flow's own callbacks are.
+
+        Returns:
+          The name of every callback in front of the agent, sorted, so that a flow which
+          builds its list afresh before each turn is offering the same thing each time.
+          Names rather than everything a tool says: a name is what a tool is here -- two
+          conversations offering one name are offering one tool -- and building every
+          argument schema again before every turn to catch a reworded sentence would cost
+          each turn more than the sentence is worth.
+        """
+        return tuple(sorted(one.name for one in self._agent.toolbox.offered()))
 
     def _stale(self) -> bool:
-        """Whether the process up was started to think at something this turn is not.
+        """Whether the process up was started for something this turn is no longer.
 
         `--effort` is an argument of the process, so a flow that moves it mid-session is
         answered by ending this one and resuming the conversation in a process started at the
-        new one -- exactly as asking for a shape is. So is `--mcp-config`: a flow that offers
-        the agent a callback between two turns is answered the same way, since a Claude that
-        was started without one was never told the tool exists.
+        new one -- exactly as asking for a shape is. So is `--mcp-config`: Claude reads what
+        an MCP server has when it starts it and holds that list for the life of the process,
+        so a flow that changes which callbacks it offers between two turns is answered the
+        same way. What is compared is the list the process was actually told, not whether it
+        was told anything: a tool swapped for another is one the model has never heard of and
+        one it can still reach for and be told is not there.
         """
         if self._at is not None and self._at != self.effort:
             return True
-        offering = not self._agent.toolbox.empty()
-        return self._offering is not None and self._offering != offering
+        return self._offering is not None and self._offering != self._offered()
 
     def _spent(self, said: dict[str, Any]) -> tuple[dict[str, int], Usage]:
         """What the turn just ending cost, per model and by the kind it went on.

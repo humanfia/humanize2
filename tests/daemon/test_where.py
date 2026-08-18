@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -94,3 +95,99 @@ def test_every_daemon_is_kept_under_humanize_s_own_home(
 ) -> None:
     """So that a machine holding more than one has them all in one place to list."""
     assert where.under() == where.at(tmp_path).parent
+
+
+def _too_long_to_name_whole(tmp_path: pathlib.Path) -> pathlib.Path:
+    """A daemon directory whose socket cannot be reached by its whole path.
+
+    One long name rather than a deep tree, so that the address is over the limit whatever the
+    temporary directory it is made under happens to be called. Well under NAME_MAX, which is
+    255 bytes on every filesystem this runs on.
+    """
+    spot = tmp_path / ("d" * 128)
+    spot.mkdir()
+    assert len(str(spot / where.SOCKET).encode()) > where._LONGEST
+    return spot
+
+
+def test_a_socket_named_whole_is_reached_from_wherever_the_caller_stands(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The ordinary case: nothing moves, because the whole path is an address already.
+
+    Which branch is taken is pinned rather than trusted to the directory pytest was given:
+    under a long `--basetemp` this path is the long one, and the test would fail as though
+    `reached` were wrong instead of covering the branch it is here for. The number it is
+    pinned to is this path's own length, which also holds the inclusive edge of the test.
+    """
+    was = Path.cwd()
+    monkeypatch.setattr(where, "_LONGEST", len(str(tmp_path / where.SOCKET).encode()))
+
+    with where.reached(tmp_path) as reaching:
+        assert reaching == str(tmp_path / where.SOCKET)
+        assert Path.cwd() == was
+
+    assert Path.cwd() == was
+
+
+def test_a_socket_too_long_to_name_whole_is_reached_from_its_own_directory(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The name alone is short enough, and the process is put back once it has been used."""
+    spot = _too_long_to_name_whole(tmp_path)
+    standing = tmp_path / "standing"
+    standing.mkdir()
+    monkeypatch.chdir(standing)
+
+    with where.reached(spot) as reaching:
+        assert reaching == where.SOCKET
+        assert Path.cwd() == spot
+
+    assert Path.cwd() == standing
+
+
+def test_a_directory_that_goes_while_the_socket_is_reached_is_written_down(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A process left standing where it was never asked to run must not be left silent.
+
+    For a daemon that is a flow going on somewhere of its own choosing, which is the one thing
+    worse than the move itself.
+    """
+    spot = _too_long_to_name_whole(tmp_path)
+    standing = tmp_path / "standing"
+    standing.mkdir()
+    monkeypatch.chdir(standing)
+
+    with where.reached(spot):
+        standing.rmdir()
+
+    said = (spot / where.LOG).read_text(encoding="utf-8")
+    assert str(standing) in said
+    assert "FileNotFoundError" in said
+
+
+def test_an_interrupt_the_moment_the_move_is_made_still_puts_it_back(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The window is the breath between the move and the `try` that undoes it."""
+    spot = _too_long_to_name_whole(tmp_path)
+    standing = tmp_path / "standing"
+    standing.mkdir()
+    monkeypatch.chdir(standing)
+
+    moves = os.chdir
+    moved: list[object] = []
+
+    def interrupted(path: os.PathLike[str] | str) -> None:
+        moves(path)
+        moved.append(path)
+        if len(moved) == 1:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(os, "chdir", interrupted)
+
+    with pytest.raises(KeyboardInterrupt), where.reached(spot):
+        pass
+
+    assert Path.cwd() == standing

@@ -14,14 +14,16 @@ it is about neither on its own.
 
 from __future__ import annotations
 
+import json
 import os
+import subprocess
 import sys
 from typing import TYPE_CHECKING
 
 import pytest
 
 from hmz import backends, fallbacks
-from hmz.agents import AgentConfig, ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.agents import AgentConfig, ClaudeCodeAgent, ClaudeCodeAgentConfig, Tool
 from hmz.agents.skills import Loaded
 from tests.stubs import ShellAgent
 
@@ -371,3 +373,137 @@ def test_the_conversation_it_moved_to_ends_when_this_one_does(
     session.close()
 
     assert not (tmp_path / ".claude").exists()
+
+
+#: A `claude` that will not run at all at one model, and writes down how it was started at any
+#: other: which is a place with nowhere left to go, and the place the step names.
+_CLAUDE_GONE = """
+import json, pathlib, sys
+
+flags = dict(zip(sys.argv, sys.argv[1:]))
+if flags.get("--model") == "gone":
+    sys.exit(3)
+with pathlib.Path(LOG).open("a") as wrote:
+    wrote.write(json.dumps(sys.argv[1:]) + "\\n")
+print(json.dumps({"type": "system",
+                  "session_id": flags.get("--session-id") or flags["--resume"]}), flush=True)
+for line in sys.stdin:
+    said = json.loads(line)["message"]["content"][0]["text"]
+    print(json.dumps({"type": "result", "result": "claude took it: " + said}), flush=True)
+"""
+
+
+def _gone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Puts that `claude` on PATH, and answers with the log of every start it wrote."""
+    log = tmp_path / "starts.jsonl"
+    binaries = tmp_path / "bin"
+    binaries.mkdir(exist_ok=True)
+    fake = binaries / "claude"
+    fake.write_text(
+        f"#!{sys.executable}\n{_CLAUDE_GONE.replace('LOG', repr(str(log)))}"
+    )
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
+    return log
+
+
+def _delegating() -> Tool:
+    """One callback of a flow's own, of the kind a loop offers between two rounds."""
+    return Tool(name="delegate", about="hand a task on", call=lambda: "did it")
+
+
+@pytest.mark.timeout(60)
+def test_the_stand_in_is_offered_the_callbacks_the_conversation_was_offering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The flow's own callbacks go with the turn, the way the flow's skills do.
+
+    They are the conversation's rather than the agent's -- said between two turns, long after
+    the step was written down -- so a turn that moved without them would be the flow losing
+    what it offered by being moved, and nothing about it would look wrong.
+    """
+    log = _gone(tmp_path, monkeypatch)
+    fallbacks.points("claude/gone", "claude/claude-opus-5")
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="gone", effort="high"))
+    session = agent.new()
+    session.offers([_delegating()])
+
+    assert session("hello") == "claude took it: hello"
+
+    # One start written down: the model that is gone never got as far as writing one.
+    (argv,) = [json.loads(line) for line in log.read_text().splitlines()]
+    held = json.loads(argv[argv.index("--mcp-config") + 1])
+    assert list(held["mcpServers"]) == ["humanize"]
+
+
+@pytest.mark.timeout(60)
+def test_a_stand_in_that_cannot_be_given_the_callbacks_is_no_stand_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A callback quietly never offered is a flow that quietly does not do what it says.
+
+    Which is the rule about a setting the CLI taking over cannot be told, applied to the one
+    thing a conversation says after the step was read: the turn fails the way it failed before
+    anybody wrote a step down.
+    """
+    _gone(tmp_path, monkeypatch)
+    fallbacks.points("claude/gone", "grok/grok-5")
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="gone", effort="high"))
+    said: list[str] = []
+    agent.watch(lambda _agent, _session, event: said.append(event.text))
+    session = agent.new()
+    session.offers([_delegating()])
+
+    with pytest.raises(subprocess.CalledProcessError):
+        session("hello")
+
+    # The step is there and the agent for it was made; what stopped the turn going is that
+    # Grok Build has no way of being given a tool of a flow's own.
+    assert agent.stands_in() is not None
+    assert not [one for one in said if "grok" in one]
+
+
+@pytest.mark.timeout(60)
+def test_the_stand_in_is_offered_what_the_agent_holds_and_not_only_this_conversation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A CLI told about its tools once per agent has a sibling's offer in front of it too.
+
+    So the conversation that moves is not always the one that offered: the list to carry is
+    the agent's, or a turn that never said anything about tools loses the ones the model
+    could see.
+    """
+    log = _gone(tmp_path, monkeypatch)
+    fallbacks.points("claude/gone", "claude/claude-opus-5")
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="gone", effort="high"))
+    # Held, or the conversation offering is collected and takes its offer back with it.
+    sibling = agent.new()
+    sibling.offers([_delegating()])
+    session = agent.new()
+
+    assert sibling.tools
+    assert session.tools == ()  # this one offered nothing, and moves with them anyway
+    assert session("hello") == "claude took it: hello"
+
+    (argv,) = [json.loads(line) for line in log.read_text().splitlines()]
+    held = json.loads(argv[argv.index("--mcp-config") + 1])
+    assert list(held["mcpServers"]) == ["humanize"]
+
+
+@pytest.mark.timeout(60)
+def test_a_sibling_s_callbacks_stop_a_move_to_a_backend_that_takes_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The other half of the same thing: what refuses the move is what the model can see."""
+    _gone(tmp_path, monkeypatch)
+    fallbacks.points("claude/gone", "grok/grok-5")
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="gone", effort="high"))
+    sibling = agent.new()
+    sibling.offers([_delegating()])
+    session = agent.new()
+
+    assert sibling.tools
+    with pytest.raises(subprocess.CalledProcessError):
+        session("hello")
+
+    assert agent.stands_in() is not None

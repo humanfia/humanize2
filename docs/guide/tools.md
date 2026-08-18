@@ -103,9 +103,14 @@ working.offers(None)       # and now it is offering none
 
 A CLI is told about its tools where it is started, and some of these are started once per
 agent, so what is actually in front of the model is the **agent's** list: two conversations of
-one agent offering a tool of one name are offering one tool. Offering one between two turns of
-a Claude restarts its process and resumes the same conversation, because a process that was
-started without the tool has never heard of it.
+one agent offering a tool of one name are offering one tool. Changing that list between two
+turns — offering one, taking one back, or swapping one for another — restarts the Claude
+holding the conversation, and the Codex app server that agent holds, and resumes the same
+conversation: a process that was started without the tool has never heard of it, and one
+started with a tool that is gone can still reach for it. Because the list is the agent's, that
+is agent-wide — every live session of the agent starts a new process at its next turn, and a
+conversation closing takes its own offer back, so opening and dropping conversations in a loop
+restarts a sibling once per drop.
 
 ## Which backends take one
 

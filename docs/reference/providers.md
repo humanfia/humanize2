@@ -221,7 +221,7 @@ make, sign in or take away.
 | `ways` | How that backend can be signed into: each way, what it asks for, and what it runs. |
 | `add` | Makes one. `-w` chooses the way — the backend's first when nothing says otherwise, which is `login` for the CLIs that sign in and `key` for `dsh` — and `-s` answers one of its questions on the line rather than being asked. Then it runs the way's own command, unless `--no-login` says only to write it down. `--also` writes the same account down for the backends it names, comma separated, or for every one it could be run as with `all`. |
 | `login` | Signs an existing one in again, by the way it was made with. For a way that has nothing to run, `add` it again instead. |
-| `show` | What one holds: the way, when it was made, where it is kept, what it falls back to, the **names** of the variables it sets, which paths a turn under it is given instead of which, and an `also runs` line per [other backend](#one-account-several-clis) that could be run as it. |
+| `show` | What one holds: the way, when it was made, where it is kept, what it falls back to, the **names** of the variables it sets, which paths a turn under it is given instead of which, an `also runs` line per [other backend](#one-account-several-clis) that could be run as it, and — for an account written down before retrying moved — the line that says where that is said now. |
 | `falls-back` | Says which account of that CLI a turn carries on under when this one fails, or — with nothing after it — that this one is the end of the line. How many times over a failed turn is taken again first is [`hmz fallback retry`](/guide/fallback), that being a thing about the place rather than the account. |
 | `remove` | Takes it away, credentials and all. |
 
@@ -325,6 +325,13 @@ five places.
 `show` ends with an `also runs` line per backend this account could be run as, which is what it
 could be copied to rather than what it has been copied to: a backend already holding a copy
 reads the same as one holding none. The copies themselves are in `list`, under that same name.
+
+An account written down before [retrying](/guide/fallback) became a thing about the place gets
+one line after those, in `list` as well as in `show`: the tries it still holds are no longer
+read, and the line names the `hmz fallback retry` to type instead, carrying the number, the
+policy and the timeout that were written down. Only the model is missing, that being the part
+an account never had — which is why nothing could carry these over by itself. The same line is
+under the account's own menu on `/providers`.
 
 In the interface it is a question rather than a flag: making an account that several backends
 could be run as asks which of them to write it down for, with the ones installed here already

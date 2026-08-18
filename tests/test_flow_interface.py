@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import pytest
 
+import hmz.agents
 import hmz.flows
 from hmz.agents import HumanAgent
 from hmz.agents import Unrecoverable as AgentUnrecoverable
@@ -29,6 +30,13 @@ if TYPE_CHECKING:
 #: the vocabulary a turn is described in, the facts about the CLIs, where humanize keeps what
 #: outlives a run -- is handed through from there.
 ONLY = "hmz.flows"
+
+#: What a flow names for the two things that reach back out of a turn: the callbacks it puts
+#: in front of an agent as tools, and the board it and the person both write on. Each is
+#: written in `hmz.agents`. `Tool` is in an import line in the guide that introduces it;
+#: `Board`, `Item` and `Refused` are the types and the exception a flow meets through
+#: `person.board`, which it has to be able to annotate and catch by name.
+REACHING = ("Board", "Item", "Refused", "Tool")
 
 
 def _flows() -> Iterator[Path]:
@@ -70,6 +78,30 @@ def test_a_name_it_does_not_offer_is_an_attribute_error() -> None:
 def test_an_unrecoverable_turn_is_the_same_exception_a_flow_can_catch() -> None:
     """The flow-facing vocabulary is handed through, not redefined at the boundary."""
     assert FlowUnrecoverable is AgentUnrecoverable
+
+
+@pytest.mark.parametrize("name", REACHING)
+def test_what_reaches_back_out_of_a_turn_is_offered_by_name(name: str) -> None:
+    """A flow names each of these, and offered means both things.
+
+    In `__all__`, since that is where a type checker reads what this module lets through --
+    a name only `__getattr__` knows about is a name a flow imports and then cannot call --
+    and the same object, since the tool the flow builds is the tool a backend is handed.
+    """
+    assert name in hmz.flows.__all__
+    assert getattr(hmz.flows, name) is getattr(hmz.agents, name)
+
+
+def test_everything_handed_through_is_offered() -> None:
+    """A name `__getattr__` knows and `__all__` does not is `object` to a type checker.
+
+    Which is the direction nothing else watches: pyright reads a name in `__all__` that is
+    nowhere in the module and says so, and says nothing at all about one handed through and
+    never listed. So the list above is these four names being right today, and this is the
+    rule they are right by.
+    """
+    handed = set(hmz.flows._ELSEWHERE) | set(hmz.flows._MODULES)
+    assert handed <= set(hmz.flows.__all__)
 
 
 def _members(protocol: type) -> set[str]:

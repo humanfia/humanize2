@@ -1150,10 +1150,10 @@ class CodexAgent(AgentBase):
         #: Which account the server up now was started as, so that an agent which has fallen
         #: back starts another rather than going on talking to one signed in as somebody else.
         self._server_as = ""
-        #: Whether the server now up was started knowing about the flow's own callbacks: an
-        #: app server is told about its tool servers where it is started, so one that was
-        #: started without them has never heard of them.
-        self._server_tools = False
+        #: Which of the flow's own callbacks the server now up was told about, by the names
+        #: it was told them under: an app server is told about its tool servers where it is
+        #: started, so one whose list has moved since has never heard of what is offered now.
+        self._server_tools: tuple[str, ...] = ()
         self._serving = threading.Lock()
 
     def disable_goals(self) -> None:
@@ -1185,14 +1185,17 @@ class CodexAgent(AgentBase):
         with (
             self._serving
         ):  # two sessions of one agent share the server rather than start two
-            offering = not self.toolbox.empty()
+            # By name, and read once for both the deciding and the starting: what a running
+            # server can be wrong about is which callbacks it enumerated, and a flow that
+            # builds an equal list of them afresh each turn has changed nothing.
+            offering = tuple(sorted(one.name for one in self.toolbox.offered()))
             if self._server is not None and (
                 self._server_as != self.node().name or self._server_tools != offering
             ):
-                # Started as an account this agent has since left, or before the flow put a
-                # callback of its own in front of it. Let go of rather than taken down: a
-                # turn on another thread may still be talking to it, and it is stopped by its
-                # own finalizer when the agent is collected either way.
+                # Started as an account this agent has since left, or knowing a list of the
+                # flow's callbacks that is not the list it is offering now. Let go of rather
+                # than taken down: a turn on another thread may still be talking to it, and it
+                # is stopped by its own finalizer when the agent is collected either way.
                 self._server, self._server_as = None, ""
             if self._server is None:
                 argv = ["codex", "app-server"]

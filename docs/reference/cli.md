@@ -564,7 +564,7 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.sock` | `hmz` with no command | The socket a terminal reaches a [held run](/reference/daemon) through. `0600`. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.json` | the same | Which process is holding it, which workspace, and since when. |
-| `~/.humanize/daemons/<project>-<digest>/daemon.log` | the same | Whatever the daemon itself could not say through a terminal. |
+| `~/.humanize/daemons/<project>-<digest>/daemon.log` | the same | Whatever could not be said through a terminal about that run — what the daemon itself could not say, and what went wrong in a process reaching for its socket. |
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
 | `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** in `/flowverses` | A [flowverse](/guide/flowverses), cloned. Every flow in it is offered as `<name>/<flow>`. |
 | `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |

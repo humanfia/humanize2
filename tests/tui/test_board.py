@@ -235,6 +235,43 @@ def test_the_board_is_named_lines_that_either_side_may_be_kept_off() -> None:
     assert held.about == "what there is to do"
 
 
+def test_a_renamed_line_comes_back_under_its_new_name() -> None:
+    """A rename is one write, so what it wrote is what the caller is handed."""
+    board = Board()
+    board.put("todo", "fix the build", about="what there is to do", whose="user")
+
+    moved = board.moves("todo", to="doing", by="user")
+
+    assert moved.key == "doing"
+    assert moved.value == "fix the build"
+    assert moved.about == "what there is to do"  # everything else it said survives
+    assert moved.whose == "user"
+    assert moved.by == "user"
+    assert [one.key for one in board.items()] == ["doing"]
+
+
+def test_a_renamed_line_comes_back_where_something_watching_took_it_away() -> None:
+    """The rename happened; what a watcher did on being told is the next thing, not this one.
+
+    Which is the whole board in one call: the line is made under the lock, and what anybody
+    else does to the board afterwards cannot turn the answer into a different line or into
+    no line at all.
+    """
+
+    def away(one: Board) -> None:
+        one.drop("doing")
+
+    board = Board()
+    board.put("todo", "fix the build")
+    board.watch(away)
+
+    moved = board.moves("todo", to="doing")
+
+    assert moved.key == "doing"
+    assert moved.value == "fix the build"
+    assert board.held("doing") is None  # the watcher got what it asked for
+
+
 def test_whatever_is_watching_the_board_is_told_when_a_line_moves() -> None:
     """Which is how the sheet redraws without asking the board on a clock."""
     board = Board()

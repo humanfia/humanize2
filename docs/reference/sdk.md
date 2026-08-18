@@ -57,7 +57,7 @@ holding.
 | `running` | Whether the flow is still going. `False` before it is started. |
 | `raised` | Whatever the flow raised, for a run started on a thread and now over. |
 | `run()` | Runs the flow here, until it returns. |
-| `start()` | Runs it on a thread of its own, and returns at once. One run **in a container** at a time per process: the container a run works in is the process's, since a flow that called another is one run working in one place. Runs on this machine have no such limit. |
+| `start()` | Runs it on a thread of its own, and returns at once. One run **in a container** at a time per process: the container a run works in is the process's, since a flow that called another is one run working in one place. Runs on this machine have no such limit. The second of two is refused where the container is settled — on the thread, so it arrives in `raised` rather than out of this call; `run()` raises it where it stands. |
 | `wait(timeout=None)` | Waits for it to end. Returns whether it has. |
 | `stop()` | Tells every agent to take no further turn, so the turn running now is closed out and the loop ends rather than handing on. |
 | `close()` | Closes every conversation still open, which is the backend's process going. The last thing there is to do about a run. |

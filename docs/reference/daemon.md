@@ -85,7 +85,7 @@ hmz: error: a run is already being held here, and it is set up as it was set up;
 | --- | --- |
 | `~/.humanize/daemons/<project>-<digest>/daemon.sock` | The socket a terminal reaches the run through. `0600`. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.json` | The process holding it, the workspace, and when it started. |
-| `~/.humanize/daemons/<project>-<digest>/daemon.log` | Whatever the daemon itself could not say through a terminal. |
+| `~/.humanize/daemons/<project>-<digest>/daemon.log` | Whatever could not be said through a terminal about this run: what the daemon itself could not say, and what went wrong in a process reaching for its socket. |
 
 The directory is named for the project and then for the whole path it is at, since two checkouts
 of one repository are two workspaces. A note whose process has gone reads as nothing being held:

@@ -163,7 +163,8 @@ class Board:
           by: Which side is writing, as :data:`USER` or :data:`FLOW`.
 
         Returns:
-          The line as it now stands.
+          The line as this call wrote it under the lock, which is the same thing :meth:`moves`
+          answers with and read the same way: something watching is told before this returns.
 
         Raises:
           Refused: If the line is the other side's own.
@@ -223,7 +224,9 @@ class Board:
           by: Which side is renaming it.
 
         Returns:
-          The line under its new name.
+          The line under its new name, as this call made it under the lock rather than as
+          the board stands by the time the answer is back: something watching is told before
+          this returns, and may already have moved the line again or taken it away.
 
         Raises:
           Refused: If the line is the other side's own.
@@ -241,17 +244,13 @@ class Board:
                 raise Refused(f"{key} is {was.whose}'s to change, not {by}'s")
             if named != key and named in self._held:
                 raise ValueError(f"the board already has a line called {named}")
-            held = {
-                (named if one == key else one): (
-                    replace(was, key=named, by=by, at=time.monotonic())
-                    if one == key
-                    else line
-                )
+            now = replace(was, key=named, by=by, at=time.monotonic())
+            self._held = {
+                (named if one == key else one): (now if one == key else line)
                 for one, line in self._held.items()
             }
-            self._held = held
         self._moved()
-        return self._held[named]
+        return now
 
     def watch(self, listener: Callable[[Board], None]) -> None:
         """Has this board tell something whenever a line of it moves.

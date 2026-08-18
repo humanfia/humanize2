@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import re
+import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -43,7 +44,8 @@ SOCKET = "daemon.sock"
 RECORD = "daemon.json"
 
 #: Where whatever the daemon itself could not say through a terminal goes -- a crash before
-#: the interface was up, or after the last terminal let go.
+#: the interface was up, after the last terminal let go, or a directory that went away under
+#: whoever was reaching for the socket.
 LOG = "daemon.log"
 
 #: What the one daemon of a workspace holds for as long as it is running. A lock rather than
@@ -110,18 +112,50 @@ def reached(where: Path) -> Generator[str]:
       the socket is being reached. It is done where a process has one thread -- opening the
       interface, and answering a line about a run -- and never while a flow is running, which
       is a flow that may be standing somewhere of its own.
+
+      Where the directory it set out from has gone by the time it is over, that is written
+      down beside the socket rather than raised. This is a `finally`: raising here would put
+      a directory that went away in place of whatever the socket itself had to say, and every
+      caller reads an `OSError` from this as the socket being unreachable -- which would turn
+      a daemon that bound perfectly well into one that never came up. What must not happen is
+      the quiet version, a run left standing somewhere it was never asked to run and no line
+      anywhere saying so.
     """
     whole = where / SOCKET
     if len(str(whole).encode()) <= _LONGEST:
         yield str(whole)
         return
     was = Path.cwd()
-    os.chdir(where)
     try:
+        # The move is under the same `try` as what undoes it, so that a signal arriving in
+        # the breath between the two cannot be the thing that leaves the process here. The
+        # cost is putting a process back where it already is when the move itself failed,
+        # which is one syscall and never wrong.
+        os.chdir(where)
         yield SOCKET
     finally:
-        with contextlib.suppress(OSError):
+        try:
             os.chdir(was)
+        except OSError:
+            _logged(where, f"a run reaching for its socket could not go back to {was}")
+
+
+def _logged(where: Path, about: str) -> None:
+    """Writes down beside the socket what there was no terminal to say.
+
+    The daemon's own log, written here rather than through :func:`hmz.daemon.serve.logged`:
+    every other module of this package reaches for this one, so this one reaches for none of
+    them.
+
+    Args:
+      where: The daemon's own directory.
+      about: What was being done, since whatever is being handled is what raised.
+    """
+    with (
+        contextlib.suppress(OSError),
+        (where / LOG).open("a", encoding="utf-8") as writing,
+    ):
+        writing.write(f"{about}\n{traceback.format_exc()}\n")
 
 
 def holds(where: Path) -> int:

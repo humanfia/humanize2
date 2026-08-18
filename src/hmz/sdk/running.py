@@ -66,7 +66,10 @@ class Run:
         One run in a container at a time, per process: the container a run works in is the
         process's, since a flow that called another is one run working in one place -- so two
         of these started at once with an image between them would be two runs reaching for
-        one container. Runs on this machine have no such thing between them.
+        one container. Runs on this machine have no such thing between them. The second of
+        two is refused where the container is settled, which is on the thread this starts --
+        so what says so is :attr:`raised` rather than this call, and a caller holding two
+        runs in containers has to read it. :meth:`run` raises it where it stands.
 
         Raises:
           RuntimeError: If it has already been started.

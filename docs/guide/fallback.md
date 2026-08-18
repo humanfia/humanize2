@@ -90,7 +90,8 @@ In order, and it stops at the first thing that works:
    stays moved: the account that went down is not one to try again each turn.
 4. **Walks the chain of places**, once there is no account left. The turn is taken in a new
    session of an agent at the next place, configured exactly as the agent it left — carrying
-   its effort, its permission rung and the skills the flow gave it.
+   its effort, its permission rung, the skills the flow gave it and the
+   [callbacks](/guide/tools) the agent is offering.
 
 The flow sees one turn either way. The events come back through the session it asked, between
 the same `begins` and `ends`, and the transcript says where it was picked up.
@@ -112,7 +113,10 @@ for a failure that never came.
 - **Fork.** One place has one place to go. Writing a step again says the new thing and not both.
 - **Move a setting the CLI taking over cannot be told.** An agent told not to search the web
   does not fall back to a CLI with no way of being told: a setting quietly ignored would be a
-  setting that lies, so the turn fails as it failed before anybody wrote a step down.
+  setting that lies, so the turn fails as it failed before anybody wrote a step down. The
+  same goes for what is in front of the model rather than configured on it — a turn taken
+  with the flow's own [callbacks](/guide/tools) offered does not move to a backend that has
+  no way of being given one.
 - **Rescue a turn that failed for a reason another try cannot fix.** A prompt longer than the
   context window is that long at the next place too. Those are `Unrecoverable`, and are
   [taken once](/reference/agents#when-an-account-goes-down) whatever any chain says.

@@ -1117,3 +1117,102 @@ async def test_an_account_that_travels_nowhere_is_not_asked_about() -> None:
 
     assert providers.find("dsh", "only") is not None
     assert providers.find("pi", "only") is None
+
+
+@pytest.mark.timeout(60)
+async def test_an_account_still_holding_tries_says_where_they_moved() -> None:
+    """A setting that stopped being read without a word is one somebody goes on believing in.
+
+    How often a failed turn is taken again moved off the account and onto the place, and
+    nothing carried what was written down over: an account is a CLI and a name, a place is a
+    CLI, a name and a model, and the model is the part that would have to be invented. So
+    what is left in the file is said where somebody is looking at the account.
+    """
+    made = _account("work")
+    at = made.at / "provider.json"
+    held = json.loads(at.read_text(encoding="utf-8"))
+    at.write_text(json.dumps({**held, "retries": 3, "policy": "exponential-jitter"}))
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        await onto(app, driver, "claude/work")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Account), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        said = _under(app)
+        assert "no longer read" in said
+        assert "/fallback" in said
+
+
+@pytest.mark.timeout(60)
+async def test_an_account_that_never_had_tries_says_nothing_about_them() -> None:
+    """Which is every account made since they moved, and a line about one of those is noise."""
+    _account("work")
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        await onto(app, driver, "claude/work")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Account), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        assert _under(app) == ""
+
+
+@pytest.mark.timeout(60)
+async def test_the_machines_own_account_is_listed_for_the_tries_it_still_holds() -> (
+    None
+):
+    """Under a CLI with no accounts of its own it would otherwise have no row at all.
+
+    Which would put the notice somewhere nobody can walk to: the sheet is what says an
+    account is holding a setting nothing reads, and a sheet with no row for it says nothing.
+    """
+    at = providers.alone("claude")
+    at.parent.mkdir(parents=True, exist_ok=True)
+    at.write_text(json.dumps({"retries": 2, "policy": "exponential-jitter"}))
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/providers")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Providers), driver)
+        listing = app.screen.query_one("#choices", OptionList)
+        await until(lambda: bool(listing.options), driver)
+        await onto(app, driver, "claude/")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Account), driver)
+        await until(
+            lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
+        )
+
+        said = _under(app)
+        assert "no longer read" in said
+        assert "/fallback" in said
+
+
+def test_the_file_the_notice_reads_is_the_file_the_store_writes() -> None:
+    """Both spell it, and the one that would go quiet on a rename is the notice.
+
+    It cannot be asked of the store: what is read is exactly the key the store stopped
+    reading, so the store is the wrong thing to ask for the file it is kept in.
+    """
+    from hmz.providers import store
+    from hmz.tui import pick
+
+    assert pick._HELD == store._HELD

@@ -4251,7 +4251,10 @@ class Reports(Popup):
     next time rather than taken as a no.
     """
 
-    CSS = _POPUP
+    #: The same box, said again under this name, for the reason the one about a run being
+    #: left behind is: every rule in this file selects by the name of the sheet it is about,
+    #: so a box drawn for another one is a rule of its own.
+    CSS = f"Reports {{ align: center middle; background: transparent; }}\n{_POPUP}"
 
     asked = "Report what goes wrong to humanize?"
 
@@ -5764,6 +5767,49 @@ class Saved(Drafts[list[str]]):
 #: menu of four is a menu; four keys nobody can see are four keys nobody presses.
 _CORRECTS, _SIGNS_IN, _FALLS_BACK = "corrects", "signs-in", "falls"
 
+#: What one account is written down in, spelled here because what is read below is the key the
+#: store stopped reading -- so it cannot be asked through the store. Pinned to the store's own
+#: spelling by a test, a rename reaching only one of them being a notice that quietly stopped.
+_HELD = "provider.json"
+
+
+def _tries_moved(cli: str, name: str) -> str:
+    """What to say about tries written on one account before they moved, or "" for none.
+
+    How many times over a failed turn is taken again was once a thing about an account and is
+    now a thing about a place -- the CLI, the account and the model -- so the accounts store
+    stopped reading it. An account written down before that move still holds it, and tries
+    that quietly stopped happening are worse than tries nobody ever set: they are a setting
+    somebody goes on believing in. So the file is read again as it stands, exactly for the
+    key nothing reads, and what is found is said where somebody is looking at the account.
+
+    Args:
+      cli: The backend the account belongs to.
+      name: What it is called, or "" for the account this machine is already signed into.
+
+    Returns:
+      The line to say under the list, or "" for an account holding no such thing -- which is
+      every account made since it moved.
+    """
+    import json
+
+    from hmz.providers import LOCAL, alone, where
+
+    try:
+        at = alone(cli) if name == LOCAL else where(cli, name) / _HELD
+        said = json.loads(at.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    if not isinstance(said, dict):
+        return ""
+    tries = cast("dict[str, Any]", said).get("retries")
+    if not isinstance(tries, int) or isinstance(tries, bool) or tries < 1:
+        return ""
+    return (
+        "the tries written down on this account are no longer read: how often a failed turn "
+        "is taken again is said of a place now, on /fallback"
+    )
+
 
 class Account(Picks):
     """What to do with one account: correct it, sign it in again, say where it falls back to.
@@ -5788,6 +5834,9 @@ class Account(Picks):
         super().__init__()
         self._cli = cli
         self._name = name
+        #: What this account still says about tries, read once here: the line under the list
+        #: is drawn again on every keystroke, and the file cannot change while this is up.
+        self._stale_tries = _tries_moved(cli, name)
         self.asked = f"{cli}/{name}" if name else f"{cli}, as this machine is signed in"
         self.about = (
             "What to do with this account. Correcting it and saying where it falls back to "
@@ -5820,13 +5869,22 @@ class Account(Picks):
         ]
 
     def nothing(self) -> str:
-        """Why two of them are not here, for the account humanize did not make."""
-        if self._name:
-            return ""
-        return (
-            f"this is {escape(self._cli)} as this machine is already signed in: humanize "
-            "keeps no credentials for it, so there is nothing to correct or sign in"
-        )
+        """Why two of them are not here, and what this account holds that nothing reads.
+
+        Returns:
+          One line apiece, or "" for the account with neither to say -- which is any account
+          humanize made and nobody ever wrote tries on.
+        """
+        said: list[str] = []
+        if not self._name:
+            said.append(
+                f"this is {escape(self._cli)} as this machine is already signed in: "
+                "humanize keeps no credentials for it, so there is nothing to correct or "
+                "sign in"
+            )
+        if self._stale_tries:
+            said.append(self._stale_tries)
+        return "\n".join(said)
 
 
 class Providers(Drafts[list[str]]):
@@ -5906,7 +5964,8 @@ class Providers(Drafts[list[str]]):
         where that agent's chain begins, so it is a row to press f and t on like any other.
         Under a CLI with no accounts there is nothing for it to fall back to, so it is a row
         there only where something has already been said about it -- a chain that outlived
-        the accounts it named -- which must not be a setting in force that nothing shows.
+        the accounts it named, or tries written down before they moved -- which must not be
+        a setting somebody believes in that nothing shows.
 
         Last in each CLI's group rather than first: what somebody came here to read is the
         accounts they made, and this is the one that was always there.
@@ -5921,7 +5980,14 @@ class Providers(Drafts[list[str]]):
             one
             for profile in hmz.backends()
             if (one := accounts.find(profile.name, LOCAL)) is not None
-            and (profile.name in whose or one.fallback)
+            and (
+                profile.name in whose
+                or one.fallback
+                # Or it is holding tries nothing reads any more, which is the other setting
+                # in force that nothing would otherwise show: the row is where the line
+                # saying where that is said now is read.
+                or _tries_moved(profile.name, LOCAL)
+            )
         ]
         self._found = sorted(
             [*held, *mine], key=lambda one: (one.cli, not one.name, one.name)
