@@ -110,6 +110,9 @@ def inside(named_: str) -> str: ...
 def about(named_: str) -> str: ...
 
 
+def reading(named_: str) -> str: ...
+
+
 def foretold(named_: str) -> str: ...
 
 
@@ -138,6 +141,10 @@ def __getattr__(name: str) -> object: ...
 - What a flow says about itself MUST be the first line of its docstring where the decorator was
   not told one, and for a file that is one flow MUST fall back to the file's own docstring: a
   file that is one flow is documented as that flow.
+- What a reading of a flow is pointed at MUST be worked out in one place, and MUST NOT be
+  what runs it: both readings take the whole of a flow -- the directory where there is one,
+  so that what the entry point imports beside it is read too, and the file where there is
+  not -- while what runs it is the entry point. Two rules for that is two rules to drift.
 - A name MUST resolve to the `__init__.py` of the directory called that, else to the `.py`
   file called that. A path given outright MAY be either, and MUST be taken in both shapes:
   a path with the extension left off is how a single-file flow is written down everywhere a
@@ -620,6 +627,7 @@ class Edge(NamedTuple):
     out_of: str
     into: str
     when: When | None = None
+    answers: str = ""
 
 
 class Prophecy(NamedTuple):
@@ -672,6 +680,14 @@ def kept(prophecy: Prophecy) -> bytes: ...
 
 
 def told(said: bytes) -> Prophecy | None: ...
+
+
+class Shipped(NamedTuple):
+    at: Path
+    prophecy: Prophecy | None
+
+
+def shipped(under: str | os.PathLike[str]) -> Shipped | None: ...
 ```
 
 What an atlas is written in, and the prophecy it compiles to. A flow is a Python file that may
@@ -720,6 +736,13 @@ atlas is the other bargain, and this is the vocabulary of both halves.
   those bytes runs what they say, which is the trust a flowverse already has; what MUST be
   added is the check that what came back is a prophecy at all, so that a file which is merely
   corrupt is refused rather than walked.
+- Where a shipped prophecy is, whether it is there, and what it takes to read it back MUST be
+  one rule rather than one per reader. What to do about a file that will not read back MUST
+  be each reader's own -- a run refuses it and a checking says so -- but a flow that is one
+  file having nowhere to ship anything MUST be answered the same way wherever it is asked.
+- What each of the atlases in one prophecy is called MUST be worked out in one place, since
+  a directory ships one prophecy and a file may hold several atlases: which of them a shipped
+  one is for is read by comparing that name.
 
 ## `prophesying.py`
 
@@ -727,6 +750,12 @@ atlas is the other bargain, and this is the vocabulary of both halves.
 class Prophesied(NamedTuple):
     findings: tuple[Finding, ...]
     prophecy: Prophecy | None
+
+
+def is_atlas(flow: str | os.PathLike[str]) -> bool: ...
+
+
+def named_as(under: Path, inside_: str = "") -> str: ...
 
 
 def prophesied(
@@ -741,6 +770,9 @@ def prophesied(
 Compiling an atlas: the reading that holds a body to the narrower Python it is written in, and
 turns what it declared into the prophecy a run walks.
 
+- Which reading a flow gets MUST be decidable without paying for either, which is
+  `is_atlas`: the mark that says a flow is an atlas is on a function in its entry point, and
+  whoever is choosing has a choice to make before reading everything the flow holds.
 - It MUST NOT import or execute anything of the atlas it reads, for the reason `checking.py`
   MUST NOT: the atlas most worth compiling is one nobody has read yet, and a compiler that ran
   what it was compiling would be the attack it exists to catch.

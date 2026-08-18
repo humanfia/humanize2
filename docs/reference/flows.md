@@ -1269,12 +1269,13 @@ if held.prophecy is not None:
 ```
 
 `prophesied` answers with `(findings, prophecy)`, the prophecy being None where anything was
-an error. A `Prophecy` holds its `name`, what it `takes` and `gives`, the `agents` it drives,
-its `nodes`, its `edges`, the `shapes` that flow along them, and one `Prophecy` per supernode
-under it. A `Node` carries `at` (its id — the callee, and `:2`, `:3` for the second and third
-call to it), `kind`, `calls`, `takes`, `binds`, `gives`, `rerun` and `under`. An `Edge`
-carries `out_of`, `into` and a `When` or None; `""` is the way in at one end and the way out
-at the other.
+an error. A `Prophecy` holds its `name`, what it `takes`, `gives` and can be set up with as a
+`config`, the `agents` it drives, its `nodes`, its `edges`, the `shapes` that flow along them,
+and one `Prophecy` per supernode under it. A `Node` carries `at` (its id — the callee, and
+`:2`, `:3` for the second and third call to it), `kind`, `calls`, `takes`, `binds`, `gives`,
+`rerun` and `under`. An `Edge` carries `out_of`, `into`, a `When` or None, and — for a way out
+of the prophecy — the name the run `answers` with; `""` is the way in at one end and the way
+out at the other.
 
 `canonical` is one line of JSON with everything ordered by what it is rather than where it was
 written, so two readings of one atlas are the same bytes; `digest` is what a run picked up
