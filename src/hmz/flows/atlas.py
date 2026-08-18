@@ -493,6 +493,7 @@ class Prophecy(NamedTuple):
     name: str
     takes: str
     gives: str
+    config: str
     agents: tuple[str, ...]
     nodes: tuple[Node, ...]
     edges: tuple[Edge, ...]
@@ -570,6 +571,7 @@ def _written(prophecy: Prophecy) -> dict[str, object]:
         "name": prophecy.name,
         "takes": prophecy.takes,
         "gives": prophecy.gives,
+        "config": prophecy.config,
         "agents": list(prophecy.agents),
         "nodes": [
             {

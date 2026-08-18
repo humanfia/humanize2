@@ -451,3 +451,63 @@ def test_a_prophecy_that_cannot_be_read_back_is_not_walked(tmp_path: Path) -> No
     (at / PROPHECY).write_bytes(b"nothing here is a prophecy")
 
     assert "stale-prophecy" in {one.code for one in checked(at)}
+
+
+def test_a_supernode_that_says_it_can_be_set_up_is_refused(tmp_path: Path) -> None:
+    """What is set up is the run, so such an atlas is one to start and not one to reach."""
+    body = '''class Config(BaseModel):
+    """What it takes."""
+
+    model_config = {"extra": "forbid"}
+
+    rounds: int = Field(default=2, description="how many rounds it takes")
+
+
+@atlas(name="inner")
+def inner(agents: Agents, said: Draft, config: Config | None = None) -> Verdict:
+    """A graph that says it can be set up."""
+    verdict = judge(said)
+    return verdict
+
+
+@atlas
+def run(agents: Agents, task: str) -> None:
+    """Says it."""
+    draft = write(agents.writer, task)
+    verdict = inner(agents, draft)
+'''
+    assert "unstatic-body" in _codes(tmp_path, body)
+
+
+def test_what_an_atlas_can_be_set_up_with_is_part_of_the_prophecy(
+    tmp_path: Path,
+) -> None:
+    """A node may read the config, so what it is is what the graph is checked against."""
+    body = '''class Config(BaseModel):
+    """What it takes."""
+
+    model_config = {"extra": "forbid"}
+
+    rounds: int = Field(default=2, description="how many rounds it takes")
+
+
+@logic
+def bounded(said: Draft, rounds: int) -> Verdict:
+    """Reads the draft against the bound the run was set up with."""
+    return Verdict(done=bool(said.text) and rounds > 0)
+
+
+@atlas
+def run(agents: Agents, task: str, config: Config | None = None) -> None:
+    """Says it."""
+    draft = write(agents.writer, task)
+    verdict = bounded(draft, config.rounds)
+'''
+    prophecy = _held(tmp_path, body).prophecy
+    assert prophecy is not None
+
+    assert prophecy.config == "Config"
+    node = prophecy.node("bounded")
+    assert node is not None
+    assert node.takes[1].reads == "@config"
+    assert node.takes[1].field == "rounds"

@@ -401,6 +401,7 @@ def _compiled(
             name=named,
             takes=takes,
             gives=wiring.gives,
+            config=config,
             agents=agents,
             nodes=tuple(wiring.nodes),
             edges=tuple(wiring.edges),
@@ -983,6 +984,18 @@ class _Wiring:
             if under is None:
                 return None
             self.prophecies.append(under)
+        if under.config:
+            self.found.append(
+                _said(
+                    "unstatic-body",
+                    self.where,
+                    call.lineno,
+                    f"{named} says it can be set up, and a supernode is a node: what is "
+                    "set up is the run, so an atlas that takes a config is one to start "
+                    "rather than one to reach for",
+                )
+            )
+            return None
         short = set(under.agents) - set(self.agents)
         if short:
             self.found.append(

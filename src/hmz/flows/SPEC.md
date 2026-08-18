@@ -626,6 +626,7 @@ class Prophecy(NamedTuple):
     name: str
     takes: str
     gives: str
+    config: str
     agents: tuple[str, ...]
     nodes: tuple[Node, ...]
     edges: tuple[Edge, ...]
@@ -770,6 +771,9 @@ turns what it declared into the prophecy a run walks.
   which is its head -- what the test reads, answered again each round -- and the body MUST
   bind at least one name that head reads, else nothing in the loop can change what it says and
   the loop never ends.
+- A supernode MUST be an atlas that takes no config. What is set up is the run, so an atlas
+  that says it can be set up is one to start rather than one to reach for -- and one reached
+  as a node would otherwise read a config nothing ever handed it.
 - A supernode MUST be compiled into the prophecy reaching for it, and one that reaches back
   into an atlas already being compiled MUST be refused. Which atlas a name means MUST be
   settled by where it is declared and what it is called there rather than by how it was
