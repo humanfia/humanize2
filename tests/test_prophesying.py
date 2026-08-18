@@ -511,3 +511,45 @@ def run(agents: Agents, task: str, config: Config | None = None) -> None:
     assert node is not None
     assert node.takes[1].reads == "@config"
     assert node.takes[1].field == "rounds"
+
+
+def test_a_way_out_carries_what_the_atlas_answers_with(tmp_path: Path) -> None:
+    """Which is what the `return` named, and not whatever the last node happened to say."""
+    body = '''@atlas(name="inner")
+def inner(agents: Agents, said: Draft) -> Draft:
+    """Answers with something it bound two nodes ago."""
+    draft = write(agents.writer, said.text)
+    verdict = judge(draft)
+    return draft
+
+
+@atlas
+def run(agents: Agents, task: str) -> None:
+    """Says it."""
+    draft = write(agents.writer, task)
+    again = inner(agents, draft)
+'''
+    prophecy = _held(tmp_path, body).prophecy
+    assert prophecy is not None
+    under = prophecy.under("inner")
+    assert under is not None
+
+    out = next(one for one in under.edges if not one.into)
+    assert out.answers == "draft"
+
+
+def test_an_atlas_that_answers_says_so_on_every_way_out(tmp_path: Path) -> None:
+    """A path running off the bottom of the body answers with nothing, which is not it."""
+    body = '''@atlas(name="inner")
+def inner(agents: Agents, said: Draft) -> Draft:
+    """Says it answers with a draft and runs off the bottom instead."""
+    draft = write(agents.writer, said.text)
+
+
+@atlas
+def run(agents: Agents, task: str) -> None:
+    """Says it."""
+    draft = write(agents.writer, task)
+    again = inner(agents, draft)
+'''
+    assert "shape-mismatch" in _codes(tmp_path, body)

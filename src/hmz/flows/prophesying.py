@@ -577,6 +577,20 @@ class _Wiring:
           body: The entry point's statements.
         """
         for out_of, when in self._block(body, [("", None)]):
+            # A path that runs off the bottom of the body ends the run, and answers with
+            # nothing: an atlas that says it answers with something says so on every way
+            # out of it, which is what a `return` there is.
+            if self.gives:
+                self.found.append(
+                    _said(
+                        "shape-mismatch",
+                        self.where,
+                        body[-1].lineno if body else 0,
+                        f"the atlas answers with {self.gives}, and this way out of it ends "
+                        "without returning anything",
+                    )
+                )
+                break
             self.edges.append(Edge(out_of, "", when))
         if not self.nodes:
             self.found.append(
@@ -630,12 +644,17 @@ class _Wiring:
           loose: The ends arriving at it.
         """
         given = NOTHING
+        answers = ""
         if node.value is not None:
-            read = self._reads(node.value)
-            if read is None:
-                self._refuse(node, "an atlas returns a name a node bound, or nothing")
+            if not isinstance(node.value, ast.Name):
+                self._refuse(
+                    node,
+                    "an atlas returns a name a node bound, whole -- a field of one is a "
+                    "thing a logic node reads",
+                )
                 return
-            given = self._shape_of(read) or NOTHING
+            answers = node.value.id
+            given = self._shape_of((answers, "")) or NOTHING
         if given != (self.gives or NOTHING):
             self.found.append(
                 _said(
@@ -647,7 +666,7 @@ class _Wiring:
                 )
             )
         for out_of, when in loose:
-            self.edges.append(Edge(out_of, "", when))
+            self.edges.append(Edge(out_of, "", when, answers))
 
     def _branch(self, node: ast.If, loose: _Loose) -> _Loose:
         """An `if`, which is the several ways out of the node above it.

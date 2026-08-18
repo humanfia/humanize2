@@ -434,3 +434,22 @@ def test_a_flow_that_is_one_file_has_nowhere_to_ship_a_prophecy(project: Path) -
 
     with pytest.raises(NotAFlow, match="no directory to ship a prophecy in"):
         Hmz().flows.foretell("lone")
+
+
+def test_a_supernode_answers_with_what_its_return_named(project: Path) -> None:
+    """A graph may answer with something it bound three nodes before it ended."""
+    inner = INNER.replace(
+        """    out = deepen(agents.writer, said)
+    return out""",
+        """    out = deepen(agents.writer, said)
+    more = deepen(agents.writer, out)
+    return out""",
+    )
+    _write(project, "inner", inner)
+    _write(project, "outer", OUTER)
+
+    _run("outer", "hello")
+
+    # Two turns were taken, and what came back out is the first one's answer.
+    assert (project / "ran.txt").read_text() == "start deepen deepen "
+    assert (project / "out.txt").read_text() == "hello!"

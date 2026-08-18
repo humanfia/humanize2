@@ -467,11 +467,15 @@ class Edge(NamedTuple):
       into: The node it arrives at, and "" for the way out of it, which is where the run
         ends.
       when: What has to hold for this to be the way taken, and None for a node's only one.
+      answers: For a way out of the prophecy, the name the run answers with -- which is what
+        the `return` named, and not whatever the last node happened to say. "" everywhere
+        else, and for an atlas that answers with nothing.
     """
 
     out_of: str
     into: str
     when: When | None = None
+    answers: str = ""
 
 
 class Prophecy(NamedTuple):
@@ -593,6 +597,7 @@ def _written(prophecy: Prophecy) -> dict[str, object]:
                 "when": None
                 if one.when is None
                 else [one.when.reads, one.when.field, one.when.truth],
+                "answers": one.answers,
             }
             for one in sorted(prophecy.edges, key=_ordered)
         ],
@@ -612,7 +617,7 @@ def _written(prophecy: Prophecy) -> dict[str, object]:
     }
 
 
-def _ordered(edge: Edge) -> tuple[str, str, str, str, bool]:
+def _ordered(edge: Edge) -> tuple[str, str, str, str, bool, str]:
     """One edge as something two of them can be sorted by, an absent guard and all."""
     when = edge.when
     return (
@@ -621,6 +626,7 @@ def _ordered(edge: Edge) -> tuple[str, str, str, str, bool]:
         "" if when is None else when.reads,
         "" if when is None else when.field,
         when is not None and when.truth,
+        edge.answers,
     )
 
 

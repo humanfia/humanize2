@@ -216,13 +216,14 @@ def _walked(
     """
     bound: dict[str, Any] = {AGENTS: agents, INPUT: given, CONFIG: config}
     seen: dict[str, int] = {}
-    answered: Any = None
     at = ""
     while True:
         edge = _way(prophecy, at, bound)
         node = None if edge is None else prophecy.node(edge.into)
         if node is None:
-            return answered
+            # What the `return` named, and not whatever the last node happened to say: a
+            # body may answer with something it bound three nodes ago.
+            return bound.get(edge.answers) if edge is not None else None
         seen[node.at] = visit = seen.get(node.at, 0) + 1
         held = f"{under}{node.at}{_VISIT}{visit}"
         answered = _answered(
@@ -242,8 +243,9 @@ def _way(prophecy: Prophecy, at: str, bound: dict[str, Any]) -> Edge | None:
       bound: What each name holds now.
 
     Returns:
-      The edge, or None where this is the end of the run -- either because nothing leads on
-      from here, or because the way out that does leads out of the prophecy.
+      The edge. One whose far end is "" is the way out of the prophecy, and what the run
+      answers with is on it; None is a node nothing leads on from, which nothing that
+      compiled can be.
     """
     for edge in prophecy.out_of(at):
         when = edge.when
@@ -251,7 +253,7 @@ def _way(prophecy: Prophecy, at: str, bound: dict[str, Any]) -> Edge | None:
             when is None
             or bool(_read(bound, Reads(when.reads, when.field))) is when.truth
         ):
-            return edge if edge.into else None
+            return edge
     return None
 
 
