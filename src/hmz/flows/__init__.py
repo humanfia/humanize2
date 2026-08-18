@@ -52,6 +52,22 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, overload
 
 from .agent import Agent, Driven, Person, Session
+from .atlas import (
+    Edge,
+    Node,
+    Prophecy,
+    Shape,
+    Shipped,
+    atlas,
+    canonical,
+    digest,
+    kept,
+    logic,
+    mind,
+    shipped,
+    sub,
+    told,
+)
 from .driving import (
     NotAFlow,
     Place,
@@ -113,15 +129,32 @@ if TYPE_CHECKING:
     )
     from hmz.backends import Model, Profile
 
+    from .checking import Capability, Finding, briefed, catalogue, checked
+    from .prophesying import Prophesied, is_atlas, prophesied
+    from .proving import (
+        ALWAYS_DONE,
+        NEVER_DONE,
+        SILENT,
+        Outcome,
+        Proof,
+        Scenario,
+        proved,
+    )
+
 __all__ = [
+    "ALWAYS_DONE",
     "BUILTIN",
     "BUILTIN_AT",
     "ENTRY",
     "EVERYWHERE",
     "FLOWS",
     "LOCAL",
+    "MINE",
+    "NEVER_DONE",
     "OFFICIAL",
     "PERMISSIONS",
+    "PROPHECY",
+    "SILENT",
     "SWARM",
     "USER",
     "WINDOW",
@@ -129,9 +162,12 @@ __all__ = [
     "AgentConfig",
     "AgentDefaults",
     "Board",
+    "Capability",
     "Driven",
+    "Edge",
     "Event",
     "Failed",
+    "Finding",
     "Flow",
     "Flowverse",
     "Goal",
@@ -143,17 +179,25 @@ __all__ = [
     "Item",
     "Model",
     "Moment",
+    "Node",
     "NotAFlow",
     "Occasion",
     "Offer",
+    "Outcome",
     "Person",
     "Place",
     "Profile",
+    "Proof",
+    "Prophecy",
+    "Prophesied",
     "Question",
     "Refused",
     "Remote",
     "Running",
+    "Scenario",
     "Session",
+    "Shape",
+    "Shipped",
     "Stopped",
     "Tool",
     "Unhooked",
@@ -162,29 +206,46 @@ __all__ = [
     "Verdict",
     "about",
     "at",
+    "atlas",
     "backends",
+    "briefed",
+    "canonical",
     "carries",
+    "catalogue",
+    "checked",
     "configures",
     "container",
+    "digest",
     "drives",
     "entry",
     "find",
     "flow",
     "flowverses",
+    "foretold",
     "fork",
     "found",
     "held",
     "holds",
     "home",
     "inside",
+    "is_atlas",
+    "kept",
     "load",
     "loaded",
+    "logic",
+    "mind",
     "models",
     "nearest",
     "offered",
     "offers",
+    "prophesied",
+    "proved",
+    "reading",
     "resumes",
     "running",
+    "shipped",
+    "sub",
+    "told",
     "wanted",
 ]
 
@@ -196,8 +257,25 @@ __all__ = [
 _MODULES = ("backends", "models")
 
 #: And the names a flow imports from here that are written down elsewhere: the vocabulary a
-#: turn is described in, and where humanize keeps what outlives a run.
+#: turn is described in, where humanize keeps what outlives a run, and the two readings of a
+#: flow -- which are thousands of lines of `ast` apiece and are asked for by the one command
+#: that checks a flow rather than by anything that lists, finds or runs one.
 _ELSEWHERE = {
+    "ALWAYS_DONE": "hmz.flows.proving",
+    "Capability": "hmz.flows.checking",
+    "Finding": "hmz.flows.checking",
+    "NEVER_DONE": "hmz.flows.proving",
+    "Outcome": "hmz.flows.proving",
+    "Proof": "hmz.flows.proving",
+    "Prophesied": "hmz.flows.prophesying",
+    "SILENT": "hmz.flows.proving",
+    "Scenario": "hmz.flows.proving",
+    "briefed": "hmz.flows.checking",
+    "catalogue": "hmz.flows.checking",
+    "checked": "hmz.flows.checking",
+    "is_atlas": "hmz.flows.prophesying",
+    "prophesied": "hmz.flows.prophesying",
+    "proved": "hmz.flows.proving",
     "AgentConfig": "hmz.agents",
     "Board": "hmz.agents",
     "AgentDefaults": "hmz.agents",
@@ -267,6 +345,12 @@ BUILTIN_AT = Path(__file__).parent / "builtin"
 #: What a flow's directory holds the flow itself in. The rest of the directory is what it
 #: imports and the `skills/` it brings, so the entry point is named rather than guessed.
 ENTRY = "__init__.py"
+
+#: And what an atlas's directory may hold the prophecy it was already compiled to in. A
+#: flowverse that ships one ships the graph its flow was checked into, and that graph is
+#: what runs: the compiling is where an atlas is refused, and a repository which has been
+#: through it once has an answer worth carrying rather than working out again.
+PROPHECY = "prophecy.pkl"
 
 #: What a flow's own name is separated from the one inside it by. A flow that holds one flow
 #: is named by itself; one that holds three names each of them after it.
@@ -742,6 +826,54 @@ def find(named_: str) -> str:
         if os.path.isfile(shape):
             return os.path.realpath(shape)
     return at_
+
+
+def reading(named_: str) -> str:
+    """What to point a reading of one flow at, which is not always what runs it.
+
+    A flow is a directory or a single file, and the two readings of one -- the checking and
+    the compiling -- take the whole of it either way: the directory where there is one, so
+    that what the entry point imports beside it is read too, and the file where there is
+    not. :func:`find` answers with the entry point instead, that being what is run.
+
+    Args:
+      named_: A flow's name, as :func:`find` takes it.
+
+    Returns:
+      The path to read: the flow's own directory, or the file a single-file flow is. A name
+      nothing answers to comes back as :func:`find` left it, so whatever asked hears about
+      it where it looks rather than here.
+    """
+    found_ = find(named_)
+    if os.path.isfile(found_) and os.path.basename(found_) == ENTRY:
+        return os.path.dirname(found_)
+    return found_
+
+
+def foretold(named_: str) -> str:
+    """Where the prophecy one flow ships is, for a flow that ships one.
+
+    An atlas is compiled before it runs, and a flowverse may ship what compiling it came
+    to: `prophecy.pkl`, beside the entry point, holding the graph the atlas was read into.
+    Where there is one it is what runs -- the compiling having already happened, in the
+    repository the flow came from, over the source that repository holds.
+
+    What is beside it still matters. A prophecy names the functions its nodes are, and
+    those are in the flow's own Python: a directory holding a prophecy and no entry point
+    is not a flow, the same way a directory holding neither is not one.
+
+    Args:
+      named_: A flow's name, as :func:`find` takes it.
+
+    Returns:
+      The path to it, and "" for a flow that ships none -- which is every flow that is not
+      an atlas, and most atlases.
+    """
+    from .atlas import shipped
+
+    beside = at(named_)
+    held = shipped(beside) if beside else None
+    return "" if held is None else str(held.at)
 
 
 def at(named_: str) -> str:

@@ -135,6 +135,32 @@ thing to write and three to run. Each asks only for the agents it drives.
 
 See [Flows](/reference/flows).
 
+## Atlas
+
+**A flow whose body is read rather than run.** Marked `@atlas` rather than `@flow`, written in
+a narrower Python, and compiled before anything happens into a graph — a **prophecy** — of the
+nodes the run will take and the edges between them.
+
+```python
+@atlas
+def run(agents: Agents, task: str) -> None:
+    draft = write(agents.writer, task)
+    verdict = judge(draft)
+    while not verdict.done:
+        draft = write(agents.writer, task)
+```
+
+Each statement is one node. A `@mind` is one turn by one agent and has exactly one way out; a
+`@logic` is a Python function and may have several, which is what a branch hangs off. What
+flows between them is a pydantic model, checked edge by edge before the first turn. An atlas
+called by an atlas is one node of the graph around it.
+
+An atlas is a flow in every other way — found, listed, named and run by the same line. What it
+buys is that its shape is known in advance: it can be printed and diffed, it is checked whole
+before it starts, and a run of one is picked up node by node rather than started again.
+
+See [An atlas](/guide/atlas).
+
 ## Flowverse
 
 **A git repository with a `flows/` directory in it.** One directory per flow holds an
