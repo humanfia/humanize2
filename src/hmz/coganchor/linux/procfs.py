@@ -16,6 +16,7 @@ from typing import Final
 from hmz.coganchor.linux.syscalls import NR
 
 __all__ = [
+    "MAX_ARG_STRLEN",
     "PATH_MAX",
     "TraceeGoneError",
     "fd_target",
@@ -30,6 +31,10 @@ __all__ = [
 PATH_MAX: Final = 4096
 _PAGE_SIZE: Final = os.sysconf("SC_PAGESIZE")
 _MAX_ARGV_ENTRIES: Final = 65536
+
+#: The kernel's own ceiling on one ``argv`` or ``envp`` entry, ``MAX_ARG_STRLEN``: thirty-two
+#: pages. What a command may be, as opposed to what a path may be.
+MAX_ARG_STRLEN: Final = 32 * _PAGE_SIZE
 
 _libc = ctypes.CDLL("libc.so.6", use_errno=True)
 
@@ -137,7 +142,11 @@ def read_string_array(
         pointer = int.from_bytes(raw, "little")
         if pointer == 0:
             break
-        text = read_cstring(pid, pointer)
+        # An argv entry is not a path, so PATH_MAX is the wrong ceiling for it: the kernel
+        # lets one be MAX_ARG_STRLEN long, and a shell command is routinely longer than a
+        # path. Truncating one is worse than failing to read it -- what reaches the target
+        # is then a prefix of the command, which runs and means something else.
+        text = read_cstring(pid, pointer, MAX_ARG_STRLEN)
         values.append("" if text is None else text)
         address += word
     return values
