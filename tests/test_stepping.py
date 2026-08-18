@@ -417,3 +417,20 @@ def test_one_is_shipped_and_read_back_through_the_sdk(project: Path) -> None:
     assert said is not None
     assert [one.at for one in said.nodes] == ["write", "judge", "write:2"]
     assert flows.check("rounds") == ()
+
+
+def test_an_atlas_may_be_one_file(project: Path) -> None:
+    """A flow that is one function still is one, and so is an atlas that is one graph."""
+    (project / ".humanize/flows/lone.py").write_text(ROUNDS)
+
+    _run("lone")
+
+    assert (project / "rounds.txt").read_text() == "www"
+
+
+def test_a_flow_that_is_one_file_has_nowhere_to_ship_a_prophecy(project: Path) -> None:
+    """What is beside such a flow is the other flows, and none of it came with this one."""
+    (project / ".humanize/flows/lone.py").write_text(ROUNDS)
+
+    with pytest.raises(NotAFlow, match="no directory to ship a prophecy in"):
+        Hmz().flows.foretell("lone")

@@ -283,7 +283,9 @@ class Flows:
           Where it was written.
 
         Raises:
-          NotAFlow: If it is not an atlas, or does not compile.
+          NotAFlow: If it is not an atlas, does not compile, or is a flow that is a single
+            file -- which has no directory of its own to ship anything in, what is beside
+            such a flow being the other flows.
         """
         from pathlib import Path
 
@@ -293,7 +295,12 @@ class Flows:
         if held is None:
             raise NotAFlow(f"{named}: not an atlas that compiles -- hmz check says why")
         at = Path(find(str(named)))
-        into = (at.parent if at.name == ENTRY else at) / PROPHECY
+        if at.name != ENTRY:
+            raise NotAFlow(
+                f"{named}: a flow that is one file has no directory to ship a prophecy "
+                "in -- make it a directory with an __init__.py in it"
+            )
+        into = at.parent / PROPHECY
         into.write_bytes(kept(held))
         return str(into)
 
