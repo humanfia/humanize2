@@ -14,6 +14,7 @@ Prints one JSON object on stdout describing the run.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shutil
@@ -116,7 +117,9 @@ def _prepare(lab: Path, index: int, seed_bytes: int) -> tuple[Path, Path]:
         (target / name).write_text(f"# {name}\n" + "line\n" * 40)
     (target / "pkg").mkdir(exist_ok=True)
     for number in range(8):
-        (target / "pkg" / f"mod{number}.py").write_text("def f():\n    return %d\n" % number)
+        (target / "pkg" / f"mod{number}.py").write_text(
+            f"def f():\n    return {number}\n"
+        )
     return workspace, target
 
 
@@ -125,7 +128,9 @@ def _prepare(lab: Path, index: int, seed_bytes: int) -> tuple[Path, Path]:
 _EFFORT = {"dsh": "high"}
 
 
-def _turn(backend: str, model: str, workspace: Path, target: Path, endpoint: str) -> dict[str, object]:
+def _turn(
+    backend: str, model: str, workspace: Path, target: Path, endpoint: str
+) -> dict[str, object]:
     from hmz.agents import driver
     from hmz.coganchor import AnchorConfig
     from hmz.machines import AnchoredConfig
@@ -160,10 +165,9 @@ def _turn(backend: str, model: str, workspace: Path, target: Path, endpoint: str
         said = list(session.stream(PROMPT))
         record["answer"] = (said[-1].text if said else "")[-160:]
         record["events"] = len(said)
-        try:
+        # A daemon that will not stop is not this turn's verdict.
+        with contextlib.suppress(Exception):
             agent.stop()
-        except Exception:  # noqa: BLE001,S110 -- a daemon that will not stop is not this turn's verdict
-            pass
     except Exception as exc:  # noqa: BLE001 -- every failure is a datum
         record["error"] = f"{type(exc).__name__}: {exc}"[:1500]
     record["seconds"] = round(time.time() - started, 2)
@@ -185,6 +189,7 @@ def _turn(backend: str, model: str, workspace: Path, target: Path, endpoint: str
 
 
 def main() -> int:
+    """Run one rung -- N agents at once -- and print a JSON object describing it."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend", required=True)
     parser.add_argument("--model", required=True)
@@ -209,31 +214,28 @@ def main() -> int:
     # humanize echoes every turn's transcript.  At two hundred agents that is a great deal
     # of writing to one pipe, and it is not what is being measured, so it goes to a file for
     # the length of the run and stdout is given back for the summary.
-    transcript = open(lab / "logs" / f"{args.backend}-{args.concurrency}.transcript", "w")
-    console, sys.stdout = sys.stdout, transcript
-
     endpoints = [one for one in args.endpoint.split(",") if one]
-    target_cpu_before = _target_cpu()
 
-    started = time.time()
-    with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        futures = [
-            pool.submit(
-                _turn,
-                args.backend,
-                args.model,
-                workspace,
-                target,
-                endpoints[index % len(endpoints)],
-            )
-            for index, (workspace, target) in enumerate(slots)
-        ]
-        results = [future.result() for future in futures]
-    elapsed = time.time() - started
-    target_cpu = _target_cpu() - target_cpu_before
+    transcript = lab / "logs" / f"{args.backend}-{args.concurrency}.transcript"
+    with transcript.open("w") as handle, contextlib.redirect_stdout(handle):
+        target_cpu_before = _target_cpu()
 
-    sys.stdout = console
-    transcript.close()
+        started = time.time()
+        with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
+            futures = [
+                pool.submit(
+                    _turn,
+                    args.backend,
+                    args.model,
+                    workspace,
+                    target,
+                    endpoints[index % len(endpoints)],
+                )
+                for index, (workspace, target) in enumerate(slots)
+            ]
+            results = [future.result() for future in futures]
+        elapsed = time.time() - started
+        target_cpu = _target_cpu() - target_cpu_before
 
     sampler.stopped.set()
     sampler.join(timeout=2)
@@ -254,16 +256,24 @@ def main() -> int:
         "failed": len(results) - len(good),
         "wall_seconds": round(elapsed, 2),
         "turn_p50": round(statistics.median(times), 2) if times else -1,
-        "turn_p95": round(times[max(0, int(len(times) * 0.95) - 1)], 2) if times else -1,
+        "turn_p95": round(times[max(0, int(len(times) * 0.95) - 1)], 2)
+        if times
+        else -1,
         "turn_max": round(times[-1], 2) if times else -1,
         "peak_memory_gib": round(peak_memory / (1 << 30), 2),
         "peak_pids": int(peak_pids),
         "cpu_seconds": round(cpu_used, 1),
-        "cpu_busy_ratio": round(cpu_used / elapsed / 16, 2) if elapsed > 0 and cpu_used >= 0 else -1,
+        "cpu_busy_ratio": round(cpu_used / elapsed / 16, 2)
+        if elapsed > 0 and cpu_used >= 0
+        else -1,
         "target_cpu_seconds": round(target_cpu, 1),
         # Against the 208 CPUs the mock target has to itself, outside the cgroup.
-        "target_busy_ratio": round(target_cpu / elapsed / 208, 3) if elapsed > 0 else -1,
-        "errors": sorted({str(one.get("error", "")) for one in results if one.get("error")})[:5],
+        "target_busy_ratio": round(target_cpu / elapsed / 208, 3)
+        if elapsed > 0
+        else -1,
+        "errors": sorted(
+            {str(one.get("error", "")) for one in results if one.get("error")}
+        )[:5],
         "no_done": sum(1 for one in results if not one["said_done"]),
         "no_landing": sum(1 for one in results if not int(one["steps_on_target"])),
         "steps_landed": sorted({int(one["steps_on_target"]) for one in results}),

@@ -25,6 +25,7 @@ import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 #: How many shell tool calls one scripted turn makes before it answers.
@@ -47,7 +48,9 @@ FINAL = os.environ.get("STANDIN_FINAL", "STANDIN-TURN-COMPLETE")
 #: rather than matched exactly, and a name no pattern claims leaves the turn tool-free.
 _SHELL_PATTERNS = (
     re.compile(r"^(bash|shell|sh|local_shell)$", re.IGNORECASE),
-    re.compile(r"^(run|execute|exec)_?(terminal_?)?(command|shell|bash)s?$", re.IGNORECASE),
+    re.compile(
+        r"^(run|execute|exec)_?(terminal_?)?(command|shell|bash)s?$", re.IGNORECASE
+    ),
     re.compile(r"terminal.*command|command.*terminal", re.IGNORECASE),
     re.compile(r"^(run|execute|exec)[_-]?", re.IGNORECASE),
     re.compile(r"(^|_)(bash|shell|terminal)(_|$)", re.IGNORECASE),
@@ -69,8 +72,10 @@ LOG_PATH = os.environ.get("STANDIN_LOG", "")
 def _log(kind: str, detail: object) -> None:
     if not LOG_PATH:
         return
-    with _log_lock, open(LOG_PATH, "a") as handle:
-        handle.write(json.dumps({"at": time.time(), "kind": kind, "detail": detail}) + "\n")
+    with _log_lock, Path(LOG_PATH).open("a") as handle:
+        handle.write(
+            json.dumps({"at": time.time(), "kind": kind, "detail": detail}) + "\n"
+        )
 
 
 # --------------------------------------------------------------------------- tool choice
@@ -117,9 +122,11 @@ def _fill(schema: dict[str, Any], command: str) -> dict[str, Any]:
     ):
         for name, spec in properties.items():
             if str(name).lower() in ("command", "cmd", "script"):
-                spec = spec if isinstance(spec, dict) else {}
+                shape = spec if isinstance(spec, dict) else {}
                 filled[name] = (
-                    ["bash", "-lc", command] if spec.get("type") == "array" else command
+                    ["bash", "-lc", command]
+                    if shape.get("type") == "array"
+                    else command
                 )
                 break
     return filled
@@ -180,7 +187,11 @@ def _steps_taken_responses(body: dict[str, Any]) -> int:
     if isinstance(items, list):
         for item in items:
             if isinstance(item, dict) and str(item.get("type", "")).endswith(
-                ("function_call_output", "local_shell_call_output", "custom_tool_call_output")
+                (
+                    "function_call_output",
+                    "local_shell_call_output",
+                    "custom_tool_call_output",
+                )
             ):
                 taken += 1
     return taken
@@ -247,7 +258,6 @@ def _anthropic(body: dict[str, Any]) -> list[tuple[str | None, Any]]:
         )
     ]
     if tool is None or step >= STEPS:
-        text = FINAL if step >= STEPS or tool is None else FINAL
         return [
             *start,
             (
@@ -263,7 +273,7 @@ def _anthropic(body: dict[str, Any]) -> list[tuple[str | None, Any]]:
                 {
                     "type": "content_block_delta",
                     "index": 0,
-                    "delta": {"type": "text_delta", "text": text},
+                    "delta": {"type": "text_delta", "text": FINAL},
                 },
             ),
             ("content_block_stop", {"type": "content_block_stop", "index": 0}),
@@ -402,14 +412,20 @@ def _responses(body: dict[str, Any]) -> list[tuple[str | None, Any]]:
     }
     done = dict(envelope, status="completed", output=[item], usage=usage)
     chunks: list[tuple[str | None, Any]] = [
-        numbered("response.created", {"type": "response.created", "response": dict(envelope)}),
+        numbered(
+            "response.created", {"type": "response.created", "response": dict(envelope)}
+        ),
         numbered(
             "response.in_progress",
             {"type": "response.in_progress", "response": dict(envelope)},
         ),
         numbered(
             "response.output_item.added",
-            {"type": "response.output_item.added", "output_index": 0, "item": dict(item)},
+            {
+                "type": "response.output_item.added",
+                "output_index": 0,
+                "item": dict(item),
+            },
         ),
     ]
     if item["type"] == "message":
@@ -463,7 +479,11 @@ def _responses(body: dict[str, Any]) -> list[tuple[str | None, Any]]:
     chunks.append(
         numbered(
             "response.output_item.done",
-            {"type": "response.output_item.done", "output_index": 0, "item": dict(item)},
+            {
+                "type": "response.output_item.done",
+                "output_index": 0,
+                "item": dict(item),
+            },
         )
     )
     chunks.append(
@@ -472,7 +492,9 @@ def _responses(body: dict[str, Any]) -> list[tuple[str | None, Any]]:
     return chunks
 
 
-def _chat_chunks(body: dict[str, Any]) -> tuple[dict[str, Any], list[tuple[str | None, Any]]]:
+def _chat_chunks(
+    body: dict[str, Any],
+) -> tuple[dict[str, Any], list[tuple[str | None, Any]]]:
     model = str(body.get("model") or "standin-1")
     step = _steps_taken_chat(body)
     tool = _shell_tool(body)
@@ -484,7 +506,12 @@ def _chat_chunks(body: dict[str, Any]) -> tuple[dict[str, Any], list[tuple[str |
         "total_tokens": 1040 + 100 * step,
         "prompt_tokens_details": {"cached_tokens": 0},
     }
-    head = {"id": made, "object": "chat.completion.chunk", "created": created, "model": model}
+    head = {
+        "id": made,
+        "object": "chat.completion.chunk",
+        "created": created,
+        "model": model,
+    }
 
     if tool is None or step >= STEPS:
         message = {"role": "assistant", "content": FINAL}
@@ -524,11 +551,21 @@ def _chat_chunks(body: dict[str, Any]) -> tuple[dict[str, Any], list[tuple[str |
         ]
 
     chunks: list[tuple[str | None, Any]] = [
-        (None, dict(head, choices=[{"index": 0, "delta": delta, "finish_reason": None}]))
+        (
+            None,
+            dict(head, choices=[{"index": 0, "delta": delta, "finish_reason": None}]),
+        )
         for delta in deltas
     ]
     chunks.append(
-        (None, dict(head, choices=[{"index": 0, "delta": {}, "finish_reason": finish}], usage=usage))
+        (
+            None,
+            dict(
+                head,
+                choices=[{"index": 0, "delta": {}, "finish_reason": finish}],
+                usage=usage,
+            ),
+        )
     )
     chunks.append((None, "[DONE]"))
     whole = {
@@ -549,7 +586,12 @@ def _catalogue() -> dict[str, Any]:
     return {
         "object": "list",
         "data": [
-            {"id": name, "object": "model", "created": 1700000000, "owned_by": "standin"}
+            {
+                "id": name,
+                "object": "model",
+                "created": 1700000000,
+                "owned_by": "standin",
+            }
             for name in _MODEL_IDS
         ],
     }
@@ -590,6 +632,8 @@ def _registry(port: int) -> dict[str, Any]:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """The one handler all three wire protocols are answered from, by path."""
+
     protocol_version = "HTTP/1.1"
     port = 0
 
@@ -678,7 +722,9 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._json(whole)
             else:
-                self._json({"error": {"message": f"no route {path}", "type": "not_found"}}, 404)
+                self._json(
+                    {"error": {"message": f"no route {path}", "type": "not_found"}}, 404
+                )
         except (BrokenPipeError, ConnectionResetError):
             pass
 

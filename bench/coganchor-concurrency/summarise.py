@@ -17,22 +17,21 @@ import json
 import sys
 from pathlib import Path
 
-LAB = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "lab"
+LAB = (
+    Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "lab"
+)
 SLOWDOWN = 2.0
 
 BACKENDS = ("claude", "codex", "grok", "kimi", "dsh")
 
 
 def rungs(backend: str) -> list[dict[str, object]]:
+    """Every rung recorded for one backend, in the order the ladder ran them."""
     path = LAB / f"ladder-{backend}.jsonl"
     if not path.exists():
         return []
-    out = []
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if line.startswith("{"):
-            out.append(json.loads(line))
-    return out
+    lines = (line.strip() for line in path.read_text().splitlines())
+    return [json.loads(line) for line in lines if line.startswith("{")]
 
 
 print(
@@ -86,8 +85,10 @@ for backend in BACKENDS:
     print("-" * 92)
 
 print()
-print(f"{'backend':8} {'all correct up to':>18} {'and still quick to':>19} "
-      f"{'MiB/agent':>10} {'procs/agent':>12} {'peak turns/min':>15}")
+print(
+    f"{'backend':8} {'all correct up to':>18} {'and still quick to':>19} "
+    f"{'MiB/agent':>10} {'procs/agent':>12} {'peak turns/min':>15}"
+)
 for backend, verdict in verdicts.items():
     print(
         f"{backend:8} {verdict['correct']:18d} {verdict['comfortable']:19d} "
