@@ -11,6 +11,7 @@ import errno
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -204,9 +205,9 @@ def test_an_agent_is_one_agent_apart_from_its_configuration() -> None:
     assert actor.id != reviewer.id
     assert actor.config == reviewer.config
     # A flow that names its agents keeps those names across restarts; one left unnamed is
-    # named after its class, so a trace of two of them still reads as two.
+    # called after a Chrysos Heir, so a trace of two of them still reads as two.
     assert _EchoAgent(CONFIG, name="actor").id == "actor"
-    assert actor.id.startswith("_EchoAgent#")
+    assert re.fullmatch(r"[A-Z][a-z]+[A-Z][a-z]+[0-9]{3}", actor.id)
 
 
 def test_an_agent_remembers_every_session_it_opened() -> None:
@@ -735,7 +736,7 @@ def test_calling_the_agent_is_a_session_it_keeps_nothing_of(clis: _FakeCLIs) -> 
 
 
 def test_an_agent_takes_the_name_a_flow_calls_it_unless_it_has_one() -> None:
-    """`builder` says what a hex tail does not, and a trace groups the sessions under it."""
+    """`builder` says what a codename does not, and a trace groups the sessions under it."""
     named = ClaudeCodeAgent(CONFIG, name="actor")
     unnamed = ClaudeCodeAgent(CONFIG)
 

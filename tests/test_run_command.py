@@ -346,7 +346,7 @@ def test_a_named_tuple_says_what_each_agent_is_for_as_well_as_how_many(
     seen = _seen(tmp_path)
     assert seen["held"] == "Agents"  # the named tuple, not a plain one
     # And the agents took those names, so a trace groups each one's sessions under a word
-    # rather than under a hex tail.
+    # rather than under the codename an unnamed agent draws.
     assert seen["agents"] == [["builder"], ["reviewer"]]
 
 

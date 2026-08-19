@@ -324,7 +324,7 @@ run as **does not quietly run as yours**:
 
 ```console
 $ hmz exec -f ralph_loop -a claude@gone/claude-opus-5:max "…"
-… ValueError: ClaudeCodeAgent#859ee5b7: no claude provider called 'gone'
+… ValueError: NeiKos496: no claude provider called 'gone'
 ```
 
 In the interface, an agent given an account that has since been taken away is a red line when

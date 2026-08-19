@@ -9,6 +9,7 @@ agents it drives and only for the settings it takes.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -257,6 +258,18 @@ def test_each_of_them_asks_only_for_its_own_agents_and_settings(
     assert idea is not None
     assert set(idea.model_fields) == {"n"}
     assert configures(f"{where}:build") is None
+
+
+def test_an_agent_a_flow_never_named_is_left_with_its_codename(tmp_path: Path) -> None:
+    """A flow that said how many it drives and no more has no name to give the one it gets."""
+    where = _written(tmp_path, ONE, "one")
+    agent = ShellAgent(CONFIG)
+    drawn = agent.id
+
+    Runner(where, [agent]).run("echo one")
+
+    assert agent.id == drawn  # the place had no name, so nothing renamed it
+    assert re.fullmatch(r"[A-Z][a-z]+[A-Z][a-z]+[0-9]{3}", agent.id)  # a Chrysos Heir's
 
 
 def test_the_one_that_was_asked_for_is_the_one_that_runs(tmp_path: Path) -> None:

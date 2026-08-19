@@ -787,6 +787,27 @@ A [flow](/reference/flows#how-many-agents-and-what-they-are-for) that declares i
 `NamedTuple` names them for you, and a run started through `Runner` writes all of this into its
 [cycle](/reference/tracing#cycles) — so this is only needed for agents built and driven by hand.
 
+### The name nobody gave it
+
+An agent nobody named still needs one nothing else answers to, and what it gets is a codename out
+of Amphoreus — a Greek word for what a Chrysos Heir was made to be, and three digits behind it:
+
+```text
+NeiKos496   PhiLia093   SkeMma720   KykLos204
+```
+
+Twelve of those are codes *Honkai: Star Rail* says out loud, and while any of the twelve is still
+free they come up half the time — against the once in eleven thousand a pool that size would give
+them by chance, since a name is only a joke to somebody who recognises it. The rest are those same
+roles under some other number, or a word no heir ever carried: another cycle of a story that has
+run 33,550,336 of them, which is the fifth perfect number, as 496 is the third.
+
+No code is handed out twice in one process. Two agents left unnamed are two agents, and a trace
+that read them as one would read a flow reviewing its own work as a flow arguing with itself.
+
+A name given where the agent was made is kept, and `builder` says what `NeiKos496` does not — so
+name the ones whose roles matter and let the rest be heirs.
+
 ## The person as an agent
 
 A flow that is a conversation rather than a loop has two sides, and the second is you.

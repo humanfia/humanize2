@@ -98,7 +98,7 @@ be moved after the fact:
 
 ```text
 onbox: tester works in a container of this flow's own, so there is nothing to point it at
-/.../flow.py: tester ClaudeCodeAgent#1a2b3c4d has already opened a session
+/.../flow.py: tester PoleMos600 has already opened a session
 ```
 
 ## This machine

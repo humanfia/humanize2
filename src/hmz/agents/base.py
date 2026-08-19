@@ -23,6 +23,7 @@ from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import IO, TYPE_CHECKING, Any, ClassVar, Literal, Protocol, Self, overload
 
+from .codenames import codename
 from .event import Event, Failed, Question, Stopped, Unrecoverable, Usage, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
 from .skills import Loaded, mount, unmount
@@ -2205,10 +2206,11 @@ class AgentBase(ABC):
 
         Args:
           config: The model and effort every session of this agent runs at.
-          name: What to call this agent, defaulting to one nothing else answers to. Two agents
-            sharing a name are one agent to a trace, which is how the roles of a flow survive
-            being restarted; two left unnamed are two, which is how one configuration driven
-            twice -- an actor and the reviewer reading its work -- stays two.
+          name: What to call this agent, defaulting to one nothing else answers to -- a
+            Chrysos Heir's, out of :mod:`hmz.agents.codenames`. Two agents sharing a name are
+            one agent to a trace, which is how the roles of a flow survive being restarted;
+            two left unnamed are two, which is how one configuration driven twice -- an actor
+            and the reviewer reading its work -- stays two.
         """
         self._serves(config)
         self._config = config
@@ -2219,7 +2221,7 @@ class AgentBase(ABC):
         #: each of them: a Ralph loop drops a session a turn, and what the agent has spent
         #: must outlive the conversations it spent it in.
         self._meter = Meter()
-        self._id = name or f"{type(self).__name__}#{uuid.uuid4().hex[:8]}"
+        self._id = name or codename()
         #: Whether that name is the agent's own, rather than one to be told by whatever ends
         #: up driving it: a flow that names the agents it takes names the ones that are not.
         self._named = name is not None
@@ -2452,8 +2454,9 @@ class AgentBase(ABC):
         """Calls this agent what the flow driving it calls it, if it has no name of its own.
 
         A flow that declares its agents as a named tuple has said what each of them is for --
-        builder, reviewer -- and that is a better name than a hex tail. One handed an agent
-        that was named where it was made says nothing: the name it was given is the name.
+        builder, reviewer -- and that is a better name than a codename out of somebody else's
+        story, which is what an agent nobody named has. One handed an agent that was named
+        where it was made says nothing: the name it was given is the name.
 
         Args:
           name: What the flow calls this one.
