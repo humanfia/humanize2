@@ -94,3 +94,24 @@ def test_large_round_trip_is_byte_exact(anchorage: Anchorage) -> None:
     )
     assert "1" in result.stdout
     assert anchorage.target_text("echoed.txt") == payload
+
+
+def test_a_command_longer_than_a_path_crosses_whole(anchorage: Anchorage) -> None:
+    """An ``argv`` entry is not a path, so ``PATH_MAX`` is the wrong ceiling to read it at.
+
+    A truncated one is worse than an unread one: what reaches the target is a prefix of the
+    command, which runs, and means something else. Codex prefixes every shell command it
+    runs with a preamble of several kilobytes, so this is the ordinary case for it rather
+    than an exotic one.
+    """
+    payload = "y" * 8000
+
+    # `sh` rather than another `bash`: the agent here *is* bash, and an agent's own program
+    # runs on this machine wherever it turns up, so spawning one would never cross at all.
+    result = anchorage.shell(f"/bin/sh -c 'printf %s {payload} > long.txt'")
+
+    assert result.returncode == 0, result.stderr
+    # Truncated, the command is `printf %s yyy...` with the redirect cut off, so the payload
+    # comes back on stdout and nothing is written anywhere.
+    assert result.stdout == ""
+    assert anchorage.target_text("long.txt") == payload

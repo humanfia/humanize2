@@ -89,12 +89,14 @@ the agent once it exits, and when the session ends nothing it started is left ru
 
 ## What stays on this machine
 
-- The agent's own runtime executables and re-execs. For an npm-installed Codex, that includes
-  Node, the native CLI and its code-mode host.
-- Its state directory. All twelve known CLIs are known by name — `agy`, `claude`, `codex`,
-  `cursor`, `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen`, `zcode` — as is humanize's own
-  `~/.humanize`; any other agent keeping state inside the workspace has to be named with
-  `--local-path`.
+- The agent's own runtime executables and re-execs. For any CLI installed by npm that includes
+  the interpreter its `#!/usr/bin/env` line names, at every path on `PATH` the search for it may
+  reach; for Codex, the native CLI and its code-mode host besides.
+- Its state directory, and anything the agent runs from inside it — grok keeps its native binary
+  under `~/.grok/bin` and re-execs it. All twelve known CLIs are known by name — `agy`, `claude`,
+  `codex`, `cursor`, `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen`, `zcode` — as is
+  humanize's own `~/.humanize`; any other agent keeping state inside the workspace has to be
+  named with `--local-path`.
 - Anything named as a local path (`--local-path`) or a local program (`--local-exec`).
 - The agent's own network connections, so that it can still reach its model provider. `--net
   remote` sends them to the target instead, and `--net-allow HOST[:PORT]` keeps named hosts

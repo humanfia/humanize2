@@ -75,10 +75,11 @@ there kills its local counterpart the same way.
 
 ## What never leaves this machine
 
-- the agent's own runtime executables and re-execs — for an npm-installed Codex, that includes
-  Node, the native CLI and its code-mode host
-- its state directory — the known CLIs are known by name, and any other agent keeping state
-  inside the workspace has to be named
+- the agent's own runtime executables and re-execs — for any CLI installed by npm that means
+  the interpreter its `#!/usr/bin/env` line names, wherever on `PATH` it is found, and for Codex
+  the native CLI and its code-mode host besides
+- its state directory, and anything the agent runs from inside it — the known CLIs are known by
+  name, and any other agent keeping state inside the workspace has to be named
 - anything a path is answered with, and the paths that answer it: an agent run as somebody
   else's account reads those credentials from here, and a refreshed token lands here
 - any variable named as the agent's own, so that a credential it was given to reach its model

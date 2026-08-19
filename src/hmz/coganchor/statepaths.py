@@ -156,10 +156,20 @@ def resolve(command: list[str]) -> ResolvedAgent:
     # Only the agent's own runtime stays here. Work helpers such as ripgrep
     # deliberately go to the target: running them against the partly materialised
     # mirror would return quietly wrong answers, which is worse than a visible failure.
-    local_programs = [located, program]
+    # A program the agent keeps in its own state directory is its own runtime, not a helper
+    # for the work: grok installs its native binary under `~/.grok/bin` and re-execs it, and
+    # sending that to the target sends the agent there with it. Those directories are
+    # already answered from this machine as paths; this is the same claim about executing
+    # them.
+    local_programs = [
+        located,
+        program,
+        *(_expand(path) for path in profile.state_paths),
+    ]
     shebang = _shebang(program)
     if shebang:
         local_programs.append(shebang[0])
+        local_programs.extend(_interpreter(shebang))
     if profile.name == "codex":
         local_programs.extend(_codex_runtime_programs(program, shebang))
 
@@ -186,6 +196,52 @@ def _shebang(program: str) -> tuple[str, ...]:
     if not first.startswith(b"#!"):
         return ()
     return tuple(first[2:].decode("utf-8", "replace").strip().split())
+
+
+def _interpreter(shebang: tuple[str, ...]) -> list[str]:
+    """Every path an ``#!/usr/bin/env NAME`` line could reach its interpreter at.
+
+    Every agent installed by npm starts with one, and keeping only the ``env`` keeps the
+    wrong program on this machine: ``env`` runs here and then searches ``PATH`` for the
+    interpreter, one ``execve`` per directory. The first of those names a path that does not
+    exist here -- which is not the agent's own by name, so it is sent to the target, where
+    the name resolves and the agent itself ends up running. It then reads the target's copy
+    of its state directory and cannot reach the account it was signed in with. Codex is
+    spared this only because its runtime is listed by hand.
+
+    So the whole search is claimed, not just the directory the interpreter is really in: a
+    candidate kept here fails here, with the ``ENOENT`` that makes ``env`` try the next one.
+
+    Args:
+      shebang: The command the script's first line names.
+
+    Returns:
+      Each path the search may name, or nothing when the line names the interpreter
+      directly -- that one is already kept by its own path.
+    """
+    if not shebang or os.path.basename(shebang[0]) != "env":
+        return []
+    words: list[str] = []
+    for word in shebang[1:]:
+        # `env -S "node --flag"` carries the whole command in one word, and
+        # `env NAME=VALUE prog` sets variables before naming one.
+        words.extend(word.split())
+    name = next(
+        (word for word in words if not word.startswith("-") and "=" not in word), ""
+    )
+    if not name:
+        return []
+    if os.path.sep in name:
+        return [os.path.abspath(name), os.path.realpath(name)]
+    found = [
+        os.path.join(directory, name)
+        for directory in os.environ.get("PATH", os.defpath).split(os.pathsep)
+        if directory
+    ]
+    resolved = shutil.which(name)
+    if resolved:
+        found.extend((os.path.abspath(resolved), os.path.realpath(resolved)))
+    return found
 
 
 def _codex_runtime_programs(program: str, shebang: tuple[str, ...]) -> list[str]:

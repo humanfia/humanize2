@@ -87,12 +87,13 @@ it adds nothing. Then check `python3 --version` there. See
 
 **Stays here**
 
-- The agent's own runtime executables and re-execs. For an npm-installed Codex, that includes
-  Node, the native CLI and its code-mode host.
-- Its state directory. humanize knows the twelve known CLIs by name — `agy`, `claude`,
-  `codex`, `cursor`, `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen`, `zcode` — and its
-  own `~/.humanize`.
-  Any other agent that keeps state inside the workspace has to be named with `--local-path`.
+- The agent's own runtime executables and re-execs. For any CLI installed by npm that includes
+  the interpreter its `#!/usr/bin/env` line names, wherever on `PATH` it is found; for Codex, the
+  native CLI and its code-mode host besides.
+- Its state directory, and anything the agent runs from inside it. humanize knows the twelve
+  known CLIs by name — `agy`, `claude`, `codex`, `cursor`, `dsh`, `grok`, `kimi`, `mimo`,
+  `opencode`, `pi`, `qwen`, `zcode` — and its own `~/.humanize`. Any other agent that keeps
+  state inside the workspace has to be named with `--local-path`.
 - Anything named `--local-path` or `--local-exec`.
 - The agent's own network connections, so it can still reach its model provider. `--net remote`
   sends them to the target instead. `--net-allow HOST[:PORT]` keeps named hosts local anyway.
