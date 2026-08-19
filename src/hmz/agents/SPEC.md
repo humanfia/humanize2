@@ -8,6 +8,7 @@
 ├── base.py
 ├── board.py
 ├── claude.py
+├── codenames.py
 ├── codex.py
 ├── config.py
 ├── event.py
@@ -233,7 +234,7 @@ class AgentBase(ABC):
   naming a flow, so the arrow points one way and inheriting would turn it round. What is here
   and not there is how an agent is driven rather than what a flow drives, and a public name
   added here MUST be one or the other on purpose.
-- `id` MUST be the given name, or one no other agent answers to when no name is given, so that
+- `id` MUST be the given name, or a codename from `codenames.py` when no name is given, so that
   two agents of the same config are two agents. `rename` MUST take a name from a flow only for
   an agent that was not named where it was made: a name given is a name kept.
 - `clone` MUST answer with another agent of this one's backend, differing in what the call
@@ -506,6 +507,28 @@ class CommandSessionBase(SessionBase):
   down with it, and MUST NOT stop the reading either: a pipe nobody drains blocks the agent.
 - Every session that is not one command per turn MUST derive from `SessionBase` instead, so
   that a backend driven another way inherits none of this.
+
+## `codenames.py`
+
+```python
+def codename() -> str: ...
+```
+
+- What an agent nobody named is called. It MUST be one rule and nothing else: a Greek word,
+  capitalised at the front and wherever the word breaks, and three digits -- `NeiKos496`. The
+  twelve the story spells out MUST be among what it answers with and MUST come up far oftener
+  than their share of the pool, a name being only a joke to somebody who recognises it.
+- A word MUST be buildable rather than only listed, since a list has a last word and there
+  MUST NOT be one: morphemes join at the capital, so `Meta` and `Kratos` are `MetaKratos` by
+  the same rule that spells `ApoRia`. There MUST be at least two morphemes a word may lead
+  with, the count being spelled in them.
+- A code MUST NOT be handed out twice in one process. Two agents left unnamed are two agents,
+  and a name is what a trace groups an agent's sessions under.
+- A process that has drawn every short code MUST be answered with a longer one built the same
+  way -- the word grows a morpheme when the shorter ones run out -- and MUST NOT be answered
+  with a hex tail or anything else off the rule. The point of the name is that a person can
+  read it, and a name that degrades to hex under load degrades exactly where a run is hardest
+  to read.
 
 ## `tools.py`
 

@@ -793,17 +793,24 @@ An agent nobody named still needs one nothing else answers to, and what it gets 
 of Amphoreus — a Greek word for what a Chrysos Heir was made to be, and three digits behind it:
 
 ```text
-NeiKos496   PhiLia093   SkeMma720   KykLos204
+NeiKos496   PhiLia093   SkeMma720   KykLos204   MetaKratos881
 ```
 
 Twelve of those are codes *Honkai: Star Rail* says out loud, and while any of the twelve is still
-free they come up half the time — against the once in eleven thousand a pool that size would give
-them by chance, since a name is only a joke to somebody who recognises it. The rest are those same
-roles under some other number, or a word no heir ever carried: another cycle of a story that has
-run 33,550,336 of them, which is the fifth perfect number, as 496 is the third.
+free they come up half the time — against the once in eleven thousand the written-down words alone
+would give them by chance, since a name is only a joke to somebody who recognises it. The rest are
+those same roles under some other number: another cycle of a story that has run 33,550,336 of
+them, which is the fifth perfect number, as 496 is the third.
 
-No code is handed out twice in one process. Two agents left unnamed are two agents, and a trace
-that read them as one would read a flow reviewing its own work as a flow arguing with itself.
+The word is built rather than looked up. Morphemes join at the capital — `Apo` and `Ria` are
+`ApoRia`, which is an heir's, so `Meta` and `Kratos` are `MetaKratos`, which is a word the same
+rule makes and the story merely never needed. That is what makes the supply endless: a process
+that has used the short words up is answered with a longer one built the same way, and **never
+with a hex tail**. There is no last code, so there is nothing to fall back to.
+
+No code is handed out twice in one process either. Two agents left unnamed are two agents, and a
+trace that read them as one would read a flow reviewing its own work as a flow arguing with
+itself.
 
 A name given where the agent was made is kept, and `builder` says what `NeiKos496` does not — so
 name the ones whose roles matter and let the rest be heirs.

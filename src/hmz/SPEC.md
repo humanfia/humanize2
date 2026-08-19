@@ -488,7 +488,7 @@ never have reason to name this module.
   send it to, and a config that is not what the flow asked for.
 - An agent that was not named where it was made MUST take the name the flow gives it, before
   anything is written down about the run: a name is what a trace groups an agent's sessions
-  under, and `builder` says what a hex tail does not. One named already MUST keep that name.
+  under, and `builder` says what a codename does not. One named already MUST keep that name.
 - The person at the prompt MUST be made here rather than given: nobody chooses what they run,
   so nothing upstream of this was ever asked about them. `agents` MUST answer with them among
   the rest, that being the one agent whatever started the flow could not have got any other way.

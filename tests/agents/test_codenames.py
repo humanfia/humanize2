@@ -9,6 +9,7 @@ left unnamed are still two agents.
 
 from __future__ import annotations
 
+import itertools
 import random
 import re
 import threading
@@ -16,14 +17,15 @@ import threading
 import pytest
 
 from hmz.agents import AgentConfig, codenames
-from hmz.agents.codenames import HEIRS, WORDS, codename
+from hmz.agents.codenames import HEIRS, JOINS, STEMS, WORDS, codename
 from tests.stubs import ShellAgent
 
 CONFIG = AgentConfig(model="m", effort="high")
 
-#: How the story spells a code: a capital at the front, one more where the word breaks, and
-#: three digits. Every code drawn here is one of these, canon or not.
-SHAPE = re.compile(r"[A-Z][a-z]+[A-Z][a-z]+[0-9]{3}")
+#: How the story spells a code: a capital at the front, one more wherever the word breaks,
+#: and three digits. Every code this hands out is one of these, canon, built or counted -- and
+#: never a hex tail, which is the name the codenames were written to be rid of.
+SHAPE = re.compile(r"[A-Z][a-z]+(?:[A-Z][a-z]+)+[0-9]{3}")
 
 
 def test_the_twelve_are_spelled_as_the_story_spells_them() -> None:
@@ -53,6 +55,16 @@ def test_every_word_a_code_is_drawn_from_breaks_where_the_heirs_words_do() -> No
     assert not set(WORDS) & {one for one, _ in HEIRS}  # and no heir's word among them
 
 
+def test_a_morpheme_joins_into_a_word_spelled_the_way_the_heirs_words_are() -> None:
+    """`Apo` and `Ria` are `ApoRia`, so `Meta` and `Kratos` are a word by the same rule."""
+    for one in (*JOINS, *STEMS):
+        assert re.fullmatch(r"[A-Z][a-z]+", one), one
+
+    for join in JOINS:
+        for stem in STEMS:
+            assert SHAPE.fullmatch(f"{join}{stem}000"), f"{join}{stem}"
+
+
 def test_a_code_is_a_word_and_three_digits() -> None:
     for _ in range(500):
         assert SHAPE.fullmatch(codename())
@@ -63,7 +75,9 @@ def test_the_heirs_come_up_far_oftener_than_chance_would_give_them(
 ) -> None:
     """Which is the whole point: a name is only a joke to somebody who recognises it."""
     random.seed(496)
-    monkeypatch.setattr(codenames, "_CALLED", set[str]())  # a process that has drawn none
+    monkeypatch.setattr(
+        codenames, "_CALLED", set[str]()
+    )  # a process that has drawn none
     canon = {f"{word}{number}" for word, number in HEIRS}
 
     drawn = [codenames._drawn() for _ in range(4000)]
@@ -128,16 +142,39 @@ def test_two_threads_drawing_at_once_draw_two_codes() -> None:
     assert len(set(drawn)) == len(drawn) == 800
 
 
-def test_a_process_that_has_drawn_every_code_is_answered_with_the_misnumbered_one(
+def test_a_crowded_process_is_answered_by_the_rule_and_never_with_a_hex(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Past every heir there is, an early cycle's fault -- unique the way a name was before."""
+    """The point of the whole file: there is no last code, so there is nothing to fall back to."""
     monkeypatch.setattr(codenames, "HEIRS", (("NeiKos", "496"),))
     monkeypatch.setattr(codenames, "WORDS", ("KykLos",))
+    monkeypatch.setattr(codenames, "JOINS", ("Meta", "Poly"))
+    monkeypatch.setattr(codenames, "STEMS", ("Kratos",))
     monkeypatch.setattr(codenames, "_CALLED", set[str]())
+    monkeypatch.setattr(codenames, "_COUNTING", itertools.count(1))
+    monkeypatch.setattr(codenames, "_TRIES", 4)  # crowded sooner, so the test is a test
 
-    whole = {codename() for _ in range(2000)}
+    # Four words and a thousand numbers each is the whole of what luck can reach here.
+    whole = [codename() for _ in range(6000)]
 
-    assert len(whole) == 2000  # the whole of a space that small, each of it once
-    assert all(SHAPE.fullmatch(one) for one in whole)
-    assert codename().startswith("Chaoz666#")
+    assert len(set(whole)) == len(whole)  # every one of them somebody else's
+    for one in whole:
+        assert SHAPE.fullmatch(one), one
+        assert "#" not in one
+
+    # And past those four the word grew a morpheme rather than a tail.
+    assert any(one.count("Meta") + one.count("Poly") > 1 for one in whole)
+
+
+def test_counting_spells_a_different_word_every_thousand(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Place notation over the morphemes, so a count is a word and no count is another's."""
+    monkeypatch.setattr(codenames, "_CALLED", set[str]())
+    monkeypatch.setattr(codenames, "_COUNTING", itertools.count(1))
+
+    counted = [codenames._counted() for _ in range(4000)]
+
+    assert len(set(counted)) == len(counted)
+    assert len({one[:-3] for one in counted}) >= 4  # a word per thousand, at the least
+    assert all(SHAPE.fullmatch(one) for one in counted)

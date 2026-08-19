@@ -207,7 +207,7 @@ def test_an_agent_is_one_agent_apart_from_its_configuration() -> None:
     # A flow that names its agents keeps those names across restarts; one left unnamed is
     # called after a Chrysos Heir, so a trace of two of them still reads as two.
     assert _EchoAgent(CONFIG, name="actor").id == "actor"
-    assert re.fullmatch(r"[A-Z][a-z]+[A-Z][a-z]+[0-9]{3}", actor.id)
+    assert re.fullmatch(r"[A-Z][a-z]+(?:[A-Z][a-z]+)+[0-9]{3}", actor.id)
 
 
 def test_an_agent_remembers_every_session_it_opened() -> None:

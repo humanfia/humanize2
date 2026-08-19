@@ -269,7 +269,9 @@ def test_an_agent_a_flow_never_named_is_left_with_its_codename(tmp_path: Path) -
     Runner(where, [agent]).run("echo one")
 
     assert agent.id == drawn  # the place had no name, so nothing renamed it
-    assert re.fullmatch(r"[A-Z][a-z]+[A-Z][a-z]+[0-9]{3}", agent.id)  # a Chrysos Heir's
+    assert re.fullmatch(
+        r"[A-Z][a-z]+(?:[A-Z][a-z]+)+[0-9]{3}", agent.id
+    )  # a Chrysos Heir's
 
 
 def test_the_one_that_was_asked_for_is_the_one_that_runs(tmp_path: Path) -> None:

@@ -10,17 +10,25 @@ perfect number, so the numbers are the joke and not decoration.
 
 Twelve of the thirteen carry a code the story says out loud. The thirteenth is the outsider
 who walked into the simulation and was never issued one, which is the shape of this file: the
-twelve are the canon, and everything else drawn here is another cycle of the same roles under
-another number -- Amphoreus reruns its heirs, and two of them have already shared `EpieiKeia216`
-across cycles. The canon comes up far more often than its share of the pool would give it, a
-name being only a joke to somebody who recognises it.
+twelve are the canon, and everything else is another cycle of the same roles under another
+number -- Amphoreus reruns its heirs, and two of them have already shared `EpieiKeia216` across
+cycles. The canon comes up far more often than its share would give it, a name being only a
+joke to somebody who recognises it.
+
+The rule builds words rather than only listing them. A Greek word is morphemes joined at a
+capital -- `Apo` and `Ria` are `ApoRia`, which is an heir's -- so `MetaKratos`, `PolyMorphe`
+and `NeoTelos` are words the same rule makes and the story merely never needed. That is what
+makes the space endless: when the short words are used up the next one grows a morpheme, so
+there is always another code and never a tail of hex to fall back to. `Chaoz666`, the
+misnumbered serial out of an early cycle, is the one code that breaks the rule, and this
+generates it no more than the story explains it.
 """
 
 from __future__ import annotations
 
+import itertools
 import random
 import threading
-import uuid
 
 __all__ = ["codename"]
 
@@ -169,15 +177,121 @@ WORDS: tuple[str, ...] = (
     "XeNos",
 )
 
+#: The morphemes a word may lead with, and the ones it may end on. A word is one of each
+#: joined at the capital -- `MetaKratos`, `PolyMorphe` -- which is how `ApoRia` is spelled and
+#: so how anything the story never needed is spelled too. Split in two rather than drawn from
+#: one bag because `KratosMeta` reads backwards and `MetaKratos` does not. Two of these at
+#: the least: a count is spelled in them, and one alone is a place notation that never carries.
+JOINS: tuple[str, ...] = (
+    "Amphi",
+    "Ana",
+    "Anti",
+    "Apo",
+    "Archi",
+    "Auto",
+    "Dia",
+    "Dys",
+    "Ek",
+    "En",
+    "Endo",
+    "Epi",
+    "Eu",
+    "Exo",
+    "Hemi",
+    "Hetero",
+    "Homo",
+    "Hyper",
+    "Hypo",
+    "Iso",
+    "Kata",
+    "Makro",
+    "Meso",
+    "Meta",
+    "Mikro",
+    "Mono",
+    "Neo",
+    "Ortho",
+    "Oxy",
+    "Palin",
+    "Pan",
+    "Para",
+    "Peri",
+    "Poly",
+    "Pro",
+    "Proto",
+    "Pseudo",
+    "Syn",
+    "Tele",
+    "Tetra",
+    "Tri",
+)
+
+#: What one of those leads to.
+STEMS: tuple[str, ...] = (
+    "Aion",
+    "Arche",
+    "Bios",
+    "Chronos",
+    "Doxa",
+    "Genesis",
+    "Gnosis",
+    "Grapha",
+    "Kosmos",
+    "Kratos",
+    "Krisis",
+    "Latreia",
+    "Lexis",
+    "Logos",
+    "Machia",
+    "Mania",
+    "Metron",
+    "Moira",
+    "Morphe",
+    "Nomos",
+    "Nous",
+    "Odos",
+    "Pathos",
+    "Phonia",
+    "Phora",
+    "Pistis",
+    "Pneuma",
+    "Poiesis",
+    "Praxis",
+    "Psyche",
+    "Rhythmos",
+    "Skopos",
+    "Soma",
+    "Sophia",
+    "Sphaira",
+    "Stasis",
+    "Taxis",
+    "Techne",
+    "Telos",
+    "Thesis",
+    "Thymos",
+    "Tonos",
+    "Topos",
+    "Tropos",
+    "Tyche",
+)
+
+#: The fewest morphemes a word is made of. One alone has no capital inside it and would not
+#: read as a code at all, so a word is two and grows from there.
+JOINED = 2
+
 #: How often a code is one of the twelve exactly as the story spells it, while any of the
-#: twelve is still free. Half, which is nothing like the one in eleven thousand a pool this
-#: size would give them by chance: the heirs are what somebody would recognise, so they are
-#: what somebody mostly gets.
+#: twelve is still free. Half, which is nothing like the one in eleven thousand the words
+#: written down here would give them by chance, let alone the ones built: the heirs are what
+#: somebody would recognise, so they are what somebody mostly gets.
 CANON = 0.5
 
 #: And how often the rest of the time is an heir's own word under a different number -- the
-#: same role out of another cycle -- rather than a word no heir ever carried.
+#: same role out of another cycle -- rather than some other word.
 AGAIN = 0.5
+
+#: How often that other word is one Greek already had rather than one built out of morphemes.
+#: Both are the same rule; a word with a meaning behind it is just the better joke.
+KNOWN = 0.5
 
 #: The codes handed out in this process, which no second agent may be given: two agents left
 #: unnamed are two agents, and a trace that read them as one would read a flow reviewing its
@@ -185,9 +299,12 @@ AGAIN = 0.5
 _CALLED: set[str] = set()
 _CALLING = threading.Lock()
 
-#: How many draws before the space is treated as crowded and walked in order instead. Well
-#: past what luck needs when most of it is free, and reached only by a process that has
-#: opened tens of thousands of agents nobody named.
+#: How far the counted codes have got. Only a process that has drawn most of what luck can
+#: find reaches them, and it goes on from where it left off rather than counting again.
+_COUNTING = itertools.count(1)
+
+#: How many draws before the space is treated as crowded and codes are counted out instead.
+#: Well past what luck needs when most of it is free.
 _TRIES = 64
 
 
@@ -195,7 +312,7 @@ def codename() -> str:
     """Draws a codename no agent in this process has been given.
 
     Returns:
-      The code, as an heir's word and three digits -- `NeiKos496`, `KykLos204`.
+      The code, as a Greek word and three digits -- `NeiKos496`, `KykLos204`, `MetaKratos881`.
     """
     with _CALLING:
         for _ in range(_TRIES):
@@ -203,7 +320,7 @@ def codename() -> str:
             if drawn not in _CALLED:
                 _CALLED.add(drawn)
                 return drawn
-        return _walked()
+        return _counted()
 
 
 def _drawn() -> str:
@@ -221,25 +338,42 @@ def _drawn() -> str:
         canon = (f"{word}{number}" for word, number in HEIRS)
         if free := [one for one in canon if one not in _CALLED]:
             return random.choice(free)  # noqa: S311
-    again = random.random() < AGAIN  # noqa: S311
-    word = random.choice(HEIRS)[0] if again else random.choice(WORDS)  # noqa: S311
-    return f"{word}{random.randrange(1000):03d}"  # noqa: S311
+    return f"{_word()}{random.randrange(1000):03d}"  # noqa: S311
 
 
-def _walked() -> str:
-    """The whole space in order, for a process that has drawn most of it already.
+def _word() -> str:
+    """A word to hang three digits off: an heir's, one Greek keeps, or one built to order.
 
     Returns:
-      The first code nobody holds, or -- past every code there is -- the misnumbered one out
-      of the early cycle, which is not a code so much as a fault, and is made unique the way
-      an agent's name was before any of this.
+      The word, capitalised at the front and where it breaks.
     """
-    for word in (*(one for one, _ in HEIRS), *WORDS):
-        for number in range(1000):
-            drawn = f"{word}{number:03d}"
-            if drawn not in _CALLED:
-                _CALLED.add(drawn)
-                return drawn
-    drawn = f"Chaoz666#{uuid.uuid4().hex[:8]}"
-    _CALLED.add(drawn)
-    return drawn
+    if random.random() < AGAIN:  # noqa: S311
+        return random.choice(HEIRS)[0]  # noqa: S311
+    if random.random() < KNOWN:  # noqa: S311
+        return random.choice(WORDS)  # noqa: S311
+    return random.choice(JOINS) + random.choice(STEMS)  # noqa: S311
+
+
+def _counted() -> str:
+    """A code built to order, for a process that has drawn most of what luck can find.
+
+    Counted rather than drawn, so it always answers and always by the rule. The count is read
+    off as morphemes -- the stem lowest, the joins above it -- which is a place notation over
+    the two lists, so every count spells a different word and the word grows one morpheme each
+    time the shorter ones run out. There is no last code, and so nothing to fall back to: an
+    agent nobody named has a Greek word and three digits however many have been handed out.
+
+    Returns:
+      The first counted code nobody holds.
+    """
+    while True:
+        count, number = divmod(next(_COUNTING), 1000)
+        count, index = divmod(count, len(STEMS))
+        parts = [STEMS[index]]
+        while count or len(parts) < JOINED:
+            count, index = divmod(count, len(JOINS))
+            parts.append(JOINS[index])
+        drawn = f"{''.join(reversed(parts))}{number:03d}"
+        if drawn not in _CALLED:
+            _CALLED.add(drawn)
+            return drawn
