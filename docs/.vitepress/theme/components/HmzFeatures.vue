@@ -20,8 +20,8 @@ import { withBase } from 'vitepress'
           <circle cx="158" cy="74" r="5.5" />
         </g>
       </svg>
-      <h3>One flow, eleven CLIs</h3>
-      <p>claude · codex · dsh · agy · grok · kimi · qwen · pi · opencode · mimo · zcode</p>
+      <h3>One flow, many coding agents</h3>
+      <p>agy · claude · codex · cursor · dsh · grok · kimi · mimo · opencode · pi · qwen · zcode</p>
     </a>
 
     <a class="card" :href="withBase('/features/steering')">
@@ -51,8 +51,8 @@ import { withBase } from 'vitepress'
         </g>
         <line class="head" x1="20" y1="10" x2="20" y2="78" />
       </svg>
-      <h3>Every run, a timeline</h3>
-      <p><code>hmz trace collect</code> — then open it in Perfetto.</p>
+      <h3>Trace a run on one timeline</h3>
+      <p>Reconstruct the agents and programs, then inspect them together in Perfetto.</p>
     </a>
 
     <a class="card" :href="withBase('/features/anchor')">
@@ -194,7 +194,7 @@ svg text {
   text-anchor: middle;
 }
 
-/* one flow, eleven CLIs */
+/* one flow, many coding agents */
 .fan path {
   fill: none;
   stroke: var(--vp-c-divider);

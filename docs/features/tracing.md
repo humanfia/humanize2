@@ -86,6 +86,18 @@ and the traces collected of it. Runs are named so that they sort in the order th
 **to the millisecond**: two started inside one second would otherwise be ordered at random, and
 what a flow is picked up from is the last run of it.
 
+## A local trace is not a report
+
+Collecting a trace reads local run records and backend logs into another local file. Opening it
+in Perfetto does not send it to humanize, and the trace may contain prompts, answers and tool
+output because it is the record its owner asked to inspect.
+
+Reporting failures is a separate, opt-in path. It has three states — nobody has answered, yes
+and no — and the unanswered state sends nothing. Report suppliers provide names, counts and
+configuration rather than transcripts or trace files; final filters remove command lines,
+credentials, external paths, frame context and logging breadcrumbs. The full promise, and the
+switch that controls it, is in [Reporting](/guide/reporting).
+
 ## Which backends can be read back
 
 Four backends have a reader today, and so are what a trace is made of: Claude Code, Codex,
@@ -96,11 +108,12 @@ about the backend, kept where every other fact about it is.
 Several more write a log humanize reads *as a run happens*, which is where the running cost and
 rate come from. And a backend that keeps its conversation in a database — rows rather than
 files, with protobuf payloads — has nothing to read either way: no slices afterwards, and no
-tally while it runs. Which of them is which is on [Twelve CLIs, one agent](/features/backends).
+tally while it runs. Which of them is which is on [Many backends, one agent](/features/backends).
 
 ## Where the detail is
 
 - [Tracing](/guide/tracing) — collecting one, and what to look for in your first
 - [Tracing reference](/reference/tracing) — the cycle format, the trace format, what a slice
   carries
+- [Reporting](/guide/reporting) — what may leave the machine, and only after consent
 - [Many turns at once](/features/concurrency) — why a fan-out is one process and many tracks

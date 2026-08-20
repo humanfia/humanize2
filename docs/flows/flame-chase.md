@@ -47,4 +47,4 @@ once is counted once.
 
 - [official/rlar](/flows/rlar) — two agents, but one of them reviews rather than works
 - [official/parallel_flame_chase](/flows/parallel-flame-chase) — three of these at once, in isolation
-- [Twelve CLIs, one agent](/features/backends) — what you can put on either side of it
+- [Many backends, one agent](/features/backends) — what you can put on either side of it

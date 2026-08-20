@@ -1326,9 +1326,10 @@ Hmz().flows.prophecy("official/review")   # reads what the source compiles to
 ```
 
 or [`hmz check --ship`](/reference/cli#hmz-check) from a command line. The flow's own Python
-still has to be there: a prophecy names the functions its nodes are. Reading a shipped
-prophecy runs what its bytes say, which is the trust a [flowverse](/guide/security) already
-has.
+still has to be there: a prophecy names the functions its nodes are. The shipped-file reader
+rebuilds only the seven allowlisted tuple types a prophecy uses and validates the resulting
+shape. Any other class or malformed shape is refused; loading the flow's Python remains the
+separate trust boundary described in [Security](/guide/security).
 
 ## Testing a flow
 

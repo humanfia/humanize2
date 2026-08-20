@@ -78,4 +78,5 @@ is about to use.
 
 - [The person as an agent](/guide/human-agent) — driving one from a flow
 - [Questions](/guide/questions) — an agent asking its user
+- [The mission board](/guide/board) — work the flow and the person can change without waiting
 - [Being away](/guide/afk) — deciding what happens when nobody is at the prompt

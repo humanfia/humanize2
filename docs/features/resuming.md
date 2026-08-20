@@ -5,10 +5,23 @@ pageClass: hmz-feature
 # Picked up where it stopped
 
 A loop meant to run for a week is a loop that will be stopped: somebody presses escape, a
-machine goes down, a turn takes the process with it. So a flow may say that it can be picked up
-where its last run left off — and then running it again is what picks it up. There is no flag.
+machine goes down, a turn takes the process with it. humanize has two answers. An ordinary
+flow may preserve the state it explicitly owns; an atlas preserves its completed node visits.
+Starting the flow again is what picks either one up.
 
 <HmzResume />
+
+## State in one case, completed visits in the other
+
+The diagram shows an ordinary resumable flow. It starts its Python function again with the
+dict it last wrote, so the flow decides what progress means and where to continue. It also runs
+the current version of that function: saved state is an input to today's code, not a frozen
+copy of yesterday's code.
+
+An [atlas](/features/prophecy) has a stronger coordinate. Every completed visit's answer is
+written beside the identity of the prophecy it belongs to. A later run walks those answers to
+the first unfinished visit and continues there. If the graph has changed, its identity has
+changed and the run starts at the beginning rather than putting an old answer into a new edge.
 
 ## What a flow keeps is its own handful of things
 
@@ -53,10 +66,11 @@ of it recorded. A flow is a directory on disk, and what can happen next is what 
 
 ## What does not come back
 
-The conversation. A session is opened rather than reopened, so a run picked up again starts
-from the task and the repository with none of the rounds before it in context. A stateful loop
-stopped on its fortieth round says round 41 when it is started again — and remembers nothing
-else about the forty.
+The conversation. Neither a state dict nor a prophecy is a copy of a backend session. An
+ordinary flow opens a session rather than reconstructing one; an atlas reuses completed visit
+answers rather than recreating the context in which an agent produced them. A stateful loop
+stopped on its fortieth round says round 41 when it starts again — and remembers nothing else
+about the forty unless the flow wrote it down.
 
 Which is the argument for keeping little: the repository is the memory, and the handful of
 things the flow tracks is what has to survive.
@@ -64,5 +78,6 @@ things the flow tracks is what has to survive.
 ## Where the detail is
 
 - [Picking a run up](/guide/resuming) — declaring it, and where the file lives
+- [An atlas](/guide/atlas#stopping-and-starting) — graph identity and node-level continuation
 - [Tracing](/guide/tracing#what-a-run-writes-down) — what else a run writes down
 - [Stopping](/guide/stopping) — what escape does to a turn

@@ -45,7 +45,7 @@ onUnmounted(() => clearTimeout(clearing))
     </div>
 
     <p class="under">
-      Python ≥ 3.12 · drives the coding agent CLI you already log into · no API key of its own
+      Python ≥ 3.12 · reuses existing CLI logins · bundled DSH uses provider credentials
     </p>
   </div>
 </template>

@@ -273,9 +273,10 @@ thing and reads as another
 ```
 
 ::: warning
-A shipped prophecy is a pickle, and reading one runs what it says. That is the trust a
-flowverse already has — [a flow is a directory of Python and reading one means running
-it](/guide/security) — but it is worth knowing that `prophecy.pkl` is code and not data.
+A shipped prophecy uses pickle's format, but humanize does not open it with a general-purpose
+pickle reader. It rebuilds only the seven allowlisted tuple types that make up a prophecy,
+checks their canonical shape, and refuses anything else. The flow's Python is still trusted
+code when it is loaded, as [the security guide](/guide/security) explains.
 :::
 
 ## When to write one, and when not to

@@ -4,12 +4,14 @@ pageClass: hmz-feature
 
 # A flow is Python
 
-A flow is a directory holding a function that takes the agents and the task. Everything else
-about it is ordinary Python — a loop, a subprocess call, a file read between two turns, a
-condition on what the last answer said.
+A flow is a directory holding Python that takes the agents and the task. Most are ordinary
+functions: a loop, a subprocess call, a file read between two turns, a condition on what the
+last answer said. An **atlas** makes a different bargain: its deliberately narrow body is read
+before it runs and compiled into a typed graph called a prophecy.
 
-There is no graph to declare, no YAML, and no engine deciding what happens next. The flow *is*
-what happens next.
+Both are Python, discovered the same way and driven by the same run. Choose an ordinary flow
+when its shape should remain free; choose an atlas when the shape must be checked, compared or
+resumed node by node before any agent starts.
 
 <HmzLoops />
 
@@ -38,11 +40,16 @@ What the mark carries is what a command line cannot otherwise know:
 A flow may also declare **settings of its own** as a pydantic model, which become fields on the
 sheet where it is set up and lines in a file a scripted run can hand it.
 
-## Reading one means running it
+## Ordinary flows are loaded as code
 
-There is no static description of a flow to read instead, and none is cached. A flow rewritten
-between two runs — by hand, or by an agent that flow is itself driving — runs as it is *now*.
-That is what makes a flow, and the skills it brings, a thing a run can improve.
+There is no static description of an ordinary flow to run instead, and none is cached. A flow
+rewritten between two runs — by hand, or by an agent that flow is itself driving — runs as it
+is *now*. That is what makes a flow, and the skills it brings, a thing a run can improve.
+
+The static checker can inspect a flow's source without importing it. An atlas goes further: its
+body is the description, so compiling it produces a prophecy without executing that body. Its
+node functions and the rest of its module remain ordinary Python, which is why a flowverse is
+still trusted as code rather than treated as data.
 
 Its own directory is importable while it runs and only while, since what a flow imports is not
 something the rest of the process should be able to.
@@ -108,6 +115,8 @@ somebody had thought to add it would be a list that hid what there is to run.
 
 - [Writing a flow](/guide/writing-a-flow) · [Loops](/guide/loops) · [Testing a
   flow](/guide/testing-flows)
+- [An atlas](/guide/atlas) · [Checking a flow](/guide/checking-flows) · [Python becomes a
+  prophecy](/features/prophecy)
 - [Settings of its own](/guide/flow-settings) · [A flow that calls a
   flow](/guide/calling-flows) · [Flowverses](/guide/flowverses)
 - [Flows reference](/reference/flows) — the contract, in full
