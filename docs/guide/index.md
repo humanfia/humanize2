@@ -59,6 +59,8 @@ These are for looking things up. If you have not used humanize before, the
 | [Settings of its own](/guide/flow-settings) | A pydantic model that becomes `/config` fields |
 | [Many turns at once](/guide/async-flows) | `async def run`, and awaiting several turns |
 | [A flow that calls a flow](/guide/calling-flows) | Composition, and whose agents the inner one gets |
+| [An atlas](/guide/atlas) | Restricted Python compiled into a typed, resumable prophecy |
+| [Checking a flow](/guide/checking-flows) | Static findings and executable proof before a real turn |
 | [Testing a flow](/guide/testing-flows) | Checking the loop without spending a turn |
 | [Flowverses](/guide/flowverses) | A git repository of flows, offered by name |
 

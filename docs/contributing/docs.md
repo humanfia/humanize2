@@ -25,7 +25,7 @@ inbound links moving is a red build rather than a 404 somebody finds later.
 docs/
 ├── .vitepress/config.mts     nav, sidebars, the root's redirect, everything
 ├── .vitepress/theme/         the palette, and every diagram on the site
-├── features/                 one page per feature, each built on a diagram you can push
+├── features/                 one capability map, then feature pages built on diagrams
 ├── flows/                    one page per flow, each with its own loop played on it
 ├── tutorials/                six, in order, each a whole piece of work
 ├── guide/                    one page per feature, answering "how do I use this?"
@@ -49,7 +49,7 @@ Five kinds of page, and a page that is two of them is two pages.
 
 | | | |
 | --- | --- | --- |
-| **Features** | understanding | One page per feature, built around a diagram the reader can push. What it is and why it works the way it does. **No commands and no code**: a reader who wants to run it is one click from the guide, which every page ends by naming. Its index is the front of the site. |
+| **Features** | understanding | A system-wide capability map, then one page per deep feature, built around a diagram the reader can push. What it is and why it works the way it does. The map and deep pages have **no commands and no code**: a reader who wants to run it is one click from the guide. The index is the front of the site, so its one install line and recorded demos are the deliberate exception. |
 | **Flows** | what there is to run | One page per flow humanize or the official flowverse ships, named the way `-f` takes it, opening with the `hmz exec` line and the shape of its loop. What it is for, what it takes, and what a run picked up carries in. |
 | **Tutorials** | learning | Taken in order, start to finish, with every command written out. A reader following one is not choosing anything; they are being led. Six of them, and adding a seventh means arguing that one of the six should go. |
 | **Guides** | doing | "How do I use X?" One feature each. Opens with a `## Try it` section short enough to paste, then explains the rest. A reader here has a job and knows what they want. |
@@ -80,9 +80,11 @@ otherwise.
 ## The front of the site
 
 `features/index.md` is what somebody arriving is handed: one line of install with the way to
-the quickstart beside it, four drawings, the recorded demos, and the index of the feature
-pages. It explains nothing at length — a reader who wants to know how to use something is one
-click from a tutorial, a guide or the reference, and every one of those is a better page for it.
+the quickstart beside it, the unusual features drawn, the five-system capability map, the
+recorded demos, and the index of the feature pages. `features/capabilities.md` expands that map
+into the reader's path to the right explanation without turning internal implementation units
+into a second product vocabulary. The map and deep pages do not explain how to run something
+— a tutorial, guide or reference page is one click away and better at that job.
 
 ```
 .vitepress/theme/
@@ -123,19 +125,22 @@ One page, one diagram, one component, registered in the same `index.ts` — the 
 and the one elsewhere that is built the same way:
 
 ```
-HmzMap.vue          features/            the six stages, and every page hung off one
+HmzMap.vue          features/            five systems, nineteen reader-facing capability groups
+HmzProphecy.vue     features/prophecy    Python becoming a checked, resumable graph
 HmzSyscalls.vue     features/anchor      a call, the seccomp verdict, and where it lands
 HmzAccounts.vue     features/accounts    the path swap, then the chain and its waits
 HmzTimeline.vue     features/tracing     a trace, with the programs and the clock as switches
 HmzSteer.vue        features/steering    type a line into a running turn, or queue behind it
 HmzShape.vue        features/shapes      a model, how a backend is held to it, what comes back
-HmzBackends.vue     features/backends    twelve backends against what a flow may ask for
+HmzBackends.vue     features/backends    backends against what a flow may ask for
 HmzLoops.vue        features/flows       the shapes a loop takes, stepped through
 HmzTurns.vue        features/concurrency twelve prompts, scheduled across n conversations
 HmzResume.vue       features/resuming    pull the plug, then run it again
+HmzDaemon.vue       features/daemon      leave, attach again, and see the held PTY
 HmzGoal.vue         features/goals       the model deciding, beside your code deciding
 HmzMoments.vue      features/hooks       hang a hook, run the turn, read what it said
 HmzPerson.vue       features/human       a questionnaire built out of a pydantic model
+HmzSurfaces.vue     features/surfaces    several entry points converging on one run
 HmzStack.vue        contributing/architecture
                                          the layers, and what each is allowed to name
 ```

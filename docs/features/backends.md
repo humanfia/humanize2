@@ -2,14 +2,14 @@
 pageClass: hmz-feature
 ---
 
-# Twelve CLIs, one agent
+# Many backends, one agent
 
-humanize never talks to a model provider. It drives the coding agent CLI you already have,
-logged in the way you already log in — twelve of them, plus anything that speaks the Agent
-Client Protocol. There is no API key for it to hold.
+Most humanize backends do not talk to a model provider. They drive a supported coding agent
+under its existing login, through a built-in adapter or the Agent Client Protocol. humanize
+does not need the provider's API key for those backends.
 
-The one exception ships inside it: DeepSeek Harness arrives with humanize, because it has no
-subscription login to use instead.
+The exception ships inside it: DeepSeek Harness arrives as an SDK-backed agent and uses its
+own DeepSeek provider credentials because it has no subscription login to reuse.
 
 <HmzBackends />
 
@@ -19,16 +19,13 @@ A backend, a model, an effort, and the [account](/features/accounts) its turns r
 agents of one spelling are two agents, so a flow of an actor and a reviewer at one
 configuration is what it says it is.
 
-## What it runs is asked, never written down
+## What it runs is discovered for the account
 
-A model id is not a fact that keeps. These CLIs ship models without asking anybody, and which
-of them your account may name is your account's business — so a list written down here would be
-wrong the day the CLI ships one, and would say nothing about what you may actually run.
+A model id is not usually a fact that keeps. Coding agents add models, and which of them an
+account may name is the account's business. Wherever a backend can report its catalogue,
+humanize asks it under that account and keeps the answer:
 
-So the backend itself is asked, by whatever mechanism that backend offers for being asked, and
-what it says is kept:
-
-- **Asked as the account whose it would be** — under that account's own credential paths and
+- **It is asked as the account whose it would be** — under that account's own credential paths and
   variables, and without the ones its backend would otherwise take an account from. Which is
   exactly how a turn of that account is run. Two accounts of one CLI are two catalogues.
 - **Kept with the account**, so taking the account away takes its catalogue with it.
@@ -38,11 +35,14 @@ what it says is kept:
   to ask. A backend that would not answer leaves the account made — an account whose models are
   not known yet is one to ask again, not one that failed.
 
-Nothing is added to what a backend answered. Claude Code will report a model named by
-`ANTHROPIC_CUSTOM_MODEL_OPTION` without checking that the account can run it, so humanize
-never sets that variable to put a model in front of you: a catalogue is what the account said
-it runs. One you set yourself is passed through untouched, and is kept under the alias you
-chose rather than the id Claude resolves it to — the alias is what `--model` takes.
+DeepSeek Harness and Qwen Code cannot list their models dynamically. Their adapters provide
+small advisory catalogues instead: the official DeepSeek adapter's current models, and the
+models Qwen Code ships pointed at. Those lists make initial setup possible; they are not proof
+of what an account or compatible endpoint will accept.
+
+For a discovered catalogue, nothing is added to what the backend answered. Claude Code may
+report a custom alias without proving the account can run it, so humanize preserves the alias
+exactly as that account supplied it rather than silently manufacturing another model entry.
 
 ## The efforts are a vocabulary, so they are written down
 

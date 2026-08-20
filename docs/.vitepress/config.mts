@@ -61,39 +61,51 @@ export default defineConfig({
     // a title nobody would write on the page itself, and the page is what it goes to. So the
     // section is the first line, and the groups under it are what they were.
     sidebar: {
-      // One page per feature, each built around a diagram you can push. The first group is
-      // the one to send somebody who wants to know what is unusual about this.
+      // The capability map groups the whole system; the pages beneath it take one mechanism
+      // far enough to explain its trade-offs, each around a diagram the reader can push.
       '/features/': [
         { text: 'Features', link: '/features/' },
+        { text: 'Capability map', link: '/features/capabilities' },
         {
-          text: 'The deep end',
+          text: 'Flow system',
           collapsed: false,
           items: [
-            { text: 'The anchor', link: '/features/anchor' },
-            { text: 'Two accounts of one CLI', link: '/features/accounts' },
-            { text: 'One timeline', link: '/features/tracing' },
-            { text: 'A line typed mid-turn', link: '/features/steering' },
-            { text: 'Answers in a shape', link: '/features/shapes' },
-          ],
-        },
-        {
-          text: 'The shape of a run',
-          collapsed: false,
-          items: [
-            { text: 'Twelve CLIs, one agent', link: '/features/backends' },
+            { text: 'Python becomes a prophecy', link: '/features/prophecy' },
             { text: 'A flow is Python', link: '/features/flows' },
             { text: 'Many turns at once', link: '/features/concurrency' },
             { text: 'Picked up where it stopped', link: '/features/resuming' },
           ],
         },
         {
-          text: 'Who is at the other end',
+          text: 'Agent control plane',
           collapsed: false,
           items: [
+            { text: 'Many backends, one agent', link: '/features/backends' },
+            { text: 'Two accounts of one CLI', link: '/features/accounts' },
+            { text: 'A line typed mid-turn', link: '/features/steering' },
+            { text: 'Answers in a shape', link: '/features/shapes' },
             { text: 'It decides when it is done', link: '/features/goals' },
             { text: 'The moments of a turn', link: '/features/hooks' },
             { text: 'You, as one of the agents', link: '/features/human' },
           ],
+        },
+        {
+          text: 'Execution fabric',
+          collapsed: false,
+          items: [{ text: 'The anchor', link: '/features/anchor' }],
+        },
+        {
+          text: 'Run continuity and observability',
+          collapsed: false,
+          items: [
+            { text: 'The terminal can leave', link: '/features/daemon' },
+            { text: 'One timeline', link: '/features/tracing' },
+          ],
+        },
+        {
+          text: 'Product surfaces',
+          collapsed: false,
+          items: [{ text: 'One system, four ways in', link: '/features/surfaces' }],
         },
       ],
 
