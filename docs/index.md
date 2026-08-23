@@ -53,11 +53,13 @@ AGENT=claude/claude-opus-4-8:high
 | ZCode | `zcode/zai/glm-5.3:high` |
 | DeepSeek Harness | `dsh/deepseek-v4-flash:high`, with `export DEEPSEEK_API_KEY=sk-…` |
 
-Those are examples, not a fixed list. A model id is whatever that CLI shipped this week, and
-which ones you may name depends on the account you are logged in as — `pi`, `opencode`, `mimo`
-and `zcode` write a model as `provider/id`, which is the extra slash in their rows. To see what
-yours offers, open `/flow` in the interface and turn to its agents. Get the id wrong and the
-backend says so on the first turn:
+Those are examples, not a fixed list, and not every backend humanize drives is in it — [Many
+backends, one agent](/features/backends) is all of them against what a flow may ask of each. A
+model id is whatever that CLI shipped this week, and which ones you may name depends on the
+account you are logged in as — `pi`, `opencode`, `mimo` and `zcode` write a model as
+`provider/id`, which is the extra slash in their rows. To see what yours offers, open `/flow`
+in the interface and turn to its agents. Get the id wrong and the backend says so on the first
+turn:
 
 ```console
 [claude-code:unrecognized_model] {"model":"not-a-real-model","query_source":"sdk"}
@@ -140,9 +142,9 @@ hmz trace collect
 ```
 
 Drag that file into [ui.perfetto.dev](https://ui.perfetto.dev). Each agent becomes a process,
-each of its conversations a track, and each slice one thing the agent did — with the prompt, the
-reasoning, the tool input and the tool output attached. For a nine-hour run it is the only view
-that fits on a screen.
+each of its conversations a track, and each slice one thing the agent did — with the prompt,
+the reasoning, the tool input and the tool output attached. For a nine-hour run it is the only
+view that fits on a screen.
 
 | What you now know | |
 | --- | --- |
@@ -186,8 +188,8 @@ def run(agents: tuple[Agent], task: str) -> None:
 ```
 
 Run it by name. humanize also offers it in the interface: `/flow` lists the flows it ships,
-every [flowverse](/weaver/flowverses) fetched here, and your own — the ones in `.humanize/flows`
-as `local`, the ones in `~/.humanize/flows` as `user`.
+every [flowverse](/weaver/flowverses) fetched here, and your own — the ones in
+`.humanize/flows` as `local`, the ones in `~/.humanize/flows` as `user`.
 
 ```sh
 hmz exec -f twice -a claude/claude-opus-4-8:high "add a --dry-run flag to calc.py"
@@ -271,7 +273,8 @@ patch](/contributing/tutorials/first-patch) takes one change from clone to pull 
   </a>
   <a :href="withBase('/user/')">
     <strong>User Guide</strong>
-    <span>Running flows: a page per thing humanize does, opening with something to paste.</span>
+    <span>Running flows: a page per thing humanize does, opening with something to
+    paste.</span>
   </a>
   <a :href="withBase('/weaver/')">
     <strong>Weaver Guide</strong>
@@ -290,6 +293,6 @@ patch](/contributing/tutorials/first-patch) takes one change from clone to pull 
 <p class="hmz-warn">
 humanize runs every agent with permission prompts disabled, and no setting turns them back on —
 an agent under a flow edits files, runs commands and makes commits without asking. Read
-<a :href="withBase('/user/security')">Security</a> before you point one at a repository you care
-about.
+<a :href="withBase('/user/security')">Security</a> before you point one at a repository you
+care about.
 </p>

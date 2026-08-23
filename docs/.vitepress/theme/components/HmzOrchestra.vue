@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // A run of a flow, drawn as it happens: one lane per agent, and every turn's tool calls
 // landing on the trace strip underneath the way `hmz trace collect` lands them in Perfetto.
-// The motion is a simulation of the shape of a run -- the real screens are in the gallery.
+// The motion is a simulation of the shape of a run -- the recorded screens are in the guides.
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 
 type Kind = 'tool' | 'think' | 'say' | 'wait'
