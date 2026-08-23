@@ -6,7 +6,7 @@ than one thing.
 
 ## Write the flow as a coroutine
 
-To run more than one turn at a time, the loop has to wait for several things at once. Write
+To have more than one turn going, the flow has to wait for several things at once. Write
 `async def run`:
 
 ```python
@@ -52,8 +52,8 @@ reviews = agent.batch(prompts, schema=Review, suppress=True)      # shaped, and 
 ```
 
 **How wide** a batch runs is a question about the machine, not about this library, so nothing
-caps it. A batch runs at once whatever it is given. `at_once` is where a flow says otherwise,
-and every prompt lands either way. The rest queue behind the ones running:
+caps it: a batch runs at once whatever it is given. `at_once` is where a flow says otherwise,
+and every prompt lands either way — the rest queue behind the ones running:
 
 ```python
 agent.batch(prompts, at_once=32)
@@ -103,8 +103,8 @@ is handed straight back.
 
 ## Run one agent in several directories
 
-This is the pattern that matters. A worktree per task, a checkout per shard: **a session
-apiece**, and their turns going together.
+A worktree per task, a checkout per shard: **a session apiece**, and their turns going
+together.
 
 ```python
 import subprocess
@@ -124,8 +124,8 @@ async def run(agents: tuple[Agent], task: str) -> None:
     )
 ```
 
-Either way the agent is **one agent**: one set of settings, one id, one place in the trace.
-What differs is where each conversation is rooted. See [Worktrees](/weaver/worktrees).
+The agent is still **one agent**: one set of settings, one id, one place in the trace. What
+differs is where each conversation is rooted. See [Worktrees](/weaver/worktrees).
 
 ## Create ten thousand conversations up front
 

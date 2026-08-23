@@ -1,12 +1,10 @@
 # Writing a flow
 
 A **flow** is a directory whose `__init__.py` holds a function marked `@flow`, and that
-function drives the agents. Write one when you want the same agents run the same way again and
-again, rather than typed out afresh each time.
+function drives the agents. A weaver writes one when the same agents should be run the same way
+again and again, rather than typed out afresh each time.
 
 ## Write the flow
-
-Create the directory, then write the flow in it.
 
 ```sh
 mkdir -p .humanize/flows/twice
@@ -29,17 +27,14 @@ def run(agents: tuple[Agent], task: str) -> None:
 
 ## Run the flow
 
-Run the flow by name from the command line.
-
 ```sh
 hmz exec -f twice -a claude/claude-opus-4-8:high "add a --dry-run flag to calc.py"
 ```
 
-humanize also offers the flow in the interface. `/flow` lists the flows humanize ships,
-everything in every [**flowverse**](/weaver/flowverses) fetched here, and your own — the ones in
-`.humanize/flows` here as `local`, and the ones in `~/.humanize/flows` as `user`. A flowverse is
-a place where flows live, and your own two directories are places like any other. Each place has
-**←** and **→** to step between them.
+`/flow` offers it in the interface too, beside the flows humanize ships and everything in every
+[**flowverse**](/weaver/flowverses) fetched here. A flowverse is a place flows live, and your
+own two directories are places like any other: `.humanize/flows` here is `local`,
+`~/.humanize/flows` is `user`. **←** and **→** step between the places.
 
 ## The contract, in three rules
 
@@ -82,8 +77,6 @@ defined) -- import what the annotation names at runtime, so the count it states 
 
 ## Choose what the next turn remembers
 
-Choose whether the second turn should remember the first one.
-
 ```python
 agent("do the task")          # a session of its own, dropped straight after: nothing carries over
 session = agent.new()
@@ -92,7 +85,7 @@ session("keep going")         # resumes it, the first turn still in context
 ```
 
 A **turn** is one request to the agent. A **session** keeps its turns in context, so the second
-turn knows what the first one did. The flow you wrote holds a session. Change it to:
+turn knows what the first one did. The flow above holds a session; without one:
 
 ```python
 @flow
@@ -150,13 +143,11 @@ def run(agents: tuple[Agent], task: str) -> None:
             return
 ```
 
-There is nothing special to do here. A flow is just a function, so it may branch, sleep, read
-files, shell out and give up.
+A flow is just a function, so it may branch, sleep, read files, shell out and give up.
 
 ## Say what the flow is
 
-The first line of the docstring is shown beside the flow's name where flows are listed. Write
-one:
+The first line of the docstring is what is shown beside the flow's name where flows are listed:
 
 ```python
 """Two passes: do the work, then read it back and fix what is wrong."""
@@ -176,16 +167,16 @@ by taking its name. A file whose name starts with `_` is not a flow.
 
 ## Check your work
 
-Check the flow itself, before anything runs it: a static reading that executes nothing, then
-the flow loaded in a subprocess held to a clock. Driving it with stubs — including the world
-where the reviewer never says the work is done — is `proved()`, a call of your own. See
+`hmz check` reads the flow before anything runs it: a static reading that executes nothing,
+then the flow loaded in a subprocess held to a clock. Driving it with stubs — including the
+world where the reviewer never says the work is done — is `proved()`, a call of your own. See
 [Checking a flow](/weaver/checking-flows).
 
 ```sh
 hmz check local/twice
 ```
 
-And check which agents the flow declares.
+And from Python:
 
 ```python
 from hmz.flows import drives
@@ -195,7 +186,7 @@ drives("twice")       # the names of the agents it declares
 
 ## A flow whose shape is known before it runs
 
-Everything above is a flow: a Python file that may branch any way it likes, and whose shape is
+Everything above is a flow: Python that may branch any way it likes, and whose shape is
 whatever it does. Where the shape is known in advance — a pipeline of phases, a review loop
 meant to run for a week — an [atlas](/weaver/atlas) is the stricter bargain. Its body is a
 declaration rather than a program, compiled into a graph before the first turn, so it is

@@ -37,14 +37,8 @@ model refuses is what the flow will not run.
 
 ## Set it at the prompt
 
-Run `/flow` and choose the flow to open its settings sheet.
-
-```
-/flow
-```
-
-The sheet is that model with a cursor on it. Each row shows one setting: its name, what it is
-set to, and the line the flow declared it with.
+Choosing the flow in `/flow` opens its settings sheet: that model with a cursor on it. Each row
+is one setting — its name, what it is set to, and the line the flow declared it with.
 
 ```
    ❯ 1. rounds                       3            how many times round
@@ -64,12 +58,10 @@ land. A setting that is **stepped** does not, so a blank setting does not read a
 can be typed into.
 
 `/flow` walks through this between choosing the flow and landing on its agents page. That is
-the only place it can: only the flow just chosen says what there is to set. The agents page
-never does. The two are halves of one question, and each asks only its own.
+the only place it can: only the flow just chosen says what there is to set. The two pages are
+halves of one question, and each asks only its own.
 
 ## Set it from a file
-
-You can set the same values from a YAML file instead of the sheet.
 
 ```yaml
 # setup.yaml
@@ -97,8 +89,7 @@ hmz -f pair -c setup.yaml
 setting = config or Config()
 ```
 
-This falls back to the model's own defaults, so the flow runs the same either way. Do that in
-one line at the top and never think about it again.
+That falls back to the model's own defaults, so the flow runs the same either way.
 
 ## Refuse the combinations you cannot run
 
