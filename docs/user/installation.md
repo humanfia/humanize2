@@ -8,10 +8,9 @@
 | **At least one supported backend** | `agy`, `claude`, `codex`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen` or `zcode` on your `PATH` — or nothing at all, since DeepSeek Harness arrives with humanize and needs only a DeepSeek API key. |
 | **A project you are willing to have rewritten** | Read [Security](/user/security) first. |
 
-You need nothing else. Two features want more, but neither is needed for anything in the
-tutorials: [a container of the agent's own](/user/containers) wants `docker`, and [remote
-execution](/user/remote-execution) wants Linux on x86-64 here plus `python3` on the far
-machine.
+Nothing else, and no tutorial needs more. Two features do: [a container of the agent's
+own](/user/containers) wants `docker`, and [remote execution](/user/remote-execution) wants
+Linux on x86-64 here plus `python3` on the far machine.
 
 ## Install humanize
 
@@ -50,9 +49,9 @@ hmz`, or activate `.venv` first.
 
 ### DeepSeek Harness
 
-There is nothing to add. Its SDK and the runtime that its turns are taken on are ordinary
-dependencies of humanize. Any install that has humanize has them. It still needs an API key —
-see [Signing each backend in](#signing-each-backend-in) below.
+Nothing to add: its SDK and the runtime its turns are taken on are ordinary dependencies, so
+any install that has humanize has them. It still needs an API key — see [Signing each backend
+in](#signing-each-backend-in).
 
 ## Check what you have
 
@@ -62,13 +61,14 @@ humanize can run the backends installed in its environment. Check the CLI backen
 command -v agy claude codex grok kimi pi qwen opencode mimo zcode
 ```
 
-A CLI backend humanize cannot find is not offered. It looks on your `PATH` first, and then
-where an installer would have put one — `~/.local/bin`, `/usr/local/bin`, `/opt/homebrew/bin`,
+A CLI backend humanize cannot find is not offered. It looks on your `PATH` first, then where an
+installer would have put one — `~/.local/bin`, `/usr/local/bin`, `/opt/homebrew/bin`,
 `/usr/bin`, `/bin` — so a backend installed on this machine is offered even when whatever
-started `hmz` handed it a `PATH` of its own. That last part is what a notebook kernel, a
-service or a runtime platform's launcher does. `dsh` stays in the list of CLIs that
-an agent may be set to when its SDK is missing, so that it can show the installation command.
-It becomes selectable when this import succeeds:
+started `hmz` handed it a `PATH` of its own, as a notebook kernel, a service or a runtime
+platform's launcher does.
+
+`dsh` stays in the list of CLIs an agent may be set to when its SDK is missing, so that it can
+show the installation command. It becomes selectable when this import succeeds:
 
 ```sh
 python -c 'import deepseek_harness; print("dsh installed")'
@@ -93,22 +93,22 @@ Each CLI logs in its own way. humanize never sees the credential:
 | ZCode | `zcode login` |
 | DeepSeek Harness | a DeepSeek API key saved by dsh, stored from an agent's `provider` row, or supplied as `DEEPSEEK_API_KEY` |
 
-DeepSeek Harness is currently a developer preview, and **arrives with humanize**.
+DeepSeek Harness is a developer preview and **arrives with humanize**:
 `deepseek-harness-sdk>=0.1.0rc6,<0.2` and its bundled runtime are ordinary dependencies rather
-than an extra. A backend that humanize drives is not a thing an install should be able to have
-half of. The published runtime wheels support Linux on x86-64 or arm64 and macOS on arm64. It
-does not require the `dsh` CLI.
+than an extra, because a backend humanize drives is not a thing an install should be able to
+have half of. The runtime wheels are published for Linux on x86-64 or arm64 and macOS on arm64.
+The `dsh` CLI is not required.
 
-DeepSeek Harness supports API-key login only. To use dsh's own credential store, run `dsh web`,
-open **Settings -> Models**, enter the DeepSeek key, and save it. In humanize, set an agent's
-`cli` row to `dsh` and leave its `provider` row on `as local`. That choice uses dsh's normal
-configuration sources: the saved key and any `llm-deepseek.baseURL` in
+It supports API-key login only, and there are two places to keep that key. For dsh's own
+credential store, run `dsh web`, open **Settings -> Models**, enter the DeepSeek key and save
+it; then set an agent's `cli` row to `dsh` and leave its `provider` row on `as local`. That
+reads dsh's normal configuration sources — the saved key and any `llm-deepseek.baseURL` in
 `$DSH_HOME/settings.yaml`, then its environment layers. `$DSH_HOME` defaults to `~/.dsh`.
 
-To keep a separate key in humanize's provider store instead, choose `dsh` on the `cli` row,
-press enter on the `provider` row and **a** in the list of accounts, choose `key`, and enter an
-account name and the key. You can make the same account from a terminal. This command asks for
-the key without putting it in the command itself:
+For a separate key in humanize's provider store, choose `dsh` on the `cli` row, press enter on
+the `provider` row and **a** in the list of accounts, choose `key`, and enter an account name
+and the key. The same account is one command from a terminal, which asks for the key rather
+than taking it in the command itself:
 
 ```sh
 hmz providers add dsh/deepseek -w key
@@ -170,4 +170,4 @@ coding agent CLIs or their own logins.
 
 ## Next
 
-[Getting started](/) goes from here to a run you can read back.
+The [quickstart](/#run-a-flow) goes from here to a run you can read back.
