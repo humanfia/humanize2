@@ -5,14 +5,14 @@ a repository you care about.
 
 ## Every agent runs with permission prompts disabled
 
-humanize drives coding agents unattended, as flowbench does. **No setting turns the prompts
-back on.** An agent under a flow edits files, runs commands and makes commits without asking.
+humanize drives coding agents unattended, as
+[flowbench](https://humanfia.ai/projects/flowbench) does. **No setting turns the prompts back
+on.** An agent under a flow edits files, runs commands and makes commits without asking.
 
 [`/afk`](/user/afk) governs whether an agent may stop and ask you a *question*. It does not
 govern whether the agent may act. Nothing does.
 
-You can narrow [what an agent may do at all](/user/permissions). There are four rungs, set per
-agent:
+You can narrow [what an agent may do at all](/user/permissions) — four rungs, set per agent:
 
 ```sh
 hmz exec -f ralph_loop \
@@ -66,7 +66,7 @@ hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 
 - **No API key.** humanize drives the CLI you already logged in. The credential goes from that
   CLI to its own provider.
-- **No transcript of its own.** The backends write their own logs. A
+- **No transcript of its own.** The backends write their own logs. An
   [epic](/user/concepts#epic) records only which sessions belonged to which agent.
 - **No values from a provider.** `hmz providers show` and `list` name the variables an account
   sets. They never print what those variables are. A secret you type at the prompt appears as

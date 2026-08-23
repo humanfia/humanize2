@@ -7,8 +7,8 @@ outline: 2
 
 # Troubleshooting
 
-Each entry shows what a problem looks like and what to do about it. The entries are grouped by
-where you were when it happened.
+What a problem looks like, and what to do about it — grouped by where you were when it
+happened.
 
 ## Starting a flow
 
@@ -41,9 +41,9 @@ as a path — `flows/mine` and `flows/mine.py` both. See
 
 ### `the official flowverse has not been fetched yet`
 
-The name is right, but the download has not happened. Open `/flow`. It fetches whatever has
-never been fetched as it opens. Press `r` on it in `/flowverses` to fetch it again. `hmz
-flowverses fetch official` does the same from a command line.
+The name is right; the download has not happened. `/flow` fetches whatever has never been
+fetched as it opens. Press `r` on it in `/flowverses` to fetch it again, or run `hmz flowverses
+fetch official`.
 
 ### `nothing in it is marked @flow(), and it holds …`
 
@@ -128,7 +128,7 @@ codex --version
 
 Not a failure: a note, said once per agent. This Codex was given requirements by somebody
 else — an enterprise policy that arrives with the account, or a `requirements.toml` on a
-machine whose platform packages Codex — and they forbid the `danger-full-access` sandbox that
+machine whose platform packages Codex — forbidding the `danger-full-access` sandbox that
 [`bypass`](/user/permissions) is. Codex refuses such a call outright, so humanize asks again a
 rung down, at `auto`: the same freedom, with Codex asking before it reaches past the workspace
 and humanize granting what it asks. Set the agent to `auto` in `/agents` to say it yourself and
@@ -142,8 +142,8 @@ cat /etc/codex/requirements.toml
 
 ### `no coding agent is installed here`
 
-None of `claude`, `codex` or `kimi` was found, on your `PATH` or in the directories an
-installer puts one in. humanize drives the CLI you already have. It holds no API key and talks to no model provider itself.
+No backend was found, on your `PATH` or in the directories an installer puts one in. humanize
+drives the CLI you already have; it holds no API key and talks to no model provider itself.
 
 ```sh
 command -v claude codex kimi pi opencode mimo zcode
@@ -151,9 +151,9 @@ command -v claude codex kimi pi opencode mimo zcode
 
 ### `no choosing a flow while a flow is running: ctrl+c twice stops it first`
 
-Or `no switching flow while a flow is running`. You choose a flow in order to run it. So
-humanize stops whatever was running. It says so rather than doing it behind your back. Press
-ctrl+c twice first.
+Or `no switching flow while a flow is running`. Choosing a flow means running it, which means
+stopping whatever was running — and humanize says so rather than doing it behind your back.
+Press ctrl+c twice first.
 
 ### `a flow is already running`
 
@@ -167,17 +167,17 @@ exactly `on` or `off`.
 ### `no such command: /foo`
 
 Type `/` to see the list. `hmz anchor` is deliberately not a command here: it is not a thing to
-do to a flow that is running. `/epics` shows what a run left behind. It is where the runs of
-this directory are, and where one of them is collected into a trace.
+do to a flow that is running. `/epics` is where the runs of this directory are, and where one
+of them is collected into a trace.
 
 ### A line I typed did not reach the agent
 
 Look at whether it is still [pinned above the
 prompt](/reference/tui#talking-to-a-running-flow). A line sits there, rather than in the
-transcript, until somebody has actually taken it. That is the next turn if none was open, or
-the running turn saying the words are in front of it. A line to a running flow is never
-dropped. One that nothing ever took is written down as never sent, rather than left to look
-like it went. It reaches whichever agent has a turn *open*, not whichever was named last.
+transcript, until somebody has actually taken it — the next turn if none was open, or the
+running turn saying the words are in front of it. A line to a running flow is never dropped:
+one that nothing ever took is written down as never sent rather than left looking like it went.
+It reaches whichever agent has a turn *open*, not whichever was named last.
 
 Several lines typed in a row go one at a time. The ones behind the first sit pinned for a turn
 or two before their own answer comes back. That is deliberate: handed over together, they would
@@ -195,7 +195,7 @@ colour at all.
 
 ### The token count sits still, then jumps
 
-It should not. The cost readout tails the logs the backends write as they go, rather than
+It should not: the cost readout tails the logs the backends write as they go rather than
 waiting for a turn to end. If it does sit still, the backend's home is somewhere humanize is
 not looking. Check `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `KIMI_CODE_HOME`. ZCode has no variable
 of its own, so its home is `~/.zcode` under whatever `HOME` says.
@@ -299,9 +299,9 @@ Ask it what it is. This runs nothing there:
 hmz anchor --check --target ssh://build-box
 ```
 
-That exercises the whole path without starting an agent. It bootstraps the target half, opens
-the channel and reads the workspace back. `--log-level debug` says more. The log goes to
-stderr, which is the one stream a session never speaks the protocol on.
+It bootstraps the target half, opens the channel and reads the workspace back — the whole path,
+without starting an agent. `--log-level debug` says more, on stderr, the one stream a session
+never speaks the protocol on.
 
 ### The target refuses the mirror directory
 
