@@ -102,6 +102,7 @@ if TYPE_CHECKING:
         Remote,
         Stopped,
         Unhooked,
+        Unrecoverable,
         Usage,
         Verdict,
     )
@@ -146,6 +147,7 @@ __all__ = [
     "Session",
     "Stopped",
     "Unhooked",
+    "Unrecoverable",
     "Usage",
     "Verdict",
     "about",
@@ -206,6 +208,7 @@ _ELSEWHERE = {
     "SWARM": "hmz.agents",
     "Stopped": "hmz.agents",
     "Unhooked": "hmz.agents",
+    "Unrecoverable": "hmz.agents",
     "Usage": "hmz.agents",
     "Verdict": "hmz.agents",
     "WINDOW": "hmz.agents",
