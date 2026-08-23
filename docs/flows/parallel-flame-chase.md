@@ -57,7 +57,7 @@ rest_seconds: 1.0      # what the single-writer scheduler rests between control 
 resume_mode: auto      # or `fresh`, to deliberately start another run
 ```
 
-The [skill](/guide/skills) it brings, `parallel-flame-chase`, is the actor, report, artifact,
+The [skill](/user/skills) it brings, `parallel-flame-chase`, is the actor, report, artifact,
 checkpoint and resume protocol — mounted onto every session the flow opens.
 
 ## What it keeps
@@ -71,4 +71,4 @@ substantive task starts a fresh run, and `resume_mode: fresh` starts one deliber
 
 - [official/parallel_flame_chase_mission](/flows/parallel-flame-chase-mission) — the same lanes, audited
 - [official/flame_chase](/flows/flame-chase) — one lane of this, and the flow it is named after
-- [Worktrees](/guide/worktrees) — humanize's own way of giving an agent a tree of its own
+- [Worktrees](/weaver/worktrees) — humanize's own way of giving an agent a tree of its own

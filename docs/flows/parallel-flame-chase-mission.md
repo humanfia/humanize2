@@ -61,4 +61,4 @@ snapshots, each lane's alternation and failure state.
 
 - [official/parallel_flame_chase](/flows/parallel-flame-chase) — the same lanes, unaudited
 - [Many turns at once](/features/concurrency) — why seven agents are not seven queues
-- [Hooks](/guide/hooks) — the moments an interruption is allowed to land on
+- [Hooks](/weaver/hooks) — the moments an interruption is allowed to land on

@@ -27,7 +27,7 @@ did the work — which is exactly what [`official/rlar`](/flows/rlar) fixes by a
 else.
 
 A backend without a goal feature cannot run this flow, and says so before the first turn rather
-than an hour in. [Which backends have one](/guide/goals#which-backends-have-one).
+than an hour in. [Which backends have one](/weaver/goals#which-backends-have-one).
 
 ## What it takes
 

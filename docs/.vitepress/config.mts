@@ -1,7 +1,4 @@
-import { writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-
-import { defineConfig, type SiteConfig } from 'vitepress'
+import { defineConfig } from 'vitepress'
 
 // Deployed to https://docs.humanfia.ai/humanize2/ by .github/workflows/build-docs.yml.
 // The custom domain belongs to the organisation's own pages, so this repository is a project
@@ -10,9 +7,6 @@ import { defineConfig, type SiteConfig } from 'vitepress'
 // site is. Internal links are still written from the site's own root -- VitePress prepends
 // the base to each of them -- so nothing in a page names the subdirectory.
 const BASE = '/humanize2/'
-
-/** Where somebody arriving at the site's root is sent. */
-const FRONT = `${BASE}features/`
 
 export default defineConfig({
   base: BASE,
@@ -32,34 +26,37 @@ export default defineConfig({
     // Written out with the base in it: VitePress prepends the base to a theme's own
     // links and to what a page names, and hands `head` to the template as it is.
     ['link', { rel: 'icon', href: '/humanize2/logo.svg' }],
-    ['meta', { name: 'theme-color', content: '#3c8772' }],
+    ['meta', { name: 'theme-color', content: '#2a6ea6' }],
   ],
 
   themeConfig: {
     logo: '/logo.svg',
 
-    // Five sections, and features come first: what there is, drawn rather than described, is
-    // what somebody who has never run this wants before anything else -- so it is also what
-    // the site's root goes to, there being no front page above it. Then flows, which is what
-    // there is to run; tutorials, which teach a whole piece of work end to end; guides, which
-    // answer "how do I use this one feature"; and reference, which spells all of it out.
+    // Six sections. Features is what there is, drawn rather than described; flows is what
+    // there is to run; then a guide per role -- the person running flows, and the weaver
+    // writing them -- then contributing, for the person working on humanize itself; and
+    // reference, which spells all of it out. The home page sits above the six and sends a
+    // reader to whichever of the three roles is theirs.
     nav: [
       { text: 'Features', link: '/features/', activeMatch: '/features/' },
       { text: 'Flows', link: '/flows/', activeMatch: '/flows/' },
-      { text: 'Tutorials', link: '/tutorials/', activeMatch: '/tutorials/' },
-      { text: 'Guides', link: '/guide/', activeMatch: '/guide/' },
-      { text: 'Reference', link: '/reference/', activeMatch: '/reference/' },
+      { text: 'User Guide', link: '/user/', activeMatch: '/user/' },
+      { text: 'Weaver Guide', link: '/weaver/', activeMatch: '/weaver/' },
       {
         text: 'Contributing',
         link: '/contributing/',
         activeMatch: '/contributing/',
       },
+      { text: 'Reference', link: '/reference/', activeMatch: '/reference/' },
     ],
 
     // Every sidebar opens with its own section as a link rather than with an entry inside a
     // group of the same name: a group called Features holding an item called "All of them" is
     // a title nobody would write on the page itself, and the page is what it goes to. So the
     // section is the first line, and the groups under it are what they were.
+    //
+    // The three role guides then open with Tutorials, because a reader who has arrived at
+    // their own section wants to be led once before being asked to look something up.
     sidebar: {
       // The capability map groups the whole system; the pages beneath it take one mechanism
       // far enough to explain its trade-offs, each around a diagram the reader can push.
@@ -154,112 +151,143 @@ export default defineConfig({
         },
       ],
 
-      '/tutorials/': [
-        { text: 'Tutorials', link: '/tutorials/' },
+      // For the person who runs flows: the interface, the agents they point at it, where the
+      // work lands, and how to read a run back. Nothing here asks them to write Python.
+      '/user/': [
+        { text: 'User Guide', link: '/user/' },
         {
-          text: 'Start here',
-          collapsed: false,
-          items: [{ text: '1 · Quickstart', link: '/tutorials/quickstart' }],
-        },
-        {
-          text: 'Three pieces of real work',
+          text: 'Tutorials',
           collapsed: false,
           items: [
-            { text: '2 · Beat a benchmark', link: '/tutorials/take-home' },
-            { text: '3 · Port a project', link: '/tutorials/port-a-project' },
-            { text: '4 · Build a coding agent', link: '/tutorials/build-an-agent' },
+            { text: 'Beat a benchmark', link: '/user/tutorials/take-home' },
+            { text: 'Port a project', link: '/user/tutorials/port-a-project' },
+            { text: 'Build a coding agent', link: '/user/tutorials/build-an-agent' },
           ],
         },
         {
-          text: 'Writing flows of your own',
+          text: 'Start here',
           collapsed: false,
           items: [
-            { text: '5 · Build under test', link: '/tutorials/flow-checked-build' },
-            { text: '6 · Four agents on a maths problem', link: '/tutorials/flow-prove' },
-          ],
-        },
-      ],
-
-      '/guide/': [
-        { text: 'Guides', link: '/guide/' },
-        {
-          text: 'Start here',
-          items: [
-            { text: 'Installation', link: '/guide/installation' },
-            { text: 'Concepts', link: '/guide/concepts' },
-            { text: 'Security', link: '/guide/security' },
-            { text: 'Troubleshooting', link: '/guide/troubleshooting' },
+            { text: 'Installation', link: '/user/installation' },
+            { text: 'Concepts', link: '/user/concepts' },
+            { text: 'Security', link: '/user/security' },
+            { text: 'Troubleshooting', link: '/user/troubleshooting' },
           ],
         },
         {
           text: 'At the prompt',
           collapsed: false,
           items: [
-            { text: 'Talking to a running turn', link: '/guide/steering' },
-            { text: 'Side questions (/btw)', link: '/guide/btw' },
-            { text: 'Many conversations at once', link: '/guide/conversations' },
-            { text: 'Showing the working (/details)', link: '/guide/details' },
-            { text: 'The shape of a run (/status)', link: '/guide/status' },
-            { text: 'The mission board', link: '/guide/board' },
-            { text: 'Being away (/afk)', link: '/guide/afk' },
-            { text: 'Completion', link: '/guide/completion' },
-            { text: 'History', link: '/guide/history' },
-            { text: 'Exporting a transcript', link: '/guide/export' },
-            { text: 'What a project remembers', link: '/guide/settings' },
-            { text: 'Stopping', link: '/guide/stopping' },
+            { text: 'Talking to a running turn', link: '/user/steering' },
+            { text: 'Side questions (/btw)', link: '/user/btw' },
+            { text: 'Many conversations at once', link: '/user/conversations' },
+            { text: 'Showing the working (/details)', link: '/user/details' },
+            { text: 'The shape of a run (/status)', link: '/user/status' },
+            { text: 'The mission board', link: '/user/board' },
+            { text: 'Being away (/afk)', link: '/user/afk' },
+            { text: 'Falling back', link: '/user/fallback' },
+            { text: 'Completion', link: '/user/completion' },
+            { text: 'History', link: '/user/history' },
+            { text: 'Exporting a transcript', link: '/user/export' },
+            { text: 'What a project remembers', link: '/user/settings' },
+            { text: 'Stopping', link: '/user/stopping' },
           ],
         },
         {
           text: 'Setting an agent up',
           collapsed: false,
           items: [
-            { text: 'Efforts', link: '/guide/efforts' },
-            { text: 'Permissions', link: '/guide/permissions' },
-            { text: 'Skills', link: '/guide/skills' },
-            { text: 'Goals', link: '/guide/goals' },
-            { text: 'Questions', link: '/guide/questions' },
-            { text: 'Answers in a shape', link: '/guide/shapes' },
-            { text: 'Hooks', link: '/guide/hooks' },
-            { text: 'Callbacks as tools', link: '/guide/tools' },
-            { text: 'Cost and rate', link: '/guide/tally' },
-            { text: 'The person as an agent', link: '/guide/human-agent' },
-            { text: 'Reporting', link: '/guide/reporting' },
-          ],
-        },
-        {
-          text: 'Writing flows',
-          collapsed: false,
-          items: [
-            { text: 'Writing a flow', link: '/guide/writing-a-flow' },
-            { text: 'Loops', link: '/guide/loops' },
-            { text: 'Settings of its own', link: '/guide/flow-settings' },
-            { text: 'Many turns at once', link: '/guide/async-flows' },
-            { text: 'A flow that calls a flow', link: '/guide/calling-flows' },
-            { text: 'An atlas', link: '/guide/atlas' },
-            { text: 'Checking a flow', link: '/guide/checking-flows' },
-            { text: 'Testing a flow', link: '/guide/testing-flows' },
-            { text: 'Flowverses', link: '/guide/flowverses' },
+            { text: 'Efforts', link: '/user/efforts' },
+            { text: 'Permissions', link: '/user/permissions' },
+            { text: 'Skills', link: '/user/skills' },
+            { text: 'Questions', link: '/user/questions' },
+            { text: 'Cost and rate', link: '/user/tally' },
+            { text: 'Reporting', link: '/user/reporting' },
           ],
         },
         {
           text: 'Where the work lands',
           collapsed: false,
           items: [
-            { text: 'Providers', link: '/guide/providers' },
-            { text: 'Falling back', link: '/guide/fallback' },
-            { text: 'Containers', link: '/guide/containers' },
-            { text: 'Remote execution', link: '/guide/remote-execution' },
-            { text: 'Worktrees', link: '/guide/worktrees' },
+            { text: 'Providers', link: '/user/providers' },
+            { text: 'Containers', link: '/user/containers' },
+            { text: 'Remote execution', link: '/user/remote-execution' },
           ],
         },
         {
           text: 'Running it, and reading it back',
           collapsed: false,
           items: [
-            { text: 'Run it unattended', link: '/guide/unattended' },
-            { text: 'humanize in CI', link: '/guide/ci' },
-            { text: 'Tracing', link: '/guide/tracing' },
-            { text: 'Picking a run up', link: '/guide/resuming' },
+            { text: 'Run it unattended', link: '/user/unattended' },
+            { text: 'humanize in CI', link: '/user/ci' },
+            { text: 'Tracing', link: '/user/tracing' },
+            { text: 'Picking a run up', link: '/user/resuming' },
+          ],
+        },
+      ],
+
+      // For the weaver: the person who writes the flow. Everything here is Python, and the
+      // reader is expected to have run one before writing one.
+      '/weaver/': [
+        { text: 'Weaver Guide', link: '/weaver/' },
+        {
+          text: 'Tutorials',
+          collapsed: false,
+          items: [
+            { text: 'Build under test', link: '/weaver/tutorials/checked-build' },
+            { text: 'Four agents on a maths problem', link: '/weaver/tutorials/prove' },
+          ],
+        },
+        {
+          text: 'Writing a flow',
+          collapsed: false,
+          items: [
+            { text: 'Writing a flow', link: '/weaver/writing-a-flow' },
+            { text: 'Loops', link: '/weaver/loops' },
+            { text: 'Settings of its own', link: '/weaver/flow-settings' },
+            { text: 'Many turns at once', link: '/weaver/async-flows' },
+            { text: 'A flow that calls a flow', link: '/weaver/calling-flows' },
+            { text: 'An atlas', link: '/weaver/atlas' },
+          ],
+        },
+        {
+          text: 'What an agent can be asked',
+          collapsed: false,
+          items: [
+            { text: 'Goals', link: '/weaver/goals' },
+            { text: 'Answers in a shape', link: '/weaver/shapes' },
+            { text: 'Hooks', link: '/weaver/hooks' },
+            { text: 'Callbacks as tools', link: '/weaver/tools' },
+            { text: 'The person as an agent', link: '/weaver/human-agent' },
+            { text: 'Worktrees', link: '/weaver/worktrees' },
+          ],
+        },
+        {
+          text: 'Checking and publishing',
+          collapsed: false,
+          items: [
+            { text: 'Checking a flow', link: '/weaver/checking-flows' },
+            { text: 'Testing a flow', link: '/weaver/testing-flows' },
+            { text: 'Flowverses', link: '/weaver/flowverses' },
+          ],
+        },
+      ],
+
+      '/contributing/': [
+        { text: 'Contributing', link: '/contributing/' },
+        {
+          text: 'Tutorials',
+          collapsed: false,
+          items: [
+            { text: 'Your first patch', link: '/contributing/tutorials/first-patch' },
+            { text: 'Add a page to these docs', link: '/contributing/tutorials/a-page-of-docs' },
+          ],
+        },
+        {
+          text: 'How the repository works',
+          items: [
+            { text: 'Architecture', link: '/contributing/architecture' },
+            { text: 'Working on these docs', link: '/contributing/docs' },
           ],
         },
       ],
@@ -287,17 +315,6 @@ export default defineConfig({
           ],
         },
       ],
-
-      '/contributing/': [
-        { text: 'Contributing', link: '/contributing/' },
-        {
-          text: 'How the repository works',
-          items: [
-            { text: 'Architecture', link: '/contributing/architecture' },
-            { text: 'Working on these docs', link: '/contributing/docs' },
-          ],
-        },
-      ],
     },
 
     socialLinks: [{ icon: 'github', link: 'https://github.com/humanfia/humanize2' }],
@@ -315,50 +332,5 @@ export default defineConfig({
       message: 'Released under the Apache-2.0 licence.',
       copyright: 'Copyright © 2026 Zijian Zhang',
     },
-  },
-
-  // There is no home page. A front page that explains nothing, above four sections that
-  // explain everything, is a page a reader passes through on the way to Features -- so the
-  // root goes there, and what the front page used to draw is drawn on the page it goes to.
-  // GitHub Pages serves files, so the redirect has to be one: an index.html with nothing in
-  // it but the way on, written after the build so no page has to pretend to be it.
-  async buildEnd(site: SiteConfig) {
-    await writeFile(
-      join(site.outDir, 'index.html'),
-      [
-        '<!doctype html>',
-        '<html lang="en-US">',
-        '<head>',
-        '<meta charset="utf-8">',
-        `<meta http-equiv="refresh" content="0; url=${FRONT}">`,
-        `<link rel="canonical" href="https://docs.humanfia.ai${FRONT}">`,
-        '<title>humanize</title>',
-        '</head>',
-        `<body><a href="${FRONT}">humanize documentation</a></body>`,
-        '</html>',
-        '',
-      ].join('\n'),
-    )
-  },
-
-  vite: {
-    plugins: [
-      {
-        // The same redirect while `pnpm dev` is running, where nothing has been built yet and
-        // there is no index.html to serve. Without it the root is a 404 in development and a
-        // features page in production, which is the sort of difference nobody finds until it
-        // is deployed.
-        name: 'hmz-no-home',
-        configureServer(server) {
-          server.middlewares.use((req, res, next) => {
-            const asked = (req.url ?? '').split('?')[0]
-            if (asked !== BASE && asked !== '/') return next()
-            res.statusCode = 302
-            res.setHeader('location', FRONT)
-            res.end()
-          })
-        },
-      },
-    ],
   },
 })

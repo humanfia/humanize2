@@ -22,7 +22,7 @@ Orchestrate, execute, and observe agent flows
 ## Security
 
 Three things to know before pointing one at a repository you care about. Each is explained in
-[Security](https://docs.humanfia.ai/humanize2/guide/security):
+[Security](https://docs.humanfia.ai/humanize2/user/security):
 
 - humanize runs every agent with **permission prompts disabled**, and nothing turns them back on.
 - **A flow is a directory of Python, and reading one means running it**, so adding a flowverse
@@ -51,7 +51,7 @@ dsh web
 Needs Python ≥ 3.12 and at least one supported backend: `agy`, `claude`, `codex`, `grok`,
 `kimi`, `pi`, `qwen`, `opencode`, `mimo` or `zcode` on your PATH — or none of them, since
 DeepSeek Harness arrives with humanize. See
-[Installation](https://docs.humanfia.ai/humanize2/guide/installation).
+[Installation](https://docs.humanfia.ai/humanize2/user/installation).
 
 ## Usage
 
@@ -96,7 +96,7 @@ To collect what a run left behind, and open it in [ui.perfetto.dev](https://ui.p
 hmz trace collect
 ```
 
-[Quickstart](https://docs.humanfia.ai/humanize2/tutorials/quickstart) goes from here to a run you can
+[Quickstart](https://docs.humanfia.ai/humanize2/) goes from here to a run you can
 read back, in fifteen minutes.
 
 ## Documentation
@@ -108,9 +108,9 @@ read back, in fifteen minutes.
   front of the site.
 - **[Flows](https://docs.humanfia.ai/humanize2/flows/)** — every flow it can run, from `chat` to seven
   agents in three isolated lanes, with the shape of each one drawn.
-- **[Tutorials](https://docs.humanfia.ai/humanize2/tutorials/)** — six, in order. A quickstart, three real
+- **[Tutorials](https://docs.humanfia.ai/humanize2/user/)** — six, in order. A quickstart, three real
   pieces of work run end to end, and two flows written from scratch.
-- **[Guides](https://docs.humanfia.ai/humanize2/guide/)** — a page per feature, each answering "how do I
+- **[Guides](https://docs.humanfia.ai/humanize2/user/)** — a page per feature, each answering "how do I
   use this?" and opening with something you can paste.
 - **[Reference](https://docs.humanfia.ai/humanize2/reference/)** — the complete CLI, TUI and Python API.
 

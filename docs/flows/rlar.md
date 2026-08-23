@@ -35,7 +35,7 @@ special-cased, work stubbed out or faked — as the thing it is most there to ca
 a round of work against the repository it landed in, and how to write the review the actor is
 then handed, is the flow's own skill: `skills/review-notes`, mounted onto every session either
 agent opens. A fork of this flow that wants its reviews written differently edits that file and
-runs. See [Skills](/guide/skills).
+runs. See [Skills](/user/skills).
 
 ## Give the two the same model, if you like
 

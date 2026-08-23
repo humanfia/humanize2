@@ -3,9 +3,9 @@
 Complete and dry. Every command, flag, key, argument and return, for a reader who already
 knows what they are looking for.
 
-If you do not yet, the [guides](/guide/) answer "how do I use this one feature", and the
-[tutorials](/tutorials/) teach it in order starting with the
-[Quickstart](/tutorials/quickstart).
+If you do not yet, the [guides](/user/) answer "how do I use this one feature", and the
+[tutorials](/user/) teach it in order starting with the
+[Quickstart](/).
 
 ## Command line
 

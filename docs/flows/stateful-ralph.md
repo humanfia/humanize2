@@ -50,4 +50,4 @@ loop that stalled is one to fix and carry on from, not one that is over.
 
 - [ralph_loop](/flows/ralph-loop) — a session of its own each round
 - [official/continue_loop](/flows/continue-loop) — one session too, nudged rather than re-sent the task
-- [Picking a run up](/guide/resuming) — what a resumable flow may and may not carry
+- [Picking a run up](/user/resuming) — what a resumable flow may and may not carry

@@ -84,7 +84,7 @@ is where a fan-out is meant to be read.
 
 ## Where the detail is
 
-- [Many turns at once](/guide/async-flows) — writing the coroutine, and gathering
-- [Worktrees](/guide/worktrees) · [Containers](/guide/containers) · [Remote
-  execution](/guide/remote-execution)
-- [Many conversations at once](/guide/conversations) — the editor view
+- [Many turns at once](/weaver/async-flows) — writing the coroutine, and gathering
+- [Worktrees](/weaver/worktrees) · [Containers](/user/containers) · [Remote
+  execution](/user/remote-execution)
+- [Many conversations at once](/user/conversations) — the editor view

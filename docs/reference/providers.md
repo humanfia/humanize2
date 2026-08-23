@@ -224,7 +224,7 @@ make, sign in or take away.
 | `add` | Makes one. `-w` chooses the way — the backend's first when nothing says otherwise, which is `login` for the CLIs that sign in and `key` for `dsh` — and `-s` answers one of its questions on the line rather than being asked. Then it runs the way's own command, unless `--no-login` says only to write it down. `--also` writes the same account down for the backends it names, comma separated, or for every one it could be run as with `all`. |
 | `login` | Signs an existing one in again, by the way it was made with. For a way that has nothing to run, `add` it again instead. |
 | `show` | What one holds: the way, when it was made, where it is kept, what it falls back to, the **names** of the variables it sets, which paths a turn under it is given instead of which, an `also runs` line per [other backend](#one-account-several-clis) that could be run as it, and — for an account written down before retrying moved — the line that says where that is said now. |
-| `falls-back` | Says which account of that CLI a turn carries on under when this one fails, or — with nothing after it — that this one is the end of the line. How many times over a failed turn is taken again first is [`hmz fallback retry`](/guide/fallback), that being a thing about the place rather than the account. |
+| `falls-back` | Says which account of that CLI a turn carries on under when this one fails, or — with nothing after it — that this one is the end of the line. How many times over a failed turn is taken again first is [`hmz fallback retry`](/user/fallback), that being a thing about the place rather than the account. |
 | `remove` | Takes it away, credentials and all. |
 
 Whatever a way asks that the line did not answer is asked at the terminal, and a secret is not
@@ -281,14 +281,14 @@ into last under each CLI's heading. **a** makes one and **d** twice takes it awa
 opens what else can be done to the one under the cursor — correct what it holds, sign it in
 again, say what it falls back to, say how a failed turn under it is tried again. The screens
 themselves are [TUI › The accounts themselves](/reference/tui#the-accounts-themselves), and the
-account chains are also the second page of [`/fallback`](/guide/fallback).
+account chains are also the second page of [`/fallback`](/user/fallback).
 
 **An account's chain and an agent's are two different things.** This one answers an account
 going down — a subscription that ran out, a key refused, a gateway that answered 503 — and it
 happens inside the conversation that was running, with the same agent at the same model
 throughout. A model that has been retired, a CLI that will not start, a rate limit on the whole
 account rather than one request: none of those is answered by another account of that backend,
-and what answers them is [another agent](/guide/fallback), which a turn walks only once this
+and what answers them is [another agent](/user/fallback), which a turn walks only once this
 chain is spent.
 
 ## One account, several CLIs
@@ -328,7 +328,7 @@ five places.
 could be copied to rather than what it has been copied to: a backend already holding a copy
 reads the same as one holding none. The copies themselves are in `list`, under that same name.
 
-An account written down before [retrying](/guide/fallback) became a thing about the place gets
+An account written down before [retrying](/user/fallback) became a thing about the place gets
 one line after those, in `list` as well as in `show`: the tries it still holds are no longer
 read, and the line names the `hmz fallback retry` to type instead, carrying the number, the
 policy and the timeout that were written down. Only the model is missing, that being the part

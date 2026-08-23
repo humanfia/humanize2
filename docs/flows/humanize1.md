@@ -95,4 +95,4 @@ from.
 
 - [The moments of a turn](/features/hooks) — what a `STOP` hook is, and the six others
 - [official/rlar](/flows/rlar) — the same actor-and-reviewer shape, without the plugin's format
-- [A flow that calls a flow](/guide/calling-flows) — running one of these three from inside another flow
+- [A flow that calls a flow](/weaver/calling-flows) — running one of these three from inside another flow

@@ -100,6 +100,6 @@ and none is sent.
 
 ## Where the detail is
 
-- [Efforts](/guide/efforts) · [Permissions](/guide/permissions) · [Skills](/guide/skills)
+- [Efforts](/user/efforts) · [Permissions](/user/permissions) · [Skills](/user/skills)
 - [Providers reference](/reference/providers) — adding a CLI, and every way into each one
 - [Agents reference](/reference/agents) — turns, sessions, and what each backend can do

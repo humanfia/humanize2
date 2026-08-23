@@ -126,7 +126,7 @@ session.offers([Tool(name="review", about="…", takes=Reviewing, call=…)])
 ```
 
 — which is how an agent asks the flow for something mid-turn, up to and including another
-flow. See [Callbacks as tools](/guide/tools).
+flow. See [Callbacks as tools](/weaver/tools).
 
 ## A flow that waits for more than one thing
 
@@ -524,7 +524,7 @@ was given.
 ### The board
 
 Asking stops the turn. **The board does not.** It is a handful of named lines kept beside the
-run and drawn on [`/status`](/guide/status) — the flow reads and writes it whenever it likes,
+run and drawn on [`/status`](/user/status) — the flow reads and writes it whenever it likes,
 the person changes it whenever they like, and neither is ever waiting on the other:
 
 ```python
@@ -543,7 +543,7 @@ Which is what makes it a work queue: you put more up while the loop is going, an
 round takes it. `todo` is left as a line either of you writes, since taking an item off is the
 flow doing its half of that; `doing` is the flow's, and a line whose `whose` is one side's is
 refused to the other where it writes, with `Refused`, rather than quietly ignored. See
-[The mission board](/guide/board).
+[The mission board](/user/board).
 
 ## Running one
 
@@ -974,7 +974,7 @@ whether the coordinator comes back: the base flow stops at durable peer coordina
 mission flow adds scoped evidence audits, interruptions and an integration queue. Both want
 exactly seven agents, in the order the flow names them.
 
-Read [Security](/guide/security) before starting any of them.
+Read [Security](/user/security) before starting any of them.
 
 ## Patterns
 
@@ -1217,7 +1217,7 @@ the driver classes' own declarations — so what it promises is what this instal
 
 An atlas is a flow whose body is read rather than run: a narrower Python, compiled before
 anything happens into a **prophecy** — the graph of what the run will do. The guide is
-[An atlas](/guide/atlas); this is the surface.
+[An atlas](/weaver/atlas); this is the surface.
 
 ```python
 from hmz.flows import Agent, atlas, canonical, digest, logic, mind, prophesied, sub
@@ -1329,7 +1329,7 @@ or [`hmz check --ship`](/reference/cli#hmz-check) from a command line. The flow'
 still has to be there: a prophecy names the functions its nodes are. The shipped-file reader
 rebuilds only the seven allowlisted tuple types a prophecy uses and validates the resulting
 shape. Any other class or malformed shape is refused; loading the flow's Python remains the
-separate trust boundary described in [Security](/guide/security).
+separate trust boundary described in [Security](/user/security).
 
 ## Testing a flow
 

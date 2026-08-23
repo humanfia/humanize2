@@ -13,8 +13,8 @@ and write down everything they did. Most backends drive a coding agent you alrea
 its existing login; the bundled DeepSeek Harness is the SDK-backed exception.
 
 This is the front of the documentation: one way to install it, then what the system is rather
-than how to operate each part. The [tutorials](/tutorials/) teach it in order starting with the
-[Quickstart](/tutorials/quickstart), the [guides](/guide/) answer "how do I use this?", and
+than how to operate each part. The [tutorials](/user/) teach it in order starting with the
+[Quickstart](/), the [guides](/user/) answer "how do I use this?", and
 [Flows](/flows/) is what it can run out of the box.
 
 <HmzInstall />
@@ -118,7 +118,7 @@ played on it.
 
 <p class="hmz-note">
 Every one of them, with the shape of each: <a :href="withBase('/flows/')">Flows</a>. How to write
-one of your own: <a :href="withBase('/guide/writing-a-flow')">Writing a flow</a>.
+one of your own: <a :href="withBase('/weaver/writing-a-flow')">Writing a flow</a>.
 </p>
 
 ## The real thing, recorded
@@ -139,7 +139,7 @@ Recorded against a stand-in coding agent, in a container of its own — see
     <strong>Map the whole system</strong>
     <span>Five domains, every capability group, and the right explanation for each.</span>
   </a>
-  <a :href="withBase('/tutorials/quickstart')">
+  <a :href="withBase('/')">
     <strong>Never used it</strong>
     <span>Nothing installed to a run you can open in Perfetto, in fifteen minutes.</span>
   </a>
@@ -147,7 +147,7 @@ Recorded against a stand-in coding agent, in a container of its own — see
     <strong>What it can run</strong>
     <span>The flows it ships, with the shape of each one drawn and played.</span>
   </a>
-  <a :href="withBase('/guide/')">
+  <a :href="withBase('/user/')">
     <strong>One feature</strong>
     <span>A page each, opening with something you can paste.</span>
   </a>
@@ -161,5 +161,5 @@ Recorded against a stand-in coding agent, in a container of its own — see
 humanize runs every agent with permission prompts disabled, and nothing turns them back on. A
 flow is trusted Python: loading or running it may execute its code, even though static checks
 can inspect selected structure without doing so. Read
-[Security](/guide/security).
+[Security](/user/security).
 :::

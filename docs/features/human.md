@@ -39,7 +39,7 @@ its refusal is the only wording worth showing. It is put back a bounded number o
 person who keeps typing something the model will not accept ends the questionnaire rather than
 living in it.
 
-Each of those questions goes the road [a coding agent's own question](/guide/questions) goes,
+Each of those questions goes the road [a coding agent's own question](/user/questions) goes,
 so it is a real question wherever the run is being watched, options and all.
 
 ## Nobody there is an answer
@@ -76,7 +76,7 @@ is about to use.
 
 ## Where the detail is
 
-- [The person as an agent](/guide/human-agent) — driving one from a flow
-- [Questions](/guide/questions) — an agent asking its user
-- [The mission board](/guide/board) — work the flow and the person can change without waiting
-- [Being away](/guide/afk) — deciding what happens when nobody is at the prompt
+- [The person as an agent](/weaver/human-agent) — driving one from a flow
+- [Questions](/user/questions) — an agent asking its user
+- [The mission board](/user/board) — work the flow and the person can change without waiting
+- [Being away](/user/afk) — deciding what happens when nobody is at the prompt

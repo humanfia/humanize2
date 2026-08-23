@@ -55,7 +55,7 @@ Its own directory is importable while it runs and only while, since what a flow 
 something the rest of the process should be able to.
 
 It is also why a flowverse is trusted the way a repository of code is trusted, and why
-[Security](/guide/security) is a page rather than a paragraph.
+[Security](/user/security) is a page rather than a paragraph.
 
 ## The shapes a loop takes
 
@@ -113,10 +113,10 @@ somebody had thought to add it would be a list that hid what there is to run.
 
 ## Where the detail is
 
-- [Writing a flow](/guide/writing-a-flow) · [Loops](/guide/loops) · [Testing a
-  flow](/guide/testing-flows)
-- [An atlas](/guide/atlas) · [Checking a flow](/guide/checking-flows) · [Python becomes a
+- [Writing a flow](/weaver/writing-a-flow) · [Loops](/weaver/loops) · [Testing a
+  flow](/weaver/testing-flows)
+- [An atlas](/weaver/atlas) · [Checking a flow](/weaver/checking-flows) · [Python becomes a
   prophecy](/features/prophecy)
-- [Settings of its own](/guide/flow-settings) · [A flow that calls a
-  flow](/guide/calling-flows) · [Flowverses](/guide/flowverses)
+- [Settings of its own](/weaver/flow-settings) · [A flow that calls a
+  flow](/weaver/calling-flows) · [Flowverses](/weaver/flowverses)
 - [Flows reference](/reference/flows) — the contract, in full

@@ -77,7 +77,7 @@ things the flow tracks is what has to survive.
 
 ## Where the detail is
 
-- [Picking a run up](/guide/resuming) — declaring it, and where the file lives
-- [An atlas](/guide/atlas#stopping-and-starting) — graph identity and node-level continuation
-- [Tracing](/guide/tracing#what-a-run-writes-down) — what else a run writes down
-- [Stopping](/guide/stopping) — what escape does to a turn
+- [Picking a run up](/user/resuming) — declaring it, and where the file lives
+- [An atlas](/weaver/atlas#stopping-and-starting) — graph identity and node-level continuation
+- [Tracing](/user/tracing#what-a-run-writes-down) — what else a run writes down
+- [Stopping](/user/stopping) — what escape does to a turn

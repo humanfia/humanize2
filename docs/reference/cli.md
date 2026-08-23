@@ -1,7 +1,7 @@
 # CLI reference
 
 Every command, flag, environment variable, exit status and file. For a walk through rather than
-a lookup, start at [Quickstart](/tutorials/quickstart).
+a lookup, start at [Quickstart](/).
 
 ```
 hmz [<command> [<args>...]]
@@ -71,7 +71,7 @@ hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] [--containe
 | --- | --- |
 | `-f`, `--flow <flow>[:<name>]` | **Required.** The flow to drive: the name of one humanize ships, `<where>/<flow>` for one any other place holds — a [flowverse](/reference/flows#flowverses), or `local`/`user` for your own — or the path to a flow anywhere else. A file that holds [several flows](/reference/flows#several-flows-in-one-file) is said which, after a colon. See [where flows live](/reference/flows#where-flows-live). |
 | `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](/reference/flows#settings-of-the-flow-s-own). The flow's own model checks it before the first turn. |
-| `--container <image>` | Run the whole of it in one container of that image: every agent's turns land there, the project directory is mounted at the path it already has, and the flow reaches it through `hmz.flows.container()`. A place the flow itself declared `Isolated` keeps the container the flow named. See [Containers](/guide/containers#the-whole-run-in-one-container). |
+| `--container <image>` | Run the whole of it in one container of that image: every agent's turns land there, the project directory is mounted at the path it already has, and the flow reaches it through `hmz.flows.container()`. A place the flow itself declared `Isolated` keeps the container the flow named. See [Containers](/user/containers#the-whole-run-in-one-container). |
 | `-a`, `--agent <spec>` | **Repeated once for each agent the flow drives**, in the order it takes them — so none at all for a flow whose only side is you, since nobody chooses what the person runs. |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
 
@@ -271,7 +271,7 @@ hmz anchor serve --export VIRTUAL[:REAL] (--stdio | --listen [HOST:]PORT) [--tok
 `--stdio` and `--listen` are mutually exclusive, and one is required.
 
 **Listening on anything but loopback without `--token` is refused.** An open port is equivalent
-to a shell on that machine — read [Security](/guide/security).
+to a shell on that machine — read [Security](/user/security).
 
 ```sh
 hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
@@ -294,7 +294,7 @@ path of your own.
 | `--static` | Only the reading that executes nothing: do not load the flow at all. |
 | `--strict` | Exit non-zero on warnings too. |
 | `--json` | One JSON object per finding, one a line, for a script to read. |
-| `--prophecy` | Print what each [atlas](/guide/atlas) compiles to instead of what is wrong with it. |
+| `--prophecy` | Print what each [atlas](/weaver/atlas) compiles to instead of what is wrong with it. |
 | `--ship` | Write each atlas's prophecy into its own directory, for runs of it to walk. |
 
 Each finding prints as `file:line: severity: code: what is wrong`, with a count under them.
@@ -307,7 +307,7 @@ It exits `0` for flows with nothing blocking (warnings print and pass), `1` wher
 was found — or any warning, under `--strict` — and `2` for a line to correct or a name no
 flow answers to.
 
-An [atlas](/guide/atlas) gets the stricter reading of the two automatically, its body being a
+An [atlas](/weaver/atlas) gets the stricter reading of the two automatically, its body being a
 declaration rather than a program. `--prophecy` prints the graph that reading compiled, one
 line of canonical JSON; `--ship` writes it to `<flow>/prophecy.pkl`, which every run of that
 flow walks from then on. The two cannot be given together, and a name that is not an atlas
@@ -324,7 +324,7 @@ hmz check --ship local/mine      # and beside the flow, for runs of it to walk
 
 Where flows come from: a git repository with a `flows/` directory apiece, cloned under
 humanize's home, and the flows of your own read where they lie. Each is offered under the name
-it is listed here under. See [Flowverses](/guide/flowverses).
+it is listed here under. See [Flowverses](/weaver/flowverses).
 
 ```
 hmz flowverses list [-q|--quiet]
@@ -371,7 +371,7 @@ there are is not asking about any of them.
 So the name `show` prints is always a name `-f` takes — `official/humanize1:gen-plan`, not the
 `official/humanize1` its filename would suggest, and never a `conftest.py` that holds no flow at
 all. Adding one is still trusting that repository with this machine, exactly as installing a
-package is. See [Security](/guide/security).
+package is. See [Security](/user/security).
 
 ## `hmz agents`
 
@@ -501,7 +501,7 @@ hmz fallback remove claude/claude-opus-5
 A place cannot fall back to itself, one place has one place to go, and a chain that comes
 round on itself ends at the second sight of a place. The same steps are in the interface at
 [`/fallback`](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken), and what they mean is
-[Falling back](/guide/fallback).
+[Falling back](/user/fallback).
 
 ## `hmz daemon`
 
@@ -543,7 +543,7 @@ hmz tools --at <socket>
 ```
 
 Carries the tool protocol between a coding agent and the flow whose
-[callbacks](/guide/tools) it is: it reads its stdin into the flow's socket and the flow's
+[callbacks](/weaver/tools) it is: it reads its stdin into the flow's socket and the flow's
 answers back out to its stdout, and does nothing else.
 
 **Not a command anybody types.** A CLI takes a tool by starting a program, so there is a
@@ -560,7 +560,7 @@ than as a turn that failed.
 | `HUMANIZE_TOKEN` | `hmz anchor`, `hmz anchor serve` | Default for `--token`. |
 | `HUMANIZE_LOG` | `hmz anchor`, `hmz anchor serve` | Default for `--log-level`. |
 | `HUMANIZE_DAEMON` | `hmz` with no command | `off`, `0` or `no` opens the interface in this terminal rather than [holding the run apart from it](/reference/daemon), which is what `--no-daemon` says on the line. Anything else — including empty — is silence, and silence holds the run. |
-| `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/guide/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
+| `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/user/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
 | `HUMANIZE_SHADOWS` | `hmz anchor`, a container or a machine an agent works on | Where the mirrors coganchor has been pointed at are recorded. Defaults to `~/.cache/humanize/shadows`. |
 | `CLAUDE_CONFIG_DIR` | `hmz trace collect`, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
 | `CODEX_HOME` | same | Codex's home. Defaults to `~/.codex`. |
@@ -602,14 +602,14 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/local/<cli>.json` | `hmz providers falls-back`, `retry`, and what enter opens in `/providers` | What the account this machine is signed into does when it fails: where it falls back to, and how a turn under it is tried again. |
 | `~/.humanize/acp.json` | a CLI of your own, added where `/providers` asks which CLI | The CLIs of your own that speak the [Agent Client Protocol](/reference/agents#a-cli-of-your-own), as `{name: [argv…]}`. A backend from the moment it is written. |
 | `~/.humanize/models/<cli>.json` | the TUI, **r** | The same, for the CLI as you already run it. |
-| `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run and whether its runs are profiled, and the settings that are not a workspace's — `enable_sentry`, the answer to the [reporting](/guide/reporting) question. |
+| `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run and whether its runs are profiled, and the settings that are not a workspace's — `enable_sentry`, the answer to the [reporting](/user/reporting) question. |
 | `~/.humanize/agents.yaml` | `hmz agents`, `/agents` | The agents written down under a name, to be reached for from any flow. |
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.sock` | `hmz` with no command | The socket a terminal reaches a [held run](/reference/daemon) through. `0600`. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.json` | the same | Which process is holding it, which workspace, and since when. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.log` | the same | Whatever could not be said through a terminal about that run — what the daemon itself could not say, and what went wrong in a process reaching for its socket. |
 | `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
-| `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** in `/flowverses` | A [flowverse](/guide/flowverses), cloned. Every flow in it is offered as `<name>/<flow>`. |
+| `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** in `/flowverses` | A [flowverse](/weaver/flowverses), cloned. Every flow in it is offered as `<name>/<flow>`. |
 | `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |
 | `.humanize/flows/*/` | you | This project's own flows, offered as `local/<flow>`. |
 | `~/.humanize/flows/*/` | you | Your flows in every project, offered as `user/<flow>`. |
@@ -647,7 +647,7 @@ hmz.verses.add("humanfia/flowverse")
 - `hmz.exec(argv)` / `hmz.run(flow, agents, task)` — [Flows](/reference/flows)
 - `hmz.epics.trace(...)` — [Tracing](/reference/tracing)
 - `hmz.accounts` — [Providers](/reference/providers)
-- `hmz.verses` — [Flowverses](/guide/flowverses)
+- `hmz.verses` — [Flowverses](/weaver/flowverses)
 - `hmz.agents` — the agents written down under a name
 
 The layers under it are reachable directly where that is what you want — the SDK composes them

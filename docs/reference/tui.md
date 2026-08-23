@@ -3,7 +3,7 @@
 `hmz` with no command opens the terminal interface. There is no command that opens it too: one
 way in is one way in.
 
-It is a coding agent's own terminal with a [flow](/guide/concepts#flow) underneath instead of one
+It is a coding agent's own terminal with a [flow](/user/concepts#flow) underneath instead of one
 agent — a transcript, a multi-line editor under it, and a status line under that.
 
 ## The screen
@@ -34,7 +34,7 @@ which is the one it opens on. Which, and how to move between them, is
 
 **Above the editor**, one line per agent the flow drives: the name the flow calls it, then what
 it runs as `cli/model:effort`, then the machine its turns land on where that is not this one,
-[what it may do](/guide/permissions) where that is not the ordinary rung, the
+[what it may do](/user/permissions) where that is not the ordinary rung, the
 [account](#which-cli-and-which-account) it runs as where that is not this machine's own, and
 finally what it is holding — `●` or `○` for whether it is working, how many conversations it
 has open, `reading` on the agent whose transcript is on the screen, and `unread` on one that
@@ -143,12 +143,12 @@ list appears under the editor with a line about each.
 | Command | Takes | What it does |
 | --- | --- | --- |
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Its Agents page saves the complete setup; esc remains the way to save or discard on the way out. |
-| `/flowverses` | | [Where flows come from](/guide/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
+| `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
-| `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/guide/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
+| `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
-| `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent that has worked, marked as it works, with the handovers between them drawn as the arrows joining them, whatever each started of its own hanging under it, and [the board](/guide/board) below. Enter reads an agent or changes a line. **esc** opens it. |
+| `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent that has worked, marked as it works, with the handovers between them drawn as the arrows joining them, whatever each started of its own hanging under it, and [the board](/user/board) below. Enter reads an agent or changes a line. **esc** opens it. |
 | `/btw` | `<question>` | Asks a side question about the running flow from a read-only snapshot of its progress. It runs in a separate session and never steers the flow. |
 | `/details` | `[on\|off]` | Shows or hides everything a turn did on the way to its answer: tool calls, thinking, and whatever a backend printed on its way past. One question — how much of the working to show — so one switch. **Off** to begin with. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
@@ -314,7 +314,7 @@ fleet too long to draw is cut, with a line saying how many were left off.
 **The board is under the diagram**, for a flow that talks to you: the named lines you and the
 flow both write on, and neither waits at. `a` puts one up — a name, then what it says — enter
 changes the one under the cursor, and `d` twice takes it off. A line the flow keeps to itself
-says so instead of opening an editor. See [The mission board](/guide/board).
+says so instead of opening an editor. See [The mission board](/user/board).
 
 **Enter or a click on a box reads that agent** — whether or not it is working. tab is held to
 the ones thinking, so this is the one place an agent that has stopped is reached. The first row
@@ -895,7 +895,7 @@ Everything is held until the menu is saved on the way out, as everything on a me
 A place cannot fall back to itself, and a chain that comes round on itself ends at the second
 sight of a place. The same steps are on the command line as
 [`hmz fallback`](/reference/cli#hmz-fallback), and what they mean is
-[Falling back](/guide/fallback).
+[Falling back](/user/fallback).
 
 ## What humanize remembers
 
@@ -912,7 +912,7 @@ rather than two halves of one:
 ```
 
 **Everywhere** is what is true of this machine wherever humanize is run from: whether it
-[reports what goes wrong](/guide/reporting), and — on enter — the list of what a report
+[reports what goes wrong](/user/reporting), and — on enter — the list of what a report
 carries and what it never does, said under the rows. The row shows what is **written down**: an
 environment that is answering for this run says so under the list rather than being drawn as
 the setting, since a menu cannot change it.

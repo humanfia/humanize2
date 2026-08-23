@@ -36,11 +36,11 @@ onUnmounted(() => clearTimeout(clearing))
     </button>
 
     <div class="ways">
-      <a class="go" :href="withBase('/tutorials/quickstart')">
+      <a class="go" :href="withBase('/')">
         Quickstart
         <em>fifteen minutes, from nothing installed</em>
       </a>
-      <a class="also" :href="withBase('/guide/installation')">Installation guide</a>
+      <a class="also" :href="withBase('/user/installation')">Installation guide</a>
       <a class="also" :href="withBase('/flows/')">What it can run</a>
     </div>
 

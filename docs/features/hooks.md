@@ -83,6 +83,6 @@ swallowing that would let the turn end quietly and the flow report that it finis
 
 ## Where the detail is
 
-- [Hooks](/guide/hooks) — hanging one, and each moment's fields
+- [Hooks](/weaver/hooks) — hanging one, and each moment's fields
 - [It decides when it is done](/features/goals) — the refused stop, and what it costs
 - [Agents reference](/reference/agents#hooks)

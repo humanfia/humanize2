@@ -79,7 +79,7 @@ const SYSTEMS: SystemDomain[] = [
       {
         code: 'B3',
         name: 'Tools & skills',
-        link: '/guide/tools',
+        link: '/weaver/tools',
         guarantee:
           'Skills are selected per session, while flow callbacks can become temporary native tools.',
       },

@@ -86,6 +86,6 @@ flow can be a conversation rather than a loop.
 
 ## Where the detail is
 
-- [Talking to a running turn](/guide/steering) — the keys, the pin, and the Python
-- [Many conversations at once](/guide/conversations) — which agent a line reaches
-- [Stopping](/guide/stopping) — when a steer is not enough
+- [Talking to a running turn](/user/steering) — the keys, the pin, and the Python
+- [Many conversations at once](/user/conversations) — which agent a line reaches
+- [Stopping](/user/stopping) — when a steer is not enough

@@ -48,11 +48,11 @@ that is true under any flow, and [Steering](/features/steering) is how.
 
 Nothing. What was said is the conversation, and the backend that ran it logged it turn by turn.
 A session is opened rather than reopened, so starting this again is another conversation rather
-than the last one carried on. To read one back, [collect the trace](/guide/tracing) or
-[export the transcript](/guide/export).
+than the last one carried on. To read one back, [collect the trace](/user/tracing) or
+[export the transcript](/user/export).
 
 ## See also
 
-- [Many conversations at once](/guide/conversations) — `chat` is one of them; the interface holds several
-- [The person as an agent](/guide/human-agent) — what `agents.human` is, and what it does unattended
+- [Many conversations at once](/user/conversations) — `chat` is one of them; the interface holds several
+- [The person as an agent](/weaver/human-agent) — what `agents.human` is, and what it does unattended
 - [ralph_loop](/flows/ralph-loop) — the same one agent, with a loop around it

@@ -116,8 +116,8 @@ code.
 
 ## Where the detail is
 
-- [An atlas](/guide/atlas) — writing the restricted body and reading the compiled graph
-- [Checking a flow](/guide/checking-flows) — the zero-execution findings and their limits
-- [Testing a flow](/guide/testing-flows) — stand-in agents instead of model calls
-- [Picking a run up](/guide/resuming) — how runs and saved state relate
+- [An atlas](/weaver/atlas) — writing the restricted body and reading the compiled graph
+- [Checking a flow](/weaver/checking-flows) — the zero-execution findings and their limits
+- [Testing a flow](/weaver/testing-flows) — stand-in agents instead of model calls
+- [Picking a run up](/user/resuming) — how runs and saved state relate
 - [Flows reference](/reference/flows) — every mark, graph field and finding

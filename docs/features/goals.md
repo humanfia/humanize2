@@ -43,7 +43,7 @@ agent is built and the flow does not change it afterwards.
 An agent with goals off is one whose flow owns every continuation. Beyond refusing the goal
 itself, humanize refuses the tools that would carry work past the turn it is holding — the
 backend's own switch where it has one, and a refusal before the CLI is invoked where it has
-none. Everything else the agent may reach for is what its [permission](/guide/permissions) rung
+none. Everything else the agent may reach for is what its [permission](/user/permissions) rung
 says it may, exactly as before, and neither path touches your global configuration of that
 backend.
 
@@ -66,6 +66,6 @@ that still fails, a diff that still touches the wrong directory.
 
 ## Where the detail is
 
-- [Goals](/guide/goals) — the calls, the marker, and which backends have one
+- [Goals](/weaver/goals) — the calls, the marker, and which backends have one
 - [The moments of a turn](/features/hooks) — the refused stop, in full
 - [Agents reference](/reference/agents#goals)

@@ -228,4 +228,4 @@ Each of these is deliberate, and each looks like a defect if you meet it cold.
 and prefer `ssh://` or `docker://`, which need no open port at all.
 
 The full statement, including what running any agent under humanize means, is in
-[Security](/guide/security).
+[Security](/user/security).

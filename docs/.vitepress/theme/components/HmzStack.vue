@@ -30,7 +30,7 @@ const NODES: Node[] = [
   { id: 'machines', x: 120, y: 486, blurb: "where an agent's turns land: a container, a host, here", href: '/reference/machines' },
   { id: 'providers', x: 560, y: 486, blurb: 'which account an agent runs as, kept apart from which CLI it is', href: '/reference/providers' },
   { id: 'coganchor', x: 120, y: 560, blurb: 'syscall interposition: a supervisor here, a server there', href: '/reference/remote-execution' },
-  { id: 'backends', x: 660, y: 560, blurb: 'every fact about a coding agent CLI that is not code', href: '/guide/concepts' },
+  { id: 'backends', x: 660, y: 560, blurb: 'every fact about a coding agent CLI that is not code', href: '/user/concepts' },
 ]
 
 const EDGES: [string, string][] = [

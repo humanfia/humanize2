@@ -31,7 +31,7 @@ the first agent turn.
 - Shipped graphs are checked for drift and rebuilt only from allowlisted prophecy types.
 
 **Learn:** [Python becomes a prophecy](/features/prophecy) · **Use:**
-[Writing a flow](/guide/writing-a-flow), [Atlas](/guide/atlas) · **Reference:**
+[Writing a flow](/weaver/writing-a-flow), [Atlas](/weaver/atlas) · **Reference:**
 [Flows](/reference/flows#an-atlas)
 
 ### A2. Static correctness and proving
@@ -48,7 +48,7 @@ turn.
   real model.
 
 **Learn:** [Python becomes a prophecy](/features/prophecy) · **Use:**
-[Checking flows](/guide/checking-flows), [Testing flows](/guide/testing-flows) ·
+[Checking flows](/weaver/checking-flows), [Testing flows](/weaver/testing-flows) ·
 **Reference:** [Flows](/reference/flows#checking-a-flow)
 
 ### A3. Composition and hot reload
@@ -64,7 +64,7 @@ independently scoped.
 - Synchronous and asynchronous flows share the same runner and failure model.
 
 **Learn:** [A flow is Python](/features/flows) · **Use:**
-[Calling flows](/guide/calling-flows), [Skills](/guide/skills) · **Reference:**
+[Calling flows](/weaver/calling-flows), [Skills](/user/skills) · **Reference:**
 [Flows](/reference/flows#a-flow-that-calls-another-flow)
 
 ### A4. Scheduling, state, and resumption
@@ -84,7 +84,7 @@ actually recorded.
 
 **Learn:** [Many turns at once](/features/concurrency),
 [Picked up where it stopped](/features/resuming) · **Use:**
-[Async flows](/guide/async-flows), [Picking a run up](/guide/resuming) · **Reference:**
+[Async flows](/weaver/async-flows), [Picking a run up](/user/resuming) · **Reference:**
 [Flows](/reference/flows#a-flow-that-can-be-picked-up)
 
 ## B. Agent control plane
@@ -107,8 +107,8 @@ pretending every backend supports the same controls.
 - Shaped answers are reconstructed into the same typed result where a backend supports them.
 
 **Learn:** [Many backends, one agent](/features/backends),
-[Answers in a shape](/features/shapes) · **Use:** [Providers](/guide/providers),
-[Efforts](/guide/efforts) · **Reference:**
+[Answers in a shape](/features/shapes) · **Use:** [Providers](/user/providers),
+[Efforts](/user/efforts) · **Reference:**
 [Agents](/reference/agents#what-each-backend-can-do)
 
 ### B2. Turn and session control
@@ -128,9 +128,9 @@ an out-of-band interruption.
 
 **Learn:** [A line typed mid-turn](/features/steering),
 [It decides when it is done](/features/goals), [The moments of a turn](/features/hooks),
-[You, as one of the agents](/features/human) · **Use:** [Questions](/guide/questions),
-[Side questions (/btw)](/guide/btw), [Board](/guide/board),
-[Human agent](/guide/human-agent), [Being away](/guide/afk) · **Reference:**
+[You, as one of the agents](/features/human) · **Use:** [Questions](/user/questions),
+[Side questions (/btw)](/user/btw), [Board](/user/board),
+[Human agent](/weaver/human-agent), [Being away](/user/afk) · **Reference:**
 [Agents](/reference/agents#turns), [Flows](/reference/flows#the-person-at-the-prompt)
 
 ### B3. Tools and skills
@@ -145,7 +145,7 @@ role needs.
   session ends, on a capable backend.
 
 **Learn:** [Many backends, one agent](/features/backends) · **Use:**
-[Skills](/guide/skills), [Callbacks as tools](/guide/tools) · **Reference:**
+[Skills](/user/skills), [Callbacks as tools](/weaver/tools) · **Reference:**
 [Agents](/reference/agents#the-skills-an-agent-carries),
 [Flows](/reference/flows#the-skills-a-flow-brings)
 
@@ -164,7 +164,7 @@ an explicit boundary.
   attempt cannot fix.
 
 **Learn:** [Two accounts of one CLI](/features/accounts) · **Use:**
-[Falling back](/guide/fallback) · **Reference:**
+[Falling back](/user/fallback) · **Reference:**
 [Account recovery](/reference/agents#when-an-account-goes-down),
 [Cross-backend recovery](/reference/agents#when-the-place-has-nowhere-left-to-run)
 
@@ -184,7 +184,7 @@ leaking another account into the turn.
   it.
 
 **Learn:** [Two accounts of one CLI](/features/accounts) · **Use:**
-[Providers](/guide/providers) · **Reference:** [Providers](/reference/providers)
+[Providers](/user/providers) · **Reference:** [Providers](/reference/providers)
 
 ## C. Execution fabric
 
@@ -204,7 +204,7 @@ belong to the target machine.
 - The anchor is routing and transport, not a sandbox or an authorization boundary.
 
 **Learn:** [The anchor](/features/anchor) · **Use:**
-[Remote execution](/guide/remote-execution), [Security](/guide/security) · **Reference:**
+[Remote execution](/user/remote-execution), [Security](/user/security) · **Reference:**
 [Remote execution](/reference/remote-execution)
 
 ### C2. Shadow workspace and consistent writes
@@ -217,7 +217,7 @@ updates.
 - Writes stream to the target and become visible atomically when the complete file arrives.
 
 **Learn:** [The anchor](/features/anchor) · **Use:**
-[Remote execution](/guide/remote-execution) · **Reference:**
+[Remote execution](/user/remote-execution) · **Reference:**
 [What the agent observes](/reference/remote-execution#what-the-agent-observes)
 
 ### C3. Portable transport runtime
@@ -234,7 +234,7 @@ on the target first.
   directory.
 
 **Learn:** [The anchor](/features/anchor) · **Use:**
-[Remote execution](/guide/remote-execution) · **Reference:**
+[Remote execution](/user/remote-execution) · **Reference:**
 [Targets](/reference/remote-execution#targets)
 
 ### C4. Machine lifecycle
@@ -248,7 +248,7 @@ cleanup.
   created them.
 - Workspace placement is declared separately from which backend performs the turn.
 
-**Learn:** [The anchor](/features/anchor) · **Use:** [Containers](/guide/containers) ·
+**Learn:** [The anchor](/features/anchor) · **Use:** [Containers](/user/containers) ·
 **Reference:** [Machines](/reference/machines)
 
 ## D. Run continuity and observability
@@ -270,7 +270,7 @@ screen later.
   resurrect the old process.
 
 **Learn:** [The terminal can leave](/features/daemon) · **Use:**
-[Unattended runs](/guide/unattended), [Stopping](/guide/stopping) · **Reference:**
+[Unattended runs](/user/unattended), [Stopping](/user/stopping) · **Reference:**
 [Daemon](/reference/daemon)
 
 ### D2. Persistent state and layered logs
@@ -286,7 +286,7 @@ that explicitly supports it.
 
 **Learn:** [Picked up where it stopped](/features/resuming),
 [The terminal can leave](/features/daemon) · **Use:**
-[Picking a run up](/guide/resuming), [History](/guide/history) · **Reference:**
+[Picking a run up](/user/resuming), [History](/user/history) · **Reference:**
 [Resumable flows](/reference/flows#a-flow-that-can-be-picked-up),
 [Epic records](/reference/tracing#epics)
 
@@ -303,7 +303,7 @@ inspected after the run.
 - Dense lane packing and lazy attachments keep large traces navigable without dropping detail.
 - A trace is a local artifact; creating or opening it does not opt into outbound telemetry.
 
-**Learn:** [One timeline](/features/tracing) · **Use:** [Tracing](/guide/tracing) ·
+**Learn:** [One timeline](/features/tracing) · **Use:** [Tracing](/user/tracing) ·
 **Reference:** [Tracing](/reference/tracing)
 
 ### D4. Telemetry privacy
@@ -318,8 +318,8 @@ anything leaves the machine.
   breadcrumbs before an outbound report is sent.
 - Local run journals, session logs, profiles, and traces are separate from optional reporting.
 
-**Learn:** [One timeline](/features/tracing) · **Use:** [Reporting](/guide/reporting),
-[Tracing](/guide/tracing) · **Reference:** [SDK](/reference/sdk),
+**Learn:** [One timeline](/features/tracing) · **Use:** [Reporting](/user/reporting),
+[Tracing](/user/tracing) · **Reference:** [SDK](/reference/sdk),
 [Tracing](/reference/tracing)
 
 ## E. Product surfaces
@@ -340,7 +340,7 @@ configure it from the contract the flow declares.
 - Remembered settings are revalidated against the model the flow declares now.
 
 **Learn:** [One system, four ways in](/features/surfaces) · **Use:**
-[Flowverses](/guide/flowverses), [Flow settings](/guide/flow-settings) · **Reference:**
+[Flowverses](/weaver/flowverses), [Flow settings](/weaver/flow-settings) · **Reference:**
 [Flows](/reference/flows#flowverses)
 
 ### E2. Unified entry points
@@ -358,6 +358,6 @@ definition of what a flow or run means.
 - Shared semantics do not imply identical interaction or backend capability on every surface.
 
 **Learn:** [One system, four ways in](/features/surfaces) · **Use:**
-[Quickstart](/tutorials/quickstart), [Status](/guide/status) · **Reference:**
+[Quickstart](/), [Status](/user/status) · **Reference:**
 [SDK](/reference/sdk), [CLI](/reference/cli), [TUI](/reference/tui),
 [Daemon](/reference/daemon)

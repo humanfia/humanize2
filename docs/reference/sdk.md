@@ -40,7 +40,7 @@ a workspace is what loads the tracer.
 | Method | |
 | --- | --- |
 | `backends()` | Every coding agent CLI humanize drives, as `hmz.backends.Profile`. |
-| `reports()` | Starts [reporting humanize's own failures](/guide/reporting) where that has been answered yes. Returns whether anything is being reported. |
+| `reports()` | Starts [reporting humanize's own failures](/user/reporting) where that has been answered yes. Returns whether anything is being reported. |
 | `read(argv)` | Reads an `hmz exec` line into `(flow, agents, task, config, container)`. |
 | `runner(flow, agents, config=None, resume=None, container="")` | Loads a flow and hands it the agents it was written for, as `hmz.runner.Runner`. |
 | `run(flow, agents, task, config=None, resume=None, container="")` | The same, as a [`Run`](#run). |
@@ -87,10 +87,10 @@ run.wait(timeout=60)
 | `about(named)` | The line a flow says about itself. |
 | `places(named)` | Every agent it needs chosen for it, in the order it takes them. |
 | `check(named, static=False)` | Reads it for what will not run, before anything runs it: one finding per thing found, errors and warnings. `static=True` keeps to the reading that executes nothing. |
-| `prophecy(named)` | What an [atlas](/guide/atlas) compiles to, or `None` for a flow that is not one or does not compile — which `check` says the reasons for. |
+| `prophecy(named)` | What an [atlas](/weaver/atlas) compiles to, or `None` for a flow that is not one or does not compile — which `check` says the reasons for. |
 | `foretell(named)` | Writes that prophecy into the flow's own directory, which every run of it walks from then on. |
 | `configures(named)` | What it can be [set up with](/reference/flows#settings-of-the-flow-s-own), or `None`. |
-| `resumes(named)` | Whether it says it can be [picked up](/guide/resuming). |
+| `resumes(named)` | Whether it says it can be [picked up](/user/resuming). |
 | `fork(named, into=None)` | Copies it into this project's own flows, whole. |
 | `running()` | Every flow running in this process now, the one started first and whatever it called. |
 | `set_up_from(path)` | Reads a flow's YAML setup file. |
@@ -194,7 +194,7 @@ happened.
 | `sessions(epic)` | Every session it opened. |
 | `opened(epic)` | What each agent opened, by the name the run knew that agent as. |
 | `resumed(flow)` | The last run of one flow here. |
-| `state(epic, flow="")` | What a [resumable](/guide/resuming) flow left behind in one run. |
+| `state(epic, flow="")` | What a [resumable](/user/resuming) flow left behind in one run. |
 | `traced(epic, *, output=None, start=None, end=None)` | Gathers one run into a [trace](/reference/tracing) of that run — its own sessions, by the ids it wrote down, beside the programs it profiled — and answers with where it went and what is in it. It goes beside the run unless an output is named. |
 | `trace(*, sessions=None, agents=None, output=None, start=None, end=None, profile=None)` | The same collector, asked for whatever sessions you name — which is how a session no run ever drove is read back. |
 

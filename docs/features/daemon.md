@@ -94,8 +94,8 @@ shape and state of the run; the coding-agent backend remains the owner of the co
 
 ## Where the detail is
 
-- [Run it unattended](/guide/unattended) — running with no interactive reader at all
-- [Picking a run up](/guide/resuming) — what saved state can do after a process has ended
-- [Stopping](/guide/stopping) — how a flow unwinds, and what a harder stop leaves behind
+- [Run it unattended](/user/unattended) — running with no interactive reader at all
+- [Picking a run up](/user/resuming) — what saved state can do after a process has ended
+- [Stopping](/user/stopping) — how a flow unwinds, and what a harder stop leaves behind
 - [Daemon reference](/reference/daemon) — lifecycle, terminal rules and the on-disk note
-- [Tracing](/guide/tracing) — the run journal, session links and traces made from them
+- [Tracing](/user/tracing) — the run journal, session links and traces made from them

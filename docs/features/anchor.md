@@ -129,7 +129,7 @@ if their versions disagree.
 
 ## Where the detail is
 
-- [Remote execution](/guide/remote-execution) — how to point an agent at one
+- [Remote execution](/user/remote-execution) — how to point an agent at one
 - [Remote execution reference](/reference/remote-execution) — what you are entitled to, exactly
-- [Security](/guide/security) — read this first
+- [Security](/user/security) — read this first
 - [Two accounts of one CLI](/features/accounts) — the same technique, aimed at credentials

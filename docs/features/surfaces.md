@@ -102,6 +102,6 @@ session means.
 
 ## Where the detail is
 
-- [Flowverses and forking](/guide/flowverses) · [Flow settings](/guide/flow-settings)
+- [Flowverses and forking](/weaver/flowverses) · [Flow settings](/weaver/flow-settings)
 - [Python SDK](/reference/sdk) · [CLI](/reference/cli) · [TUI](/reference/tui) ·
   [Daemon](/reference/daemon)

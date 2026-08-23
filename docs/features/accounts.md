@@ -100,7 +100,7 @@ What answers those is another **place** — another CLI, another account, anothe
 that is written between the two places rather than on either, because it is about neither on
 its own: it is what to do when *this* CLI, at *this* model, as *this* account, cannot run. How
 hard the agent thinks and what it may reach for are what that agent *is*, and come across the
-step unchanged. [`/fallback`](/guide/fallback) is where it is said.
+step unchanged. [`/fallback`](/user/fallback) is where it is said.
 
 It is the second thing tried and not the first, and the reason is the conversation. No backend
 takes another backend's session id, so a turn that leaves its backend leaves the conversation
@@ -113,7 +113,7 @@ Before either chain moves, the turn is taken again: how many times over, how lon
 tries, and how long the whole of it may go on for. Written against the **place** rather than
 against the account — the CLI, the account and the model together — because it is a thing about
 where the turn runs rather than about the credentials it runs with, and because it and where
-the turn goes next are answers to the one thing that happened. [`/fallback`](/guide/fallback)
+the turn goes next are answers to the one thing that happened. [`/fallback`](/user/fallback)
 says both.
 
 **Nothing is retried by default.** A turn is taken once, as it always was: a prompt the model
@@ -139,6 +139,6 @@ answered by another, and no supervisor at all.
 
 ## Where the detail is
 
-- [Providers](/guide/providers) — making one, signing it in, pointing it somewhere
+- [Providers](/user/providers) — making one, signing it in, pointing it somewhere
 - [Providers reference](/reference/providers) — every way in, every field, and adding a CLI
 - [The anchor](/features/anchor) — the same interception, over a whole session

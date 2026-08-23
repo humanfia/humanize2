@@ -66,10 +66,10 @@ that never came.
 On a backend that takes the schema as an argument of the process rather than of the turn,
 asking a session for a shape it was not started with ends that process and starts one that
 **resumes** the conversation. The conversation is not restarted; only the process is. It is the
-same thing [moving an effort](/guide/efforts) does.
+same thing [moving an effort](/user/efforts) does.
 
 ## Where the detail is
 
-- [Answers in a shape](/guide/shapes) — writing the model, and the failing branch
+- [Answers in a shape](/weaver/shapes) — writing the model, and the failing branch
 - [Agents reference](/reference/agents#answering-in-a-shape) — every call that takes one
 - [You, as one of the agents](/features/human) — the same shape, asked of a person

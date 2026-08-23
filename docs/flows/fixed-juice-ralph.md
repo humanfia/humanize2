@@ -67,6 +67,6 @@ starting today has none of yesterday's minutes to average.
 
 ## See also
 
-- [Efforts](/guide/efforts) — what a rung is, and which ladder each model has
-- [Cost and rate](/guide/tally) — reading what a run is spending while it runs
+- [Efforts](/user/efforts) — what a rung is, and which ladder each model has
+- [Cost and rate](/user/tally) — reading what a run is spending while it runs
 - [ralph_loop](/flows/ralph-loop) — the same loop, ungoverned

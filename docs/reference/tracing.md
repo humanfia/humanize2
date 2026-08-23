@@ -47,7 +47,7 @@ process   agent          reviewer · 2 sessions
 
 | In the trace | Is |
 | --- | --- |
-| a **process** | one [agent](/guide/concepts#agent) and everything it drove, called `<agent> · <n> sessions` — or, for a [profiled](#profiling-a-run) run, one program it ran, called `<program> · <pid>` |
+| a **process** | one [agent](/user/concepts#agent) and everything it drove, called `<agent> · <n> sessions` — or, for a [profiled](#profiling-a-run) run, one program it ran, called `<program> · <pid>` |
 | a **track** | one row of that agent's sessions: `main` for the ones somebody started, `subagent` for what a turn reached for. Sessions of one agent that never run at the same time share a track; root sessions and sub-agents stay apart. Or one thread of that program. |
 | a **slice** | one action — a tool call, a message, or waiting for reasoning |
 
@@ -143,7 +143,7 @@ Running that flow again here carries on from the last run of it that left anythi
 epic of its own, whose `began` line says which run it was `picked_up` from, so a week of stops
 and starts reads as the week it was. `/epics` picks a named run up: enter on a row offers
 *carry on from here*, which is asked of the flow rather than of the run, a flow being a file
-that may have been rewritten since. See [Picking a run up](/guide/resuming) and
+that may have been rewritten since. See [Picking a run up](/user/resuming) and
 [a flow that can be picked up](/reference/flows#a-flow-that-can-be-picked-up).
 
 An agent stopped by hand makes the run `stopped` rather than `failed`, whatever the turn under

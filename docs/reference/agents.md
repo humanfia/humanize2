@@ -1,7 +1,7 @@
 # Agents
 
 Driving a coding agent from Python. An agent is settings; a
-[session](/guide/concepts#session) is memory. Which of the two a [flow](/reference/flows) holds decides what
+[session](/user/concepts#session) is memory. Which of the two a [flow](/reference/flows) holds decides what
 it remembers.
 
 Everything here is importable from `hmz.agents`. This is the layer under a flow rather than the
@@ -101,7 +101,7 @@ the region has gone dark, the rate limit is on the whole account rather than on 
 Another key for the same backend is another way of asking the same thing that is not there.
 
 What answers those is another **place** — a CLI, an account and a model — and it is written
-down [between the two](/guide/fallback) rather than on either:
+down [between the two](/user/fallback) rather than on either:
 
 ```sh
 hmz fallback add claude@work/claude-opus-5 codex@key/gpt-5.6-sol
@@ -204,7 +204,7 @@ the conversation carries on into the turn after it.
 A config takes `model`, `effort`, `service_tier`, an optional
 [`machine`](#where-the-turns-land),
 [what it may do](#what-an-agent-may-do), [which account it runs as](#which-account-it-runs-as),
-whether [goals](/guide/goals) are available to it,
+whether [goals](/weaver/goals) are available to it,
 [whether it may search the web](#whether-an-agent-may-search-the-web), and nothing else — the
 [skills it carries](#the-skills-an-agent-carries) are not among them, being its CLI's own and
 its flow's. Codex also takes `overrides`, the app-server `-c` keys that are not already one
@@ -675,7 +675,7 @@ agent.hooks.on(Moment.SUBAGENT_START, counted)
 They are told rather than answered: no backend here waits to be told whether it may start one,
 so a refusal would be a verdict that goes nowhere. The same events reach a watcher as
 `subagent` and `subagent-ends`, and the interface draws them
-[under the agent that started them](/guide/status).
+[under the agent that started them](/user/status).
 
 A hook that raises has said nothing. A flow must not fail because something hung off it did —
 with one exception: a hook that drove an agent which has been [stopped](#stopping) lets

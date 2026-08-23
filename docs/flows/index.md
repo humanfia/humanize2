@@ -60,7 +60,7 @@ fields at the prompt:
 hmz exec -f ralph_loop -c budget.yaml -a claude/claude-opus-5:high "$(cat TASK.md)"
 ```
 
-The whole of it is in [Calling flows](/guide/calling-flows) and the [CLI
+The whole of it is in [Calling flows](/weaver/calling-flows) and the [CLI
 reference](/reference/cli).
 
 ## What ends a loop
@@ -90,12 +90,12 @@ The flows that end themselves instead: [`chat`](/flows/chat) ends when you stop 
 | `local` · `user` | `.humanize/flows/` here, and `~/.humanize/flows/` everywhere |
 
 Any git repository with a `flows/` directory in it is a **flowverse**, and adding one offers
-its flows by name on every machine you add it to. [Flowverses](/guide/flowverses) is how, and
-[Writing a flow](/guide/writing-a-flow) is how to write one worth publishing.
+its flows by name on every machine you add it to. [Flowverses](/weaver/flowverses) is how, and
+[Writing a flow](/weaver/writing-a-flow) is how to write one worth publishing.
 
 ::: danger Adding a flowverse is trusting that repository with this machine
 A flow is Python, and reading one means **running** it: listing what a flowverse holds imports
 every file in its `flows/`. Add the ones you would clone and run. Every flow here also runs its
 agents with permission prompts disabled, and nothing turns them back on — read
-[Security](/guide/security) first.
+[Security](/user/security) first.
 :::

@@ -37,7 +37,7 @@ budget: 25    # millions of output tokens; 0 goes on until it is stopped
 | `budget` | Millions of output tokens the loop may spend before it stops, counted across every run of it in this workspace. **10 by default**, and `0` goes on until it is stopped by hand. |
 
 `hmz exec -f ralph_loop -c budget.yaml …`, or `/config` at the prompt. See [Settings of its
-own](/guide/flow-settings).
+own](/weaver/flow-settings).
 
 ## What it keeps
 
@@ -48,7 +48,7 @@ whole week of restarts shares.
 
 A loop that has spent its budget is **over**, and what is over is not picked up: it clears what
 it kept, so the next run here opens on a budget of its own and at round one rather than
-stopping before it has taken a turn. [Picking a run up](/guide/resuming) is the whole of it.
+stopping before it has taken a turn. [Picking a run up](/user/resuming) is the whole of it.
 
 ## What else ends it
 
@@ -63,4 +63,4 @@ loop that stalled is one to fix and carry on from, not one that is over.
 - [stateful_ralph](/flows/stateful-ralph) — one session instead, re-sent the task each round
 - [official/fixed_juice_ralph](/flows/fixed-juice-ralph) — this loop with a governor on it
 - [official/goal](/flows/goal) — this loop, with each round run as the agent's own goal
-- [Loops](/guide/loops) — writing one of these yourself
+- [Loops](/weaver/loops) — writing one of these yourself

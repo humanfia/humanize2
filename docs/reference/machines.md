@@ -247,7 +247,7 @@ the one an anchored turn opens, made when the flow first asks and held for the r
 different toolchain and a different filesystem, and mounts your workspace into it. It does not
 stop the agent editing that workspace, and an `hmz anchor` export bounds which files a request
 may name but does not confine the commands that request can run. Read
-[Security](/guide/security).
+[Security](/user/security).
 
 ## Writing a machine of your own
 

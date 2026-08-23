@@ -61,12 +61,12 @@ and a reader learning read a feature page.
 
 ## Writing a page
 
-- Links are written from the site root, without the extension: `/guide/afk`. VitePress checks
+- Links are written from the site root, without the extension: `/user/afk`. VitePress checks
   them at build time.
 - Assets in `public/` are referenced from the root without `public`: `![…](/tui.svg)`.
 - Do not add a `## Table of Contents`. The right-hand outline is generated, from `##` and `###`.
   A page whose `###`s are dozens of error messages sets `outline: 2` in its frontmatter, the way
-  [Troubleshooting](/guide/troubleshooting) does: forty half-sentences, each cut off at the same
+  [Troubleshooting](/user/troubleshooting) does: forty half-sentences, each cut off at the same
   width, name nothing. The handful of places they happen in do.
 - The first `#` heading is the page title.
 - Wrap prose at 95 columns, as the rest of the repository does.
@@ -192,7 +192,7 @@ Concretely:
   obviously invalid — `gateway.example.invalid`, `not-a-real-token`, `not-a-real-key`.
 - No turn is ever run. `/opt/standin/claude` and `/opt/standin/codex` exist so that humanize
   offers those backends; both exit 1 if anything actually calls them.
-- What the [`collect`](/guide/tracing) demo reads, and the runs `/epics` lists, are what
+- What the [`collect`](/user/tracing) demo reads, and the runs `/epics` lists, are what
   `stage.py` invented.
 
 If you add a tape, look at the rendered GIF before committing it. Frame by frame is worth it:
