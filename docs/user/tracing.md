@@ -23,25 +23,9 @@ sessions.
 ![hmz trace collect writing into the last run's own directory: the path, the run it is of, and
 1 session, 10 slices, 3 programs](/demo/collect.png)
 
-Open it. Go to [ui.perfetto.dev](https://ui.perfetto.dev) and drag the file in. Nothing is
+Now open it. Go to [ui.perfetto.dev](https://ui.perfetto.dev) and drag the file in. Nothing is
 uploaded; Perfetto opens it in the browser. `chrome://tracing` works too, as does anything that
 reads a Chrome JSON trace.
-
-You see one row per agent, and one track per session:
-
-```
-process   agent          actor · claude-opus-5 · max
-  track     session ──▶ ▓▓▓ ▓ ▓▓▓▓▓▓ ▓▓  ▓▓▓▓▓  ▓ ▓▓▓▓▓▓▓▓▓▓
-  track     sub-agent ─▶      ▓▓▓▓▓▓▓▓▓▓▓
-process   agent          reviewer · gpt-5.6-sol · high
-  track     session ──▶            ▓▓▓▓        ▓▓▓▓        ▓▓▓▓
-```
-
-Click a slice. Its arguments are there: the prompt, the reasoning, the tool input, the tool
-output.
-
-That is the whole of it: one command gathers the sessions, Perfetto draws them as a timeline,
-and each slice holds the details.
 
 ## What you get
 
@@ -53,14 +37,10 @@ process   agent          reviewer · 2 sessions
   track     main ──────────────▶            ▓▓▓▓        ▓▓▓▓
 ```
 
-A **process** is an agent and everything it drove. A **track** is one row of that agent's
-sessions. For a [profiled](#profiling-a-run) run the same two words carry over to the programs
-the agents ran: a process is a program, and a track is one of its threads.
-
 | In the trace | Is |
 | --- | --- |
-| a **process** | one [agent](/user/concepts#agent), called `<agent> · <n> sessions` — or, for a profiled run, one program it ran, called `<program> · <pid>` |
-| a **track** | one row of that agent's [sessions](/user/concepts#session): `main` for the ones somebody started, `subagent` for what a turn reached for, named after the kind where a row is all of one kind. Sessions of one agent that never run at the same time share a track; root sessions and sub-agents stay apart. |
+| a **process** | one [agent](/user/concepts#agent) and everything it drove, called `<agent> · <n> sessions` — or, for a [profiled](#profiling-a-run) run, one program it ran, called `<program> · <pid>` |
+| a **track** | one row of that agent's [sessions](/user/concepts#session): `main` for the ones somebody started, `subagent` for what a turn reached for, named after the kind where a row is all of one kind. Sessions of one agent that never run at the same time share a track; root sessions and sub-agents stay apart. For a profiled run, one of a program's threads. |
 | a **slice** | one action — a tool call, a message, or waiting for reasoning |
 
 Click a slice and its arguments are there: the prompt, the reasoning, the tool input, the tool
@@ -88,7 +68,7 @@ reviewer at the same model and effort would read as one agent, which is not.
 That is what an [epic](#what-a-run-writes-down) is for. `hmz trace collect` reads the run it is
 tracing, so `official/rlar` traces as `actor` and `reviewer` without being told anything.
 
-Driving agents by hand, say so yourself:
+Driving agents by hand from Python, say so yourself:
 
 ```python
 collect(agents={a.id: a.opened for a in (actor, reviewer)})
@@ -161,20 +141,16 @@ rather than a run that stops.
 ![one run's sessions/ directory, its name saying agent, CLI and account, holding a symlink to
 Claude Code's own log](/demo/run-linked.png)
 
-`/epics` is the same list at the prompt: every run of this directory, newest first, with a
-mark on the ones whose flow says it can be picked up. Enter opens what there is to do with the
-run under the cursor: carry on from here, collect a trace, where it is. The mark and that first
-row are one question, and it is asked of the **flow** as it stands rather than of the run. A
-flow marked `resumable=True` after a run of it has that older run marked and offered too, and
-one that has since dropped the mark has neither, whatever the run wrote down at the time.
-Carrying one on is [picking a run up](/user/resuming); collecting a trace is offered for every
-run, whatever its flow says.
+`/epics` is the same list at the prompt: every run of this directory, newest first, with a mark
+on the ones whose flow says it can be picked up. Enter opens what there is to do with the run
+under the cursor — carry on from here, collect a trace, where it is. Collecting a trace is
+offered for every run, whatever its flow says; the rest is [picking a run
+up](/user/resuming#carrying-an-older-one-on).
 
 **It is not a transcript.** The backend's own log is the turn-by-turn record. An epic is the
-*shape* of the run: enough to gather a trace afterwards out of the ids alone.
-
-An epic covers one run and is never reopened. Carrying a flow on is another run, with sessions
-of its own, written into an epic that says which run it was picked up from.
+*shape* of the run: enough to gather a trace afterwards out of the ids alone. It covers one run
+and is never reopened, so carrying a flow on is another run, with sessions of its own, written
+into an epic that says which run it was picked up from.
 
 An agent [stopped by hand](/user/stopping) makes the run `stopped` rather than `failed`,
 whatever the turn under way made of it. A run you stopped by hand is written down as `stopped`
@@ -223,17 +199,16 @@ hmz trace collect --end "yesterday 18:00" --output /tmp/before.json
 ```
 
 A trace is **of a run**. It holds the sessions that run opened and no others, by the ids the
-run wrote down as it went. A directory run in fifty times has fifty traces to collect, and none
-of them holds another's work. A run that opened nothing is a trace of nothing. It goes by id
-rather than by directory, so a flow that ran on a [machine of its own](/user/remote-execution)
-is in its own trace too, though the backend logged it under a mirror this directory has never
-heard of.
+run wrote down as it went, so a directory run in fifty times has fifty traces to collect and
+none of them holds another's work. A run that opened nothing is a trace of nothing. It goes by
+id rather than by directory, so a flow that ran on a [machine of its
+own](/user/remote-execution) is in its own trace too, though the backend logged it under a
+mirror this directory has never heard of.
 
 ::: details `0 sessions, 0 slices`
 Three usual reasons. You are in a different directory from the one the run happened in. The
 backend was `opencode` or `mimocode`, which keep sessions in a database and have nothing to
-gather. Or the run being traced never opened a session. It died first, and a run that opened
-nothing is a trace of nothing. See
+gather. Or the run being traced died before it opened a session. See
 [Troubleshooting](/user/troubleshooting#_0-sessions-0-slices).
 :::
 
@@ -252,12 +227,10 @@ a usage error rather than one of them quietly winning. Neither is offered in the
 because `/epics` is a list of runs with nothing to hang them on.
 
 A session is named by its whole id, by the key the trace shows it under, or by a leading part
-of either. The sub-agents it started come with it. `--start` and `--end` take anything
+of either, and the sub-agents it started come with it. `--start` and `--end` take anything
 [dateparser](https://dateparser.readthedocs.io/) understands. `--output` wins over where any of
-these would otherwise land; a trace is also a thing to attach to an issue.
-
-The default output is named after the UTC moment it was collected, so collecting twice keeps
-both.
+these would otherwise land; a trace is also a thing to attach to an issue. The default output
+is named after the UTC moment it was collected, so collecting twice keeps both.
 
 ![hmz trace collect three times: the last run of this directory, one named with --epic, and
 one sent elsewhere with --output](/demo/collect.gif)
@@ -303,8 +276,7 @@ process   program        pytest · 41207
   track     main ──────▶       ▓▓▓▓▓▓▓▓▓▓
 ```
 
-Off until a directory asks for it. It is a sampler running for as long as the flow does, and
-what a run costs in processes is a question about the project rather than about the machine: a
+Off until a directory asks for it: it is a sampler running for as long as the flow does, and a
 repository whose tests take an hour is a different question from one whose tests take a minute.
 What it costs is a thread reading the process tree twenty times a second, and two lines of JSON
 per program — one when it is first seen, one when it has gone.
@@ -313,7 +285,7 @@ Sampled rather than intercepted: nothing goes between an agent and what it runs,
 lived for thirty milliseconds may be missed, and a machine whose processes cannot be read is a
 run with no profile rather than a run that stops.
 
-The switch is read where a run starts. Turning it on holds from the next run rather than the
+The switch is read where a run starts, so turning it on holds from the next run rather than the
 one under way. A run `hmz exec` starts in that directory is profiled too: the switch says
 nothing about what runs, only about whether what runs is watched. From Python it is one
 property and one call:
@@ -354,7 +326,6 @@ live. It is read off the turns going past, never by asking the flow.
 
 ## See also
 
-- [Tutorial: read the run back](/user/tracing)
 - [Picking a run up](/user/resuming) — carrying one of these runs on where it stopped
 - [Tracing reference](/reference/tracing)
 - [CLI › `hmz trace`](/reference/cli#hmz-trace)

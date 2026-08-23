@@ -15,9 +15,8 @@ watching. Only the YAML below is specific to GitHub Actions.
 
 ## Bound the run
 
-Bound the run first. A Ralph loop is a `while True`, and a CI job has a bill.
-
-Bound it three ways, and take whichever fires first:
+A Ralph loop is a `while True`, and a CI job has a bill. Bound it three ways in the flow, and
+take whichever fires first — this part is the [weaver's](/weaver/writing-a-flow):
 
 ```python
 # .humanize/flows/nightly/__init__.py
@@ -47,9 +46,9 @@ And give the job a `timeout-minutes` as the outermost bound.
 ## Get a credential into the runner
 
 humanize holds no API key. It drives the CLI you already logged in, so the question is how that
-CLI is signed in on a machine nobody is sitting at.
-
-Use a [provider](/user/providers), made non-interactively from a secret:
+CLI is signed in on a machine nobody is sitting at. Use a [provider](/user/providers), made
+non-interactively from a secret — a line with nobody at a terminal has to answer everything
+itself, and `-s` is how:
 
 ```sh
 hmz providers add claude/ci -w token -s CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN"
@@ -59,8 +58,7 @@ hmz providers add claude/ci -w token -s CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN"
 hmz providers add codex/ci -w key -s OPENAI_API_KEY="$OPENAI_API_KEY"
 ```
 
-A line with nobody at a terminal has to answer everything itself, and `-s` is how. Then name
-the account on the agent:
+Then name the account on the agent:
 
 ```sh
 hmz exec -f nightly -a claude@ci/claude-opus-5:high "$(cat TASK.md)"
@@ -80,8 +78,8 @@ hmz exec -f nightly \
     "$(cat TASK.md)"
 ```
 
-`bypass` is the default. A flow driving an agent unattended has always run at it. On a runner,
-`workspace-write` costs you nothing and bounds the blast radius to the checkout. See
+`bypass` is the default, and a flow driving an agent unattended has always run at it. On a
+runner, `workspace-write` costs you nothing and bounds the blast radius to the checkout. See
 [Permissions](/user/permissions).
 
 ## Write the workflow
@@ -144,17 +142,17 @@ jobs:
 
 ## Read what happened
 
-`hmz trace collect` with `if: always()` is the point of the whole exercise. The trace is on the
+`hmz trace collect` with `if: always()` is the point of the whole exercise: the trace is on the
 artifacts whether the run finished, failed, or hit the timeout.
 
-`--output` is what puts it there. Left alone, a trace goes with the run it is a trace of:
-`traces/` inside `~/.humanize/epics/<workspace>/<run>/`. That is outside the checkout and
-named after a run the YAML has never heard of. `--output` is for the other case — a trace as a
-file to hand to somebody. A job uploading an artifact is exactly that.
+`--output` is what puts it there. Left alone, a trace goes with the run it is a trace of —
+`traces/` inside `~/.humanize/epics/<workspace>/<run>/`, which is outside the checkout and
+named after a run the YAML has never heard of. `--output` is for the other case: a trace as a
+file to hand to somebody, which is exactly what a job uploading an artifact wants.
 
 Download it and drag it into [ui.perfetto.dev](https://ui.perfetto.dev). One process per agent,
 one track per row of its sessions, one slice per thing it did, with the prompts and the tool
-output attached. See [tutorial 5](/user/tracing).
+output attached. See [Tracing](/user/tracing).
 
 The [epic](/user/tracing#what-a-run-writes-down) says how it ended. A run is a directory, and
 its record is `epic.jsonl` inside it:
@@ -213,9 +211,10 @@ This opens the interface already set up, and starts nothing.
 
 ## Things that bite
 
-**A flow that needs a feature the runner's backend has not got.** Say so in the annotation:
-`Annotated[Agent, Goal]` or `Annotated[Agent, Moment.PERMISSION_REQUEST]`. Then it is
-refused in two seconds rather than an hour in. See [Port a project](/user/tutorials/port-a-project).
+**A flow that needs a feature the runner's backend has not got.** The weaver says so in the
+annotation: `Annotated[Agent, Goal]` or `Annotated[Agent, Moment.PERMISSION_REQUEST]`. Then it
+is refused in two seconds rather than an hour in. See [Port a
+project](/user/tutorials/port-a-project).
 
 **A flowverse that has not been fetched.** `official/...` says so rather than saying there is
 no such file. Fetch it in the job, or vendor the flow into `.humanize/flows/`.
@@ -228,8 +227,8 @@ git diff --quiet && { echo "nothing changed"; exit 0; }
 ```
 
 **A container-backed flow.** Its trajectories are in a mirror rather than in the checkout, and
-they still trace: the run wrote down the ids, and its trace is gathered by those. See [tutorial
-17](/user/containers).
+they still trace: the run wrote down the ids, and its trace is gathered by those. See
+[Containers](/user/containers).
 
 ## See also
 

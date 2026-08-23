@@ -1,15 +1,16 @@
 # Containers
 
-A container gives an agent a toolchain that is not yours, without giving up your workspace.
+A container gives an agent a toolchain that is not yours without giving up your workspace.
 Reach for it when the agent needs a toolchain or a filesystem you do not have. You name an
-image, and humanize brings it up on the agent's first turn and removes it with the agent,
-holding **this project directory at the path it already has** and running as you, so the work
-it leaves behind is yours and everything else is the image's.
+image; humanize brings it up on the agent's first turn and takes it down with the agent,
+holding **this project directory at the path it already has** and running as you — so the work
+it leaves behind is yours, and everything else is the image's.
 
 ## Try it
 
-1. Declare the container beside the tester's place in a flow, so the flow can run the suite in
-   an image that has the right Python:
+1. The flow says which of its agents works in a container. That part is the
+   [weaver's](/weaver/writing-a-flow): the image goes beside the place, and nobody is asked
+   anything.
 
 ```python
 # .humanize/flows/tested/__init__.py
@@ -61,22 +62,22 @@ everything they produce lands in your workspace.
 
 ## The whole run in one container
 
-The section above puts **one agent** in a container, which is what a flow says when only one
-place needs a toolchain of its own. When the answer is *all of them*, say it once from outside
-instead:
+That puts **one agent** in a container, which is what a flow says when only one place needs a
+toolchain of its own. When the answer is *all of them*, say it once from outside, with no flow
+to edit:
 
 ```sh
 hmz exec -f ralph_loop --container python:3.12 -a claude/claude-opus-5:max "get the suite green"
 ```
 
 One container is started for the run, **every** agent's turns land in it, and it goes when the
-run ends. One container rather than one apiece, which is the point: the agents are working on
-one thing, so what one of them writes is what the next one reads.
+run ends. One rather than one apiece, which is the point: the agents are working on one thing,
+so what one of them writes is what the next one reads.
 
 The project directory is mounted at the path it already has, so the flow's own `open()` reads
 the same bytes a turn wrote. What a mounted directory does **not** answer for is a command: one
 the flow runs is run by this machine's shell against this machine's tools, which is the thing a
-container was reached for to avoid. So the flow asks:
+container was reached for to avoid. So the flow asks — the weaver's side again:
 
 ```python
 from hmz.flows import container, flow
@@ -101,29 +102,16 @@ prompt is left alone too, taking no turn anywhere.
 
 ## From a flow
 
-This is the usual way for one agent. The flow writes the image beside the place, and nobody is
-asked anything:
-
-```python
-from typing import Annotated, NamedTuple
-
-from hmz.flows import Agent, Isolated
-
-class Agents(NamedTuple):
-    """The two this drives."""
-
-    tester: Annotated[Agent, Isolated("python:3.12")]  # a container of the flow's own
-    reviewer: Agent                                    # here, and nowhere else
-```
-
-The image is the flow's, and the workspace is the directory the flow is running in. Nothing can
-point that agent anywhere else, including you. The agents page of `/flow` reads it back on that
-agent's `where` row as `in a container of python:3.12`, with `the flow settled this` beside it
-— a row to read rather than one to open.
+**For the weaver.** `Annotated[Agent, Isolated("python:3.12")]` beside the place, as in [Try
+it](#try-it) above, is the usual way for one agent. The image is the flow's, and the workspace
+is the directory the flow is running in; nothing can point that agent anywhere else, including
+you. The agents page of `/flow` reads it back on that agent's `where` row as `in a container of
+python:3.12`, with `the flow settled this` beside it — a row to read rather than one to open.
 
 ## From Python
 
-Use this for an agent you build yourself, or for a place the flow declared `Remote`:
+**For the weaver, or for anyone building agents by hand.** Use this for an agent you build
+yourself, or for a place the flow declared `Remote`:
 
 ```python
 from hmz.machines import DockerConfig
@@ -196,11 +184,11 @@ The label carries your uid, so this cannot reach past you on a machine several p
 
 This is the same arrangement as [remote execution](/user/remote-execution), with the far end a
 container instead of a host. The agent **process** stays on this machine, keeping its
-credentials and its link to its model provider. Everything it *does* happens in the container,
-so the container needs no network access to a model provider and no login.
+credentials and its link to its model provider, so the container needs no network access to a
+model provider and no login. Everything the agent *does* happens in the container.
 
-Because the work happens in a **mirror** rather than in this directory, the backend logs the
-agent's turns under a path this project has never heard of. It makes no difference: the run
+The work therefore happens in a **mirror** rather than in this directory, and the backend logs
+the agent's turns under a path this project has never heard of. It makes no difference: the run
 wrote down the ids of the sessions it opened, and that is what its trace is gathered by.
 
 ```sh
@@ -208,8 +196,8 @@ hmz trace collect
 ```
 
 The run itself is still written down here. An [epic](/user/tracing#what-a-run-writes-down)
-belongs to the directory the flow ran in, and it is a directory of its own with a `sessions/`
-in it. Each session is named for whose it was, what took its turns, which account it ran as and
+belongs to the directory the flow ran in, and is a directory of its own with a `sessions/` in
+it. Each session is named for whose it was, what took its turns, which account it ran as and
 what the backend called it:
 
 ```sh
@@ -223,16 +211,15 @@ tester-codex@local-0a1b2c3d-1a2b-3c4d-5e6f-708192a3b4c5
 ```
 
 The id is the end of the name, and a leading part of it is enough, so the line above collects
-the tester's, which is the session that worked in the container. At the prompt the same thing
-is `/epics`: enter on the run, then **where it is**.
+the tester's — the session that worked in the container. At the prompt the same thing is
+`/epics`: enter on the run, then **where it is**.
 
 ## Isolation here is about environment, not permission
 
 A container gives the agent a different toolchain and a different filesystem, and mounts your
-workspace into it. It does **not** stop the agent editing that workspace.
-
-To narrow what the agent may do at all, that is [permissions](/user/permissions) — a different
-setting, and they compose:
+workspace into it. It does **not** stop the agent editing that workspace. Narrowing what the
+agent may do at all is [permissions](/user/permissions) — a different setting, and they
+compose:
 
 ```sh
 hmz exec -f tested \

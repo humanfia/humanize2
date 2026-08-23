@@ -1,8 +1,7 @@
 # Run it unattended
 
 `hmz exec` runs a flow with nobody at a prompt — which is what a script, a cron entry or a CI
-job wants. Below: how to write the agent line, narrow what an agent may do, pass settings in,
-and read the exit status.
+job wants. Reach for it once a run is the same run every time.
 
 ## The shape of the line
 
@@ -30,10 +29,10 @@ cli=claude,model=claude-opus-4-8,effort=high
 ```
 
 The written-out form exists because a model or an effort may hold the punctuation the short
-form separates on. It also exists because some settings have no unambiguous short spelling.
+form separates on, and because some settings have no unambiguous short spelling.
 
-Read an agent from both ends. The CLI comes first; the effort comes after the **last** colon.
-That is why a model with slashes in it works:
+Read an agent from both ends: the CLI comes first, and the effort comes after the **last**
+colon. That is why a model with slashes in it works:
 
 ```sh
 hmz exec -f ralph_loop -a kimi/kimi-code/k3:swarmmax "$(cat TASK.md)"
@@ -48,7 +47,7 @@ mention it.
 
 ## Narrow what an agent may do
 
-You can narrow what an agent may do only in the written-out form:
+Only the written-out form takes it:
 
 ```sh
 hmz exec -f ralph_loop \
@@ -61,18 +60,16 @@ misspelling is refused before any agent runs. See [Permissions](/user/permission
 
 ## Run with nobody at a prompt
 
-The one difference is that nobody is at a prompt, and it has one consequence: **an agent that
-stops to ask a question is told nobody answered and carries on**. It does not wait forever on a
-reply that is not coming.
-
-There is nothing to switch. It is [`/afk`](/user/afk) always.
+Nobody at a prompt has one consequence: **an agent that stops to ask a question is told nobody
+answered and carries on**, rather than waiting forever on a reply that is not coming. There is
+nothing to switch. It is [`/afk`](/user/afk) always.
 
 Two things follow:
 
 - A flow whose other side is [the person](/weaver/human-agent), such as `chat`, answers nothing.
   So it does the one thing it was given, once.
-- A flow that asks you for [an answer in a shape](/weaver/shapes) gets `None`, and it had better
-  handle that.
+- A flow that asks you for [an answer in a shape](/weaver/shapes) gets `None`, and the weaver
+  who wrote it had better have handled that.
 
 ## See what is checked first
 
@@ -90,15 +87,15 @@ $ hmz exec -f nosuchflow -a claude/claude-opus-5:max "fix the build"
 hmz exec: error: nosuchflow: no flow to read: a flow is a directory with an __init__.py in it
 ```
 
-Everything that can be known before the first turn is checked before the first turn. This is
-deliberate: an hour into a loop is the wrong place to find out you miscounted.
+Everything that can be known before the first turn is checked before the first turn: an hour
+into a loop is the wrong place to find out you miscounted.
 
 ![hmz exec refusing a malformed agent, the wrong agent count, and a flow that is not
 there](/demo/checks.gif)
 
 ## Pass a task that starts with a dash
 
-The `--` ends the flags, so a task that starts with a dash is read as the task:
+`--` ends the flags, so a task that starts with a dash is read as the task:
 
 ```sh
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high -- "--force is not a flag here"
@@ -120,8 +117,9 @@ hmz exec -f official/humanize1:rlcr -c setup.yaml \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:xhigh "add undo"
 ```
 
-The flow's own model checks the settings **before the first turn**. So a combination the flow
-will not run is refused where you wrote it. See [tutorial 8](/weaver/flow-settings).
+The flow's own model checks the settings **before the first turn**, so a combination the flow
+will not run is refused where you wrote it. What the weaver may ask for, and how, is in [Flow
+settings](/weaver/flow-settings).
 
 ## Read the exit status
 
@@ -167,6 +165,6 @@ it to cron. What the line says is checked before the interface opens.
 
 - [Permissions](/user/permissions)
 - [Flow settings](/weaver/flow-settings)
-- [What a run writes down](/user/tracing#what-a-run-writes-down)
+- [Tracing](/user/tracing) — what a run writes down, and reading it back
 - [Stopping](/user/stopping)
-- [Read the run back](/user/tracing)
+- [humanize in CI](/user/ci)
