@@ -609,6 +609,12 @@ one that will not answer says why, under the list, and leaves the sheet up.
 Choosing a model you were not already on starts the effort at the hardest that model takes —
 the one to reach for. Choosing the one you are on leaves the effort where you had it.
 
+For a Claude Code subscription, the list also includes the `fable` alias through Claude's
+custom-model option, even when Claude's ordinary `/model` list hides it. The alias is passed
+unchanged to the turn, so selecting it is equivalent to entering `/model fable` in Claude. If
+the account's catalogue was cached before this option was added, press `r` once to ask Claude
+again.
+
 ## Agents kept under a name
 
 `/agents` is not the flow's agents. It is the agents written down under a name, to be imported

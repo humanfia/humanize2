@@ -29,7 +29,7 @@ from hmz import home, providers
 from hmz.backends import Model, named, speaking
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
     from pathlib import Path
 
     from hmz.backends import Profile
@@ -50,6 +50,34 @@ _HELD = "models.json"
 
 #: The id the one thing said to Claude Code is sent under, which it answers by.
 _ASKS = "models"
+
+#: Claude Code hides the Fable model from the ordinary subscription catalogue. Its documented
+#: custom-model hook makes the same model available to the model-list request, which lets the
+#: picker offer the alias that a turn can pass to ``--model``.
+_CLAUDE_CUSTOM_MODEL_ENV = "ANTHROPIC_CUSTOM_MODEL_OPTION"
+_CLAUDE_CUSTOM_MODEL = "fable"
+
+#: The ways that identify a Claude subscription, rather than a vendor key or a gateway.
+_CLAUDE_SUBSCRIPTION_WAYS = frozenset({"login", "token"})
+
+#: Variables that move Claude Code onto a non-subscription account when no named provider is
+#: being used. A value is enough: Claude treats these switches as enabled when they are set.
+_CLAUDE_EXTERNAL_ACCOUNT_ENV = (
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_FOUNDRY",
+    "CLAUDE_CODE_USE_GATEWAY",
+    "CLAUDE_CODE_USE_VERTEX",
+)
+
+#: An OAuth token supplied through an arbitrary environment provider still identifies a
+#: subscription, even though its provider way is not named `login` or `token`.
+_CLAUDE_SUBSCRIPTION_ENV = (
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CODE_OAUTH_REFRESH_TOKEN",
+)
 
 #: What Claude Code writes on the end of a model to mean that model at its largest window. A
 #: way of running the model rather than a model, so it comes off the id: the backend asked for
@@ -215,6 +243,11 @@ def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., st
     )
     environ = {name: value for name, value in os.environ.items() if name not in hushed}
     environ |= dict(held.env) if held is not None else {}
+    if profile.name == "claude" and _claude_subscription(held, environ):
+        # Claude Code's subscription-only Fable alias is intentionally absent from its normal
+        # picker. Asking through its custom-model hook makes the CLI report it to us, while
+        # leaving the environment of an actual turn untouched.
+        environ.setdefault(_CLAUDE_CUSTOM_MODEL_ENV, _CLAUDE_CUSTOM_MODEL)
 
     def run(args: list[str], said: str = "") -> str:
         argv = [profile.name, *args]
@@ -307,12 +340,47 @@ def _claude(profile: Profile, run: Callable[..., str]) -> list[Model]:
     )
     return [
         Model(
-            _WINDOW.sub("", str(one.get("resolvedModel") or one.get("value") or "")),
+            _claude_name(one),
             _rungs(profile, one.get("supportedEffortLevels")),
             profile.swarms,
         )
         for one in _answered(said)
     ]
+
+
+def _claude_name(model: dict[str, Any]) -> str:
+    """The name a Claude model may be asked for, preserving an explicit custom alias.
+
+    Claude normally gives a stable canonical id in ``resolvedModel`` and a short alias in
+    ``value``. For its custom-model option the alias is the only name the user supplied, so
+    retaining it is important: ``--model fable`` is the supported way to select the hidden
+    subscription model even though Claude resolves it internally to ``claude-fable-5``.
+    """
+    value = model.get("value")
+    description = model.get("description")
+    custom = isinstance(value, str) and _WINDOW.sub("", value) == _CLAUDE_CUSTOM_MODEL
+    chosen = (
+        value
+        if isinstance(value, str)
+        and value
+        and (
+            custom
+            or (isinstance(description, str) and description.startswith("Custom model"))
+        )
+        else model.get("resolvedModel") or value
+    )
+    return _WINDOW.sub("", str(chosen or ""))
+
+
+def _claude_subscription(
+    held: providers.Provider | None, environ: Mapping[str, str]
+) -> bool:
+    """Whether a Claude account is a subscription that may use the Fable alias."""
+    if held is not None:
+        if held.way in _CLAUDE_SUBSCRIPTION_WAYS:
+            return True
+        return any(held.env.get(name) for name in _CLAUDE_SUBSCRIPTION_ENV)
+    return not any(environ.get(name) for name in _CLAUDE_EXTERNAL_ACCOUNT_ENV)
 
 
 def _answered(said: str) -> list[dict[str, Any]]:
