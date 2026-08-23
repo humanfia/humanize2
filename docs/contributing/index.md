@@ -3,6 +3,13 @@
 PRs accepted. Ask a question or discuss a substantial change first in
 [issues](https://github.com/humanfia/humanize2/issues).
 
+## Tutorials
+
+| | |
+| --- | --- |
+| [Your first patch](/contributing/tutorials/first-patch) | Clone it, change one thing, both gates, a pull request |
+| [Add a page to these docs](/contributing/tutorials/a-page-of-docs) | Write it, put it in the sidebar, prove the links resolve |
+
 ## Set up
 
 ```sh
@@ -16,26 +23,16 @@ Installing the hooks once means every commit is checked before it is made.
 
 ## The two gates
 
-**A commit** runs the formatter, the linter and the type checker — everything that answers in
-seconds:
+| | |
+| --- | --- |
+| `uv run pre-commit run --all-files` | The file-hygiene hooks, the formatter, the linter and the type checker — everything that answers in seconds |
+| `uv run pytest` | The tests, against [stand-in agents](/reference/flows#testing-a-flow) |
+| `uv run pytest --run-agents` | Also the `agent`-marked tests, which drive the real coding agent CLIs and spend real tokens |
 
-```sh
-uv run pre-commit run --all-files
-```
-
-**CI** runs those over every file, and the tests on each Python the package claims:
-
-```sh
-uv run pytest                       # everything that does not need a real agent
-uv run pytest --run-agents          # also drives the real coding agent CLIs
-```
-
-`--run-agents` starts the CLIs that are actually installed and spends real tokens on them. The
-rest of the suite drives [stand-in agents](/reference/flows#testing-a-flow) instead.
-
-Both gates have to pass. `ruff` and `pyright` run out of this project's own environment rather
-than one pre-commit builds, so bump them with `uv lock --upgrade-package ruff` rather than by
-editing a second pin.
+Both of the first two have to pass. CI runs them over every file and on each Python the package
+claims, and never runs the third. `ruff` and `pyright` come from this project's own environment
+rather than one pre-commit builds, so bump them with `uv lock --upgrade-package ruff` rather
+than by editing a second pin.
 
 ## What the code is held to
 
@@ -45,14 +42,10 @@ editing a second pin.
   each is annotated in `pyproject.toml`.
 - **Google-style docstrings.**
 - **Popular, well-maintained libraries** in preference to a custom implementation.
-
-## Where things go
-
-[Architecture](/contributing/architecture) has the layers and the rules that keep them. The short
-version: each package depends only downwards, and the layering is checked by a test.
-
-Beside most packages there is a `SPEC.md`. **Do not modify a `SPEC.md`** unless you were asked
-to — it is the contract, and the code is what has to move.
+- **Each package depends only downwards**, which is checked by a test.
+  [Architecture](/contributing/architecture) has the layers and the rules that keep them.
+- **Beside most packages there is a `SPEC.md`.** Do not modify one unless you were asked to —
+  it is the contract, and the code is what has to move.
 
 ## Documentation
 
@@ -64,5 +57,6 @@ to — it is the contract, and the code is what has to move.
 
 ## Commits
 
-There is no commit message convention beyond writing what changed and why. Keep a change and its
-tests in the same commit.
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `fix(agents): …`,
+`docs(contributing): …`, with a `!` before the colon for a breaking change. Keep a change and
+its tests in the same commit.

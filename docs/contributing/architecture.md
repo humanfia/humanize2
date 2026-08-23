@@ -12,7 +12,10 @@ src/hmz/
 ├── backends.py       every fact about a coding agent CLI that is not code
 ├── models.py         what each backend runs, asked of it and kept per account
 ├── epic.py           what one run of one flow was, written down as it happens
-├── fallbacks.py     where a turn goes when the place taking it cannot take it at all
+├── fallbacks.py      where a turn goes when the place taking it cannot take it at all
+├── kept.py           an agent written down under a name: a shape and a file
+├── settings.py       what each workspace was set up to run
+├── telemetry.py      what humanize reports about itself, and whether it does at all
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
 ├── sdk/              humanize as one object: Hmz, which every way in goes through
 ├── cli/              the command line: one module per command that has a parser
@@ -26,21 +29,20 @@ src/hmz/
 └── tui/              the terminal interface
 ```
 
-There are four ways in and one thing under them. `sdk/` is humanize as one object, and `cli/`,
-`daemon/` and `tui/` are each a way of reaching it rather than a second copy of what it does: a
-command line reads a line and prints what came of it, a daemon holds a run where a terminal
-closing cannot end it, and the interface draws. What two of them would otherwise each have
-written is written in `sdk/` instead, so that a thing that can be done one way can be done every
-way and is refused the same way whichever way it was asked.
+Four ways in, and one thing under them. `sdk/` is humanize as one object; `cli/`, `daemon/` and
+`tui/` each reach it rather than keeping a second copy of what it does. What two of them would
+otherwise each have written is written in `sdk/` instead, so that anything doable one way is
+doable every way, and is refused the same way whichever way it was asked.
 
-Every name says what it holds. `coganchor` is the one exception — it is a program that ships to
-a target and could be lifted out whole, so it has a name of its own.
+Every name says what it holds, except `coganchor` — a program that ships to a target and could
+be lifted out whole, so it has a name of its own.
 
 ## The layers
 
 | Layer | Is | Entry points |
 | --- | --- | --- |
 | `backends.py` | Names, aliases, efforts, home directories, log globs, credential paths, ways in and skill directories for all twelve backends. Facts, not code — standard library only, and no model id anywhere in it. | `PROFILES`, `named()`, `profiles()`, `read()`, `remember()` |
+| `providers/` | Which account an agent runs as, kept apart from which CLI it is: what one is, where its state lives, and the interception a turn is run under. | `Provider`, `add`, `remove`, `find`, `providers`, `chain`, `points`, `ready`, `filled`, `alone`, `copies`, `serves`, `ways`, `where`, `environ`, `env_of`, `ENV`, `LOCAL` |
 | `models.py` | What each backend runs, asked of that backend the way it offers being asked, and kept per account. Nothing here is a list: a CLI ships models without asking anybody. | `ask`, `offered`, `asked`, `where` |
 | `agents/` | The drivers: one per backend, plus the vocabulary a turn is described in (`Event`, `Question`, `Moment`). `AgentBase` and `SessionBase` answer to the interface `flows/` declares, structurally — this layer never names a flow. | everything in `__init__` |
 | `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
@@ -167,8 +169,9 @@ what a single class could not express.
 
 ## Naming
 
-Module names come from the product's own vocabulary — the same words `hmz` and `docs/` use.
-`docs/agents.md` documents `agents/`, `docs/tracing.md` documents `tracing/`, and so on.
+Module names come from the product's own vocabulary — the same words `hmz` and this site use.
+[Agents](/reference/agents) documents `agents/`, [Tracing](/reference/tracing) documents
+`tracing/`, and so on.
 
 A name of its own is for something that could be its own repository: its own SPEC, its own wire
 protocol, its own architecture requirement, shippable on its own. Exactly one thing qualifies,

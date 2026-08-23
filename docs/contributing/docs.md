@@ -2,6 +2,8 @@
 
 The site is [VitePress](https://vitepress.dev/) under `docs/`, built and deployed by
 `.github/workflows/build-docs.yml`.
+[Add a page to these docs](/contributing/tutorials/a-page-of-docs) walks one page through from
+`pnpm install` to the pull request; this is what the site is made of.
 
 ## Running it
 
@@ -12,52 +14,57 @@ pnpm dev        # http://localhost:5173/
 ```
 
 ```sh
-pnpm build      # what CI runs
-pnpm preview    # serve what it built
+pnpm build          # fails on a dead internal link
+pnpm check:anchors  # fails on a dead #fragment
+pnpm preview        # serve what it built
 ```
 
-`pnpm build` **fails on a dead internal link**, which is the point: a page moved without its
-inbound links moving is a red build rather than a 404 somebody finds later.
+The first two are what CI runs, and between them they are the point: a page moved without its
+inbound links moving is a red build rather than a 404 somebody finds later, and a `#fragment`
+written the way GitHub would slugify it is caught rather than silently dropping the reader at
+the top of the page.
 
 ## The layout
 
 ```
 docs/
-├── .vitepress/config.mts     nav, sidebars, the root's redirect, everything
+├── .vitepress/config.mts     the nav, and one sidebar per section
 ├── .vitepress/theme/         the palette, and every diagram on the site
+├── index.md                  the home page
 ├── features/                 one capability map, then feature pages built on diagrams
 ├── flows/                    one page per flow, each with its own loop played on it
-├── tutorials/                six, in order, each a whole piece of work
-├── guide/                    one page per feature, answering "how do I use this?"
+├── user/                     running flows: tutorials/ first, then a page per thing
+├── weaver/                   writing them: tutorials/ first, then a page per thing
+├── contributing/             this, and tutorials/ ahead of it
 ├── reference/                CLI, TUI, and the Python API
-├── contributing/             this
 ├── public/                   served at the site root: logo.svg, tui.svg, demo/*.gif, demo/*.png
 └── tapes/                    the VHS scripts the demos are rendered from
 ```
-
-**There is no `index.md`.** The site's root is a redirect to `/features/`, written into the
-built site by `buildEnd` and served by a dev-server middleware beside it — both in
-`config.mts`, both naming one constant. A front page that explained nothing, above five
-sections that explain everything, was a page a reader passed through; what it used to draw is
-drawn on the page it now goes to.
 
 `tapes/` is the one directory under `docs/` that is not the site: `srcExclude` keeps its README
 out of the build, because a page written for somebody standing in that directory with docker is
 not a page a reader of the site is looking for. What they need of it is below.
 
-Five kinds of page, and a page that is two of them is two pages.
+Six sections, and a page that is two kinds of page is two pages.
 
 | | | |
 | --- | --- | --- |
-| **Features** | understanding | A system-wide capability map, then one page per deep feature, built around a diagram the reader can push. What it is and why it works the way it does. The map and deep pages have **no commands and no code**: a reader who wants to run it is one click from the guide. The index is the front of the site, so its one install line and recorded demos are the deliberate exception. |
+| **Features** | understanding | A system-wide capability map, then one page per deep feature, built around a diagram the reader can push. What it is and why it works the way it does. **No commands and no code**: a reader who wants to run it is one click from a guide. |
 | **Flows** | what there is to run | One page per flow humanize or the official flowverse ships, named the way `-f` takes it, opening with the `hmz exec` line and the shape of its loop. What it is for, what it takes, and what a run picked up carries in. |
-| **Tutorials** | learning | Taken in order, start to finish, with every command written out. A reader following one is not choosing anything; they are being led. Six of them, and adding a seventh means arguing that one of the six should go. |
-| **Guides** | doing | "How do I use X?" One feature each. Opens with a `## Try it` section short enough to paste, then explains the rest. A reader here has a job and knows what they want. |
+| **User Guide** | doing | "How do I use X?" for the person running flows. One thing each, opening with a `## Try it` short enough to paste, then the rest of it. Nothing here asks the reader to write Python. |
+| **Weaver Guide** | doing | The same, for the **weaver** — whoever writes the flow. All of it is Python, and the reader is expected to have run a flow before writing one. |
+| **Contributing** | working on humanize itself | The layers, the two gates, and this. For somebody changing humanize rather than using it. |
 | **Reference** | looking up | Complete and dry. Every flag, key, argument and return. A reader here already knows what they are looking for. |
 
-That split is the [Diátaxis](https://diataxis.fr/) one, and the reason the docs were
-reorganised: everything used to be in **Guide**, which made a reader with a job read a tutorial
-and a reader learning read a feature page.
+Each of the three guide sections opens with a **Tutorials** group: taken in order, start to
+finish, with every command written out. A reader following one is not choosing anything; they
+are being led. There are seven — three, two and two — and adding an eighth means arguing that
+one of the seven should go.
+
+That split is the [Diátaxis](https://diataxis.fr/) one, and the reason the docs are arranged
+this way: everything used to be in **Guide**, which made a reader with a job read a tutorial,
+a reader learning read a feature page, and the person running a flow read the page written for
+whoever wrote it.
 
 ## Writing a page
 
@@ -79,12 +86,19 @@ otherwise.
 
 ## The front of the site
 
-`features/index.md` is what somebody arriving is handed: one line of install with the way to
-the quickstart beside it, the unusual features drawn, the five-system capability map, the
-recorded demos, and the index of the feature pages. `features/capabilities.md` expands that map
-into the reader's path to the right explanation without turning internal implementation units
-into a second product vocabulary. The map and deep pages do not explain how to run something
-— a tutorial, guide or reference page is one click away and better at that job.
+`index.md` is what somebody arriving is handed, and the only page whose job is to send the
+reader elsewhere: a full-viewport opening that says what humanize is, the one line that
+installs it, and three buttons — one for the person running a flow, one for the weaver writing
+one, one for whoever is working on humanize itself. Under it, the system in a single diagram —
+flows above, humanize in the middle, the agent CLIs it drives, and the environment their work
+lands in — and then those three quickstarts themselves.
+
+`features/index.md` is the front of Features rather than of the site: the unusual features
+drawn, the five-system capability map, and the index of the feature pages.
+`features/capabilities.md` expands that map into the reader's path to the right explanation
+without turning internal implementation units into a second product vocabulary. Neither
+explains how to run something — a tutorial, guide or reference page is one click away and
+better at that job.
 
 ```
 .vitepress/theme/
@@ -93,11 +107,12 @@ into a second product vocabulary. The map and deep pages do not explain how to r
 │                              the nav folds into a button at
 ├── flows.ts                  every flow there is, and the shape of each one
 └── components/
-    ├── HmzInstall.vue        the one line, a button that copies it, and the way to the quickstart
+    ├── HmzHero.vue           what humanize is, held to the height of the window
+    ├── HmzArch.vue           flows, humanize, the agent CLIs, and where the work lands
+    ├── HmzInstall.vue        the one line, and a button that copies it
     ├── HmzOrchestra.vue      a run simulated lane by lane, landing on a trace strip
     ├── HmzFeatures.vue       eight features, one small drawing each
-    ├── HmzAnchor.vue         pick a syscall, watch which side of the anchor answers it
-    └── HmzGallery.vue        the recorded demos, played on hover and opened on click
+    └── HmzAnchor.vue         pick a syscall, watch which side of the anchor answers it
 ```
 
 ## The flow pages
@@ -155,8 +170,7 @@ Four things they are all held to:
   `fallbacks.py`; every agent on `HmzOrchestra` is spelled the way `hmz exec -a` would
   take it. A diagram that drifts from those is a diagram that lies to a reader.
 - **A simulation is not dressed up as a recording.** `HmzOrchestra`, the feature diagrams and
-  the flow shapes are drawn; the gallery below them is what the real thing looks like, and says
-  so.
+  the flow shapes are drawn, and say so; the GIFs under `public/demo/` are the real terminal.
 - **Interaction is the argument.** The switch on `HmzTimeline` exists because the clock
   correction is hard to believe in prose, and the one on `HmzTurns` because "two turns on one
   session are sequential" is a rule people read past. A control that does not settle a question
