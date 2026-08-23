@@ -1,4 +1,4 @@
-# 2 · Beat a benchmark
+# Beat a benchmark
 
 **An hour of your attention, several of the machine's.** You will point
 [`official/flame_chase`](https://github.com/humanfia/flowverse) at Anthropic's open performance
@@ -6,19 +6,17 @@ take-home and watch two agents take turns driving a kernel from 147,734 simulate
 past 1,790.
 
 ::: tip Before you start
-Finish the [Quickstart](/). You need two backends logged in — this tutorial
-uses `claude` and `codex`, and any two will do, including the same one twice.
+Finish the [quickstart on the home page](/#run-a-flow). You need two backends logged in — this
+tutorial uses `claude` and `codex`, and any two will do, including the same one twice.
 :::
 
 ## The shape of work this is for
 
-Some problems have a number attached. Optimisation is the obvious one: there is a measurement,
-the measurement is cheap to take, and every attempt is either better than the last or it is
-not.
-
-For that shape, the useful thing an agent can do is *try something*, measure, and write down
-what it learnt. The unhelpful thing is to keep reasoning about its own earlier reasoning until
-the context window is mostly a record of ideas that did not work.
+Some problems have a number attached. Optimisation is the obvious one: the measurement is cheap
+to take, and every attempt is either better than the last or it is not. For that shape the
+useful thing an agent can do is try something, measure, and write down what it learnt — not
+reason about its own earlier reasoning until the context window is a record of ideas that did
+not work.
 
 `flame_chase` is eighteen lines long and does exactly one thing about that:
 
@@ -32,12 +30,9 @@ def run(agents: tuple[Agent, Agent], task: str) -> None:
 ```
 
 Two agents, alternating. Each turn opens a **session** — a conversation with the model — that
-has never seen anything. Neither agent is handed the other's transcript. What passes between
-them is the repository: the code as it now stands, and whatever notes the last turn left
-behind.
-
-That is the whole idea. The repository is the memory, and it is a memory that has already been
-checked by a measurement.
+has never seen anything, so what passes between them is not a transcript but the repository:
+the code as it now stands, and whatever notes the last turn left behind. The repository is the
+memory, and it is a memory a measurement has already checked.
 
 ## Step 1 — get the problem
 
@@ -46,9 +41,9 @@ git clone https://github.com/anthropics/original_performance_takehome
 cd original_performance_takehome
 ```
 
-This is Anthropic's original take-home, opened to the public. You optimise a kernel for a
-simulated VLIW SIMD machine. `problem.py` is the simulator, `perf_takehome.py` is the kernel
-you are allowed to change, and `tests/submission_tests.py` measures it.
+Anthropic's original take-home, opened to the public: you optimise a kernel for a simulated
+VLIW SIMD machine. `problem.py` is the simulator, `perf_takehome.py` is the kernel you are
+allowed to change, and `tests/submission_tests.py` measures it.
 
 Measure the starting point:
 
@@ -107,16 +102,14 @@ git add -A && git commit -qm "the task"
 
 Three parts of that prompt are doing real work.
 
-**The rules against cheating.** The repository's own Readme warns that none of the sub-1,300
-submissions on the first day were valid — in each case a model had edited the tests. An agent
-running unattended with permissions disabled will find that shortcut. Naming it, and naming the
-command that proves you did not take it, is cheaper than discovering it afterwards.
-
-**Measure, change, measure.** Without it a turn can end believing it made things faster.
-
-**`NOTES.md`.** This is the part that makes an alternating loop worth more than one long
-session. Each turn starts from nothing, so anything worth carrying has to be written to a file.
-Ask for that explicitly and the agents build themselves a lab notebook.
+- **The rules against cheating.** The repository's own Readme warns that none of the sub-1,300
+  submissions on the first day were valid — in each case a model had edited the tests. An agent
+  running unattended with permissions disabled will find that shortcut, so name it, and name
+  the command that proves you did not take it.
+- **Measure, change, measure.** Without it a turn can end believing it made things faster.
+- **`NOTES.md`.** Each turn starts from nothing, so anything worth carrying has to be written
+  to a file. Ask for that explicitly and the agents build themselves a lab notebook — which is
+  what makes an alternating loop worth more than one long session.
 
 ## Step 3 — start the loop
 
@@ -127,16 +120,16 @@ hmz exec -f official/flame_chase \
     "$(cat TASK.md)"
 ```
 
-Two `-a` flags because `flame_chase` drives two agents, and they are taken in the order you
-write them. The first turn goes to `claude`, the second to `codex`, and round it goes.
+Two `-a` flags because `flame_chase` drives two agents, taken in the order you write them: the
+first turn goes to `claude`, the second to `codex`, and round it goes.
 
 The first time you name `official/…`, humanize fetches the [official
 flowverse](/weaver/flowverses) — a git repository of flows — into `~/.humanize/flowverses/`.
 
 ::: warning `flame_chase` never stops itself
 There is no exit condition in those eighteen lines, because "as few cycles as possible" has no
-end. Stop it with **ctrl+c** at a command line, or **ctrl+c** twice in the interface, when the curve
-flattens.
+end. Stop it with **ctrl+c** at a command line, or **ctrl+c** twice in the interface, when the
+curve flattens.
 :::
 
 ## Step 4 — watch the number, not the transcript
@@ -148,8 +141,7 @@ cd original_performance_takehome
 python tests/submission_tests.py 2>&1 | grep -E "CYCLES|Speedup" | tail -2
 ```
 
-This is the honest way to follow a run like this. The transcript tells you what an agent
-*believes*; the test tells you what is true.
+The transcript tells you what an agent *believes*; the test tells you what is true.
 
 ::: warning You are measuring a working tree somebody is editing
 Run that command in the middle of a turn and you may catch the kernel halfway through a
@@ -164,8 +156,8 @@ CYCLES:  1770
 Speedup over baseline:  83.46553672316384
 ```
 
-83× faster than the starting point, and past `test_opus45_casual` — the threshold that
-Anthropic's own Readme puts at roughly the best human result in two hours.
+83× faster than the starting point, and past `test_opus45_casual` — the threshold Anthropic's
+own Readme puts at roughly the best human result in two hours.
 
 Read what they wrote themselves:
 
@@ -187,8 +179,8 @@ head -30 NOTES.md
   loads/cycle that's a HARD floor of ~2048 cycles for the naive per-lane gather.
 ```
 
-That file was not in the repository when the run started. It is what the loop has instead of a
-memory, and it is why turn twelve is not turn one again.
+That file was not there when the run started. It is what the loop has instead of a memory, and
+it is why turn twelve is not turn one again.
 
 ## Step 5 — check that it did not cheat
 
@@ -215,27 +207,24 @@ hmz trace collect
 ```
 
 Open the file it names in [ui.perfetto.dev](https://ui.perfetto.dev). Each agent is a process
-and each of its turns is a track, so the two of them appear as two lanes taking it in turns.
-Click any slice to see the prompt, the reasoning, the tool call and the tool output that
-produced it.
+and each of its turns is a track, so the two appear as two lanes taking it in turns. Click any
+slice to see the prompt, the reasoning, the tool call and the tool output that produced it.
 
 For a run measured in hours, this is where you find out which turn actually moved the number —
 and which four turns after it were an expensive way of confirming the fifth.
 
 ## What to change
 
-**Stop when the curve flattens.** Two turns in a row that measure the same is the signal.
-Ratchet it by editing `TASK.md` to name the new floor, and start again.
-
-**Change who is in the loop.** `flame_chase` takes any two agents. Two models that are wrong in
-different ways beat two copies of the stronger one, because each turn starts fresh and so
-inherits the other's blind spots rather than its own.
-
-**Raise the effort.** `:high` is deliberately not the hardest setting. `:max` costs more per
-turn and is worth it on the last stretch, when the easy wins are gone. See
-[Efforts](/user/efforts).
+- **Stop when the curve flattens.** Two turns in a row that measure the same is the signal.
+  Ratchet it by editing `TASK.md` to name the new floor, and start again.
+- **Change who is in the loop.** `flame_chase` takes any two agents. Two models that are wrong
+  in different ways beat two copies of the stronger one, because each turn starts fresh and so
+  inherits the other's blind spots rather than its own.
+- **Raise the effort.** `:high` is deliberately not the hardest setting. `:max` costs more per
+  turn and is worth it on the last stretch, when the easy wins are gone. See
+  [Efforts](/user/efforts).
 
 ## Next
 
-The opposite arrangement: one agent that remembers everything, and a reviewer that remembers
-nothing. [Port a project](/user/tutorials/port-a-project).
+The opposite arrangement — one agent that remembers everything, and a reviewer that remembers
+nothing: [Port a project](/user/tutorials/port-a-project).

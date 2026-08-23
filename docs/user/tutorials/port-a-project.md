@@ -1,4 +1,4 @@
-# 3 · Port a project
+# Port a project
 
 **An hour, mostly waiting.** You will use
 [`official/rlar`](https://github.com/humanfia/flowverse) to move a module of a real C# project
@@ -7,19 +7,18 @@ actually landed, and the loop ending when the reviewer says it is finished rathe
 worker says so.
 
 ::: tip Before you start
-Finish the [Quickstart](/). This tutorial uses DeepSeek Harness, so an API
-key is enough; any two backends work.
+Finish the [quickstart on the home page](/#run-a-flow). This tutorial uses DeepSeek Harness, so
+an API key is enough; any two backends work.
 :::
 
 ## The shape of work this is for
 
-A port is not an optimisation. There is no number that goes down. What there is instead is a
-long list of small decisions — this C# `Exception` return becomes a Python `None`, this
-`TheoryData` table becomes a `pytest.mark.parametrize` — and one agent making them in sequence
-does a better job than five agents making them independently, because consistency is most of
-the work.
+A port is not an optimisation. There is no number that goes down — there is a long list of
+small decisions, this C# `Exception` return becoming a Python `None`, this `TheoryData` table
+becoming a `pytest.mark.parametrize`. One agent making them in sequence does a better job than
+five agents making them independently, because consistency is most of the work.
 
-So the worker should remember everything. That is exactly what makes it a bad judge of its own
+So the worker should remember everything, which is exactly what makes it a bad judge of its own
 output: by the time it has written a thousand lines, it has also written a thousand lines of
 reasoning about why each one is right.
 
@@ -43,19 +42,15 @@ def run(agents: Agents, task: str) -> None:
 
 Three things are worth stopping on.
 
-**`agents.actor.new()` is outside the loop.** One session, held across every round. The actor
-remembers.
-
-**`agents.reviewer(...)` is inside it.** Calling an agent rather than a session opens a fresh
-conversation. Every review starts from a blank context, is handed the task again as if for the
-first time, and reads the repository with `git diff` and `cat` rather than reading the actor's
-account of it.
-
-**`schema=Review`.** The reviewer does not answer in prose. It fills in a
-[pydantic](https://docs.pydantic.dev/) model with two fields — `done`, a boolean, and `notes`,
-the message the actor hears next. The loop ends on the boolean. A review that says the words
-"this is done" in a paragraph does not end anything, which means the reviewer cannot end the
-run by accident. See [Answers in a shape](/weaver/shapes).
+- **`agents.actor.new()` is outside the loop.** One session, held across every round. The actor
+  remembers.
+- **`agents.reviewer(...)` is inside it.** Calling an agent rather than a session opens a fresh
+  conversation: every review starts blank, is handed the task again as if for the first time,
+  and reads the repository with `git diff` and `cat` rather than the actor's account of it.
+- **`schema=Review`.** The reviewer fills in a [pydantic](https://docs.pydantic.dev/) model
+  with two fields — `done`, a boolean, and `notes`, the message the actor hears next. The loop
+  ends on the boolean, so a review that says the words "this is done" in a paragraph cannot end
+  the run by accident. See [Answers in a shape](/weaver/shapes).
 
 ## Step 1 — get the project
 
@@ -67,9 +62,8 @@ git clone https://github.com/futrime/lip
 cd lip
 ```
 
-You are going to port one project out of its solution: `src/Golang.Org.X.Mod/`, which is a C#
-port of Go's `golang.org/x/mod` — semantic version comparison and module-path validation. Two
-files:
+You are going to port one project out of its solution: `src/Golang.Org.X.Mod/`, a C# port of
+Go's `golang.org/x/mod` — semantic version comparison and module-path validation. Two files:
 
 ```sh
 wc -l src/Golang.Org.X.Mod/*.cs tests/Golang.Org.X.Mod.Tests/*.cs
@@ -82,10 +76,9 @@ wc -l src/Golang.Org.X.Mod/*.cs tests/Golang.Org.X.Mod.Tests/*.cs
   198 tests/Golang.Org.X.Mod.Tests/ModuleTests.cs
 ```
 
-This is a good first slice of a migration for three reasons. It has no I/O and no network, so
-correctness is decidable. It has an existing test suite with tables of cases in it, so
-"finished" is checkable. And the C# is itself a port, so the original Go is a second opinion
-whenever the C# is unclear.
+A good first slice of a migration, for three reasons: no I/O and no network, so correctness is
+decidable; an existing test suite with tables of cases in it, so "finished" is checkable; and
+the C# is itself a port, so the original Go is a second opinion whenever the C# is unclear.
 
 It also has a trap in it. Some methods in the C# are unfinished:
 
@@ -152,9 +145,8 @@ hmz exec -f official/rlar \
 ```
 
 Two `-a` flags: the actor first, then the reviewer, in the order `rlar` declares them. Giving
-both the same model is normal and is not the same as giving the job to one agent — what makes
-the reviewer independent is that its conversation has never seen the actor's, not that it runs
-a different model.
+both the same model is normal — what makes the reviewer independent is that its conversation
+has never seen the actor's, not that it runs a different model.
 
 `rlar` also brings a **skill** with it: `skills/review-notes`, a Markdown file mounted onto
 every session either agent opens, which says how to read a round of work and how to write the
@@ -164,9 +156,8 @@ and editing that file is how you change the way reviews are written. See
 
 ## Step 4 — watch a round go by
 
-Each round is one long actor turn followed by a short reviewer turn. The reviewer's `notes`
-become the actor's next prompt word for word, so the loop reads as a conversation between two
-agents that never actually meet.
+Each round is one long actor turn followed by a short reviewer turn, and the reviewer's `notes`
+become the actor's next prompt word for word.
 
 From another terminal:
 
@@ -206,10 +197,10 @@ semver/module/pseudo functions against the upstream golang.org/x/mod test vector
 and they all pass.
 ```
 
-That is the reviewer's `notes` field, and it is worth reading closely. It cites row counts, it
-says how it checked that the tables were not quietly shortened, and it names a third source it
-verified against. None of that was in the flow's prompt — it is what the loop drove the actor
-to do, round after round, by refusing to say `done`.
+That is the reviewer's `notes` field. It cites row counts, says how it checked that the tables
+were not quietly shortened, and names a third source it verified against — none of which was in
+the flow's prompt. It is what the loop drove the actor to do, round after round, by refusing to
+say `done`.
 
 ```sh
 cd python && python -m pytest -q
@@ -257,19 +248,18 @@ That picture is the flow. If you ever want to know what a flow does, collect a t
 
 ## What to change
 
-**Point it at the next project.** `src/Lip.Core/` is the rest of the migration. The same
-`TASK.md`, the same command, a new slice named in it. Landing a migration one verifiable
-project at a time is the technique; the flow is only what runs it.
-
-**Give the reviewer a different model.** The reviewer's job is to disagree. Two models that
-fail differently disagree more usefully than one model twice.
-
-**Change what "done" means.** Fork the flow — press **f** on it in `/flow`, or copy it out of
-`~/.humanize/flowverses/official/flows/rlar/` — and edit the `description` on the `done` field.
-That description is the whole instruction the backend is held to. Adding "and `ruff check`
-passes" to it changes what ends the run. See [Answers in a shape](/weaver/shapes).
+- **Point it at the next project.** `src/Lip.Core/` is the rest of the migration. The same
+  `TASK.md`, the same command, a new slice named in it. Landing a migration one verifiable
+  project at a time is the technique; the flow is only what runs it.
+- **Give the reviewer a different model.** The reviewer's job is to disagree. Two models that
+  fail differently disagree more usefully than one model twice.
+- **Change what "done" means.** Fork the flow — press **f** on it in `/flow`, or copy it out of
+  `~/.humanize/flowverses/official/flows/rlar/` — and edit the `description` on the `done`
+  field. That description is the whole instruction the backend is held to. Adding
+  "and `ruff check` passes" to it changes what ends the run.
+  See [Answers in a shape](/weaver/shapes).
 
 ## Next
 
-Neither of the first two flows built anything from nothing. The third does: [Build a coding
+Neither of the flows so far built anything from nothing. The third does: [Build a coding
 agent](/user/tutorials/build-an-agent).
