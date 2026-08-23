@@ -5,8 +5,8 @@ pageClass: hmz-feature
 # You, as one of the agents
 
 A flow can drive the person at the prompt the way it drives a model: ask them something, wait
-for the answer, and carry on. Given a [shape](/features/shapes), it asks them a question per
-field and builds the model out of what they typed.
+for the answer, and carry on. The person is a place a weaver declares in the flow, and given a
+[shape](/features/shapes) they are asked a question per field, out of which the model is built.
 
 <HmzPerson />
 
@@ -17,8 +17,8 @@ the agents a flow is configured with — nobody chooses what the person runs. A 
 to a person is a flow with one fewer agent to pick.
 
 Their turn is also not a turn of a model, and is not bracketed by the events that say whose
-turn it is. The person takes no turn of a model, and counting it would put them in the graph of
-who handed to whom and spin a clock at them while they thought.
+turn it is: counting it would put them in the graph of who handed to whom and spin a clock at
+them while they thought.
 
 ## A schema is not a question
 
@@ -34,13 +34,12 @@ field instead, and the field is what makes the question:
 | a list | one line, separated by commas |
 
 **What the model refuses is put back on the field it was refused for, in the model's own
-words.** The flow that declared the field is the only thing that knows what it will take, so
-its refusal is the only wording worth showing. It is put back a bounded number of times: a
-person who keeps typing something the model will not accept ends the questionnaire rather than
-living in it.
+words** — the flow that declared the field is the only thing that knows what it will take. It
+is put back a bounded number of times: a person who keeps typing something the model will not
+accept ends the questionnaire rather than living in it.
 
-Each of those questions goes the road [a coding agent's own question](/user/questions) goes,
-so it is a real question wherever the run is being watched, options and all.
+Each question goes the road [a coding agent's own question](/user/questions) goes, so it is a
+real question wherever the run is being watched, options and all.
 
 ## Nobody there is an answer
 
@@ -58,7 +57,7 @@ Asking stops the turn. The **board** does not: a handful of named lines kept bes
 drawn where the run is drawn, which the flow reads and writes whenever it likes and the person
 changes whenever they like. Neither is ever held up by the other.
 
-Which is what a run's work queue wants to be. You put more work up while the loop is going and
+Which is what a run's work queue wants to be — you put more work up while the loop is going and
 the next round takes it; the loop writes down how far through it is and you read that without
 saying anything. A line may be one side's alone — a flow's note of its own progress, a person's
 list of what they want next — and the other side is refused where it writes rather than quietly
@@ -67,12 +66,10 @@ ignored.
 ## Which is why it is one feature and not two
 
 An agent stopping mid-turn to ask its user something and a flow asking a person something are
-the same road. Both are answered by whoever is at the prompt or by the flow; both say what was
-asked to whatever is watching the agent, since the one place a run is visible is the turns
-going past; and both are answered with nothing where nobody is there.
-
-The difference is only that a flow states the shape of the whole answer once, in the model it
-is about to use.
+the same road: both are answered by whoever is at the prompt or by the flow, both say what was
+asked to whatever is watching the agent, and both are answered with nothing where nobody is
+there. The difference is only that a flow states the shape of the whole answer once, in the
+model it is about to use.
 
 ## Where the detail is
 
