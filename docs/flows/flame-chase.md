@@ -4,9 +4,9 @@ pageClass: hmz-feature
 
 # official/flame_chase
 
-Two agents take turns on the same task, in the same working directory, each starting from the
-repository rather than from a history. Neither is told what the other said; what passes between
-them is the tree, which is the only account of the last turn there is.
+Two agents take turns on the same task, in one working directory, each starting from the
+repository rather than from a history. Neither is told what the other said; the tree is the
+only account of the last turn there is.
 
 ```sh
 hmz exec -f official/flame_chase \
@@ -19,27 +19,25 @@ hmz exec -f official/flame_chase \
 
 Two different models fail differently. A loop over one agent compounds that agent's blind spot;
 a loop that alternates gives every round to somebody who did not write what they are looking
-at, and has to read the tree to find out what happened.
+at.
 
 Give the two the same model and effort and they are still two agents, which is sometimes the
 point: a [trace](/features/tracing) reads the run as two sets of sessions rather than one.
 
 ## What it takes
 
-`budget`, in millions of output tokens the **two may spend between them** across every run of
-it in this workspace. **10 by default**, `0` for no limit. Between them rather than apiece,
-because the loop is the two of them: a pair that alternates spends what it spends whichever of
-them was writing at the time.
+`budget`, millions of output tokens [counted across every run of it here](/flows/) — **10 by
+default**, `0` for no limit. The **two spend it between them** rather than apiece, because the
+loop is the pair: it spends what it spends whichever of them was writing.
 
 ## What it keeps
 
 `turn`, `rounds` and `output`. The turn is the half that has to be kept: a run that always
-opened at the first agent would hand it the turn the other one was owed, and two turns in a row
-is the one thing a flow whose whole shape is two agents alternating must not do.
+opened at the first agent would hand it the turn the other was owed — two turns in a row, the
+one thing a flow built on alternating must not do.
 
-A round is a turn each, so it is the turn that *finishes* one that counts it — a round the
-first agent was cut off in is finished by the run that picks that turn up, and a round finished
-once is counted once.
+A round is a turn each, and the turn that *finishes* one counts it, so a round the first agent
+was cut off in is finished, and counted once, by the run that picks that turn up.
 
 ## See also
 

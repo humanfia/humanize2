@@ -6,9 +6,9 @@ pageClass: hmz-feature
 
 The same three isolated lanes as
 [`official/parallel_flame_chase`](/flows/parallel-flame-chase), with a coordinator that comes
-back. A **fresh** coordinator adjudicates terminal outcomes, deadlines, stalls, failures,
-objective revisions, external review requests and periodic portfolio audits — and accepted
-private-lane artifacts enter lane 1's durable integration queue.
+back to adjudicate terminal outcomes, deadlines, stalls, failures, objective revisions,
+external review requests and periodic portfolio audits — and accepted private-lane artifacts
+enter lane 1's durable integration queue.
 
 ```sh
 hmz exec -f official/parallel_flame_chase_mission \
@@ -24,8 +24,7 @@ hmz exec -f official/parallel_flame_chase_mission \
 
 It has its own configuration, its own mounted mission skill and its own resumable state. The
 two share only a hidden runtime implementation, so their common isolation and recovery
-semantics cannot drift apart — which is the reason they are two public flows rather than one
-with a switch.
+semantics cannot drift apart.
 
 Reach for the base flow when durable peer coordination is enough. Reach for this one when
 something has to decide, mid-run, that a lane is finished, stuck, or working on the wrong
@@ -33,7 +32,7 @@ thing.
 
 ## Fresh, every audit
 
-The coordinator that audits is a new session. What it adjudicates is the evidence in front of
+Every audit is a new session, so what the coordinator adjudicates is the evidence in front of
 it — reports, artifacts, the state of the lanes — rather than the run it planned six hours ago
 and would otherwise be defending.
 
@@ -54,8 +53,8 @@ carry on.
 
 ## What it keeps
 
-The missions, the audits and their outcomes, and everything the base flow keeps: the plan, the
-snapshots, each lane's alternation and failure state.
+The missions, the audits and their outcomes, and [everything the base flow
+keeps](/flows/parallel-flame-chase#what-it-keeps).
 
 ## See also
 

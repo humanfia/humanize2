@@ -4,10 +4,10 @@ pageClass: hmz-feature
 
 # official/parallel_flame_chase
 
-Seven agents, three lanes, one working directory. A coordinator plans the three lanes once and
-does not come back; six actors alternate in fresh sessions and coordinate through durable
-reports. **Lane 1 alone owns the original source** — lanes 2 and 3 work in private snapshots
-and publish reconstructable artifacts rather than writing to your tree.
+Seven agents, three lanes, one working directory. A coordinator plans them once and does not
+come back; six actors alternate in fresh sessions and coordinate through durable reports.
+**Lane 1 alone owns the original source** — lanes 2 and 3 work in private snapshots and publish
+artifacts rather than writing to your tree.
 
 ```sh
 hmz exec -f official/parallel_flame_chase \
@@ -21,8 +21,7 @@ hmz exec -f official/parallel_flame_chase \
 
 ## Seven agents, in this order
 
-`-a` takes them in the order the flow names them, and the interface asks for them under these
-names:
+`-a` takes them in this order, and the interface asks for them by name:
 
 | | |
 | --- | --- |
@@ -32,16 +31,15 @@ names:
 | `lane_3_actor_a` · `lane_3_actor_b` | Lane 3, alternating, in a snapshot of its own |
 
 All seven open with the backend's [goal feature](/features/goals) turned off —
-`AgentDefaults(goals=False)` beside each of them — because a lane's turn ends where the lane
-protocol says it ends rather than where a model decides it has met the objective. That is what
-the flow opens `/agents` on, not something it holds you to.
+`AgentDefaults(goals=False)` beside each — because a lane's turn ends where the lane protocol
+says it ends rather than where a model decides it has met the objective. That is what `/agents`
+opens on, not something it holds you to.
 
 ## One writer, and two that cannot write
 
-The isolation is the point of the flow. A per-source advisory lock permits only one lane 1
-owner; lanes 2 and 3 are confined to snapshots, and the runtime's control paths reject links
-and replacements. What they produce reaches lane 1 as a **report** and a hashed,
-reconstructable artifact package — never as a write into your tree — and reports are
+A per-source advisory lock permits only one lane 1 owner; lanes 2 and 3 are confined to
+snapshots, and the runtime's control paths reject links and replacements. What they produce
+reaches lane 1 as a **report** and a hashed, reconstructable artifact package, and reports are
 redelivered until the receiving lane completes a valid turn and acknowledges them, so a lane
 that fell over does not lose what it was told.
 
@@ -63,8 +61,8 @@ checkpoint and resume protocol — mounted onto every session the flow opens.
 
 The plan, the snapshots, each lane's A/B alternation and its lane-local failure state. The same
 substantive task resumes compatible state; a bare `continue` reads `TASK.md` when there is one,
-and replans against a fresh source snapshot where the objective has changed. A different
-substantive task starts a fresh run, and `resume_mode: fresh` starts one deliberately.
+and replans against a fresh source snapshot where the objective has changed. A different one
+starts a fresh run.
 
 ## See also
 
