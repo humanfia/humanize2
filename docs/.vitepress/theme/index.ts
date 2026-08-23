@@ -1,8 +1,8 @@
 // The page at the site's root is a hero and an architecture diagram, the features landing is a
 // set of diagrams rather than a page of prose, each feature page is one diagram of its own, and
 // every flow has its loop played on its own page -- so the theme exists to register them.
-// Everything else is VitePress's default theme untouched: the guides, tutorials and reference
-// render exactly as they did.
+// Everything else is VitePress's default theme untouched: the two role guides, contributing
+// and reference render exactly as they did.
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 

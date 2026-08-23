@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Type something while the turn is running. On one side the words reach the turn that is
 // already going; on the other they wait for it to end and start another. The queue rule, the
-// pin and the "never quietly counted as said" ending are the ones `guide/steering` describes.
+// pin and the "never quietly counted as said" ending are the ones `user/steering` describes.
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 interface Line {

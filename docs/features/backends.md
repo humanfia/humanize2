@@ -70,7 +70,8 @@ A backend is driven through its command line where that can express what an agen
 with, and through the app server it serves its own client from where it cannot. A model, an
 effort, a mode or a goal that has no flag is a setting of a session there — and asking the
 model for it in the prompt is not the same feature. A turn that has to stay open to be [talked
-to](/features/steering) is such a case.
+to](/features/steering) is such a case: a command line run per turn has ended by the time
+there is anything to say to it.
 
 Where a server is needed it is started at most once per agent, only when a turn first needs
 one, so a flow that needs none starts none. One server serves every session of its agent, so

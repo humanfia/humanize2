@@ -1,8 +1,8 @@
 # User Guide
 
 One page per thing humanize does, each answering "how do I use this?" — for the person who runs
-flows rather than writes them. Nothing here asks you for Python; writing a flow is the [Weaver
-Guide](/weaver/).
+flows rather than writes them. Where a page here shows Python, it is to say what the weaver on
+the other side of the feature did; writing a flow yourself is the [Weaver Guide](/weaver/).
 
 Never run one before? Start at the [quickstart](/#run-a-flow). The tutorials below each take a
 whole piece of work start to finish; everything under them is for looking up.

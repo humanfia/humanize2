@@ -1,4 +1,7 @@
-import { defineConfig } from 'vitepress'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+
+import { defineConfig, type SiteConfig } from 'vitepress'
 
 // Deployed to https://docs.humanfia.ai/humanize2/ by .github/workflows/build-docs.yml.
 // The custom domain belongs to the organisation's own pages, so this repository is a project
@@ -7,6 +10,80 @@ import { defineConfig } from 'vitepress'
 // site is. Internal links are still written from the site's own root -- VitePress prepends
 // the base to each of them -- so nothing in a page names the subdirectory.
 const BASE = '/humanize2/'
+
+// Where a page used to be, and where it is now. Guides used to be one flat section serving two
+// audiences at once; they are a User Guide and a Weaver Guide now, and the tutorials went with
+// the audience each one teaches. GitHub Pages serves files and nothing else, so a page that
+// moved is a 404 for every bookmark and search result unless a file is left where it was --
+// which is what `buildEnd` below writes, one small redirect apiece.
+//
+// This table is a record of what the paths once were rather than a second copy of what they
+// are: nothing new belongs in it, and an entry only ever comes out if the page it names is
+// finally allowed to go cold.
+const MOVED_TO_USER = [
+  'installation',
+  'concepts',
+  'security',
+  'troubleshooting',
+  'steering',
+  'btw',
+  'conversations',
+  'details',
+  'status',
+  'board',
+  'afk',
+  'fallback',
+  'completion',
+  'history',
+  'export',
+  'settings',
+  'stopping',
+  'efforts',
+  'permissions',
+  'skills',
+  'questions',
+  'tally',
+  'reporting',
+  'providers',
+  'containers',
+  'remote-execution',
+  'unattended',
+  'ci',
+  'tracing',
+  'resuming',
+]
+
+const MOVED_TO_WEAVER = [
+  'writing-a-flow',
+  'loops',
+  'flow-settings',
+  'async-flows',
+  'calling-flows',
+  'atlas',
+  'goals',
+  'shapes',
+  'hooks',
+  'tools',
+  'human-agent',
+  'worktrees',
+  'checking-flows',
+  'testing-flows',
+  'flowverses',
+]
+
+const MOVED: Record<string, string> = {
+  ...Object.fromEntries(MOVED_TO_USER.map((page) => [`guide/${page}`, `user/${page}`])),
+  ...Object.fromEntries(MOVED_TO_WEAVER.map((page) => [`guide/${page}`, `weaver/${page}`])),
+  'guide/': 'user/',
+  'tutorials/': 'user/',
+  // The quickstart is not a page any more. It is the first of the three the home page opens on.
+  'tutorials/quickstart': '#run-a-flow',
+  'tutorials/take-home': 'user/tutorials/take-home',
+  'tutorials/port-a-project': 'user/tutorials/port-a-project',
+  'tutorials/build-an-agent': 'user/tutorials/build-an-agent',
+  'tutorials/flow-checked-build': 'weaver/tutorials/checked-build',
+  'tutorials/flow-prove': 'weaver/tutorials/prove',
+}
 
 export default defineConfig({
   base: BASE,
@@ -152,7 +229,9 @@ export default defineConfig({
       ],
 
       // For the person who runs flows: the interface, the agents they point at it, where the
-      // work lands, and how to read a run back. Nothing here asks them to write Python.
+      // work lands, and how to read a run back. Where one of these pages has a Python half --
+      // the flow on the other side of the board, of a question, of a container -- it is there
+      // to say what the weaver did, and links on rather than teaching it here.
       '/user/': [
         { text: 'User Guide', link: '/user/' },
         {
@@ -285,6 +364,7 @@ export default defineConfig({
         },
         {
           text: 'How the repository works',
+          collapsed: false,
           items: [
             { text: 'Architecture', link: '/contributing/architecture' },
             { text: 'Working on these docs', link: '/contributing/docs' },
@@ -332,5 +412,59 @@ export default defineConfig({
       message: 'Released under the Apache-2.0 licence.',
       copyright: 'Copyright © 2026 Zijian Zhang',
     },
+  },
+
+  // One file per moved page, written after the build so no page has to pretend to be a
+  // redirect. `cleanUrls` means GitHub Pages answers /humanize2/guide/afk with guide/afk.html,
+  // so that is the name each one is written under, and a path that ended in a slash is the
+  // index.html of its directory.
+  async buildEnd(site: SiteConfig) {
+    await Promise.all(
+      Object.entries(MOVED).map(async ([from, to]) => {
+        const at = join(site.outDir, from.endsWith('/') ? `${from}index.html` : `${from}.html`)
+        const way = `${BASE}${to}`
+        await mkdir(dirname(at), { recursive: true })
+        await writeFile(
+          at,
+          [
+            '<!doctype html>',
+            '<html lang="en-US">',
+            '<head>',
+            '<meta charset="utf-8">',
+            '<meta name="robots" content="noindex">',
+            `<meta http-equiv="refresh" content="0; url=${way}">`,
+            `<link rel="canonical" href="https://docs.humanfia.ai${way}">`,
+            '<title>humanize</title>',
+            '</head>',
+            `<body>This page moved to <a href="${way}">${way}</a>.</body>`,
+            '</html>',
+            '',
+          ].join('\n'),
+        )
+      }),
+    )
+  },
+
+  vite: {
+    plugins: [
+      {
+        // The same redirects while `pnpm dev` is running, where nothing has been built yet and
+        // there is no file to serve. Without it an old path is a 404 in development and a
+        // redirect in production, which is the sort of difference nobody finds until it is
+        // deployed.
+        name: 'hmz-moved',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            const asked = (req.url ?? '').split('?')[0]
+            if (!asked.startsWith(BASE)) return next()
+            const to = MOVED[asked.slice(BASE.length)]
+            if (to === undefined) return next()
+            res.statusCode = 302
+            res.setHeader('location', `${BASE}${to}`)
+            res.end()
+          })
+        },
+      },
+    ],
   },
 })

@@ -116,9 +116,9 @@ where the turn goes next are answers to the one thing that happened.
 - **Nothing is retried by default.** A turn is taken once, as it always was: a prompt the model
   refused is the same refusal every time, and only the caller knows which of its places fails
   the other way.
-- **No wait is invented here.** They are the ones everybody uses, under the names everybody
-  uses them by, and the default is exponential backoff with full jitter — which is what keeps a
-  flow's agents from all coming back on the same second.
+- **No wait is invented here.** The waits are the ones everybody uses, under the names
+  everybody uses them by, and the default is exponential backoff with full jitter — which is
+  what keeps a flow's agents from all coming back on the same second.
 - **No single wait is longer than a minute**, however far the backoff has climbed.
 - **The time a place was given is checked *before* a wait**, not after it, so a turn is never
   started knowing it is already spent.
