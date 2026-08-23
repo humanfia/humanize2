@@ -12,8 +12,7 @@ while True:
 ```
 
 That is the whole of it. `agent(...)` opens a **session** (a conversation the agent holds) and
-drops it, so nothing carries over. The agent starts from the task and the repository each time,
-with nothing of the last turn in context.
+drops it, so nothing of the last turn carries over.
 
 The opposite is `stateful_ralph`, which holds one session for the whole run:
 
@@ -23,8 +22,8 @@ while True:
     session(task, suppress=True)
 ```
 
-The agent is the same, but the behaviour is opposite. **The flow decides, not the agent.** This
-is the most important choice a flow makes. See [Concepts › Session](/user/concepts#session).
+The agent is the same; the behaviour is opposite. **The flow decides, not the agent** — the
+most important choice a weaver makes. See [Concepts › Session](/user/concepts#session).
 
 ## Write a task the loop can finish
 
@@ -54,18 +53,15 @@ In `hmz`:
 /flow
 ```
 
-The flows appear one place at a time, one list each. Press **←** and **→** to step between the
-places. Press **s** to narrow by name. Take `ralph_loop` with enter.
-
-Or say it outright:
+The flows appear one place at a time, one list each. **←** and **→** step between the places,
+**s** narrows by name, and enter takes `ralph_loop`. Or say it outright:
 
 ```
 /flow ralph_loop
 ```
 
 `/flow` is **refused while a flow is running**. You get `no choosing a flow while a flow is
-running: ctrl+c twice stops it first`. So stop the last one before you choose the next. Looking
-and leaving without choosing changes nothing.
+running: ctrl+c twice stops it first`. Looking and leaving without choosing changes nothing.
 
 ::: details What the three built-in flows are
 | Flow | Agents | |
@@ -86,7 +82,7 @@ Say what you want done:
 Work through TASK.md.
 ```
 
-It keeps going until you stop it. That is what a Ralph loop is.
+It keeps going until you stop it.
 
 ## Watch the run
 
@@ -106,12 +102,11 @@ Above the editor, continuously:
 ```
 
 `●` is an agent with a turn open, and `1` is how many conversations it has open **right now**.
-A Ralph loop holds one at a time, and that conversation is the turn's own. It lets the
-conversation go when the turn ends, so the number does not climb with the turns; between turns
-it holds none and the line says nothing about conversations at all. All of them run down this
-agent's one transcript either way — nothing is redrawn when the next one opens. **tab** steps
-between the agents that are working, which matters on a flow that drives several, such as
-[two agents taking turns](/user/tutorials/take-home).
+A Ralph loop holds one at a time — the turn's own — and lets it go when the turn ends, so the
+number does not climb with the turns; between turns it holds none and the line says nothing
+about conversations at all. All of them run down this agent's one transcript either way, and
+nothing is redrawn when the next one opens. **tab** steps between the agents that are working,
+which matters on a flow that drives several.
 
 The cost line is per model, over a recent window, so a flow that has stopped reads as stopped.
 See [Cost and rate](/user/tally).
@@ -127,7 +122,8 @@ echo '- [ ] and a --help flag' >> TASK.md
 
 The next turn starts from a file that says so. Nothing had to be told.
 
-You can also type at it. That goes into the turn that is running, as before.
+You can also type at it; that goes into the turn that is running. See [Talking to a running
+turn](/user/steering).
 
 ## Stop the loop
 
@@ -137,10 +133,9 @@ The loop never ends by itself; it is a `while True`. A stop raises `Stopped` ins
 code. `suppress=True` deliberately **does not** catch that — otherwise the loop would carry on
 past a stop and never end. See [Stopping](/user/stopping).
 
-Stopping is not losing your place. `ralph_loop` says it [can be picked up](/user/resuming),
-and what it keeps is which round it is on. Start it here again and it goes on from the round it
-reached. That run is a run of its own, with its own sessions and its own record. `/epics` is
-where both of them are.
+Stopping is not losing your place. `ralph_loop` [can be picked up](/user/resuming): start it
+here again and it goes on from the round it reached. That run is a run of its own, with its own
+sessions and its own record. `/epics` is where both of them are.
 
 ## Try this
 

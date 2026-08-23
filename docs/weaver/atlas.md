@@ -5,10 +5,12 @@ atlas is the other bargain: a narrower Python whose body is read rather than run
 before anything happens into a graph called a **prophecy** — the nodes, the edges between
 them, and the shapes that flow along each edge.
 
-What you get for the narrowness is everything a graph makes possible. The flow is checked
-whole before its first turn, not hours in. What it will do can be printed, diffed and
-reviewed. And a run of one can be stopped and picked up in the middle, because a graph is a
-list of nodes with an answer apiece and the run writes those answers down as they arrive.
+What the narrowness buys is everything a graph makes possible:
+
+- The flow is checked whole before its first turn, not hours in.
+- What it will do can be printed, diffed and reviewed.
+- A run of one can be stopped and picked up in the middle, because a graph is a list of nodes
+  with an answer apiece and the run writes those answers down as they arrive.
 
 ## One that writes and reviews
 
@@ -83,14 +85,15 @@ hmz exec -f review_loop -a claude/sonnet:high -a codex/gpt-5.6-sol "$(cat TASK.m
 
 ## The two kinds of node
 
-A **mind** is a turn: real work by a real agent, handed the agent the call site names. A
-**logic** is a Python function: no agent, no turn, and a decision anything can read.
+| | |
+| --- | --- |
+| `@mind` | a turn: real work by a real agent, handed the agent the call site names. Exactly one way out. |
+| `@logic` | a Python function: no agent, no turn, and a decision anything can read. May have several ways out. |
 
-A mind has exactly one way out; a logic may have several. That is the whole of why the two
-are told apart. A branch is a decision, and a decision nothing but a model made is a decision
-no reading of the flow can state — so the node a branch hangs off is a logic node, and what a
-model said reaches a branch by being read by one. Writing the `if` straight off the turn is
-refused:
+The ways out are the whole of why the two are told apart. A branch is a decision, and a
+decision nothing but a model made is a decision no reading of the flow can state — so what a
+model said reaches a branch by being read by a logic node. Writing the `if` straight off the
+turn is refused:
 
 ```
 …/__init__.py:71: error: branching-mind: review is a turn, and a turn has one way out --
@@ -125,10 +128,10 @@ said = write(agents.writer, judge(draft))   # a call inside a call is two nodes
 if verdict.done and enough:  # a compound test is a decision a logic node makes
 ```
 
-The rest of the file is ordinary Python. Only the `@atlas` body is narrowed — a mind or a
-logic may do whatever a Python function may do, and is read by the same rules as any other
-flow's code. One exception: a node may not be `async def`, since the walk over the graph does
-not await. What waits for a model is a turn, and a `mind` already is one.
+Only the `@atlas` body is narrowed. The rest of the file is ordinary Python: a mind or a logic
+may do whatever a Python function may do, and is read by the same rules as any other flow's
+code. One exception — a node may not be `async def`, since the walk over the graph does not
+await. What waits for a model is a turn, and a `mind` already is one.
 
 ## What flows between nodes
 
@@ -161,8 +164,7 @@ A loop whose body changes nothing the head reads would answer the same thing eve
 is refused as a `dead-loop` rather than run for a week.
 
 Don't write the head again at the bottom of the body. It is the natural Python and the wrong
-graph — the edge back runs the head anyway, so the copy would run first and have its answer
-thrown away. `twice-round` refuses it:
+graph, and `twice-round` refuses it:
 
 ```
 …/__init__.py:71: error: twice-round: the body of this loop ends with settled, which is what
@@ -197,7 +199,7 @@ def announce(said: Verdict) -> None:
 Such a node answers with nothing — the compiling refuses one that does not, since a run
 stepping past it would have no answer for what comes next.
 
-A run is picked up into the same graph or not at all. What was written down is written down
+A run is picked up into the same graph or not at all: what was written down is written down
 against the prophecy's digest, so an atlas rewritten between two runs starts from the top
 rather than resuming into somewhere it has never been. Rewriting a node's *body* changes
 nothing about the graph, and such a run picks up as it should.
@@ -283,8 +285,8 @@ code when it is loaded, as [the security guide](/user/security) explains.
 
 An atlas is worth it when the shape of the work is known and the run is long: a pipeline of
 phases, a review loop meant to run for a week, anything a machine going down should not send
-back to the start. It is worth it when somebody other than its author has to be able to say
-what the flow will do before it does it.
+back to the start. And it is worth it when somebody other than the weaver who wrote it has to
+be able to say what the flow will do before it does it.
 
 An ordinary [flow](/weaver/writing-a-flow) is right for everything else — a loop that decides
 its own shape as it goes, a flow that fans out over whatever it found, one that is thirty

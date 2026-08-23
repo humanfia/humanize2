@@ -1,13 +1,12 @@
 # A flow that calls a flow
 
 `load` runs one flow from inside another, hands it the agents it declares, and passes
-settings and skills through. Reach for it when one flow is a reusable step that others build
-on — which is what turns a flowverse into a library rather than a menu.
+settings and skills through. Reach for it when one flow is a reusable step another weaver
+builds on — which is what turns a flowverse into a library rather than a menu.
 
 ## Call one
 
-`load` takes exactly what `-f` takes. It hands you the flow itself, which you run with the
-agents you already have:
+`load` hands you the flow itself, which you run with the agents you already have:
 
 ```python
 # .humanize/flows/planned/__init__.py
@@ -34,9 +33,8 @@ into your loop.
 
 ## Hand it the agents it declares
 
-Call a flow that drives one agent with that agent, **in the tuple it declared them as**. Pass a
-list or a tuple. It arrives as that flow's own `NamedTuple`, named the way that flow names
-them:
+Pass a list or a tuple of the agents that flow declares, **in the order it declares them**. It
+arrives as that flow's own `NamedTuple`, named the way that flow names them:
 
 ```python
 load("official/rlar")([builder, checker], task)     # arrives as Agents(actor=…, reviewer=…)
@@ -51,9 +49,8 @@ drives("official/rlar")     # ("actor", "reviewer")
 wanted("official/rlar")     # one Place per agent: .name, .moments, .goal, .where
 ```
 
-**Nothing is renamed.** The agents belong to the run you started. What is already written down
-about them stays true. Your `builder` is still `builder` in the [trace](/user/tracing),
-whatever the called flow calls the place it filled.
+**Nothing is renamed.** The agents belong to the run you started: your `builder` is still
+`builder` in the [trace](/user/tracing), whatever the called flow calls the place it filled.
 
 ## Pass settings through
 
@@ -69,7 +66,7 @@ that takes no settings, or different ones, says so instead of quietly ignoring t
 
 ## Await a coroutine flow
 
-A called flow answers with whatever it answers with. A flow written as `async def` is awaited
+A called flow answers with whatever it answers with, and one written as `async def` is awaited
 by whoever called it:
 
 ```python
@@ -149,8 +146,8 @@ hmz exec -f official/humanize1:gen-idea -a claude/claude-opus-5:max "add undo to
 hmz exec -f official/humanize1:gen-plan -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max ""
 ```
 
-Each declares its own agents and its own settings. The agents page asks two questions rather
-than five. Setting one up shows one phase's flags rather than three phases' at once. What
+Each declares its own agents and its own settings: the agents page asks two questions rather
+than five, and setting one up shows one phase's flags rather than three phases' at once. What
 passes between them is whatever they write, usually a file.
 
 **The name is what you write in the mark and nothing else.** A name written down where a flow
