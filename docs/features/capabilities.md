@@ -4,25 +4,25 @@ pageClass: hmz-feature
 
 # Capability map
 
-This is a wayfinding map, not an exhaustive product contract. It groups related behavior by
-the user problem it solves; one group may combine several implementations, and one feature may
-support more than one group. Availability still depends on the backend, account, operating
-system, and shape of the run.
+Nineteen capability groups in five systems, grouped by the problem each solves rather than by
+the code that solves it. It is for finding the right page, not for stating a contract: a group
+may combine several implementations, a feature may serve more than one group, and availability
+still depends on the backend, account, operating system, and shape of the run.
 
-Use the interactive map to choose an area, then follow **Learn** for the design, **Use** for a
-task-oriented guide, or **Reference** for the complete interface and its limits.
+Choose an area on the map, then follow **Learn** for the design, **Use** for a task-oriented
+guide, and **Reference** for the complete interface and its limits.
 
 <HmzMap />
 
 ## A. Flow system
 
 Express work as ordinary Python or as an inspectable graph, then compose, schedule, and recover
-it without hiding which execution model is in use.
+it without hiding which execution model is in use — the weaver's half of the system.
 
 ### A1. Expression and compilation
 
-**Outcome.** Choose unrestricted runtime behavior or a graph whose structure is settled before
-the first agent turn.
+Choose unrestricted runtime behavior or a graph whose structure is settled before the first
+agent turn.
 
 - A regular flow is unrestricted Python; its next step is whatever its body decides at runtime.
 - An atlas uses a restricted declarative body that compiles into a typed prophecy graph.
@@ -36,8 +36,7 @@ the first agent turn.
 
 ### A2. Static correctness and proving
 
-**Outcome.** Find structural mistakes and exercise hostile paths before spending a real model
-turn.
+Find structural mistakes and exercise hostile paths before spending a real model turn.
 
 - Zero-execution checking reads flow structure without importing or running user code.
 - Atlas checks cover edge shapes, bound values, recursion, returns, and loop progress.
@@ -53,8 +52,8 @@ turn.
 
 ### A3. Composition and hot reload
 
-**Outcome.** Reuse flows and their supporting assets while keeping each nested run visible and
-independently scoped.
+Reuse flows and their supporting assets while keeping each nested run visible and independently
+scoped.
 
 - A regular flow may load and call another flow while preserving nested run context.
 - An atlas may contain another atlas as a typed supernode in the outer prophecy.
@@ -69,8 +68,8 @@ independently scoped.
 
 ### A4. Scheduling, state, and resumption
 
-**Outcome.** Place and fan out work deliberately, then continue the workflow state that was
-actually recorded.
+Place and fan out work deliberately, then continue the workflow state that was actually
+recorded.
 
 - Flows declare agent roles, capabilities, and working locations without binding them to one
   backend implementation.
@@ -94,8 +93,8 @@ capabilities, identities, conversations, and ways of collaborating with a person
 
 ### B1. Backend unification
 
-**Outcome.** Configure one agent abstraction across different CLIs and protocols without
-pretending every backend supports the same controls.
+Configure one agent abstraction across different CLIs and protocols without pretending every
+backend supports the same controls.
 
 - Agent and session contracts normalize turns, events, answers, and lifecycle operations.
 - Native app servers, streaming command-line adapters, and Agent Client Protocol (ACP) servers
@@ -113,8 +112,8 @@ pretending every backend supports the same controls.
 
 ### B2. Turn and session control
 
-**Outcome.** Keep live work steerable and make human collaboration part of the run rather than
-an out-of-band interruption.
+Keep live work steerable and make human collaboration part of the run rather than an
+out-of-band interruption.
 
 - Per-turn controls, lifecycle hooks, and typed failures give flows explicit decision points.
 - Steering delivers an acknowledged instruction into a supported turn that is already running.
@@ -135,12 +134,11 @@ an out-of-band interruption.
 
 ### B3. Tools and skills
 
-**Outcome.** Give each session only the reusable instructions and temporary callable tools its
-role needs.
+Give each session only the reusable instructions and temporary callable tools its role needs.
 
-- Each session receives the flow-owned skills selected for its role and scope.
+- Each session receives the flow-owned skills selected for its role and scope, mounted for that
+  session and removed when the scope ends.
 - Backends expose the native skills already installed where their own CLI reads them.
-- Flow-owned skills are mounted for the session and removed when that scope ends.
 - A flow callback can become a native tool from the next turn until it is withdrawn or the
   session ends, on a capable backend.
 
@@ -151,8 +149,8 @@ role needs.
 
 ### B4. Failure recovery
 
-**Outcome.** Respond to a failed turn according to what failed, while making conversation loss
-an explicit boundary.
+Respond to a failed turn according to what failed, while making conversation loss an explicit
+boundary.
 
 - Backends distinguish failures worth another attempt from explicitly unrecoverable ones;
   configured policy then retries, walks accounts, and finally walks places.
@@ -170,8 +168,8 @@ an explicit boundary.
 
 ### B5. Accounts and credentials
 
-**Outcome.** Run the same CLI under separate identities without changing the agent's command or
-leaking another account into the turn.
+Run the same CLI under separate identities without changing the agent's command or leaking
+another account into the turn.
 
 - Where a CLI provides a native login, capture lets it create and refresh credentials in its
   own format; other backends use their configured credential inputs.
@@ -193,8 +191,8 @@ movement, transport, and machine ownership explicit.
 
 ### C1. Transparent remote execution
 
-**Outcome.** Keep the agent local while selected work behaves as though its processes and files
-belong to the target machine.
+Keep the agent local while selected work behaves as though its processes and files belong to
+the target machine.
 
 - A supervisor decides selected system calls and can replay them remotely one at a time.
 - Program launches, descendants, network access, paths, and executables follow explicit routes.
@@ -209,8 +207,7 @@ belong to the target machine.
 
 ### C2. Shadow workspace and consistent writes
 
-**Outcome.** Make a remote workspace available quickly without exposing readers to partial file
-updates.
+Make a remote workspace available quickly without exposing readers to partial file updates.
 
 - A sparse local shadow presents the target workspace before every file has crossed the wire.
 - Missing files and virtual exports are materialized when the agent actually reaches them.
@@ -222,8 +219,8 @@ updates.
 
 ### C3. Portable transport runtime
 
-**Outcome.** Reach different targets through one session protocol without installing humanize
-on the target first.
+Reach different targets through one session protocol without installing humanize on the target
+first.
 
 - A compact target runtime carries process, file, environment, and working-directory
   operations.
@@ -239,8 +236,7 @@ on the target first.
 
 ### C4. Machine lifecycle
 
-**Outcome.** Give agents isolated or shared machines with a clear owner for startup, reuse, and
-cleanup.
+Give agents isolated or shared machines with a clear owner for startup, reuse, and cleanup.
 
 - An agent may receive a dedicated container whose lifetime follows that agent.
 - A run may share one container when the participants need the same environment.
@@ -258,8 +254,7 @@ separate local traces from optional outbound reporting.
 
 ### D1. Detached operation
 
-**Outcome.** Let an interactive run survive terminal or SSH loss and reattach to its current
-screen later.
+Let an interactive run survive terminal or SSH loss and reattach to its current screen later.
 
 - One workspace daemon owns the interface pseudoterminal (PTY) while terminals act as
   attachable readers.
@@ -275,8 +270,8 @@ screen later.
 
 ### D2. Persistent state and layered logs
 
-**Outcome.** Preserve enough structured evidence to inspect an abrupt stop and continue a flow
-that explicitly supports it.
+Preserve enough structured evidence to inspect an abrupt stop and continue a flow that
+explicitly supports it.
 
 - Each run's epic record gains complete journal entries as events happen.
 - Ordinary flow state is written through on assignment, with a final save for nested mutations.
@@ -292,8 +287,8 @@ that explicitly supports it.
 
 ### D3. Trace reconstruction
 
-**Outcome.** Rebuild agent activity and the programs it started onto one timeline that can be
-inspected after the run.
+Rebuild agent activity and the programs it started onto one timeline that can be inspected
+after the run.
 
 - Backend session logs and profiled processes are combined without copying their source
   records.
@@ -308,8 +303,8 @@ inspected after the run.
 
 ### D4. Telemetry privacy
 
-**Outcome.** Send diagnostic reporting only after consent, with content limits enforced before
-anything leaves the machine.
+Send diagnostic reporting only after consent, with content limits enforced before anything
+leaves the machine.
 
 - Consent may remain unanswered, be enabled, or be disabled; unanswered machines send nothing.
 - Data suppliers run only while a report is actually being assembled and provide names,
@@ -329,8 +324,8 @@ scripted, embedded, or detached work.
 
 ### E1. Discovery, forking, and configuration
 
-**Outcome.** Find the nearest flow, make a safe local copy when it should become yours, and
-configure it from the contract the flow declares.
+Find the nearest flow, make a safe local copy when it should become yours, and configure it
+from the contract the flow declares.
 
 - Built-in, fetched, project, and user flows participate in explicit catalogue and resolution
   precedence.
@@ -345,8 +340,8 @@ configure it from the contract the flow declares.
 
 ### E2. Unified entry points
 
-**Outcome.** Choose a terminal, command line, or Python entry point without creating a second
-definition of what a flow or run means.
+Choose a terminal, command line, or Python entry point without creating a second definition of
+what a flow or run means.
 
 - The SDK, command line, and terminal interface share workspace stores, flow loading,
   validation, and the underlying runner where their responsibilities overlap.
@@ -358,6 +353,6 @@ definition of what a flow or run means.
 - Shared semantics do not imply identical interaction or backend capability on every surface.
 
 **Learn:** [One system, four ways in](/features/surfaces) · **Use:**
-[Quickstart](/), [Status](/user/status) · **Reference:**
+[Run a flow](/#run-a-flow), [Status](/user/status) · **Reference:**
 [SDK](/reference/sdk), [CLI](/reference/cli), [TUI](/reference/tui),
 [Daemon](/reference/daemon)
