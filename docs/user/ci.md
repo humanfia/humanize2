@@ -1,8 +1,8 @@
 # humanize in CI
 
 Run a flow on a schedule, open a pull request with what it did, and keep a trace you can read
-afterwards. Reach for this when you want an agent working through a task while nobody is
-watching. Only the YAML below is specific to GitHub Actions.
+afterwards — an agent working through a task while nobody is watching. Only the YAML below is
+specific to GitHub Actions.
 
 ## What changes when nobody is watching
 
@@ -47,8 +47,7 @@ And give the job a `timeout-minutes` as the outermost bound.
 
 humanize holds no API key. It drives the CLI you already logged in, so the question is how that
 CLI is signed in on a machine nobody is sitting at. Use a [provider](/user/providers), made
-non-interactively from a secret — a line with nobody at a terminal has to answer everything
-itself, and `-s` is how:
+non-interactively from a secret with `-s`:
 
 ```sh
 hmz providers add claude/ci -w token -s CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN"
@@ -78,9 +77,8 @@ hmz exec -f nightly \
     "$(cat TASK.md)"
 ```
 
-`bypass` is the default, and a flow driving an agent unattended has always run at it. On a
-runner, `workspace-write` costs you nothing and bounds the blast radius to the checkout. See
-[Permissions](/user/permissions).
+`bypass` is the default. On a runner, `workspace-write` costs you nothing and bounds the blast
+radius to the checkout. See [Permissions](/user/permissions).
 
 ## Write the workflow
 
@@ -147,14 +145,13 @@ artifacts whether the run finished, failed, or hit the timeout.
 
 `--output` is what puts it there. Left alone, a trace goes with the run it is a trace of —
 `traces/` inside `~/.humanize/epics/<workspace>/<run>/`, which is outside the checkout and
-named after a run the YAML has never heard of. `--output` is for the other case: a trace as a
-file to hand to somebody, which is exactly what a job uploading an artifact wants.
+named after a run the YAML has never heard of.
 
-Download it and drag it into [ui.perfetto.dev](https://ui.perfetto.dev). One process per agent,
+Download it and drag it into [ui.perfetto.dev](https://ui.perfetto.dev): one process per agent,
 one track per row of its sessions, one slice per thing it did, with the prompts and the tool
 output attached. See [Tracing](/user/tracing).
 
-The [epic](/user/tracing#what-a-run-writes-down) says how it ended. A run is a directory, and
+The [epic](/user/tracing#what-a-run-writes-down) says how it ended — a run is a directory, and
 its record is `epic.jsonl` inside it:
 
 ```sh
@@ -184,8 +181,8 @@ hmz exec -f nightly -a claude@ci/claude-opus-5:high "$(cat TASK.md)" || {
 | `2` | the command line was wrong |
 | `130` | interrupted |
 
-A wrong `-a` or a miscounted flow is a `2` **before any agent runs**. That is what you want
-from a scheduled job: it fails in two seconds rather than in forty minutes.
+A wrong `-a` or a miscounted flow is a `2` **before any agent runs**: a scheduled job fails in
+two seconds rather than in forty minutes.
 
 ## Make the run cheap to reproduce
 
@@ -212,9 +209,8 @@ This opens the interface already set up, and starts nothing.
 ## Things that bite
 
 **A flow that needs a feature the runner's backend has not got.** The weaver says so in the
-annotation: `Annotated[Agent, Goal]` or `Annotated[Agent, Moment.PERMISSION_REQUEST]`. Then it
-is refused in two seconds rather than an hour in. See [Port a
-project](/user/tutorials/port-a-project).
+annotation: `Annotated[Agent, Goal]` or `Annotated[Agent, Moment.PERMISSION_REQUEST]`, and it
+is refused up front. See [Port a project](/user/tutorials/port-a-project).
 
 **A flowverse that has not been fetched.** `official/...` says so rather than saying there is
 no such file. Fetch it in the job, or vendor the flow into `.humanize/flows/`.
@@ -227,8 +223,7 @@ git diff --quiet && { echo "nothing changed"; exit 0; }
 ```
 
 **A container-backed flow.** Its trajectories are in a mirror rather than in the checkout, and
-they still trace: the run wrote down the ids, and its trace is gathered by those. See
-[Containers](/user/containers).
+they still trace: the run wrote down the ids. See [Containers](/user/containers).
 
 ## See also
 
