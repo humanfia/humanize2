@@ -3,15 +3,14 @@
 When a flow drives several agents, each agent holds as many conversations as it likes. A Ralph
 loop opens one conversation each turn, and a fan-out holds one per worktree. There is a
 transcript **per agent**, all of its conversations running down it, and one more where **every
-agent's work appears together** — which is the one the interface opens on. **tab** and
-**shift+tab** step round them.
+agent's work appears together** — which is the one the interface opens on.
 
 ## Try it
 
 Open a flow where more than one agent is working. You are watching all of them: each part says
 which agent it is from as that changes. Press **tab** and the screen becomes the first working
-agent's own transcript, drawn from the top. Press **tab** again for the next, and again to come
-back round to all of them. **shift+tab** goes the other way.
+agent's own transcript, drawn from the top. Press it again for the next, and again to come back
+round to all of them.
 
 ## The keys
 
@@ -20,10 +19,9 @@ back round to all of them. **shift+tab** goes the other way.
 | **tab** | The next agent that is working, and round to the one they all appear on. |
 | **shift+tab** | The one before it. Both wrap. |
 
-The keys step between the agents that are working. With ten going, you step between the ones
-thinking right now, not the ones that have stopped. An agent between its turns stays readable
-once you are on it — what you are reading stays put until you press one of these keys — but it
-is not stepped onto.
+With ten agents going, these step between the ones thinking right now, not the ones that have
+stopped. An agent between its turns stays readable once you are on it — what you are reading
+stays put until you press one of these keys — but it is not stepped onto.
 
 **Every agent there is can still be read**, from the diagram
 [`/status`](/reference/tui#how-the-run-is-going) draws. **esc** opens it, and enter or a click
@@ -34,8 +32,7 @@ or has not started, is picked out by name rather than stepped past.
 
 - What the transcript shows: that agent's own, drawn from the top under a line saying so.
 - Where [a line you type](/user/steering) goes — of that agent's conversations, the one with a
-  turn open. Reading all of them, there is no one agent you can have meant, so it goes to
-  whichever has a turn open.
+  turn open.
 - What the line above the editor marks as `reading`.
 
 A word you put into a turn is kept against the agent that took it, wherever you were looking
@@ -73,7 +70,7 @@ older runs are gone from the screen, not from the [trace](/user/tracing).
 
 ## Where the conversations come from
 
-Every conversation is a session, and the flow decides how many. They all come from the flow:
+Every conversation is a session, and the flow decides how many:
 
 ```python
 agent("do the task")                     # a conversation of its own, dropped straight after

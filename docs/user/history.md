@@ -6,25 +6,20 @@ you reach for history when you want to write either again.
 
 ## Try it
 
-Press **↑** at an empty prompt. The last thing you typed appears. Press **↑** again to walk
-further back, or **↓** to come forward.
-
-## Walking it
-
-Press **↑** and **↓** to walk the history. They act only off the first and last line, so a
-prompt of several lines still moves with the same keys. Over an open [offers
-list](/user/completion), the keys move within the list instead.
+Press **↑** at an empty prompt and the last thing you typed appears. **↑** again walks further
+back, **↓** comes forward. The keys act only off the first and last line, so a prompt of
+several lines still moves with them; over an open [offers list](/user/completion) they move
+within the list instead.
 
 ## What is walked
 
-The history holds what you typed **in this directory**.
+The history holds what you typed **in this directory**. If you have not typed anything here
+yet, it holds everything you have ever typed anywhere, so a fresh project still has something
+to walk back through.
 
-If you have not typed anything here yet, it holds everything you have ever typed anywhere. A
-fresh project still has something to walk back through.
-
-The interface settles which of the two applies when it starts. The history cannot change under
-you mid-session. Type one line in a new project, restart, and from then on it is that project's
-own.
+The interface settles which of the two applies when it starts, and the history cannot change
+under you mid-session. Type one line in a new project, restart, and from then on it is that
+project's own.
 
 **Commands go down too.** `/flow rlar` is a line you typed, and one you may want back. Only a
 line identical to the one before it is left out. Holding a key down does not fill the walk with

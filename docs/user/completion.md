@@ -7,8 +7,7 @@ whenever you do not want to type the rest yourself.
 ## Try it
 
 Type `/` and a list of commands appears under the editor. Type `/flow ` and the list becomes
-the flows humanize knows. Press **↑ ↓** to move through the list, **tab** or **enter** to take
-the highlighted offer, and **esc** to dismiss it.
+the flows humanize knows.
 
 ## What completion offers
 

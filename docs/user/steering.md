@@ -8,26 +8,19 @@ after the refactor has finished.
 ## Try it
 
 While a turn is running, type a line at the prompt and press enter. There is no separate mode
-and no separate key.
-
-Your line stays pinned against the agent it went to:
+and no separate key. Your line stays pinned against the agent it went to:
 
 ```
 ❯ and fix the tests too · with claude#3a15
 ```
 
-It comes off the pin only when that agent's turn says the words are in front of it.
+It comes off the pin only when that agent's own turn says the words are in front of it.
 
 ## At the prompt
 
-Type a line and press enter. There is no separate mode and no separate key. The editor means
-both things at once.
-
 If no turn is open, the line is **held for the next one**. A line to a running flow is never
-dropped.
-
-A held line is pinned onto the editor, not written into the transcript. It is dimmed, behind
-the same `❯`:
+dropped. A held line is pinned onto the editor rather than written into the transcript, dimmed,
+behind the same `❯`:
 
 ```
 ❯ and fix the tests too                    assistant · claude-opus-5:high
@@ -36,37 +29,30 @@ the same `❯`:
 ❯ █
 ```
 
-The line has not been said to anybody yet. The transcript is what happened. When something
+The line has not been said to anybody yet; the transcript is what happened. When something
 takes the line, it comes off the pin and into the transcript, in front of the turn that took
 it.
 
 ### Handed to a backend is not the same as taken
 
-A line put into a turn that is already running also stays pinned, this time against the agent
-it went to:
-
-```
-❯ and fix the tests too · with claude#3a15
-```
-
-It comes off only when that agent's own turn says the words are in front of it. A turn that
-ends without saying so puts the line back into the transcript **as never sent**. A line typed
-at an agent that was not listening is never quietly counted as said.
+A turn that ends without ever saying the words are in front of it puts the line back into the
+transcript **as never sent**. A line typed at an agent that was not listening is never quietly
+counted as said.
 
 ### One at a time, in order
 
 Everything you type joins one queue and leaves it a line at a time. The next line goes only
-once the turn has said it has the one before it. A turn takes one waiting line, not the whole
-queue. Three `hi` in a row are three things said, and they come back as three answers.
+once the turn has said it has the one before it, and a turn takes one waiting line rather than
+the whole queue. Three `hi` in a row are three things said, and they come back as three
+answers.
 
 ### It reaches the agent you are reading
 
-Your line reaches the agent you are reading, not whichever happens to be working. A flow
-drives several, and a line said to the one that is not on the screen is a line said to
-somebody else. Of that agent's conversations it goes to the one with a turn open. Reading all
-of them at once there is no one agent you can have meant, so it goes to whichever has a turn
-open — which is the one the screen is showing anyway. See [Many conversations at
-once](/user/conversations).
+Your line reaches the agent you are reading, not whichever happens to be working: a flow drives
+several, and a line said to the one that is not on the screen is a line said to somebody else.
+Of that agent's conversations it goes to the one with a turn open. Reading all of them at once
+there is no one agent you can have meant, so it goes to whichever has a turn open — which is
+the one the screen is showing anyway. See [Many conversations at once](/user/conversations).
 
 ## What each backend does with it
 
@@ -81,7 +67,7 @@ once](/user/conversations).
 
 An [anchored](/user/remote-execution) Claude ends its process with each turn so its work
 reaches the target before the turn says it landed. It hears you during a turn as any Claude
-does. Between two turns there is nothing there to hear, so `interject` raises `RuntimeError`
+does; between two turns there is nothing there to hear, so `interject` raises `RuntimeError`
 until the next turn opens. An anchored Codex keeps one app server for the life of the agent and
 can be steered throughout, at the cost of that same guarantee.
 
@@ -102,15 +88,14 @@ session.interject("actually, use pathlib")
 - On a backend that can be talked to, it raises `RuntimeError` when nothing is running to hear
   it.
 
-Two related hooks, both set by whatever is driving the agent:
+Two related hooks, both set by the flow driving the agent:
 
 | | |
 | --- | --- |
 | `agent.waiting` | Asked as each turn starts for anything said to this agent while no turn was open. What it returns goes into that turn. |
 | `agent.prompting` | Asked between turns for the next thing to say, so a flow can be a conversation rather than a loop. `None` once there will be nothing more. |
 
-That pair is how the pin in the interface works. `waiting` drains the queue into the turn that
-is starting. `prompting` hands the flow the next thing to say.
+That pair is how the pin in the interface works.
 
 ## See also
 

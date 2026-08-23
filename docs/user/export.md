@@ -12,31 +12,28 @@ than a few copied lines.
 
 ## Try it
 
-Run `/export`. It writes the transcript to `.humanize/<datetime>.session.md`. Open that file to
-see everything on the screen since the interface opened or since the last `/clear`.
+Run `/export`, then open the file it names.
 
 ## What it writes
 
-**What is on the screen** is everything drawn in the transcript since the last `/clear`.
-Pressing **tab** steps between conversations and draws each one into the same transcript. An
-export therefore holds every conversation you have read, not only the one showing now. To see
+**What is on the screen** is everything drawn in the transcript since the interface opened or
+since the last `/clear` — not the tail of it, so an export of a nine-hour run is the whole of
+it. The two-thousand-line bound applies to what is kept to redraw a conversation you step back
+onto, not to what has already been written down the screen.
+
+Pressing **tab** steps between conversations and draws each one into the same transcript, so an
+export holds every conversation you have read rather than only the one showing now. To see
 which conversations are drawn and how to move between them, read [Many conversations at
-once](/user/conversations).
+once](/user/conversations). Whether tool calls and thinking are in it depends on what
+[`/details`](/user/details) is showing: it is the screen that is written.
 
 **As it was written, not as it was wrapped.** A line too long for your terminal is drawn over
 four rows, but what is exported is the line itself. There is no break where the terminal ran
 out of room and none of the padding that stretched each row to the edge. A break in the file is
 a break that was really there.
 
-Whether the export includes tool calls and thinking depends on what
-[`/details`](/user/details) is showing. It is the screen that is written.
-
-What is on the screen is not bounded. It is everything since the interface opened or since the
-last `/clear`. An export of a nine-hour run is therefore the whole of it, not the tail. The
-two-thousand-line bound applies to what is kept to redraw a conversation you step back onto,
-not to what has already been written down the screen. For tool input and output that never
-reached the screen, and for every agent's sessions rather than the ones that were read, use
-[`hmz trace collect`](/user/tracing).
+For tool input and output that never reached the screen, and for every agent's sessions rather
+than the ones that were read, use [`hmz trace collect`](/user/tracing).
 
 ## Copying instead
 

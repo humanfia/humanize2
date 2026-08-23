@@ -6,11 +6,8 @@ needs from you — what there is to do next, how far through it is, the thing yo
 while it was running.
 
 The board is the other shape. A handful of named lines, kept beside the run and shown on
-[`/status`](/user/status). The flow reads and writes it whenever it likes; you change it
-whenever you like; **neither waits on the other**.
-
-Which makes it an issue list without being one: you put work up, the flow takes it, the flow
-writes down how far through it is, you read that and put more up.
+[`/status`](/user/status). The flow reads and writes it whenever it likes, you change it
+whenever you like, and **neither waits on the other** — an issue list without being one.
 
 ## Try it
 
@@ -46,9 +43,26 @@ def run(agents: Agents, task: str) -> None:
 hmz -f board_loop -a claude/claude-opus-5:max
 ```
 
-Press **esc** for `/status`. Under the diagram is the board. `a` puts a line up, enter changes
-one, `d` twice takes one off. Add a second line to `todo` while the loop is working through the
-first, and it is picked up on the next round — nothing was interrupted and nothing waited.
+Press **esc** for `/status`. Under the diagram is the board. Add a second line to `todo` while
+the loop is working through the first, and it is picked up on the next round — nothing was
+interrupted and nothing waited.
+
+## From the prompt
+
+It is drawn beside how far through the run is, rather than behind a command of its own: a board
+you have to go and open is a board nobody reads.
+
+```
+  Board · what you and the flow both write on
+    ◈ todo          write the parser
+    ◈ doing         write the parser · flow's
+```
+
+| key | |
+| --- | --- |
+| `a` | put a line up: type a name, enter, then what it says |
+| enter | change the line under the cursor |
+| `d` twice | take it off the board |
 
 ## Whose each line is
 
@@ -65,7 +79,23 @@ line says whose it is:
 The other side is **refused where it writes**, with a `Refused` — a write that quietly did
 nothing would be a flow that quietly does not do what it says.
 
+## It is not a question
+
+| | [`/questions`](/user/questions) | the board |
+| --- | --- | --- |
+| The turn | stops until it is answered | goes on |
+| Who starts it | the agent | either of you |
+| Where it is | in the transcript, once | on `/status`, until it changes |
+| What it is for | one thing the agent cannot decide | what there is to do, and how far through it is |
+
+A flow that has to have an answer asks. A flow that wants to *know whether* there is more to do
+reads the board.
+
 ## From a flow
+
+The other side of these keys is Python, and this is what the
+[weaver](/weaver/human-agent#the-board-the-half-that-does-not-wait) puts on the board while you
+are reading it:
 
 ```python
 board = person.board
@@ -87,39 +117,6 @@ it says now. Writing a value keeps what the line is *for*: `about` is said once.
 
 Everything is under one lock and what is read out is a copy, so a flow reading the board while
 somebody types on it reads one moment of it rather than four moments of four lines.
-
-## From the prompt
-
-The board is on `/status`, under the diagram, because it belongs beside how far through the run
-is — a board you have to go and open is a board nobody reads.
-
-```
-  Board · what you and the flow both write on
-    ◈ todo          write the parser
-    ◈ doing         write the parser · flow's
-```
-
-| key | |
-| --- | --- |
-| `a` | put a line up: type a name, enter, then what it says |
-| enter | change the line under the cursor |
-| `d` twice | take it off the board |
-
-A line the flow keeps to itself says so instead of opening an editor.
-
-## It is not a question
-
-| | [`/questions`](/user/questions) | the board |
-| --- | --- | --- |
-| The turn | stops until it is answered | goes on |
-| Who starts it | the agent | either of you |
-| Where it is | in the transcript, once | on `/status`, until it changes |
-| What it is for | one thing the agent cannot decide | what there is to do, and how far through it is |
-
-A flow that has to have an answer asks. A flow that wants to *know whether* there is more to do
-reads the board.
-
-## A run with nobody at a prompt
 
 The board is the person's, and a flow declares a person by taking one:
 `agents: tuple[Agent, Person]`. Run from a command line, where nobody is there, the board is
