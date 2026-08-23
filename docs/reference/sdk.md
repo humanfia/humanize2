@@ -35,7 +35,7 @@ a workspace is what loads the tracer.
 | `agents` | [The agents written down under a name](#agents). |
 | `accounts` | [The accounts an agent may be run as](#accounts), and what each backend runs as one. |
 | `fallbacks` | [Where a turn goes](#fallbacks) when the place taking it cannot take it at all. |
-| `cycles` | [The runs of this workspace](#cycles) that have already happened. |
+| `epics` | [The runs of this workspace](#epics) that have already happened. |
 
 | Method | |
 | --- | --- |
@@ -181,21 +181,21 @@ when the place taking it cannot take it at all.
 | `retrying(said, tries, policy, timeout)` | Says how a failed turn there is taken again. |
 | `clear(said)` | Takes one step away. |
 
-## Cycles
+## Epics
 
-`hmz.cycles` — [the runs of this workspace](/reference/tracing#cycles) that have already
+`hmz.epics` — [the runs of this workspace](/reference/tracing#epics) that have already
 happened.
 
 | | |
 | --- | --- |
 | `under()` | The directory this workspace's runs are kept in. |
 | `all()` | Every run, oldest first. |
-| `read(cycle)` | What one run was: when, which flow, on what, how it went, what it opened. |
-| `sessions(cycle)` | Every session it opened. |
-| `opened(cycle)` | What each agent opened, by the name the run knew that agent as. |
+| `read(epic)` | What one run was: when, which flow, on what, how it went, what it opened. |
+| `sessions(epic)` | Every session it opened. |
+| `opened(epic)` | What each agent opened, by the name the run knew that agent as. |
 | `resumed(flow)` | The last run of one flow here. |
-| `state(cycle, flow="")` | What a [resumable](/guide/resuming) flow left behind in one run. |
-| `traced(cycle, *, output=None, start=None, end=None)` | Gathers one run into a [trace](/reference/tracing) of that run — its own sessions, by the ids it wrote down, beside the programs it profiled — and answers with where it went and what is in it. It goes beside the run unless an output is named. |
+| `state(epic, flow="")` | What a [resumable](/guide/resuming) flow left behind in one run. |
+| `traced(epic, *, output=None, start=None, end=None)` | Gathers one run into a [trace](/reference/tracing) of that run — its own sessions, by the ids it wrote down, beside the programs it profiled — and answers with where it went and what is in it. It goes beside the run unless an output is named. |
 | `trace(*, sessions=None, agents=None, output=None, start=None, end=None, profile=None)` | The same collector, asked for whatever sessions you name — which is how a session no run ever drove is read back. |
 
 ## Session

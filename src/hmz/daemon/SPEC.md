@@ -52,7 +52,7 @@ A run held where a terminal closing cannot end it, and the terminals that come a
   thing it has to be told. That is what makes it a leaf, and what makes the interface running
   under one identical to the interface running under none.
 - It MUST be one daemon per workspace. Two runs of one project in one directory are two flows
-  writing over each other's cycle, and a daemon somebody cannot find is a daemon nobody can
+  writing over each other's epic, and a daemon somebody cannot find is a daemon nobody can
   stop. It MUST be held by a lock rather than by looking: looking is what leaves a window
   between the look and the socket, and two `hmz` started in the same second would both find
   nothing and both bind. The lock MUST be one the kernel drops however the process ends, so

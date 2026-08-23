@@ -7,7 +7,7 @@ each other, so the rest of the documentation can use them without redefining the
 
 A **flow** — one humanize ships, or one a **flowverse** holds — drives **agents**, each of
 which holds **sessions** with a coding-agent **backend**; a session is made of **turns**; one
-run of a flow is a **cycle**; an agent's turns land on a **machine** and may run as a
+run of a flow is an **epic**; an agent's turns land on a **machine** and may run as a
 **provider**; and what the whole thing did is read back as a **trace**.
 
 ## Backend
@@ -176,25 +176,25 @@ arrows step between them, because that is which list of flows is being read.
 
 See [Flows › Flowverses](/reference/flows#flowverses).
 
-## Cycle
+## Epic
 
 **One run of one flow, written down as it happens — and one directory.**
 
 It opens when the flow starts and closes when the flow stops, finished, failed or interrupted.
-It is never reopened. Its `cycle.jsonl` records the flow, the agents and the backend's id for
+It is never reopened. Its `epic.jsonl` records the flow, the agents and the backend's id for
 every session each of them opened. Beside it are a record apiece for the flows this one
 [called](/reference/flows#a-flow-that-calls-another-flow), a link per file each session was logged to, whatever a flow
 that [can be picked up](/guide/resuming) left behind, the programs a
 [profiled](/guide/tracing#profiling-a-run) run started and the traces gathered of it
 afterwards. It does *not* record what the sessions said. The backend's own log is the
-turn-by-turn record, and a cycle is not a second copy of it.
+turn-by-turn record, and an epic is not a second copy of it.
 
 It exists because the backends log a session under an id and never say whose it was. Without
-the cycle, two agents at one configuration are indistinguishable afterwards. With it, a
+the epic, two agents at one configuration are indistinguishable afterwards. With it, a
 [trace](#trace) can say `builder` and `reviewer`.
 
-Cycles live under `~/.humanize/cycles/<workspace>/`, one directory apiece. See
-[Tracing](/reference/tracing#cycles).
+Epics live under `~/.humanize/epics/<workspace>/`, one directory apiece. See
+[Tracing](/reference/tracing#epics).
 
 ## Machine
 
@@ -231,7 +231,7 @@ and neither can read the other's. See [Providers](/reference/providers).
 **Everything a run left behind, as one timeline.**
 
 `hmz trace collect` reads the backends' own transcripts and names each session by the agent
-that opened it (using the cycle). It writes a Chrome JSON trace into the cycle of the run it is
+that opened it (using the epic). It writes a Chrome JSON trace into the epic of the run it is
 a trace of. Load it in [ui.perfetto.dev](https://ui.perfetto.dev). Each agent is a process,
 each row of that agent's sessions is a track and each slice is one thing the agent did.
 
@@ -241,7 +241,7 @@ trace collect` away. See [Tracing](/reference/tracing).
 ## How they fit
 
 ```
-cycle ─── one run of one flow, written down
+epic ──── one run of one flow, written down
   │
 flow ──── the loop, a directory of Python
   │

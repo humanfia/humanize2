@@ -785,7 +785,7 @@ collect(agents={a.id: a.opened for a in (actor, reviewer)})
 
 A [flow](/reference/flows#how-many-agents-and-what-they-are-for) that declares its agents as a
 `NamedTuple` names them for you, and a run started through `Runner` writes all of this into its
-[cycle](/reference/tracing#cycles) — so this is only needed for agents built and driven by hand.
+[epic](/reference/tracing#epics) — so this is only needed for agents built and driven by hand.
 
 ### The name nobody gave it
 
@@ -799,7 +799,7 @@ NeiKos496   PhiLia093   SkeMma720   KykLos204   MetaKratos881
 Twelve of those are codes *Honkai: Star Rail* says out loud, and while any of the twelve is still
 free they come up half the time — against the once in eleven thousand the written-down words alone
 would give them by chance, since a name is only a joke to somebody who recognises it. The rest are
-those same roles under some other number: another cycle of a story that has run 33,550,336 of
+those same roles under some other number: another epic of a story that has run 33,550,336 of
 them, which is the fifth perfect number, as 496 is the third.
 
 The word is built rather than looked up. Morphemes join at the capital — `Apo` and `Ria` are

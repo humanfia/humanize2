@@ -14,11 +14,11 @@ link rather than a copy, and read by whoever is looking rather than by humanize:
 written and read through the paths the backends themselves keep, so that nothing here can be
 the reason a log is written twice or read from the wrong place.
 
-One cycle is one run, and one directory::
+One epic is one run, and one directory::
 
-    ~/.humanize/cycles/<workspace>/<when>-<which>/
-        cycle.jsonl                     what happened, a line at a time
-        cycle.<flow>_<which>.jsonl      the same, for one flow the run called
+    ~/.humanize/epics/<workspace>/<when>-<which>/
+        epic.jsonl                      what happened, a line at a time
+        epic.<flow>_<which>.jsonl       the same, for one flow the run called
         state.json                      what a flow that can be picked up again left behind
         profile.jsonl                   the programs it ran, for a run that was profiled
         sessions/<session>/…            a link per file the backend logged it to
@@ -30,10 +30,10 @@ record of whatever called it says what it called and which file to read it in. S
 and still one directory: a called flow is part of the run that called it, not another run.
 
 It opens when the flow starts and closes when the flow stops, however it stops -- finished,
-failed, or interrupted. A closed cycle is never reopened: running the flow again is another
-run, with sessions of its own, and so another cycle -- which is what a flow that says it can
-be picked up again is picked up as. What it left behind is read out of the cycle it left it
-in and handed to the next run of it, which writes into a cycle of its own.
+failed, or interrupted. A closed epic is never reopened: running the flow again is another
+run, with sessions of its own, and so another epic -- which is what a flow that says it can
+be picked up again is picked up as. What it left behind is read out of the epic it left it
+in and handed to the next run of it, which writes into an epic of its own.
 """
 
 from __future__ import annotations
@@ -65,14 +65,14 @@ __all__ = [
     "STATE",
     "TRACES",
     "Called",
-    "Cycle",
     "Drove",
+    "Epic",
     "Ran",
     "Session",
     "State",
     "Sub",
     "called",
-    "cycles",
+    "epics",
     "linked",
     "opened",
     "read",
@@ -93,17 +93,17 @@ _PLAIN = re.compile(r"[^A-Za-z0-9]")
 #: narrower than a path, because it is one directory name on somebody's filesystem.
 _LEGIBLE = re.compile(r"[^A-Za-z0-9._@-]+")
 
-#: The file a cycle's own record is written to, inside the cycle's directory.
-JOURNAL = "cycle.jsonl"
+#: The file an epic's own record is written to, inside the epic's directory.
+JOURNAL = "epic.jsonl"
 
 #: What the record of a flow another flow called is called, beside the run's own: which
 #: flow it is of, and an id of that call rather than of the flow -- a flow called twice is
 #: two records, since it is two runs of it and each opened its own sessions.
-RECORD = "cycle.{flow}_{ident}.jsonl"
+RECORD = "epic.{flow}_{ident}.jsonl"
 
-#: Every such record of one cycle, as a glob over its directory. It does not match the
+#: Every such record of one epic, as a glob over its directory. It does not match the
 #: run's own, which is the record of the flow nothing called.
-RECORDS = "cycle.*.jsonl"
+RECORDS = "epic.*.jsonl"
 
 #: Where the links to the sessions' own logs go, a directory per session.
 SESSIONS = "sessions"
@@ -196,7 +196,7 @@ class Called(NamedTuple):
     Attributes:
       flow: The flow, as it was asked for.
       task: What it was called with.
-      record: The file inside the cycle it was written to, which is where its own sessions
+      record: The file inside the epic it was written to, which is where its own sessions
         are and where whatever it called in turn is written down.
       began: When it was called.
       ended: When it returned, or "" for a call that never did -- a run killed under it.
@@ -210,10 +210,10 @@ class Called(NamedTuple):
 
 
 class Ran(NamedTuple):
-    """What one cycle was, read back off its own record.
+    """What one epic was, read back off its own record.
 
     Attributes:
-      at: The cycle's directory, which is what everything about it is under.
+      at: The epic's directory, which is what everything about it is under.
       flow: The flow that was run, as it was named.
       task: What its agents were asked to do.
       workspace: Where it ran.
@@ -244,7 +244,7 @@ class Ran(NamedTuple):
 
     @property
     def name(self) -> str:
-        """What this cycle is called, which is the directory it is written in."""
+        """What this epic is called, which is the directory it is written in."""
         return self.at.name
 
 
@@ -279,7 +279,7 @@ def called(agent: str, backend: str, provider: str, ident: str) -> str:
 
 
 def _record(flow: str, ident: str) -> str:
-    """What the record of one called flow is called, inside the cycle that called it.
+    """What the record of one called flow is called, inside the epic that called it.
 
     Args:
       flow: The flow, as it was asked for -- which may be a path, and is flattened the way
@@ -340,7 +340,7 @@ def _logs(backend: str, ident: str) -> list[Path]:
 
 
 def _link(at: Path, backend: str, ident: str) -> list[str]:
-    """Points a directory of the cycle's own at the logs one session is being written to.
+    """Points a directory of the epic's own at the logs one session is being written to.
 
     Made for whoever is reading the run afterwards, and for nothing else: humanize reads and
     writes a log where the backend keeps it, so a link that is broken, refused by the
@@ -388,7 +388,7 @@ class State(dict[str, Any]):
     """What a resumable flow left behind, and what it is writing now.
 
     A dict as far as the flow is concerned -- it is handed one, it writes into it, and the
-    next run of that flow is handed what it wrote. What it also is is a file in the cycle,
+    next run of that flow is handed what it wrote. What it also is is a file in the epic,
     written as the flow writes: a flow worth picking up again is one that was stopped or
     killed rather than one that ended tidily, and state saved only at the end is state a
     stopped run does not have. Something written inside a value it holds -- a list appended
@@ -399,10 +399,10 @@ class State(dict[str, Any]):
     def __init__(
         self, at: Path, flow: str, held: Mapping[str, Any] | None = None
     ) -> None:
-        """Holds what one flow left behind, against the cycle it is being written into.
+        """Holds what one flow left behind, against the epic it is being written into.
 
         Args:
-          at: The cycle's directory.
+          at: The epic's directory.
           flow: Whose state this is, since a flow that called another is two flows and each
             has its own to keep.
           held: What was read back, or nothing for a run that is picking nothing up.
@@ -444,7 +444,7 @@ class State(dict[str, Any]):
         self.save()
 
     def save(self) -> None:
-        """Writes what this flow is holding into the cycle, beside what the others hold.
+        """Writes what this flow is holding into the epic, beside what the others hold.
 
         Read again and merged rather than dumped over, for the reason the settings are: a
         flow that called another is two flows writing one file, and a plain dump would put
@@ -468,18 +468,18 @@ class State(dict[str, Any]):
                 return
 
 
-def _kept(cycle: Path) -> dict[str, Any]:
-    """What every flow of one cycle left behind, by the name each was run as.
+def _kept(epic: Path) -> dict[str, Any]:
+    """What every flow of one epic left behind, by the name each was run as.
 
     Args:
-      cycle: The cycle's directory.
+      epic: The epic's directory.
 
     Returns:
-      One entry per flow that wrote anything, and nothing at all for a cycle that holds no
+      One entry per flow that wrote anything, and nothing at all for an epic that holds no
       state, holds one nothing can read, or holds one written by hand as something else.
     """
     try:
-        said = json.loads((cycle / STATE).read_text(encoding="utf-8"))
+        said = json.loads((epic / STATE).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     if not isinstance(said, dict):
@@ -491,33 +491,33 @@ def _kept(cycle: Path) -> dict[str, Any]:
     }
 
 
-def state(cycle: Path, flow: str = "") -> dict[str, Any]:
-    """What a resumable flow left behind in one cycle.
+def state(epic: Path, flow: str = "") -> dict[str, Any]:
+    """What a resumable flow left behind in one epic.
 
     Args:
-      cycle: The cycle's directory.
-      flow: Which flow's, as it was named when it ran, or "" for the one the cycle is a run
-        of -- which is the flow somebody picking the cycle up is picking up.
+      epic: The epic's directory.
+      flow: Which flow's, as it was named when it ran, or "" for the one the epic is a run
+        of -- which is the flow somebody picking the epic up is picking up.
 
     Returns:
       What it wrote, and nothing at all where that flow wrote nothing.
     """
-    held = _kept(cycle)
+    held = _kept(epic)
     if flow:
         return held.get(flow, {})
-    ran = read(cycle)
+    ran = read(epic)
     return held.get(ran.flow, {}) if ran is not None else {}
 
 
 def resumed(flow: str, workspace: Path | str | None = None) -> Path | None:
-    """The cycle one flow's next run picks up from, which is the last run of it here.
+    """The epic one flow's next run picks up from, which is the last run of it here.
 
     Args:
       flow: The flow, as it is named when it is run.
       workspace: Where it runs, defaulting to this directory.
 
     Returns:
-      The cycle, or None where the flow has not run here. A run that wrote nothing at all is
+      The epic, or None where the flow has not run here. A run that wrote nothing at all is
       nothing to pick up and the search goes past it; a run that wrote and then emptied what
       it had written is not the same thing, and is where the search stops -- a flow that
       cleared its state said the next run starts clean, and answering that by handing it the
@@ -525,9 +525,9 @@ def resumed(flow: str, workspace: Path | str | None = None) -> Path | None:
       rather than by what the run was of, so that a flow which was called by another is
       picked up too -- it wrote under its own name, which is where it is looked for.
     """
-    for cycle in reversed(cycles(workspace)):
-        if flow in _kept(cycle):
-            return cycle
+    for epic in reversed(epics(workspace)):
+        if flow in _kept(epic):
+            return epic
     return None
 
 
@@ -565,7 +565,7 @@ def _drove(agents: Sequence[AgentBase]) -> list[dict[str, Any]]:
     ]
 
 
-class Cycle:
+class Epic:
     """One run of one flow: the directory it is written to, and what has happened to it."""
 
     def __init__(
@@ -579,25 +579,25 @@ class Cycle:
         picked_up: str = "",
         profile: bool = False,
     ) -> None:
-        """Opens a cycle, and writes down what it is a run of.
+        """Opens an epic, and writes down what it is a run of.
 
         Args:
           flow: The flow being run, as it was named.
           agents: The agents it is being run with, in the order it takes them.
           task: What they were asked to do.
-          workspace: Where the run happens, defaulting to this directory. Cycles are kept
+          workspace: Where the run happens, defaulting to this directory. Epics are kept
             under the workspace they ran in, since that is what anyone looking for one has.
           resumable: Whether the flow says it can be picked up again, which is what makes
             the state it leaves behind something to run it on rather than something to read.
-          picked_up: The cycle this run was picked up from, by name, or "" for one starting
+          picked_up: The epic this run was picked up from, by name, or "" for one starting
             from nothing.
           profile: Whether to sample the programs the agents start while the run goes, so
             that what a turn spent its minutes on is in the run's trace beside the turn. A
-            setting of the workspace, asked of it by whoever opens the cycle.
+            setting of the workspace, asked of it by whoever opens the epic.
         """
         self._begin(
             home()
-            / "cycles"
+            / "epics"
             / _PLAIN.sub("-", str((workspace or Path.cwd()).resolve()))
             # The moment names it and six hex say which, since two flows may be started in
             # one millisecond and neither is the other's run. To the millisecond rather than
@@ -638,7 +638,7 @@ class Cycle:
         exactly as the flow that called it does, and neither writes the other's.
 
         Args:
-          at: The cycle's directory.
+          at: The epic's directory.
           journal: The file inside it these lines go to.
           workspace: Where the run is happening.
           flow: The flow this is a record of, as it was named.
@@ -662,7 +662,7 @@ class Cycle:
 
     @property
     def path(self) -> Path:
-        """The directory this cycle is written in."""
+        """The directory this epic is written in."""
         return self._at
 
     @property
@@ -672,12 +672,12 @@ class Cycle:
 
     @property
     def record(self) -> str:
-        """What that file is called inside the cycle, which is what a call refers to."""
+        """What that file is called inside the epic, which is what a call refers to."""
         return self._journal
 
     @property
     def workspace(self) -> Path:
-        """Where this run is happening, which is what its cycles are kept under."""
+        """Where this run is happening, which is what its epics are kept under."""
         return self._where
 
     def _profiling(self) -> Profiler | None:
@@ -711,7 +711,7 @@ class Cycle:
           held: What it is picking up, or nothing for a run starting from nothing.
 
         Returns:
-          The state, saved into this cycle as the flow writes it.
+          The state, saved into this epic as the flow writes it.
         """
         one = State(self._at, flow or self._flow, held)
         with self._writing:
@@ -719,13 +719,13 @@ class Cycle:
         return one
 
     def __enter__(self) -> Self:
-        """Hands the cycle to whatever is running the flow inside it."""
+        """Hands the epic to whatever is running the flow inside it."""
         return self
 
     def __exit__(
         self, kind: type[BaseException] | None, why: object, traceback: object
     ) -> None:
-        """Closes the cycle, saying how the run ended: a cycle closes once and for all.
+        """Closes the epic, saying how the run ended: an epic closes once and for all.
 
         Args:
           kind: What was raised out of the run, if anything.
@@ -734,7 +734,7 @@ class Cycle:
         """
         self._close(kind)
         for agent in self._agents:
-            agent.cycle = None
+            agent.epic = None
 
     def _close(self, kind: type[BaseException] | None) -> None:
         """Writes down that what this is a record of has ended, and how it ended.
@@ -798,7 +798,7 @@ class Cycle:
         # Named for the flow and for this call of it: a flow called twice in one run is two
         # runs of it, each with its own sessions, and one file for both would say neither.
         record = _record(flow, uuid.uuid4().hex[:6])
-        self.write("called", flow=flow, task=task, cycle=record)
+        self.write("called", flow=flow, task=task, epic=record)
         return Sub(self, record, flow, agents, task, resumable=resumable)
 
     def opened(self, agent: AgentBase, session: str) -> None:
@@ -823,13 +823,13 @@ class Cycle:
             provider=provider or LOCAL,
             session=session,
             name=name,
-            # Where to look for it inside this cycle, which is a link and not the log itself.
+            # Where to look for it inside this epic, which is a link and not the log itself.
             where=f"{SESSIONS}/{name}",
         )
         self.links(name)
 
     def links(self, only: str = "") -> None:
-        """Points this cycle's `sessions/` at the logs its sessions are being written to.
+        """Points this epic's `sessions/` at the logs its sessions are being written to.
 
         Args:
           only: One session, by the name it was written down under, or "" for every session
@@ -843,10 +843,10 @@ class Cycle:
             _link(self._at / SESSIONS / name, backend, ident)
 
     def write(self, event: str, **said: Any) -> None:
-        """Appends one line to the cycle.
+        """Appends one line to the epic.
 
         Appended and flushed apiece rather than held: a flow runs for hours and is watched
-        while it does, and a run that died is a run whose cycle has to say what it got to.
+        while it does, and a run that died is a run whose epic has to say what it got to.
 
         Args:
           event: What happened.
@@ -858,13 +858,13 @@ class Cycle:
                 stream.write(json.dumps({"event": event, "at": _now(), **said}) + "\n")
 
 
-class Sub(Cycle):
+class Sub(Epic):
     """One flow another flow called, written down in a record of its own.
 
     Everything a run writes down, a flow the run called writes down too: the sessions it
     opened, what it kept, and whatever it called in turn. What it does not have is a
     directory: it is part of the run that called it, so its record sits beside that run's own
-    in the same cycle, and its sessions link into the same `sessions/`.
+    in the same epic, and its sessions link into the same `sessions/`.
 
     It ends when the call returns rather than when the run does, and says so at both ends --
     here, and in the record of whatever called it. Closed by :meth:`ended` rather than as a
@@ -874,7 +874,7 @@ class Sub(Cycle):
 
     def __init__(
         self,
-        under: Cycle,
+        under: Epic,
         record: str,
         flow: str,
         agents: Sequence[AgentBase],
@@ -886,7 +886,7 @@ class Sub(Cycle):
 
         Args:
           under: What called it, which is where the call itself is written down.
-          record: What this record is called, inside the cycle they share.
+          record: What this record is called, inside the epic they share.
           flow: The flow being called, as it was asked for.
           agents: The agents it was handed, in the order it takes them.
           task: What it was called with.
@@ -913,7 +913,7 @@ class Sub(Cycle):
           kind: What was raised out of the called flow, if anything.
         """
         self._close(kind)
-        self._under.write("returned", flow=self._flow, cycle=self._journal)
+        self._under.write("returned", flow=self._flow, epic=self._journal)
 
 
 def under(workspace: Path | str | None = None) -> Path:
@@ -927,20 +927,18 @@ def under(workspace: Path | str | None = None) -> Path:
       whatever writes there is what makes it.
     """
     return (
-        home()
-        / "cycles"
-        / _PLAIN.sub("-", str(Path(workspace or Path.cwd()).resolve()))
+        home() / "epics" / _PLAIN.sub("-", str(Path(workspace or Path.cwd()).resolve()))
     )
 
 
-def cycles(workspace: Path | str | None = None) -> list[Path]:
-    """The cycles run in one workspace, oldest first.
+def epics(workspace: Path | str | None = None) -> list[Path]:
+    """The epics run in one workspace, oldest first.
 
     Args:
       workspace: Where they ran, defaulting to this directory.
 
     Returns:
-      One directory per cycle, which is empty where nothing has been run.
+      One directory per epic, which is empty where nothing has been run.
     """
     try:
         return sorted(
@@ -950,17 +948,17 @@ def cycles(workspace: Path | str | None = None) -> list[Path]:
         return []
 
 
-def _events(cycle: Path) -> list[dict[str, Any]]:
-    """Every line one cycle holds, in the order they were written.
+def _events(epic: Path) -> list[dict[str, Any]]:
+    """Every line one epic holds, in the order they were written.
 
     Args:
-      cycle: The cycle's directory, or the record inside it.
+      epic: The epic's directory, or the record inside it.
 
     Returns:
       One record apiece, less whatever could not be read as one: a run that died mid-line
-      left a line rather than a cycle, and the rest of it is still what happened.
+      left a line rather than an epic, and the rest of it is still what happened.
     """
-    at = cycle / JOURNAL if cycle.is_dir() else cycle
+    at = epic / JOURNAL if epic.is_dir() else epic
     try:
         lines = at.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
@@ -976,62 +974,62 @@ def _events(cycle: Path) -> list[dict[str, Any]]:
     return held
 
 
-def records(cycle: Path) -> list[Path]:
-    """Every record one cycle holds: the run's own, and one per flow the run called.
+def records(epic: Path) -> list[Path]:
+    """Every record one epic holds: the run's own, and one per flow the run called.
 
     Args:
-      cycle: The cycle's directory.
+      epic: The epic's directory.
 
     Returns:
       The files, the run's own first and the rest by name. Not the order they were opened
       in: a name says which flow before it says which call of it, and what happened in what
       order is what the lines themselves say.
     """
-    at = cycle / JOURNAL
+    at = epic / JOURNAL
     held = [at] if at.is_file() else []
     # A directory that went while it was being read is the records that were read, the way
-    # a record that cannot be read at all is a cycle with nothing in it.
+    # a record that cannot be read at all is an epic with nothing in it.
     with contextlib.suppress(OSError):
-        held += sorted(one for one in cycle.glob(RECORDS) if one.is_file())
+        held += sorted(one for one in epic.glob(RECORDS) if one.is_file())
     return held
 
 
-def opened(cycle: Path) -> dict[str, list[str]]:
-    """What each agent of one cycle opened, as the ids the backends gave those sessions.
+def opened(epic: Path) -> dict[str, list[str]]:
+    """What each agent of one epic opened, as the ids the backends gave those sessions.
 
     Which is what a trace is gathered by: the backends log a session under an id and never
-    say whose it was, so the run has to say it instead. Every record of the cycle, since a
+    say whose it was, so the run has to say it instead. Every record of the epic, since a
     session opened inside a flow the run called is one of the run's own -- what a trace of it
     is is what the whole run did.
 
     Args:
-      cycle: The cycle to read.
+      epic: The epic to read.
 
     Returns:
       One entry per agent that opened anything, oldest session first.
     """
     held: dict[str, list[str]] = {}
-    for one in sessions(cycle):
+    for one in sessions(epic):
         held.setdefault(one.agent, []).append(one.ident)
     return held
 
 
-def sessions(cycle: Path) -> list[Session]:
-    """Every session one cycle opened, oldest first.
+def sessions(epic: Path) -> list[Session]:
+    """Every session one epic opened, oldest first.
 
     Read across every record it holds, and each session says which flow opened it: one run
     is one run, however many flows it took to run it, and which of them a session was opened
     inside is what a record of its own is for.
 
     Args:
-      cycle: The cycle to read.
+      epic: The epic to read.
 
     Returns:
       One apiece, saying whose it was, what took its turns, which account they ran as, what
       the run calls it and which flow it was opened in.
     """
     held: list[Session] = []
-    for at in records(cycle):
+    for at in records(epic):
         events = _events(at)
         flow = next(
             (
@@ -1056,8 +1054,8 @@ def sessions(cycle: Path) -> list[Session]:
                     backend=backend,
                     provider=provider,
                     ident=ident,
-                    # Worked out where an older cycle did not write one down: a name is what
-                    # this session is called, and a cycle written before it had one still
+                    # Worked out where an older epic did not write one down: a name is what
+                    # this session is called, and an epic written before it had one still
                     # has sessions.
                     name=str(
                         said.get("name") or called(agent, backend, provider, ident)
@@ -1071,17 +1069,17 @@ def sessions(cycle: Path) -> list[Session]:
     return sorted(held, key=lambda one: one.at)
 
 
-def read(cycle: Path) -> Ran | None:
-    """What one cycle was, read back off its own record.
+def read(epic: Path) -> Ran | None:
+    """What one epic was, read back off its own record.
 
     Args:
-      cycle: The cycle's directory.
+      epic: The epic's directory.
 
     Returns:
       The run, or None for a directory holding nothing this wrote -- which is a directory
       somebody put there rather than a run to report.
     """
-    events = _events(cycle)
+    events = _events(epic)
     began = next((one for one in events if one.get("event") == "began"), None)
     if began is None:
         return None
@@ -1104,7 +1102,7 @@ def read(cycle: Path) -> Ran | None:
             )
         )
     return Ran(
-        at=cycle,
+        at=epic,
         flow=str(began.get("flow") or ""),
         task=str(began.get("task") or ""),
         workspace=str(began.get("workspace") or ""),
@@ -1112,7 +1110,7 @@ def read(cycle: Path) -> Ran | None:
         ended=str(ended.get("at") or "") if ended else "",
         how=str(ended.get("how") or "") if ended else "",
         agents=tuple(agents),
-        sessions=tuple(sessions(cycle)),
+        sessions=tuple(sessions(epic)),
         called=tuple(_calls(events)),
         resumable=bool(began.get("resumable")),
     )
@@ -1137,7 +1135,7 @@ def _calls(events: Sequence[dict[str, Any]]) -> list[Called]:
     held: list[Called] = []
     where: dict[str, int] = {}
     for said in events:
-        record, flow = str(said.get("cycle") or ""), str(said.get("flow") or "")
+        record, flow = str(said.get("epic") or ""), str(said.get("flow") or "")
         if said.get("event") == "called":
             # Kept by the record and not by the flow: one flow called twice is two calls,
             # and each wrote to a file of its own.
@@ -1168,31 +1166,31 @@ def _calls(events: Sequence[dict[str, Any]]) -> list[Called]:
     return held
 
 
-def where(cycle: Path, session: Session) -> Path:
-    """Where one session's links are, inside the cycle that opened it.
+def where(epic: Path, session: Session) -> Path:
+    """Where one session's links are, inside the epic that opened it.
 
     Args:
-      cycle: The cycle's directory.
+      epic: The epic's directory.
       session: The session.
 
     Returns:
       The directory, which is there once that session has been logged to anything.
     """
-    return cycle / SESSIONS / session.name
+    return epic / SESSIONS / session.name
 
 
-def linked(cycle: Path) -> dict[str, list[str]]:
-    """What each session of one cycle is linked to, as the paths the links point at.
+def linked(epic: Path) -> dict[str, list[str]]:
+    """What each session of one epic is linked to, as the paths the links point at.
 
     Args:
-      cycle: The cycle's directory.
+      epic: The epic's directory.
 
     Returns:
       One entry per session that has links, by the name the run gave it.
     """
     held: dict[str, list[str]] = {}
-    for one in sessions(cycle):
-        at = where(cycle, one)
+    for one in sessions(epic):
+        at = where(epic, one)
         try:
             found = sorted(at.iterdir())
         except OSError:

@@ -239,7 +239,7 @@ class Agent(Protocol):
     #: Where the run this agent is being driven in is written down, or None for an agent
     #: nobody is keeping a record of -- one driven from a test, or by a flow that was called
     #: from nothing. Set by whatever started the run rather than by the flow.
-    cycle: Journal | None
+    epic: Journal | None
 
     @property
     def id(self) -> str:

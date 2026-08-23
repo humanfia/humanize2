@@ -682,7 +682,7 @@ class _AppServer:
                         self._proc.wait(timeout=_STOP_SECONDS)
                     except subprocess.TimeoutExpired:
                         self._proc.kill()
-                # Reaped rather than left: a flow that cycles through agents would otherwise
+                # Reaped rather than left: a flow that runs agent after agent would otherwise
                 # gather a zombie for each one it let go of.
                 self._proc.wait()
                 return

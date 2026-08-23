@@ -308,8 +308,8 @@ time.
 hmz trace collect
 ```
 
-Three runs happened here, one per phase, and each is its own **cycle** — a directory under
-`~/.humanize/cycles/`. `hmz trace collect` collects the last one; `/cycles` in the interface
+Three runs happened here, one per phase, and each is its own **epic** — a directory under
+`~/.humanize/epics/`. `hmz trace collect` collects the last one; `/epics` in the interface
 lists all of them and collects whichever you pick.
 
 The `rlcr` trace is the interesting one. The builder is a single long track, and the reviewer

@@ -192,7 +192,7 @@ Concretely:
   obviously invalid — `gateway.example.invalid`, `not-a-real-token`, `not-a-real-key`.
 - No turn is ever run. `/opt/standin/claude` and `/opt/standin/codex` exist so that humanize
   offers those backends; both exit 1 if anything actually calls them.
-- What the [`collect`](/guide/tracing) demo reads, and the runs `/cycles` lists, are what
+- What the [`collect`](/guide/tracing) demo reads, and the runs `/epics` lists, are what
   `stage.py` invented.
 
 If you add a tape, look at the rendered GIF before committing it. Frame by frame is worth it:

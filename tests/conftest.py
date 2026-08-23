@@ -28,7 +28,7 @@ _ASKS = hmz.models.ask
 def _humanize_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Keeps what outlives a run out of the home directory of whoever runs the tests.
 
-    A run writes down its cycle and what was typed at it, and neither belongs in the history
+    A run writes down its epic and what was typed at it, and neither belongs in the history
     of the person who only asked for the suite to pass.
 
     And nothing here reports anything anywhere. Every test starts with a home nobody has

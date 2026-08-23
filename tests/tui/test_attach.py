@@ -102,7 +102,7 @@ class SteerableAgent(ShellAgent):
 async def until(ready: Callable[[], bool], driver: Pilot[None]) -> None:
     """Pumps the interface until something is true, or gives up after a while.
 
-    Waited on the clock rather than counted in pump cycles: a cycle can pass in microseconds,
+    Waited on the clock rather than counted in pumps: a pump can pass in microseconds,
     so counting them is a spin that finishes before the worker thread has done anything.
 
     Args:

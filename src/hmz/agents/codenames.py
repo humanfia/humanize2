@@ -5,14 +5,14 @@ is a name only a debugger loves. So one is drawn from the Chrysos Heirs instead 
 blooded of Amphoreus, whose codes *Honkai: Star Rail* spells as a Greek word for what the heir
 was made to be and three digits with something behind them. `NeiKos496` is strife, and 496 is
 the third perfect number; `SkeMma720` is inquiry, and 720 is 6!; `KaLos618` is beauty, and 618
-is the golden ratio. The cycle the story is told in is the 33,550,336th, which is the fifth
+is the golden ratio. The era the story is told in is the 33,550,336th, which is the fifth
 perfect number, so the numbers are the joke and not decoration.
 
 Twelve of the thirteen carry a code the story says out loud. The thirteenth is the outsider
 who walked into the simulation and was never issued one, which is the shape of this file: the
-twelve are the canon, and everything else is another cycle of the same roles under another
+twelve are the canon, and everything else is another era of the same roles under another
 number -- Amphoreus reruns its heirs, and two of them have already shared `EpieiKeia216` across
-cycles. The canon comes up far more often than its share would give it, a name being only a
+eras. The canon comes up far more often than its share would give it, a name being only a
 joke to somebody who recognises it.
 
 The rule builds words rather than only listing them. A Greek word is morphemes joined at a
@@ -20,7 +20,7 @@ capital -- `Apo` and `Ria` are `ApoRia`, which is an heir's -- so `MetaKratos`, 
 and `NeoTelos` are words the same rule makes and the story merely never needed. That is what
 makes the space endless: when the short words are used up the next one grows a morpheme, so
 there is always another code and never a tail of hex to fall back to. `Chaoz666`, the
-misnumbered serial out of an early cycle, is the one code that breaks the rule, and this
+misnumbered serial out of an early era, is the one code that breaks the rule, and this
 generates it no more than the story explains it.
 """
 
@@ -53,7 +53,7 @@ HEIRS: tuple[tuple[str, str], ...] = (
 #: Everything else a code may be drawn from: Greek for a thing a person can be made to be,
 #: spelled as the heirs' own are -- a capital at the front and one more inside, falling where
 #: the word breaks. No heir was ever issued one of these, which is the point: an agent called
-#: `KykLos204` reads as somebody out of a cycle this one has not been told about.
+#: `KykLos204` reads as somebody out of an era this one has not been told about.
 WORDS: tuple[str, ...] = (
     "AgaPe",
     "AiDos",
@@ -286,7 +286,7 @@ JOINED = 2
 CANON = 0.5
 
 #: And how often the rest of the time is an heir's own word under a different number -- the
-#: same role out of another cycle -- rather than some other word.
+#: same role out of another era -- rather than some other word.
 AGAIN = 0.5
 
 #: How often that other word is one Greek already had rather than one built out of morphemes.

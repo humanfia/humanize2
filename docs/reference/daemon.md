@@ -69,7 +69,7 @@ the run, so there is nothing to let go of.
 ## One per directory
 
 Two runs of one project in one directory would be two flows writing over each other's
-[cycle](/reference/tracing#cycles), so there is one daemon per workspace and `hmz` reads the one
+[epic](/reference/tracing#epics), so there is one daemon per workspace and `hmz` reads the one
 that is there. A line that also says what to run — `hmz -f rlar` — while one is being held is a
 line to correct: a run that is set up is set up, and two answers to how it is set up would be
 one of them silently losing.

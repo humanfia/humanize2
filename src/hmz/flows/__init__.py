@@ -373,7 +373,7 @@ class Flow:
         directory's, and is found by looking rather than by being declared.
       resumable: Whether it can be picked up where the last run of it left off. One that says
         so is handed a dict as its last argument -- what it wrote there last time -- which is
-        kept in the run's own cycle and read back into the run after it. A flow that says
+        kept in the run's own epic and read back into the run after it. A flow that says
         nothing is run from the top every time, which is what every flow was before this.
       selectable: Whether people are offered this flow in lists and the flow picker. An
         internal composition may set this false while remaining callable by name.
@@ -449,7 +449,7 @@ def flow[**P, T](
             state["round"] = state.get("round", 0) + 1
 
     Such a flow is handed a dict as its last argument -- after the config, for one that takes
-    a config -- holding whatever it wrote there last time. It is kept in the run's own cycle
+    a config -- holding whatever it wrote there last time. It is kept in the run's own epic
     and saved as the flow writes it, so a run that was stopped or killed is one the next run
     picks up from rather than one whose week is gone.
 

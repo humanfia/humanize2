@@ -82,7 +82,7 @@ def test_a_clone_has_none_of_what_a_run_puts_on_an_agent() -> None:
     agent = ShellAgent(CONFIG)
     said: list[Event] = []
     agent.watch(lambda _agent, _session, event: said.append(event))
-    agent.cycle = None
+    agent.epic = None
     agent.new()("echo hi")
     with agent.hooks.on(Moment.STOP, lambda occasion: None):
         made = agent.clone()

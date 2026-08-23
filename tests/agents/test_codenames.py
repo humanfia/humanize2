@@ -89,7 +89,7 @@ def test_the_heirs_come_up_far_oftener_than_chance_would_give_them(
     assert seen > 1000 * by_chance
 
     # And of what is left, half is an heir's own word under some other number -- the same
-    # role out of a cycle this one has not been told about.
+    # role out of an era this one has not been told about.
     words = {one for one, _ in HEIRS}
     heirs = sum(one[:-3] in words for one in drawn) / len(drawn)
     theirs = codenames.CANON + (1 - codenames.CANON) * codenames.AGAIN

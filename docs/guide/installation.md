@@ -148,7 +148,7 @@ Nothing is written until something needs it.
 
 | Path | |
 | --- | --- |
-| `~/.humanize/cycles/` | one directory per run: the flow, the agents, every session opened, and the [trace](/guide/tracing) gathered of it afterwards |
+| `~/.humanize/epics/` | one directory per run: the flow, the agents, every session opened, and the [trace](/guide/tracing) gathered of it afterwards |
 | `~/.humanize/settings.yaml` | what each project was last set up to run |
 | `~/.humanize/history.jsonl` | what has been typed at the prompt |
 | `~/.humanize/flowverses/` | the [flowverses](/guide/flowverses) fetched here |

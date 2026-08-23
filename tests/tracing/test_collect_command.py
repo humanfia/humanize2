@@ -1,7 +1,7 @@
 """`hmz trace collect` -- the command line shell around `tracing.collect`.
 
 What a trace is of is a run: the sessions that run opened and no others, and it goes where
-that run is. A cycle is a directory holding what happened, what each session was logged to
+that run is. An epic is a directory holding what happened, what each session was logged to
 and what the flow left behind, and the trace belongs beside those rather than in whatever
 directory somebody happened to be standing in. An output named outright still wins -- a trace
 is also a thing to attach to an issue.
@@ -116,12 +116,12 @@ def test_the_run_says_whose_sessions_were_whose(
     Two agents at one configuration are one agent to a collector reading the logs alone, so
     the last run in this workspace is read for what it wrote down about itself.
     """
-    from hmz.cycle import Cycle
+    from hmz.epic import Epic
 
     monkeypatch.chdir(tmp_path)
-    cycle = Cycle("rlar", [], "go")
-    cycle.write("opened", agent="actor", backend="claude", session="one")
-    cycle.write("opened", agent="reviewer", backend="claude", session="two")
+    epic = Epic("rlar", [], "go")
+    epic.write("opened", agent="actor", backend="claude", session="one")
+    epic.write("opened", agent="reviewer", backend="claude", session="two")
     collect = unittest.mock.Mock(return_value={"otherData": {}})
     monkeypatch.setattr("hmz.tracing.collector.collect", collect)
 
@@ -133,7 +133,7 @@ def test_the_run_says_whose_sessions_were_whose(
     }
     # And the profile of that same run, for a run that was profiled: one document holds the
     # sessions and the programs they ran.
-    assert collect.call_args.kwargs["profile"] == cycle.path / "profile.jsonl"
+    assert collect.call_args.kwargs["profile"] == epic.path / "profile.jsonl"
 
 
 def test_a_trace_goes_beside_the_run_it_is_a_trace_of(
@@ -141,32 +141,32 @@ def test_a_trace_goes_beside_the_run_it_is_a_trace_of(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The cycle holds what happened and what it left behind; the trace is one of those."""
-    from hmz.cycle import Cycle
+    """The epic holds what happened and what it left behind; the trace is one of those."""
+    from hmz.epic import Epic
 
     monkeypatch.chdir(tmp_path)
-    cycle = Cycle("rlar", [], "go")
+    epic = Epic("rlar", [], "go")
 
     assert run() == 0
 
-    (written,) = (cycle.path / "traces").glob("*.trace.json")
+    (written,) = (epic.path / "traces").glob("*.trace.json")
     assert _STAMPED.fullmatch(written.name)
     said = capsys.readouterr().out
     assert str(written) in said
-    assert cycle.path.name in said  # and which run it is a trace of
+    assert epic.path.name in said  # and which run it is a trace of
 
 
 def test_a_named_run_is_the_one_traced(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A workspace has many runs, and the last of them is not always the one being read."""
-    from hmz.cycle import Cycle
+    from hmz.epic import Epic
 
     monkeypatch.chdir(tmp_path)
-    first = Cycle("rlar", [], "one")
-    Cycle("rlar", [], "two")
+    first = Epic("rlar", [], "one")
+    Epic("rlar", [], "two")
 
-    assert run("--cycle", first.path.name) == 0
+    assert run("--epic", first.path.name) == 0
 
     assert list((first.path / "traces").glob("*.trace.json"))
 
@@ -184,19 +184,19 @@ def test_a_trace_of_a_run_holds_that_runs_own_sessions_and_no_others(
     work of the runs after it is a trace of nothing anybody asked about, and it is worst
     exactly where it is most wanted: the long-running loop, read back a week later.
     """
-    from hmz.cycle import Cycle
+    from hmz.epic import Epic
 
     monkeypatch.chdir(workspace)
-    # A millisecond apart, said rather than waited for. Cycles sort in the order they were
+    # A millisecond apart, said rather than waited for. Epics sort in the order they were
     # run to the millisecond and no finer, and two of them opened in one -- which is what a
     # test does and a person never would -- are ordered by the random tail of their names.
     ticks = itertools.count(1)
     monkeypatch.setattr(
-        "hmz.cycle._stamp", lambda: f"20260101T000000.{next(ticks):03d}Z"
+        "hmz.epic._stamp", lambda: f"20260101T000000.{next(ticks):03d}Z"
     )
-    earlier = Cycle("rlar", [], "one")
+    earlier = Epic("rlar", [], "one")
     earlier.write("opened", agent="actor", backend="codex", session=CODEX_THREAD)
-    now = Cycle("rlar", [], "two")
+    now = Epic("rlar", [], "two")
     now.write("opened", agent="actor", backend="claude", session=CLAUDE_SESSION)
 
     assert run() == 0
@@ -223,15 +223,15 @@ def test_a_run_that_worked_somewhere_else_is_still_its_own_trace(
     the ids down all the same, and a trace gathered by those finds them -- which a trace
     gathered by directory never could.
     """
-    from hmz.cycle import Cycle
+    from hmz.epic import Epic
 
     monkeypatch.chdir(workspace)
-    cycle = Cycle("rlar", [], "go")
-    cycle.write("opened", agent="actor", backend="claude", session=CLAUDE_ELSEWHERE)
+    epic = Epic("rlar", [], "go")
+    epic.write("opened", agent="actor", backend="claude", session=CLAUDE_ELSEWHERE)
 
     assert run() == 0
 
-    (written,) = (cycle.path / "traces").glob("*.trace.json")
+    (written,) = (epic.path / "traces").glob("*.trace.json")
     assert keys(loaded(written)) == {f"claude:{CLAUDE_ELSEWHERE}"}
 
 
@@ -247,14 +247,14 @@ def test_a_run_that_opened_nothing_is_a_trace_of_nothing(
     answer that is certainly wrong, and is the answer a session filter that reads "none" as
     "all of them" gives.
     """
-    from hmz.cycle import Cycle
+    from hmz.epic import Epic
 
     monkeypatch.chdir(workspace)
-    cycle = Cycle("rlar", [], "go")
+    epic = Epic("rlar", [], "go")
 
     assert run() == 0
 
-    (written,) = (cycle.path / "traces").glob("*.trace.json")
+    (written,) = (epic.path / "traces").glob("*.trace.json")
     assert loaded(written)["traceEvents"] == []
     assert "0 sessions, 0 slices" in capsys.readouterr().out
 
@@ -270,15 +270,15 @@ def test_every_session_of_a_directory_is_asked_for_outright(
     not a trace of any run, so it does not go inside one -- it goes where that workspace's
     runs are kept, beside them.
     """
-    from hmz.cycle import Cycle, under
+    from hmz.epic import Epic, under
 
     monkeypatch.chdir(workspace)
-    cycle = Cycle("rlar", [], "go")
-    cycle.write("opened", agent="actor", backend="claude", session=CLAUDE_SESSION)
+    epic = Epic("rlar", [], "go")
+    epic.write("opened", agent="actor", backend="claude", session=CLAUDE_SESSION)
 
     assert run("--all") == 0
 
-    assert not list((cycle.path / "traces").glob("*.trace.json"))
+    assert not list((epic.path / "traces").glob("*.trace.json"))
     (written,) = under(str(workspace)).glob("*.trace.json")
     held = keys(loaded(written))
     assert f"claude:{CLAUDE_SESSION}" in held
@@ -291,15 +291,15 @@ def test_named_sessions_are_not_a_runs_trace_and_are_not_filed_as_one(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Sessions named outright are sessions, not a run: they belong beside the runs."""
-    from hmz.cycle import Cycle, under
+    from hmz.epic import Epic, under
 
     monkeypatch.chdir(workspace)
-    cycle = Cycle("rlar", [], "go")
-    cycle.write("opened", agent="actor", backend="claude", session=CLAUDE_SESSION)
+    epic = Epic("rlar", [], "go")
+    epic.write("opened", agent="actor", backend="claude", session=CLAUDE_SESSION)
 
     assert run("--session", CODEX_THREAD) == 0
 
-    assert not list((cycle.path / "traces").glob("*.trace.json"))
+    assert not list((epic.path / "traces").glob("*.trace.json"))
     (written,) = under(str(workspace)).glob("*.trace.json")
     assert keys(loaded(written)) == {
         f"codex:{CODEX_THREAD}",
@@ -315,13 +315,13 @@ def test_a_run_and_a_directory_are_two_traces_and_a_line_asks_for_one(
     wider: list[str],
 ) -> None:
     """Naming a run and then naming something wider is a line asking for two things."""
-    from hmz.cycle import Cycle
+    from hmz.epic import Epic
 
     monkeypatch.chdir(workspace)
-    cycle = Cycle("rlar", [], "go")
+    epic = Epic("rlar", [], "go")
 
     with pytest.raises(SystemExit) as failure:
-        run("--cycle", cycle.path.name, *wider)
+        run("--epic", epic.path.name, *wider)
 
     assert failure.value.code == 2
     assert "a trace of a run holds that run's own sessions" in capsys.readouterr().err
@@ -334,7 +334,7 @@ def test_a_run_of_that_name_that_is_not_there_is_a_line_to_correct(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     with pytest.raises(SystemExit) as failure:
-        run("--cycle", "nothing-like-it")
+        run("--epic", "nothing-like-it")
 
     assert failure.value.code == 2
     assert "no run of this workspace is called" in capsys.readouterr().err
@@ -346,7 +346,7 @@ def test_a_workspace_that_has_run_nothing_still_keeps_its_trace_with_the_rest(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Where the runs of that workspace would go, rather than a directory inside the project."""
-    from hmz.cycle import under
+    from hmz.epic import under
 
     assert run(str(workspace)) == 0
 

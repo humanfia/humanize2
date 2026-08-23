@@ -16,7 +16,7 @@ import pytest
 
 from hmz.agents import AgentConfig, Stopped
 from hmz.cli import main
-from hmz.cycle import cycles, opened
+from hmz.epic import epics, opened
 from hmz.flows import NotAFlow, configures, drives, wanted
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, events
@@ -276,21 +276,21 @@ def test_a_coroutine_flow_left_unset_runs_on_its_own_defaults(
     }
 
 
-def test_a_coroutine_flow_is_one_cycle_saying_what_each_agent_opened(
+def test_a_coroutine_flow_is_one_epic_saying_what_each_agent_opened(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A run is a run however the flow was written: the same cycle, and the same sessions."""
+    """A run is a run however the flow was written: the same epic, and the same sessions."""
     monkeypatch.chdir(tmp_path)
     flow = _flow(tmp_path, ASYNC)
 
     Runner(flow, [ShellAgent(CONFIG), ShellAgent(CONFIG)]).run("the task")
 
-    (cycle,) = cycles()
-    assert opened(cycle) == {
+    (epic,) = epics()
+    assert opened(epic) == {
         "actor": ["acted-the task"],
         "reviewer": ["reviewed-the task"],
     }
-    assert events(cycle)[-1]["how"] == "done"
+    assert events(epic)[-1]["how"] == "done"
 
 
 def test_what_a_coroutine_flow_raises_comes_out_of_the_run(
@@ -301,8 +301,8 @@ def test_what_a_coroutine_flow_raises_comes_out_of_the_run(
     with pytest.raises(ValueError, match="the flow itself went wrong"):
         Runner(_flow(tmp_path, FAILING), [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    assert events(cycle)[-1]["how"] == "failed"
+    (epic,) = epics()
+    assert events(epic)[-1]["how"] == "failed"
 
 
 def test_a_coroutine_flow_stopped_by_hand_is_written_down_as_stopped(
@@ -313,8 +313,8 @@ def test_a_coroutine_flow_stopped_by_hand_is_written_down_as_stopped(
     with pytest.raises(Stopped):
         Runner(_flow(tmp_path, STOPPED), [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    assert events(cycle)[-1]["how"] == "stopped"
+    (epic,) = epics()
+    assert events(epic)[-1]["how"] == "stopped"
 
 
 async def test_a_coroutine_flow_started_from_a_loop_of_its_own_still_runs(

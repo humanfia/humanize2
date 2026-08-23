@@ -226,7 +226,7 @@ hmz trace collect
 ```
 
 ```console
-~/.humanize/cycles/-tmp-humanize-demo/20260817T021608.271Z-e000e6/traces/20260817T022635Z.trace.json of 20260817T021608.271Z-e000e6: 15 sessions, 240 slices
+~/.humanize/epics/-tmp-humanize-demo/20260817T021608.271Z-e000e6/traces/20260817T022635Z.trace.json of 20260817T021608.271Z-e000e6: 15 sessions, 240 slices
 ```
 
 Drag that file into [ui.perfetto.dev](https://ui.perfetto.dev). Each agent becomes a process,
@@ -242,7 +242,7 @@ For a nine-hour run it is the only view that fits on a screen.
 | **turn** | one exchange with the model |
 | **session** | a conversation held across turns |
 | **flow** | a directory of Python driving one or more agents |
-| **cycle** | one run of a flow, written down under `~/.humanize/cycles/` |
+| **epic** | one run of a flow, written down under `~/.humanize/epics/` |
 | `hmz` | the interface |
 | `hmz exec -f FLOW -a CLI/MODEL:EFFORT "task"` | the same flows, unattended |
 | `hmz trace collect` | the run as a timeline |

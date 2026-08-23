@@ -139,7 +139,7 @@ past a stop and never end. See [Stopping](/guide/stopping).
 
 Stopping is not losing your place. `ralph_loop` says it [can be picked up](/guide/resuming),
 and what it keeps is which round it is on. Start it here again and it goes on from the round it
-reached. That run is a run of its own, with its own sessions and its own record. `/cycles` is
+reached. That run is a run of its own, with its own sessions and its own record. `/epics` is
 where both of them are.
 
 ## Try this

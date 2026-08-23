@@ -54,7 +54,7 @@ LOG = "daemon.log"
 LOCK = "daemon.lock"
 
 #: What a directory may be called after: everything else in a path is flattened, the way a
-#: cycle flattens the workspace it was run in.
+#: epic flattens the workspace it was run in.
 _PLAIN = re.compile(r"[^A-Za-z0-9]+")
 
 #: How much of the workspace's own name is kept in front of the digest of the whole path. A
@@ -162,7 +162,7 @@ def holds(where: Path) -> int:
     """Takes the one daemon of this workspace, for as long as this process lives.
 
     One daemon per workspace: two runs of one project in one directory are two flows writing
-    over each other's cycle. A lock rather than a file somebody looks at, because looking is
+    over each other's epic. A lock rather than a file somebody looks at, because looking is
     what leaves a window between the look and the socket -- two `hmz` started in the same
     second would both find nothing and both bind.
 

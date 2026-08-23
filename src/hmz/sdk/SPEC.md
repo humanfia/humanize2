@@ -8,7 +8,7 @@
 ├── accounts.py
 ├── agents.py
 ├── core.py
-├── cycles.py
+├── epics.py
 ├── fallbacks.py
 ├── flows.py
 ├── running.py
@@ -17,7 +17,7 @@
 
 ## `__init__.py`
 
-Expose `Hmz` and every type it hands back: `Accounts`, `Agents`, `Cycles`, `Fallbacks`,
+Expose `Hmz` and every type it hands back: `Accounts`, `Agents`, `Epics`, `Fallbacks`,
 `Flows`, `Flowverses`, `Run`, `Session`, `Taken`.
 
 ## `core.py`
@@ -51,7 +51,7 @@ class Hmz:
     def fallbacks(self) -> Fallbacks: ...
 
     @property
-    def cycles(self) -> Cycles: ...
+    def epics(self) -> Epics: ...
 
     def backends(self) -> tuple[Profile, ...]: ...
 
@@ -272,21 +272,21 @@ class Fallbacks:
 
 Where a turn goes when the place taking it cannot take it at all.
 
-## `cycles.py`
+## `epics.py`
 
 ```python
-class Cycles:
+class Epics:
     def __init__(self, workspace: str | os.PathLike[str] | None = None): ...
     def under(self) -> Path: ...
     def all(self) -> list[Path]: ...
-    def read(self, cycle: Path) -> Ran | None: ...
-    def sessions(self, cycle: Path) -> list[Session]: ...
-    def opened(self, cycle: Path) -> dict[str, list[str]]: ...
+    def read(self, epic: Path) -> Ran | None: ...
+    def sessions(self, epic: Path) -> list[Session]: ...
+    def opened(self, epic: Path) -> dict[str, list[str]]: ...
     def resumed(self, flow: str) -> Path | None: ...
-    def state(self, cycle: Path, flow: str = "") -> dict[str, Any]: ...
+    def state(self, epic: Path, flow: str = "") -> dict[str, Any]: ...
     def traced(
         self,
-        cycle: Path,
+        epic: Path,
         *,
         output: str | os.PathLike[str] | None = None,
         start: str | None = None,

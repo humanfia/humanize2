@@ -1,4 +1,4 @@
-"""`/cycles` -- the runs of this directory, and what there is to do with one.
+"""`/epics` -- the runs of this directory, and what there is to do with one.
 
 A run is written down as it happens and until now nothing showed them. What they are for is
 two things: reading one back afterwards, which is what the links to its sessions are, and
@@ -18,9 +18,9 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import Label, OptionList
 
-from hmz.cycle import cycles, state
+from hmz.epic import epics, state
 from hmz.tui import Humanize
-from hmz.tui.pick import Cycles, Does
+from hmz.tui.pick import Does, Epics
 from tests.stubs import written
 
 from .test_app import onto, rows, until
@@ -91,7 +91,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _ran(flow: str, task: str) -> None:
-    """Runs one flow here, the way a command line would, so there is a cycle to look at.
+    """Runs one flow here, the way a command line would, so there is an epic to look at.
 
     On the fake `claude` this suite puts on PATH rather than on a stand-in of our own: what a
     run is picked up as is a command line naming what each agent runs, so the agents of a run
@@ -104,13 +104,13 @@ def _ran(flow: str, task: str) -> None:
     Runner(flow, [agent(config(model="m", effort="high"))]).run(task)
 
 
-async def _open(app: Humanize, driver: Pilot[None]) -> Cycles:
-    """Opens the runs of this directory, as `/cycles` does."""
-    await driver.press(*"/cycles")
+async def _open(app: Humanize, driver: Pilot[None]) -> Epics:
+    """Opens the runs of this directory, as `/epics` does."""
+    await driver.press(*"/epics")
     await driver.press("enter")
-    await until(lambda: isinstance(app.screen, Cycles), driver)
+    await until(lambda: isinstance(app.screen, Epics), driver)
     sheet = app.screen
-    assert isinstance(sheet, Cycles)
+    assert isinstance(sheet, Epics)
     return sheet
 
 
@@ -126,7 +126,7 @@ async def test_the_runs_of_this_directory_are_listed_newest_first(
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        newest, oldest = (one.name for one in reversed(cycles(workspace)))
+        newest, oldest = (one.name for one in reversed(epics(workspace)))
         assert rows(app) == [newest, oldest]
         shown = "\n".join(
             str(one.prompt) for one in sheet.query_one("#choices", OptionList).options
@@ -189,8 +189,8 @@ async def test_where_a_run_is_written_down_is_said_under_the_list(
         await driver.press("enter")
         await until(lambda: app.screen is sheet, driver)
 
-        (cycle,) = cycles(workspace)
-        assert str(cycle) in str(sheet.query_one("#tuning", Label).render())
+        (epic,) = epics(workspace)
+        assert str(epic) in str(sheet.query_one("#tuning", Label).render())
 
 
 @pytest.mark.timeout(90)
@@ -200,7 +200,7 @@ async def test_carrying_a_run_on_runs_the_flow_again_on_what_it_left(
     """The whole of it: the run is picked up, and the flow goes on rather than starting over."""
     _ran("counts", "keep going")
     assert (workspace / "rounds.txt").read_text() == "1"
-    first = cycles(workspace)[0]
+    first = epics(workspace)[0]
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -210,10 +210,10 @@ async def test_carrying_a_run_on_runs_the_flow_again_on_what_it_left(
         await onto(app, driver, "carry-on")
         await driver.press("enter")
         await until(lambda: app.screen is not sheet, driver)
-        await until(lambda: len(cycles(workspace)) == 2, driver)
+        await until(lambda: len(epics(workspace)) == 2, driver)
         await until(lambda: (workspace / "rounds.txt").read_text() == "2", driver)
 
-    second = next(one for one in cycles(workspace) if one != first)
+    second = next(one for one in epics(workspace) if one != first)
     # A run of its own, on what the run it was picked up from left behind.
     assert state(second) == {"rounds": 2}
     assert app._flow_named == "counts"
@@ -237,7 +237,7 @@ async def test_a_trace_of_a_run_is_gathered_from_the_menu_under_it(
 ) -> None:
     """Every run has one to gather, whatever its flow says about being picked up.
 
-    And it lands beside the run rather than in this directory: a cycle already holds what
+    And it lands beside the run rather than in this directory: an epic already holds what
     happened and what each session was logged to, and the trace is one of those.
     """
     from .test_app import _transcript
@@ -254,12 +254,12 @@ async def test_a_trace_of_a_run_is_gathered_from_the_menu_under_it(
         await until(lambda: app.screen is sheet, driver)
         await until(lambda: "sessions" in _under(sheet), driver)
 
-        (cycle,) = cycles(workspace)
-        (written,) = (cycle / "traces").glob("*.trace.json")
+        (epic,) = epics(workspace)
+        (written,) = (epic / "traces").glob("*.trace.json")
         assert str(written) in _under(sheet)
 
         await driver.press("escape")
-        await until(lambda: not isinstance(app.screen, Cycles), driver)
+        await until(lambda: not isinstance(app.screen, Epics), driver)
         # And said where it can be read back afterwards, rather than only under a list that
         # has since been closed.
         assert str(written) in _transcript(app)
@@ -278,16 +278,16 @@ def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
     """
     import unittest.mock
 
-    from hmz.cycle import Cycle, read
+    from hmz.epic import Epic, read
     from hmz.tui.pick import collected
 
     del workspace
-    cycle = Cycle("plain", [], "go")
-    cycle.write("opened", agent="actor", backend="claude", session="one")
-    cycle.write("opened", agent="reviewer", backend="claude", session="two")
+    epic = Epic("plain", [], "go")
+    epic.write("opened", agent="actor", backend="claude", session="one")
+    epic.write("opened", agent="reviewer", backend="claude", session="two")
     collect = unittest.mock.Mock(return_value={"otherData": {}})
     monkeypatch.setattr("hmz.tracing.collector.collect", collect)
-    ran = read(cycle.path)
+    ran = read(epic.path)
     assert ran is not None
 
     collected(ran)
@@ -297,7 +297,7 @@ def test_the_trace_from_the_menu_is_of_that_run_and_of_nothing_else(
     assert collect.call_args.kwargs["agents"] == {"actor": ["one"], "reviewer": ["two"]}
 
 
-def _under(sheet: Cycles) -> str:
+def _under(sheet: Epics) -> str:
     """What is said under the list, which is where a collection reports itself."""
     from textual.widgets import Label
 
@@ -315,10 +315,10 @@ async def test_a_run_of_a_flow_marked_since_can_be_picked_up_too(
     to do with it today.
     """
     _ran("plain", "go")
-    (cycle,) = cycles(workspace)
-    from hmz.cycle import read
+    (epic,) = epics(workspace)
+    from hmz.epic import read
 
-    ran = read(cycle)
+    ran = read(epic)
     assert ran is not None
     assert not ran.resumable  # it was not, when it ran
 

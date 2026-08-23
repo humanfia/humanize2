@@ -179,10 +179,10 @@ def test_the_runs_of_a_workspace_are_the_ones_run_there(
     held = Hmz()
     held.exec(["-f", str(written), "-a", "claude/model:high", "go"])
 
-    runs = held.cycles.all()
+    runs = held.epics.all()
 
     assert len(runs) == 1
-    ran = held.cycles.read(runs[0])
+    ran = held.epics.read(runs[0])
     assert ran is not None
     assert ran.task == "go"
 
@@ -197,8 +197,8 @@ def test_a_workspace_that_was_named_is_the_one_the_runs_are_read_from(
     written.write_text(FLOW, encoding="utf-8")
     Hmz().exec(["-f", str(written), "-a", "claude/model:high", "go"])
 
-    assert Hmz(tmp_path).cycles.all()
-    assert Hmz(elsewhere).cycles.all() == []
+    assert Hmz(tmp_path).epics.all()
+    assert Hmz(elsewhere).epics.all() == []
 
 
 def test_a_directory_that_is_a_clone_of_nothing_reads_as_whoever_shows_it_says(

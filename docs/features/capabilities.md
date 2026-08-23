@@ -278,7 +278,7 @@ screen later.
 **Outcome.** Preserve enough structured evidence to inspect an abrupt stop and continue a flow
 that explicitly supports it.
 
-- Each run's cycle record gains complete journal entries as events happen.
+- Each run's epic record gains complete journal entries as events happen.
 - Ordinary flow state is written through on assignment, with a final save for nested mutations.
 - Atlas state records completed node visits under the prophecy identity and nesting path.
 - Called flows keep layered journals and state beside the run without overwriting their caller.
@@ -288,7 +288,7 @@ that explicitly supports it.
 [The terminal can leave](/features/daemon) · **Use:**
 [Picking a run up](/guide/resuming), [History](/guide/history) · **Reference:**
 [Resumable flows](/reference/flows#a-flow-that-can-be-picked-up),
-[Cycle records](/reference/tracing#cycles)
+[Epic records](/reference/tracing#epics)
 
 ### D3. Trace reconstruction
 
@@ -298,7 +298,7 @@ inspected after the run.
 - Backend session logs and profiled processes are combined without copying their source
   records.
 - Process clocks are calibrated so agent events and operating-system activity can be compared.
-- Cycle records bound collection to the sessions opened by the run being inspected.
+- Epic records bound collection to the sessions opened by the run being inspected.
 - Subagent relationships become explicit topology rather than anonymous extra sessions.
 - Dense lane packing and lazy attachments keep large traces navigable without dropping detail.
 - A trace is a local artifact; creating or opening it does not opt into outbound telemetry.
@@ -354,7 +354,7 @@ definition of what a flow or run means.
   engine.
 - Each surface keeps its purpose: composable SDK, scriptable command line, conversational
   interface, and detached terminal continuity.
-- A user-facing run is written as a cycle record that history, state, and tracing can inspect.
+- A user-facing run is written as an epic record that history, state, and tracing can inspect.
 - Shared semantics do not imply identical interaction or backend capability on every surface.
 
 **Learn:** [One system, four ways in](/features/surfaces) · **Use:**

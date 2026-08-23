@@ -8,7 +8,7 @@ here to see which declare a flow, which is a guess, and far too slow to make bet
 keystrokes.
 
 `hmz anchor` is not offered: it is not something to do to a flow while it runs, and it takes
-a command line of its own. What a run left behind is `/cycles`, which is where the runs are.
+a command line of its own. What a run left behind is `/epics`, which is where the runs are.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ _ABOUT = {
     "agents": "Set what each agent runs",
     "providers": "Manage the accounts agents run as",
     "fallback": "Where a turn goes when the place taking it cannot take it at all",
-    "cycles": "The runs of this directory, and what to do with one",
+    "epics": "The runs of this directory, and what to do with one",
     "settings": "What humanize remembers, here and everywhere",
     "status": "Show how the run is going, and the board",
     "clear": "Clear the screen",

@@ -41,7 +41,7 @@ let frame = 0
 let last = 0
 let idle = false
 let counter = 0
-let cycle = 0
+let epic = 0
 let step = 0
 
 const progress = computed(() => Math.min(1, clock.value / TURN))
@@ -113,8 +113,8 @@ function tick(now: number) {
     }
     clock.value = 0
     step = 0
-    cycle += 1
-    if (cycle % 2 === 0) {
+    epic += 1
+    if (epic % 2 === 0) {
       into.value = []
       after.value = []
       lines.value = []

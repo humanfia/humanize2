@@ -13,7 +13,7 @@ hmz trace collect
 ```
 
 ```console
-~/.humanize/cycles/-home-you-code-myproject/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
+~/.humanize/epics/-home-you-code-myproject/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
 ```
 
 The line prints the file, then the run it is a trace of, then what went into it. The file lands
@@ -85,7 +85,7 @@ trace is one configuration: a backend at a model at an effort, plus every sub-ag
 A Ralph loop of a hundred one-shot sessions reads as one agent, which is right. An actor and a
 reviewer at the same model and effort would read as one agent, which is not.
 
-That is what a [cycle](#what-a-run-writes-down) is for. `hmz trace collect` reads the run it is
+That is what an [epic](#what-a-run-writes-down) is for. `hmz trace collect` reads the run it is
 tracing, so `official/rlar` traces as `actor` and `reviewer` without being told anything.
 
 Driving agents by hand, say so yourself:
@@ -98,12 +98,12 @@ Sessions nobody claims are read as the configuration they ran at.
 
 ## What a run writes down
 
-Every run of a flow is one **cycle**, which is a directory:
+Every run of a flow is one **epic**, which is a directory:
 
 ```
-~/.humanize/cycles/<workspace>/<datetime>-<hex>/
-    cycle.jsonl                     what happened, a line at a time
-    cycle.<flow>_<hex>.jsonl        the same, for one flow the run called
+~/.humanize/epics/<workspace>/<datetime>-<hex>/
+    epic.jsonl                      what happened, a line at a time
+    epic.<flow>_<hex>.jsonl         the same, for one flow the run called
     state.json                      what a flow that can be picked up again left behind
     profile.jsonl                   the programs it ran, for a run that was profiled
     sessions/<session>/…            a link per file the backend logged that session to
@@ -113,27 +113,27 @@ Every run of a flow is one **cycle**, which is a directory:
 Not all of it every time: `state.json` is there for a flow that [can be picked
 up](/reference/flows#a-flow-that-can-be-picked-up), `profile.jsonl` for a directory that asked
 to be [profiled](#profiling-a-run), `traces/` from the first time a trace is collected, and a
-`cycle.<flow>_<hex>.jsonl` for each flow the run [called](#what-a-called-flow-writes-down).
+`epic.<flow>_<hex>.jsonl` for each flow the run [called](#what-a-called-flow-writes-down).
 
 Find the run that just finished and list it:
 
 ```sh
-run=$(ls -dt ~/.humanize/cycles/*/*/ | head -1)   # the one that just finished
+run=$(ls -dt ~/.humanize/epics/*/*/ | head -1)   # the one that just finished
 ls "$run"
 ```
 
 ```console
-cycle.jsonl  sessions  traces
+epic.jsonl  sessions  traces
 ```
 
-![ls of one run's directory: cycle.jsonl, profile.jsonl, sessions and state.json, and no traces
+![ls of one run's directory: epic.jsonl, profile.jsonl, sessions and state.json, and no traces
 yet](/demo/run.png)
 
-`cycle.jsonl` is JSON lines, appended and flushed as it goes. A run that died is a run whose
-cycle still says what it got to:
+`epic.jsonl` is JSON lines, appended and flushed as it goes. A run that died is a run whose
+epic still says what it got to:
 
 ```sh
-head -3 "$run"cycle.jsonl
+head -3 "$run"epic.jsonl
 ```
 
 ```console
@@ -145,9 +145,9 @@ head -3 "$run"cycle.jsonl
 | `event` | Written | Carries |
 | --- | --- | --- |
 | `began` | when the flow starts | `flow`, `task`, `workspace`, whether the flow can be picked up again and which run this one was picked up from, and one entry per agent with its id, backend, model, effort, account, what it may do, whether it could use goals and whether it was the person at the prompt |
-| `opened` | each time an agent opens a session | `agent`, `backend`, `provider`, `session`, the name the run gives it and where inside the cycle its links are |
-| `called` | when the flow calls another flow | `flow`, `task`, and the `cycle` — the record that call was written to |
-| `returned` | when that call returns, however it ended | `flow` and the same `cycle` |
+| `opened` | each time an agent opens a session | `agent`, `backend`, `provider`, `session`, the name the run gives it and where inside the epic its links are |
+| `called` | when the flow calls another flow | `flow`, `task`, and the `epic` — the record that call was written to |
+| `returned` | when that call returns, however it ended | `flow` and the same `epic` |
 | `ended` | when the flow stops | `how`: `done`, `failed`, or `stopped` |
 
 Each session's own logs are pointed at from `sessions/<name>/`, under a name that says whose
@@ -161,7 +161,7 @@ rather than a run that stops.
 ![one run's sessions/ directory, its name saying agent, CLI and account, holding a symlink to
 Claude Code's own log](/demo/run-linked.png)
 
-`/cycles` is the same list at the prompt: every run of this directory, newest first, with a
+`/epics` is the same list at the prompt: every run of this directory, newest first, with a
 mark on the ones whose flow says it can be picked up. Enter opens what there is to do with the
 run under the cursor: carry on from here, collect a trace, where it is. The mark and that first
 row are one question, and it is asked of the **flow** as it stands rather than of the run. A
@@ -170,21 +170,21 @@ one that has since dropped the mark has neither, whatever the run wrote down at 
 Carrying one on is [picking a run up](/guide/resuming); collecting a trace is offered for every
 run, whatever its flow says.
 
-**It is not a transcript.** The backend's own log is the turn-by-turn record. A cycle is the
+**It is not a transcript.** The backend's own log is the turn-by-turn record. An epic is the
 *shape* of the run: enough to gather a trace afterwards out of the ids alone.
 
-A cycle covers one run and is never reopened. Carrying a flow on is another run, with sessions
-of its own, written into a cycle that says which run it was picked up from.
+An epic covers one run and is never reopened. Carrying a flow on is another run, with sessions
+of its own, written into an epic that says which run it was picked up from.
 
 An agent [stopped by hand](/guide/stopping) makes the run `stopped` rather than `failed`,
 whatever the turn under way made of it. A run you stopped by hand is written down as `stopped`
 too.
 
 ```python
-from hmz.cycle import cycles, opened
+from hmz.epic import epics, opened
 
-for cycle in cycles():                 # this workspace, oldest first
-    print(cycle, opened(cycle))        # {"actor": ["0a1b…"], "reviewer": [...]}
+for epic in epics():                   # this workspace, oldest first
+    print(epic, opened(epic))          # {"actor": ["0a1b…"], "reviewer": [...]}
 ```
 
 ### What a called flow writes down
@@ -194,18 +194,18 @@ opens sessions and calls flows of its own. Each call is written to a record of i
 the run's, named for the flow and for that call of it:
 
 ```sh
-ls "$run"cycle.*.jsonl
+ls "$run"epic.*.jsonl
 ```
 
 ```console
-cycle.jsonl  cycle.gen-plan_0a1b2c.jsonl
+epic.jsonl  epic.gen-plan_0a1b2c.jsonl
 ```
 
 The run's own record says what it called and which file to read it in:
 
 ```console
-{"event":"called","at":"...","flow":"official/humanize1:gen-plan","task":"...","cycle":"cycle.official-humanize1-gen-plan_0a1b2c.jsonl"}
-{"event":"returned","at":"...","flow":"official/humanize1:gen-plan","cycle":"cycle.official-humanize1-gen-plan_0a1b2c.jsonl"}
+{"event":"called","at":"...","flow":"official/humanize1:gen-plan","task":"...","epic":"epic.official-humanize1-gen-plan_0a1b2c.jsonl"}
+{"event":"returned","at":"...","flow":"official/humanize1:gen-plan","epic":"epic.official-humanize1-gen-plan_0a1b2c.jsonl"}
 ```
 
 A called flow's own record holds the same events, its `began` says which record is `under` it,
@@ -217,7 +217,7 @@ one directory: a called flow is part of the run that called it.
 ```sh
 hmz trace collect                                    # the last run of this workspace
 hmz trace collect ~/code/other                       # the last run of another workspace
-hmz trace collect --cycle 20260809T0144              # that run of it, by name
+hmz trace collect --epic 20260809T0144               # that run of it, by name
 hmz trace collect --start "3 days ago"               # and only what it did since
 hmz trace collect --end "yesterday 18:00" --output /tmp/before.json
 ```
@@ -247,9 +247,9 @@ hmz trace collect ~/code/other --session 0a1b2c3d    # that session, only if it 
 ```
 
 Neither is a trace of any run, so neither is filed inside one. They go beside that workspace's
-runs, in `~/.humanize/cycles/<workspace>/`. Asking for `--cycle` with `--all` or `--session` is
+runs, in `~/.humanize/epics/<workspace>/`. Asking for `--epic` with `--all` or `--session` is
 a usage error rather than one of them quietly winning. Neither is offered in the interface,
-because `/cycles` is a list of runs with nothing to hang them on.
+because `/epics` is a list of runs with nothing to hang them on.
 
 A session is named by its whole id, by the key the trace shows it under, or by a leading part
 of either. The sub-agents it started come with it. `--start` and `--end` take anything
@@ -259,7 +259,7 @@ these would otherwise land; a trace is also a thing to attach to an issue.
 The default output is named after the UTC moment it was collected, so collecting twice keeps
 both.
 
-![hmz trace collect three times: the last run of this directory, one named with --cycle, and
+![hmz trace collect three times: the last run of this directory, one named with --epic, and
 one sent elsewhere with --output](/demo/collect.gif)
 
 From Python the same choices are one call:
@@ -291,7 +291,7 @@ flow and forget](/demo/profiling.png)
 
 While a flow runs there, every process underneath it is sampled as each is seen: the agent CLIs
 themselves, and the tests, the builds and the greps their turns start. Each sample says what it
-was, what started it, and how long it took, into `profile.jsonl` in that run's cycle.
+was, what started it, and how long it took, into `profile.jsonl` in that run's epic.
 Collecting the run draws them in the same document as its sessions, at the same scale, so *what
 was this run doing at 09:41* has one answer. A trace of a profiled run counts them: `3
 sessions, 412 slices, 61 programs`.

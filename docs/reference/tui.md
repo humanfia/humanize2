@@ -145,7 +145,7 @@ list appears under the editor with a line about each.
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Its Agents page saves the complete setup; esc remains the way to save or discard on the way out. |
 | `/flowverses` | | [Where flows come from](/guide/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/agents` | | [The agents saved under a name](#agents-kept-under-a-name), to be imported wherever a flow's agent is set up. Not the agents of the flow — those are the second page of `/flow`. |
-| `/cycles` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/guide/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
+| `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/guide/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent that has worked, marked as it works, with the handovers between them drawn as the arrows joining them, whatever each started of its own hanging under it, and [the board](/guide/board) below. Enter reads an agent or changes a line. **esc** opens it. |
@@ -453,7 +453,7 @@ true of all of them:
   and close. Esc on the box is the way back to the menu. A menu you only looked at asks
   nothing.
 
-`/cycles` and `/flowverses` are lists of the same kind, and the first two are true of them as
+`/epics` and `/flowverses` are lists of the same kind, and the first two are true of them as
 well. The third is not: neither holds a draft of anything, so what is asked for there happens
 as it is asked for and esc asks nothing on the way out.
 
@@ -745,12 +745,12 @@ mounted onto every session its agents open and taken away again after.
 
 ## The runs that have already happened
 
-`/cycles` is every run of a flow in this directory, newest first. A run writes itself down as
+`/epics` is every run of a flow in this directory, newest first. A run writes itself down as
 it happens — which flow, on what, by which agents, and every session each of them opened —
 and this is what reads it back:
 
-![The /cycles list: two runs, each with when it began, the flow that ran, what it was asked to
-do and how many sessions it opened, the newer one marked "can be picked up"](/demo/cycles.png)
+![The /epics list: two runs, each with when it began, the flow that ran, what it was asked to
+do and how many sessions it opened, the newer one marked "can be picked up"](/demo/epics.png)
 
 A row is when the run began and the flow that ran; beside it, what that flow was asked to do,
 how many sessions it opened, and `can be picked up` for a run whose flow said it was
@@ -765,7 +765,7 @@ The list is read rather than chosen from, so **enter** opens what there is to do
 under the cursor:
 
 ![The menu under one run: carry on from here, collect a trace, and where it is, each with a
-line saying what it does](/demo/cycle-does.png)
+line saying what it does](/demo/epic-does.png)
 
 | Row | What it does |
 | --- | --- |
@@ -783,7 +783,7 @@ whatever its flow says: a run that cannot be continued is still a run to read.
 What is carried on is the run rather than what the interface happens to be set up on — the
 flow, its agents and what they were asked to do all come off the record of that run, an agent
 swapped under it being a different run wearing its name. And it is a run of its own: a
-[cycle](/reference/tracing#cycles) is never reopened, so carrying one on writes a new one
+[epic](/reference/tracing#epics) is never reopened, so carrying one on writes a new one
 that says which run it came from.
 
 **Reading is not refused while a flow is running. Carrying one on is.** What has already
@@ -793,7 +793,7 @@ shutting the menu, since the question the menu is asking is still worth answerin
 running; ctrl+c twice stops it before another can be picked up`.
 
 A directory nothing has ever been run in says so under the empty list. The same trace is
-[`hmz trace collect`](/reference/cli#hmz-trace-collect) on a command line, with `--cycle` to
+[`hmz trace collect`](/reference/cli#hmz-trace-collect) on a command line, with `--epic` to
 name which run. A trace of what a directory holds whoever opened it — a session no flow ever
 drove — is `--all` or `--session` there, and is not offered here at all: this is a list of runs,
 and a trace of none of them has nothing here to hang on.

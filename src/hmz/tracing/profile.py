@@ -3,7 +3,7 @@
 An agent's turn is mostly other programs. It runs the tests, it builds the thing, it greps the
 repository, and the minutes a run takes are mostly minutes those took -- none of which appears
 anywhere in the backend's own log, which records the tool call and not the process. So a run
-may be profiled as well as traced: while the cycle is open, the processes underneath it are
+may be profiled as well as traced: while the epic is open, the processes underneath it are
 sampled, and what they were and how long each took is written down beside the sessions.
 
 Which is the whole point of putting them in one trace. An agent's sessions are a process whose
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 __all__ = ["PROFILE", "Process", "Profiler", "Thread", "read"]
 
-#: What a run's profile is written to, inside the cycle it was taken in.
+#: What a run's profile is written to, inside the epic it was taken in.
 PROFILE = "profile.jsonl"
 
 #: How often the processes under a run are looked at. Fast enough to catch a `grep` and slow
@@ -100,8 +100,8 @@ class Profiler:
 
     Started by the run it is a profile of and stopped when that run ends. What it writes is
     one line per program -- when it started, when it was last seen, what it was and what
-    started it -- appended as the program goes rather than held to the end, for the reason a
-    cycle's own record is appended: a run that died is a run whose profile has to say what it
+    started it -- appended as the program goes rather than held to the end, for the reason an
+    epic's own record is appended: a run that died is a run whose profile has to say what it
     got to.
     """
 
@@ -111,7 +111,7 @@ class Profiler:
         """Holds where to write and what to watch.
 
         Args:
-          at: The file to write, which is `profile.jsonl` in the run's own cycle.
+          at: The file to write, which is `profile.jsonl` in the run's own epic.
           every: How often to look, in seconds.
           root: The process whose descendants are the run's, defaulting to this one -- which
             is the process the agents were started from, so everything they started is under
@@ -292,7 +292,7 @@ def read(at: str | os.PathLike[str]) -> list[Process]:
     """The programs one profile holds, in the order they started.
 
     Args:
-      at: The profile, or the cycle it is in.
+      at: The profile, or the epic it is in.
 
     Returns:
       One apiece, the last thing written about each being what is read -- a program is

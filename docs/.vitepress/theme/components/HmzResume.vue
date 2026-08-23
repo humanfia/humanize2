@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // A loop meant to run for a week is a loop that will be stopped. What a run keeps is written
-// as the flow writes it -- setting a key saves the file -- and it is kept in the cycle of the
+// as the flow writes it -- setting a key saves the file -- and it is kept in the epic of the
 // run that wrote it, keyed by the flow that wrote it. Pull the plug and start it again.
 import { computed, onUnmounted, ref } from 'vue'
 
-interface Cycle {
+interface Epic {
   name: string
   rounds: number[]
   from: number
@@ -17,7 +17,7 @@ const NAMES = [
   '20260819T060102.019Z-71b3aa',
 ]
 
-const cycles = ref<Cycle[]>([
+const epics = ref<Epic[]>([
   { name: NAMES[0], rounds: [], from: 0, state: 'idle' },
 ])
 const round = ref(0)
@@ -25,18 +25,18 @@ const running = ref(false)
 
 let timer = 0
 
-const now = computed(() => cycles.value[cycles.value.length - 1])
+const now = computed(() => epics.value[epics.value.length - 1])
 
 function start() {
-  const cycle = now.value
-  if (cycle.state === 'stopped') return
-  cycle.state = 'running'
+  const epic = now.value
+  if (epic.state === 'stopped') return
+  epic.state = 'running'
   running.value = true
   window.clearInterval(timer)
   timer = window.setInterval(() => {
     round.value += 1
-    cycle.rounds.push(round.value)
-    if (cycle.rounds.length > 14) pull()
+    epic.rounds.push(round.value)
+    if (epic.rounds.length > 14) pull()
   }, 900)
 }
 
@@ -47,9 +47,9 @@ function pull() {
 }
 
 function again() {
-  if (cycles.value.length >= NAMES.length) reset()
-  const cycle = { name: NAMES[cycles.value.length], rounds: [], from: round.value, state: 'idle' as const }
-  cycles.value = [...cycles.value, cycle]
+  if (epics.value.length >= NAMES.length) reset()
+  const epic = { name: NAMES[epics.value.length], rounds: [], from: round.value, state: 'idle' as const }
+  epics.value = [...epics.value, epic]
   start()
 }
 
@@ -57,7 +57,7 @@ function reset() {
   window.clearInterval(timer)
   running.value = false
   round.value = 0
-  cycles.value = [{ name: NAMES[0], rounds: [], from: 0, state: 'idle' }]
+  epics.value = [{ name: NAMES[0], rounds: [], from: 0, state: 'idle' }]
 }
 
 onUnmounted(() => window.clearInterval(timer))
@@ -83,27 +83,27 @@ const held = computed(() =>
 
     <div class="body">
       <div class="runs">
-        <div v-for="(cycle, i) in cycles" :key="cycle.name" class="run" :class="cycle.state">
+        <div v-for="(epic, i) in epics" :key="epic.name" class="run" :class="epic.state">
           <header>
-            <code>{{ cycle.name }}</code>
-            <span v-if="cycle.state === 'stopped'" class="tagline stopped">stopped where it stood</span>
-            <span v-else-if="cycle.state === 'running'" class="tagline live">running</span>
+            <code>{{ epic.name }}</code>
+            <span v-if="epic.state === 'stopped'" class="tagline stopped">stopped where it stood</span>
+            <span v-else-if="epic.state === 'running'" class="tagline live">running</span>
             <span v-else class="tagline">not started</span>
           </header>
           <p v-if="i > 0" class="picked">
-            picked up at round {{ cycle.from + 1 }} — the last run of this flow in this workspace
+            picked up at round {{ epic.from + 1 }} — the last run of this flow in this workspace
           </p>
           <div class="rounds">
-            <span v-for="one in cycle.rounds" :key="one" class="round">{{ one }}</span>
-            <span v-if="!cycle.rounds.length" class="none">no rounds yet</span>
+            <span v-for="one in epic.rounds" :key="one" class="round">{{ one }}</span>
+            <span v-if="!epic.rounds.length" class="none">no rounds yet</span>
           </div>
           <ul class="tree">
-            <li><code>cycle.jsonl</code><em>what the run was, appended as it happened</em></li>
+            <li><code>epic.jsonl</code><em>what the run was, appended as it happened</em></li>
             <li><code>sessions/</code><em>a link apiece to the backend's own transcript</em></li>
-            <li v-if="cycle.rounds.length">
+            <li v-if="epic.rounds.length">
               <code>state.json</code><em>what the flow keeps, saved as it is set</em>
             </li>
-            <li v-if="cycle.state === 'stopped'"><code>traces/</code><em>collected afterwards, and filed in here</em></li>
+            <li v-if="epic.state === 'stopped'"><code>traces/</code><em>collected afterwards, and filed in here</em></li>
           </ul>
         </div>
       </div>

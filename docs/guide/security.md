@@ -67,7 +67,7 @@ hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 - **No API key.** humanize drives the CLI you already logged in. The credential goes from that
   CLI to its own provider.
 - **No transcript of its own.** The backends write their own logs. A
-  [cycle](/guide/concepts#cycle) records only which sessions belonged to which agent.
+  [epic](/guide/concepts#epic) records only which sessions belonged to which agent.
 - **No values from a provider.** `hmz providers show` and `list` name the variables an account
   sets. They never print what those variables are. A secret you type at the prompt appears as
   bullets and never shows again.

@@ -71,7 +71,7 @@ off.
 | --- | --- | --- |
 | `/export` | the screen: everything since it opened or was last cleared | `.humanize/<datetime>.session.md` |
 | the clipboard | whatever you dragged across | your machine's clipboard |
-| [`hmz trace collect`](/guide/tracing) | every session of every agent, in full, with tool input and output | `traces/<datetime>.trace.json`, in the run's own cycle |
+| [`hmz trace collect`](/guide/tracing) | every session of every agent, in full, with tool input and output | `traces/<datetime>.trace.json`, in the run's own epic |
 
 ## See also
 

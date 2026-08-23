@@ -2,7 +2,7 @@
 
 The innovation this is here for: an agent's turns and the programs those turns ran are one
 document at one scale, so that `what was this run doing at 09:41` has one answer. Driven as a
-real run -- a flow, an agent that starts processes, a cycle -- rather than as a profile handed
+real run -- a flow, an agent that starts processes, an epic -- rather than as a profile handed
 to a renderer, since what is being checked is that the two halves meet at all.
 """
 
@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import AgentConfig
-from hmz.cycle import TRACES, cycles, opened
+from hmz.epic import TRACES, epics, opened
 from hmz.runner import Runner
 from hmz.settings import Settings
 from hmz.tracing.collector import collect
@@ -57,8 +57,8 @@ def test_a_run_is_profiled_when_the_workspace_asks_for_it(
 
     Runner(workspace / "flow", [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    ran = read(cycle / PROFILE)
+    (epic,) = epics()
+    ran = read(epic / PROFILE)
     assert ran, "the programs the turn ran are not in the run's profile"
     # The turn itself, which is a shell running a sleep: both are programs this run started.
     assert {"sh", "sleep"} <= {one.name for one in ran}
@@ -71,8 +71,8 @@ def test_a_run_nobody_asked_to_profile_is_traced_and_not_profiled(
     """A sampler nobody asked for is a sampler running for the length of every run there is."""
     Runner(workspace / "flow", [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    assert not (cycle / PROFILE).exists()
+    (epic,) = epics()
+    assert not (epic / PROFILE).exists()
 
 
 @pytest.mark.timeout(90)
@@ -82,14 +82,14 @@ def test_the_programs_and_the_sessions_are_one_document(
     """Which is the point of profiling into a trace rather than into a profile of its own."""
     Settings().profiles(on=True)
     Runner(workspace / "flow", [ShellAgent(CONFIG)]).run("go")
-    (cycle,) = cycles()
+    (epic,) = epics()
 
-    output = cycle / TRACES / "one.trace.json"
+    output = epic / TRACES / "one.trace.json"
     document = collect(
         workspace,
-        agents=opened(cycle) or None,
+        agents=opened(epic) or None,
         output=output,
-        profile=cycle / PROFILE,
+        profile=epic / PROFILE,
     )
 
     assert int(document["otherData"]["programs"]) >= 2

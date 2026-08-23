@@ -149,7 +149,7 @@ async def run(agents: tuple[Agent, Agent], task: str) -> None:
 
 Nothing about starting it changes: `hmz exec -f …` and the interface run a coroutine flow the
 same way they run any other, on a loop of the flow's own, and the run is over when `run`
-returns. The count of its agents, the settings it declares, the [cycle](/reference/tracing#cycles) it is
+returns. The count of its agents, the settings it declares, the [epic](/reference/tracing#epics) it is
 written down as and the way it is [stopped](#stopping) are all exactly as they are for a flow
 that is a plain function.
 
@@ -306,11 +306,11 @@ def run(agents: tuple[Agent], task: str, state: dict[str, Any]) -> None:
 ```
 
 **It is not a second copy of the transcript.** The backends keep that, and the run's
-[cycle](/reference/tracing#cycles) already says which sessions it opened. What belongs here is
+[epic](/reference/tracing#epics) already says which sessions it opened. What belongs here is
 the handful of things the loop itself is keeping track of — which round it is on, which files it
 has been through, what it has decided so far — which is the part of a run nothing else knows.
 
-**It lives in the run's own cycle**, as `state.json`, under the name the flow was run as. A flow
+**It lives in the run's own epic**, as `state.json`, under the name the flow was run as. A flow
 that [called another](#a-flow-that-calls-another-flow) is two flows and each keeps its own, side
 by side in that one file: neither writes the other's, and each is picked up as itself.
 
@@ -328,23 +328,23 @@ would be worse than one carrying on from a round ago.
 **Running the flow again is what picks it up.** There is no flag for it: `hmz exec -f weekly`
 twice in one directory is one loop carried on, from the last run of it here that left anything —
 a run that wrote nothing is nothing to pick up, so what carries on is the run before it. In the
-interface, `/cycles` marks the runs whose flow said so, and enter on one offers *carry on from
+interface, `/epics` marks the runs whose flow said so, and enter on one offers *carry on from
 here* where the flow still says it, which runs that run's own flow on that run's own agents with
 what it was asked to do. From Python it is an argument:
 
 ```python
-Runner("weekly", agents, resume=cycle).run("go through the tests")
+Runner("weekly", agents, resume=epic).run("go through the tests")
 ```
 
-**A run that was picked up is a run of its own.** A cycle is never reopened, so what carries on
-is written into a cycle of its own whose `began` line says which run it was `picked_up` from —
+**A run that was picked up is a run of its own.** An epic is never reopened, so what carries on
+is written into an epic of its own whose `began` line says which run it was `picked_up` from —
 and a week of stops and starts reads as the week it was rather than as one enormous run.
 
 Whether a flow can be picked up at all is asked of the flow rather than of the run, since a flow
 may have been rewritten since it last ran:
 
 ```python
-from hmz.cycle import resumed, state
+from hmz.epic import resumed, state
 from hmz.flows import resumes
 
 resumes("weekly")            # what the flow says now, read by running it
@@ -354,7 +354,7 @@ if at is not None:
 ```
 
 A flow that says nothing is run from the top every time, which is what every flow was before
-this, and a run pointed at a cycle to pick up ignores it, having nowhere to put what is there.
+this, and a run pointed at an epic to pick up ignores it, having nowhere to put what is there.
 One that says it can be picked up and takes no such argument is handed one it has no place for,
 and says so at the first call rather than starting over in silence.
 
@@ -681,12 +681,12 @@ async def run(agents: tuple[Agent], task: str) -> None:
 
 **What is running is both of them.** `hmz.flows.running()` reports the flow that was started
 and whatever it called, innermost last; the interface names them on its status line and on
-`/status`, and the [cycle](/reference/tracing) records each call and each return. A flow that called
+`/status`, and the [epic](/reference/tracing) records each call and each return. A flow that called
 another does not read as the flow somebody chose.
 
 **And each call is written down as a run of its own.** A called flow opens sessions, keeps its
-own state and calls flows of its own, so the cycle gives every call a record of its own beside
-the run's — `cycle.<flow>_<hex>.jsonl` — and the record of whatever called it says `called` and
+own state and calls flows of its own, so the epic gives every call a record of its own beside
+the run's — `epic.<flow>_<hex>.jsonl` — and the record of whatever called it says `called` and
 `returned` with that filename. What the called flow opened is in its record rather than in the
 record of whatever started the run. See [Records of called
 flows](/reference/tracing#records-of-called-flows).
@@ -1107,7 +1107,7 @@ Runner("official/rlar", agents).run("fix the build")
 ```
 
 `Runner` takes the same flow names and paths `-f` does, checks the count the same way, and
-writes the same [cycle](/reference/tracing#cycles). See [Agents](/reference/agents) for what those objects can
+writes the same [epic](/reference/tracing#epics). See [Agents](/reference/agents) for what those objects can
 do.
 
 ## Stopping
@@ -1124,7 +1124,7 @@ outside:
 Every agent is told to take no further turn. The turn under way is closed out, and the next
 call into that agent raises `Stopped` — which `suppress=True` deliberately does not catch,
 because a loop that carried on past it would never end. Let it propagate; the
-[cycle](/reference/tracing#cycles) then records the run as stopped by hand rather than as one that
+[epic](/reference/tracing#epics) then records the run as stopped by hand rather than as one that
 finished.
 
 What the turn was doing is left where it got to. A stop that waited for a turn would not read

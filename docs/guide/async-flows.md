@@ -29,7 +29,7 @@ async def run(agents: tuple[Agent], task: str) -> None:
 
 **Nothing about starting it changes.** `hmz exec -f fanout …` and the interface run a coroutine
 flow the same way they run any other, on a loop of the flow's own. The run is over when `run`
-returns. The agent count, the settings, the [cycle](/guide/tracing#what-a-run-writes-down) and
+returns. The agent count, the settings, the [epic](/guide/tracing#what-a-run-writes-down) and
 the way it is stopped are all exactly as for a plain function.
 
 ```sh

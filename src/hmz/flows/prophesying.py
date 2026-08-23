@@ -1307,7 +1307,7 @@ class _Wiring:
         """Whether one supernode reaches back into an atlas already being compiled.
 
         Asked of where the atlas is and what it is called there rather than of the name the
-        body wrote: one atlas is reached as `deeper` beside it and as `cycle:deeper` from
+        body wrote: one atlas is reached as `deeper` beside it and as `epic:deeper` from
         anywhere else, and a check that compared spellings would follow that forever.
 
         Args:

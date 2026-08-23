@@ -27,7 +27,7 @@ tool call rather than the process.
   process that went while it was being read, a profile that cannot be written: each MUST
   leave the run as it was.
 - What it saw MUST be appended as each program goes rather than held to the end, for the
-  reason a cycle's own record is appended: a run that died is a run whose profile has to say
+  reason an epic's own record is appended: a run that died is a run whose profile has to say
   what it got to.
 - A start MUST be timed against the clock the rest of a trace is timed by. What the operating
   system reports is worked out from an estimate of when the machine booted, which is half a
@@ -52,7 +52,7 @@ Args:
 - `output`: Same as `--output`, except that no file is written if it is not provided.
 - `start`: Same as `--start`.
 - `end`: Same as `--end`.
-- `profile`: The programs the run started while it ran, as the profile a cycle holds or as the records themselves. Nothing for a run that was not profiled, which is every run until a workspace says otherwise.
+- `profile`: The programs the run started while it ran, as the profile an epic holds or as the records themselves. Nothing for a run that was not profiled, which is every run until a workspace says otherwise.
 
 Returns the trace document, whose `otherData` reports what was asked for and what was collected.
 

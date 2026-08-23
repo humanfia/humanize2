@@ -14,7 +14,7 @@ import pytest
 
 from hmz.agents import AgentConfig
 from hmz.agents.skills import Loaded
-from hmz.cycle import JOURNAL, cycles, read, records, sessions
+from hmz.epic import JOURNAL, epics, read, records, sessions
 from hmz.flows import NotAFlow, load, running
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, events, written
@@ -300,11 +300,11 @@ def test_a_flow_that_calls_one_written_as_a_coroutine_awaits_it(flows: Path) -> 
 
 
 def test_the_run_writes_down_the_flow_it_called(flows: Path) -> None:
-    """A cycle is what a run was, and a flow that called another is part of what it was."""
+    """An epic is what a run was, and a flow that called another is part of what it was."""
     Runner("outer", [ShellAgent(CONFIG)]).run("do it")
 
-    (cycle,) = cycles()
-    called = [one for one in events(cycle) if one["event"] in ("called", "returned")]
+    (epic,) = epics()
+    called = [one for one in events(epic) if one["event"] in ("called", "returned")]
 
     assert [one["event"] for one in called] == ["called", "returned"]
     assert called[0]["flow"] == "inner"
@@ -315,20 +315,20 @@ def test_a_called_flow_is_written_down_in_a_record_of_its_own(flows: Path) -> No
     """A flow that called another is two flows, and each of them is a flow that ran."""
     Runner("outer", [ShellAgent(CONFIG)]).run("do it")
 
-    (cycle,) = cycles()
-    ran = read(cycle)
+    (epic,) = epics()
+    ran = read(epic)
     assert ran is not None
     (call,) = ran.called
 
     assert (call.flow, call.task) == ("inner", "inner: do it")
     # Named for the flow and for this call of it, and beside the record of the run itself.
-    assert call.record.startswith("cycle.inner_")
+    assert call.record.startswith("epic.inner_")
     assert call.record.endswith(".jsonl")
-    assert records(cycle) == [cycle / JOURNAL, cycle / call.record]
+    assert records(epic) == [epic / JOURNAL, epic / call.record]
     assert call.began
     assert call.ended
     # And it says what it was a run of, under the record that called it.
-    began, *_, ended = events(cycle / call.record)
+    began, *_, ended = events(epic / call.record)
     assert (began["event"], began["flow"], began["task"]) == (
         "began",
         "inner",
@@ -342,25 +342,25 @@ def test_what_a_called_flow_opened_is_written_where_it_ran(flows: Path) -> None:
     """A session opened inside a called flow is that flow's, and a run has to say which."""
     Runner("outer", [ShellAgent(CONFIG)]).run("do it")
 
-    (cycle,) = cycles()
-    ran = read(cycle)
+    (epic,) = epics()
+    ran = read(epic)
     assert ran is not None
     (call,) = ran.called
 
     # Nothing of the called flow's own in the run's record but the call itself.
-    assert [one["event"] for one in events(cycle)] == [
+    assert [one["event"] for one in events(epic)] == [
         "began",
         "called",
         "returned",
         "ended",
     ]
-    assert [one["event"] for one in events(cycle / call.record)] == [
+    assert [one["event"] for one in events(epic / call.record)] == [
         "began",
         "opened",
         "ended",
     ]
     # And the run is still every session it opened, each saying which flow opened it.
-    (one,) = sessions(cycle)
+    (one,) = sessions(epic)
     assert (one.ident, one.flow) == ("inner: do it", "inner")
 
 
@@ -368,36 +368,36 @@ def test_a_flow_called_twice_is_written_down_twice(flows: Path) -> None:
     """Two calls of one flow are two runs of it, each with sessions of its own."""
     Runner("twice", [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    ran = read(cycle)
+    (epic,) = epics()
+    ran = read(epic)
     assert ran is not None
     once, again = ran.called
 
     assert (once.flow, once.task) == ("inner", "once")
     assert (again.flow, again.task) == ("inner", "again")
     assert once.record != again.record
-    assert sorted(one.name for one in records(cycle)) == sorted(
+    assert sorted(one.name for one in records(epic)) == sorted(
         [JOURNAL, once.record, again.record]
     )
-    assert [one.ident for one in sessions(cycle)] == ["once", "again"]
+    assert [one.ident for one in sessions(epic)] == ["once", "again"]
 
 
 def test_a_flow_a_called_flow_called_is_written_down_under_it(flows: Path) -> None:
     """A run is the shape it ran in: what called what, and not one flat list of it all."""
     Runner("nests", [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    ran = read(cycle)
+    (epic,) = epics()
+    ran = read(epic)
     assert ran is not None
 
     # The run called `deeper` and nothing else: what `deeper` called is `deeper`'s to say.
     assert [one.flow for one in ran.called] == ["deeper"]
     (deeper,) = ran.called
-    (deep,) = [one for one in events(cycle / deeper.record) if one["event"] == "called"]
+    (deep,) = [one for one in events(epic / deeper.record) if one["event"] == "called"]
     assert deep["flow"] == "inner"
-    assert events(cycle / str(deep["cycle"]))[0]["under"] == deeper.record
+    assert events(epic / str(deep["epic"]))[0]["under"] == deeper.record
     # And every session of the run is still the run's, each under the flow that opened it.
-    assert [(one.ident, one.flow) for one in sessions(cycle)] == [
+    assert [(one.ident, one.flow) for one in sessions(epic)] == [
         ("middle", "deeper"),
         ("deep", "inner"),
     ]
@@ -440,14 +440,14 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 
     Runner("catches", [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    ran = read(cycle)
+    (epic,) = epics()
+    ran = read(epic)
     assert ran is not None
     (call,) = ran.called
 
     assert ran.how == "done"  # the run went on: what failed was the flow it called
     assert call.ended
-    last = events(cycle / call.record)[-1]
+    last = events(epic / call.record)[-1]
     assert (last["event"], last["how"]) == ("ended", "failed")
 
 

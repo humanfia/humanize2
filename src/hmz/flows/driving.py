@@ -12,9 +12,9 @@ found by the same name `-f` takes, handed the agents the calling flow was given,
 own skills and its own kept state, and written down -- in a record of its own, beside the
 record of the run that called it -- as running under whatever called it.
 
-Nothing here reads a command line and nothing here opens a cycle: :mod:`hmz.runner` does both,
-and asks this what the flow it was named says about itself. A call asks the cycle already open
-for a record to be written into, which is not a second cycle: it is part of the one run.
+Nothing here reads a command line and nothing here opens an epic: :mod:`hmz.runner` does both,
+and asks this what the flow it was named says about itself. A call asks the epic already open
+for a record to be written into, which is not a second epic: it is part of the one run.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from hmz.agents import AgentBase, Isolated, Moment, Remote
     from hmz.agents.base import Journal
     from hmz.agents.skills import Loaded
-    from hmz.cycle import Sub
+    from hmz.epic import Sub
     from hmz.machines import MachineBase, MachineConfig, Mapped
 
     from . import Flow as Marked
@@ -647,7 +647,7 @@ def readies(run: Entry) -> Entry:
     up neither pays for a reading of every file it holds nor is refused by one. The two
     places that are about to run one ask here instead: a body that does not compile is then
     refused where the run is being set up, rather than from inside a run that has already
-    pulled an image and opened a cycle.
+    pulled an image and opened an epic.
 
     Args:
       run: What :func:`declares` answered with.
@@ -833,7 +833,7 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
     its skill wins when parent and child use the same name, and the agents are restored to
     exactly what the caller carried when the call returns or raises.
 
-    Each call is written down as the run of a flow it is. The cycle of the run that called it
+    Each call is written down as the run of a flow it is. The epic of the run that called it
     gets a record of that call -- one file per call, named for the flow and for this call of
     it -- and what the called flow opens, keeps and calls in turn goes there rather than into
     the record of whatever started the run. The record that called it says `called` and
@@ -877,7 +877,7 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
         given = None if config is None else set_up(named, setting, config)
         settings = () if setting is None else (given,)
         # And what it left behind last time, for a flow that says it can be picked up: kept
-        # under its own name in the cycle of the run that called it, since a flow that called
+        # under its own name in the epic of the run that called it, since a flow that called
         # another is two flows and neither writes the other's.
         held = () if not mark.resumable else (_holding(driven, named),)
         # And the skills it works by, which are the flow's rather than the agents': a called
@@ -885,7 +885,7 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
         # back as it found them so that the flow which called it goes on carrying its own.
         before = skill_policy.carry(named, driven)
         started = entered(named, driven)
-        # And a record of its own to write into, in the cycle of the run that called it: a
+        # And a record of its own to write into, in the epic of the run that called it: a
         # called flow opens sessions and calls flows of its own, and what it did is its own
         # rather than a run's that happened to start it.
         writing = _opened(driven, named, task, resumable=mark.resumable)
@@ -937,7 +937,7 @@ def _opened(
 ) -> Writing:
     """Opens the record a called flow is written to, and points its agents at it.
 
-    Found through the agents rather than through anything of ours: the cycle belongs to the
+    Found through the agents rather than through anything of ours: the epic belongs to the
     run that was started, the agents were handed it as it began, and a flow called from a
     `Runner` that opened none -- a flow run from a test, a flow called from a flow called
     from nothing -- has nowhere to write and nothing to say.
@@ -958,9 +958,9 @@ def _opened(
     """
     # Asked what it is rather than taken as read: what an agent asks of a journal is that it
     # can be told a session was opened, and this is asking it for something else.
-    from hmz.cycle import Cycle
+    from hmz.epic import Epic
 
-    under = next((one.cycle for one in driven if isinstance(one.cycle, Cycle)), None)
+    under = next((one.epic for one in driven if isinstance(one.epic, Epic)), None)
     if under is None:
         return Writing(None, ())
     # Cast because a flow sees its agents through `Agent`, which says what a flow may ask
@@ -969,9 +969,9 @@ def _opened(
     record = under.called(
         named, cast("Sequence[AgentBase]", driven), task, resumable=resumable
     )
-    was = tuple(agent.cycle for agent in driven)
+    was = tuple(agent.epic for agent in driven)
     for agent in driven:
-        agent.cycle = record
+        agent.epic = record
     return Writing(record, was)
 
 
@@ -994,7 +994,7 @@ def _ended(
     left(started)
     if writing.record is not None:
         for agent, wrote in zip(driven, writing.before, strict=True):
-            agent.cycle = wrote
+            agent.epic = wrote
         writing.record.ended(kind)
     for agent, held in zip(driven, before, strict=True):
         _settles(agent).loads(held)
@@ -1068,27 +1068,25 @@ def _handed(
 def _holding(driven: tuple[Agent, ...], named: str) -> dict[str, Any]:
     """The dict a called flow that can be picked up writes what it wants back into.
 
-    Kept in the cycle of the run that called it, under the called flow's own name: a flow
+    Kept in the epic of the run that called it, under the called flow's own name: a flow
     that called another is two flows, each with its own to keep, and both of them part of one
-    run. A call from a flow that opened no cycle -- one run from a test, one called from
+    run. A call from a flow that opened no epic -- one run from a test, one called from
     nothing -- is handed a dict that is nowhere, which is a flow that runs and leaves nothing
     rather than a call that fails.
 
     Args:
-      driven: The agents the called flow is being handed, which is what holds the cycle.
+      driven: The agents the called flow is being handed, which is what holds the epic.
       named: The called flow, as it was asked for.
 
     Returns:
       What it left behind last time, as something to write this time's into.
     """
-    from hmz.cycle import Cycle, resumed, state
+    from hmz.epic import Epic, resumed, state
 
     for agent in driven:
-        if isinstance(agent.cycle, Cycle):
-            at = resumed(named, agent.cycle.workspace)
-            return agent.cycle.state(
-                named, state(at, named) if at is not None else None
-            )
+        if isinstance(agent.epic, Epic):
+            at = resumed(named, agent.epic.workspace)
+            return agent.epic.state(named, state(at, named) if at is not None else None)
     return {}
 
 

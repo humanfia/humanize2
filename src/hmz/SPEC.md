@@ -10,8 +10,8 @@
 ├── backends.py
 ├── cli
 ├── coganchor
-├── cycle.py
 ├── daemon
+├── epic.py
 ├── fallbacks.py
 ├── flows
 ├── kept.py
@@ -375,15 +375,15 @@ is not an account going down.
   the steps after its own, or a chain read from the top by each hop would walk the failed ones
   twice.
 
-## `cycle.py`
+## `epic.py`
 
 What one run of one flow was, written down as it happens: which flow, on what, by which
 agents, and which sessions each of them opened. Not what the sessions said -- the backend's
 own log is the turn-by-turn record and this MUST NOT be a second copy of it.
 
-- One cycle MUST be one run. It opens when the flow starts and closes when the flow stops,
-  however it stops -- finished, failed, or interrupted. A closed cycle MUST NOT be reopened.
-- One cycle MUST be one directory, holding the run's own record, a record per flow the run
+- One epic MUST be one run. It opens when the flow starts and closes when the flow stops,
+  however it stops -- finished, failed, or interrupted. A closed epic MUST NOT be reopened.
+- One epic MUST be one directory, holding the run's own record, a record per flow the run
   called, and a directory per session any of them opened. A run is more than a list of events
   now -- what its sessions were logged to, what it called, and what a flow that can be picked
   up again left behind -- and all of it is one run's.
@@ -391,7 +391,7 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
   and that record MUST be named for the flow and for that call of it. A flow that called
   another is two flows, and each of them opened sessions, kept its own state and may have
   called a third; a flow called twice is two runs of it, and one record for both would say
-  neither. It MUST NOT be another cycle: a called flow is part of the run that called it.
+  neither. It MUST NOT be another epic: a called flow is part of the run that called it.
 - A call MUST be written into the record of whatever called it at both ends, and both ends
   MUST say which record the call was written to. Pairing by the order the lines are in is not
   enough: a flow written as a coroutine may have two calls going at once, and their ends
@@ -401,7 +401,7 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
   back as the shape it ran in rather than as one flat list nothing can be attributed to. How
   it ended MUST be how the call ended: a call that raised inside a run that carried on is a
   call that failed and a run that did not.
-- What a cycle opened MUST be read across every record it holds, and each session MUST say
+- What an epic opened MUST be read across every record it holds, and each session MUST say
   which flow opened it. One run is one run however many flows it took to run it: a trace of it
   is gathered from what the whole run opened, and which flow a session was opened inside is
   what a record of its own is for.
@@ -412,7 +412,7 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
 - A session MUST also be given a name of its own, which MUST hold the agent, the CLI, the
   account and the backend's id, and MUST be one directory name. An id alone says nothing
   about whose session it was, and a directory of forty of them is one nobody can read.
-- Each session's own logs MUST be pointed at from inside the cycle, under that name, by a
+- Each session's own logs MUST be pointed at from inside the epic, under that name, by a
   link apiece. A link rather than a copy, and for reading rather than for running: humanize
   MUST go on reading and writing every log where the backend keeps it, so that nothing here
   can be the reason one is written twice or read from the wrong place. A filesystem that
@@ -432,7 +432,7 @@ own log is the turn-by-turn record and this MUST NOT be a second copy of it.
   directory that has gone, a file somebody wrote by hand as something else. State is what a
   flow may pick up, and a run that stopped because it could not save some is worse than one
   that carries on without it.
-- Cycles MUST be named so that they sort in the order they were run, to the millisecond: what
+- Epics MUST be named so that they sort in the order they were run, to the millisecond: what
   a flow is picked up from is the last run of it, and two started inside one second would
   otherwise be ordered at random.
 
@@ -501,7 +501,7 @@ never have reason to name this module.
   one where it named them -- in the order they were given, and the task. A flow written as a
   coroutine MUST be run to its return here too, on a loop of its own, so that whatever started
   one is holding a run rather than a coroutine somebody has to remember to await.
-- The run MUST be written down as it happens, as a cycle: which agents were driven, at what,
+- The run MUST be written down as it happens, as an epic: which agents were driven, at what,
   and which sessions each of them opened. The run MUST be over the moment `run` returns,
   however it returns.
 - A flow that says it can be picked up MUST be handed a dict as its last argument -- after
@@ -509,10 +509,10 @@ never have reason to name this module.
   left there. Which run that is MUST be the last run of that flow in this workspace unless
   one is named, so that running a resumable flow again means carrying on: a loop meant to run
   for a week is a loop that will be stopped and started. What it writes MUST be kept in the
-  cycle of the run doing the writing rather than in the one it was picked up from: a closed
-  cycle is not reopened, and a run is what that run did.
+  epic of the run doing the writing rather than in the one it was picked up from: a closed
+  epic is not reopened, and a run is what that run did.
 - Whether a run here is profiled as well as traced MUST be read from this workspace's own
-  settings rather than from the cycle, which is the run written down rather than the settings
+  settings rather than from the epic, which is the run written down rather than the settings
   under it.
 - `flow_and_agents` MUST read the same `hmz exec` line the command takes, and MUST be here
   rather than in `cli`: the terminal interface starts a flow from that line and then keeps the
@@ -596,7 +596,7 @@ Args:
 ## `hmz trace`
 
 ```shell
-hmz trace collect [<workspace>] [--cycle <cycle> | --session <session>[,<session>]... | --all] [--output <output>] [--start <start>] [--end <end>]
+hmz trace collect [<workspace>] [--epic <epic> | --session <session>[,<session>]... | --all] [--output <output>] [--start <start>] [--end <end>]
 ```
 
 Collects and aggregates what a run left behind -- the agents' own trajectories, and the
@@ -614,13 +614,13 @@ programs they ran where the run was profiled -- into a Chrome JSON trace for vis
   ever drove is still a session to read back, and it MUST be asked for outright -- `--all`,
   or the sessions named. It is not a trace of any run and MUST NOT be written inside one, and
   a line naming a run as well MUST be a line to correct rather than one of the two silently
-  winning. It MUST be here and not in the interface: `/cycles` is a list of runs, and a trace
+  winning. It MUST be here and not in the interface: `/epics` is a list of runs, and a trace
   of what is not one has nothing there to be reached from.
 
 Args:
 
 - `<workspace>`: The path to the workspace directory to generate traces for. If not provided, the current working directory is used, unless sessions are named.
-- `--cycle <cycle>`: Which run to trace, by the name of its directory or a leading part of it. If not provided, the last run of the workspace. That run says which sessions the trace holds and which agent opened each of them, its profile is drawn beside them, and its directory is where the trace lands. A name no run of it answers to MUST be a line to correct.
+- `--epic <epic>`: Which run to trace, by the name of its directory or a leading part of it. If not provided, the last run of the workspace. That run says which sessions the trace holds and which agent opened each of them, its profile is drawn beside them, and its directory is where the trace lands. A name no run of it answers to MUST be a line to correct.
 - `--session <session>[,<session>]...`: Sessions to trace instead of a run, comma separated and repeatable. A session is named by its whole id, by the key the trace shows it under, or by a leading part of either, and the sub-agents it started are collected with it. Named sessions are collected wherever they were recorded, and are cut down to the workspace when one is provided.
 - `--all`: Every session of the workspace instead of a run, whichever run opened them and whether any did.
 - `--output <output>`: The path to the output file where the aggregated trace will be saved. Its directory is created if it does not exist. If not provided, the trace is saved as `traces/<datetime>.trace.json` inside the run it is a trace of -- where `<datetime>` is the UTC moment it was collected, so that collecting twice keeps both -- and, for a trace that is of no one run, in the directory that workspace's runs are kept in. A trace of a run belongs with the run: the sessions it points at and the state it left are already there, and a trace written into whatever directory somebody was standing in is one they have to keep track of themselves. A file named outright still wins, a trace being also a thing to attach to an issue.

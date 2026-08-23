@@ -28,9 +28,9 @@ const SHOTS: Shot[] = [
     href: '/guide/tracing',
   },
   {
-    src: '/demo/cycles.gif',
-    poster: '/demo/cycles.png',
-    title: '/cycles',
+    src: '/demo/epics.gif',
+    poster: '/demo/epics.png',
+    title: '/epics',
     caption: 'Every run this directory has had, and the ones that can be picked up.',
     href: '/guide/resuming',
   },

@@ -73,8 +73,8 @@ from .pick import (
     Adjusted,
     Adjusts,
     Chosen,
-    Cycles,
     Drawn,
+    Epics,
     Fallbacks,
     Flows,
     Flowverses,
@@ -110,7 +110,7 @@ if TYPE_CHECKING:
 #: runs on is an agent apiece rather than one model, so its `/models` is the page along from
 #: it -- `/agents` being the ones saved to be imported there. `hmz anchor` is not here: it is
 #: not a thing to do to a flow that is running, and it is a command line of its own. What a
-#: run left behind is `/cycles`, which is where the runs of this directory are.
+#: run left behind is `/epics`, which is where the runs of this directory are.
 _OWN = (
     "flow",
     "btw",
@@ -118,7 +118,7 @@ _OWN = (
     "agents",
     "providers",
     "fallback",
-    "cycles",
+    "epics",
     "settings",
     "status",
     "clear",
@@ -1917,8 +1917,8 @@ class Humanize(App[None]):
             self.action_providers()
         elif name == "fallback":
             self.action_fallback()
-        elif name == "cycles":
-            self.action_cycles()
+        elif name == "epics":
+            self.action_epics()
         elif name == "flowverses":
             self.action_flowverses()
         elif name == "settings":
@@ -2222,7 +2222,7 @@ class Humanize(App[None]):
     def action_clear(self) -> None:
         """Clears the screen, and nothing else.
 
-        There is nothing else for it to clear. A turn carries no context across a cycle: a
+        There is nothing else for it to clear. A turn carries no context across an epic: a
         flow is handed agents that were made for that run and drops them at the end of it, so
         what is on screen is the whole of what starting over would have thrown away. What is
         running is left running, and what it has done so far is still beside it.
@@ -2568,7 +2568,7 @@ class Humanize(App[None]):
         if said.profile != profiling:
             self.settings.profiles(on=said.profile)
             self.show(
-                "[dim]a run here profiles the programs it starts; /cycles collects the "
+                "[dim]a run here profiles the programs it starts; /epics collects the "
                 "trace[/dim]"
                 if said.profile
                 else "[dim]a run here is traced and not profiled[/dim]"
@@ -2592,27 +2592,27 @@ class Humanize(App[None]):
             self.show(one)
 
     @work
-    async def action_cycles(self) -> None:
-        """Opens the runs of this directory, which is what `/cycles` is for.
+    async def action_epics(self) -> None:
+        """Opens the runs of this directory, which is what `/epics` is for.
 
         Every run of a flow here, newest first: what it was, how it went, and what there is
         to do with it. Read while a flow runs -- what has already happened does not change
         under one -- but a run picked up is a flow started, so that half is refused while
         one is going, on the sheet where it was asked for.
         """
-        said = await self.push_screen_wait(Cycles(running=bool(self._agents)))
+        said = await self.push_screen_wait(Epics(running=bool(self._agents)))
         if said is None:
             return
         for one in said.said:
             self.show(one)
-        if said.doing == carries_on and said.cycle is not None:
-            self._carries_on(said.cycle)
+        if said.doing == carries_on and said.epic is not None:
+            self._carries_on(said.epic)
 
-    def _carries_on(self, cycle: Path) -> None:
+    def _carries_on(self, epic: Path) -> None:
         """Runs the flow of one run again, on what that run left behind.
 
-        Which is a run of its own: a cycle is one run and is never reopened, so this is the
-        flow started again with the state of the run being picked up, writing into a cycle of
+        Which is a run of its own: an epic is one run and is never reopened, so this is the
+        flow started again with the state of the run being picked up, writing into an epic of
         its own that says which one it came from.
 
         The flow, its agents and what it was asked to do all come from the run rather than
@@ -2620,11 +2620,11 @@ class Humanize(App[None]):
         ran, and an agent swapped under it would be a different run wearing its name.
 
         Args:
-          cycle: The run to pick up, by the directory it is written in.
+          epic: The run to pick up, by the directory it is written in.
         """
-        ran = self.hmz.cycles.read(cycle)
+        ran = self.hmz.epics.read(epic)
         if ran is None:
-            self.show(f"hmz: {escape(str(cycle))} is not a run", "red")
+            self.show(f"hmz: {escape(str(epic))} is not a run", "red")
             return
         if self._mid_run("no picking a run up"):
             return
@@ -2649,7 +2649,7 @@ class Humanize(App[None]):
             f"[dim]carrying on from {escape(ran.name)}: {escape(ran.flow)} on what that "
             "run left behind[/dim]"
         )
-        self._flow(["-f", ran.flow, *named, ran.task], resume=cycle)
+        self._flow(["-f", ran.flow, *named, ran.task], resume=epic)
 
     @work
     async def action_fallback(self) -> None:

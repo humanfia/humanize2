@@ -21,7 +21,7 @@ from textual.widgets import Label, OptionList, Static
 
 from hmz.agents import PERMISSIONS, DshSession
 from hmz.backends import Model
-from hmz.cycle import cycles
+from hmz.epic import epics
 from hmz.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.app import _HELP, _OWN, Editor, _where
@@ -132,7 +132,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 async def until(ready: Callable[[], bool], driver: Pilot[None]) -> None:
     """Pumps the interface until something is true, or gives up after a while.
 
-    Waited on the clock rather than counted in pump cycles: a cycle can pass in microseconds,
+    Waited on the clock rather than counted in pumps: a pump can pass in microseconds,
     so counting them is a spin that finishes before the worker thread has done anything.
 
     Args:
@@ -741,9 +741,9 @@ async def test_two_ctrl_c_stop_the_flow_and_not_just_the_turn(workspace: Path) -
         await until(lambda: not app._agents, driver)  # the flow itself is over
 
         assert "stopping the flow" in _transcript(app)
-        # And the run is over with it: a cycle is one run of one flow, and this ends one.
-        (cycle,) = cycles(workspace)
-        assert recorded(cycle)[-1] == {
+        # And the run is over with it: an epic is one run of one flow, and this ends one.
+        (epic,) = epics(workspace)
+        assert recorded(epic)[-1] == {
             "event": "ended",
             "at": unittest.mock.ANY,
             "how": "stopped",
@@ -1442,8 +1442,8 @@ async def test_a_flow_waiting_to_be_told_something_can_still_be_stopped(
         await until(lambda: not app._agents, driver)
 
         # And the run is written down as stopped rather than as one that finished.
-        (cycle,) = cycles(talking)
-        assert recorded(cycle)[-1] == {
+        (epic,) = epics(talking)
+        assert recorded(epic)[-1] == {
             "event": "ended",
             "at": unittest.mock.ANY,
             "how": "stopped",
@@ -1454,7 +1454,7 @@ async def test_a_flow_waiting_to_be_told_something_can_still_be_stopped(
 async def test_clearing_the_screen_clears_the_screen_and_nothing_else(
     talking: Path,
 ) -> None:
-    """There is nothing else to clear: no turn carries context across a cycle."""
+    """There is nothing else to clear: no turn carries context across an epic."""
     app = Humanize()
     async with app.run_test() as driver:
         await driver.press(*"remember this")

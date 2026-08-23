@@ -66,7 +66,7 @@ def test_the_environment_says_the_same_thing(
 def test_a_run_already_being_held_here_is_the_one_that_is_read(
     held: daemon.Daemon, terminal: None
 ) -> None:
-    """Rather than a second run of the same directory, which is two flows over one cycle."""
+    """Rather than a second run of the same directory, which is two flows over one epic."""
     with unittest.mock.patch.object(daemon.Daemon, "attach", return_value=0) as reading:
         assert cli.main([]) == 0
 

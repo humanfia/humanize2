@@ -13,13 +13,13 @@ hmz trace collect
 ```
 
 ```console
-~/.humanize/cycles/-home-you-code/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
+~/.humanize/epics/-home-you-code/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
 ```
 
 Drag that file into [ui.perfetto.dev](https://ui.perfetto.dev), or open `chrome://tracing` and
 load it. It is a Chrome JSON trace, so anything that reads one will do.
 
-A trace goes with the run it is a trace of. A [cycle](#cycles) already holds what happened, a
+A trace goes with the run it is a trace of. An [epic](#epics) already holds what happened, a
 link to every log each session was written to, and whatever the flow left behind, so the trace
 belongs there rather than in whatever directory you happened to be standing in. The default
 name is the UTC moment it was collected, so collecting twice keeps both traces rather than
@@ -30,7 +30,7 @@ What it prints is that path, then the name of the run it is a trace of, then the
 that was [profiled](#profiling-a-run) has a third of them — `1 session, 10 slices, 3 programs`
 — and a trace of sessions alone stops at the slices.
 
-The same thing is a row of `/cycles` in the interface: pick the run, press enter, and collect
+The same thing is a row of `/epics` in the interface: pick the run, press enter, and collect
 it there.
 
 Full syntax in the [CLI reference](/reference/cli#hmz-trace).
@@ -85,14 +85,14 @@ collect(agents={a.id: a.opened for a in (actor, reviewer)})
 
 Sessions nobody claims are read as the configuration they ran at.
 
-## Cycles
+## Epics
 
-Every run of a flow is one **cycle**, written as it happens, and a cycle is a directory:
+Every run of a flow is one **epic**, written as it happens, and an epic is a directory:
 
 ```
-~/.humanize/cycles/<workspace>/<datetime>-<hex>/
-    cycle.jsonl                     what happened, a line at a time
-    cycle.<flow>_<hex>.jsonl        the same, for one flow the run called
+~/.humanize/epics/<workspace>/<datetime>-<hex>/
+    epic.jsonl                      what happened, a line at a time
+    epic.<flow>_<hex>.jsonl         the same, for one flow the run called
     state.json                      what a flow that can be picked up again left behind
     profile.jsonl                   the programs it ran, for a run that was profiled
     sessions/<session>/…            a link per file the backend logged that session to
@@ -103,15 +103,15 @@ Every run of a flow is one **cycle**, written as it happens, and a cycle is a di
 `-`, the way the backends flatten a workspace into the folder they log it under. `<hex>` is six
 characters, because two flows may be started in one millisecond and neither is the other's run.
 
-`cycle.jsonl` is JSON lines, one line per thing that happened to the run, appended and flushed
-as it goes — a run that died is a run whose cycle still says what it got to.
+`epic.jsonl` is JSON lines, one line per thing that happened to the run, appended and flushed
+as it goes — a run that died is a run whose epic still says what it got to.
 
 | `event` | Written | Carries |
 | --- | --- | --- |
 | `began` | when the flow starts | `flow`, `task`, `workspace`, whether the flow is `resumable`, the run it was `picked_up` from where there was one, and one entry per agent with its `agent` id, `backend`, `model`, `effort`, `permission`, `provider`, `goals` and whether it was the `person` at the prompt |
 | `opened` | each time an agent opens a session | `agent`, `backend`, `provider`, `session`, the `name` the run gives it and `where` its links are |
-| `called` | when the flow calls another flow | `flow`, `task`, and the `cycle` — the record that call was written to |
-| `returned` | when that call returns, however it ended | `flow` and the same `cycle` |
+| `called` | when the flow calls another flow | `flow`, `task`, and the `epic` — the record that call was written to |
+| `returned` | when that call returns, however it ended | `flow` and the same `epic` |
 | `ended` | when the flow stops | `how`: `done`, `failed`, or `stopped` |
 
 `sessions/<session>/` is a link per file that session was logged to, named for whose session it
@@ -128,20 +128,20 @@ goes on writing a log after the turn that opened it and a sub-agent's transcript
 whenever that sub-agent ran. A filesystem that will not make one is a run without links rather
 than a run that stops.
 
-**It is not a transcript.** The backend's own log is the turn-by-turn record, and a cycle is not
+**It is not a transcript.** The backend's own log is the turn-by-turn record, and an epic is not
 a second copy of it. What is kept here is the shape of the run — enough to gather a trace
 afterwards out of the ids alone.
 
-A cycle covers one run. It closes when the flow finishes, fails or is interrupted, and a closed
-cycle is never reopened: running the flow again is another run, with sessions of its own, and so
-another cycle.
+An epic covers one run. It closes when the flow finishes, fails or is interrupted, and a closed
+epic is never reopened: running the flow again is another run, with sessions of its own, and so
+another epic.
 
 That is what `state.json`, `resumable` and `picked_up` are for. A flow that says
 `@flow(resumable=True)` takes a state dict as its last argument, and what it writes there is
-`state.json` in the cycle of the run that wrote it, keyed by the name the flow was run under.
-Running that flow again here carries on from the last run of it that left anything — into a
-cycle of its own, whose `began` line says which run it was `picked_up` from, so a week of stops
-and starts reads as the week it was. `/cycles` picks a named run up: enter on a row offers
+`state.json` in the epic of the run that wrote it, keyed by the name the flow was run under.
+Running that flow again here carries on from the last run of it that left anything — into an
+epic of its own, whose `began` line says which run it was `picked_up` from, so a week of stops
+and starts reads as the week it was. `/epics` picks a named run up: enter on a row offers
 *carry on from here*, which is asked of the flow rather than of the run, a flow being a file
 that may have been rewritten since. See [Picking a run up](/guide/resuming) and
 [a flow that can be picked up](/reference/flows#a-flow-that-can-be-picked-up).
@@ -150,18 +150,18 @@ An agent stopped by hand makes the run `stopped` rather than `failed`, whatever 
 way made of it — so a run you ended is written down as one you ended.
 
 ```python
-from hmz.cycle import cycles, opened
+from hmz.epic import epics, opened
 
-for cycle in cycles():                 # this workspace, oldest first
-    print(cycle, opened(cycle))        # {"actor": ["0a1b…", "5f6e…"], "reviewer": [...]}
+for epic in epics():                   # this workspace, oldest first
+    print(epic, opened(epic))          # {"actor": ["0a1b…", "5f6e…"], "reviewer": [...]}
 ```
 
 ## Records of called flows
 
 A flow may [call another](/reference/flows#a-flow-that-calls-another-flow), and a called flow
 opens sessions, keeps state and calls flows of its own. So every call gets a record of its own
-beside the run's — `cycle.inner_0a1b2c.jsonl` for a call of `inner` — and the record of
-whatever called it says `called` and `returned` with the filename in `cycle`. Named for this
+beside the run's — `epic.inner_0a1b2c.jsonl` for a call of `inner` — and the record of
+whatever called it says `called` and `returned` with the filename in `epic`. Named for this
 call rather than for the flow: one flow called twice is two runs of it, each with its own
 sessions.
 
@@ -171,7 +171,7 @@ as the shape it ran in. Its `ended` says how *the call* ended — a call that ra
 inside a run that may still be `done`.
 
 It is still one run and still one directory: a called flow is part of the run that called it,
-not another run. `hmz.cycle.sessions` reads every record, so every session of a run is one list
+not another run. `hmz.epic.sessions` reads every record, so every session of a run is one list
 however many flows it took, each saying which `flow` opened it.
 
 ## Profiling a run
@@ -186,7 +186,7 @@ second page of `/settings`:
 ```
 
 While the flow runs, the programs underneath it are sampled — what each was, what started it,
-and how long it took — into `profile.jsonl` in that run's own cycle. Collecting the run puts
+and how long it took — into `profile.jsonl` in that run's own epic. Collecting the run puts
 them in the same document as its sessions, drawn the same way: a process is a program and a
 track is one of its threads, exactly as a process is an agent and a track is a row of that
 agent's sessions.
@@ -232,7 +232,7 @@ home being there changes nothing.
 ```sh
 hmz trace collect                                    # the last run of this workspace
 hmz trace collect ~/code/other                       # the last run of another workspace
-hmz trace collect --cycle 20260809T0144              # that run of it, by name
+hmz trace collect --epic 20260809T0144               # that run of it, by name
 hmz trace collect --start "3 days ago"               # and only what it did since
 ```
 
@@ -243,7 +243,7 @@ whatever else the directory has seen. Asked for by id and not by directory, whic
 flow that ran on a [machine of its own](/reference/machines)** — working in a mirror, logged
 under a path this workspace has never heard of — is in its own trace all the same.
 
-`--cycle` takes a run's directory name or a leading part of it; without one the run is the last
+`--epic` takes a run's directory name or a leading part of it; without one the run is the last
 of the workspace. A name no run of the workspace begins with is a usage error.
 
 **Or of a directory**, whoever opened its sessions, which is how an afternoon at a coding agent
@@ -264,9 +264,9 @@ A session is named by its whole id, by the key the trace shows it under, or by a
 either — and the sub-agents it started come with it.
 
 Neither of these is a trace of any run, so neither is written inside one: they go to
-`~/.humanize/cycles/<workspace>/`, beside that workspace's runs. Asking for both at once —
-`--cycle` with `--session` or `--all` — is a usage error rather than one of them quietly
-winning. And neither is offered in the interface: `/cycles` is a list of runs, and a trace of
+`~/.humanize/epics/<workspace>/`, beside that workspace's runs. Asking for both at once —
+`--epic` with `--session` or `--all` — is a usage error rather than one of them quietly
+winning. And neither is offered in the interface: `/epics` is a list of runs, and a trace of
 what is not one has nothing there to be reached from.
 
 A workspace nothing has ever been run in has no run to trace, so a bare `hmz trace collect`
@@ -288,7 +288,7 @@ document = collect(
     output="trace.json",            # omit and nothing is written
     start="3 days ago",
     end=None,
-    profile=cycle / "profile.jsonl",  # the programs that run started, if it was profiled
+    profile=epic / "profile.jsonl",  # the programs that run started, if it was profiled
 )
 ```
 
@@ -298,8 +298,8 @@ the library does that the command line does not let you skip.
 `sessions` unset is every session of the workspace; an **empty** `sessions` is no session at
 all, which is what the trace of a run that opened none holds. Naming sessions is a filter, and
 naming none of them is not the same as naming all of them. Collecting a run's own trace is that
-call with the ids the cycle wrote down and no workspace — which is what `hmz trace collect` and
-`/cycles` both do.
+call with the ids the epic wrote down and no workspace — which is what `hmz trace collect` and
+`/epics` both do.
 
 Raises `ValueError` if a time cannot be read or a named session is empty; the command line
 reports both as usage errors.

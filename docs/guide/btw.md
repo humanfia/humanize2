@@ -14,7 +14,7 @@ flow's agent or waiting for its current turn.
 The command takes a snapshot of the active flow: its name and task, each agent's current state
 and turn count, observed handovers, spending, and the latest agent events. A separate short-lived
 session answers from that snapshot. It is given read-only permissions and no flow skills, and it
-is not registered with the run's monitor or cycle.
+is not registered with the run's monitor or epic.
 
 The answer appears in the transcript when it is ready. The original flow keeps its sessions,
 queued messages and context untouched, so `/btw` is safe to use while an agent is thinking or

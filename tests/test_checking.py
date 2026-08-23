@@ -880,7 +880,7 @@ def test_a_finding_says_which_file_beside_the_entry_it_is_in(tmp_path: Path) -> 
 
 def test_the_surface_is_the_interfaces_themselves() -> None:
     """What an agent may be asked is read off `agent.py`, not kept as a second list."""
-    assert {"new", "clone", "spent", "hooks", "cycle", "__call__"} <= surface(Agent)
+    assert {"new", "clone", "spent", "hooks", "epic", "__call__"} <= surface(Agent)
     assert "board" not in surface(Agent)
     assert "board" in surface(Person)
     assert {"loads", "close", "stream"} <= surface(Session)

@@ -6,7 +6,7 @@ something typed while the flow runs reach the one working. A reader that lived i
 line would be one the interface had to reach up into.
 
 What a flow is, and what it says it drives, is :mod:`hmz.flows`. This asks it, hands the flow
-the agents it declared under the names it calls them, and writes the run down as a cycle.
+the agents it declared under the names it calls them, and writes the run down as an epic.
 Nothing a flow itself reaches for is here: a flow names one module of humanize's, and it is
 not this one.
 """
@@ -91,7 +91,7 @@ class Runner:
             the model :func:`configures` answers with, or the fields to build one from, which
             is what a YAML file of them reads as. None is a flow left as it comes, and is
             what a flow that takes no setting up is given either way.
-          resume: The cycle to pick up from, for a flow that says it can be picked up: the
+          resume: The epic to pick up from, for a flow that says it can be picked up: the
             state that run left behind is what this one is handed. None is the last run of
             this flow here, which is what running a resumable flow again means -- a loop
             meant to run for a week is one that carries on where it stopped. A flow that
@@ -112,13 +112,13 @@ class Runner:
             reached.
         """
         from .agents import HumanAgent
-        from .cycle import resumed
+        from .epic import resumed
         from .flows.driving import NotAFlow, carries, declares, lands, readies, set_up
 
         run, places, make, setting, mark = declares(flow)
         # Before anything is chosen or opened: an atlas whose body does not compile is a
         # flow refused where the run is set up rather than from inside one that has already
-        # pulled an image and opened a cycle.
+        # pulled an image and opened an epic.
         readies(run)
         if config is not None:
             config = set_up(flow, setting, config)
@@ -174,7 +174,7 @@ class Runner:
             flow
         )  # as it was named, which is what a run of it is named after
         #: Whether the flow says it can be picked up where the last run of it left off, and
-        #: which run that was. Asked here rather than when the run starts, so that a cycle
+        #: which run that was. Asked here rather than when the run starts, so that an epic
         #: named at the prompt is one whoever named it hears about before anything runs.
         self._resumable = mark.resumable
         #: The image the whole run works in, or "" for a run on this machine. The container
@@ -214,7 +214,7 @@ class Runner:
         """
         import inspect
 
-        from .cycle import Cycle, state
+        from .epic import Epic, state
         from .flows.driving import contained, entered, lands_in, left
         from .settings import Settings
 
@@ -230,7 +230,7 @@ class Runner:
             # flow itself reads, writes and runs there is `hmz.flows.container`.
             with (
                 contained(self._container) as where_,
-                Cycle(
+                Epic(
                     self._flow,
                     self._driven,
                     task,
@@ -239,26 +239,26 @@ class Runner:
                     # Whether this workspace asked for its runs to be profiled as well as
                     # traced, which is a thing about the project being worked on: a repository
                     # whose tests take an hour is a different question from one whose take a
-                    # minute. Read here rather than in the cycle, which is the run written down
+                    # minute. Read here rather than in the epic, which is the run written down
                     # rather than the settings under it.
                     profile=Settings().profiling,
-                ) as cycle,
+                ) as epic,
             ):
                 for agent in self._driven:
-                    agent.cycle = cycle
+                    agent.epic = epic
                 if where_ is not None:
                     lands_in(self._driven, where_)
                 # As it was set up, or as it comes: a flow that takes a config takes None
                 # for the run nobody set up, which is the default the flow declared. And
                 # after it, for a flow that says it can be picked up, what the run it is
                 # being picked up from left behind -- which is a dict it writes into, kept
-                # in this run's own cycle as it writes.
+                # in this run's own epic as it writes.
                 said: list[Any] = [self._agents, task]
                 if self._setting is not None:
                     said.append(self._config)
                 if self._resumable:
                     said.append(
-                        cycle.state(
+                        epic.state(
                             self._flow,
                             state(picked_up, self._flow)
                             if picked_up is not None

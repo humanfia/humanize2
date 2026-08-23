@@ -1,9 +1,9 @@
 """The runs of a workspace that have already happened, and the traces gathered of them.
 
-One run is one cycle: a directory holding what happened, what each session was logged to, and
+One run is one epic: a directory holding what happened, what each session was logged to, and
 what a flow that says it can be picked up left behind. What is written down as a run happens
-is :mod:`hmz.cycle`; reading the backends' own logs back is :mod:`hmz.tracing`. Both are asked
-here, so that whatever is listing the runs -- a command line, the interface's own `/cycles` --
+is :mod:`hmz.epic`; reading the backends' own logs back is :mod:`hmz.tracing`. Both are asked
+here, so that whatever is listing the runs -- a command line, the interface's own `/epics` --
 asks one object about the one workspace it is about.
 """
 
@@ -17,12 +17,12 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
     from typing import Any
 
-    from hmz.cycle import Ran, Session
+    from hmz.epic import Ran, Session
 
-__all__ = ["Cycles"]
+__all__ = ["Epics"]
 
 
-class Cycles:
+class Epics:
     """Every run of one workspace, newest last, and what can be read back out of one."""
 
     def __init__(self, workspace: str | os.PathLike[str] | None = None) -> None:
@@ -38,49 +38,49 @@ class Cycles:
 
     def under(self) -> Path:
         """The directory this workspace's runs are kept in."""
-        from hmz.cycle import under
+        from hmz.epic import under
 
         return under(self._workspace)
 
     def all(self) -> list[Path]:
         """Every run of this workspace, oldest first, which is the order they are named in."""
-        from hmz.cycle import cycles
+        from hmz.epic import epics
 
-        return cycles(self._workspace)
+        return epics(self._workspace)
 
-    def read(self, cycle: Path) -> Ran | None:
+    def read(self, epic: Path) -> Ran | None:
         """What one run was: when, which flow, on what, how it went, and what it opened."""
-        from hmz.cycle import read
+        from hmz.epic import read
 
-        return read(cycle)
+        return read(epic)
 
-    def sessions(self, cycle: Path) -> list[Session]:
+    def sessions(self, epic: Path) -> list[Session]:
         """Every session one run opened, across each of the records it holds."""
-        from hmz.cycle import sessions
+        from hmz.epic import sessions
 
-        return sessions(cycle)
+        return sessions(epic)
 
-    def opened(self, cycle: Path) -> dict[str, list[str]]:
+    def opened(self, epic: Path) -> dict[str, list[str]]:
         """What each agent of one run opened, by the name the run knew that agent as."""
-        from hmz.cycle import opened
+        from hmz.epic import opened
 
-        return opened(cycle)
+        return opened(epic)
 
     def resumed(self, flow: str) -> Path | None:
         """The last run of one flow here, which is what running a resumable flow picks up."""
-        from hmz.cycle import resumed
+        from hmz.epic import resumed
 
         return resumed(flow, self._workspace)
 
-    def state(self, cycle: Path, flow: str = "") -> dict[str, Any]:
+    def state(self, epic: Path, flow: str = "") -> dict[str, Any]:
         """What a flow that says it can be picked up left behind in one run."""
-        from hmz.cycle import state
+        from hmz.epic import state
 
-        return state(cycle, flow)
+        return state(epic, flow)
 
     def traced(
         self,
-        cycle: Path,
+        epic: Path,
         *,
         output: str | os.PathLike[str] | None = None,
         start: str | None = None,
@@ -95,7 +95,7 @@ class Cycles:
         the state it left are already there.
 
         Args:
-          cycle: The run, by the directory it is written in.
+          epic: The run, by the directory it is written in.
           output: Where to write it, or None for the run's own `traces/`, named after the
             moment it was collected so that collecting twice keeps both.
           start: The earliest session time to include, in any wording dateparser understands.
@@ -106,23 +106,23 @@ class Cycles:
         """
         import datetime
 
-        from hmz.cycle import TRACES
+        from hmz.epic import TRACES
         from hmz.tracing.profile import PROFILE
 
-        agents = self.opened(cycle)
+        agents = self.opened(epic)
         where = Path(output) if output is not None else None
         if where is None:
             stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
-            where = cycle / TRACES / f"{stamp}.trace.json"
+            where = epic / TRACES / f"{stamp}.trace.json"
         where.parent.mkdir(parents=True, exist_ok=True)
         # No workspace at all: the ids are exactly this run's, wherever they were logged.
-        document = Cycles().trace(
+        document = Epics().trace(
             sessions=[ident for ids in agents.values() for ident in ids],
             agents=agents or None,
             output=where,
             start=start,
             end=end,
-            profile=cycle / PROFILE,
+            profile=epic / PROFILE,
         )
         return where, document
 

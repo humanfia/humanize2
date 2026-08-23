@@ -48,7 +48,7 @@ class Journal(Protocol):
 
     Named rather than imported: a run is written out of the agents it drove, so naming the
     run from here would be a circle. This is the whole of what an agent asks of one, and
-    :class:`hmz.cycle.Cycle` is what answers to it.
+    :class:`hmz.epic.Epic` is what answers to it.
     """
 
     def opened(self, agent: AgentBase, session: str) -> None:
@@ -1514,10 +1514,10 @@ class SessionBase(ABC):
         if self._id is None:  # an id is fixed for the life of the session it names
             self._id = session_id
             self._agent._opens(session_id)
-            if self._agent.cycle is not None:
+            if self._agent.epic is not None:
                 # The run is the only thing that knows this session was one of its own: the
                 # backend logs it under this id and never says whose it was.
-                self._agent.cycle.opened(self._agent, session_id)
+                self._agent.epic.opened(self._agent, session_id)
 
     def pursue(self, objective: str, *, suppress: bool = False) -> str:
         """Runs the session under a goal, which the agent then keeps itself going toward.
@@ -2274,7 +2274,7 @@ class AgentBase(ABC):
         #: The run this agent is part of, set by whatever is driving the flow and told of
         #: every session this agent opens. Left unset by an agent driven by hand, which is
         #: not a run of anything.
-        self.cycle: Journal | None = None
+        self.epic: Journal | None = None
         #: The skills the flow driving this agent brings, mounted onto every session it
         #: opens. Set by whatever started the flow, since a skill is the flow's rather than
         #: the agent's: the same agent under another flow carries that flow's instead.
@@ -2783,7 +2783,7 @@ class AgentBase(ABC):
             self._stands_in = made = _built(walked[0], self) if walked else False
             if made:
                 made.loads(self._loads)
-                made.cycle = self.cycle
+                made.epic = self.epic
                 # Only the steps after its own: a chain read again from the top by each hop
                 # would be a chain that walks the agents before it a second time.
                 made._beyond = walked[1:]

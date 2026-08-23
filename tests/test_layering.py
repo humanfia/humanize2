@@ -4,7 +4,7 @@ Two things nothing else can check. The layers keep the dependencies the merged p
 `agents` names the machine its turns land on, so it reads `machines`, and a machine hands back
 an anchor, so `machines` reads `coganchor`. A flow is written against `flows` and names nothing
 else, which is what makes `flows` the layer that names the agents rather than the flow doing
-it; `runner` is what reads a command line into one and writes the run down as `cycle`.
+it; `runner` is what reads a command line into one and writes the run down as `epic`.
 `tracing` reads the logs back afterwards and needs only where they are. Nothing points both
 ways, which is checked here too.
 
@@ -67,19 +67,19 @@ ALLOWED: dict[str, set[str]] = {
     # `backends` is the leaf those are written down in: it names nothing, so this widens the
     # DAG without bending it. And a run that is being profiled samples the programs its
     # agents start, which is `tracing`: what a run left behind, read back.
-    "hmz.cycle": {"hmz.agents", "hmz.backends", "hmz.tracing"},
+    "hmz.epic": {"hmz.agents", "hmz.backends", "hmz.tracing"},
     # What a flow is written against, which is why it is also the one import a flow needs:
     # the agents it drives, and the facts a loop steers by. A flow that has to know where
     # its own agent keeps its tasks, or what models that account runs, is reading a fact
     # rather than a log -- `backends` is the leaf those are written down in and `models` is
     # what asks a CLI, and neither names anything above itself, so both widen the DAG
     # without bending it. The run one flow makes when it calls another is written into the
-    # cycle of the run that called it, and a failure in any of them is reported by the one
+    # epic of the run that called it, and a failure in any of them is reported by the one
     # reporter every layer may reach for.
     "hmz.flows": {
         "hmz.agents",
         "hmz.backends",
-        "hmz.cycle",
+        "hmz.epic",
         # Where a flow says one of its agents works, which is a container of the flow's own
         # naming. It names only the anchor under it, so this widens the DAG without bending
         # it.
@@ -108,7 +108,7 @@ ALLOWED: dict[str, set[str]] = {
     "hmz.runner": {
         "hmz.agents",
         "hmz.backends",
-        "hmz.cycle",
+        "hmz.epic",
         "hmz.flows",
         # Whether a run here is profiled as well as traced, which is a workspace's own
         # setting. A leaf, like the agents kept under a name beside it.
@@ -129,7 +129,7 @@ ALLOWED: dict[str, set[str]] = {
     "hmz.sdk": {
         "hmz.agents",
         "hmz.backends",
-        "hmz.cycle",
+        "hmz.epic",
         "hmz.fallbacks",
         "hmz.flows",
         "hmz.kept",
@@ -148,9 +148,9 @@ ALLOWED: dict[str, set[str]] = {
     "hmz.tui": {
         "hmz.agents",
         "hmz.backends",
-        # The runs of this directory, which `/cycles` lists and picks one up from. It names
+        # The runs of this directory, which `/epics` lists and picks one up from. It names
         # the agents and the facts about them, both of which are under the interface too.
-        "hmz.cycle",
+        "hmz.epic",
         # `/fallback` is where it is said what a turn does when the agent taking it cannot,
         # which is the other half of what `/providers` says about an account. It names only
         # `backends`, so this widens the DAG without bending it.

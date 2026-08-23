@@ -98,7 +98,7 @@ def _at(offset: float) -> str:
 
 
 def _stamped(offset: float) -> str:
-    """The same, as humanize names a cycle's directory."""
+    """The same, as humanize names an epic's directory."""
     moment = WHEN + datetime.timedelta(seconds=offset)
     return moment.strftime("%Y%m%dT%H%M%S.") + f"{moment.microsecond // 1000:03d}Z"
 
@@ -293,14 +293,14 @@ class _Invented:
 class _Drove:
     """An agent that never ran, so the invented runs are written down as real ones are.
 
-    What a cycle asks of an agent is its name, its backend, what it was configured with and
+    What an epic asks of an agent is its name, its backend, what it was configured with and
     whether it was stopped -- so this is those, and nothing that could take a turn.
     """
 
     id: str
     backend: str
     config: Any
-    cycle: Any = None
+    epic: Any = None
     stopped: bool = False
     loaded: tuple[Any, ...] = field(default_factory=tuple)
 
@@ -314,11 +314,11 @@ def _runs() -> None:
     """Writes down two runs of this project, as the code that writes down a real run.
 
     Invented, like everything else here -- the moments included, so that a rendered GIF says
-    the same date tomorrow. What is not invented is the shape: this is `hmz.cycle` writing
+    the same date tomorrow. What is not invented is the shape: this is `hmz.epic` writing
     its own record, linking each session to the transcript above and keeping what a flow that
     can be picked up left behind.
     """
-    from hmz import cycle as written_as
+    from hmz import epic as written_as
     from hmz.agents import AgentConfig
 
     moments = iter(
@@ -333,16 +333,16 @@ def _runs() -> None:
     config = AgentConfig(model="claude-opus-4-8", effort="high")
     written_as._now = _ticks(0)  # noqa: SLF001 -- each run happened when it happened
     first = _Drove(id="builder", backend="claude", config=config)
-    with written_as.Cycle("twice", [first], "work through TASK.md", WORK) as one:
-        first.cycle = one
+    with written_as.Epic("twice", [first], "work through TASK.md", WORK) as one:
+        first.epic = one
         one.opened(first, SESSION)
 
     written_as._now = _ticks(LATER)  # noqa: SLF001
     second = _Drove(id="fixer", backend="claude", config=config)
-    with written_as.Cycle(
+    with written_as.Epic(
         "nightly", [second], "keep the tests green", WORK, resumable=True
     ) as two:
-        second.cycle = two
+        second.epic = two
         two.opened(second, NIGHTLY)
         held = two.state("nightly")
         held["rounds"] = 3
@@ -363,7 +363,7 @@ def _profile(at: pathlib.Path) -> None:
     """Writes the programs the invented run 'started', for the profile a trace draws.
 
     Args:
-      at: The cycle's own directory.
+      at: The epic's own directory.
     """
     from hmz.tracing.profile import PROFILE
 

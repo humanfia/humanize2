@@ -107,9 +107,9 @@ const SURFACES: Surface[] = [
       'workspace-run',
       'run-runner',
       'runner-conversations',
-      'runner-cycle',
+      'runner-epic',
     ],
-    nodes: ['python', 'workspace', 'run', 'runner', 'conversations', 'cycle'],
+    nodes: ['python', 'workspace', 'run', 'runner', 'conversations', 'epic'],
   },
   {
     key: 'cli',
@@ -122,9 +122,9 @@ const SURFACES: Surface[] = [
       'workspace-run',
       'run-runner',
       'runner-conversations',
-      'runner-cycle',
+      'runner-epic',
     ],
-    nodes: ['cli', 'workspace', 'run', 'runner', 'conversations', 'cycle'],
+    nodes: ['cli', 'workspace', 'run', 'runner', 'conversations', 'epic'],
   },
   {
     key: 'tui',
@@ -132,8 +132,8 @@ const SURFACES: Surface[] = [
     about:
       'Keeps the workspace and runner in hand so it can configure, watch and steer the ' +
       'agent conversations while they run.',
-    path: ['tui-workspace', 'workspace-runner', 'runner-conversations', 'runner-cycle'],
-    nodes: ['tui', 'workspace', 'runner', 'conversations', 'cycle'],
+    path: ['tui-workspace', 'workspace-runner', 'runner-conversations', 'runner-epic'],
+    nodes: ['tui', 'workspace', 'runner', 'conversations', 'epic'],
   },
   {
     key: 'daemon',
@@ -147,9 +147,9 @@ const SURFACES: Surface[] = [
       'tui-workspace',
       'workspace-runner',
       'runner-conversations',
-      'runner-cycle',
+      'runner-epic',
     ],
-    nodes: ['daemon', 'session', 'tui', 'workspace', 'runner', 'conversations', 'cycle'],
+    nodes: ['daemon', 'session', 'tui', 'workspace', 'runner', 'conversations', 'epic'],
   },
 ]
 
@@ -162,7 +162,7 @@ const NODES: GraphNode[] = [
   { id: 'session', label: 'Session boundary', x: 304, y: 238, width: 166 },
   { id: 'run', label: 'Run lifecycle', x: 510, y: 54, width: 150 },
   { id: 'runner', label: 'one runner', x: 710, y: 102, width: 150 },
-  { id: 'cycle', label: 'cycle record', x: 510, y: 222, width: 150 },
+  { id: 'epic', label: 'epic record', x: 510, y: 222, width: 150 },
   { id: 'conversations', label: 'agent conversations', x: 710, y: 222, width: 166 },
 ]
 
@@ -176,7 +176,7 @@ const EDGES: GraphEdge[] = [
   { id: 'run-runner', d: 'M 585 56 C 617 58, 621 88, 635 96' },
   { id: 'workspace-runner', d: 'M 387 116 C 482 154, 576 151, 635 112' },
   { id: 'runner-conversations', d: 'M 710 124 L 710 200' },
-  { id: 'runner-cycle', d: 'M 650 124 C 620 174, 592 207, 585 216' },
+  { id: 'runner-epic', d: 'M 650 124 C 620 174, 592 207, 585 216' },
 ]
 
 const pickedSurface = computed(() => SURFACES.find((one) => one.key === surface.value)!)

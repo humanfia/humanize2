@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from hmz.sdk.accounts import Accounts
     from hmz.sdk.agents import Agents, Taken
     from hmz.sdk.core import Hmz
-    from hmz.sdk.cycles import Cycles
+    from hmz.sdk.epics import Epics
     from hmz.sdk.fallbacks import Fallbacks
     from hmz.sdk.flows import Flows, Flowverses
     from hmz.sdk.running import Run
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 __all__ = [
     "Accounts",
     "Agents",
-    "Cycles",
+    "Epics",
     "Fallbacks",
     "Flows",
     "Flowverses",
@@ -51,7 +51,7 @@ __all__ = [
 _WRITTEN = {
     "Accounts": "hmz.sdk.accounts",
     "Agents": "hmz.sdk.agents",
-    "Cycles": "hmz.sdk.cycles",
+    "Epics": "hmz.sdk.epics",
     "Fallbacks": "hmz.sdk.fallbacks",
     "Flows": "hmz.sdk.flows",
     "Flowverses": "hmz.sdk.flows",

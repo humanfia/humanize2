@@ -119,7 +119,7 @@ running()                       # one Running(flow, since) apiece, in the order 
 
 This lists the flow you started and whatever it called, **innermost last**. The interface names
 them on its status line and on `/status` as `chat ▸ official/rlar`. The
-[cycle](/guide/tracing#what-a-run-writes-down) records each call and each return.
+[epic](/guide/tracing#what-a-run-writes-down) records each call and each return.
 
 A flow that called another does not read as the flow somebody chose. That is the point: a
 five-hour trace where phase two was `gen-plan` should say so.

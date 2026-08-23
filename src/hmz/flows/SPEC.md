@@ -19,9 +19,9 @@
 
 What a flow is: what it drives, what it is called, where it is found, which of the ones it
 holds was asked for, what it brings with it, and what it takes for one flow to run another.
-Nothing here reads a command line and nothing here opens a cycle: `hmz.runner` does both, and
-asks this what the flow it was named says about itself. A call asks the cycle already open for
-a record to be written into, which is not a second cycle: it is part of the one run.
+Nothing here reads a command line and nothing here opens an epic: `hmz.runner` does both, and
+asks this what the flow it was named says about itself. A call asks the epic already open for
+a record to be written into, which is not a second epic: it is part of the one run.
 
 This MUST be the whole of what a flow imports. A flow is content -- somebody else's
 repository, forked and edited -- and one that named `hmz.agents` for the type of what it
@@ -360,7 +360,7 @@ def left(one: Running) -> None: ...
 ```
 
 What a flow says it drives, read off its own entry point, and what it takes for one flow to
-run another. `hmz.runner` asks this and then opens a cycle around the answer.
+run another. `hmz.runner` asks this and then opens an epic around the answer.
 
 - A flow's entry point MUST take `(agents: tuple[...], task: str)`, and that tuple MUST be of
   a fixed length: how many agents the flow drives is the one thing about a flow that a command
@@ -418,9 +418,9 @@ run another. `hmz.runner` asks this and then opens a cycle around the answer.
   another goes on being driven by its own. A caller MAY say the ones it carries stay reachable,
   and the called flow MUST still win a name they both use.
 - A called flow that says it can be picked up MUST be handed its own kept state, under its own
-  name, in the cycle of the run that called it: a flow that called another is two flows, each
+  name, in the epic of the run that called it: a flow that called another is two flows, each
   with its own to keep, and both of them part of one run.
-- A called flow MUST be written into a record of its own, in the cycle of the run that called
+- A called flow MUST be written into a record of its own, in the epic of the run that called
   it, and what it opens while it runs MUST go there rather than into the record of whatever
   started the run: a flow that called another is two flows, and each of them ran. Its agents
   MUST be pointed back at what they were writing to when the call returns, however it returns,
@@ -430,7 +430,7 @@ run another. `hmz.runner` asks this and then opens a cycle around the answer.
   called after it. Nothing else can say: a flow is a Python file that may branch any way it
   likes, so what it is doing is only visible where it was started and where it asked for
   another. A flow MUST leave that list however it ends, and a call MUST be written into the
-  cycle at both ends, saying which record it was written to, a run being what it did as well
+  epic at both ends, saying which record it was written to, a run being what it did as well
   as what it was started as.
 - What is running MUST be checked against the threads running it. A flow says it has ended as
   it ends, but only one that got the chance to: a flow abandoned where it stood -- an interface

@@ -163,14 +163,14 @@ was profiled -- and writes them out as one Chrome JSON trace. Works whether or n
 them. See [Tracing](/reference/tracing).
 
 ```
-hmz trace collect [<workspace>] [--cycle <cycle> | --session <session>[,<session>]... | --all]
+hmz trace collect [<workspace>] [--epic <epic> | --session <session>[,<session>]... | --all]
                   [--output <output>] [--start <start>] [--end <end>]
 ```
 
 | Argument | |
 | --- | --- |
 | `<workspace>` | The directory to collect for. Defaults to this one, unless sessions are named. |
-| `--cycle <name>` | Which run to trace, by the name of its directory or a leading part of it. Defaults to the last run of the workspace. |
+| `--epic <name>` | Which run to trace, by the name of its directory or a leading part of it. Defaults to the last run of the workspace. |
 | `--session <s>[,<s>...]` | Sessions to trace instead of a run, comma separated and repeatable. |
 | `--all` | Every session of the workspace instead of a run, whichever run opened them and whether any did. |
 | `--output <path>` | Where to write. Defaults to `traces/<datetime>.trace.json` inside the run it is a trace of, and beside that workspace's runs for a trace that is of none; the directory is created if it is not there. |
@@ -182,13 +182,13 @@ the run wrote down rather than by the directory it ran in -- so a run that worke
 [machine's](/reference/machines) mirror is in its own trace, and a run that opened nothing is a
 trace of nothing. `--session` and `--all` are the other thing a trace can be of: what a directory
 holds whoever opened it. Naming a run as well is a usage error, and neither is offered in the
-interface, `/cycles` being a list of runs.
+interface, `/epics` being a list of runs.
 
 A session is named by its whole id, by the key the trace shows it under, or by a leading part of
 either, and the sub-agents it started come with it. Named sessions are collected wherever they
 were recorded, and are then cut down to the workspace when one is given.
 
-A trace goes with the run it is a trace of: a cycle already holds what happened, what each
+A trace goes with the run it is a trace of: an epic already holds what happened, what each
 session was logged to and what the flow left behind. One that is of no run goes beside that
 workspace's runs instead. The default name is the UTC moment it was collected, so collecting
 twice keeps both traces rather than writing over the first -- and `--output` still wins, a trace
@@ -198,14 +198,14 @@ Prints the output path, which run it is a trace of, and what it holds:
 
 ```console
 $ hmz trace collect
-~/.humanize/cycles/-home-you-code/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
+~/.humanize/epics/-home-you-code/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json of 20260809T014455.212Z-9f21ab: 3 sessions, 412 slices
 ```
 
 ### Examples
 
 ```sh
 hmz trace collect                                    # the last run here
-hmz trace collect --cycle 20260809T0144              # a run of this workspace, by name
+hmz trace collect --epic 20260809T0144               # a run of this workspace, by name
 hmz trace collect ~/code/other --start "3 days ago"  # another workspace's last run, recent part
 hmz trace collect --all                              # every session here, run or no run
 hmz trace collect --session 0a1b2c3d,5f6e            # two sessions, wherever they ran
@@ -590,12 +590,12 @@ A backend home that does not exist is skipped rather than being an error.
 
 | Path | Written by | |
 | --- | --- | --- |
-| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/cycle.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened and as which account, how it ended. See [Cycles](/reference/tracing#cycles). |
-| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/cycle.<flow>_<hex>.jsonl` | the same, per flow that run [called](/reference/flows#a-flow-that-calls-another-flow) | What that call was, written the same way: a called flow opens sessions and calls flows of its own. The run's own record says which file each call is in. |
-| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/sessions/<session>/` | the same | A link per file each session was logged to, for reading a run back. humanize reads and writes the logs where the backend keeps them. |
-| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/state.json` | a [resumable](/reference/flows) flow | What that flow left behind, which the next run of it picks up. |
-| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/profile.jsonl` | a run of a workspace that asked to be profiled | The programs the run started, sampled while it ran. |
-| `~/.humanize/cycles/<workspace>/<datetime>-<hex>/traces/<datetime>.trace.json` | `hmz trace collect`, `/cycles` | The trace of that run. |
+| `~/.humanize/epics/<workspace>/<datetime>-<hex>/epic.jsonl` | every run of a flow | What the run was: the flow, the agents, every session opened and as which account, how it ended. See [Epics](/reference/tracing#epics). |
+| `~/.humanize/epics/<workspace>/<datetime>-<hex>/epic.<flow>_<hex>.jsonl` | the same, per flow that run [called](/reference/flows#a-flow-that-calls-another-flow) | What that call was, written the same way: a called flow opens sessions and calls flows of its own. The run's own record says which file each call is in. |
+| `~/.humanize/epics/<workspace>/<datetime>-<hex>/sessions/<session>/` | the same | A link per file each session was logged to, for reading a run back. humanize reads and writes the logs where the backend keeps them. |
+| `~/.humanize/epics/<workspace>/<datetime>-<hex>/state.json` | a [resumable](/reference/flows) flow | What that flow left behind, which the next run of it picks up. |
+| `~/.humanize/epics/<workspace>/<datetime>-<hex>/profile.jsonl` | a run of a workspace that asked to be profiled | The programs the run started, sampled while it ran. |
+| `~/.humanize/epics/<workspace>/<datetime>-<hex>/traces/<datetime>.trace.json` | `hmz trace collect`, `/epics` | The trace of that run. |
 | `~/.humanize/providers/<cli>/<name>/provider.json` | `hmz providers add` | What a [provider](/reference/providers) was made by, and what a turn under it runs with. `0600`, in a directory at `0700`. |
 | `~/.humanize/providers/<cli>/<name>/{home,user}/...` | the CLI's own login | That provider's credentials, at the names the CLI keeps its own under. |
 | `~/.humanize/providers/<cli>/<name>/models.json` | `hmz providers add`, **r** | What that CLI said it runs as that account. Goes when the account does. |
@@ -639,13 +639,13 @@ from hmz.sdk import Hmz
 
 hmz = Hmz()
 hmz.exec(["-f", "ralph_loop", "-a", "claude/claude-opus-5:high", "fix the build"])
-hmz.cycles.trace(output="run.trace.json")
+hmz.epics.trace(output="run.trace.json")
 hmz.accounts.all("claude")
 hmz.verses.add("humanfia/flowverse")
 ```
 
 - `hmz.exec(argv)` / `hmz.run(flow, agents, task)` — [Flows](/reference/flows)
-- `hmz.cycles.trace(...)` — [Tracing](/reference/tracing)
+- `hmz.epics.trace(...)` — [Tracing](/reference/tracing)
 - `hmz.accounts` — [Providers](/reference/providers)
 - `hmz.verses` — [Flowverses](/guide/flowverses)
 - `hmz.agents` — the agents written down under a name

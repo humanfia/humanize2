@@ -5,7 +5,7 @@ down, somebody presses esc, a turn takes the process with it. What such a flow n
 second copy of the transcript -- the backends keep that -- but the handful of things it is
 itself keeping track of: which round it is on, which files it has been through, what it has
 decided so far. So a flow says it can be picked up, and is handed a dict: what it wrote there
-last time, kept in the run's own cycle and saved as it writes.
+last time, kept in the run's own epic and saved as it writes.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import AgentConfig, Stopped
-from hmz.cycle import STATE, cycles, read, resumed, state
+from hmz.epic import STATE, epics, read, resumed, state
 from hmz.flows import NotAFlow, resumes
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, written
@@ -70,9 +70,9 @@ def run(
 '''
 
 
-def _state(cycle: Path) -> dict[str, object]:
-    """What one cycle's state file holds, by flow."""
-    return json.loads((cycle / STATE).read_text())
+def _state(epic: Path) -> dict[str, object]:
+    """What one epic's state file holds, by flow."""
+    return json.loads((epic / STATE).read_text())
 
 
 def test_a_resumable_flow_is_handed_what_the_last_run_of_it_left(
@@ -85,11 +85,11 @@ def test_a_resumable_flow_is_handed_what_the_last_run_of_it_left(
     for _ in range(3):
         Runner(flow, [ShellAgent(CONFIG)]).run("go")
 
-    first, second, third = cycles()
+    first, second, third = epics()
     assert _state(first) == {str(flow): {"rounds": 1}}
     assert _state(second) == {str(flow): {"rounds": 2}}
     assert _state(third) == {str(flow): {"rounds": 3}}
-    # Each run is a run of its own, whatever it picked up: a cycle is never reopened.
+    # Each run is a run of its own, whatever it picked up: an epic is never reopened.
     assert read(third) is not None
     assert read(third).resumable  # pyright: ignore[reportOptionalMemberAccess]
 
@@ -97,33 +97,33 @@ def test_a_resumable_flow_is_handed_what_the_last_run_of_it_left(
 def test_a_run_says_which_run_it_was_picked_up_from(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A cycle is what a run was, and being the second half of another one is part of that."""
+    """An epic is what a run was, and being the second half of another one is part of that."""
     monkeypatch.chdir(tmp_path)
     flow = written(tmp_path, "counts", COUNTS)
 
     Runner(flow, [ShellAgent(CONFIG)]).run("go")
     Runner(flow, [ShellAgent(CONFIG)]).run("go")
 
-    first, second = cycles()
-    began = json.loads((second / "cycle.jsonl").read_text().splitlines()[0])
+    first, second = epics()
+    began = json.loads((second / "epic.jsonl").read_text().splitlines()[0])
     assert began["picked_up"] == first.name
     assert began["resumable"] is True
 
 
-def test_a_run_picked_up_from_a_named_cycle_takes_that_one_s_state(
+def test_a_run_picked_up_from_a_named_epic_takes_that_one_s_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Which is what choosing one in `/cycles` and carrying on comes to."""
+    """Which is what choosing one in `/epics` and carrying on comes to."""
     monkeypatch.chdir(tmp_path)
     flow = written(tmp_path, "counts", COUNTS)
 
     for _ in range(3):
         Runner(flow, [ShellAgent(CONFIG)]).run("go")
-    first, _, _ = cycles()
+    first, _, _ = epics()
 
     Runner(flow, [ShellAgent(CONFIG)], resume=first).run("go")
 
-    assert _state(cycles()[-1]) == {str(flow): {"rounds": 2}}
+    assert _state(epics()[-1]) == {str(flow): {"rounds": 2}}
 
 
 def test_a_flow_that_says_nothing_is_run_from_the_top_every_time(
@@ -144,9 +144,9 @@ def test_a_flow_that_says_nothing_is_run_from_the_top_every_time(
     Runner(flow, [ShellAgent(CONFIG)]).run("go")
 
     assert not resumes(flow)
-    assert not (cycles()[0] / STATE).exists()
-    assert read(cycles()[0]) is not None
-    assert not read(cycles()[0]).resumable  # pyright: ignore[reportOptionalMemberAccess]
+    assert not (epics()[0] / STATE).exists()
+    assert read(epics()[0]) is not None
+    assert not read(epics()[0]).resumable  # pyright: ignore[reportOptionalMemberAccess]
 
 
 def test_the_state_of_a_run_that_was_stopped_is_there_to_be_picked_up(
@@ -170,9 +170,9 @@ def test_the_state_of_a_run_that_was_stopped_is_there_to_be_picked_up(
     with pytest.raises(Stopped):
         Runner(flow, [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    assert state(cycle) == {"reached": "half way"}
-    assert resumed(str(flow)) == cycle
+    (epic,) = epics()
+    assert state(epic) == {"reached": "half way"}
+    assert resumed(str(flow)) == epic
 
 
 def test_something_written_inside_the_state_is_saved_when_the_run_ends(
@@ -195,7 +195,7 @@ def test_something_written_inside_the_state_is_saved_when_the_run_ends(
     Runner(flow, [ShellAgent(CONFIG)]).run("one")
     Runner(flow, [ShellAgent(CONFIG)]).run("two")
 
-    assert state(cycles()[-1]) == {"seen": ["one", "two"]}
+    assert state(epics()[-1]) == {"seen": ["one", "two"]}
 
 
 def test_a_resumable_flow_that_takes_a_config_is_handed_both(
@@ -208,7 +208,7 @@ def test_a_resumable_flow_that_takes_a_config_is_handed_both(
     Runner(flow, [ShellAgent(CONFIG)], {"step": 4}).run("go")
     Runner(flow, [ShellAgent(CONFIG)], {"step": 4}).run("go")
 
-    assert state(cycles()[-1]) == {"at": 8}
+    assert state(epics()[-1]) == {"at": 8}
 
 
 def test_a_called_flow_keeps_its_own_state_under_its_own_name(
@@ -236,7 +236,7 @@ def test_a_called_flow_keeps_its_own_state_under_its_own_name(
     Runner("outer", [ShellAgent(CONFIG)]).run("go")
     Runner("outer", [ShellAgent(CONFIG)]).run("go")
 
-    held = _state(cycles()[-1])
+    held = _state(epics()[-1])
     assert held == {"outer": {"outer": 2}, "inner": {"rounds": 2}}
 
 
@@ -253,7 +253,7 @@ def test_a_flow_called_outside_a_run_is_handed_a_dict_that_is_nowhere(
 
     load("counts")([ShellAgent(CONFIG)], "go")
 
-    assert cycles() == []
+    assert epics() == []
 
 
 def test_a_flow_that_says_it_resumes_and_takes_no_dict_says_so(
@@ -313,10 +313,10 @@ def test_a_flow_that_emptied_its_state_starts_the_next_run_clean(
 
     Runner(flow, [ShellAgent(CONFIG)]).run("go")
     Runner(flow, [ShellAgent(CONFIG)]).run("go")
-    assert state(cycles()[-1]) == {"rounds": 2}
+    assert state(epics()[-1]) == {"rounds": 2}
 
     Runner(flow, [ShellAgent(CONFIG)]).run("done")  # which empties it
     Runner(flow, [ShellAgent(CONFIG)]).run("go")
 
     # From nothing, rather than from the two rounds two runs ago.
-    assert state(cycles()[-1]) == {"rounds": 1}
+    assert state(epics()[-1]) == {"rounds": 1}

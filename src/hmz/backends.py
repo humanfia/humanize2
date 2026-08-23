@@ -114,7 +114,7 @@ class Model:
 
     Attributes:
       name: What to ask the backend for. The id it answers to, never an alias it also takes:
-        `opus` is whichever Opus is newest today and something else tomorrow, so a cycle that
+        `opus` is whichever Opus is newest today and something else tomorrow, so an epic that
         recorded it says nothing about what actually ran.
       efforts: The efforts this model takes, hardest first, which is not always all of the
         ones its backend has.

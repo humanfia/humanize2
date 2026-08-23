@@ -505,7 +505,7 @@ def _rebuilt(written: Any, gives: str, inside: Mapping[str, Any]) -> Any:
 def _saved(state: dict[str, Any]) -> None:
     """Writes the run's state where it is kept, for a run stopped after this node.
 
-    A `hmz.cycle.State` saves itself as it is written into, and a plain dict is what a flow
+    A `hmz.epic.State` saves itself as it is written into, and a plain dict is what a flow
     run from a test is handed. Both are dicts here, and only one of them has anything to do:
     what is written inside `done` is written inside a value the mapping cannot see change.
 

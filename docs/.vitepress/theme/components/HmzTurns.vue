@@ -18,7 +18,7 @@ const FILES = [
   'verses.py',
   'skills.py',
   'runner.py',
-  'cycle.py',
+  'epic.py',
   'kept.py',
   'models.py',
 ]

@@ -1,7 +1,7 @@
 """What more than one suite needs: a shell-backed agent, and an anchor that stays here.
 
 Here rather than in a conftest because these are imported by name, and a conftest is a pytest
-plugin rather than a module to import from -- and because the agents, the cycles and the
+plugin rather than a module to import from -- and because the agents, the epics and the
 machines are three suites now, all of which drive a stand-in agent.
 """
 
@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from hmz.agents import AgentBase, CommandSessionBase
 from hmz.coganchor import AnchorConfig
-from hmz.cycle import JOURNAL
+from hmz.epic import JOURNAL
 from hmz.flows import ENTRY
 from hmz.flows.skills import SKILLS
 
@@ -102,19 +102,19 @@ def written(
     return at
 
 
-def events(cycle: Path) -> list[dict[str, Any]]:
+def events(epic: Path) -> list[dict[str, Any]]:
     """Every line one record wrote, in the order it wrote them.
 
-    A cycle is a directory now -- the run's own record, a record per flow the run called, and
+    An epic is a directory now -- the run's own record, a record per flow the run called, and
     a link per session any of them opened -- so what these suites want is one file inside it:
     the run's own where they are handed the directory, and the one they name where they name
     a record of a called flow.
 
     Args:
-      cycle: The cycle's directory, or one record inside it.
+      epic: The epic's directory, or one record inside it.
 
     Returns:
       One record per line.
     """
-    at = cycle / JOURNAL if cycle.is_dir() else cycle
+    at = epic / JOURNAL if epic.is_dir() else epic
     return [json.loads(line) for line in at.read_text(encoding="utf-8").splitlines()]

@@ -26,7 +26,7 @@ Screenshot "/out/collect.png"
 Sleep 600ms
 
 # Or one run by name, wherever it comes among them.
-Type "hmz trace collect --cycle 20260720T1000" Enter
+Type "hmz trace collect --epic 20260720T1000" Enter
 Sleep 3500ms
 
 # And a trace is also a thing to attach to an issue.

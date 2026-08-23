@@ -51,7 +51,7 @@ def test_a_directory_nothing_is_held_in_has_no_daemon(tmp_path: Path) -> None:
 
 
 def test_two_runs_of_one_workspace_are_refused(held: daemon.Daemon) -> None:
-    """One daemon per workspace: two flows writing over each other's cycle is not two runs."""
+    """One daemon per workspace: two flows writing over each other's epic is not two runs."""
     with pytest.raises(OSError, match="already being held"):
         daemon.start(runs.opens)
 

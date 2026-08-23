@@ -38,7 +38,7 @@ def _profiled(
     """The programs a run started, read back and cut down to the window asked for.
 
     Args:
-        said: The profile a cycle holds, by path, or the records themselves,
+        said: The profile an epic holds, by path, or the records themselves,
             or None for a trace of the sessions alone.
         window: The times the trace was narrowed to.
 
@@ -98,8 +98,8 @@ def collect(
         start: Earliest session time to include, in any wording dateparser
             understands, defaults to the earliest record.
         end: Latest session time to include, defaults to the latest record.
-        profile: The programs the run started while it ran, as the profile a
-            cycle holds or the records themselves. Each becomes a process of
+        profile: The programs the run started while it ran, as the profile an
+            epic holds or the records themselves. Each becomes a process of
             the trace with a track per thread, beside the agents' own: a turn
             is mostly other programs, and one timeline is what makes that
             visible.

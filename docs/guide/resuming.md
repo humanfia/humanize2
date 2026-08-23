@@ -21,7 +21,7 @@ The second run finds the state the first run left behind. It carries on from rou
 To make a flow resumable, give it `resumable=True` and a dict. The dict is where you keep what
 the loop itself knows: which round it is on, which files it has been through, what it has
 decided so far. It is not a second copy of the transcript. The backends keep that, and the
-run's **[cycle](/guide/tracing#what-a-run-writes-down)** (what the run writes down) already
+run's **[epic](/guide/tracing#what-a-run-writes-down)** (what the run writes down) already
 says which sessions it opened.
 
 ```python
@@ -50,10 +50,10 @@ this.
 
 ## Where it lives
 
-What a flow keeps goes in the cycle of the run that wrote it, as `state.json`. It sits beside
+What a flow keeps goes in the epic of the run that wrote it, as `state.json`. It sits beside
 that run's own record and the links to its sessions:
 
-![one run's directory listed: cycle.jsonl, profile.jsonl, sessions and
+![one run's directory listed: epic.jsonl, profile.jsonl, sessions and
 state.json](/demo/run.png)
 
 The state is keyed by flow. A flow that calls [another
@@ -101,13 +101,13 @@ where it is looked for.
 
 ## Carrying an older one on
 
-`/cycles` is every run of a flow in this directory, newest first. It shows when the run
+`/epics` is every run of a flow in this directory, newest first. It shows when the run
 happened, which flow it was, what it was asked to do, how many sessions it opened, and a mark
 on the runs whose flow says it can be picked up. Enter opens what there is to do with the run
 under the cursor:
 
-![the /cycles list with the run that can be picked up marked, the menu that opens under one
-run, and a trace collected from it](/demo/cycles.gif)
+![the /epics list with the run that can be picked up marked, the menu that opens under one
+run, and a trace collected from it](/demo/epics.gif)
 
 | | |
 | --- | --- |
@@ -144,7 +144,7 @@ Runner("nightly", agents, resume=at).run("keep the tests green")
 ```
 
 `at` is that run's own directory: what *where it is* prints, and what
-[`hmz.cycle.cycles()`](/reference/tracing#cycles) lists.
+[`hmz.epic.epics()`](/reference/tracing#epics) lists.
 
 ## What carrying on runs
 
@@ -159,16 +159,16 @@ Two things are not the run's. The person at the prompt is not an agent anybody c
 that talks to one is handed a fresh one. How the flow was set up is not written in the run, so
 that is [what this project remembers](/guide/settings) for the flow now.
 
-## A cycle is never reopened
+## An epic is never reopened
 
-What carries on is written into a cycle of its own. Its `began` line says which run it was
+What carries on is written into an epic of its own. Its `began` line says which run it was
 `picked_up` from.
 
 The run being picked up is read and left exactly as it was. Carrying the same run on twice is
 two runs from one starting point, rather than one record with two runs inside it.
 
 This is what makes a week of stops and starts readable afterwards. Each stretch is a run, with
-its own sessions, its own trace and its own end, rather than one enormous cycle claiming to
+its own sessions, its own trace and its own end, rather than one enormous epic claiming to
 have begun on Monday.
 
 ## An atlas picks itself up

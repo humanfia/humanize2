@@ -59,7 +59,7 @@ while True:
 ```
 
 `Stopped` is not a `subprocess.CalledProcessError`. Nothing that catches a failed turn catches
-this by accident. Let it propagate. The [cycle](/guide/tracing#what-a-run-writes-down) then
+this by accident. Let it propagate. The [epic](/guide/tracing#what-a-run-writes-down) then
 records the run as **stopped by hand** rather than as one that finished. That is the difference
 between "it decided it was done" and "somebody stopped it", and the only place that
 distinction is written down.

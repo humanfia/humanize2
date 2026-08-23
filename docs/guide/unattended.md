@@ -147,7 +147,7 @@ Stop it with **ctrl+c**. The interrupt reaches the whole process group, so the a
 process takes it too. The turn under way dies with it, what it was doing is left where it got
 to, and the command exits `130`.
 
-The [cycle](/guide/tracing#what-a-run-writes-down) records that run as **`failed`**. `stopped`
+The [epic](/guide/tracing#what-a-run-writes-down) records that run as **`failed`**. `stopped`
 is for an agent [told to stop by hand](/guide/stopping), with ctrl+c twice in the interface or
 `agent.stop()` from inside the flow. Nothing on a command line tells the two apart.
 

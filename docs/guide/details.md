@@ -44,7 +44,7 @@ discarded. Turning it back on does not recover what scrolled past, but the
 
 `/details` changes nothing about the run. The agent is not told about the setting, and it does
 not think less because you are not looking. A flow that is running is not restarted. Nothing
-about the [cycle](/guide/concepts#cycle) or the [trace](/guide/tracing) is different.
+about the [epic](/guide/concepts#epic) or the [trace](/guide/tracing) is different.
 
 ## From Python
 

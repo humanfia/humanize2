@@ -113,7 +113,7 @@ tally while it runs. Which of them is which is on [Many backends, one agent](/fe
 ## Where the detail is
 
 - [Tracing](/guide/tracing) — collecting one, and what to look for in your first
-- [Tracing reference](/reference/tracing) — the cycle format, the trace format, what a slice
+- [Tracing reference](/reference/tracing) — the epic format, the trace format, what a slice
   carries
 - [Reporting](/guide/reporting) — what may leave the machine, and only after consent
 - [Many turns at once](/features/concurrency) — why a fan-out is one process and many tracks

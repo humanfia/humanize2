@@ -11,7 +11,7 @@ src/hmz/
 ├── __main__.py       python -m hmz
 ├── backends.py       every fact about a coding agent CLI that is not code
 ├── models.py         what each backend runs, asked of it and kept per account
-├── cycle.py          what one run of one flow was, written down as it happens
+├── epic.py           what one run of one flow was, written down as it happens
 ├── fallbacks.py     where a turn goes when the place taking it cannot take it at all
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
 ├── sdk/              humanize as one object: Hmz, which every way in goes through
@@ -47,8 +47,8 @@ a target and could be lifted out whole, so it has a name of its own.
 | `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |
 | `flows/` | What a flow is: the interface it drives, the mark, what it says it drives, the skills it brings, calling one from another, and where flowverses are fetched to. The one import a flow writes — what it needs from another layer is handed through from here. `builtin/` beside it is the three humanize ships. | `Agent`, `Session`, `Person`, `flow`, `load`, `drives`, `wanted`, `found`, `find`, `held`, `fork`, `flowverses` |
 | `fallbacks.py` | The layer between an agent and its accounts: where a turn goes when the place taking it cannot take it at all, and how many times over it is taken again first. A step is written between two places — `CLI[@ACCOUNT]/MODEL` — rather than on the account, which `providers` already answers for. Names `backends` and nothing else. | `Falls`, `falls`, `points`, `retrying`, `tried`, `clear`, `chain`, `spec`, `reads`, `waits`, `POLICIES` |
-| `cycle.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Cycle`, `cycles`, `read`, `opened`, `state`, `resumed` |
-| `runner.py` | Handing a flow the agents it declared, naming them, and running it under a cycle. Also reads the `hmz exec` line, which the interface starts a flow from too. What the flow says it drives is `flows/`'s to answer. | `Runner`, `flow_and_agents`, `read_agent`, `set_up_from` |
+| `epic.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Epic`, `epics`, `read`, `opened`, `state`, `resumed` |
+| `runner.py` | Handing a flow the agents it declared, naming them, and running it under an epic. Also reads the `hmz exec` line, which the interface starts a flow from too. What the flow says it drives is `flows/`'s to answer. | `Runner`, `flow_and_agents`, `read_agent`, `set_up_from` |
 | `tracing/` | Reading the backends' logs back — and, for a profiled run, sampling the programs its agents start — and rendering both as one Chrome trace. | `collect`, `profile.Profiler` |
 | `sdk/` | humanize as one object. A workspace, what is remembered about it, the flows there are, the agents and accounts they run as, the runs already made and the run being made now. It composes the layers and restates none of them, and it reaches each of them from inside the call that needs it — which is what lets `hmz exec` name it without paying for the tracer. | `Hmz`, `Run`, `Session` |
 | `tui/` | The terminal interface. | `Humanize` |
@@ -100,7 +100,7 @@ machines            │
     │                │
  agents ────────────┤
     │                │
- cycle   flows       │
+  epic   flows       │
     └──┬───┘         │
        │             │
     runner ──────────┤
@@ -124,10 +124,10 @@ Two edges are worth explaining:
 - **`tracing → backends` only.** `tracing` does not know how to *drive* anything; it needs the
   home directories and log globs, and nothing else.
 
-And one edge deliberately absent: **`agents` does not name `cycle`.** A run is written out of
+And one edge deliberately absent: **`agents` does not name `epic`.** A run is written out of
 the agents it drove, so naming the run from an agent would be a circle. What an agent needs of
 one — somewhere to write down a session it opened — is a `Journal` protocol declared in
-`agents/base.py`, which `Cycle` happens to satisfy.
+`agents/base.py`, which `Epic` happens to satisfy.
 
 ## Rules that are checked
 

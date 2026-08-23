@@ -207,13 +207,13 @@ wrote down the ids of the sessions it opened, and that is what its trace is gath
 hmz trace collect
 ```
 
-The run itself is still written down here. A [cycle](/guide/tracing#what-a-run-writes-down)
+The run itself is still written down here. An [epic](/guide/tracing#what-a-run-writes-down)
 belongs to the directory the flow ran in, and it is a directory of its own with a `sessions/`
 in it. Each session is named for whose it was, what took its turns, which account it ran as and
 what the backend called it:
 
 ```sh
-run=$(ls -dt ~/.humanize/cycles/*/*/ | head -1)   # the run that just finished
+run=$(ls -dt ~/.humanize/epics/*/*/ | head -1)   # the run that just finished
 ls "$run"sessions
 ```
 
@@ -224,7 +224,7 @@ tester-codex@local-0a1b2c3d-1a2b-3c4d-5e6f-708192a3b4c5
 
 The id is the end of the name, and a leading part of it is enough, so the line above collects
 the tester's, which is the session that worked in the container. At the prompt the same thing
-is `/cycles`: enter on the run, then **where it is**.
+is `/epics`: enter on the run, then **where it is**.
 
 ## Isolation here is about environment, not permission
 

@@ -167,7 +167,7 @@ exactly `on` or `off`.
 ### `no such command: /foo`
 
 Type `/` to see the list. `hmz anchor` is deliberately not a command here: it is not a thing to
-do to a flow that is running. `/cycles` shows what a run left behind. It is where the runs of
+do to a flow that is running. `/epics` shows what a run left behind. It is where the runs of
 this directory are, and where one of them is collected into a trace.
 
 ### A line I typed did not reach the agent
@@ -254,8 +254,8 @@ Nothing matched. In order of likelihood:
 1. **The backend's home is elsewhere.** Check `CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
    `KIMI_CODE_HOME`. A home that does not exist is skipped silently.
 2. **The run being traced opened nothing.** A trace is of a run and holds that run's own
-   sessions. So a run that died before its first turn is a trace of nothing. `/cycles` says how
-   many sessions each run opened, and `--cycle` names another.
+   sessions. So a run that died before its first turn is a trace of nothing. `/epics` says how
+   many sessions each run opened, and `--epic` names another.
 3. **You are tracing the wrong directory.** Runs are kept per workspace. Without a
    `<workspace>`, the last run of *this* one is what is traced.
 4. **Nothing here was ever run by a flow.** Then there is no run to trace. What you want is
@@ -265,8 +265,8 @@ Nothing matched. In order of likelihood:
 ### Two agents show up as one
 
 They ran at the same configuration, and nothing said they were two. `hmz trace collect` reads
-that off the run it is a trace of. That run is the last [cycle](/reference/tracing#cycles) of
-the workspace unless `--cycle` names another. So a trace asked for by `--session` or `--all` is
+that off the run it is a trace of. That run is the last [epic](/reference/tracing#epics) of
+the workspace unless `--epic` names another. So a trace asked for by `--session` or `--all` is
 of no run and has nothing to read it off. If you drive agents by hand, pass `agents={a.id:
 a.opened for a in …}`. See [what counts as one
 agent](/reference/tracing#what-counts-as-one-agent).

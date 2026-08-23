@@ -15,7 +15,7 @@ Set TypingSpeed 25ms
 
 Hide
 Type "cd /work/demo && clear" Enter
-Type "run=$(ls -d /root/.humanize/cycles/-work-demo/*/ | tail -1)" Enter
+Type "run=$(ls -d /root/.humanize/epics/-work-demo/*/ | tail -1)" Enter
 Type "clear" Enter
 Show
 

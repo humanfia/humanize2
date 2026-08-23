@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import AgentConfig, Stopped, Usage
-from hmz.cycle import STATE, cycles, state
+from hmz.epic import STATE, epics, state
 from hmz.flows import resumes
 from hmz.flows.builtin import ralph_loop, stateful_ralph
 from hmz.runner import Runner
@@ -175,7 +175,7 @@ def test_a_ralph_loop_says_which_round_it_is_on(
     _ran(monkeypatch, ralph_loop, agent, rounds=3)
 
     assert _said(capsys) == ["round 1", "round 2", "round 3"]
-    assert state(cycles()[-1]) == {"rounds": 3, "output": 0.0}
+    assert state(epics()[-1]) == {"rounds": 3, "output": 0.0}
 
 
 @pytest.mark.timeout(60)
@@ -190,7 +190,7 @@ def test_a_ralph_loop_started_again_goes_on_from_the_round_it_reached(
     _ran(monkeypatch, ralph_loop, ShellAgent(CONFIG), rounds=2)
 
     assert _said(capsys) == ["round 3", "round 4"]
-    first, second = cycles()
+    first, second = epics()
     assert state(first) == {"rounds": 2, "output": 0.0}
     assert state(second) == {"rounds": 4, "output": 0.0}
 
@@ -211,7 +211,7 @@ def test_a_ralph_loop_keeps_the_count_and_nothing_of_what_was_said(
     _ran(monkeypatch, ralph_loop, agent, rounds=2)
 
     assert len(agent.opened) == 2
-    assert state(cycles()[-1]) == {"rounds": 2, "output": 0.0}
+    assert state(epics()[-1]) == {"rounds": 2, "output": 0.0}
 
 
 @pytest.mark.timeout(60)
@@ -227,7 +227,7 @@ def test_stateful_ralph_holds_one_session_and_a_run_after_it_opens_another(
 
     assert len(first.opened) == 1  # one conversation, three rounds of it
     assert len(second.opened) == 1  # and another, which has none of the first in it
-    assert state(cycles()[-1]) == {"rounds": 5, "output": 0.0}
+    assert state(epics()[-1]) == {"rounds": 5, "output": 0.0}
 
 
 @pytest.mark.timeout(60)
@@ -265,8 +265,8 @@ def test_a_run_of_chat_leaves_nothing_behind_to_pick_up(
 
     Runner("chat", [ShellAgent(CONFIG)]).run(TASK)
 
-    (cycle,) = cycles()
-    assert not (cycle / STATE).exists()
+    (epic,) = epics()
+    assert not (epic / STATE).exists()
 
 
 @pytest.mark.timeout(60)
@@ -322,7 +322,7 @@ def test_a_loop_that_stalled_leaves_what_it_kept_for_the_next_run(
         monkeypatch, ralph_loop, ShellAgent(CONFIG), config={"budget": 0}, task=FAILS
     )
 
-    assert state(cycles()[-1]) == {"rounds": 3, "output": 0.0}
+    assert state(epics()[-1]) == {"rounds": 3, "output": 0.0}
 
 
 @pytest.mark.timeout(60)
@@ -404,7 +404,7 @@ def test_a_loop_that_spent_its_budget_leaves_nothing_for_the_next_run_to_pick_up
 
     _ran_out(monkeypatch, ralph_loop, Spends(CONFIG), config={"budget": 2})
 
-    assert state(cycles()[-1]) == {}
+    assert state(epics()[-1]) == {}
 
 
 @pytest.mark.timeout(60)
@@ -417,7 +417,7 @@ def test_a_budget_of_nothing_is_a_loop_that_goes_on_until_it_is_stopped(
 
     _ran(monkeypatch, ralph_loop, agent, rounds=5, config={"budget": 0})
 
-    assert state(cycles()[-1]) == {"rounds": 5, "output": 5 * EACH}
+    assert state(epics()[-1]) == {"rounds": 5, "output": 5 * EACH}
 
 
 @pytest.mark.timeout(60)
@@ -432,7 +432,7 @@ def test_what_a_loop_spent_is_carried_into_the_run_that_picks_it_up(
     monkeypatch.chdir(tmp_path)
 
     _ran(monkeypatch, ralph_loop, Spends(CONFIG), rounds=2, config={"budget": 9})
-    assert state(cycles()[-1]) == {"rounds": 2, "output": 2 * EACH}
+    assert state(epics()[-1]) == {"rounds": 2, "output": 2 * EACH}
     capsys.readouterr()
 
     _ran_out(monkeypatch, ralph_loop, Spends(CONFIG), config={"budget": 3})
@@ -440,7 +440,7 @@ def test_what_a_loop_spent_is_carried_into_the_run_that_picks_it_up(
     said = capsys.readouterr().out.splitlines()
     assert [line for line in said if line.startswith("round ")] == ["round 3"]
     assert "stopping: 3.00M output tokens of 3M" in said
-    assert state(cycles()[-1]) == {}
+    assert state(epics()[-1]) == {}
 
 
 @pytest.mark.timeout(60)
@@ -459,7 +459,7 @@ def test_stateful_ralph_stops_on_its_budget_too(
         "round 2",
     ]
     assert len(agent.opened) == 1  # one conversation, both rounds of it
-    assert state(cycles()[-1]) == {}
+    assert state(epics()[-1]) == {}
 
 
 @pytest.mark.timeout(60)

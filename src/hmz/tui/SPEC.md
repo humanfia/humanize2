@@ -129,7 +129,7 @@ line, with what the flow is doing beside the transcript.
 - `hmz anchor` MUST NOT be a command here: it is not a thing to do to a flow that is running,
   and a command that only ever means one thing is a command line. Gathering a trace MUST NOT
   be one either -- it is a thing done to a run that has already happened, so it is one of the
-  things `/cycles` offers about the run under the cursor rather than a command of its own.
+  things `/epics` offers about the run under the cursor rather than a command of its own.
 - Setting the flow up MUST NOT be a command here either: it is asked as the flow is chosen, so
   a command for it would be a second way in to one sheet of one menu -- and one that has to
   say `that flow takes no setting up` for most of the flows there are.
@@ -499,7 +499,7 @@ adjusted rather than chosen.
 
 ### The runs that have already happened
 
-- `/cycles` MUST list every run of a flow in this directory, newest first, saying what each
+- `/epics` MUST list every run of a flow in this directory, newest first, saying what each
   was -- when it began, which flow, what it was asked to do, how it went and how many sessions
   it opened -- and marking the ones whose flow says they can be picked up again. A run is
   written down as it happens and nothing showed them, which made the record something only a
@@ -521,7 +521,7 @@ adjusted rather than chosen.
 - Carrying a run on MUST run that run's own flow, on that run's own agents, with what it was
   asked to do -- what is being picked up is what ran, and an agent swapped under it would be
   a different run wearing its name. It MUST be a run of its own, saying which run it came
-  from, since a closed cycle is never reopened. While a flow is running it MUST be refused
+  from, since a closed epic is never reopened. While a flow is running it MUST be refused
   where it was asked for, `ctrl+c` twice being what stops one.
 - It MUST be readable while a flow runs: what has already happened does not change under one.
 

@@ -148,7 +148,7 @@ jobs:
 artifacts whether the run finished, failed, or hit the timeout.
 
 `--output` is what puts it there. Left alone, a trace goes with the run it is a trace of:
-`traces/` inside `~/.humanize/cycles/<workspace>/<run>/`. That is outside the checkout and
+`traces/` inside `~/.humanize/epics/<workspace>/<run>/`. That is outside the checkout and
 named after a run the YAML has never heard of. `--output` is for the other case — a trace as a
 file to hand to somebody. A job uploading an artifact is exactly that.
 
@@ -156,11 +156,11 @@ Download it and drag it into [ui.perfetto.dev](https://ui.perfetto.dev). One pro
 one track per row of its sessions, one slice per thing it did, with the prompts and the tool
 output attached. See [tutorial 5](/guide/tracing).
 
-The [cycle](/guide/tracing#what-a-run-writes-down) says how it ended. A run is a directory, and
-its record is `cycle.jsonl` inside it:
+The [epic](/guide/tracing#what-a-run-writes-down) says how it ended. A run is a directory, and
+its record is `epic.jsonl` inside it:
 
 ```sh
-tail -1 ~/.humanize/cycles/*/*/cycle.jsonl
+tail -1 ~/.humanize/epics/*/*/epic.jsonl
 ```
 
 ```console

@@ -110,7 +110,7 @@ def _answers(driver: object) -> set[str]:
 
     Args:
       driver: A driver, made rather than named: an attribute written in `__init__` -- the
-        cycle the run is written into is one -- is on the agent rather than on its class, and
+        epic the run is written into is one -- is on the agent rather than on its class, and
         is as much what the driver has as a method is.
 
     Returns:

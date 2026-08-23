@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hmz.agents import AgentConfig
-from hmz.cycle import cycles, state
+from hmz.epic import epics, state
 from hmz.flows import PROPHECY, NotAFlow, configures, kept, resumes, wanted
 from hmz.flows.prophesying import prophesied
 from hmz.runner import Runner
@@ -287,7 +287,7 @@ def test_what_a_run_has_done_is_the_answers_it_has(project: Path) -> None:
 
     _run("rounds")
 
-    held = state(cycles()[-1], "rounds")
+    held = state(epics()[-1], "rounds")
     assert (project / "rounds.txt").read_text() == "www"
     # A node visited twice is two answers: a round that overwrote the last round's would be
     # a run nothing could be picked up in the middle of.
@@ -354,7 +354,7 @@ def test_a_supernode_is_the_graph_under_it_walked(project: Path) -> None:
 
     assert (project / "ran.txt").read_text() == "start deepen "
     assert (project / "out.txt").read_text() == "hello!"
-    assert sorted(state(cycles()[-1], "outer")["done"]) == [
+    assert sorted(state(epics()[-1], "outer")["done"]) == [
         "beside#1",
         "beside#1/deeper#1",
         "beside#1/deeper#1/deepen#1",
@@ -530,7 +530,7 @@ def test_a_run_that_was_set_up_is_handed_what_it_was_set_up_with(project: Path) 
 def test_an_atlas_that_will_not_compile_is_refused_before_the_run_is_set_up(
     project: Path,
 ) -> None:
-    """Rather than from inside one that has pulled an image and opened a cycle."""
+    """Rather than from inside one that has pulled an image and opened an epic."""
     _write(
         project,
         "three",

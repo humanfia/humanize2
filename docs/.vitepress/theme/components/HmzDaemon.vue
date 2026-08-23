@@ -331,7 +331,7 @@ function reset() {
           <span v-else>removed with the closed socket</span>
         </div>
         <div class="file journal">
-          <strong>cycle.jsonl</strong>
+          <strong>epic.jsonl</strong>
           <span>{{ journal }} complete lines · append as events happen</span>
         </div>
         <div class="file state">

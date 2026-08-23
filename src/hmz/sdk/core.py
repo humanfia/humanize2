@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from hmz.runner import Runner
     from hmz.sdk.accounts import Accounts
     from hmz.sdk.agents import Agents
-    from hmz.sdk.cycles import Cycles
+    from hmz.sdk.epics import Epics
     from hmz.sdk.fallbacks import Fallbacks
     from hmz.sdk.flows import Flows, Flowverses
     from hmz.sdk.running import Run
@@ -53,7 +53,7 @@ class Hmz:
         self._agents: Agents | None = None
         self._accounts: Accounts | None = None
         self._fallbacks: Fallbacks | None = None
-        self._cycles: Cycles | None = None
+        self._epics: Epics | None = None
 
     @property
     def workspace(self) -> Path:
@@ -120,13 +120,13 @@ class Hmz:
         return self._fallbacks
 
     @property
-    def cycles(self) -> Cycles:
+    def epics(self) -> Epics:
         """The runs of this workspace that have already happened."""
-        if self._cycles is None:
-            from hmz.sdk.cycles import Cycles
+        if self._epics is None:
+            from hmz.sdk.epics import Epics
 
-            self._cycles = Cycles(self._workspace)
-        return self._cycles
+            self._epics = Epics(self._workspace)
+        return self._epics
 
     def backends(self) -> tuple[Profile, ...]:
         """Every coding agent CLI humanize drives, whether or not it is installed here."""

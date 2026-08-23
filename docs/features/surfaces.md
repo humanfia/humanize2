@@ -74,7 +74,7 @@ a bad setup presented to a run is refused before its first turn.
 ## Shared core does not mean identical interfaces
 
 The SDK's workspace object is the composition point. It reaches the same settings, flows,
-agents, accounts and cycles that the other surfaces show, and loads each of them only when it
+agents, accounts and epics that the other surfaces show, and loads each of them only when it
 is asked for. Adding a flowverse through one surface and seeing it in another is not a sync
 operation. Both are reading the same store.
 

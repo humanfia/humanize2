@@ -67,7 +67,7 @@ if TYPE_CHECKING:
 
     from hmz.agents import AgentBase, Board, Moment
     from hmz.backends import Model, Way
-    from hmz.cycle import Ran
+    from hmz.epic import Ran
 
     # Under another name, because `Falls` here is the sheet one account's chain is chosen on
     # and this is the step itself. Two things called the same thing in one file is one of
@@ -95,12 +95,12 @@ __all__ = [
     "Clis",
     "Configures",
     "Confirms",
-    "Cycles",
     "Does",
     "Doing",
     "Drafts",
     "Drawn",
     "Entry",
+    "Epics",
     "Failing",
     "Fallbacks",
     "Fitted",
@@ -6478,7 +6478,7 @@ class Doing(NamedTuple):
     """What somebody asked to have done with one run that has already happened.
 
     Attributes:
-      cycle: The run, by the directory it is written in, or None where this is only what the
+      epic: The run, by the directory it is written in, or None where this is only what the
         sheet has to say on the way out.
       doing: What to do with it, which is what the menu under it answered, and "" where the
         sheet did it itself.
@@ -6486,7 +6486,7 @@ class Doing(NamedTuple):
         a trace and said nothing afterwards is one nobody can read back.
     """
 
-    cycle: Path | None = None
+    epic: Path | None = None
     doing: str = ""
     said: tuple[str, ...] = ()
 
@@ -6519,7 +6519,7 @@ def _asked_for(task: str) -> str:
 
 
 def _when(said: str) -> str:
-    """One of the moments a cycle writes down, as a row of a list says one.
+    """One of the moments an epic writes down, as a row of a list says one.
 
     Args:
       said: The moment, as it was written -- `2026-08-16T03:04:05.123Z`.
@@ -6621,7 +6621,7 @@ def collected(ran: Ran) -> tuple[Path, str]:
     of nothing anybody asked about. They are asked for by the ids the run wrote down rather
     than by directory, so a flow that worked in a machine's mirror is in its own trace too.
 
-    Beside the run rather than in this directory: a cycle is what a run was, and the trace of
+    Beside the run rather than in this directory: an epic is what a run was, and the trace of
     that run belongs with the sessions it points at and the state it left. A trace of what a
     directory holds whoever opened it is `hmz trace collect --all`, and a trace to attach to
     an issue is `--output`: both are a command line, there being no run here to hang either
@@ -6633,7 +6633,7 @@ def collected(ran: Ran) -> tuple[Path, str]:
     Returns:
       Where the trace was written, and a line saying what it holds.
     """
-    where, document = _hmz().cycles.traced(ran.at)
+    where, document = _hmz().epics.traced(ran.at)
     said = document["otherData"]
     held = f"{said.get('sessions', '0')} sessions, {said.get('slices', '0')} slices"
     if said.get("programs"):
@@ -6641,7 +6641,7 @@ def collected(ran: Ran) -> tuple[Path, str]:
     return where, held
 
 
-class Cycles(Sheet[Doing]):
+class Epics(Sheet[Doing]):
     """Every run of a flow in this directory, newest first, and what to do with one.
 
     A run is written down as it happens -- which flow, on what, by which agents, and which
@@ -6671,7 +6671,7 @@ class Cycles(Sheet[Doing]):
         super().__init__()
         from hmz.sdk import Hmz
 
-        runs = Hmz(workspace).cycles
+        runs = Hmz(workspace).epics
         #: Newest first: what somebody opening this came to look at is the run that has just
         #: happened, and a list of a hundred is one nobody scrolls to the end of.
         self._ran = [
@@ -6693,7 +6693,7 @@ class Cycles(Sheet[Doing]):
 
     def _ask(self) -> None:
         """Says what these are, and puts them up."""
-        self.query_one("#asked", Label).update("Cycles")
+        self.query_one("#asked", Label).update("Epics")
         self.query_one("#about", Label).update(
             "Every run of a flow in this directory, newest first: what it was, how it went, "
             "and how many sessions it opened. Enter says what there is to do with one."

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from hmz.agents import AgentConfig, Stopped
-from hmz.cycle import JOURNAL, called, cycles, linked, opened, read, sessions
+from hmz.epic import JOURNAL, called, epics, linked, opened, read, sessions
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, events, written
 
@@ -53,12 +53,12 @@ class ClaudeAgent(ShellAgent):
     """A stand-in that answers to a backend humanize knows where the logs of."""
 
 
-def _lines(cycle: Path) -> list[dict[str, Any]]:
-    """Every event of one cycle, in the order it was written."""
-    return events(cycle)
+def _lines(epic: Path) -> list[dict[str, Any]]:
+    """Every event of one epic, in the order it was written."""
+    return events(epic)
 
 
-def test_a_run_is_one_cycle_and_says_what_it_opened(
+def test_a_run_is_one_epic_and_says_what_it_opened(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The whole of it: what was run, by whom, at what, and every session that came of it."""
@@ -71,8 +71,8 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
 
     Runner(tmp_path / "flow", agents).run("go")
 
-    (cycle,) = cycles()
-    began, *held, ended = _lines(cycle)
+    (epic,) = epics()
+    began, *held, ended = _lines(epic)
     assert began["flow"] == str(tmp_path / "flow")
     assert began["task"] == "go"
     assert began["workspace"] == str(tmp_path.resolve())
@@ -108,26 +108,26 @@ def test_a_run_is_one_cycle_and_says_what_it_opened(
     ]
     assert ended == {"event": "ended", "at": ended["at"], "how": "done"}
     # And what a trace is gathered by: whose each of those sessions was.
-    assert opened(cycle) == {"actor": ["session-0"], "reviewer": ["session-1"]}
+    assert opened(epic) == {"actor": ["session-0"], "reviewer": ["session-1"]}
 
 
-def test_a_second_run_is_a_second_cycle(
+def test_a_second_run_is_a_second_epic(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A cycle is a run and not a workspace: running the flow again is another run."""
+    """An epic is a run and not a workspace: running the flow again is another run."""
     monkeypatch.chdir(tmp_path)
     written(tmp_path, "flow", FLOW)
 
     for _ in range(2):
         Runner(tmp_path / "flow", [ShellAgent(CONFIG), ShellAgent(CONFIG)]).run("go")
 
-    assert len(cycles()) == 2
+    assert len(epics()) == 2
 
 
 def test_a_run_that_was_interrupted_says_so(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Esc ends a flow, and a cycle that ended that way is not one that finished."""
+    """Esc ends a flow, and an epic that ended that way is not one that finished."""
     monkeypatch.chdir(tmp_path)
     written(
         tmp_path,
@@ -142,14 +142,14 @@ def test_a_run_that_was_interrupted_says_so(
     with pytest.raises(Stopped):
         Runner(tmp_path / "flow", [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    assert _lines(cycle)[-1]["how"] == "stopped"
+    (epic,) = epics()
+    assert _lines(epic)[-1]["how"] == "stopped"
 
 
 def test_a_run_that_failed_says_so(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A turn that failed takes the flow with it, and the cycle says how it went."""
+    """A turn that failed takes the flow with it, and the epic says how it went."""
     monkeypatch.chdir(tmp_path)
     written(
         tmp_path,
@@ -164,11 +164,11 @@ def test_a_run_that_failed_says_so(
     with pytest.raises(subprocess.CalledProcessError):
         Runner(tmp_path / "flow", [ShellAgent(CONFIG)]).run("go")
 
-    (cycle,) = cycles()
-    assert _lines(cycle)[-1]["how"] == "failed"
+    (epic,) = epics()
+    assert _lines(epic)[-1]["how"] == "failed"
 
 
-def test_the_cycles_of_one_workspace_are_not_another_workspace_s(
+def test_the_epics_of_one_workspace_are_not_another_workspace_s(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """They are kept under the workspace they ran in, which is what looks them up."""
@@ -179,18 +179,18 @@ def test_the_cycles_of_one_workspace_are_not_another_workspace_s(
     monkeypatch.chdir(here)
     Runner(here / "flow", [ShellAgent(CONFIG), ShellAgent(CONFIG)]).run("go")
 
-    assert len(cycles(here)) == 1
-    assert cycles(there) == []
+    assert len(epics(here)) == 1
+    assert epics(there) == []
 
 
 def test_an_agent_driven_by_hand_is_not_a_run_of_anything(tmp_path: Path) -> None:
-    """A session opened outside a flow belongs to no cycle, and writes to none."""
+    """A session opened outside a flow belongs to no epic, and writes to none."""
     agent = ShellAgent(CONFIG)
 
     agent.new()("echo alone")
 
     assert agent.opened == ["alone"]
-    assert cycles(tmp_path) == []
+    assert epics(tmp_path) == []
 
 
 def test_a_session_is_named_for_whose_it_is_what_ran_it_and_which_account(
@@ -202,8 +202,8 @@ def test_a_session_is_named_for_whose_it_is_what_ran_it_and_which_account(
 
     Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
 
-    (cycle,) = cycles()
-    (one,) = sessions(cycle)
+    (epic,) = epics()
+    (one,) = sessions(epic)
     assert one == (
         "builder",
         "claude",
@@ -231,18 +231,18 @@ def test_a_session_says_which_account_took_its_turns(
 
     Runner(tmp_path / "flow", [agent]).run("go")
 
-    (cycle,) = cycles()
-    (one,) = sessions(cycle)
+    (epic,) = epics()
+    (one,) = sessions(epic)
     assert one.provider == "work"
     assert one.name == "builder-claude@work-the-session"
     # And what it was configured with is what the run says it was driven by.
-    ran = read(cycle)
+    ran = read(epic)
     assert ran is not None
     assert ran.agents[0].provider == "work"
     assert ran.agents[0].spec == "claude@work/m:high"
 
 
-def test_the_logs_of_a_session_are_linked_into_the_cycle_that_opened_it(
+def test_the_logs_of_a_session_are_linked_into_the_epic_that_opened_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A link rather than a copy: humanize reads and writes the log where the backend keeps it."""
@@ -256,12 +256,12 @@ def test_the_logs_of_a_session_are_linked_into_the_cycle_that_opened_it(
 
     Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
 
-    (cycle,) = cycles()
-    (one,) = sessions(cycle)
-    link = cycle / "sessions" / one.name / "the-session.jsonl"
+    (epic,) = epics()
+    (one,) = sessions(epic)
+    link = epic / "sessions" / one.name / "the-session.jsonl"
     assert link.is_symlink()
     assert link.resolve() == log.resolve()
-    assert linked(cycle) == {one.name: [str(log)]}
+    assert linked(epic) == {one.name: [str(log)]}
 
 
 def test_a_log_written_after_the_last_turn_is_linked_when_the_run_ends(
@@ -295,15 +295,15 @@ def test_a_log_written_after_the_last_turn_is_linked_when_the_run_ends(
 
     Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
 
-    (cycle,) = cycles()
-    (one,) = sessions(cycle)
-    assert sorted(p.name for p in (cycle / "sessions" / one.name).iterdir()) == [
+    (epic,) = epics()
+    (one,) = sessions(epic)
+    assert sorted(p.name for p in (epic / "sessions" / one.name).iterdir()) == [
         "explore.jsonl",
         "the-session.jsonl",
     ]
 
 
-def test_a_cycle_reads_back_as_what_was_run_and_how_it_went(
+def test_a_epic_reads_back_as_what_was_run_and_how_it_went(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Which is what a listing of them shows, and what one of them can be picked up from."""
@@ -312,12 +312,12 @@ def test_a_cycle_reads_back_as_what_was_run_and_how_it_went(
 
     Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
 
-    (cycle,) = cycles()
-    ran = read(cycle)
+    (epic,) = epics()
+    ran = read(epic)
     assert ran is not None
     assert (ran.flow, ran.task, ran.how) == (str(tmp_path / "flow"), "go", "done")
     assert ran.workspace == str(tmp_path.resolve())
-    assert ran.name == cycle.name
+    assert ran.name == epic.name
     assert not ran.resumable
     assert [one.agent for one in ran.agents] == ["builder"]
     assert [one.ident for one in ran.sessions] == ["the-session"]
@@ -326,8 +326,8 @@ def test_a_cycle_reads_back_as_what_was_run_and_how_it_went(
 def test_a_run_written_before_calls_had_records_still_reads_as_what_it_called(
     tmp_path: Path,
 ) -> None:
-    """A cycle is read where it was written, and older runs were written differently."""
-    at = tmp_path / "cycle"
+    """An epic is read where it was written, and older runs were written differently."""
+    at = tmp_path / "epic"
     at.mkdir()
     lines: tuple[dict[str, Any], ...] = (
         {"event": "began", "at": "1", "flow": "outer", "task": "go", "agents": []},
@@ -354,7 +354,7 @@ def test_a_run_written_before_calls_had_records_still_reads_as_what_it_called(
 
 
 def test_a_directory_that_holds_no_run_is_not_one(tmp_path: Path) -> None:
-    """A cycle is what this wrote; anything else under there is somebody else's directory."""
-    (tmp_path / "not-a-cycle").mkdir()
+    """An epic is what this wrote; anything else under there is somebody else's directory."""
+    (tmp_path / "not-a-epic").mkdir()
 
-    assert read(tmp_path / "not-a-cycle") is None
+    assert read(tmp_path / "not-a-epic") is None

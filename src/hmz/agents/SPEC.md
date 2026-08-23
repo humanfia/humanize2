@@ -290,7 +290,7 @@ class AgentBase(ABC):
   up, at most once and only when first asked, and which MUST be taken down when the agent is
   collected or the process exits. An agent given no machine MUST answer `None`.
 - What an agent writes a session down to MUST be named as a protocol here rather than imported
-  from `hmz.cycle`: a run is written out of the agents it drove, so naming the run from
+  from `hmz.epic`: a run is written out of the agents it drove, so naming the run from
   here would be a circle.
 
 ### `SessionBase`
