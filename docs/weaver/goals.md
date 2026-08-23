@@ -7,31 +7,22 @@ in a single prompt.
 
 ## Try it
 
-Give an agent a goal with one call:
-
 ```python
 agent.pursue("the suite passes and nothing has been stubbed out")
 ```
 
-The agent keeps going until it decides the objective has been met, and `pursue` returns the
-final turn. This is the backend's own goal feature, the one its `/goal` command reaches, not a
-prompt that asks for one. The backend starts the extra turns itself.
+That is the backend's own goal feature — the one its `/goal` command reaches — not a prompt
+asking for one. The backend starts the extra turns itself; `pursue` follows the goal across all
+of them and returns the last. Four spellings, and every one of them exists: `agent.pursue`,
+`await agent.apursue`, `session.pursue`, `await session.apursue`.
 
-## What `pursue` answers with
-
-A goal takes as many turns of the model as it needs. `pursue` follows the goal across all of
-them and returns the last one.
-
-When a session goes quiet, the goal has stopped because the goal itself said so. A flow that
-loops over `pursue` runs the objective again. It does not nudge an agent that stopped early:
+A goal that goes quiet has stopped because the goal itself said so. A flow that loops over
+`pursue` runs the objective again; it does not nudge an agent that stopped early:
 
 ```python
 while True:
     agent.pursue(objective, suppress=True)
 ```
-
-The awaited twin is `agent.apursue(objective)`. A session has both: `session.pursue(...)` and
-`await session.apursue(...)`.
 
 ## Which backends have one
 
@@ -49,7 +40,7 @@ set. A missing feature is a flow to correct, not a turn to retry.
 
 ## Disabling goals
 
-If your flow owns every continuation, you can suggest `off` for each agent it declares:
+If your flow owns every continuation, suggest `off` for each agent it declares:
 
 ```python
 from typing import Annotated, NamedTuple
@@ -63,10 +54,8 @@ class Agents(NamedTuple):
 
 The marker only supplies the model picker's initial value. The `goals` row switches the
 selected agent between `on` and `off`, and the resolved value is saved on that agent's
-`AgentConfig`. The picker and config have no third state, and the flow does not change an agent
-after it is made.
-
-Python callers set the same policy directly when they construct an agent:
+`AgentConfig`. There is no third state, and the flow does not change an agent after it is made.
+Python callers set the same policy directly:
 
 ```python
 agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high", goals=False))
@@ -75,18 +64,23 @@ agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high", goals=Fa
 `agent.disable_goals()` does the same thing imperatively before the first turn.
 
 Ordinary turns still work. Later calls to `pursue` raise `RuntimeError`, even with
-`suppress=True`. Codex starts that agent's app server with its goal tools disabled. Claude Code
-has no such switch, so humanize refuses the goal before it invokes the CLI. It also refuses the
-tools that would carry work past the turn it is holding: `Agent`, `ScheduleWakeup`,
-`CronCreate`, `CronDelete` and `CronList`, as one `--disallowedTools` argument written in that
-order. Everything else the agent may reach for is what its [permission](/user/permissions)
-rung says it may, exactly as before. Neither path changes your global backend configuration. An
-agent whose goals are on keeps the command it always had.
+`suppress=True`, and each backend is held to that its own way:
+
+| | |
+| --- | --- |
+| **Codex** | that agent's app server starts with its goal tools disabled |
+| **Claude Code** | no such switch, so humanize refuses the goal before it invokes the CLI |
+
+Claude is also refused the tools that would carry work past the turn it is holding: `Agent`,
+`ScheduleWakeup`, `CronCreate`, `CronDelete` and `CronList`, as one `--disallowedTools`
+argument written in that order. Everything else the agent may reach for is what its
+[permission](/user/permissions) rung says it may, exactly as before. Neither path changes your
+global backend configuration, and an agent whose goals are on keeps the command it always had.
 
 ## Asking for an agent that has one
 
-A flow built on `pursue` says so where it declares its agents. It is refused before its first
-turn, not an hour into a loop:
+A flow built on `pursue` says so where it declares its agents, and is refused before its first
+turn rather than an hour into a loop:
 
 ```python
 from typing import Annotated, NamedTuple
@@ -109,9 +103,9 @@ to make.
 
 ## A goal by hand: refusing `STOP`
 
-A goal, written by hand, is a refused `STOP` [hook](/weaver/hooks). The turn is not over until
-the hook lets it be. Do this on a backend with no goal feature. Do it when the condition is
-something a Python function can check, not something the model should judge:
+A goal written by hand is a refused `STOP` [hook](/weaver/hooks): the turn is not over until
+the hook lets it be. Do this on a backend with no goal feature, and when the condition is
+something a Python function can check rather than something the model should judge:
 
 ```python
 def unfinished(occasion: Occasion) -> Verdict | None:
@@ -123,7 +117,7 @@ with agent.hooks.on(Moment.STOP, unfinished):
     agent(task, suppress=True)
 ```
 
-`occasion.again` counts how many times this turn has already been sent on. A hook that keeps
+`occasion.again` counts how many times this turn has already been sent on, so a hook that keeps
 refusing can use it to decide when to stop.
 
 | | Decides it is done | Costs |
@@ -133,8 +127,8 @@ refusing can use it to decide when to stop.
 
 ## The flow that is this
 
-[`official/goal`](/flows/goal) is Ralph with the task set as the
-agent's own goal. The loop starts it over only when it stopped without having met it.
+[`official/goal`](/flows/goal) is Ralph with the task set as the agent's own goal. The loop
+starts it over only when it stopped without having met it.
 
 ```sh
 hmz exec -f official/goal -a claude/claude-opus-5:max "$(cat TASK.md)"

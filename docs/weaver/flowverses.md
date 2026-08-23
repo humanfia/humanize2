@@ -2,29 +2,31 @@
 
 A [**flowverse**](/reference/flows#flowverses) is a git repository with a `flows/` directory in
 it. Put your flows in one and they are offered by name, as `<flowverse>/<flow>`, on every
-machine you add it to. Reach for a flowverse when you want to publish a flow somebody else can
-run, or install one somebody else published.
+machine you add it to. It is how a [weaver](/weaver/) hands a flow to somebody else: reach for
+one to publish a flow somebody else can run, or to install one somebody else published.
+
+Only installing one? [Adding one](#adding-one) is that half, and nothing before it is needed.
 
 ## Try it
 
-Publish two flows in a repository, add the repository, and run one by name. Four steps take you
-from an empty directory to a running flow.
+Publish two flows in a repository, add the repository, and run one by name.
 
-1. **Lay out the repository.** A flowverse is a git repository with a `flows/` directory in it.
-   There is no manifest and nothing to register.
+1. **Lay out the repository.** There is no manifest and nothing to register.
 
 ```
 my-flowverse/
-├── README.md
-└── flows/
-    ├── review/          →  yours/review
-    │   ├── __init__.py      the flow
-    │   └── skills/          what it brings, if it brings any
-    ├── nightly.py       →  yours/nightly, a flow that brings nothing
-    └── _shared.py       →  not a flow; imported by the two above
+├── flows/
+│   ├── review/          →  yours/review
+│   │   ├── __init__.py      the flow
+│   │   └── skills/          what it brings, mounted onto its agents' sessions
+│   │       └── review-notes/SKILL.md
+│   ├── nightly.py       →  yours/nightly, a flow that brings nothing
+│   └── _shared.py       →  not a flow; imported by the two above
+├── tests/               →  not read: only flows/ is
+└── README.md
 ```
 
-The `review` flow is a directory whose `__init__.py` holds the function marked `@flow`:
+`review` is a directory whose `__init__.py` holds the function marked `@flow`:
 
 ```python
 # flows/review/__init__.py
@@ -39,8 +41,6 @@ def run(agents: tuple[Agent], task: str) -> None:
     agent(f"Read the diff and write what is wrong to REVIEW.md.\n\n{task}", suppress=True)
 ```
 
-The repository now has two flows: `review` and `nightly`.
-
 2. **Push it.**
 
 ```sh
@@ -50,17 +50,13 @@ git remote add origin git@github.com:you/my-flowverse.git
 git push -u origin main
 ```
 
-The repository is now at `you/my-flowverse`.
-
-3. **Add it.**
+3. **Add it.** `add` clones the repository into `~/.humanize/flowverses/yours/`, and `show`
+   prints what it holds by the name `-f` takes.
 
 ```sh
 hmz flowverses add you/my-flowverse yours
 hmz flowverses show yours
 ```
-
-`add` clones the repository into `~/.humanize/flowverses/yours/`. Every flow in it is then
-offered as `yours/<flow>`, and `show` prints what it holds by the name `-f` takes.
 
 4. **Run one.**
 
@@ -69,10 +65,8 @@ hmz exec -f yours/review -a claude/claude-opus-4-8:high "the payments module"
 ```
 
 `yours/review` is the qualified spelling, `<flowverse>/<flow>`, the one spelling nothing can
-stand in for.
-
-That is the whole feature: flows in a repository are offered by name, on every machine you add
-the repository to.
+stand in for. That is the whole feature: flows in a repository are offered by name, on every
+machine you add the repository to.
 
 ## The two that are always there
 
@@ -81,18 +75,17 @@ the repository to.
 | `builtin` | the flows in the package: [`chat`, `ralph_loop`, `stateful_ralph`](/flows/) |
 | `official` | [humanfia/flowverse](https://github.com/humanfia/flowverse) — [everything else](/flows/) humanize offers |
 
-Run a flow from `official` by giving `-f` the flowverse and the flow:
+Neither can be taken away. Run one from `official` by giving `-f` the flowverse and the flow:
 
 ```sh
 hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
 ```
 
-`official` is **listed before it has been fetched**. What there is to run is not the same
-question as what has been downloaded. Opening `/flow` fetches whatever has never been fetched,
-so in practice it is there by the time you look. Neither of the two can be taken away.
-
-A flow from a flowverse that has not been fetched says so rather than saying there is no such
-file. The name is right; the download has not happened.
+`official` is **listed before it has been fetched**, because what there is to run is not the
+same question as what has been downloaded. Opening `/flow` fetches whatever has never been
+fetched, so in practice it is there by the time you look — and a flow from a flowverse that has
+not been fetched says so, rather than saying there is no such file. The name is right; the
+download has not happened.
 
 ## Adding one
 
@@ -116,14 +109,15 @@ hmz flowverses add you/my-flowverse yours
 hmz exec -f yours/review -a claude/claude-opus-5:high "the payments module"
 ```
 
-`add` names it after the repository when you do not, as `git clone` does. `list -q` prints just
-the names, one a line, for a script to read.
+- `add` names it after the repository when you do not, as `git clone` does.
+- `list -q` prints just the names, one a line, for a script to read.
+- `show` prints `official/humanize1:gen-plan`, not the `official/humanize1` its filename would
+  suggest. Working that out means **importing** the files, which is what `/flow` does for the
+  same question.
+- `list`, `add` and `fetch` read nothing, so a repository you have just cloned is never run
+  until you ask what is in it.
 
-`show` prints the name `-f` takes. It prints `official/humanize1:gen-plan`, not the
-`official/humanize1` its filename would suggest. Working that out means **importing** the
-files, which is what `/flow` does for the same question. `list`, `add` and `fetch` read
-nothing, so a repository you have just cloned is never run until you ask what is in it. See
-[CLI reference](/reference/cli#hmz-flowverses).
+See [CLI reference](/reference/cli#hmz-flowverses).
 
 ### At the prompt
 
@@ -138,41 +132,35 @@ nothing, so a repository you have just cloned is never run until you ask what is
 | **r** | Fetch the one under the cursor again, or for the first time |
 | **d** **d** | Take an added one away, flows and all |
 
-What a flowverse holds is something you read rather than choose from. It shows each flow's name
-and the line it says about itself. Which of them to run is `/flow`'s question, where every
-place's flows are:
+What a flowverse holds is something you read rather than choose from: each flow's name, and the
+line it says about itself.
 
 ![what builtin holds: chat, ralph_loop and stateful_ralph, each with the line its flow says
 about itself](/demo/flowverse-holds.png)
 
-A flowverse that has never been fetched has nothing to read yet. It says so, and says that
-**r** fetches it, rather than reading as a place with nothing in it.
+One that has never been fetched has nothing to read yet. It says so, and says that **r**
+fetches it, rather than reading as a place with nothing in it. A fetch runs off the interface's
+own loop: it keeps drawing while it clones, and what became of it is said under the list rather
+than thrown at you. Opening `/flow` fetches whatever has never been fetched, in the background
+and without moving what you are reading, so **r** is for fetching one *again*.
 
-`/flow` is where the flows are, and it steps between the same places:
+Which flow to run is `/flow`'s question, and it steps between the same places:
 
 | Key | |
 | --- | --- |
 | **←** **→** | Step between the places flows come from, a list apiece — every flowverse, ending with `local` and `user` where either holds anything |
 | **f** | Copy the flow under the cursor into `.humanize/flows/`, to change |
 
-A flow whose file will not import is still listed, under the name it would have had and with
-nothing beside it. It is a flow somebody named. Saying so where it is chosen beats leaving it
-off the list and letting you wonder where it went.
+A flow whose file will not import is still listed there, under the name it would have had and
+with nothing beside it. It is a flow somebody named. Saying so where it is chosen beats leaving
+it off the list and letting you wonder where it went.
 
-The two are apart because they are two questions. Which flow to run is the one `/flow` asks.
-What places there are, and what is in them, is about the list rather than the row under the
-cursor. What stays on `/flow` is **f**, which is about the flow you are looking at: the moment
-you find out it is *nearly* what you want.
-
-A flow is a directory, so the copy is the whole of it, skills and all, and it lands under the
-name it already had. Yours are looked in first, so from then on that name means your copy.
-Editing a flowverse's own copy would not keep, since fetching it again takes what that
-repository says now.
-
-A fetch runs off the interface's own loop. It keeps drawing while it clones, and what became of
-it is said under the list rather than thrown at you. Opening `/flow` fetches whatever has never
-been fetched, in the background and without moving what you are reading, so **r** is for
-fetching one *again*.
+The two pages are apart because they are two questions: which flow to run, and what places
+there are. What stays on `/flow` is **f**, which is about the flow you are looking at — the
+moment you find out it is *nearly* what you want. A flow is a directory, so the copy is the
+whole of it, skills and all, and it lands under the name it already had. Yours are looked in
+first, so from then on that name means your copy. Editing a flowverse's own copy would not
+keep, since fetching it again takes what that repository says now.
 
 Typing `/flow` and pressing enter still sends `/flow`. A command that has been written out
 whole is offered nothing to finish it with, so `/flowverses` never sits under a cursor waiting
@@ -197,7 +185,7 @@ One list, so one rule for what a flow is called and one place a name is looked u
 | `user` | `~/.humanize/flows/*` — yours, in every project |
 | — | the ones humanize ships, and every flowverse there is |
 
-Nearest wins. A flow of your own may stand in for one of humanize's by taking its name. A
+Nearest wins. A flow of your own may stand in for one of humanize's by taking its name: a
 `.humanize/flows/chat/__init__.py` is what `-f chat` runs *in that project*.
 
 What a flow is **called** is a separate question, and every place answers it the same way:
@@ -233,20 +221,8 @@ Publish two small flows rather than one large one for exactly this reason.
 
 ## Making one
 
-Any git repository will do. There is no manifest and nothing to register:
-
-```
-my-flowverse/
-├── flows/
-│   ├── review/           →  yours/review
-│   │   ├── __init__.py       the flow
-│   │   └── skills/           what it brings, mounted onto its agents' sessions
-│   │       └── review-notes/SKILL.md
-│   ├── nightly.py       →  yours/nightly, a flow that brings nothing
-│   └── _shared.py       →  not a flow; imported by the two above
-├── tests/               →  not read: only flows/ is
-└── README.md
-```
+Any git repository will do, laid out the way [Try it](#try-it) lays one out, and held to six
+rules:
 
 | Rule | |
 | --- | --- |
@@ -279,7 +255,8 @@ is imported is the flow's own business, and it fails for somebody who was only b
 list. See [Security](/user/security).
 :::
 
-Check it in the repository's own CI before anybody else does:
+Check it in the repository's own CI before anybody else does. A flow that stopped loading is a
+red build:
 
 ```python
 from hmz.flows import drives, wanted
@@ -287,8 +264,6 @@ from hmz.flows import drives, wanted
 drives("yours/review")     # loads it exactly as `-f` would
 wanted("yours/review")     # what somebody choosing the agents will be asked
 ```
-
-A flow that stopped loading is a red build.
 
 ## See also
 

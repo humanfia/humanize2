@@ -3,13 +3,12 @@
 A [**hook**](/reference/agents#hooks) is a Python callable hung on a **moment**, one of the
 points a turn passes through. Reach for one when you want to get between an agent and its turn:
 refuse a command, add to a prompt, or refuse to let a turn end. Claude Code, Codex and Kimi
-Code each take a table of shell commands for the same moments; hooks are the same idea, but
-hung on a live agent, taken down again while it runs, and written in the language the flow is
-written in.
+Code each take a table of shell commands for the same moments; a hook is the same idea, hung on
+a live agent, taken down again while it runs, and written in the language the flow is.
 
 ## Try it
 
-The gentlest hook does nothing but look. Make a flow that prints what its agent reaches for:
+The gentlest hook does nothing but look. This one says what its agent reached for:
 
 ```python
 # .humanize/flows/watched/__init__.py
@@ -31,15 +30,13 @@ def run(agents: tuple[Agent], task: str) -> None:
             agent(task, suppress=True)
 ```
 
-Run it with a task:
-
 ```sh
 hmz exec -f watched -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 ```
 
-You see a line each time the agent reaches for a tool: an arrow, the tool name, and the first
-60 characters of what it was about to do. The hook sees each `PRE_TOOL_USE` moment, prints it,
-and returns `None`, so the turn goes on unchanged.
+Each time the agent reaches for a tool you get a line: an arrow, the tool name, and the first
+60 characters of what it was about to do. The hook returns `None`, so the turn goes on
+unchanged.
 
 ::: tip What a flow prints goes into the transcript
 The interface captures everything printed under it, so a `print` is how a flow says something.
@@ -75,11 +72,9 @@ one a Ralph loop makes each turn. Hanging one mid-run is the point.
 | `SESSION_END` | a session has been closed | — |
 
 A hook is told an `Occasion`, which carries `moment`, `agent`, `session`, `prompt`, `tool`,
-`about`, `input`, `said` and `again`. The hook answers with a `Verdict` or with `None`, and
-`None` says nothing.
-
-Two hooks on one moment are **one verdict**: refused if either refused, and adding everything
-either added.
+`about`, `input`, `said` and `again`. It answers with a `Verdict` or with `None`, and `None`
+says nothing. Two hooks on one moment are **one verdict**: refused if either refused, and
+adding everything either added.
 
 A verdict can refuse a command:
 
@@ -117,11 +112,11 @@ def keep_going(occasion: Occasion) -> Verdict | None:
     return None
 ```
 
-That is what [`official/humanize1:rlcr`](/flows/humanize1) is built on:
-a round *is* the builder believing the plan is done and trying to stop, and what the reviewer
-says is what it hears instead. Compare [Goals](/weaver/goals), where the model decides.
+That is what [`official/humanize1:rlcr`](/flows/humanize1) is built on: a round *is* the
+builder believing the plan is done and trying to stop, and what the reviewer says is what it
+hears instead.
 
-A refused `STOP` is one of three ways to keep an agent going:
+It is one of three ways to keep an agent going:
 
 | | Decides it is done | Works on |
 | --- | --- | --- |
@@ -139,11 +134,10 @@ hook where it is hung, rather than hanging one that quietly never fires.
 | everything except `PERMISSION_REQUEST` | yes | yes | yes | yes | no |
 | `PERMISSION_REQUEST` | yes | yes | no | yes | no |
 
-Claude Code, Codex and ZCode ask before they use a tool and wait for the answer. Those are the
-three backends where a refusal reaches the agent. Kimi Code, pi, opencode and mimocode are
-driven unattended, which is what a flow watching its agent rather than gating it means.
-`Person` runs none of the moments: a moment is a point in a turn of a model, and the person
-takes no such turn.
+Claude Code, Codex and ZCode ask before they use a tool and wait for the answer, so those are
+the three where a refusal reaches the agent. Kimi Code, pi, opencode and mimocode are driven
+unattended — a flow watches its agent rather than gating it. `Person` runs none of the moments:
+a moment is a point in a turn of a model, and the person takes no such turn.
 
 `PERMISSION_REQUEST` also wants the [`auto` rung](/user/permissions), the one setting under
 which a backend asks and waits.
@@ -151,8 +145,7 @@ which a backend asks and waits.
 ## Saying so in the flow
 
 A flow that hangs a hook on a moment only some backends run declares the moment beside the
-type. If you give it a backend that cannot run the moment, the flow is refused before its first
-turn:
+type, and is refused before its first turn:
 
 ```python
 from typing import Annotated, NamedTuple
