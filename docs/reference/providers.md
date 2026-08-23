@@ -42,8 +42,10 @@ that is set:
 ├── home/              the credential files the CLI keeps under its own home
 │   ├── .credentials.json
 │   └── .claude.json
-└── user/              and the ones it keeps outside it
-    └── .claude.json
+├── user/              the ones it keeps outside it
+│   └── .claude.json
+└── config/            and the ones it keeps where every program keeps its configuration
+    └── anthropic/
 ```
 
 The files keep the names the CLI gave them, because it is the CLI that writes them: a login run

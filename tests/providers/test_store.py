@@ -205,8 +205,11 @@ def test_what_holds_keys_is_readable_by_nobody_else() -> None:
 
     assert stat.S_IMODE((provider.at / "provider.json").stat().st_mode) == 0o600
     assert stat.S_IMODE(provider.at.stat().st_mode) == 0o700
-    # And nothing half-written is left beside it: the file is moved into place whole.
+    # And nothing half-written is left beside it: the file is moved into place whole. One
+    # directory per root a credential is kept under -- the CLI's own home, the user's, and
+    # the configuration directory every program shares.
     assert sorted(one.name for one in provider.at.iterdir()) == [
+        "config",
         "home",
         "provider.json",
         "user",
@@ -230,10 +233,15 @@ def test_a_provider_taken_away_is_gone_and_stays_gone() -> None:
 def test_a_turn_is_answered_at_every_path_the_backend_keeps_a_credential_at(
     profile: backends.Profile, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Two homes, two roots: a file of the CLI's own under `home/`, one of yours under `user/`."""
+    """Three roots, and a credential of this backend's is kept under exactly one of them.
+
+    A file of the CLI's own under `home/`, one of yours under `user/`, and one where every
+    program keeps its configuration under `config/`.
+    """
     house = tmp_path / "house"
     monkeypatch.setenv("HOME", str(house))
     monkeypatch.delenv(profile.home_var, raising=False)
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     provider = providers.add(profile.name, "mine")
 
     swaps = provider.swaps()
@@ -243,6 +251,10 @@ def test_a_turn_is_answered_at_every_path_the_backend_keeps_a_credential_at(
         if said.startswith("~/"):
             assert real == str(house / said[2:])
             assert instead == str(provider.at / "user" / said[2:])
+        elif said.startswith("config/"):
+            under = said[len("config/") :]
+            assert real == str(house / ".config" / under)
+            assert instead == str(provider.at / "config" / under)
         else:
             assert real == str(profile.directory() / said)
             assert instead == str(provider.at / "home" / said)
@@ -398,6 +410,7 @@ def test_two_writing_at_once_do_not_take_each_others_files_away(
     assert found.way in ("key", "gateway")
     # And nothing is left lying beside it: every write took its own file with it.
     assert sorted(one.name for one in found.at.iterdir()) == [
+        "config",
         "home",
         "provider.json",
         "user",

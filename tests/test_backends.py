@@ -202,3 +202,37 @@ def test_a_command_written_as_a_path_is_that_path_or_nothing(tmp_path: Path) -> 
 
     assert backends.program(str(program)) == str(program)
     assert backends.program(str(unrunnable)) is None
+
+
+def test_an_account_kept_where_every_program_keeps_its_configuration_moves_with_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Claude keeps one where the vendor's other programs read it, and `XDG_CONFIG_HOME` moves it.
+
+    Which is a third root and not a spelling of either of the others: neither the variable that
+    moves the backend's own home nor the user's home reaches it, so a provider that mapped only
+    those two would leave the machine's own account readable and answer every turn with it.
+    """
+    claude = backends.named("claude")
+    assert claude is not None
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/elsewhere/config")
+
+    kept = {under: real for real, under in claude.credentials()}
+
+    assert kept["config/anthropic"] == "/elsewhere/config/anthropic"
+
+
+def test_an_endpoint_a_backend_sends_its_credential_to_is_an_account() -> None:
+    """A variable naming where the token goes is as much an account as one holding the token.
+
+    `CODEX_AUTHAPI_BASE_URL` is where codex asks whose credential it is holding, and it sends
+    that credential to ask; `ANTHROPIC_CONFIG_DIR` moves the whole directory Claude reads one
+    out of. Left set, either takes a turn somewhere the provider never named.
+    """
+    codex = backends.named("codex")
+    claude = backends.named("claude")
+    assert codex is not None
+    assert claude is not None
+
+    assert "CODEX_AUTHAPI_BASE_URL" in codex.accounts()
+    assert "ANTHROPIC_CONFIG_DIR" in claude.accounts()

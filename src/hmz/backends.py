@@ -188,8 +188,10 @@ class Profile:
         be a setting that lies, so it is refused where it is written instead.
       creds: What a login to this backend leaves behind: the paths it reads its credentials
         back out of and writes its refreshed ones to. One under this backend's home per entry,
-        or one under the user's own home where the entry starts with `~/` -- which is where
-        some of them keep a second file. A directory names everything inside it. These are the
+        one under the user's own home where the entry starts with `~/` -- which is where some
+        of them keep a second file -- and one under whatever `XDG_CONFIG_HOME` names where it
+        starts with `config/`, which is where a CLI that shares a vendor's account with the
+        vendor's other programs keeps it. A directory names everything inside it. These are the
         paths, and only these, that a turn run under a provider is pointed somewhere else: the
         sessions, the settings and the skills are the same ones the CLI already has.
       ways: How credentials get into this backend, one entry per kind it offers -- the
@@ -280,18 +282,23 @@ class Profile:
         """Every path this backend keeps a credential at, and where it is kept relative to.
 
         Read here rather than written down twice: a path under the backend's own home moves
-        with the variable that moves the home, and one written `~/...` is under the user's own
-        wherever that home went.
+        with the variable that moves the home, one written `~/...` is under the user's own
+        wherever that home went, and one written `config/...` is under whatever
+        `XDG_CONFIG_HOME` names. Three roots because a CLI that keeps its account where every
+        program keeps its configuration keeps it somewhere neither of the other two moves.
 
         Returns:
           One `(absolute path, name to keep it under)` pair per credential, the name being the
-          path with the root it is under taken off -- `home/...` for the backend's own and
-          `user/...` for the user's, so that two files of the same name are two files.
+          path with the root it is under taken off -- `home/...` for the backend's own,
+          `user/...` for the user's and `config/...` for the shared configuration directory,
+          so that two files of the same name are two files.
         """
         held: list[tuple[str, str]] = []
         for said in self.creds:
             if said.startswith("~/"):
                 held.append((str(Path.home() / said[2:]), f"user/{said[2:]}"))
+            elif said.startswith("config/"):
+                held.append((str(self.configuration() / said[len("config/") :]), said))
             else:
                 held.append((str(self.directory() / said), f"home/{said}"))
         return tuple(held)
@@ -386,15 +393,26 @@ PROFILES = (
         # reads a project's skills out of, which is the one place a skill can be given to it
         # without touching what the person at this machine has installed.
         mounts=".claude/skills",
-        # Two files, and the second of them is the one people forget: the session lives in
-        # `.credentials.json`, and the account it belongs to -- with the API key a run was
+        # Three places, and the last of them is the one people forget: the session lives in
+        # `.credentials.json`, the account it belongs to -- with the API key a run was
         # approved for beside it -- lives in `.claude.json`, which sits outside the home
-        # directory until `CLAUDE_CONFIG_DIR` moves it inside. Both spellings, so that a
-        # provider works whether or not the home has been moved.
-        creds=(".credentials.json", ".claude.json", "~/.claude.json"),
+        # directory until `CLAUDE_CONFIG_DIR` moves it inside, and the account Claude shares
+        # with the vendor's other programs lives under `XDG_CONFIG_HOME`, which neither of
+        # those moves. Both spellings of the second, so that a provider works whether or not
+        # the home has been moved; and the third because a machine signed in there and
+        # nowhere else would answer every provider's turns with its own account.
+        creds=(
+            ".credentials.json",
+            ".claude.json",
+            "~/.claude.json",
+            "config/anthropic",
+        ),
         # Everything else Claude Code would read an account out of: the two the ways already
-        # name are there too, through `accounts()`.
+        # name are there too, through `accounts()`. `ANTHROPIC_CONFIG_DIR` is an account for
+        # the reason the others are -- it moves the shared configuration directory whole, and
+        # a turn that read one this table had never heard of would be the wrong account.
         ambient=(
+            "ANTHROPIC_CONFIG_DIR",
             "ANTHROPIC_CUSTOM_HEADERS",
             "ANTHROPIC_MODEL",
             "CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR",
@@ -547,7 +565,11 @@ PROFILES = (
         # One file, whichever way it was signed into: the subscription's tokens and an API
         # key land in the same place, under the mode that says which of them is in force.
         creds=("auth.json",),
-        ambient=("CODEX_API_KEY", "OPENAI_BASE_URL"),
+        # `CODEX_AUTHAPI_BASE_URL` is an account for the reason a key is: codex sends the
+        # credential it was signed in with to whatever it names, so a turn run under a
+        # provider with somebody's copy of it still exported would hand that provider's token
+        # to somebody's endpoint.
+        ambient=("CODEX_API_KEY", "CODEX_AUTHAPI_BASE_URL", "OPENAI_BASE_URL"),
         ways=(
             Way(
                 name="login",
