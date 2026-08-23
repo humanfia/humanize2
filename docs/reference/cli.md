@@ -1,7 +1,7 @@
 # CLI reference
 
 Every command, flag, environment variable, exit status and file. For a walk through rather than
-a lookup, start at [Quickstart](/).
+a lookup, start at the [quickstart](/#run-a-flow).
 
 ```
 hmz [<command> [<args>...]]

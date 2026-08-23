@@ -8,7 +8,7 @@ Everything here is importable from `hmz.agents`. This is the layer under a flow 
 one a flow is written against: `AgentBase` and `SessionBase` answer to the `Agent` and `Session`
 interfaces [flows](/reference/flows#what-a-flow-drives) declares, and a flow imports those from
 `hmz.flows`. Reach for this page when you are building agents yourself — from a script, from a
-test that stands in for one — rather than writing a flow.
+test that stands in for one — rather than weaving a flow.
 
 ## Making one
 
