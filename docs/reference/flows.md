@@ -1201,7 +1201,8 @@ answers, so it is every guard tried at once. A flow the loading refuses comes ba
 `refused-load` finding, and the flow's live config model is read against the config rules
 whether or not the static reading could see it.
 
-And the catalogue, for whoever — or whatever — is writing a flow against this installation:
+And the catalogue, for the weaver — whoever, or whatever, is writing a flow against this
+installation:
 
 ```python
 from hmz.flows import briefed, catalogue

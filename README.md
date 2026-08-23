@@ -9,6 +9,8 @@
 
 Orchestrate, execute, and observe agent flows
 
+humanize runs flows over coding agents; whoever writes a flow is a **weaver**.
+
 ## Table of Contents
 
 - [Security](#security)
@@ -96,22 +98,24 @@ To collect what a run left behind, and open it in [ui.perfetto.dev](https://ui.p
 hmz trace collect
 ```
 
-[Quickstart](https://docs.humanfia.ai/humanize2/) goes from here to a run you can
-read back, in fifteen minutes.
+The [quickstart](https://docs.humanfia.ai/humanize2/#run-a-flow) goes from here to a run you can
+read back. The home page has one for each role: running a flow, weaving one, and working on
+humanize itself.
 
 ## Documentation
 
-**[docs.humanfia.ai/humanize2](https://docs.humanfia.ai/humanize2/)**, in five parts. Its source is under
+**[docs.humanfia.ai/humanize2](https://docs.humanfia.ai/humanize2/)**, in six parts. Its source is under
 [docs/](docs/).
 
-- **[Features](https://docs.humanfia.ai/humanize2/features/)** — what humanize does, a diagram each. The
-  front of the site.
+- **[Features](https://docs.humanfia.ai/humanize2/features/)** — what humanize does, a diagram each.
 - **[Flows](https://docs.humanfia.ai/humanize2/flows/)** — every flow it can run, from `chat` to seven
   agents in three isolated lanes, with the shape of each one drawn.
-- **[Tutorials](https://docs.humanfia.ai/humanize2/user/)** — six, in order. A quickstart, three real
-  pieces of work run end to end, and two flows written from scratch.
-- **[Guides](https://docs.humanfia.ai/humanize2/user/)** — a page per feature, each answering "how do I
-  use this?" and opening with something you can paste.
+- **[User Guide](https://docs.humanfia.ai/humanize2/user/)** — running flows. Tutorials first, then a
+  page per feature, each opening with something you can paste.
+- **[Weaver Guide](https://docs.humanfia.ai/humanize2/weaver/)** — weaving them. Tutorials first, then a
+  page per thing a flow may be written to do.
+- **[Contributing](https://docs.humanfia.ai/humanize2/contributing/)** — working on humanize itself: the
+  checks a commit has to pass, the layers of the code, and these docs.
 - **[Reference](https://docs.humanfia.ai/humanize2/reference/)** — the complete CLI, TUI and Python API.
 
 ## Maintainers

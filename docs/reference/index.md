@@ -3,9 +3,12 @@
 Complete and dry. Every command, flag, key, argument and return, for a reader who already
 knows what they are looking for.
 
-If you do not yet, the [guides](/user/) answer "how do I use this one feature", and the
-[tutorials](/user/) teach it in order starting with the
-[Quickstart](/).
+If you do not yet: [Features](/features/) is what humanize does and [Flows](/flows/) is what
+there is to run, and then there is a section per role — the [User Guide](/user/) for running
+flows, the [Weaver Guide](/weaver/) for weaving them, [Contributing](/contributing/) for
+working on humanize itself. Each of the three opens with tutorials, and the home page carries
+a quickstart apiece: [run a flow](/#run-a-flow), [weave a flow](/#weave-a-flow),
+[work on humanize](/#work-on-humanize).
 
 ## Command line
 
