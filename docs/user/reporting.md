@@ -7,22 +7,7 @@ should.
 
 ## Try it
 
-Run this to register what a report carries:
-
-```python
-from hmz import telemetry
-
-telemetry.about("worktrees", lambda: {"held": len(worktrees)})
-telemetry.snag("gave-up", after=3)          # not an error, and not what anybody meant either
-telemetry.crash(why, doing="my own tool")   # reported, and raised on as it was
-```
-
-The calls run only when a report is actually being made. `telemetry.enabled()` tells you the
-answer: `True`, `False`, or `None` for a machine nobody has asked.
-
-## The question
-
-humanize asks you once, on the first start of the interface:
+Start the interface. On its first run it asks:
 
 ```
    Report what goes wrong to humanize?
@@ -37,16 +22,14 @@ humanize asks you once, on the first start of the interface:
 ```
 
 **The answer that helps is the one it opens on.** Esc leaves the question unanswered, and
-humanize asks again next time. Silence is neither a yes nor a no. A machine that has not
+humanize asks again next time: silence is neither a yes nor a no, and a machine that has not
 answered sends nothing. `/settings` changes the answer afterwards.
 
 Only the interface asks, because only the interface has somebody to ask. `hmz exec` reports if
 the answer is already yes, and is silent otherwise. A headless run must not stop for a
-question. Nothing on a CI box should start uploading because nobody was there to say no.
+question, and nothing on a CI box should start uploading because nobody was there to say no.
 
 ## What is sent
-
-A report carries these five kinds of information:
 
 | | |
 | --- | --- |
@@ -71,14 +54,14 @@ A report carries these five kinds of information:
 
 The Sentry quickstart turns on three switches that are off here, and the module says why where
 they are set. `send_default_pii` attaches the address, the machine's name and, in this SDK,
-**the variables of every frame**. That is where the task, the prompt and the answer live.
+**the variables of every frame** — which is where the task, the prompt and the answer live.
 `enable_logs` is off because what humanize logs is paths and commands. Stack-frame variables
 have their own switch, and that is off too. The hostname is not sent either.
 
 One default integration is switched off for the same reason. `ArgvIntegration` attaches
-`sys.argv`. The command `hmz exec -f ralph_loop -a claude/… "$(cat TASK.md)"` puts the whole
-task there. The integration is disabled where the reporter starts. Everything the SDK collects
-under `extra` is dropped again on the way out.
+`sys.argv`, and the command `hmz exec -f ralph_loop -a claude/… "$(cat TASK.md)"` puts the
+whole task there. It is disabled where the reporter starts. Everything the SDK collects under
+`extra` is dropped again on the way out.
 
 ## The friction it notices
 
@@ -94,14 +77,14 @@ somebody finding that it does not work the way they expected:
 | `key-does-nothing` | a key that is offered and does nothing where it was pressed |
 | `line-refused`, `lines-never-sent` | something said to an agent that never arrived |
 
-Each one carries counts and names. It records which sheet, which key and how many. It never
-records a word of what was typed.
+Each one carries counts and names — which sheet, which key, how many. It never records a word
+of what was typed.
 
 ## From Python
 
-A layer or a flow says what should go with a report by handing over something that knows. That
-thing runs only when a report is actually being made, so nothing is gathered on a machine that
-reports nothing:
+This section is the weaver's, and any layer of humanize itself. A flow says what should go with
+a report by handing over something that knows. That thing runs only when a report is actually
+being made, so nothing is gathered on a machine that reports nothing:
 
 ```python
 from hmz import telemetry
@@ -111,12 +94,10 @@ telemetry.snag("gave-up", after=3)          # not an error, and not what anybody
 telemetry.crash(why, doing="my own tool")   # reported, and raised on as it was
 ```
 
-`telemetry.enabled()` is the answer. It is `True`, `False`, or `None` for a machine nobody has
-asked. `telemetry.SENT` and `telemetry.KEPT` are the two lists this page is written from.
+`telemetry.enabled()` is the answer: `True`, `False`, or `None` for a machine nobody has asked.
+`telemetry.SENT` and `telemetry.KEPT` are the two lists this page is written from.
 
 ## Turning it off
-
-To turn reporting off for one run only, whatever is written down:
 
 ```sh
 HUMANIZE_SENTRY=off hmz          # this run only, whatever is written down

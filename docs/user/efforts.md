@@ -1,7 +1,7 @@
 # Efforts
 
 An agent is a backend, a model and an **[effort](/reference/agents#efforts)**: how hard to
-think.
+think. Set one when a task needs more or less thought than the agent's default.
 
 ```
 claude / claude-opus-4-8 : high
@@ -10,23 +10,39 @@ claude / claude-opus-4-8 : high
   └── backend
 ```
 
-You set an effort when a task needs more or less thought than the agent's default. The word
-belongs to each backend, not to humanize, so the values differ.
+The word belongs to each backend rather than to humanize, so the values differ.
 
 ## Try it
-
-Run an agent with `high` as the effort:
 
 ```sh
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "fix the build"
 ```
 
-The `effort` row of the agent's sheet shows `high`. Press **←/→** to adjust it.
+The `effort` row of the agent's sheet shows `high`. Press **←/→** to adjust it; the `swarm` row
+turns swarm mode on for a model that has one.
+
+## Set the effort
+
+`backend/model:effort` is the short spelling. The written-out form of `-a` takes the same
+thing, and so does a flow's Python config:
+
+::: code-group
+
+```sh [command line]
+hmz exec -f ralph_loop -a cli=kimi,model=kimi-code/k3,effort=swarmmax "fix the build"
+```
+
+```python [Python]
+ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+```
+
+:::
 
 ## Efforts by backend
 
 humanize does not check an effort against a list: a value your account has but this page does
-not still works. Backends take these efforts:
+not still works. These are the backends whose ladders need explaining; the whole set is in
+[Agents › Efforts](/reference/agents#efforts).
 
 | Backend | Efforts, hardest first |
 | --- | --- |
@@ -37,47 +53,24 @@ not still works. Backends take these efforts:
 | opencode, mimocode | the model variant: `xhigh`, `high`, `medium`, `low`, `minimal` |
 | ZCode | `max`, `high`, `low`, `enabled`, `nothink`, `disabled` — two vocabularies, and a model takes one of them |
 
-**`ultracode`** is Claude Code's `xhigh` thinking with the turn opted into orchestrating a
-fleet of its own. It is more work than any single-agent effort, so it sits above `max`. It is
-real and undocumented, and no listing the CLI answers with will ever name it. humanize keeps it
-anyway.
-
-**Kimi Code's effort says how wide as well as how hard.** `max` is one agent; `swarmmax` is the
-same thinking at the width of a fleet of subagents. The prefix is exported as
-`hmz.flows.SWARM`, which is where a flow steering by it reads it.
-
-**pi's `off`** is the model asked not to think at all. It is an effort like any other here: the
-least of them, not the absence of a setting.
-
-**Codex's models differ from each other.** `gpt-5.6-sol` takes `ultra`; `gpt-5.5` does not. So
-the interface offers each model only the efforts it takes.
-
-**ZCode's ladder is two vocabularies in one.** Its models have two: the ones that take a
-thinking budget answer `max`, `high` and `low`, with `nothink` at the bottom of that one, and
-the ones that only take thinking-or-not answer `enabled` and `disabled`. Each model is offered
-the rungs it said it takes, and no model takes both halves.
-
-## Set the effort
-
-You set the effort when you name an agent, or in its Python config:
-
-::: code-group
-
-```sh [command line]
-hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "fix the build"
-hmz exec -f ralph_loop -a cli=kimi,model=kimi-code/k3,effort=swarmmax "fix the build"
-```
-
-```python [Python]
-ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
-```
-
-:::
-
-At the prompt, the `effort` row of the sheet shows it. Press **←/→** to adjust it, and the
-`swarm` row turns swarm mode on for a model that has one.
+- **`ultracode`** is Claude Code's `xhigh` thinking with the turn opted into orchestrating a
+  fleet of its own, so it sits above `max`. It is real and undocumented, and no listing the CLI
+  answers with will ever name it. humanize keeps it anyway.
+- **Kimi Code's effort says how wide as well as how hard.** `max` is one agent; `swarmmax` is
+  the same thinking at the width of a fleet of subagents. The prefix is exported as
+  `hmz.flows.SWARM`, which is where a flow steering by it reads it.
+- **pi's `off`** is the model asked not to think at all — the least of the efforts, not the
+  absence of a setting.
+- **Codex's models differ from each other.** `gpt-5.6-sol` takes `ultra`; `gpt-5.5` does not,
+  so the interface offers each model only the efforts it takes.
+- **ZCode's ladder is two vocabularies in one.** The models that take a thinking budget answer
+  `max`, `high` and `low`, with `nothink` at the bottom; the ones that only take
+  thinking-or-not answer `enabled` and `disabled`. Each model is offered the rungs it said it
+  takes, and no model takes both halves.
 
 ## Change the effort while the flow runs
+
+The rest of this page is the weaver's — whoever wrote the flow.
 
 A config is frozen. A session resumes under the settings it opened with, and a config that
 changed mid-flow would silently split one conversation across two models. The effort is the one
@@ -89,7 +82,8 @@ session.effort = "max"              # this conversation alone
 session.effort = ""                 # and back to whatever the agent runs at
 ```
 
-Read it back through the same property:
+A `swarm` prefix moves with it: `agent.effort = "swarmmax"`. Read it back through the same
+property:
 
 | | |
 | --- | --- |
@@ -97,29 +91,28 @@ Read it back through the same property:
 | `agent.effort` | what its turns actually **run at** |
 
 **The change takes hold on the next turn.** The turn already under way keeps the effort it
-started at: a model does not think harder halfway through an answer.
+started at: a model does not think harder halfway through an answer. How it lands is the
+backend's own business:
 
-Each backend carries the effort in its own way. Codex, Kimi Code, opencode and mimocode take
-the effort with each turn, so the next turn carries the new one. Claude Code takes it as an
-argument of the process it is held open as, so moving it ends that process and resumes the
-conversation in one started at the new effort. pi has a command for it, and is told. ZCode's
-app server keeps the level on the session, so it is told the new one before the next turn.
-
-A `swarm` prefix moves with it: `agent.effort = "swarmmax"`.
+| Backend | How the new effort reaches the model |
+| --- | --- |
+| Codex, Kimi Code, opencode, mimocode | sent with each turn |
+| Claude Code | an argument of the process it is held open as, so that process ends and the conversation resumes in one started at the new effort |
+| pi | it has a command for it, and is told |
+| ZCode | its app server keeps the level on the session, and is told the new one before the next turn |
 
 ## What to steer by
 
 The reading that responds to effort is **`juice()`**: output tokens an average turn *of the
-model* came out with. A model asked to think harder writes more in each answer and takes longer
-over it. So that average is what an effort moves.
+model* came out with. A model asked to think harder writes more in each answer, so that average
+is what an effort moves.
 
 ```python
 agent.juice(over=60)
 ```
 
-`juice()` is what [`official/fixed_juice_ralph`](/flows/fixed-juice-ralph)
-governs on. It is a Ralph loop that moves the effort a rung a round to hold the agent to a
-target. See [Cost and rate](/user/tally).
+[`official/fixed_juice_ralph`](/flows/fixed-juice-ralph) governs on it — a Ralph loop that
+moves the effort a rung a round to hold the agent to a target.
 
 ## See also
 
