@@ -1,9 +1,9 @@
 # Remote execution
 
 Remote execution runs an agent on **this** machine while everything it does happens on a
-**target**. The agent needs no plugin, no configuration and no cooperation: it is told none of
-this and takes part in none of it. Reach for it when the work must happen on another machine
-but the agent and its model credentials stay where you are.
+**target**. Reach for it when the work must happen on another machine but the agent and its
+model credentials stay where you are. The agent needs no plugin, no configuration and no
+cooperation: it is told none of this and takes part in none of it.
 
 ```
      this machine                              the target
@@ -19,9 +19,9 @@ but the agent and its model credentials stay where you are.
    the model provider
 ```
 
-The workspace the agent works in is a **local mirror** of the target's copy. The agent reads
-and writes the mirror at local speed, and humanize keeps the two in step. The mirror lives at
-the workspace's own path by default, so the paths the agent sees are the target's own.
+The workspace the agent works in is a **local mirror** of the target's copy, read and written
+at local speed and kept in step. It lives at the workspace's own path by default, so the paths
+the agent sees are the target's own.
 
 ## Try it
 
@@ -39,8 +39,7 @@ export      /home/me/code/myproject -> /home/me/code/myproject
 workspace   /home/me/code/myproject (184 entries)
 ```
 
-The output names the target and shows the workspace it will mirror. Then run an agent against
-it:
+Then run an agent against it:
 
 ```sh
 hmz anchor --target ssh://build-box claude
@@ -117,8 +116,8 @@ before.
 
 ## Anchoring a flow
 
-Give an agent's config an anchored machine and its turns land there, with no other change to
-the flow:
+**For the weaver.** Give an agent's config an anchored machine and its turns land there, with
+no other change to the flow:
 
 ```python
 from hmz.agents import ClaudeCodeAgentConfig
@@ -139,8 +138,9 @@ spawns what an operator would have typed. Settings no session could run under ar
 they are *written*, so a flow that misspells a target hears about it as it configures its
 agents rather than hours into the loop.
 
-**The flow says which agents may be moved at all.** A place declared plain `Agent` works
-here and cannot be pointed anywhere. Only `Annotated[Agent, Remote]` may be:
+**The flow says which agents may be moved at all.** A place declared plain `Agent` works here
+and cannot be pointed anywhere. Only `Annotated[Agent, Remote]` may be — see [Writing a
+flow](/weaver/writing-a-flow):
 
 ```python
 # .humanize/flows/onbox/__init__.py
@@ -165,9 +165,9 @@ def run(agents: Agents, task: str) -> None:
                 suppress=True)
 ```
 
-At the prompt, that is the `where` row of the agent's own sheet on the agents page of `/flow`.
-The row appears only for a `Remote` place. It lists the containers running and the hosts in
-your `~/.ssh/config`, and anything else is typed:
+Whoever runs that flow then picks the machine on the `where` row of the agent's own sheet, on
+the agents page of `/flow`. The row appears only for a `Remote` place. It lists the containers
+running and the hosts in your `~/.ssh/config`, and anything else is typed:
 
 | Typed | Where the work goes |
 | --- | --- |
@@ -180,7 +180,7 @@ your `~/.ssh/config`, and anything else is typed:
 
 For an anchored agent, `agent.new(cwd)` takes **the target's** path, and it must be inside the
 workspace the anchor names. humanize puts the agent in this machine's mirror of that directory
-and tells the anchor to run the work in the directory itself. A flow says where the work
+and tells the anchor to run the work in the directory itself, so a flow says where the work
 happens in the only names the far end has.
 
 ```text
