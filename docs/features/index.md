@@ -12,12 +12,13 @@ humanize runs **flows**: directories of Python that drive one or more coding age
 and write down everything they did. Most backends drive a coding agent you already have under
 its existing login; the bundled DeepSeek Harness is the SDK-backed exception.
 
-This is the front of the documentation: one way to install it, then what the system is rather
-than how to operate each part. The [tutorials](/user/) teach it in order starting with the
-[Quickstart](/), the [guides](/user/) answer "how do I use this?", and
-[Flows](/flows/) is what it can run out of the box.
+This section is what the system is rather than how to operate it: the unusual parts drawn, one
+map over all of them, and a page for each mechanism worth pushing on. Nothing here is a
+command — the guide that runs it is one click from every diagram.
 
-<HmzInstall />
+To install it and run something, start on the [home page](/), which has a quickstart for
+[running a flow](/#run-a-flow), [weaving one](/#weave-a-flow) and
+[working on humanize](/#work-on-humanize).
 
 ## A run, as it happens
 
@@ -28,9 +29,8 @@ lane; change how many agents are on it.
 <HmzOrchestra />
 
 <p class="hmz-note">
-A simulation of the shape of a run, not a recording. What the real screens look like is
-<a href="#the-real-thing-recorded">further down</a>, and
-<a :href="withBase('/features/tracing')">One timeline</a> is how the trace is built.
+A simulation of the shape of a run, not a recording.
+<a :href="withBase('/features/tracing')">One timeline</a> is how the real one is built.
 </p>
 
 ## What it does, one picture each
@@ -53,9 +53,9 @@ you are deliberately not entitled to:
 ## How the capabilities fit together
 
 A run crosses five systems: the flow that describes the work, the control plane that drives
-agents, the execution fabric that decides where work lands, the run record that keeps it
-continuous and readable, and the surfaces through which people start and inspect it. Hover or
-focus a group to read the guarantee it owns; follow it to the best explanation.
+agents, the fabric that decides where work lands, the record that keeps it continuous and
+readable, and the surfaces people start and inspect it through. Hover a group to read the
+guarantee it owns.
 
 <HmzMap />
 
@@ -66,8 +66,8 @@ The complete map adds the boundaries, related guides and reference for every gro
 
 ## Feature deep dives
 
-The map is broad. These pages take one mechanism far enough that its trade-offs make sense,
-each around a diagram you can push.
+Each takes one mechanism far enough that its trade-offs make sense, around a diagram you can
+push.
 
 ### Flow system
 
@@ -111,48 +111,40 @@ each around a diagram you can push.
 
 ## The flows it comes with
 
-Between the package and the official flowverse are a ralph loop and a stateful one, two agents
-alternating, an actor with a reviewer between its rounds, a loop the model itself decides is
-over, and isolated lanes with a coordinator over them. Each has a page with its own loop
-played on it.
+A ralph loop and a stateful one, two agents alternating, an actor with a reviewer between its
+rounds, a loop the model itself decides is over, and isolated lanes under a coordinator. Each
+has a page with its own loop played on it.
 
 <p class="hmz-note">
-Every one of them, with the shape of each: <a :href="withBase('/flows/')">Flows</a>. How to write
-one of your own: <a :href="withBase('/weaver/writing-a-flow')">Writing a flow</a>.
-</p>
-
-## The real thing, recorded
-
-Hover to play, click to open.
-
-<HmzGallery />
-
-<p class="hmz-note">
-Recorded against a stand-in coding agent, in a container of its own — see
-<a :href="withBase('/contributing/docs#the-terminal-demos')">Working on these docs</a>.
+Every one of them, with the shape of each: <a :href="withBase('/flows/')">Flows</a>. What a
+weaver writes to add another: <a :href="withBase('/weaver/writing-a-flow')">Writing a flow</a>.
 </p>
 
 ## Where to go next
 
 <div class="hmz-paths">
   <a :href="withBase('/features/capabilities')">
-    <strong>Map the whole system</strong>
-    <span>Five domains, every capability group, and the right explanation for each.</span>
-  </a>
-  <a :href="withBase('/')">
-    <strong>Never used it</strong>
-    <span>Nothing installed to a run you can open in Perfetto, in fifteen minutes.</span>
+    <strong>Capability map</strong>
+    <span>Nineteen groups in five systems, and the right page for each.</span>
   </a>
   <a :href="withBase('/flows/')">
-    <strong>What it can run</strong>
-    <span>The flows it ships, with the shape of each one drawn and played.</span>
+    <strong>Flows</strong>
+    <span>What it can run out of the box, each loop drawn and played.</span>
   </a>
   <a :href="withBase('/user/')">
-    <strong>One feature</strong>
-    <span>A page each, opening with something you can paste.</span>
+    <strong>User Guide</strong>
+    <span>For the person running flows: the prompt, and reading a run back.</span>
   </a>
-  <a :href="withBase('/reference/cli')">
-    <strong>Looking it up</strong>
+  <a :href="withBase('/weaver/')">
+    <strong>Weaver Guide</strong>
+    <span>For the weaver writing them: Python, atlases, checks and tests.</span>
+  </a>
+  <a :href="withBase('/contributing/')">
+    <strong>Contributing</strong>
+    <span>For the person working on humanize itself, these docs included.</span>
+  </a>
+  <a :href="withBase('/reference/')">
+    <strong>Reference</strong>
     <span>Every command, key, flag and Python call.</span>
   </a>
 </div>
@@ -160,6 +152,5 @@ Recorded against a stand-in coding agent, in a container of its own — see
 ::: warning Before you point one at a repository you care about
 humanize runs every agent with permission prompts disabled, and nothing turns them back on. A
 flow is trusted Python: loading or running it may execute its code, even though static checks
-can inspect selected structure without doing so. Read
-[Security](/user/security).
+can inspect selected structure without doing so. Read [Security](/user/security).
 :::
