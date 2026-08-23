@@ -1130,6 +1130,31 @@ for is granted
 It is found out once per agent rather than once per turn, and the rung you chose is what is
 tried first: an agent set to `auto` in `/agents` asks for `auto` and never sees this.
 
+**A Claude Code whose account is somebody else's runs a rung down too, and does not find it out
+the same way.** An account can arrive with managed settings, and one carrying
+`"disableBypassPermissionsMode": "disable"` does not refuse the command line the way Codex
+refuses such a call: `claude` takes `--dangerously-skip-permissions`, starts the turn at
+`default`, declines every edit the agent asks for, and ends the turn successfully with the work
+not done. So the driver reads the mode the first line of the stream says the turn is *running*
+at — `permissionMode` on the `init` event — and asks again a rung down over the same stream,
+with `set_permission_mode`, before the model has answered the first question. It says so as it
+does:
+
+```
+claude: this account will not run an agent at bypass, so it runs at auto, where the account's
+own rules still apply
+```
+
+Said as each Claude starts, which is once for an ordinary session and once a turn for an
+anchored one. `auto` here is not the equivalence it is on Codex: Claude decides for itself
+under the account's own rules rather than having the deciding switched off, so a tool the
+account's `permissions.ask` or `permissions.deny` covers is still declined — and in print mode
+declined without anybody being asked, which is the same quiet success this step exists to
+close, surviving for those tools. A step up from doing nothing at all, and worth reading
+`~/.claude/remote-settings.json` to know the shape of. An account that refuses that rung too, and an account that will not start a turn
+at any other rung it was asked for, are both failed turns rather than quiet ones: an agent told
+it may change nothing is not handed the workspace for having been refused.
+
 **ZCode has a mode for each of these**, so nothing in its column is a repeat of the one above
 it. `plan` refuses an edit and refuses a command it reads as high-risk. `edit` changes the
 workspace without asking, and stops at a high-risk tool to ask — which is answered no at that

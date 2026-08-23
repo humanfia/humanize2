@@ -92,6 +92,14 @@ reaches past the workspace and humanize granting what it asks. It is found out o
 and the rung you chose is always what is tried first. See
 [Troubleshooting](/guide/troubleshooting#codex-this-machine-will-not-run-an-agent-at-bypass-so-it-runs-at-auto).
 
+**A Claude Code whose account was set up by somebody else runs a rung down too.** An account can
+arrive with managed settings, and one that turns off `bypassPermissions` does not refuse the
+command line that asks for it: Claude starts the turn at `default` instead, where every edit is
+declined and the turn ends successfully with the work not done. So humanize reads the mode the
+first line Claude writes says the turn is *running* at, rather than the one it asked for, and
+asks again at `auto` over the same stream — before the model has answered anything. See
+[Troubleshooting](/guide/troubleshooting#claude-this-account-will-not-run-an-agent-at-bypass-so-it-runs-at-auto).
+
 Where a backend cannot tell two rungs apart, it says so rather than pretending. **A dash is the
 rung above it, run again.** Asking Kimi for `auto` gets you `workspace-write` behaviour, not a
 quiet promotion to `bypass`. Asking pi for anything above `read-only` gets you the same agent

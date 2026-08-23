@@ -352,6 +352,169 @@ def test_a_failed_turn_is_still_a_failed_turn_at_every_rung(
         ).new()("hi")
 
 
+#: A `claude` on an account somebody else settled the rules for: its managed settings forbid
+#: `bypassPermissions` and say so nowhere -- the command line is taken, the first line out says
+#: the turn is running at `default`, and a turn left there is declined every edit and ends
+#: successfully having changed nothing. `--model stuck` is an account that will not grant the
+#: rung below either; `--model sealed` is one that starts no turn at the mode it was asked for,
+#: which is a rung with nothing under it that would not be a promotion.
+_MANAGED = """
+import json, pathlib, select, sys
+
+log = pathlib.Path(LOG)
+
+
+def note(entry):
+    with log.open("a") as stream:
+        json.dump(entry, stream)
+        stream.write("\\n")
+
+
+def send(message):
+    sys.stdout.write(json.dumps(message) + "\\n")
+    sys.stdout.flush()
+
+
+note({"argv": sys.argv[1:]})
+flags = dict(zip(sys.argv, sys.argv[1:]))
+asked = flags.get("--permission-mode") or "bypassPermissions"
+granted = "default" if asked == "bypassPermissions" or flags.get("--model") == "sealed" else asked
+send({"type": "system", "subtype": "init", "permissionMode": granted,
+      "session_id": flags.get("--session-id") or flags.get("--resume")})
+words = ""
+while True:
+    # A window before answering, which is the ordering the real CLI has: the prompt is written
+    # first and the step lands microseconds after the init line, while the model is still being
+    # asked. Answering the moment the prompt arrives would be a turn no step could ever reach.
+    ready, _, _ = select.select([sys.stdin], [], [], 0.5)
+    if ready:
+        line = sys.stdin.readline()
+        if not line:
+            break
+        said = json.loads(line)
+        if said.get("type") == "control_request":
+            note({"asked": said["request"]})
+            stuck = flags.get("--model") == "stuck"
+            send({"type": "control_response", "response": {
+                "subtype": "error" if stuck else "success",
+                "request_id": said["request_id"],
+                "response": {"mode": said["request"]["mode"]},
+                "error": "Cannot set permission mode to bypassPermissions because it is "
+                         "disabled by settings or configuration"}})
+            if not stuck:
+                granted = said["request"]["mode"]
+                # As Claude does: the mode it is now at, said again on a line of its own.
+                send({"type": "system", "subtype": "status", "permissionMode": granted,
+                      "session_id": flags.get("--session-id") or flags.get("--resume")})
+        else:
+            words = said["message"]["content"][0]["text"]
+        continue
+    if words:
+        note({"ran": granted})
+        # Answered at whatever rung it ended up at: a turn left at `default` is declined its
+        # edits and still ends successfully, saying it could not -- which is the whole defect,
+        # and what a run of these tests against an unstepped driver must show rather than hang.
+        send({"type": "result", "subtype": "success", "is_error": False,
+              "result": words if granted != "default"
+              else "I don't have permission to write that file"})
+        words = ""
+"""
+
+
+def _managed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Puts that `claude` on PATH, and says where it writes down what it was asked."""
+    log = tmp_path / "claude.jsonl"
+    binaries = tmp_path / "bin"
+    binaries.mkdir(exist_ok=True)
+    fake = binaries / "claude"
+    fake.write_text(f"#!{sys.executable}\n{_MANAGED.replace('LOG', repr(str(log)))}")
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
+    return log
+
+
+def test_claude_runs_a_rung_down_where_this_account_will_not_start_at_the_one_asked_for(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`bypass` is what an unattended flow runs at, and some accounts forbid it silently.
+
+    The rung below is the same freedom with the asking turned back on, and the asking is
+    granted here -- so the flow does the work rather than answering that it could not.
+    """
+    log = _managed(tmp_path, monkeypatch)
+    session = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high")).new()
+
+    assert session("do the task") == "do the task"
+
+    noted = _noted(log)
+    assert "--dangerously-skip-permissions" in noted[0]["argv"]
+    # Once: Claude says the mode again on every line of status once one has been set, and a
+    # session that read one of those as an answer would ask for the rung for the whole turn.
+    assert [one["asked"] for one in noted if "asked" in one] == [
+        {"subtype": "set_permission_mode", "mode": "auto"}
+    ]
+    assert noted[-1]["ran"] == "auto"
+
+
+def test_claude_says_it_is_running_a_rung_down(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rung nobody asked for is a thing to say, once, the way the other backend says it."""
+    _managed(tmp_path, monkeypatch)
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    said: list[str] = []
+    agent.watch(lambda _agent, _session, event: said.append(event.text))
+
+    agent.new()("do the task")
+
+    stepped = (
+        "claude: this account will not run an agent at bypass, so it runs at auto,"
+    )
+    assert [one for one in said if stepped in one] == [
+        f"{stepped} where the account's own rules still apply"
+    ]
+
+
+def test_claude_fails_the_turn_where_the_rung_below_is_refused_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The turn is still at `default`, where the answer says the work is done and it is not."""
+    _managed(tmp_path, monkeypatch)
+    session = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="stuck", effort="high")).new()
+
+    with pytest.raises(subprocess.CalledProcessError, match="disabled by settings"):
+        session("do the task")
+
+
+def test_claude_does_not_step_a_rung_the_account_granted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nothing is asked for again where the turn is already running at what it asked for."""
+    log = _managed(tmp_path, monkeypatch)
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="m", effort="high", permission="read-only")
+    ).new()
+
+    assert session("do the task") == "do the task"
+    assert not [one for one in _noted(log) if "asked" in one]
+
+
+def test_claude_is_never_promoted_for_having_been_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An agent told it may change nothing is not handed the workspace by a step down."""
+    log = _managed(tmp_path, monkeypatch)
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="sealed", effort="high", permission="read-only")
+    ).new()
+
+    with pytest.raises(
+        subprocess.CalledProcessError, match="not run an agent at read-only"
+    ):
+        session("do the task")
+    assert not [one for one in _noted(log) if "asked" in one]
+
+
 #: A `codex app-server` on a machine whose Codex was given requirements of somebody else's: an
 #: enterprise policy that arrives with the account, or the `requirements.toml` a platform that
 #: packages Codex puts on its machines. One forbidding the sandbox `bypass` is refuses the whole
