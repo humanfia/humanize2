@@ -19,6 +19,12 @@ rather than every kind, because output is what the model is asked to produce and
 kind a loop of its own accord grows: what goes in is the task and the repository, and a round
 that read more of them is not a round that did more.
 
+Or a run of rounds that did nothing. A round whose turn failed answers with nothing and spends
+nothing, so a loop whose account was refused or whose model it may not run sits under a budget
+that never moves and goes round on the same failure for as long as it is left. Three such
+rounds in a row end it. What it kept is left rather than cleared: a loop that stalled is one
+to fix and start again from, not one that is over.
+
 The spend is kept because the rounds are. A budget that started again at nothing every time
 the loop was picked up would be no budget at all for the loop a week of restarts is, so what
 is counted is every run of this flow in this workspace. A loop that has spent it is over, and
@@ -37,6 +43,12 @@ from hmz.flows import Agent, flow
 #: way because that is the size these loops come in: a round of one is thousands, and a day
 #: of rounds is millions.
 MILLION = 1_000_000.0
+
+#: How many rounds in a row may answer with nothing before the loop gives up. A round that
+#: failed answers with nothing under `suppress` and spends no output tokens, so the budget
+#: meant to end the loop never moves for it. Three rather than one, because a round that
+#: genuinely had nothing to say is a round like any other and not a reason to stop.
+STALLED = 3
 
 
 class Config(BaseModel):
@@ -65,6 +77,7 @@ def run(
     # What the runs before this one spent, which this run's own is added to: an agent counts
     # what it has spent since it was made, and the loop is older than any of them.
     before = kept.get("output", 0.0)
+    stalled = 0
     while True:
         # Said before the turn rather than counted after it, so that a run watched from the
         # outside says which round the one going now is.
@@ -72,12 +85,18 @@ def run(
         print(f"round {kept['rounds']}")
         # A session of its own each turn: the agent starts from the task and the repository,
         # with nothing of the last turn in context.
-        agent(task, suppress=True)
+        answered = agent(task, suppress=True)
         kept["output"] = spent = before + agent.spent().output
         if held.budget and spent >= held.budget * MILLION:
             print(f"stopping: {spent / MILLION:.2f}M output tokens of {held.budget:g}M")
             # Emptied rather than left, which is what the next run here is handed and reads
             # as a run to start clean rather than as a run to carry on and stop at once.
             kept.clear()
+            return
+        stalled = 0 if answered else stalled + 1
+        if stalled >= STALLED:
+            print(f"stopping: {stalled} rounds in a row answered with nothing")
+            # Kept rather than cleared: this is a loop that was stopped rather than one that
+            # is over, and what stopped it is a thing to fix and carry on from.
             return
         time.sleep(5)

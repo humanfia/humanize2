@@ -38,6 +38,14 @@ again is a conversation of its own, starting from the task and the repository wi
 rounds before it in context. A loop stopped on its fortieth round says round 41 when it is
 started again, and remembers nothing else about the forty.
 
+## What else ends it
+
+**Three rounds in a row that answered with nothing.** A round whose turn failed answers with
+nothing and spends nothing, so a loop whose account was refused — or whose model that account
+may not run — would sit under a budget that never moves and go round on the same failure for as
+long as it was left. What it kept is left alone when it stops this way, rather than cleared: a
+loop that stalled is one to fix and carry on from, not one that is over.
+
 ## See also
 
 - [ralph_loop](/flows/ralph-loop) — a session of its own each round

@@ -10,14 +10,17 @@ reads a flow's file again to run it, so the `time` the running copy waits on is 
 other sleeper in the process waits on -- a retry backoff, a machine coming up -- and a wait
 counted as a round would be a round that never happened. Watching the agent counts turns.
 
-The other way either loop ends is the budget, which is the millions of output tokens it may
-spend before it stops. A stand-in that runs a shell command spends nothing, so the agent that
-is driven where a budget is what is being read is one that says each of its turns came out
-with something -- there being otherwise nothing for a budget to be spent on.
+The other ways either loop ends are the budget and a run of rounds that did nothing. The budget
+is the millions of output tokens it may spend before it stops: a stand-in that runs a shell
+command spends nothing, so the agent that is driven where a budget is what is being read is one
+that says each of its turns came out with something -- there being otherwise nothing for a
+budget to be spent on. The run of nothing is the opposite stand-in, whose every turn fails, and
+it is what the budget cannot end: a round that failed spends nothing to be counted.
 """
 
 from __future__ import annotations
 
+import subprocess
 from typing import TYPE_CHECKING
 
 import pytest
@@ -39,6 +42,19 @@ CONFIG = AgentConfig(model="m", effort="high")
 
 #: What the agents are set to do, which the stand-in runs as the shell command it is.
 TASK = "echo working"
+
+#: A turn that cannot be taken at all, which is what an account the backend refused looks like
+#: from inside a flow: under `suppress` it answers with nothing and spends nothing, so a budget
+#: counted in output tokens stands still for every round of it.
+FAILS = "exit 1"
+
+#: Fails, fails, answers, and fails for good after that. The answer on the third round puts the
+#: run of empty ones back to nothing, so what ends the loop is rounds four to six rather than
+#: rounds one to three -- which is the difference between three in a row and three in all.
+RECOVERS = (
+    "n=$(cat n 2>/dev/null || echo 0); n=$((n + 1)); echo $n > n; "
+    "[ $n = 3 ] && echo working || exit 1"
+)
 
 #: What one turn of the agent below is counted as having come out with, which is a millionth
 #: of a budget written in millions -- so a budget of 3 is three rounds.
@@ -76,6 +92,7 @@ def _ran(
     agent: ShellAgent,
     rounds: int,
     config: dict[str, object] | None = None,
+    task: str = TASK,
 ) -> None:
     """Runs one of the loops for so many rounds, and stops it after the last of them.
 
@@ -91,6 +108,8 @@ def _ran(
       rounds: How many rounds to let it take before it is stopped.
       config: What to set the loop up with, or None to take it as it comes -- which is a
         budget the stand-in agent will never spend.
+      task: What each round is given, which the stand-in runs as a shell command -- so a task
+        that exits non-zero is a round whose turn could not be taken.
     """
     taken: list[str] = []
     agent.watch(
@@ -105,7 +124,7 @@ def _ran(
 
     monkeypatch.setattr(module.time, "sleep", waited)
     with pytest.raises(Stopped):
-        Runner(module.__name__.rpartition(".")[2], [agent], config=config).run(TASK)
+        Runner(module.__name__.rpartition(".")[2], [agent], config=config).run(task)
 
 
 def _ran_out(
@@ -113,6 +132,7 @@ def _ran_out(
     module: ModuleType,
     agent: ShellAgent,
     config: dict[str, object] | None = None,
+    task: str = TASK,
 ) -> None:
     """Runs one of the loops until it stops itself, which is the budget being spent.
 
@@ -124,13 +144,15 @@ def _ran_out(
       module: The flow, imported, for the name it is run under.
       agent: The one agent it drives.
       config: What to set the loop up with.
+      task: What each round is given, which the stand-in runs as a shell command -- so a task
+        that exits non-zero is a round whose turn could not be taken.
     """
 
     def waited(seconds: float) -> None:
         """Instant, since what ends this run is the loop's own reading of what it spent."""
 
     monkeypatch.setattr(module.time, "sleep", waited)
-    Runner(module.__name__.rpartition(".")[2], [agent], config=config).run(TASK)
+    Runner(module.__name__.rpartition(".")[2], [agent], config=config).run(task)
 
 
 def _said(capsys: pytest.CaptureFixture[str]) -> list[str]:
@@ -245,6 +267,104 @@ def test_a_run_of_chat_leaves_nothing_behind_to_pick_up(
 
     (cycle,) = cycles()
     assert not (cycle / STATE).exists()
+
+
+@pytest.mark.timeout(60)
+def test_a_chat_whose_opening_turn_cannot_be_taken_says_so(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The first turn is the one that fails out loud, and the reason is the loop's own shape.
+
+    Suppressed, a turn that failed answers with nothing -- and nothing is what the person
+    answers with where nobody is at a prompt, which this flow reads as a conversation that is
+    over. So a refused account and a finished conversation would be the same run: no output,
+    no error and a clean exit, on a flow that had done none of what it was asked.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        Runner("chat", [ShellAgent(CONFIG)]).run(FAILS)
+
+
+@pytest.mark.timeout(60)
+def test_a_loop_whose_rounds_all_answer_with_nothing_gives_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The budget cannot end this one: a round that failed spends nothing to be counted."""
+    monkeypatch.chdir(tmp_path)
+
+    _ran_out(
+        monkeypatch, ralph_loop, ShellAgent(CONFIG), config={"budget": 0}, task=FAILS
+    )
+
+    said = capsys.readouterr().out.splitlines()
+    assert [line for line in said if line.startswith("round ")] == [
+        "round 1",
+        "round 2",
+        "round 3",
+    ]
+    assert "stopping: 3 rounds in a row answered with nothing" in said
+
+
+@pytest.mark.timeout(60)
+def test_a_loop_that_stalled_leaves_what_it_kept_for_the_next_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Stopped rather than over: what stopped it is a thing to fix and carry on from.
+
+    Which is the other half of the budget's rule. A loop that spent what it was given is done
+    and clears what it kept; a loop nothing would answer is one somebody has to look at, and
+    starting it again at round one would lose the count that says how long it had been dead.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    _ran_out(
+        monkeypatch, ralph_loop, ShellAgent(CONFIG), config={"budget": 0}, task=FAILS
+    )
+
+    assert state(cycles()[-1]) == {"rounds": 3, "output": 0.0}
+
+
+@pytest.mark.timeout(60)
+def test_a_round_that_answered_puts_the_run_of_empty_ones_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Three in a row rather than three in all: a loop that recovered is not one that stalled."""
+    monkeypatch.chdir(tmp_path)
+
+    _ran_out(
+        monkeypatch, ralph_loop, ShellAgent(CONFIG), config={"budget": 0}, task=RECOVERS
+    )
+
+    said = capsys.readouterr().out.splitlines()
+    assert [line for line in said if line.startswith("round ")] == [
+        f"round {each}" for each in range(1, 7)
+    ]
+    assert "stopping: 3 rounds in a row answered with nothing" in said
+
+
+@pytest.mark.timeout(60)
+def test_stateful_ralph_gives_up_on_a_run_of_nothing_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """One session rather than one a round, and the same reason to stop going round."""
+    monkeypatch.chdir(tmp_path)
+
+    _ran_out(
+        monkeypatch,
+        stateful_ralph,
+        ShellAgent(CONFIG),
+        config={"budget": 0},
+        task=FAILS,
+    )
+
+    said = capsys.readouterr().out.splitlines()
+    assert [line for line in said if line.startswith("round ")] == [
+        "round 1",
+        "round 2",
+        "round 3",
+    ]
+    assert "stopping: 3 rounds in a row answered with nothing" in said
 
 
 @pytest.mark.timeout(60)

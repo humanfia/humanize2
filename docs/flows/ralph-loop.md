@@ -50,6 +50,14 @@ A loop that has spent its budget is **over**, and what is over is not picked up:
 it kept, so the next run here opens on a budget of its own and at round one rather than
 stopping before it has taken a turn. [Picking a run up](/guide/resuming) is the whole of it.
 
+## What else ends it
+
+**Three rounds in a row that answered with nothing.** A round whose turn failed answers with
+nothing and spends nothing, so a loop whose account was refused — or whose model that account
+may not run — would sit under a budget that never moves and go round on the same failure for as
+long as it was left. What it kept is left alone when it stops this way, rather than cleared: a
+loop that stalled is one to fix and carry on from, not one that is over.
+
 ## See also
 
 - [stateful_ralph](/flows/stateful-ralph) — one session instead, re-sent the task each round
