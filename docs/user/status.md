@@ -1,22 +1,21 @@
 # The shape of a run — `/status`
 
 `/status` answers three questions about the run in front of you: who is working right now,
-every handover between agents and how often each happened, and what each model has cost. Above
-those it shows the **Flow**, the **Agents**, and **Set**: every flow running, the one that was
-started and whatever it called, innermost last; one line apiece; and the flow's own settings
-where any were changed from what it declares. Use it to see the **shape** of a run — who handed
-to whom and how many times — because a two-agent loop that was supposed to alternate and is in
-fact one agent doing everything looks different here from the first glance.
+every handover between agents and how often each happened, and what each model has cost. Reach
+for it to see the **shape** of a run, because a two-agent loop that was supposed to alternate
+and is in fact one agent doing everything looks different here from the first glance.
 
 It is also where [the board](/user/board) is, for a flow that talks to you.
 
 ## Try it
 
-Type `/status`. Above the editor you get one line per agent, with `●` for an agent that has a
-turn open and `○` for one that has stopped. On the status line, left, you see whose turn it is
-and how long it has been going, or between turns the flow and how long the run has been going.
-Under the agent lines you see what the run has cost and the rate it is costing it at, per
-model, over a recent window.
+Type `/status`, or press **esc** with nothing else on the screen. Above the diagram:
+
+| | |
+| --- | --- |
+| **Flow** | every flow running — the one that was started and whatever it called, innermost last |
+| **Agents** | one line apiece |
+| **Set** | the flow's own settings, where any were changed from what it declares |
 
 ## What is drawn, and when
 
@@ -53,17 +52,16 @@ working, so this is where the one that has stopped is reached.
 Nothing asks the flow what it is doing. A **flow** is Python that may branch any way it likes,
 so there is nothing to ask. What `/status` draws is kept from **the turns going past** — the
 same `begins`/`ends` events any [watcher](/reference/agents#watching-a-turn-as-it-happens)
-sees.
-
-`/btw` uses this same live observation, together with the task, agent turn counts and handovers,
-to answer a quick question. Its read-only side session receives a frozen snapshot, so asking it
-does not add a message to, pause, or otherwise steer the flow.
+sees. [`/btw`](/user/btw) answers a question from that same live observation, frozen into a
+snapshot, so asking it neither pauses nor steers the flow.
 
 That is also why the person, driven as [an agent](/weaver/human-agent), is not in the graph.
 Their turns are not bracketed by those events. Counting them would put a human in the handover
 graph and spin a clock at them while they thought.
 
 ## The same three readings, elsewhere
+
+Little of this waits for `/status`. Three parts of the screen carry it while the run goes on.
 
 **Above the editor**, continuously: one line per agent. Each line shows the name the flow calls
 it, what it runs as `cli/model:effort`, the machine, [what it may do](/user/permissions) and

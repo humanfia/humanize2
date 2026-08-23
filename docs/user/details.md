@@ -7,16 +7,11 @@ call and every line of thinking while you debug.
 
 ## Try it
 
-Type `/details on` in the interface to see everything the agent does.
-
 ```
 /details            flips it
 /details on         all of the working: tool calls, thinking, printed output
 /details off        which agent is working, and what it said   ← the default
 ```
-
-You now see the agent's tool calls and thinking alongside what it says. Type `/details off` to
-hide them and read only what the agent said.
 
 ## What each setting looks like
 

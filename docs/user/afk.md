@@ -12,9 +12,6 @@ At the prompt, type:
 /afk on
 ```
 
-Now an agent that asks is told nobody answered and carries on. Type `/afk off` to take
-questions again.
-
 ## What it is not
 
 `/afk` controls whether an agent may ask you a **question**. It does not control whether an
@@ -42,7 +39,7 @@ blocked on a question.
 ## On a command line
 
 You do not switch anything. `hmz exec` has nobody at a prompt, so it always behaves as `/afk
-on`. An agent that asks is told nobody answered and carries on.
+on`.
 
 ```sh
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"

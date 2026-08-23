@@ -2,20 +2,13 @@
 
 Two things go wrong, and they are not the same thing.
 
-An **account** goes down. A subscription runs out, a key is refused, a gateway answers 503.
-The model is fine, the CLI is fine, and what the turn needs is another account of the same
-backend. That happens **inside the conversation that was running** — the conversation is the
-backend's own and is named by an id, so the next account picks it up mid-thought. It is a
-thing about the account, and it is said in [`/providers`](/user/providers).
+| What failed | What answers it |
+| --- | --- |
+| An **account**. A subscription runs out, a key is refused, a gateway answers 503. The model is fine and the CLI is fine. | Another account of the same backend, **inside the conversation that was running**: it is the backend's own and named by an id, so the next account picks it up mid-thought. That is said in [`/providers`](/user/providers). |
+| A **place**. The model was retired this morning, the CLI will not start, the region has gone dark, the whole account is rate-limited rather than one request. No other account of that backend answers any of those. | Another place — another CLI, another account, another model. The conversation cannot come with it, because no backend takes another backend's session id. That is `/fallback`. |
 
-A **place** has nowhere left to run. The model was retired this morning, the CLI will not
-start, the region has gone dark, the whole account is rate-limited rather than one request. No
-other account of that backend answers any of those. What answers them is **another place** —
-another CLI, another account, another model — and the conversation cannot come with it,
-because no backend takes another backend's session id.
-
-`/fallback` is the second. It is the layer between an agent and its accounts, and a place is
-three things and no more:
+`/fallback` is the layer between an agent and its accounts, and a place is three things and no
+more:
 
 ```
 CLI[@ACCOUNT]/MODEL
@@ -96,11 +89,9 @@ In order, and it stops at the first thing that works:
 The flow sees one turn either way. The events come back through the session it asked, between
 the same `begins` and `ends`, and the transcript says where it was picked up.
 
-## What it costs you to have one
-
-Nothing until it is needed. The agent standing in is built the first time a turn has nowhere
-left to go — a chain of four places all started when the run was would be three CLIs held open
-for a failure that never came.
+Nothing is built until it is needed: the agent standing in is made the first time a turn has
+nowhere left to go, since a chain of four places all started when the run was would be three
+CLIs held open for a failure that never came.
 
 ## What it will not do
 
@@ -110,7 +101,8 @@ for a failure that never came.
   stateful loop that moved is one conversation on the other side and not one a round.
 - **Come round on itself.** A chain ends at the second sight of a place, and a place cannot
   fall back to itself — either would be a turn that never ran out of places to go.
-- **Fork.** One place has one place to go. Writing a step again says the new thing and not both.
+- **Fork.** One place has one place to go. Writing a step again says the new thing and not
+  both.
 - **Move a setting the CLI taking over cannot be told.** An agent told not to search the web
   does not fall back to a CLI with no way of being told: a setting quietly ignored would be a
   setting that lies, so the turn fails as it failed before anybody wrote a step down. The

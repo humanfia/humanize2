@@ -6,11 +6,9 @@ you want it to end now.
 
 ## Try it
 
-Press **ctrl+c** twice in the interface while a flow is running. The whole flow stops, not
-just the turn.
-
-Twice, because a day's work is behind a key that is also pressed by mistake: the first press
-says `press ctrl+c again to stop the flow` and the second one does it.
+Press **ctrl+c** twice in the interface while a flow is running. Twice, because a day's work is
+behind a key that is also pressed by mistake: the first press says `press ctrl+c again to stop
+the flow`, and the second one does it.
 
 ## The three ways to stop
 
@@ -43,8 +41,23 @@ them to have an effect is a key nobody trusts.
 A file the agent had half-written stays half-written. A command it had started keeps running
 until it finishes. What ends is the agent's part in it.
 
+## What stopping is not
+
+**Not `/clear`.** That clears the screen and nothing else. It clears the conversation being
+read, not the others, and nothing that is running.
+
+**Not choosing another flow.** `/flow` is refused while one is running, with `no choosing a
+flow while a flow is running: ctrl+c twice stops it first`. A flow drives the agents it was
+handed, and it must not have them swapped underneath it. Stop it first, then choose. Looking at
+`/flow` and leaving without choosing changes nothing.
+
+**Not a question ending.** A question still up when the flow ends or is stopped ends with it.
+Stopping is never blocked on one.
+
 ## Why `suppress=True` does not catch a stop
 
+The other side of that key press is the loop a [weaver
+wrote](/weaver/writing-a-flow#make-the-loop-survive-a-bad-turn), which has to let it out.
 `suppress` turns a **failed turn** into an empty answer:
 
 ```python
@@ -60,9 +73,10 @@ while True:
 
 `Stopped` is not a `subprocess.CalledProcessError`. Nothing that catches a failed turn catches
 this by accident. Let it propagate. The [epic](/user/tracing#what-a-run-writes-down) then
-records the run as **stopped by hand** rather than as one that finished. That is the difference
-between "it decided it was done" and "somebody stopped it", and the only place that
-distinction is written down.
+records the run as **stopped by hand** rather than as one that finished — the difference
+between "it decided it was done" and "somebody stopped it", and the only place that distinction
+is written down.
+
 There is one other thing `suppress` does not catch, for the same reason. An
 [`Unrecoverable`](/reference/agents#when-an-account-goes-down) is a turn that failed for a
 reason no other try could come out differently on — a conversation longer than the model's
@@ -71,30 +85,16 @@ one would go round on the same failure until somebody stopped it, so it comes ou
 and the run ends with it. Unlike a stop, it is a `CalledProcessError`, so a flow that really
 does want to catch everything still can.
 
-`agent.prompted()` raises it too, so a run ended while it waited also reads as ended by hand.
-`agent.stopped` is the quiet way to ask the same question. It is a bool, and never a raise:
+`agent.prompted()` raises `Stopped` too, so a run ended while it waited also reads as ended by
+hand. `agent.stopped` is the quiet way to ask the same question — a bool, and never a raise:
 
 ```python
 agent.prompted()      # waiting for the next thing to say; raises if the wait ended in a stop
 agent.stopped         # whether it has been told to stop; answers True, and never raises
 ```
 
-A hook that raises is normally the hook's own problem. A flow must not fail because something
+A hook that raises is normally the hook's own problem: a flow must not fail because something
 hung off it did. `Stopped` is the one exception, and it is let out.
-
-## What stopping is not
-
-**Not `/clear`.** That clears the screen and nothing else. It clears the conversation being
-read, not the others, and nothing that is running.
-
-**Not choosing another flow.** `/flow` is refused while one is running. It refuses with `no
-choosing a flow while a flow is running: ctrl+c twice stops it first`. A flow drives the
-agents it was handed, and it must not have them swapped underneath it. Stop it first, then
-choose. The page of `/flow` that chooses one is shut while one runs. Looking and leaving
-without choosing changes nothing.
-
-**Not a question ending.** A question still up when the flow ends or is stopped ends with it.
-Stopping is never blocked on one.
 
 ## See also
 

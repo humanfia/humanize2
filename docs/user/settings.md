@@ -29,9 +29,6 @@ Settings().profiling            # whether a run in this directory is profiled
 Settings().profiles(on=True)    # written down for it, from now on
 ```
 
-The first call answers whether a run in this directory is profiled, which is off until somebody
-turns it on. The second writes it down for this directory, from now on.
-
 ## Why it is kept per flow
 
 What an agent runs only means something against the flow driving it. A flow's second agent is
@@ -58,6 +55,13 @@ dropped or renamed is one it starts over from, rather than one that quietly come
 from its defaults. The reporting question is asked again, and that answer lives in the same
 file.
 
+Two related files, for completeness:
+
+| | |
+| --- | --- |
+| `~/.humanize/models/<cli>.json` | what each CLI said it runs, as you run it — refreshed with **r** on the models sheet |
+| `~/.humanize/providers/<cli>/<name>/models.json` | the same, as that [account](/user/providers) |
+
 ## Reading it, and forgetting it
 
 `/settings` is the menu over this file, in two pages:
@@ -69,13 +73,6 @@ file.
 
 Nothing lands until you leave the menu and confirm saving, as on every other menu. Forgetting
 one directory leaves every other directory, and every setting, exactly as it was.
-
-Two related files, for completeness:
-
-| | |
-| --- | --- |
-| `~/.humanize/models/<cli>.json` | what each CLI said it runs, as you run it — refreshed with **r** on the models sheet |
-| `~/.humanize/providers/<cli>/<name>/models.json` | the same, as that [account](/user/providers) |
 
 ## Whether a run here is profiled
 
@@ -94,15 +91,6 @@ is profiled too — it says nothing about what runs, only about whether what run
 
 What is sampled, what that costs while the flow runs, and what a trace then makes of it are
 [Tracing › Profiling a run](/user/tracing#profiling-a-run).
-
-From Python it is one property and one call:
-
-```python
-from hmz.settings import Settings
-
-Settings().profiling            # whether a run in this directory is profiled
-Settings().profiles(on=True)    # written down for it, from now on
-```
 
 ## Overriding it for one run
 
@@ -123,23 +111,27 @@ sheet to walk back out of.
 
 `hmz exec` is set up from none of this. What it runs is what the line names, so an unattended
 run inherits nothing of what this project was last set up with, which is the point of it. It
-reads two things from outside the line: whether the runs of this directory are
-[profiled](#whether-a-run-here-is-profiled), which is the workspace's rather than the run's,
-and whether [reporting](/user/reporting) was answered yes. A flow that says it [can be picked
-up](/user/resuming) is handed what the last run of it here left behind, which is the run's own
-doing rather than a setting. An unattended run of one is the next stretch rather than the same
-stretch again.
+reads two things from outside the line:
+
+- whether the runs of this directory are [profiled](#whether-a-run-here-is-profiled), which is
+  the workspace's rather than the run's;
+- whether [reporting](/user/reporting) was answered yes.
+
+A flow that says it [can be picked up](/user/resuming) is handed what the last run of it here
+left behind — the run's own doing rather than a setting, so an unattended run of one is the
+next stretch rather than the same stretch again.
 
 ## The first time
 
-With nothing remembered, the interface opens on the
-[`chat`](/flows/chat) flow. It opens on the first backend
-installed here that has said what it runs, at the first model it named and at `high`. The first
-model is that CLI's own idea of what it runs by default. `high` is deliberately not the hardest
-setting. It is the one to reach for rather than the one to spend before anybody has asked for
-anything. DeepSeek Harness is used as this implicit fallback only when its local account can
-resolve a nonempty API key. Without one it is still in the agent picker, where it can be selected
-and an account configured; an explicit or remembered DeepSeek choice is not replaced.
+With nothing remembered, the interface opens on the [`chat`](/flows/chat) flow. It opens on the
+first backend installed here that has said what it runs, at the first model it named and at
+`high`. The first model is that CLI's own idea of what it runs by default. `high` is
+deliberately not the hardest setting: it is the one to reach for rather than the one to spend
+before anybody has asked for anything.
+
+DeepSeek Harness is used as this implicit fallback only when its local account can resolve a
+nonempty API key. Without one it is still in the agent picker, where it can be selected and an
+account configured; an explicit or remembered DeepSeek choice is not replaced.
 
 ## See also
 
