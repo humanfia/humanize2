@@ -172,6 +172,15 @@ class AgentConfig:
                 "service_tier must be one of "
                 f"{', '.join(SERVICE_TIERS)}, not {self.service_tier!r}"
             )
+        # Said where it is written, which for a config read back out of an older file is the
+        # moment it is read: a rung no backend has a word for is one every driver would have
+        # to answer for, so it is refused here where they all pass rather than reached down in
+        # one of them as a key that is not there.
+        if self.permission not in PERMISSIONS:
+            raise ValueError(
+                f"permission must be one of {', '.join(PERMISSIONS)}, "
+                f"not {self.permission!r}"
+            )
 
 
 def anchored(target: str) -> MachineConfig | None:

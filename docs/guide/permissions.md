@@ -70,7 +70,7 @@ reaches for whichever of its own settings says the same thing:
 | `read-only` | `plan` mode | `read-only` sandbox | plan mode | without `bash`, `edit`, `write` | `edit` and `bash` denied | `plan` mode |
 | `workspace-write` | `acceptEdits` mode | `workspace-write` sandbox | plan mode off | — | `webfetch` denied | `edit` mode |
 | `auto` | Claude's own `auto` mode | `workspace-write`, approvals on request | — | — | nothing denied | `build` mode, which asks before a tool with side effects |
-| `bypass` | `bypassPermissions` | `danger-full-access` | `yolo` mode | — | — | `yolo` mode |
+| `bypass` | `manual` mode, humanize answers each request | `danger-full-access` | `yolo` mode | — | — | `yolo` mode |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one.
@@ -92,24 +92,28 @@ reaches past the workspace and humanize granting what it asks. It is found out o
 and the rung you chose is always what is tried first. See
 [Troubleshooting](/guide/troubleshooting#codex-this-machine-will-not-run-an-agent-at-bypass-so-it-runs-at-auto).
 
-**A Claude Code whose account was set up by somebody else runs a rung down too.** An account can
-arrive with managed settings, and one that turns off `bypassPermissions` does not refuse the
-command line that asks for it: Claude starts the turn at `default` instead, where every edit is
-declined and the turn ends successfully with the work not done. So humanize reads the mode the
-first line Claude writes says the turn is *running* at, rather than the one it asked for, and
-asks again at `auto` over the same stream — before the model has answered anything. See
-[Troubleshooting](/guide/troubleshooting#claude-this-account-will-not-run-an-agent-at-bypass-so-it-runs-at-auto).
+**Claude Code's `bypass` runs the same on an account somebody else set up.** The flag that
+skips the asking, `--dangerously-skip-permissions`, is one managed settings can turn off — an
+account carrying `disableBypassPermissionsMode` starts the turn at a mode where every edit is
+declined and it ends successfully with the work not done. So humanize does not skip the asking:
+it runs the agent at Claude's `manual` mode and answers each request itself, yes to whatever the
+account leaves decidable, with the organisation's own hard `deny` list still enforced by Claude
+before it asks. `manual` is a mode every account allows, so `bypass` needs nothing special from
+yours — and a hook on `PERMISSION_REQUEST` can refuse a tool here too, since the agent is
+asking rather than skipping.
 
 Where a backend cannot tell two rungs apart, it says so rather than pretending. **A dash is the
 rung above it, run again.** Asking Kimi for `auto` gets you `workspace-write` behaviour, not a
 quiet promotion to `bypass`. Asking pi for anything above `read-only` gets you the same agent
 three times over.
 
-## `auto` is the rung where a hook gets a say
+## `auto` is the rung where a hook gets a say — and on Claude Code, `bypass` too
 
-`auto` is the one setting under which a backend asks before it acts *and waits for the answer*.
-It is the one rung where a [hook](/guide/hooks) hung on `PERMISSION_REQUEST` can refuse
-something and have the agent hear it:
+A [hook](/guide/hooks) hung on `PERMISSION_REQUEST` can refuse something and have the agent hear
+it only where a backend asks before it acts *and waits for the answer*. `auto` is that rung
+everywhere it exists. Claude Code runs the moment at `bypass` as well: `bypass` there is
+`manual` mode with the asking routed to humanize, so the hook sees every tool an agent nobody
+was asked about reaches for, and can still say no to one:
 
 ```python
 def no_force_push(occasion: Occasion) -> Verdict | None:

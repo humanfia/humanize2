@@ -138,27 +138,6 @@ skip the note. What the machine allows is its own to say:
 cat /etc/codex/requirements.toml
 ```
 
-### `claude: this account will not run an agent at bypass, so it runs at auto`
-
-Not a failure: a note, said as each Claude starts. This account arrived with managed settings —
-an enterprise policy that comes with the organisation — and they turn off the
-`bypassPermissions` mode that [`bypass`](/guide/permissions) is. Claude does not refuse the
-command line asking for it, the way Codex refuses such a call: it starts the turn at `default`,
-where every edit the agent asks for is declined and the turn ends successfully with the work not
-done. So humanize reads the mode the first line of the stream says the turn is *running* at and
-asks again a rung down, at `auto`, where Claude decides for itself under the account's own
-rules rather than having the deciding switched off. Set the agent to `auto` in `/agents` to say
-it yourself and skip the note.
-
-It is a step up from doing nothing, not the same as `bypass`. At `auto` the account's own
-`permissions.ask` and `permissions.deny` rules still apply, and in print mode a tool they cover
-is declined without anybody being asked — the turn ends successfully with that one thing not
-done. What the account allows is its own to say:
-
-```sh
-cat ~/.claude/remote-settings.json
-```
-
 ## In the interface
 
 ### `no coding agent is installed here`

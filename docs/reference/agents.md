@@ -1106,7 +1106,7 @@ reaches for whichever of its own settings says the same thing:
 | `read-only` | refused | `plan` mode | `read-only` sandbox | `--mode plan` | — | only `read_file`, `grep`, `list_dir` | plan mode | without `bash`, `edit`, `write` | without `edit`, `write_file`, `run_shell_command` | `edit` and `bash` denied | `plan` mode |
 | `workspace-write` | refused | `acceptEdits` mode | `workspace-write` sandbox | `--sandbox enabled` | — | `web_search` and `web_fetch` denied | plan mode off | — | `web_fetch` denied | `webfetch` denied | `edit` mode |
 | `auto` | `--dangerously-skip-permissions` | Claude's own `auto` mode | `workspace-write`, approvals on request | `--auto-review`, its own classifier | — | — | — | — | — | nothing denied | `build` mode, which asks before a tool with side effects |
-| `bypass` | `--dangerously-skip-permissions` | `bypassPermissions` | `danger-full-access` | `--force --sandbox disabled` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — | `yolo` mode |
+| `bypass` | `--dangerously-skip-permissions` | `manual` mode, every request answered here | `danger-full-access` | `--force --sandbox disabled` | supported | `--yolo` | `yolo` mode | — | `--approval-mode yolo` | — | `yolo` mode |
 
 **Codex is the one backend here with a sandbox of its own**, so its rungs are the real thing
 rather than an approximation of one. Where a backend cannot tell two rungs apart it says so
@@ -1130,30 +1130,19 @@ for is granted
 It is found out once per agent rather than once per turn, and the rung you chose is what is
 tried first: an agent set to `auto` in `/agents` asks for `auto` and never sees this.
 
-**A Claude Code whose account is somebody else's runs a rung down too, and does not find it out
-the same way.** An account can arrive with managed settings, and one carrying
-`"disableBypassPermissionsMode": "disable"` does not refuse the command line the way Codex
-refuses such a call: `claude` takes `--dangerously-skip-permissions`, starts the turn at
-`default`, declines every edit the agent asks for, and ends the turn successfully with the work
-not done. So the driver reads the mode the first line of the stream says the turn is *running*
-at — `permissionMode` on the `init` event — and asks again a rung down over the same stream,
-with `set_permission_mode`, before the model has answered the first question. It says so as it
-does:
-
-```
-claude: this account will not run an agent at bypass, so it runs at auto, where the account's
-own rules still apply
-```
-
-Said as each Claude starts, which is once for an ordinary session and once a turn for an
-anchored one. `auto` here is not the equivalence it is on Codex: Claude decides for itself
-under the account's own rules rather than having the deciding switched off, so a tool the
-account's `permissions.ask` or `permissions.deny` covers is still declined — and in print mode
-declined without anybody being asked, which is the same quiet success this step exists to
-close, surviving for those tools. A step up from doing nothing at all, and worth reading
-`~/.claude/remote-settings.json` to know the shape of. An account that refuses that rung too, and an account that will not start a turn
-at any other rung it was asked for, are both failed turns rather than quiet ones: an agent told
-it may change nothing is not handed the workspace for having been refused.
+**Claude Code's `bypass` is humanize doing the asking, not Claude skipping it.** The flag that
+skips it — `--dangerously-skip-permissions` — is one an account can be told to refuse: managed
+settings carrying `"disableBypassPermissionsMode": "disable"` do not reject the flag the way
+Codex rejects a forbidden sandbox, they quietly start the turn at a mode where every edit is
+declined and the turn ends successfully with nothing changed. So humanize does not send that
+flag. It runs the agent at Claude's `manual` mode — where Claude asks before every tool that
+would change something — and routes those asks to itself with `--permission-prompt-tool stdio`,
+answering each one `allow`. `manual` is a mode every account permits, so `bypass` runs the same
+on an account somebody else set up as on your own; and a yes here is a yes to what the account
+leaves decidable, since the hard `deny` list an organisation ships is the CLI's to refuse
+before it ever asks. The rung means the same thing it always did — an agent nobody was asked
+about, allowed what a person at the prompt would have allowed — reached by standing in for that
+person rather than by turning the question off.
 
 **ZCode has a mode for each of these**, so nothing in its column is a repeat of the one above
 it. `plan` refuses an edit and refuses a command it reads as high-risk. `edit` changes the
@@ -1164,10 +1153,13 @@ yes. `yolo` asks nothing at all. ZCode's own `auto` mode is not this `auto` and 
 rung here: in that mode its permission service refuses every tool, saying the mode is reserved
 and not implemented yet.
 
-**`auto` is the rung where a hook gets a say.** It is the one setting under which a backend
-actually asks before it acts and waits for the answer, so it is the one where a hook hung on
-[`PERMISSION_REQUEST`](#hooks) can refuse something and have the agent hear it. Claude Code,
-Codex and ZCode all run that moment; the rest have nothing to hang it on.
+**`auto` is the rung where a hook gets a say — and on Claude Code, `bypass` is too.** A hook
+hung on [`PERMISSION_REQUEST`](#hooks) can refuse something only where a backend actually asks
+before it acts and waits for the answer. `auto` is that rung everywhere it exists; Claude Code,
+Codex and ZCode run the moment there. Claude Code runs it at `bypass` as well, because `bypass`
+there is `manual` mode with the asking routed home — so a hook can refuse a tool even an agent
+nobody was asked about reached for, and the agent hears it. The rest have nothing to hang it
+on.
 
 ## The skills an agent carries
 

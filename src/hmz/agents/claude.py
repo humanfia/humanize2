@@ -60,27 +60,24 @@ _UNFINISHED = frozenset(
     }
 )
 
-#: What Claude calls each rung of the ladder. Its own four modes line up with them, and one of
-#: them is even called the same thing: `plan` is an agent that works everything out and changes
-#: nothing, `acceptEdits` is one that may change what it is working on without asking, Claude's
-#: own `auto` is one whose requests are answered for it, and `bypassPermissions` is the
-#: permission system switched off -- which is what `--dangerously-skip-permissions` has always
-#: meant here, and is spelled that way still because that flag is the one Claude documents.
+#: What Claude calls each rung of the ladder, said on its own command line. Three line up with
+#: a mode of Claude's own: `plan` is an agent that works everything out and changes nothing,
+#: `acceptEdits` is one that may change what it is working on without asking, and Claude's own
+#: `auto` is one whose requests are answered for it. `bypass` is the fourth, and it is `manual`
+#: -- the mode where Claude asks before every tool that would change something -- rather than
+#: `bypassPermissions`, the mode that skips the asking. It is not that Claude cannot be told to
+#: skip it: it is that an account can be given managed settings, and one carrying
+#: `disableBypassPermissionsMode` does not refuse `--dangerously-skip-permissions` the way a
+#: Codex given requirements refuses such a call -- it starts the turn at a mode where every
+#: edit is declined and the turn ends successfully having changed nothing. So humanize takes
+#: the asking rather than skipping it: `bypass` runs at `manual` and answers every request
+#: itself, which is a mode every account allows and which means the same thing on each of them.
 _PERMITTED = {
     "read-only": "plan",
     "workspace-write": "acceptEdits",
     "auto": "auto",
+    "bypass": "manual",
 }
-
-#: That fourth mode under the name Claude says it back by. It is not in the mapping above
-#: because the flag is what a turn asks for it with, and this is what the first line out calls
-#: the same rung once the turn is running at it -- which is the only way to find out that it
-#: is not: an account can be given managed settings, and one carrying
-#: `disableBypassPermissionsMode` does not refuse the command line the way a Codex given
-#: requirements refuses such a call. It starts the turn at `default` instead, where every edit
-#: is declined, the model says it could not do the work, and the turn ends successfully having
-#: changed nothing.
-_UNCHECKED = "bypassPermissions"
 
 #: What each kind of token is called on the total Claude states at the end of a turn, and what
 #: it is called on the message each request answered with. The same kinds either way, under
@@ -221,10 +218,6 @@ class ClaudeCodeSession(StreamSessionBase):
         #: a sibling session between the two reads would be written down as a name the process
         #: was told about when the process was told nothing at all, and never asked again.
         self._telling: tuple[str, ...] = ()
-        #: The `set_permission_mode` this process was asked to step down by, until Claude has
-        #: answered it: a rung refused twice is a turn that would go on quietly doing nothing,
-        #: which is the whole of what asking a second time is here to stop.
-        self._stepping: str = ""
 
     @property
     def named(self) -> str | None:
@@ -251,10 +244,18 @@ class ClaudeCodeSession(StreamSessionBase):
             "--verbose",
             "--resume" if self._id else "--session-id",
             pinned,
+            "--permission-mode",
+            _PERMITTED[self._agent.config.permission],
             *(
-                ["--permission-mode", mode]
-                if (mode := _PERMITTED.get(self._agent.config.permission))
-                else ["--dangerously-skip-permissions"]
+                # `bypass` is the rung nobody was asked about, so nobody is at a prompt to
+                # answer for it -- and rather than skip the asking with the flag an account
+                # may forbid, humanize does the answering. `manual` mode routes every request
+                # to whoever the CLI is talking to, and `stdio` is that being us: each one is
+                # read as a `control_request` and answered `allow`, yes to whatever the account
+                # leaves decidable, with its own hard `deny` list still the CLI's to enforce.
+                ["--permission-prompt-tool", "stdio"]
+                if self._agent.config.permission == "bypass"
+                else []
             ),
             "--settings",
             json.dumps(
@@ -335,9 +336,6 @@ class ClaudeCodeSession(StreamSessionBase):
         self._fleet = {}
         self._at = self.effort
         self._offering = self._telling
-        # And the rung, which each process is granted or refused for itself: nothing is carried
-        # over from the last one, whose account may not even be this one's.
-        self._stepping = ""
 
     def _offered(self) -> tuple[str, ...]:
         """What a Claude started now would be told the flow's own callbacks are.
@@ -483,28 +481,6 @@ class ClaudeCodeSession(StreamSessionBase):
         if said.get("type") == "control_request":
             # Claude waits on the answer, so one left unanswered is a turn that never ends.
             self._answer(said)
-        elif said.get("type") == "control_response" and self._stepping:
-            # Claude answering the one thing this session ever asks of it: the step below.
-            answer: dict[str, Any] = said.get("response") or {}
-            if answer.get("request_id") == self._stepping:
-                self._stepping = ""
-                if answer.get("subtype") == "success":
-                    yield Event(
-                        kind="tool",
-                        text="claude: this account will not run an agent at bypass, so it"
-                        " runs at auto, where the account's own rules still apply",
-                    )
-                else:
-                    # A rung refused twice. The turn is still at `default`, where every edit
-                    # is declined and the answer at the end says the work is done -- so this
-                    # is the turn's failure rather than something to carry on past.
-                    yield Event(
-                        kind="failed",
-                        text=str(
-                            answer.get("error")
-                            or "Claude would not run this turn at auto either"
-                        ),
-                    )
         elif said.get("type") == "command_lifecycle":
             # What Claude answers a word put into a turn with, under the uuid it was sent
             # with: `queued` the moment it has been read off stdin, `started` once it is in
@@ -518,12 +494,6 @@ class ClaudeCodeSession(StreamSessionBase):
             # Noted, not taken: this is the first line out, said before anything can go
             # wrong, and a session is only opened by a turn that lands in it.
             self._named = str(said["session_id"])
-            if said.get("subtype") == "init":
-                # The one line that says what the turn *started* at. Claude says the mode
-                # again on every `status` line once one has been set, and reading one of
-                # those as the answer to this would have the session asking for the same
-                # rung again for as long as the turn ran.
-                yield from self._stepped(str(said.get("permissionMode") or ""))
         elif said.get("type") == "result":
             if failure := _result_failure(said):
                 # Claude has emitted `subtype: success` with `is_error: true`, so neither
@@ -582,13 +552,18 @@ class ClaudeCodeSession(StreamSessionBase):
     def _answer(self, said: dict[str, Any]) -> None:
         """Answers something Claude asked of us over the same stream the turn is read from.
 
-        Only one kind is worth putting to a person: the tool Claude uses to ask one. Every
-        other request is a permission, and a flow watches its agent rather than gating it --
-        so those are allowed with the input they came with, unless something hung on
-        `PermissionRequest` says otherwise. That is the one moment where a refusal actually
-        stops the agent doing something, because it is the one the backend waits on. A
-        question nobody is there to answer is refused, which Claude reads as the tool having
-        been declined and carries on from, rather than waiting on a reply that is not coming.
+        Two kinds arrive here. The tool Claude uses to ask a person a question is put to the
+        person. Everything else is a permission -- and under `bypass`, where Claude runs at
+        `manual` and asks before every tool that would change something, every one of those
+        asks lands here, which is humanize taking the deciding rather than skipping it. A flow
+        watches its agent rather than gating it, so those are allowed with the input they came
+        with, unless something hung on `PermissionRequest` says otherwise: that is the one
+        moment a refusal actually stops the agent, because it is the one the backend waits on.
+        What the account itself will not allow at all -- the hard `deny` list an organisation
+        ships -- the CLI refuses before it ever asks, so a yes here is a yes to what the
+        account leaves decidable and nothing more. A question nobody is there to answer is
+        refused, which Claude reads as the tool having been declined and carries on from,
+        rather than waiting on a reply that is not coming.
 
         An agent that may change nothing is the exception: a permission is a request to do
         something, and granting one under `read-only` would be handing back the rung the flow
@@ -662,59 +637,6 @@ class ClaudeCodeSession(StreamSessionBase):
                         "subtype": "success",
                         "request_id": said.get("request_id"),
                         "response": answer,
-                    },
-                }
-            )
-            + "\n"
-        )
-
-    def _stepped(self, granted: str) -> Iterator[Event]:
-        """Asks again a rung down, where this account will not start the turn at the one asked.
-
-        The mode the first line out says the turn is *running* at, rather than the one the
-        command line asked for: an account whose managed settings forbid `bypassPermissions`
-        runs the turn at `default` and says so only here, and a turn left there reaches for a
-        tool, is declined, and ends by saying it could not -- successfully. So one running
-        lower than it was told to is asked for again over the same stream the turn is read
-        from, which lands while the model is still being asked the first question: the answer
-        to that is a round trip away, and this is a line already written.
-
-        The rung below `bypass` is `auto`, where Claude decides for itself under the account's
-        own rules rather than having the deciding switched off -- so a flow nobody was asked
-        about goes on running unattended here, though not with everything granted: a tool the
-        account's `permissions.ask` or `permissions.deny` covers is still declined, and in
-        print mode declined without anybody being asked. A step up from doing nothing at all,
-        and not the same as `bypass`. Every other rung is asked for as a mode Claude grants,
-        so one of those
-        coming back changed is an account that will not run this agent as it was configured,
-        and what is under it is not a rung but a promotion: an agent told it may change
-        nothing is not handed the workspace for having been refused. That one is a failed turn.
-
-        Args:
-          granted: What Claude says the turn is running at, or "" for a line that does not say.
-
-        Yields:
-          The turn's failure, where the rung asked for cannot be met halfway.
-        """
-        wanted = _PERMITTED.get(self._agent.config.permission, _UNCHECKED)
-        if granted in ("", wanted):
-            return
-        if wanted != _UNCHECKED:
-            yield Event(
-                kind="failed",
-                text=f"this account will not run an agent at"
-                f" {self._agent.config.permission}: Claude runs the turn at {granted}",
-            )
-            return
-        self._stepping = str(uuid.uuid4())
-        self._send(
-            json.dumps(
-                {
-                    "type": "control_request",
-                    "request_id": self._stepping,
-                    "request": {
-                        "subtype": "set_permission_mode",
-                        "mode": _PERMITTED["auto"],
                     },
                 }
             )
