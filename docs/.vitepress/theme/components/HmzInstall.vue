@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// The one line that installs it, a button that copies it, and the two ways on from there.
+// The one line that installs it, a button that copies it, and the ways on from there.
 //
-// It sits under the title of the features page, which is the front of the site now, so it
-// carries the two things somebody arriving needs and the front page used to carry in its
-// hero: the line to paste, and the way to the quickstart. Understanding what this is and
-// getting it running should be one click apart, in either order.
+// It sits under the title of the features page. The site's root carries the same line in its
+// hero, so this is not the only place to find it -- what this adds is that a reader who came
+// to features to work out what humanize is can install it without going back, and be sent to
+// whichever of the three quickstarts is theirs. Those live on the root page, so each way is
+// that page and a fragment of it rather than a page of its own.
 import { onUnmounted, ref } from 'vue'
 import { withBase } from 'vitepress'
 
@@ -36,10 +37,11 @@ onUnmounted(() => clearTimeout(clearing))
     </button>
 
     <div class="ways">
-      <a class="go" :href="withBase('/')">
-        Quickstart
-        <em>fifteen minutes, from nothing installed</em>
+      <a class="go" :href="withBase('/') + '#run-a-flow'">
+        Run a flow
+        <em>from nothing installed to a run you can open in Perfetto</em>
       </a>
+      <a class="also" :href="withBase('/') + '#weave-a-flow'">Weave one</a>
       <a class="also" :href="withBase('/user/installation')">Installation guide</a>
       <a class="also" :href="withBase('/flows/')">What it can run</a>
     </div>
@@ -91,7 +93,12 @@ onUnmounted(() => clearTimeout(clearing))
   font-weight: 700;
 }
 
-code {
+.line code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

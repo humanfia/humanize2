@@ -1,19 +1,21 @@
-// The features landing is a set of diagrams rather than a page of prose, each feature page is
-// one diagram of its own, and every flow has its loop played on its own page -- so the theme
-// exists to register them. Everything else is VitePress's default theme untouched: the guides,
-// tutorials and reference render exactly as they did.
+// The page at the site's root is a hero and an architecture diagram, the features landing is a
+// set of diagrams rather than a page of prose, each feature page is one diagram of its own, and
+// every flow has its loop played on its own page -- so the theme exists to register them.
+// Everything else is VitePress's default theme untouched: the guides, tutorials and reference
+// render exactly as they did.
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 
 import HmzAccounts from './components/HmzAccounts.vue'
 import HmzAnchor from './components/HmzAnchor.vue'
+import HmzArch from './components/HmzArch.vue'
 import HmzBackends from './components/HmzBackends.vue'
 import HmzDaemon from './components/HmzDaemon.vue'
 import HmzFeatures from './components/HmzFeatures.vue'
 import HmzFlowShape from './components/HmzFlowShape.vue'
 import HmzFlows from './components/HmzFlows.vue'
-import HmzGallery from './components/HmzGallery.vue'
 import HmzGoal from './components/HmzGoal.vue'
+import HmzHero from './components/HmzHero.vue'
 import HmzInstall from './components/HmzInstall.vue'
 import HmzLoops from './components/HmzLoops.vue'
 import HmzMap from './components/HmzMap.vue'
@@ -36,13 +38,14 @@ export default {
   enhanceApp({ app }) {
     app.component('HmzAccounts', HmzAccounts)
     app.component('HmzAnchor', HmzAnchor)
+    app.component('HmzArch', HmzArch)
     app.component('HmzBackends', HmzBackends)
     app.component('HmzDaemon', HmzDaemon)
     app.component('HmzFeatures', HmzFeatures)
     app.component('HmzFlowShape', HmzFlowShape)
     app.component('HmzFlows', HmzFlows)
-    app.component('HmzGallery', HmzGallery)
     app.component('HmzGoal', HmzGoal)
+    app.component('HmzHero', HmzHero)
     app.component('HmzInstall', HmzInstall)
     app.component('HmzLoops', HmzLoops)
     app.component('HmzMap', HmzMap)

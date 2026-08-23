@@ -23,6 +23,9 @@
   --hmz-grid: rgba(96, 138, 177, 0.16);
   --hmz-panel-bg: var(--vp-c-bg-soft);
   --hmz-panel-border: var(--vp-c-divider);
+
+  /* The wordmark on the page at the site's root: the three colours above, in one sweep. */
+  --hmz-wordmark: linear-gradient(110deg, #608ab1 0%, #2a9d8f 45%, #7c6cf0 100%);
 }
 
 .dark {
@@ -43,6 +46,7 @@
   --hmz-lane-6: #9aa3b8;
 
   --hmz-grid: rgba(140, 184, 222, 0.14);
+  --hmz-wordmark: linear-gradient(110deg, #8cb8de 0%, #2dd4bf 45%, #c084fc 100%);
 }
 
 /* A feature page -- and a flow page, and the features landing the site's root goes to -- is a
@@ -62,15 +66,133 @@
   max-width: 46rem;
 }
 
+/* The shell every diagram on the site is drawn in. Two dozen components set it as their root
+   class and then style their own insides, so the border, the radius and the fill live here
+   once rather than two dozen times. */
+.hmz-panel {
+  border: 1px solid var(--hmz-panel-border);
+  border-radius: 16px;
+  background: var(--hmz-panel-bg);
+  overflow: hidden;
+}
+
 /* The diagrams and card grids stand in the flow of a document now rather than inside a section
    of a front page, so the space around one is set here. Only a direct child of the content is
    matched: the same class names occur inside these components, laying out their own insides. */
 .vp-doc > div > .hmz-panel,
-.vp-doc > div > .gallery,
 .vp-doc > div > .flows,
 .vp-doc > div > .hmz-paths,
-.vp-doc > div > .grid {
+.vp-doc > div > .grid,
+.VPHome .vp-doc > div > div > .hmz-panel,
+.VPHome .vp-doc > div > div > .flows,
+.VPHome .vp-doc > div > div > .hmz-paths,
+.VPHome .vp-doc > div > div > .grid {
   margin: 22px 0 30px;
+}
+
+/* ---------------------------------------------------------------------------------------
+   The page at the site's root.
+
+   It is `layout: home` with no `hero:` and no `features:` key, so VitePress renders neither
+   of its own blocks and the whole page is the content: a full-viewport hero, an architecture
+   diagram, and three quickstarts. What the theme still gives us is `.VPHome` to hang the
+   backdrop on, and a content column 1280px wide with `--vp-offset` on it -- the escape hatch
+   a full-bleed child measures the viewport edge from.
+   --------------------------------------------------------------------------------------- */
+
+/* There is no sidebar here, so the content column is the full 1152px -- which is a fine width
+   for a diagram, a table or a block of shell, and much too wide for a line of prose. The same
+   measure a feature page holds its prose to, then, and only the prose: the code, the tables and
+   the diagrams keep the room. The one warning at the foot of the page is excluded, because it
+   sits under the full-width card grid and would read as ragged held in from it.
+
+   One level deeper than an ordinary page: there `vp-doc` is the class on the wrapper the
+   markdown sits directly inside, and on this layout `VPHomeContent` puts it on a container one
+   further out. So the content is `> div > div >` here rather than `> div >`. */
+.VPHome .vp-doc > div > div > p:not(.hmz-warn),
+.VPHome .vp-doc > div > div > ul,
+.VPHome .vp-doc > div > div > ol,
+.VPHome .vp-doc > div > div > blockquote,
+.VPHome .vp-doc > div > div > .custom-block {
+  max-width: 46rem;
+}
+
+/* The hero sits on a slow-drifting field, so the first screenful is moving before anything is
+   scrolled. It is drawn behind everything and takes no clicks. */
+.VPHome {
+  position: relative;
+  isolation: isolate;
+  /* The field below is drawn wider than the page so it runs off both edges rather than
+     stopping at one. Unclipped, the half of it past the right edge is scrollable width:
+     a quarter of a screen of empty page to scroll into. `clip` cuts it without making a
+     scroll container, so nothing inside stops being sticky. */
+  overflow-x: clip;
+}
+
+.VPHome::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -20%;
+  right: -20%;
+  /* Tall enough to cover the hero and to fade out inside the diagram under it, capped so a
+     tall window does not stretch the same three blooms over two screens. */
+  height: min(115svh, 1080px);
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 46% at 22% 18%, rgba(96, 138, 177, 0.28), transparent 70%),
+    radial-gradient(34% 42% at 78% 12%, rgba(20, 184, 166, 0.22), transparent 70%),
+    radial-gradient(30% 38% at 55% 46%, rgba(124, 108, 240, 0.18), transparent 72%);
+  animation: hmz-drift 24s ease-in-out infinite alternate;
+}
+
+/* The same three blooms, lifted: over #1b1b1f the light-mode alphas read as grey haze. */
+.dark .VPHome::before {
+  background:
+    radial-gradient(38% 46% at 22% 18%, rgba(140, 184, 222, 0.22), transparent 70%),
+    radial-gradient(34% 42% at 78% 12%, rgba(45, 212, 191, 0.16), transparent 70%),
+    radial-gradient(30% 38% at 55% 46%, rgba(192, 132, 252, 0.15), transparent 72%);
+}
+
+@keyframes hmz-drift {
+  from {
+    transform: translate3d(-2%, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(3%, 3%, 0) scale(1.08);
+  }
+}
+
+/* The one warning that belongs on a front page, in a line rather than in a block: `::: danger`
+   at the foot of the root page would be the loudest thing on it, and the loudest thing on it
+   should be what humanize is. */
+.hmz-warn {
+  margin: 20px 0 0;
+  padding: 14px 18px;
+  border: 1px solid var(--vp-c-warning-soft);
+  border-left: 3px solid var(--vp-c-warning-1);
+  border-radius: 10px;
+  background: var(--vp-c-warning-soft);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--vp-c-text-2);
+}
+
+/* The line under a diagram that says what it is and where the real explanation is. It is an
+   aside about the drawing above it, so it is set smaller and quieter than the prose -- without
+   this it inherits `.vp-doc p` and reads as another paragraph of the page. */
+.hmz-note {
+  margin: 14px 2px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--vp-c-text-3);
+}
+
+.hmz-warn a,
+.hmz-note a {
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
 }
 
 /* Four ways on, at the foot of the page the site's root goes to. */
@@ -78,6 +200,11 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+}
+
+/* Six of them -- one per tab in the nav -- do not divide by four. */
+.hmz-paths.by-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .hmz-paths a {
@@ -117,20 +244,31 @@
   color: var(--vp-c-text-3);
 }
 
-.hmz-note a {
-  font-weight: 600;
-  color: var(--vp-c-brand-1);
-}
-
 @media (max-width: 900px) {
-  .hmz-paths {
+  .hmz-paths,
+  .hmz-paths.by-three {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
-  .hmz-paths {
+  .hmz-paths,
+  .hmz-paths.by-three {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .VPHome::before {
+    animation: none;
+  }
+
+  .hmz-paths a {
+    transition: none;
+  }
+
+  .hmz-paths a:hover {
+    transform: none;
   }
 }
 
