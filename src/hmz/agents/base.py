@@ -708,9 +708,20 @@ class SessionBase(ABC):
             # same failure until somebody stopped it. A conversation longer than the model
             # takes is that long on the next round too.
             raise
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as failed:
             if not suppress:
                 raise
+            # Quiet on the answer, not on the reason. Suppressed, the turn answers with nothing
+            # so a loop catches it like any other line -- but an account that needs attention,
+            # a credential refused or a model not entitled, put its reason in two places a
+            # suppressed call throws away: the sentence a backend writes into its own protocol
+            # rather than onto stderr, and the non-zero exit itself. A live stderr tee shows
+            # the raw progress and not those, so the assembled diagnostic goes where that
+            # progress goes when nothing is watching the agent, which is stderr. It changes
+            # nothing about what the turn answers, only whether the reason it answered so can
+            # be read.
+            if not self._agent._watchers:
+                say(str(failed), sys.stderr)
             return None if schema is not None else ""
         if schema is None:
             return said.strip()
@@ -2839,7 +2850,7 @@ class AgentBase(ABC):
         profile = named(self.backend)
         if provider is None or profile is None:
             return frozenset()
-        return profile.accounts() - set(provider.env)
+        return profile.hushes() - set(provider.env)
 
     def _environ(self) -> dict[str, str] | None:
         """The whole environment one of this agent's processes is started with.

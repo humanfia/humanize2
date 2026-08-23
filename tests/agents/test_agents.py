@@ -725,6 +725,32 @@ def test_a_suppressed_turn_answers_with_nothing_rather_than_raising(
         agent("do the task", suppress=True)
 
 
+def test_a_suppressed_failure_is_quiet_on_the_answer_but_not_on_the_reason(
+    refusing: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A loop catches the turn, but the account that needs attention still leaves a trace.
+
+    Suppressed, the turn answers with nothing so a `while True` goes round like any other
+    line -- but a credential refused or a model not entitled would leave its reason only in
+    the exception a suppressed call throws away: the sentence the backend put in its protocol
+    rather than on its stderr, and the fact that it exited non-zero at all. So the assembled
+    diagnostic goes to stderr, where a watched-by-nobody turn's progress goes, without
+    changing what the turn answered. The refusing backend says one thing on each stream; the
+    protocol-side one -- `There's an issue with the selected model` -- is the half a live
+    stderr tee never shows, and it is what proves the assembled reason was written.
+    """
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="nonesuch", effort="high"))
+
+    assert agent("do the task", suppress=True) == ""
+
+    said = capsys.readouterr()
+    assert said.out == ""  # nothing on the answer
+    # The composed reason, which only the swallowed exception carried: the stdout-side
+    # sentence and the non-zero exit, neither of which the raw stderr tee puts out.
+    assert "issue with the selected model" in said.err
+    assert "returned non-zero exit status" in said.err
+
+
 def test_calling_the_agent_is_a_session_it_keeps_nothing_of(clis: _FakeCLIs) -> None:
     """Which is the shape a ralph loop is made of, said without reaching through a session."""
     agent = ClaudeCodeAgent(CONFIG)
