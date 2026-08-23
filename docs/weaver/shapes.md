@@ -32,13 +32,12 @@ if review.done:
 working(review.notes, suppress=True)
 ```
 
-`review` comes back as a `Review`, not a string, so you read `review.done` as a bool instead of
-searching the agent's prose.
+You read `review.done` as a bool instead of searching the agent's prose for a word.
 
 ## Why a loop wants this
 
-A flow that has to decide something reads a field instead of looking for a word at the end of a
-paragraph. Is this finished? Does this plan belong to this repository?
+Is this finished? Does this plan belong to this repository? A loop asks that of a field rather
+than of the end of a paragraph:
 
 ```python
 review = agents.reviewer(REVIEW_PROMPT + task, suppress=True, schema=Review)
@@ -46,10 +45,8 @@ if review is not None and review.done:
     return
 ```
 
-That is what [`official/rlar`](/flows/rlar) ends on, and what
-`humanize1` asks its analyst and its reviewer before it starts anything.
-
-Here is a whole flow built on it:
+That is what [`official/rlar`](/flows/rlar) ends on, and what `humanize1` asks its analyst and
+its reviewer before it starts anything. Here is a whole flow built on it:
 
 ```python
 # .humanize/flows/reviewed/__init__.py
@@ -94,18 +91,14 @@ def run(agents: Agents, task: str) -> None:
     print("twelve rounds and it is still not done")
 ```
 
-Run it with:
+It asks the reviewer for a `Review` up to twelve times and stops as soon as `review.done` is
+true:
 
 ```sh
 hmz exec -f reviewed -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:high "$(cat TASK.md)"
 ```
 
-The flow asks the reviewer for a `Review` up to twelve times and stops as soon as `review.done`
-is true.
-
 ## How each backend is held to it
-
-A backend is held to the shape in one of two ways:
 
 | | |
 | --- | --- |
@@ -114,17 +107,15 @@ A backend is held to the shape in one of two ways:
 | **Codex** | the turn's `outputSchema` |
 | anything else — `dsh`, `kimi`, `pi`, `opencode`, `mimo`, `zcode` | asked in the prompt, and what it says is read back |
 
-`Session.shapes` records which of the two a backend is. Either way the answer arrives as
-the model, or not at all.
+`Session.shapes` records which of the two a backend is. Either way the answer arrives as the
+model, or not at all.
 
 Claude's schema is an argument of the process rather than of the turn. Asking one session for a
 shape it was not started with ends that process and starts one that **resumes** the
-conversation. The conversation is not restarted; only the process is. It is the same thing
+conversation — the conversation is not restarted, only the process is. It is the same thing
 [moving the effort](/user/efforts) does.
 
 ## Failing
-
-Pass `suppress=True` to get `None` back when the turn fails:
 
 ```python
 review = agent(asked, schema=Review, suppress=True)   # a Review, or None
@@ -167,10 +158,9 @@ it the way it answers any other: nobody is there. What the model refuses is put 
 field it was refused for, in the model's own words, a bounded number of times. A questionnaire
 nobody filled in answers with `None` under `suppress`.
 
-This is the same thing a coding agent's `AskUserQuestion` is, reachable from a flow. It is
-more, because the flow states the shape of the whole answer once, in the model it is going to
-use. A flow can put the same decision to a model or to a person, in the same shape, with the
-same `None` branch.
+This is a coding agent's `AskUserQuestion`, reachable from a flow — and more, because the flow
+states the shape of the whole answer once, in the model it is going to use. The same decision
+goes to a model or to a person in the same shape, with the same `None` branch.
 
 ## Where it works
 

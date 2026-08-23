@@ -57,7 +57,7 @@ builder's — which is a thing no prompt can arrange.
 
 ## An agent that calls a flow
 
-The callback is the flow's own code, so it may do whatever the flow may do. Including start
+The callback is the flow's own code, so it may do whatever the flow may do, including start
 another flow and wait for it:
 
 ```python
@@ -101,16 +101,17 @@ working.offers([...])      # from the next turn on
 working.offers(None)       # and now it is offering none
 ```
 
-A CLI is told about its tools where it is started, and some of these are started once per
-agent, so what is actually in front of the model is the **agent's** list: two conversations of
-one agent offering a tool of one name are offering one tool. Changing that list between two
-turns — offering one, taking one back, or swapping one for another — restarts the Claude
-holding the conversation, and the Codex app server that agent holds, and resumes the same
-conversation: a process that was started without the tool has never heard of it, and one
-started with a tool that is gone can still reach for it. Because the list is the agent's, that
-is agent-wide — every live session of the agent starts a new process at its next turn, and a
-conversation closing takes its own offer back, so opening and dropping conversations in a loop
-restarts a sibling once per drop.
+What is actually in front of the model is the **agent's** list, because a CLI is told about its
+tools where it is started and some of these are started once per agent. Three things follow:
+
+- Two conversations of one agent offering a tool of one name are offering one tool.
+- Changing the list between two turns — offering one, taking one back, swapping one for another
+  — restarts the Claude holding the conversation, and the Codex app server that agent holds,
+  and **resumes** the same conversation. A process started without the tool has never heard of
+  it; one started with a tool that is gone can still reach for it.
+- That restart is agent-wide: every live session of the agent starts a new process at its next
+  turn. A conversation closing takes its own offer back, so opening and dropping conversations
+  in a loop restarts a sibling once per drop.
 
 ## Which backends take one
 
@@ -152,8 +153,8 @@ socket, no thread and no bridge, and its turns are the turns they always were.
 wrong, in words it can act on, and is free to call it again correctly. A flow must not end
 because a model called one of its tools wrongly.
 
-The callback runs on the thread serving the call, which is **not** the thread the flow is on.
-A callback that touches what the flow is touching answers for that itself — the usual lock.
+The callback runs on the thread serving the call, which is **not** the thread the flow is on. A
+callback that touches what the flow is touching answers for that itself — the usual lock.
 
 ## See also
 

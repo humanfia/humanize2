@@ -1,10 +1,10 @@
 # Checking a flow
 
-Check a flow before anything runs it: a static reading that executes nothing, then the flow
-loaded in a subprocess held to a clock — and, when you ask for it, driven by stubs through the
-worlds worth asking of a loop. Together they catch the mistakes that otherwise surface
-hours into a run — the loop nothing can end, the field read off an answer that failed, the
-name the interface does not answer to.
+Check a flow before anything runs it. Two readings, in their order: a static one that runs
+nothing, then the flow loaded in a subprocess held to a clock — and, when you ask for it,
+driven by stubs through the worlds worth asking of a loop. Together they catch what otherwise
+surfaces hours in: the loop nothing can end, the field read off an answer that failed, the name
+the interface does not answer to.
 
 ## One line
 
@@ -26,10 +26,10 @@ everything wrong is said at once, one finding a line. The full table of codes is
 ## What an error is, and what a warning is
 
 An **error** is a flow no run survives: it cannot run, cannot be answered, or cannot end.
-`hmz check` exits `1` on any of those. A **warning** is a flow that runs, and a run of it
-that may be regretted — rlar's warning above is real and documented: its loop is ended by its
-reviewer alone, which is the flow's own shape. Warnings print and pass; `--strict` holds a
-flow to the whole bar, which is the right setting for a flowverse's CI:
+`hmz check` exits `1` on any of those. A **warning** is a flow that runs, and a run of it that
+may be regretted — rlar's warning above is real and documented: its loop is ended by its
+reviewer alone, which is the flow's own shape. Warnings print and pass. `--strict` holds a flow
+to the whole bar, which is the right setting for a flowverse's CI:
 
 ```sh
 hmz check --strict local/mine
@@ -37,9 +37,9 @@ hmz check --strict local/mine
 
 ## The reading that runs nothing
 
-The static reading is pure `ast` over every file the flow holds. Nothing is imported and
-nothing is executed, so it is safe to point at a flow nobody has read — one an agent just
-wrote, one fetched off the internet, one about to be forked:
+Pure `ast` over every file the flow holds. Nothing is imported and nothing is executed, so it
+is safe to point at a flow nobody has read — one an agent just wrote, one fetched off the
+internet, one about to be forked:
 
 ```sh
 hmz check --static somebody-elses/flow
@@ -47,7 +47,7 @@ hmz check --static somebody-elses/flow
 
 ## The reading that loads it, and the one that drives it
 
-Without `--static`, the flow is also loaded — in a subprocess held to a clock, never in your
+Without `--static` the flow is also loaded — in a subprocess held to a clock, never in your
 process — and its live config model is read. That is what the command does. Driving the flow
 against the worlds worth asking of a loop is the same machinery as a library, and is a call of
 your own:
@@ -60,27 +60,11 @@ assert all(one.finished for one in proof.outcomes), proof.outcomes
 ```
 
 `NEVER_DONE` is the reviewer that never says the work is done. The stubs answer every turn at
-once — every boolean verdict `False`, every turn adding 100k output tokens to `spent()` — so
-a loop held to a budget walks to the end of it in milliseconds, and one whose only exit is
-the verdict is caught by the turn cap. That is the executable proof that a run of your flow
-can end. `SILENT` answers every turn with nothing, which is what a failed turn answers: a
-flow that reads a field off an unguarded answer falls over here rather than at hour three.
-
-## In a script
-
-`--json` says the same findings one JSON object a line, and the exit status is the answer:
-`0` with nothing blocking, `1` with something, `2` for a line to correct.
-
-```sh
-hmz check --json local/mine | jq -r .code
-```
-
-## See also
-
-- [`hmz check`](/reference/cli#hmz-check) — the command and its flags
-- [Checking a flow](/reference/flows#checking-a-flow) — the library API and the rule table
-- [Testing a flow](/weaver/testing-flows) — driving a flow with stand-ins of your own
-- [Writing a flow](/weaver/writing-a-flow)
+once — every boolean verdict `False`, every turn adding 100k output tokens to `spent()` — so a
+loop held to a budget walks to the end of it in milliseconds, and one whose only exit is the
+verdict is caught by the turn cap. That is the executable proof that a run of your flow can
+end. `SILENT` answers every turn with nothing, which is what a failed turn answers: a flow that
+reads a field off an unguarded answer falls over here rather than at hour three.
 
 ## An atlas is read more strictly
 
@@ -92,3 +76,19 @@ graph it compiled; `--ship` writes it beside the flow for runs of it to walk.
 ```sh
 hmz check --prophecy local/mine
 ```
+
+## In a script
+
+`--json` says the same findings one JSON object a line, and the exit status is the answer: `0`
+with nothing blocking, `1` with something, `2` for a line to correct.
+
+```sh
+hmz check --json local/mine | jq -r .code
+```
+
+## See also
+
+- [`hmz check`](/reference/cli#hmz-check) — the command and its flags
+- [Checking a flow](/reference/flows#checking-a-flow) — the library API and the rule table
+- [Testing a flow](/weaver/testing-flows) — driving a flow with stand-ins of your own
+- [Writing a flow](/weaver/writing-a-flow)

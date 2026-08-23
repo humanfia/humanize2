@@ -1,12 +1,10 @@
 # The person as an agent
 
-**Person** is the person's side of a conversation inside a flow. Add one to a flow when it
-needs a human to answer, and it asks for input and returns what you type. `Person` is what a
-flow declares the place as; `HumanAgent` is what fills it.
+**Person** is the person's side of a conversation inside a flow: it asks for input and returns
+what you type. Add one when the flow needs a human to answer. `Person` is what a flow declares
+the place as; `HumanAgent` is what fills it.
 
 ## Try it
-
-Create one and say something to it:
 
 ```python
 from hmz.flows import HumanAgent
@@ -15,7 +13,7 @@ person = HumanAgent()                      # takes only an optional name=, defau
 person("Here is what I did. What next?")   # asks, and answers with what was typed
 ```
 
-Saying something to it asks **what to say next**. It answers with whatever you type.
+Saying something to it asks **what to say next**, and it answers with whatever you type.
 
 ## In a flow
 
@@ -48,19 +46,18 @@ person runs**. The flow above drives two agents, so you start it with one `-a`:
 hmz exec -f chat -a claude/claude-opus-5:high "Read README.md and tell me what this is."
 ```
 
-When you run it from a command line, nobody is at a prompt, so it answers with nothing. The
-loop ends and the flow does the one thing it was given. That is what you want from `chat` in a
-script.
+Run from a command line, nobody is at a prompt, so it answers with nothing: the loop ends and
+the flow does the one thing it was given. That is what you want from `chat` in a script.
 
 ## What it is not
 
 A `Person` is not a coding agent. It runs no model and spends nothing.
 
-Its turns are **not bracketed** by the `begins`/`ends` events that say whose turn it is. If you
-counted them, you would put the person in the graph of who handed to whom. You would also spin
-a clock at them while they thought. So the person appears in neither the handover graph of
-[`/status`](/user/status) nor the [cost readout](/user/tally). The conversation with them is
-not one of the ones [tab steps between](/user/conversations).
+Its turns are **not bracketed** by the `begins`/`ends` events that say whose turn it is —
+counting them would put the person in the graph of who handed to whom, and spin a clock at
+them while they thought. So the person appears in neither the handover graph of
+[`/status`](/user/status) nor the [cost readout](/user/tally), and the conversation with them
+is not one of the ones [tab steps between](/user/conversations).
 
 It runs no [moments](/weaver/hooks) either. A **moment** is a point in a turn of a model, and
 the person takes no such turn.
@@ -82,13 +79,11 @@ if settled is not None and settled.tests:
 ```
 
 A flow settles what only a person can settle **in the model it is going to run on**, once
-rather than by parsing a sentence. This is the same thing as a coding agent's
-`AskUserQuestion`, reachable from a flow. It does more, because the shape of the whole answer
-is stated once.
-
-Each question takes the road [a coding agent's own question](/user/questions) takes. So
-[`/afk`](/user/afk) answers it the way it answers any other: nobody is there, and the
-questionnaire comes back as `None` under `suppress`.
+rather than by parsing a sentence. Each question takes the road [a coding agent's own
+question](/user/questions) takes, so [`/afk`](/user/afk) answers it the way it answers any
+other: nobody is there, and the questionnaire comes back as `None` under `suppress`. Which
+field becomes which question is a table on [Answers in a
+shape](/weaver/shapes#asking-a-person-a-questionnaire).
 
 ## The board: the half that does not wait
 

@@ -7,30 +7,20 @@ and one [trace](/user/tracing).
 
 ## Try it
 
-Open a session in a directory, then check where its turns run:
-
 ```python
 session = agent.new(worktree)     # this conversation works in that directory
 session("pwd")                    # and so does every turn of it
 session.cwd                       # where that is, as an absolute path
 ```
 
-`session.cwd` is that directory as an absolute path.
+Leave it unset and the session works in the directory the flow runs in — where every session
+worked before there was anywhere else to put one.
 
 ## Why a worktree is a session setting
 
-A worktree is a session setting because that is what it is to the backends. A conversation is
-rooted at a directory, and every turn of it runs there. It is not a per-turn argument, and you
-cannot change it once the session is open.
-
-Leave it unset and the session works in the directory the flow runs in. That is where every
-session worked before there was anywhere else to put one.
-
-```python
-session = agent.new(worktree)     # this conversation works in that directory
-session("pwd")                    # and so does every turn of it
-session.cwd                       # where that is, as an absolute path
-```
+Because that is what it is to the backends. A conversation is rooted at a directory and every
+turn of it runs there. It is not a per-turn argument, and you cannot change it once the session
+is open.
 
 ## Every call that opens a session takes a worktree
 
@@ -45,7 +35,7 @@ agent.batch_new(200, worktree)               # two hundred conversations, all in
 ```
 
 `cwd=` on a batch is **one** directory for all of its turns. A batch *across* directories is
-the `gather` at the top of this page.
+the `gather` below.
 
 ## A worked fan-out
 
@@ -106,14 +96,13 @@ is where a flow says otherwise:
 agent.batch(prompts, at_once=32)    # thirty-two going, however many prompts
 ```
 
-Every prompt lands either way; the rest queue behind the ones running.
-
-A session costs nothing until a turn lands in one, so `agent.batch_new(10_000)` is a list of
-ten thousand conversations that have not started.
+Every prompt lands either way; the rest queue behind the ones running. A session costs nothing
+until a turn lands in one, so `agent.batch_new(10_000)` is a list of ten thousand conversations
+that have not started.
 
 ## See also
 
 - [Many conversations at once](/user/conversations) — reading them at the prompt
-- [Tutorial: many turns at once](/weaver/async-flows)
+- [Many turns at once](/weaver/async-flows) — a flow that awaits
 - [Agents › The directory a session works
   in](/reference/agents#the-directory-a-session-works-in)

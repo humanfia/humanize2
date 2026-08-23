@@ -6,8 +6,8 @@ and run the real CLIs only when you ask for them.
 
 ## Check the flow loads and declares what it should
 
-Start with the cheapest test there is. It catches the mistake everybody makes: an `agents`
-annotation that cannot be read at runtime.
+The cheapest test there is, and it catches the mistake everybody makes: an `agents` annotation
+that cannot be read at runtime.
 
 ```python
 from hmz.flows import drives, wanted
@@ -57,12 +57,12 @@ def test_it_runs() -> None:
     run((FakeAgent(AgentConfig(model="m", effort="high")),), "the task")
 ```
 
-`Event(kind="result", …)` closes a turn, and it is what calling the session returns. Exactly
-one closes a turn.
+`Event(kind="result", …)` is what calling the session returns, and exactly one of them closes a
+turn.
 
 ## Script a fake that answers differently each time
 
-Most flows are loops with a condition. Make the fake say what drives the branch.
+Most flows are loops with a condition, so make the fake say what drives the branch.
 
 ```python
 class Scripted(SessionBase):
@@ -86,7 +86,7 @@ def test_it_stops_when_the_reviewer_says_done() -> None:
 
 ## Make an agent that really runs something
 
-humanize's own suite has a shell-backed agent. With it, a test spells out exactly what the
+humanize's own suite has a shell-backed agent, and with it a test spells out exactly what the
 agent it stands in for would do.
 
 ```python
@@ -102,7 +102,7 @@ class ShellAgent(AgentBase):
         return ShellSession(self, cwd)
 ```
 
-Now a test can assert on what the "agent" did to the filesystem.
+So a test can assert on what the "agent" did to the filesystem.
 
 ```python
 def test_it_writes_the_file(tmp_path: Path) -> None:
@@ -130,8 +130,8 @@ def test_unfinished() -> None:
 Then the flow is three lines of glue around things that are already tested. That is the shape
 to aim for.
 
-The same goes for a [config model](/weaver/flow-settings). It is a pydantic model, so test its
-validators directly.
+A [config model](/weaver/flow-settings) is a pydantic model, so test its validators the same
+way.
 
 ```python
 import pytest
@@ -164,8 +164,8 @@ No agent, no backend, no tokens.
 
 ## Run the real thing deliberately
 
-When you want a test that drives a real CLI, mark it and keep it out of the default run. That
-is what humanize does.
+A test that drives a real CLI is marked and kept out of the default run, which is what humanize
+itself does.
 
 ```sh
 uv run pytest                       # everything that does not need a real agent
@@ -176,6 +176,6 @@ uv run pytest --run-agents          # also drives the real coding agent CLIs
 
 - [Checking a flow](/weaver/checking-flows)
 - [Answers in a shape](/weaver/shapes)
-- [config model](/weaver/flow-settings)
-- [hook](/weaver/hooks)
-- [Publish a flowverse](/weaver/flowverses)
+- [Settings of its own](/weaver/flow-settings)
+- [Hooks](/weaver/hooks)
+- [Flowverses](/weaver/flowverses) — publishing what you tested
