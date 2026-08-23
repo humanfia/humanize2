@@ -278,6 +278,23 @@ class Profile:
         named |= {name for way in self.ways for name, _ in way.sets}
         return frozenset(named | set(self.ambient))
 
+    def hushes(self) -> frozenset[str]:
+        """`accounts()`, and every other spelling of each that names the same credential.
+
+        What a turn under a provider is actually run without. A CLI that reads one name for a
+        credential reads its aliases too -- kimi takes an account from `MOONSHOT_API_KEY` as
+        well as `KIMI_API_KEY`, opencode from `GOOGLE_API_KEY` as well as `GEMINI_API_KEY` --
+        so one of those left in the environment is the same wrong account whichever of the two
+        spellings carried it, and hushing only the name a backend's ways happened to write
+        down would leave the other to supply it. `serves()` copies an account by its declared
+        name, which is why that keeps the literal `accounts()`; this strips it by every name it
+        answers to, and hushing one no backend reads costs nothing.
+
+        Returns:
+          The account variables and their aliases, to take away before a provider's turn.
+        """
+        return frozenset(name for one in self.accounts() for name in alike(one))
+
     def credentials(self) -> tuple[tuple[str, str], ...]:
         """Every path this backend keeps a credential at, and where it is kept relative to.
 

@@ -236,3 +236,25 @@ def test_an_endpoint_a_backend_sends_its_credential_to_is_an_account() -> None:
 
     assert "CODEX_AUTHAPI_BASE_URL" in codex.accounts()
     assert "ANTHROPIC_CONFIG_DIR" in claude.accounts()
+
+
+def test_a_turn_is_run_without_every_spelling_of_the_account_not_just_the_written_one() -> (
+    None
+):
+    """A CLI reads a credential's aliases too, so hushing only the written name leaves a leak.
+
+    kimi takes an account from `MOONSHOT_API_KEY` as well as the `KIMI_API_KEY` its ways name,
+    and opencode from `GOOGLE_API_KEY` as well as `GEMINI_API_KEY`. `accounts()` is the names a
+    backend wrote down; `hushes()` is those and every alias, which is what a provider's turn is
+    actually run without -- `serves()` still copies by the written name, so the two differ.
+    """
+    kimi = backends.named("kimi")
+    opencode = backends.named("opencode")
+    assert kimi is not None
+    assert opencode is not None
+
+    assert "MOONSHOT_API_KEY" not in kimi.accounts()
+    assert "MOONSHOT_API_KEY" in kimi.hushes()
+    assert "GOOGLE_API_KEY" in opencode.hushes()
+    # Every account name is hushed too: the aliases are added to it, never in place of it.
+    assert kimi.accounts() <= kimi.hushes()

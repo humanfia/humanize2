@@ -215,9 +215,7 @@ def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., st
     # As a turn of that account is run: what the provider sets, and none of what its backend
     # would take another account from -- a key in somebody's shell profile outranks the
     # credentials a provider was signed in with, and the answer would be the wrong account's.
-    hushed = (
-        profile.accounts() - set(held.env) if held is not None else frozenset[str]()
-    )
+    hushed = profile.hushes() - set(held.env) if held is not None else frozenset[str]()
     environ = {name: value for name, value in os.environ.items() if name not in hushed}
     environ |= dict(held.env) if held is not None else {}
 
