@@ -39,13 +39,12 @@ it over the old one — so a temp file left unanswered writes the *new* token in
 were redirecting away from, and the account you were not using quietly becomes the one that
 works.
 
-Two rules hold the rest of it up:
+Two rules hold the rest of it up, because a turn taken as the wrong account is worse than a
+turn that did not run:
 
 - **A path that is answered but cannot be rewritten fails the call** rather than running
   against the path it named.
 - **A run that cannot be supervised at all is refused** rather than run unsupervised.
-
-A turn taken as the wrong account is worse than a turn that did not run.
 
 An account that is only variables costs no supervisor at all — the backend's own command line
 runs unchanged. And two supervisors cannot be nested, since a process has one tracer, so a turn
@@ -96,11 +95,10 @@ Some failures no account answers. The model was retired this morning; the CLI wi
 the region has gone dark; the rate limit is on the whole account rather than on one request.
 Another key for the same backend is another way of asking the same thing that is not there.
 
-What answers those is another **place** — another CLI, another account, another model — and
-that is written between the two places rather than on either, because it is about neither on
-its own: it is what to do when *this* CLI, at *this* model, as *this* account, cannot run. How
-hard the agent thinks and what it may reach for are what that agent *is*, and come across the
-step unchanged. [`/fallback`](/user/fallback) is where it is said.
+What answers those is another **place** — another CLI, another account, another model — written
+between the two places rather than on either, because it is about neither on its own: it is
+what to do when *this* CLI, at *this* model, as *this* account, cannot run. How hard the agent
+thinks and what it may reach for are what that agent *is*, and come across the step unchanged.
 
 It is the second thing tried and not the first, and the reason is the conversation. No backend
 takes another backend's session id, so a turn that leaves its backend leaves the conversation
@@ -110,21 +108,20 @@ is walked to its end first; this is what is left after that. The flow sees one t
 ## How it waits
 
 Before either chain moves, the turn is taken again: how many times over, how long between
-tries, and how long the whole of it may go on for. Written against the **place** rather than
-against the account — the CLI, the account and the model together — because it is a thing about
-where the turn runs rather than about the credentials it runs with, and because it and where
-the turn goes next are answers to the one thing that happened. [`/fallback`](/user/fallback)
-says both.
+tries, and how long the whole of it may go on for. That is written against the **place** — the
+CLI, the account and the model together — rather than against the credentials, because it and
+where the turn goes next are answers to the one thing that happened.
+[`/fallback`](/user/fallback) is where both are said.
 
-**Nothing is retried by default.** A turn is taken once, as it always was: a prompt the model
-refused is the same refusal every time, and only the caller knows which of its places fails
-the other way. The waits are the ones everybody uses, under the names everybody uses them by,
-and none is invented here. No single wait is longer than a minute, however far the backoff has
-climbed, and the time a place was given is checked *before* a wait rather than after it — so a
-turn is never started knowing it is already spent.
-
-The default is exponential backoff with full jitter, which is what keeps a flow's agents from
-all coming back on the same second.
+- **Nothing is retried by default.** A turn is taken once, as it always was: a prompt the model
+  refused is the same refusal every time, and only the caller knows which of its places fails
+  the other way.
+- **No wait is invented here.** They are the ones everybody uses, under the names everybody
+  uses them by, and the default is exponential backoff with full jitter — which is what keeps a
+  flow's agents from all coming back on the same second.
+- **No single wait is longer than a minute**, however far the backoff has climbed.
+- **The time a place was given is checked *before* a wait**, not after it, so a turn is never
+  started knowing it is already spent.
 
 ## The account nobody made
 
@@ -140,5 +137,6 @@ answered by another, and no supervisor at all.
 ## Where the detail is
 
 - [Providers](/user/providers) — making one, signing it in, pointing it somewhere
+- [Falling back](/user/fallback) — the chain, the second place, and the waits
 - [Providers reference](/reference/providers) — every way in, every field, and adding a CLI
 - [The anchor](/features/anchor) — the same interception, over a whole session

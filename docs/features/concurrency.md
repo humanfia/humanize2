@@ -16,8 +16,6 @@ Two turns awaited on one session run one after the other, exactly as two called 
 conversation is a conversation, and nothing about awaiting one changes that — which is the rule
 the switch above is there to make concrete.
 
-What multiplies is sessions, not calls.
-
 ## A conversation is rooted at a directory
 
 Where a session works is a setting of the session rather than of the turn, because that is what
@@ -31,18 +29,15 @@ together. And either way it is one agent: one set of settings, one id, one proce
 
 ## A session costs nothing until a turn lands in one
 
-Ten thousand conversations opened up front are a list, not a bill. Nothing is spent until
-something is said in one.
+Ten thousand conversations opened up front are a list, not a bill.
 
 ## Every call that runs a turn has an awaited twin
 
 Same arguments, same answers, same shapes, same suppression. The difference is only where the
 waiting happens: the turn runs on a thread of its own and the loop is handed straight back — so
 a flow written as a coroutine can hold as many turns as it likes without any one of them
-stopping the rest.
-
-Nothing about starting such a flow is different. The agents, the settings, the run it writes
-down and the way it is stopped are all as they are for a plain function.
+stopping the rest. The agents, the settings, the run it writes down and the way it is stopped
+are all as they are for a plain function.
 
 ## A batch is one agent over many prompts
 

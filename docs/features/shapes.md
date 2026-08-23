@@ -57,9 +57,8 @@ Given a shape, [the person at the prompt](/features/human) is not shown a JSON S
 asked a question per field — the description is the question, a `Literal` becomes the words it
 offers, a `bool` becomes yes and no — and the model is built out of what they typed.
 
-Which is the point of stating the shape once, in the model the flow is going to use: the same
-decision goes to a model or to a person, in the same shape, with the same branch for an answer
-that never came.
+Which is the point of stating the shape once: the same decision goes to a model or to a person,
+in the same shape, and comes back through the same branch.
 
 ## One more thing a shape moves
 
