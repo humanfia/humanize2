@@ -31,9 +31,8 @@ and the next round sends the task rather than nudging a session that never got i
 
 ## What it takes
 
-| | |
-| --- | --- |
-| `budget` | Millions of output tokens the loop may spend, across every run of it in this workspace. **10 by default**, `0` for no limit. |
+`budget`, in millions of output tokens the loop may spend across every run of it in this
+workspace. **10 by default**, `0` for no limit.
 
 ## What it keeps
 

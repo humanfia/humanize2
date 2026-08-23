@@ -18,12 +18,10 @@ hmz exec -f official/humanize1:rlcr \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "build it"
 ```
 
-Three rather than one because each is set up on its own: `/agents` asks one flow for the
-drafter, one for the planner and the analyst that reads it, and one for the builder and the
-reviewer. What passes between them is a file, as it is in the plugin — the draft, then the plan
-— so an idea may be opened on one model, planned on another and built on a third, with whatever
-reading and editing you like in between. They are [three flows in one
-file](/reference/flows#several-flows-in-one-file).
+Three rather than one because each is set up on its own agents, and what passes between them is
+a file, as it is in the plugin — the draft, then the plan. So an idea may be opened on one
+model, planned on another and built on a third, with whatever reading and editing you like in
+between. [Three flows in one file](/reference/flows#several-flows-in-one-file).
 
 Run it in a git repository: the work is anchored to the commit the plan was fixed in, and every
 review reads what came after it.
@@ -75,21 +73,20 @@ The plugin's mechanism, where humanize's is not the same mechanism:
 
 ## What it keeps
 
-`rlcr` is a loop meant to run for days, so a run of it can be picked up: it keeps **which**
+`rlcr` is meant to run for days, so a run of it can be picked up: it keeps **which**
 `.humanize/rlcr/` directory the loop is in and the round it reached, and reads `state.md` back
-as it stands rather than stamping a new directory beside a week of rounds. Everything else
-about the loop is already in that directory in the plugin's own format, and a second copy here
-would be a second place for it to be wrong.
+as it stands rather than stamping a new directory beside a week of rounds. Everything else is
+already in that directory in the plugin's own format, and a second copy here would be a second
+place for it to be wrong.
 
-A loop carries on with the settings it was set up with, which is what carrying on means. A run
-set up differently is neither quietly overridden nor quietly ignored: it says which setting it
-disagrees with the loop about, and starts a loop of its own. The agents are the one thing that
-is not a setting — `/agents` chooses them per run, and the state file is brought up to date to
-say who is reading the rounds.
+A loop carries on with the settings it was set up with. A run set up differently is neither
+quietly overridden nor quietly ignored: it says which setting it disagrees with the loop about,
+and starts a loop of its own. The agents are the one thing that is not a setting — `/agents`
+chooses them per run, and the state file is brought up to date to say who is reading the
+rounds.
 
-`gen-idea` and `gen-plan` keep nothing. Each writes one file, running one again is meant to
-write another, and between their turns there is nothing a second run could honestly carry on
-from.
+`gen-idea` and `gen-plan` keep nothing: each writes one file, running one again is meant to
+write another, and between their turns there is nothing to carry on from.
 
 ## See also
 

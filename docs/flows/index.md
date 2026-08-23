@@ -6,14 +6,12 @@ pageClass: hmz-feature
 
 A **flow** is a directory of Python that drives one or more coding agents: which agents, what
 each is asked, in what order, and when to stop. humanize runs flows and has no opinion about
-what a good one is — which is why the flows are content rather than product, and why the list
-below is something you can read, fork, publish and beat.
+what a good one is — so a flow is content rather than product, whoever writes one is a
+**weaver**, and the list below is something to read, fork, publish and beat.
 
-Eleven of them come with humanize or with the flowverse it fetches — thirteen by name, since
-[`official/humanize1`](/flows/humanize1) is three phases run one at a time. They are, between
-them, most of the loop shapes the field has converged on: forget every turn, remember every
-turn, alternate two agents, let the model decide when it is done, put a reviewer between the
-rounds.
+Eleven ship with humanize or with the flowverse it fetches — thirteen by name, since
+[`official/humanize1`](/flows/humanize1) is three phases. Between them they are most of the
+loop shapes the field has converged on.
 
 <HmzFlowShape pick="ralph_loop,stateful_ralph,flame_chase,rlar,goal,parallel_flame_chase" />
 
@@ -23,8 +21,8 @@ rounds.
 
 ## Picking one
 
-The question a flow answers is *what does the agent see at the start of a round*, and there are
-only a few honest answers.
+What a flow decides is *what the agent sees at the start of a round*, and there are only a few
+honest answers.
 
 | If you want | Reach for |
 | --- | --- |
@@ -38,48 +36,45 @@ only a few honest answers.
 | A plan agreed first, then built under review | [`official/humanize1`](/flows/humanize1) |
 | Three streams of work at once, only one of them touching your tree | [`official/parallel_flame_chase`](/flows/parallel-flame-chase) |
 
-Seven of them name a [FlowBench](https://humanfia.ai/projects/flowbench) loop in their own
-docstring, written against this API so that comparing one method against another is a flag
-rather than a reimplementation.
+Seven name a [FlowBench](https://humanfia.ai/projects/flowbench) loop in their own docstring,
+so that comparing one method against another is a flag rather than a reimplementation.
 
 ## Running one
 
-`-f` takes the flow and `-a` takes one agent per agent the flow wants, in the order it wants
-them:
+`-f` takes the flow, and `-a` one agent per agent the flow wants, in the order it wants them:
 
 ```sh
 hmz exec -f official/rlar \
     -a claude/claude-opus-5:high -a codex/gpt-5.6-sol:high "$(cat TASK.md)"
 ```
 
-Without `-f` the terminal interface opens on [`chat`](/flows/chat), and `/flow` changes it. A
-flow that takes settings takes them from a YAML file with `-c`, and `/config` is the same
-fields at the prompt:
+Without `-f` the terminal interface opens on [`chat`](/flows/chat), and `/flow` changes it.
+Settings come from a YAML file with `-c`, and `/config` is the same fields at the prompt:
 
 ```sh
 hmz exec -f ralph_loop -c budget.yaml -a claude/claude-opus-5:high "$(cat TASK.md)"
 ```
 
-The whole of it is in [Calling flows](/weaver/calling-flows) and the [CLI
-reference](/reference/cli).
+Every flag is in the [CLI reference](/reference/cli).
 
 ## What ends a loop
 
 A loop with nothing to stop it runs until somebody stops it, which is a bill nobody agreed to
-and a week of rounds nobody read. So every loop here that has no stopping condition of its own
+and a week of rounds nobody read. So every loop here without a stopping condition of its own
 takes a **budget**, in millions of output tokens:
 
 ```yaml
 budget: 25    # millions of output tokens; 0 goes on until it is stopped
 ```
 
-**Ten million by default.** Output rather than every kind, because output is what a model is
-asked to produce and the only kind a loop of its own accord grows. The spend is kept in the
-flow's state, so a loop restarted forty times still has one budget between the forty.
+**Ten million by default**, kept in the flow's state, so a loop restarted forty times has one
+budget between the forty. Output rather than every kind, because output is the only kind a loop
+of its own accord grows.
 
-The flows that end themselves instead: [`chat`](/flows/chat) ends when you stop typing,
-[`official/rlar`](/flows/rlar) when its reviewer agrees the work is done, and
-[`official/humanize1`](/flows/humanize1)'s loop on `--max` rounds.
+The rest stop themselves: [`chat`](/flows/chat) when you stop typing,
+[`official/rlar`](/flows/rlar) when its reviewer agrees the work is done,
+[`official/humanize1`](/flows/humanize1)'s loop on `--max` rounds, and the two [lane
+flows](/flows/parallel-flame-chase) when the lanes run out of work.
 
 ## Where they come from
 
@@ -90,8 +85,9 @@ The flows that end themselves instead: [`chat`](/flows/chat) ends when you stop 
 | `local` · `user` | `.humanize/flows/` here, and `~/.humanize/flows/` everywhere |
 
 Any git repository with a `flows/` directory in it is a **flowverse**, and adding one offers
-its flows by name on every machine you add it to. [Flowverses](/weaver/flowverses) is how, and
-[Writing a flow](/weaver/writing-a-flow) is how to write one worth publishing.
+its flows by name on every machine you add it to. To put one of your own on that list:
+[Writing a flow](/weaver/writing-a-flow) is the first flow a weaver writes, and
+[Flowverses](/weaver/flowverses) is how it gets published.
 
 ::: danger Adding a flowverse is trusting that repository with this machine
 A flow is Python, and reading one means **running** it: listing what a flowverse holds imports

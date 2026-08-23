@@ -20,23 +20,19 @@ The ticks inside one box above are turns the *backend* started. `agent.pursue(ta
 objective to the backend's own goal feature; what comes back is one call, and inside it are as
 many turns of the model as the model thought the objective needed.
 
-That is the whole reason to reach for this rather than [`ralph_loop`](/flows/ralph-loop): the
-question "is this done?" is asked by something that has just read the work, every turn, rather
-than by a `while True` that cannot tell. The cost is that it is asked by the same thing that
-did the work — which is exactly what [`official/rlar`](/flows/rlar) fixes by asking somebody
-else.
+That is the whole reason to reach for this rather than [`ralph_loop`](/flows/ralph-loop): "is
+this done?" is asked by something that has just read the work, every turn, rather than by a
+`while True` that cannot tell. The cost is that it is asked by the same thing that did the work
+— which is what [`official/rlar`](/flows/rlar) fixes by asking somebody else.
 
 A backend without a goal feature cannot run this flow, and says so before the first turn rather
 than an hour in. [Which backends have one](/weaver/goals#which-backends-have-one).
 
 ## What it takes
 
-| | |
-| --- | --- |
-| `budget` | Millions of output tokens the loop may spend, across every run of it in this workspace. **10 by default**, `0` for no limit. |
-
-The budget counts **every turn of the model the goal took**, not one per round: the backend
-started them itself, and the agent counted all of them.
+`budget`, in millions of output tokens the loop may spend across every run of it in this
+workspace. **10 by default**, `0` for no limit. It counts **every turn of the model the goal
+took**, not one per round: the backend started them itself, and the agent counted all of them.
 
 ## What it keeps
 
