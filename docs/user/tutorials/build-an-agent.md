@@ -1,4 +1,4 @@
-# 4 · Build a coding agent
+# Build a coding agent
 
 **An afternoon.** You will take one loose sentence — "a small terminal coding agent for
 `deepseek-v4-flash`" — through [`official/humanize1`](https://github.com/humanfia/flowverse)'s
@@ -8,17 +8,17 @@ The three phases are three separate flows. That is the point of them: each is se
 own, stops on its own, and hands the next one a file rather than a conversation.
 
 ::: tip Before you start
-Finish the [Quickstart](/). The third phase needs a builder that can run
-permission hooks, which today means `claude` or `codex`; the first two run on anything,
+Finish the [quickstart on the home page](/#run-a-flow). The third phase needs a builder that
+can run permission hooks, which today means `claude` or `codex`; the first two run on anything,
 including DeepSeek Harness.
 :::
 
 ## The shape of work this is for
 
-The other two example tutorials point an agent at code that already exists. This one starts
-from nothing, and starting from nothing is where agents go wrong in a particular way: they
-build the first thing that matches the words in your sentence, and you find out an hour later
-that it was not the thing you meant.
+The other two tutorials point an agent at code that already exists. This one starts from
+nothing, and starting from nothing is where agents go wrong in a particular way: they build the
+first thing that matches the words in your sentence, and you find out an hour later that it was
+not the thing you meant.
 
 `humanize1` is humanize's rebuild of [the humanize Claude Code
 plugin](https://github.com/humanfia/humanize-plugin), and its answer is to spend two phases
@@ -91,9 +91,9 @@ A small terminal coding agent for deepseek-v4-flash. …
 ```
 
 Read the "Objective Evidence" lines. Each direction had to be justified against something the
-agent had checked in this repository or this environment — not against what usually makes a
-good design. That is what "repo-grounded" means here, and it is the difference between a draft
-and a plausible essay.
+agent checked in this repository or this environment, not against what usually makes a good
+design. That is what "repo-grounded" means, and it is the difference between a draft and a
+plausible essay.
 
 ::: tip Change how wide it explores
 `--n` is a field on the flow's settings, so `-c setup.yaml` with `n: 3` narrows it and `n: 10`
@@ -117,10 +117,8 @@ hmz exec -f official/humanize1:gen-plan \
 Two agents this time: **the planner**, which writes, and **the analyst**, which reads what the
 planner wrote and says what is wrong with it. They go round until the analyst has nothing
 required left — up to three rounds — and the task you pass is what those rounds are judged
-against.
-
-The planner holds one session for the whole of the planning, so it remembers how the plan got
-to where it is. The analyst arrives fresh.
+against. The planner holds one session for the whole of the planning, so it remembers how the
+plan got to where it is; the analyst arrives fresh.
 
 This phase takes a while, and what it produces is long:
 
@@ -180,8 +178,6 @@ the plan fixed and the loop's own state out of the builder's hands. Any backend 
 
 ### The loop is a hook
 
-Worth understanding, because it is the mechanism this whole phase is built on.
-
 The builder is not asked "is it finished?". It is left to work until it believes the plan is
 done and tries to **stop** — and a `Stop` hook catches that. What the reviewer says is what the
 builder hears instead of stopping.
@@ -191,12 +187,10 @@ puts the round to Codex there. See [Hooks](/weaver/hooks).
 
 ### What a round looks like
 
-Each round: the builder works, tries to stop, gets a code review instead. The reviewer is asked
-for `[P0-9]` findings, and the loop reads those rather than looking for a verdict in a
-paragraph. Every fifth round, the reviewer is asked a different question — whether what has
-been built still matches the plan at all.
-
-The loop stops after 42 rounds unless you set `max` otherwise.
+The builder works, tries to stop, gets a code review instead. The reviewer is asked for
+`[P0-9]` findings, and the loop reads those rather than looking for a verdict in a paragraph.
+Every fifth round, the reviewer is asked a different question — whether what has been built
+still matches the plan at all. The loop stops after 42 rounds unless you set `max` otherwise.
 
 The loop keeps its own state where the plugin keeps it, so you can watch it from another
 terminal:
@@ -273,7 +267,7 @@ python -m pytest -q
 By the end of round one that was 118 tests, which is what a reviewer that will not say `done`
 does to a suite.
 
-Now use it. The whole point of this tutorial is that the thing at the end runs:
+Now use it — the thing at the end runs:
 
 ```sh
 mkdir -p /tmp/flashtry && printf 'def add(a, b):\n    return a - b\n' > /tmp/flashtry/calc.py
@@ -297,10 +291,9 @@ def add(a, b):
 
 A coding agent, built from one sentence, that just fixed a bug in a file.
 
-Look at `--allow-shell` in that command. It is not something you asked for. It came out of the
-draft's fifth direction — "guarded shell execution" — became a decision in the plan, and turned
-into an environment gate the builder implemented. That is the two planning phases earning their
-time.
+Look at `--allow-shell` in that command. You never asked for it. It came out of the draft's
+fifth direction — "guarded shell execution" — became a decision in the plan, and turned into an
+environment gate the builder implemented. That is the two planning phases earning their time.
 
 ## Step 6 — read the whole thing back
 
@@ -317,17 +310,16 @@ is a row of short ones — and the gaps between them are where the hook fired.
 
 ## What to change
 
-**Run the phases on different models.** They are three flows precisely so you can. Plan on the
-strongest model you have, build on a cheaper one, review on a third.
-
-**Stop between phases and edit the file.** The draft and the plan are both files, and both are
-meant to be read. The plugin this is a rebuild of has a `refine-plan` command; here you have a
-text editor, which is the same thing.
-
-**Point `rlcr` at a plan you wrote yourself.** `plan_file` in a `-c setup.yaml` names it.
-Nothing about the third phase requires the first two — it requires a plan.
+- **Run the phases on different models.** They are three flows precisely so you can. Plan on
+  the strongest model you have, build on a cheaper one, review on a third.
+- **Stop between phases and edit the file.** The draft and the plan are both files, and both
+  are meant to be read. The plugin this is a rebuild of has a `refine-plan` command; here you
+  have a text editor, which is the same thing.
+- **Point `rlcr` at a plan you wrote yourself.** `plan_file` in a `-c setup.yaml` names it.
+  Nothing about the third phase requires the first two — it requires a plan.
 
 ## Next
 
-You have now run three flows somebody else wrote. Time to write one: [Build under
+You have now run three flows somebody else wrote. Whoever writes one is a **weaver**, and the
+[Weaver Guide](/weaver/) teaches that — starting with [Build under
 test](/weaver/tutorials/checked-build).
