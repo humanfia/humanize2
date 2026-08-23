@@ -2,25 +2,99 @@
 
 An agent can stop mid-turn to ask you a question: which approach to take, which file to change,
 whether it understood you. A flow can ask you the other way, treating the person at the prompt
-as an agent. Use questions whenever a run needs an answer only a person should give.
+as an agent. Reach for this whenever a run needs an answer only a person should give.
 
 ## Try it
 
-A **`Person`** is the person at the prompt, declared among the agents. See [the person as
-an agent](/weaver/human-agent).
+The interface opens on [`chat`](/flows/chat) — you and one agent, taking turns:
 
-**Step 1.** Write a flow that pairs an assistant with one. It runs the assistant, then asks you
-what to say next, and repeats.
+```sh
+hmz
+```
+
+Say something, and when the agent stops mid-turn to ask you something back, the next line you
+type is the answer to it.
+
+## At the prompt
+
+The agent shows the question and whatever it offered. The next line you type is **the answer**,
+not a word put into the turn; the status line reads `enter answer` while that is so.
+
+You are not held to the options. Every backend that offers options also takes something else —
+the options are what the agent expects, and what an interface shows so the question reads as
+one.
+
+If the flow ends or is stopped while a question is still up, the question ends with it.
+Stopping a flow is never blocked on a question.
+
+## When nobody is there
+
+`hmz exec` has nobody at a prompt. [`/afk`](/user/afk) says the same thing on purpose:
+
+```
+/afk on
+```
+
+In both cases the backend is told **nobody answered**, and the agent carries on. A turn waiting
+on an answer that is not coming is a flow that has stopped, so this is the default everywhere
+except an interface with `/afk` off. Asking starts **allowed**: an agent that really needs a
+person gets one unless it has been said that none is there.
+
+## When the answer is not worth stopping for
+
+A question stops the turn until it is answered. For everything a run wants from you that is not
+one thing it cannot decide — what there is to do next, how far through it is, the thing you
+thought of while it was running — there is [the mission board](/user/board) instead: named
+lines on `/status` that either of you changes whenever you like, and neither waits at.
+
+## From Python
+
+The rest of this page is the weaver's — whoever wrote the flow.
+
+`agent.ask` is what a stopped turn reaches:
 
 ```python
-# .humanize/flows/pairing/__init__.py
-"""An agent and you, taking turns."""
+agent.ask = lambda question: input(f"{question.text} {question.options} ")
+```
 
-from typing import NamedTuple
+The question it receives is:
 
-from hmz.flows import Agent, Person, flow
+```python
+@dataclass(frozen=True, slots=True)
+class Question:
+    text: str
+    options: tuple[str, ...] = ()
+```
 
+Return a string to answer, or `None` for "nobody answered". Leave `ask` unset and it is `None`
+every time — which is why every questionnaire wants `suppress=True` and a `None` branch. A flow
+that assumed somebody was there would hang forever exactly when nobody was.
 
+Whatever happens, the question also reaches anything
+[watching](/reference/agents#watching-a-turn-as-it-happens) the agent, as an `asks` event. So
+an unattended run can collect everything its agents wanted to ask, and you can read it in the
+morning:
+
+```python
+def looking(agent, session, event):
+    if event.kind == "asks":
+        Path("questions.log").open("a").write(f"{agent.id}: {event.text}\n")
+
+agent.watch(looking)
+```
+
+The session on an `asks` event is `None`, whichever backend asked. A question belongs to the
+agent rather than to one conversation: `ask` is set on the agent, and the agent is what a
+stopped turn reaches. So a watcher can say which agent wanted to ask, as the one above does,
+but not which of its conversations did.
+
+## The other direction: a flow asking you
+
+A **`Person`** is the person at the prompt, declared among the agents — see [the person as an
+agent](/weaver/human-agent). Saying something to one is asking what to say next, and what it
+answers with is what you typed:
+
+```python
 class Agents(NamedTuple):
     """The agent, and whoever is at the prompt."""
 
@@ -37,105 +111,15 @@ def run(agents: Agents, task: str) -> None:
         said = agents.human(answered)
 ```
 
-Saying something to a `Person` is asking what to say next; what it answers with is what you
-typed. This flow is [`chat`](/flows/chat), the flow the interface
-opens on.
-
-**Step 2.** Run it from a command line.
+That is [`chat`](/flows/chat), the flow the interface opens on. One `-a` still drives two
+agents, because nobody is asked what the person runs:
 
 ```sh
-hmz exec -f pairing -a claude/claude-opus-5:high "Read README.md and tell me what this is."
+hmz exec -f chat -a claude/claude-opus-5:high "Read README.md and tell me what this is."
 ```
 
-One `-a`, and the flow drives two agents. Nobody is asked what the person runs, so a
-`Person` is not one of the agents `-a` names. On a command line nobody is at a prompt, so
-`agents.human(...)` answers with nothing. `said` is falsy, so the loop ends and the flow does
-the one thing it was given.
-
-**Step 3.** Run it in the interface to see the asking.
-
-```
-/flow pairing
-```
-
-Now it is a conversation: you and the agent take turns.
-
-## At the prompt
-
-The agent shows the question and whatever it offered. The next line you type is **the answer**,
-not a word put into the turn. The status line reads `enter answer` while that is so.
-
-You are not held to the options. Every backend that offers options also takes something else.
-The options are what the agent expects, and what an interface shows so the question reads as
-one.
-
-If the flow ends or is stopped while a question is still up, the question ends with it.
-Stopping a flow is never blocked on a question.
-
-## When nobody is there
-
-`hmz exec` has nobody at a prompt. [`/afk`](/user/afk) says the same thing on purpose:
-
-```
-/afk on
-```
-
-In both cases the backend is told **nobody answered**, and the agent carries on.
-
-A turn waiting on an answer that is not coming is a flow that has stopped. So this is the
-default everywhere except an interface with `/afk` off.
-
-This is why every questionnaire wants `suppress=True` and a `None` branch. A flow that assumed
-somebody was there would hang forever exactly when nobody was. Asking starts **allowed**: an
-agent that really needs a person gets one unless it has been said that none is there.
-
-## From Python
-
-From Python, the hook is `agent.ask`:
-
-```python
-agent.ask = lambda question: input(f"{question.text} {question.options} ")
-```
-
-The question it receives is:
-
-```python
-@dataclass(frozen=True)
-class Question:
-    text: str
-    options: tuple[str, ...]
-```
-
-Return a string to answer, or `None` for "nobody answered". Leave `ask` unset and it is `None`
-every time.
-
-Whatever happens, the question also reaches anything
-[watching](/reference/agents#watching-a-turn-as-it-happens) the agent, as an `asks` event. A
-flow can record that its agent wanted to ask without answering it:
-
-```python
-def looking(agent, session, event):
-    if event.kind == "asks":
-        Path("questions.log").open("a").write(f"{agent.id}: {event.text}\n")
-
-agent.watch(looking)
-```
-
-An unattended run can collect everything its agents wanted to ask, and you can read it in the
-morning.
-
-The session on an `asks` event is `None`, whichever backend asked. A question belongs to the
-agent, not to one conversation. `ask` is set on the agent, and the agent is what a stopped turn
-reaches. So a watcher can say which agent wanted to ask, as the one above does, but not which
-of its conversations did.
-
-## The other direction: a flow asking you
-
-The *flow* asking you is [the person as an agent](/weaver/human-agent):
-
-```python
-said = agents.human("Here is what I did. What next?")
-```
+On a command line nobody is at a prompt, so `agents.human(...)` answers with nothing, `said` is
+falsy, and the flow does the one thing it was given.
 
 With a [schema](/weaver/shapes), the same call is a questionnaire. The person is not shown a
 JSON Schema. They are asked **a question per field**, and the model is built out of what they
@@ -165,8 +149,6 @@ def run(agents: Agents, task: str) -> None:
         working(f"{task}\n\nBuild this the {settled.approach} way."
                 f"{' Write tests.' if settled.tests else ''}", suppress=True)
 ```
-
-Each field becomes a question, and what the person types is built into the model:
 
 | In the model | What they are asked |
 | --- | --- |
@@ -200,13 +182,6 @@ or wake something up instead:
 ```python
 agent.hooks.on(Moment.NOTIFICATION, lambda occasion: ring_a_bell(occasion.said))
 ```
-
-## When the answer is not worth stopping for
-
-A question stops the turn until it is answered. For everything a run wants from you that is
-not one thing it cannot decide — what there is to do next, how far through it is, the thing you
-thought of while it was running — there is [the mission board](/user/board) instead: named
-lines on `/status` that either of you changes whenever you like, and neither waits at.
 
 ## See also
 
