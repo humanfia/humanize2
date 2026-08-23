@@ -5,8 +5,8 @@ pageClass: hmz-feature
 # Many backends, one agent
 
 Most humanize backends do not talk to a model provider. They drive a supported coding agent
-under its existing login, through a built-in adapter or the Agent Client Protocol. humanize
-does not need the provider's API key for those backends.
+under its existing login, through a built-in adapter or the Agent Client Protocol, so no
+provider API key is needed for them.
 
 The exception ships inside it: DeepSeek Harness arrives as an SDK-backed agent and uses its
 own DeepSeek provider credentials because it has no subscription login to reuse.
@@ -40,9 +40,9 @@ small advisory catalogues instead: the official DeepSeek adapter's current model
 models Qwen Code ships pointed at. Those lists make initial setup possible; they are not proof
 of what an account or compatible endpoint will accept.
 
-For a discovered catalogue, nothing is added to what the backend answered. Claude Code may
-report a custom alias without proving the account can run it, so humanize preserves the alias
-exactly as that account supplied it rather than silently manufacturing another model entry.
+To a catalogue that *was* discovered, nothing is added. Claude Code may report a custom alias
+without proving the account can run it, so the alias is preserved exactly as that account
+supplied it rather than another model entry being manufactured.
 
 ## The efforts are a vocabulary, so they are written down
 
@@ -69,10 +69,8 @@ Three of them are worth knowing about:
 A backend is driven through its command line where that can express what an agent is configured
 with, and through the app server it serves its own client from where it cannot. A model, an
 effort, a mode or a goal that has no flag is a setting of a session there — and asking the
-model for it in the prompt is not the same feature.
-
-A turn that has to stay open to be [talked to](/features/steering) is such a case: a command
-line run per turn has ended by the time there is anything to say to it.
+model for it in the prompt is not the same feature. A turn that has to stay open to be [talked
+to](/features/steering) is such a case.
 
 Where a server is needed it is started at most once per agent, only when a turn first needs
 one, so a flow that needs none starts none. One server serves every session of its agent, so

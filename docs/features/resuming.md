@@ -26,11 +26,9 @@ changed and the run starts at the beginning rather than putting an old answer in
 ## What a flow keeps is its own handful of things
 
 A flow that says so is handed a dict holding what it wrote there last time. Which round it is
-on, which files it has been through, what it has decided so far.
-
-Deliberately not a second copy of the transcript: the backends already keep that, and the run's
-own record already says which sessions it opened. What the flow keeps is what only the flow
-knows.
+on, which files it has been through, what it has decided so far — deliberately not a second
+copy of the transcript, which the backends already keep and whose sessions the run's own record
+already names.
 
 ## Saved as it is written, not when the run ends
 
@@ -66,11 +64,10 @@ of it recorded. A flow is a directory on disk, and what can happen next is what 
 
 ## What does not come back
 
-The conversation. Neither a state dict nor a prophecy is a copy of a backend session. An
-ordinary flow opens a session rather than reconstructing one; an atlas reuses completed visit
-answers rather than recreating the context in which an agent produced them. A stateful loop
-stopped on its fortieth round says round 41 when it starts again — and remembers nothing else
-about the forty unless the flow wrote it down.
+The conversation. An ordinary flow opens a session rather than reconstructing one; an atlas
+reuses completed visit answers rather than recreating the context in which an agent produced
+them. A stateful loop stopped on its fortieth round says round 41 when it starts again — and
+remembers nothing else about the forty unless the flow wrote it down.
 
 Which is the argument for keeping little: the repository is the memory, and the handful of
 things the flow tracks is what has to survive.

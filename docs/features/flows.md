@@ -4,14 +4,15 @@ pageClass: hmz-feature
 
 # A flow is Python
 
-A flow is a directory holding Python that takes the agents and the task. Most are ordinary
-functions: a loop, a subprocess call, a file read between two turns, a condition on what the
-last answer said. An **atlas** makes a different bargain: its deliberately narrow body is read
-before it runs and compiled into a typed graph called a prophecy.
+A flow is a directory holding Python that takes the agents and the task, and whoever writes one
+is a **weaver**. Most are ordinary functions: a loop, a subprocess call, a file read between
+two turns, a condition on what the last answer said. An **atlas** makes a different bargain:
+its deliberately narrow body is read before it runs and compiled into a typed graph called a
+prophecy.
 
-Both are Python, discovered the same way and driven by the same run. Choose an ordinary flow
-when its shape should remain free; choose an atlas when the shape must be checked, compared or
-resumed node by node before any agent starts.
+Both are Python, discovered the same way and driven by the same run. A weaver reaches for an
+ordinary flow when the shape should remain free, and for an atlas when it must be checked,
+compared or resumed node by node before any agent starts.
 
 <HmzLoops />
 
@@ -30,9 +31,9 @@ What the mark carries is what a command line cannot otherwise know:
   [trace](/features/tracing) groups each agent's sessions under.
 - **What it needs of them.** A flow that runs an agent under a [goal](/features/goals) says so
   beside the place, and an agent whose backend has no goal feature is refused before the first
-  turn. Where an agent's turns may land is the flow's to say too: a place may be pointed at
-  another machine, or fixed to a container of an image the flow itself names and configurable
-  by nobody.
+  turn.
+- **Where its turns may land.** A place may be pointed at another machine, or fixed to a
+  container of an image the flow itself names and configurable by nobody.
 - **Whether it can be [picked up](/features/resuming)** where its last run left off.
 - **One file, several flows.** Three phases of one thing are one thing to write and three to
   run, each asking only for the agents it drives and only for the settings it takes.
@@ -47,14 +48,12 @@ rewritten between two runs — by hand, or by an agent that flow is itself drivi
 is *now*. That is what makes a flow, and the skills it brings, a thing a run can improve.
 
 The static checker can inspect a flow's source without importing it. An atlas goes further: its
-body is the description, so compiling it produces a prophecy without executing that body. Its
-node functions and the rest of its module remain ordinary Python, which is why a flowverse is
-still trusted as code rather than treated as data.
+body is the description, so compiling it produces a prophecy without executing that body — but
+its node functions and the rest of its module remain ordinary Python.
 
 Its own directory is importable while it runs and only while, since what a flow imports is not
-something the rest of the process should be able to.
-
-It is also why a flowverse is trusted the way a repository of code is trusted, and why
+something the rest of the process should be able to. All of which is why a flowverse is trusted
+the way a repository of code is trusted rather than read as data, and why
 [Security](/user/security) is a page rather than a paragraph.
 
 ## The shapes a loop takes
@@ -87,17 +86,19 @@ into the run's own record — a run is what it did as well as what it was starte
 
 ## Everything a flow needs lives inside it
 
-So that it can be copied, forked and edited whole. A flow whose parts are elsewhere is a flow
-with a hole in it wherever it is copied to.
+So that it can be copied, forked and edited whole: a flow whose parts are elsewhere has a hole
+in it wherever it lands.
 
-Its own skills are the `skills/` directory inside it, and it does not have to declare them:
-they are in it, and looking is what finds them. A skill maintained somewhere else is named as a
-git URL where the flow is declared, cloned under humanize's own home and fetched again the next
-time a run asks for it — so it keeps up, and goes on working when the network is down. The
-flow's own wins a name a repository also uses, because a fork that edited a skill meant the
-edited one. A repository that cannot be fetched at all stops the run **where the flow is got
-ready**, not at the first turn: a flow that works by a skill it has not got is not one to start
-and find out about an hour in.
+- **Its own skills are the `skills/` directory inside it**, undeclared: they are in it, and
+  looking is what finds them.
+- **A skill maintained elsewhere is named as a git URL** where the flow is declared, cloned
+  under humanize's own home and fetched again the next time a run asks for it — so it keeps up,
+  and goes on working when the network is down.
+- **The flow's own wins a name a repository also uses**, because a fork that edited a skill
+  meant the edited one.
+- **A repository that cannot be fetched at all stops the run where the flow is got ready**, not
+  at the first turn. A flow that works by a skill it has not got is not one to start and find
+  out about an hour in.
 
 ## Where flows come from
 
@@ -107,9 +108,11 @@ well, and reading a flow means running it.
 
 Nearest wins: this project's flows, then yours, then whatever there is to run, so a project may
 mean its own `chat` by `chat`. A name qualified by a flowverse is that flowverse's and is never
-stood in for. Two are always listed — the package's own, and humanize's repository of the rest,
-which is listed whether or not it has been fetched, because a list that only mentioned it once
-somebody had thought to add it would be a list that hid what there is to run.
+stood in for.
+
+Two are always listed — the package's own, and humanize's repository of the rest, which is
+listed whether or not it has been fetched. A list that only mentioned it once somebody had
+thought to add it would be a list that hid what there is to run.
 
 ## Where the detail is
 
