@@ -18,17 +18,16 @@ hmz exec -f stateful_ralph -a kimi/kimi-code/k3:high "$(cat TASK.md)"
 
 Two things, and only one of them is money. The spend is the budget's business. The other is the
 context window: one session is one conversation, and a conversation that has been going for six
-hours is one the backend is compacting, summarising or refusing. That is the ceiling this flow
-runs into, and it is the backend's ceiling rather than humanize's.
+hours is one the backend is compacting, summarising or refusing. That ceiling is the backend's
+rather than humanize's.
 
-Reach for it when the work is exploratory — when *what has already been tried* is the expensive
-thing to rediscover — and reach for `ralph_loop` when the work is long.
+Reach for this when the work is exploratory — when *what has already been tried* is the
+expensive thing to rediscover — and for `ralph_loop` when the work is long.
 
 ## What it takes
 
-| | |
-| --- | --- |
-| `budget` | Millions of output tokens the loop may spend, across every run of it in this workspace. **10 by default**, `0` for no limit. |
+`budget`, in millions of output tokens the loop may spend across every run of it in this
+workspace. **10 by default**, `0` for no limit.
 
 ## What it keeps
 
@@ -40,11 +39,9 @@ started again, and remembers nothing else about the forty.
 
 ## What else ends it
 
-**Three rounds in a row that answered with nothing.** A round whose turn failed answers with
-nothing and spends nothing, so a loop whose account was refused — or whose model that account
-may not run — would sit under a budget that never moves and go round on the same failure for as
-long as it was left. What it kept is left alone when it stops this way, rather than cleared: a
-loop that stalled is one to fix and carry on from, not one that is over.
+**Three rounds in a row that answered with nothing**, exactly as in
+[`ralph_loop`](/flows/ralph-loop#what-else-ends-it): a stall under a budget that never moves,
+stopped rather than declared over, with what it kept left alone for the run that fixes it.
 
 ## See also
 

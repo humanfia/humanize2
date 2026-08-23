@@ -26,12 +26,10 @@ point: a [trace](/features/tracing) reads the run as two sets of sessions rather
 
 ## What it takes
 
-| | |
-| --- | --- |
-| `budget` | Millions of output tokens the **two may spend between them** before the loop stops, across every run of it in this workspace. **10 by default**, `0` for no limit. |
-
-Between them rather than apiece, because the loop is the two of them: a pair that alternates
-spends what it spends whichever of them was writing at the time.
+`budget`, in millions of output tokens the **two may spend between them** across every run of
+it in this workspace. **10 by default**, `0` for no limit. Between them rather than apiece,
+because the loop is the two of them: a pair that alternates spends what it spends whichever of
+them was writing at the time.
 
 ## What it keeps
 

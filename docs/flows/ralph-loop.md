@@ -6,8 +6,8 @@ pageClass: hmz-feature
 
 A fresh session every round, so nothing carries over. The agent starts from the task and from
 the repository each time, and what the round before it did is whatever it left in the working
-directory. The oldest trick in unattended agent work, and still the one that survives longest
-runs: a loop that cannot poison itself with its own context.
+directory. The oldest trick in unattended agent work, and still the one that survives the
+longest runs: a loop that cannot poison itself with its own context.
 
 ```sh
 hmz exec -f ralph_loop -a claude/claude-opus-5:high "$(cat TASK.md)"
@@ -19,11 +19,11 @@ hmz exec -f ralph_loop -a claude/claude-opus-5:high "$(cat TASK.md)"
 
 A session that runs for a day accumulates every wrong turn it took. A round that starts clean
 reads the repository as it is — including the tests the last round broke and the file it left
-half-written — and has no memory of the reasoning that got it there.
+half-written — with no memory of the reasoning that got it there.
 
-The cost is real and worth saying: an agent that forgets will re-derive things, and will
-sometimes undo a decision it made an hour ago because nothing in the tree records that it was a
-decision. Write the decisions into the repository, and the loop reads them back.
+The cost is real: an agent that forgets will re-derive things, and will sometimes undo a
+decision it made an hour ago because nothing in the tree records that it was a decision. Write
+the decisions into the repository, and the loop reads them back.
 [`stateful_ralph`](/flows/stateful-ralph) is the same loop with the opposite trade.
 
 ## What it takes
@@ -32,12 +32,9 @@ decision. Write the decisions into the repository, and the loop reads them back.
 budget: 25    # millions of output tokens; 0 goes on until it is stopped
 ```
 
-| | |
-| --- | --- |
-| `budget` | Millions of output tokens the loop may spend before it stops, counted across every run of it in this workspace. **10 by default**, and `0` goes on until it is stopped by hand. |
-
-`hmz exec -f ralph_loop -c budget.yaml …`, or `/config` at the prompt. See [Settings of its
-own](/weaver/flow-settings).
+One setting, **10 million by default**, counted across every run of this flow in this
+workspace rather than per run. Pass the file with `-c budget.yaml`, or type `/config` at the
+prompt; see [Settings of its own](/weaver/flow-settings).
 
 ## What it keeps
 

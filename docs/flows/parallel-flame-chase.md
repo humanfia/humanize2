@@ -40,11 +40,10 @@ the flow opens `/agents` on, not something it holds you to.
 
 The isolation is the point of the flow. A per-source advisory lock permits only one lane 1
 owner; lanes 2 and 3 are confined to snapshots, and the runtime's control paths reject links
-and replacements. What lanes 2 and 3 produce reaches lane 1 as a **report** and a hashed,
-reconstructable artifact package — never as a write into your tree.
-
-Reports are redelivered until the receiving lane completes a valid turn and acknowledges them,
-so a lane that fell over does not lose what it was told.
+and replacements. What they produce reaches lane 1 as a **report** and a hashed,
+reconstructable artifact package — never as a write into your tree — and reports are
+redelivered until the receiving lane completes a valid turn and acknowledges them, so a lane
+that fell over does not lose what it was told.
 
 Durable data lives under `~/.humanize/parallel_flame_chase/<workspace-key>/<run-id>/`. The flow
 coordinates local work only: there is no release, deployment, submission, messaging or purchase

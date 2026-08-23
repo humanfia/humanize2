@@ -16,40 +16,34 @@ hmz exec -f official/fixed_juice_ralph -a claude/claude-opus-5:high "$(cat TASK.
 
 ## A governor is not a brake
 
-What it holds steady is the size of an answer. A loop held to 2000 output tokens a turn is a
-loop that goes on producing 2000 output tokens a turn for as long as anybody leaves it running;
-what ends it is still the budget.
-
-The two are one quantity read at two scales: `juice` is what a turn is worth, and `budget` is
-what the loop is.
+What it holds steady is the size of an answer. A loop held to 2000 output tokens a turn goes on
+producing 2000 output tokens a turn for as long as anybody leaves it running; what ends it is
+still the budget. The two are one quantity read at two scales: `juice` is what a turn is worth,
+and `budget` is what the loop is.
 
 Per turn of the **model** — one request and the answer to it — rather than per turn of the
 flow, which is many of those and as many again of whatever the tools took. That average is what
-an effort actually moves: a model asked to think harder writes more in each answer and takes
-longer over it. So an agent under the target is asked to think harder and one over it to think
-less, one rung of its own model's ladder per round, so that the loop settles rather than
-swings.
+an effort actually moves: a model asked to think harder writes more in each answer. So an agent
+under the target is asked to think harder and one over it to think less, one rung of its own
+model's ladder per round, so that the loop settles rather than swings.
 
 Nothing here is a clock. How long a round takes and what it costs an hour are what the model
 and the work make of it.
 
 ## What it takes
 
+Five settings, written out at their defaults:
+
 ```yaml
 juice: 2000     # output tokens an average turn of the model is to come out with
 over: 300       # how far back that average is taken, in seconds
 slack: 0.15     # how far off it may be before the effort moves
 rest: 5         # seconds between rounds
-budget: 10      # millions of output tokens the whole loop may come to
+budget: 10      # millions of output tokens the whole loop may come to; 0 for no limit
 ```
 
-| | |
-| --- | --- |
-| `juice` | What a turn of the model is to come out with, in output tokens. **2000.** |
-| `over` | How far back the average is taken, in seconds. **300.** |
-| `slack` | How far off the average may be before the effort moves, as a fraction of the target — 0.15 leaves it alone between 85% and 115%. |
-| `rest` | Seconds between rounds. **5.** |
-| `budget` | Millions of output tokens the whole loop may come to. **10**, `0` for no limit. |
+`slack` is a fraction of the target: 0.15 leaves the effort alone between 85% and 115% of it.
+`budget` is counted across every run of this flow in this workspace.
 
 ## What it keeps
 
