@@ -1,12 +1,10 @@
-# 6 · Write a flow: four agents on a maths problem
+# Four agents on a maths problem
 
 **An hour.** You will write a flow with four kinds of agent in it, several turns running at
-once, and answers held to a shape. The problem is a mathematical one, which means there is no
-compiler, no test suite and no exit code — so the flow has to build its own way of telling a
-good answer from a plausible one.
-
-This is the longest flow in these tutorials, and every part of it is there for a reason you can
-state.
+once, and answers held to a shape. The problem is a mathematical one — no compiler, no test
+suite, no exit code — so the flow has to build its own way of telling a good answer from a
+plausible one. It is the longest flow in these tutorials, and every part of it is there for a
+reason you can state.
 
 ::: tip Before you start
 Finish [Build under test](/weaver/tutorials/checked-build). This tutorial assumes you know what
@@ -15,10 +13,12 @@ Finish [Build under test](/weaver/tutorials/checked-build). This tutorial assume
 
 ## The problem with maths problems
 
-Everything in the earlier tutorials leaned on something outside the agent.
-[`flame_chase`](/user/tutorials/take-home) had a cycle count. [`rlar`](/user/tutorials/port-a-project)
-and [`checked_build`](/weaver/tutorials/checked-build) had a test suite. A wrong answer was
-caught by something that was not a language model.
+Every flow up to here leaned on something outside the agent: a cycle count in
+[`flame_chase`](/user/tutorials/take-home), a test suite in
+[`rlar`](/user/tutorials/port-a-project) and in the
+[`checked_build`](/weaver/tutorials/checked-build) you just wrote. The first two are flows
+somebody else wrote, run rather than written in the [User Guide](/user/) tutorials; all three
+caught a wrong answer with something that was not a language model.
 
 A proof has none of that. And a model asked whether its own proof is correct will nearly always
 say yes — not out of dishonesty, but because the same reasoning that produced the gap is the
@@ -39,12 +39,11 @@ Four kinds of agent.
 | **mender** | The only agent that remembers. Takes the attempt that got furthest, plus the fault the checker found, and repairs it. |
 
 And one arrangement that matters more than the four roles: **an attempt survives only if two
-separate checkers, asked separately, both call it sound.** One checker is a coin toss. Two
-sessions asked the same question independently is the cheapest way to make it not one.
+separate checkers, asked separately, both call it sound.** One checker is a coin toss.
 
-`solver` and `checker` are one agent each, not several. An agent can open as many sessions as
-it likes, and what makes two attempts independent is that neither session has seen the other —
-not that they run different models.
+`solver` and `checker` are one agent each, not several: an agent opens as many sessions as it
+likes, and what makes two attempts independent is that neither session has seen the other, not
+that they run different models.
 
 ## Step 1 — make a project and a problem
 
@@ -92,14 +91,14 @@ class Setup(BaseModel):
     output: str = Field(default="solution.md", description="where the proof is written")
 ```
 
-A flow that takes a third argument annotated with a pydantic model has **settings**. They
-become fields on the `/config` page in the interface and lines in a `-c setup.yaml` file at a
-command line, with the `description` as the label and `ge`/`le` enforced before the run starts.
-See [A flow with settings of its own](/weaver/flow-settings).
+A flow whose third argument is annotated with a pydantic model has **settings**: fields on
+`/config` and lines in a `-c setup.yaml` file, with the `description` as the label and
+`ge`/`le` enforced before the run starts. See [A flow with settings of its
+own](/weaver/flow-settings).
 
 ## Step 3 — say what you are asking each agent for
 
-Three shapes. The first is what the reader hands the rest of the flow:
+Two more shapes. The first is what the reader hands the rest of the flow:
 
 ```python
 class Statement(BaseModel):
@@ -123,9 +122,8 @@ class Statement(BaseModel):
 ```
 
 `traps` is the interesting field. The reader writes down how solutions to *this* problem
-usually fail, before anybody has attempted one — and that list then goes into both the solver's
-prompt and the checker's. It is much easier to name the traps of a problem you are not trying
-to solve.
+usually fail before anybody has attempted one, and that list goes into both the solver's prompt
+and the checker's. Naming the traps of a problem you are not trying to solve is much easier.
 
 The second is one checker's reading of one attempt:
 
@@ -153,12 +151,11 @@ class Verdict(BaseModel):
     )
 ```
 
-Three outcomes rather than a boolean, and the tie-break written into the description: *when
-unsure between sound and gap, say gap*. A checker that gives the benefit of the doubt passes
-wrong proofs, and that is the only failure mode here that costs anything.
-
-`first_fault` asks for the **first** one and nothing else. A list of six faults is not
-actionable when the first invalidates everything after it.
+Three outcomes rather than a boolean, with the tie-break in the description: *when unsure
+between sound and gap, say gap*. A checker that gives the benefit of the doubt passes wrong
+proofs, the only failure mode here that costs anything. And `first_fault` asks for the
+**first** and nothing else: a list of six is not actionable when the first invalidates the
+rest.
 
 ## Step 4 — send the solvers off in different directions
 
@@ -182,9 +179,8 @@ ANGLES = (
 )
 ```
 
-Four copies of one prompt give you four attempts that fail the same way. Four different opening
-moves give you four that fail differently, and a checker only has to find one that does not
-fail at all.
+Four copies of one prompt fail the same way. Four different opening moves fail differently, and
+a checker only has to find one that does not fail at all.
 
 ## Step 5 — make "sound" mean two people said so
 
@@ -205,9 +201,9 @@ async def sound(checker: Agent, asked: str) -> tuple[bool, Verdict | None]:
     return False, next(one for one in both if one.verdict != "sound")
 ```
 
-`abatch` is the agent called once per prompt, all of them at the same time, one session apiece
-and none of them kept. Here it is the same prompt twice, which is the whole trick: two
-conversations that have never met, answering the same question.
+`abatch` is the agent called once per prompt, all at the same time, one session apiece and none
+kept. Here, the same prompt twice: two conversations that have never met, answering the same
+question.
 
 ## Step 6 — write the loop
 
@@ -299,15 +295,12 @@ async def run(agents: Agents, task: str, config: Setup | None = None) -> None:
     print(f"{setting.rounds} rounds and nothing two checkers would both sign off. Nothing written.")
 ```
 
-Follow one round through it. Four solvers go off at once on four different angles. Every
-attempt gets two checkers, and all of those run at once too — with four attempts that is eight
-checker sessions in parallel. If any attempt is called sound twice, it is written out and the
-run is over. Otherwise the *first attempt with a gap* — not one that was called wrong, which is
-a dead end rather than a hole — goes to the mender, and the mender's repair joins next round's
-attempts and faces the same two checkers.
-
-The mender is the only agent holding a session. It is the only one that benefits from
-remembering: it sees what failed in round one when it repairs round two.
+Follow one round through it. Four solvers go off at once on four angles; each attempt then gets
+two checkers, running at once too — eight checker sessions in parallel. An attempt called sound
+twice is written out and the run is over. Otherwise the *first attempt with a gap* — not one
+called wrong, which is a dead end rather than a hole — goes to the mender, and its repair faces
+the same two checkers next round. The mender holds the only session, being the only agent that
+gains by remembering.
 
 ::: details The four prompts, in full
 One helper and four constants. Put them above `run`.
@@ -391,7 +384,7 @@ different one. Write the proof and nothing else."""
 ## Step 7 — give the flow a skill
 
 A **skill** is a directory with a `SKILL.md` in it, and a flow's own skills live inside the
-flow. Every session either agent opens gets it mounted.
+flow. Every session any of the four opens gets it mounted.
 
 Write `.humanize/flows/prove/skills/reading-a-proof/SKILL.md`:
 
@@ -422,12 +415,10 @@ These are gaps, not quibbles:
 Say where the *first* one is, quote it, and stop.
 ```
 
-Why a skill rather than more prompt? Because it is shared. The checker needs it to judge, the
-solver needs it to write something that will survive judging, and the mender needs both. One
-file, mounted on every session, is one place to change your mind about what a gap is.
-
-Skills also survive a fork. Copy this flow, edit `SKILL.md`, and you have changed how the whole
-flow reads proofs without touching the Python. See [Skills](/user/skills).
+Why a skill rather than more prompt? Because it is shared: the checker needs it to judge, the
+solver to write something that will survive judging, the mender both. One file, mounted on
+every session, is one place to change your mind about what a gap is — and editing it changes
+how the whole flow reads proofs without touching the Python. See [Skills](/user/skills).
 
 ## Step 8 — run it
 
@@ -469,9 +460,9 @@ Applying the inequality with n = 100, we obtain a_100^2 > 199. Because a_100 > 0
 square roots gives a_100 > sqrt(199). Finally, since 199 > 196 = 14^2, we have a_100 > 14.
 ```
 
-The proof squares the recurrence to find the invariant, which is the one move the problem is
-about. Note what the flow did *not* have to do: no agent was asked to grade itself, and nothing
-was accepted because it sounded confident.
+The proof squares the recurrence to find the invariant, the one move the problem is about. Note
+what the flow did *not* do: no agent graded itself, and nothing was accepted for sounding
+confident.
 
 ## Step 9 — give it something harder
 
@@ -488,10 +479,10 @@ Prove that
 EOF
 ```
 
-The obvious first thought on that one — "by symmetry the minimum is at `a = b = c`" — is wrong,
-because the expression is cyclic rather than symmetric. A solver that takes it writes something
-that reads well and proves nothing. The run above did not take it. The proof it settled on
-bounds `x²/(1+x²) ≤ x/2` for every positive `x`, so `a/(1+b²) ≥ a − ab/2`, and sums the three.
+The obvious first thought — "by symmetry the minimum is at `a = b = c`" — is wrong, because the
+expression is cyclic rather than symmetric, and a solver that takes it writes something that
+reads well and proves nothing. The run above bounded `x²/(1+x²) ≤ x/2` instead, so
+`a/(1+b²) ≥ a − ab/2`, and summed the three.
 
 Then IMO 2024, problem 1:
 
@@ -515,12 +506,11 @@ real alpha with this property for all n lies in the proposed set.
 Round 1: two checkers agree. Written to solution.md.
 ```
 
-169 lines, correct answer (`α = 2m` for integer `m`), and both directions proved — which is the
-half that the reader's `answer_form` field was there to insist on.
+169 lines, correct answer (`α = 2m` for integer `m`), and both directions proved — the half
+that the reader's `answer_form` field was there to insist on.
 
-All three problems ended in round one, on four solvers apiece. That is the flow working, not
-the flow being untested: the mending path exists for the rounds that do not end, and what it
-prints when a round does not end is the checker's `first_fault`, quoted back to you before the
+All three ended in round one, on four solvers apiece. The mending path is for the rounds that
+do not, and what it prints then is the checker's `first_fault`, quoted back to you before the
 mender is handed it.
 
 ::: tip Reading a round that did not end
@@ -533,23 +523,21 @@ nothing to repair and the next round starts clean.
 ## What to change
 
 **Widen it.** `attempts: 8` doubles the solvers and the checkers with them. Nothing here caps
-how many turns run at once, so how wide to go is a question about your rate limits. `abatch`
+how many turns run at once, so how wide to go is a question about your rate limits — `abatch`
 takes `at_once=` when you want the flow to queue rather than the API to refuse.
 
 **Make the checkers disagree on purpose.** Give `checker` a different backend from `solver`
 with a second `-a`. Two models that fail differently is the strongest version of this design.
 
 **Require three of three.** Change `[asked, asked]` to `[asked, asked, asked]` and the `all(…)`
-still holds. It is a straight trade of cost against confidence.
+still holds — a straight trade of cost against confidence.
 
 **Point it at something checkable.** If your problems have machine-checkable answers — Lean, a
-numeric result, a program — replace the second checker with the checker itself. A proof
-assistant that says yes is worth more than any number of agents that say yes.
+numeric result, a program — replace the second checker with the machine. A proof assistant that
+says yes is worth more than any number of agents that say yes.
 
 ## Next
 
-You have now written both shapes of flow. What is left is the reference:
-
-- Every feature, one page each: [Guides](/user/).
-- Every Python call these flows made: [Flows](/reference/flows) and
-  [Agents](/reference/agents).
+You have written both shapes of flow. What is left is a page per thing a weaver reaches for in
+the [Weaver Guide](/weaver/), and the Python these two called: [Flows](/reference/flows) and
+[Agents](/reference/agents).

@@ -1,15 +1,17 @@
-# 5 · Write a flow: build under test
+# Build under test
 
 **Thirty minutes.** You will write a flow of about forty lines. One agent writes code, the flow
 runs `pytest` between its turns, and a second agent reviews whatever passed. The loop ends when
 the reviewer is satisfied, not when the writer says it is finished.
 
-By the end you will have used the four things every flow is made of: agents, a session, a
-schema, and a loop.
+It is a [weaver's](/weaver/) first flow, and it uses the four things every flow is made of:
+agents, a session, a schema, and a loop.
 
 ::: tip Before you start
-Finish the [Quickstart](/). You need one backend; this tutorial uses
-DeepSeek Harness, which needs only an API key.
+Finish the [quickstart](/#run-a-flow) on the home page: humanize installed, one backend
+working, one flow run. [Weave a flow](/#weave-a-flow) beside it is the short version of what
+this tutorial builds in full. The backend here is DeepSeek Harness, which needs only an API
+key.
 :::
 
 ## What a flow actually is
@@ -27,13 +29,12 @@ def run(agents: tuple[Agent], task: str) -> None:
 ```
 
 That is a complete flow. `agents` is what the person running it named on the command line, one
-`-a` apiece; `task` is the last argument they typed. The type annotation is not decoration —
-its length is how many `-a` flags humanize requires, and it is the only way a command line can
-know before the first turn is taken.
+`-a` apiece; `task` is the last argument they typed. The annotation is not decoration — its
+length is how many `-a` flags humanize requires.
 
-Flows are looked for in three places, nearest first: `.humanize/flows/` in the project you are
-in, `~/.humanize/flows/` for your own, and then the ones humanize ships and every
-[flowverse](/weaver/flowverses) you have added. This tutorial writes one into the project.
+Flows are looked for nearest first: `.humanize/flows/` in the project you are in,
+`~/.humanize/flows/` for your own, then the ones humanize ships and every
+[flowverse](/weaver/flowverses) you have added. This one goes in the project.
 
 ## Step 1 — make a project to work in
 
@@ -93,7 +94,7 @@ python -m pytest -q
 10 passed in 0.29s
 ```
 
-Ten green tests. That is the baseline the flow will hold the agent to.
+Ten green tests — the baseline the flow will hold the agent to.
 
 ```sh
 git add -A && git commit -qm "roman numerals, one way"
@@ -120,11 +121,9 @@ class Agents(NamedTuple):
     reviewer: Agent
 ```
 
-You could have written `tuple[Agent, Agent]` and got the same count. A `NamedTuple`
-buys you names, and the names are used everywhere something has to talk about one of these
-agents: the agents page of `/flow` asks what *the reviewer* runs rather than what agent 2 of 2
-runs, the line above the prompt says `reviewer · dsh/deepseek-v4-pro:high`, and a
-[trace](/user/tracing) groups that agent's sessions under `reviewer`.
+`tuple[Agent, Agent]` would have given the same count. A `NamedTuple` buys names, and the names
+are what everything else uses: `/flow` asks what *the reviewer* runs rather than what agent 2
+of 2 runs, and a [trace](/user/tracing) groups that agent's sessions under `reviewer`.
 
 ## Step 3 — say what the reviewer has to answer
 
@@ -153,9 +152,8 @@ class Review(BaseModel):
 ```
 
 Those `description` strings are not comments. They are handed to the backend as the shape it
-must answer in, so they *are* the instruction. Everything you want the reviewer to weigh goes
-in there — this is the file you edit when you want reviews to be stricter. See [Answers in a
-shape](/weaver/shapes).
+must answer in, so they *are* the instruction — edit them when you want stricter reviews. See
+[Answers in a shape](/weaver/shapes).
 
 ## Step 4 — run the tests yourself
 
@@ -180,9 +178,8 @@ def suite() -> tuple[bool, str]:
     return ran.returncode == 0, (ran.stdout + ran.stderr)[-TAIL:]
 ```
 
-This is the part worth being deliberate about. You could ask the agent to run the tests and
-tell you how it went. Running them yourself means the flow's decisions rest on an exit code
-rather than on a report, and the exit code cannot be optimistic.
+You could ask the agent to run the tests and tell you how it went. Running them yourself rests
+the flow's decisions on an exit code, and an exit code cannot be optimistic.
 
 ## Step 5 — write the loop
 
@@ -219,17 +216,16 @@ def run(agents: Agents, task: str) -> None:
 
 Four decisions are packed into those fifteen lines.
 
-**`agents.builder.new()` sits outside the loop.** That opens one session and keeps it, so the
-builder remembers every round. **`agents.reviewer(...)` inside the loop** calls the agent
-rather than a session, which opens a fresh conversation each time: the reviewer reads the
-repository, never the builder's account of it.
+**`agents.builder.new()` sits outside the loop,** so the builder keeps one session and
+remembers every round. **`agents.reviewer(...)` inside it** calls the agent rather than a
+session, which opens a fresh conversation each time: the reviewer reads the repository, never
+the builder's account of it.
 
-**A red suite never reaches the reviewer.** It becomes the builder's next prompt instead. The
-reviewer's turn is expensive and there is nothing to review while the tests are failing.
+**A red suite never reaches the reviewer.** It becomes the builder's next prompt instead.
 
-**`suppress=True` means a failed turn answers with `""`** instead of raising. A loop meant to
-run for hours should survive one rate limit. The `if not working(...)` line catches that case
-and takes the round again rather than testing a tree nobody wrote to.
+**`suppress=True` means a failed turn answers with `""`** instead of raising, so one rate limit
+does not end a loop meant to run for hours; `if not working(...)` takes the round again rather
+than testing a tree nobody wrote to.
 
 **The loop ends on `review.good`,** a boolean the reviewer filled in — not on a phrase in a
 paragraph.
@@ -261,8 +257,8 @@ hmz exec -f checked_build \
 ```
 
 `-f checked_build` finds the flow by name, because `.humanize/flows/` is the first place
-humanize looks. A cheap fast model builds and a stronger one reviews, which is usually the
-right way round: reviewing is the harder judgement and it is one turn per round.
+humanize looks. A cheap fast model builds and a stronger one reviews, which is the right way
+round: reviewing is the harder judgement, and it is one turn per round.
 
 The run ends by itself, printing the review it ended on:
 
@@ -310,27 +306,26 @@ def from_roman(s: str) -> int:
 ```
 
 Note `to_roman(n) != s` on the last line. Greedy descent alone would accept `IIII` and `VV`;
-round-tripping through the existing function is what makes "canonical" mean something. That is
-the kind of thing the reviewer's turn is for.
+round-tripping through the existing function is what makes "canonical" mean something — the
+kind of thing the reviewer's turn is for.
 
 ## What to change
 
-**Swap `pytest` for whatever your project uses.** `suite()` is one `subprocess.run`. Point it
-at `npm test`, `cargo test`, `go test ./...`, or a shell script that runs all three.
+**Swap `pytest` for what your project uses.** `suite()` is one `subprocess.run`. Point it at
+`npm test`, `cargo test`, `go test ./...`, or a script that runs all three.
 
-**Gate on more than tests.** Add a linter to `suite()` and hand the agent both outputs.
-Anything you can run is something the loop can hold the agent to, and holding it to a command
-is stronger than asking it in a prompt.
+**Gate on more than tests.** Add a linter to `suite()` and hand the agent both outputs. Holding
+an agent to a command is stronger than asking it in a prompt.
 
 **Give the flow settings of its own.** A third argument annotated with a pydantic model turns
 into fields on `/config` and lines in a `-c setup.yaml` file. See [A flow with settings of its
 own](/weaver/flow-settings).
 
 **Stop it running for ever.** This loop has no round limit. Adding one is two lines, and
-[testing a flow](/weaver/testing-flows) shows how to check it without spending a turn.
+[testing a flow](/weaver/testing-flows) checks it without spending a turn.
 
 ## Next
 
-That flow has one loop and two agents. The last tutorial has four kinds of agent, several turns
-running at once, and a problem where nothing can tell you whether the answer is right: [Four
-agents on a maths problem](/weaver/tutorials/prove).
+The other weaver tutorial has four kinds of agent, several turns running at once, and a problem
+where nothing can tell you whether the answer is right: [Four agents on a maths
+problem](/weaver/tutorials/prove).
