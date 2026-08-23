@@ -23,14 +23,23 @@ asking what to say next, and what they answer with is what they typed:
 ```python
 conversation = agents.assistant.new()
 said = task
+opening = True
 while said:
-    answered = conversation(said, suppress=True)
+    answered = conversation(said, suppress=not opening)
+    opening = False
     said = agents.human(answered)
 ```
 
 Which is why the same flow works with nobody at a prompt. Run from a command line the person
 answers with nothing, the loop ends, and `chat` has done the one thing it was given. `/afk` and
 a shell script are the same thing to it, and that is deliberate.
+
+**The first turn is the one that fails out loud.** A conversation that could not be started at
+all — an account the backend refused, a model it will not run for that account — ends the run
+with what the backend said about it. Suppressed it would answer with nothing, which is what the
+loop above reads as a conversation that is over: the run would exit as though the one thing it
+was asked for had been done. Every turn after the first is forgiving, because by then there is
+a conversation to carry on.
 
 A line typed **while a turn is running** goes into that turn rather than becoming another one —
 that is true under any flow, and [Steering](/features/steering) is how.
