@@ -223,6 +223,3 @@ __marimo__/
 
 .humanize/
 *.trace.json
-
-# The concurrency rig writes its workspaces, mock target and results here.
-bench/*/lab/
