@@ -1,6 +1,6 @@
 # humanize
 
-![humanize](https://socialify.git.ci/humanfia/humanize2/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2Fhumanfia%2Fhumanize2%2Fraw%2Frefs%2Fheads%2Fmain%2Fdocs%2Fpublic%2Flogo.svg&name=1&owner=1&pattern=Circuit+Board&pulls=1&stargazers=1&theme=Auto)
+![humanize](https://socialify.git.ci/humanfia/humanize2/image?description=1&font=Raleway&forks=1&issues=1&logo=https%3A%2F%2Fraw.githubusercontent.com%2Fhumanfia%2Fhumanize2%2Frefs%2Fheads%2Fmain%2Fdocs%2Fpublic%2Flogo.svg&name=1&owner=1&pattern=Circuit+Board&pulls=1&stargazers=1&theme=Auto)
 
 [![CI](https://github.com/humanfia/humanize2/actions/workflows/ci.yml/badge.svg)](https://github.com/humanfia/humanize2/actions/workflows/ci.yml)
 [![docs](https://github.com/humanfia/humanize2/actions/workflows/build-docs.yml/badge.svg)](https://docs.humanfia.ai/humanize2/)
