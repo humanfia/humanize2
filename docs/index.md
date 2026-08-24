@@ -15,7 +15,7 @@ import { withBase } from 'vitepress'
 ## Run a flow
 
 ::: warning Use a scratch directory
-humanize runs every agent with permission prompts disabled. An agent under it edits files
+humanize runs every agent with permission prompts disabled: an agent under it edits files
 without asking. Do this in a throwaway git repository, and read [Security](/user/security)
 before you point it at work you care about.
 :::
@@ -26,99 +26,112 @@ already log in.
 
 ```sh
 pip install git+https://github.com/humanfia/humanize2.git
-hmz --version
 ```
 
-### Name an agent
-
-An agent is written `cli/model:effort` — the CLI that runs the turn, the model it asks for, and
-how hard that model should think. Put yours in a shell variable, and every command below is one
-you can paste:
-
-```sh
-AGENT=claude/claude-opus-4-8:high
-```
-
-| CLI | Write it as |
-| --- | --- |
-| Claude Code | `claude/claude-opus-4-8:high` |
-| Codex | `codex/gpt-5.6-sol:high` |
-| Kimi Code | `kimi/kimi-code/k3:high` |
-| Qwen Code | `qwen/qwen3-coder-plus:high` |
-| Grok Build | `grok/grok-4.6:high` |
-| Antigravity CLI | `agy/gemini-3.7-flash-high:high` |
-| pi | `pi/openai-codex/gpt-5.6-luna:high` |
-| opencode | `opencode/opencode/big-pickle:high` |
-| mimocode | `mimo/mimo/mimo-auto:high` |
-| ZCode | `zcode/zai/glm-5.3:high` |
-| DeepSeek Harness | `dsh/deepseek-v4-flash:high`, with `export DEEPSEEK_API_KEY=sk-…` |
-
-Those are examples, not a fixed list, and not every backend humanize drives is in it — [Many
-backends, one agent](/features/backends) is all of them against what a flow may ask of each. A
-model id is whatever that CLI shipped this week, and which ones you may name depends on the
-account you are logged in as — `pi`, `opencode`, `mimo` and `zcode` write a model as
-`provider/id`, which is the extra slash in their rows. To see what yours offers, open `/flow`
-in the interface and turn to its agents. Get the id wrong and the backend says so on the first
-turn:
-
-```console
-[claude-code:unrecognized_model] {"model":"not-a-real-model","query_source":"sdk"}
-```
-
-### Say something
+Then make something for it to fix. `calc.py` subtracts where it should add, and that bug is the
+work:
 
 ```sh
 mkdir -p ~/tmp/humanize-demo && cd ~/tmp/humanize-demo && git init -q
 printf 'def add(a, b):\n    return a - b\n' > calc.py
 git add -A && git commit -qm "a calculator with a bug in it"
-hmz
 ```
 
-`calc.py` subtracts where it should add — that bug is the work. `hmz` is the only way into the
-terminal interface; there is no `hmz tui`. Type a line and press enter, and the agent takes a
-**turn**: one exchange with the model, which may run tools and may take minutes.
+Both ways below run the same flow, `ralph_loop`: it gives the agent the same task over and over
+in a fresh conversation each time, so it restarts from the task and the repository rather than
+from a context window full of its own earlier attempts. Pick the tab for the CLI you have.
 
-| While a turn is running | |
-| --- | --- |
-| Type another line | It goes *into* the turn rather than starting a new one — [Talking to a running turn](/user/steering) |
-| `/details` | Show the tool calls and the thinking, or only what the agent says |
-| `/status` | Who is working, who handed to whom, and what it has cost |
-| `/` | Every command, with a line about each; **tab** takes the highlighted one |
+### At the prompt
 
-Underneath, humanize is running a **flow** called `chat` — one agent, one conversation, and
-every line you type is the next turn of it. `/exit` leaves. The run is [held apart from this
-terminal](/reference/daemon), so it goes on running if you say to leave it, which is what
-`/detach` says outright.
+::: code-group
 
-### Run it unattended
-
-```sh
-hmz exec -f chat -a "$AGENT" "What does calc.py do?"
+```sh [Claude Code]
+hmz -f ralph_loop -a claude/claude-opus-4-8:high
 ```
 
-`-f` names the flow, `-a` describes one agent and is repeated once for every agent the flow
-drives in the order the flow takes them, and the last argument is the task. Get the count wrong
-and humanize refuses before any agent runs, rather than failing hours in:
-
-```console
-$ hmz exec -f official/rlar -a claude/claude-opus-4-8:high "fix the build"
-hmz exec: error: official/rlar: the flow drives 2 agents, 1 given
+```sh [Codex]
+hmz -f ralph_loop -a codex/gpt-5.6-sol:high
 ```
 
-### Put a loop around it
-
-A **Ralph loop** gives the agent the same task over and over, in a fresh conversation each
-time, so it restarts from the task and the repository instead of from a context window full of
-its own earlier attempts.
-
-```sh
-hmz exec -f ralph_loop -a "$AGENT" "Fix the bug in calc.py."
+```sh [Antigravity CLI]
+hmz -f ralph_loop -a agy/gemini-3.7-flash-high:high
 ```
 
-::: warning A Ralph loop does not stop on its own
-That is what it is for — you leave one running for hours. Press **ctrl+c** twice when you have
-seen enough. Every round is written down, so stopping loses nothing.
+```sh [Qwen Code]
+hmz -f ralph_loop -a qwen/qwen3-coder-plus:high
+```
+
+```sh [Kimi Code]
+hmz -f ralph_loop -a kimi/kimi-code/k3:high
+```
+
+```sh [Grok Build]
+hmz -f ralph_loop -a grok/grok-4.6:high
+```
+
+```sh [ZCode]
+hmz -f ralph_loop -a zcode/zai/glm-5.3:high
+```
+
 :::
+
+That opens the terminal interface, set up and waiting. Type the task and press enter:
+
+```
+Fix the bug in calc.py.
+```
+
+The agent takes a **turn** — one exchange with the model, which may run tools and may take
+minutes — and then the loop gives it the same task again. Type another line while it is working
+and it goes *into* the running turn rather than starting a new one. `/` lists every command,
+**ctrl+c** twice stops the loop, and `/exit` leaves.
+
+### Or without the interface
+
+The same flow, the same agent, with the task on the line instead:
+
+::: code-group
+
+```sh [Claude Code]
+hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "Fix the bug in calc.py."
+```
+
+```sh [Codex]
+hmz exec -f ralph_loop -a codex/gpt-5.6-sol:high "Fix the bug in calc.py."
+```
+
+```sh [Antigravity CLI]
+hmz exec -f ralph_loop -a agy/gemini-3.7-flash-high:high "Fix the bug in calc.py."
+```
+
+```sh [Qwen Code]
+hmz exec -f ralph_loop -a qwen/qwen3-coder-plus:high "Fix the bug in calc.py."
+```
+
+```sh [Kimi Code]
+hmz exec -f ralph_loop -a kimi/kimi-code/k3:high "Fix the bug in calc.py."
+```
+
+```sh [Grok Build]
+hmz exec -f ralph_loop -a grok/grok-4.6:high "Fix the bug in calc.py."
+```
+
+```sh [ZCode]
+hmz exec -f ralph_loop -a zcode/zai/glm-5.3:high "Fix the bug in calc.py."
+```
+
+:::
+
+`-f` names the flow and `-a` names one agent, written `cli/model:effort` — the CLI that runs
+the turn, the model it asks for, and how hard that model should think. A Ralph loop does not
+stop on its own, which is what it is for: **ctrl+c** at the command line when you have seen
+enough. Every round is written down, so stopping loses nothing.
+
+Either way, check the work:
+
+```sh
+git diff
+```
 
 ```diff
  def add(a, b):
@@ -126,41 +139,23 @@ seen enough. Every round is written down, so stopping loses nothing.
 +    return a + b
 ```
 
-It made that edit with **no permission prompt**. There is no setting that turns them back on.
+It made that edit with **no permission prompt**, and there is no setting that turns them back
+on. That is the one thing to have understood before pointing this at a real repository.
 
-### Read the whole run back
+::: details The model id is wrong, or your CLI is not above
+A model id is whatever that CLI shipped this week, and which ones you may name depends on the
+account you are logged in as. Open `/flow` in the interface and turn to its agents: humanize
+asks each CLI once and keeps the answer. Every backend it drives, including the ones not in
+those tabs, is in [Many backends, one agent](/features/backends);
+[Installation](/user/installation) is how to sign each one in.
+:::
 
-Every run writes down what it was: the flow, the agents, and the id of every conversation they
-opened. Turn that plus the backends' own transcripts into one timeline:
-
-```sh
-hmz trace collect
-```
-
-```console
-~/.humanize/epics/-tmp-humanize-demo/20260817T021608.271Z-e000e6/traces/20260817T022635Z.trace.json of 20260817T021608.271Z-e000e6: 15 sessions, 240 slices
-```
-
-Drag that file into [ui.perfetto.dev](https://ui.perfetto.dev). Each agent becomes a process,
-each of its conversations a track, and each slice one thing the agent did — with the prompt,
-the reasoning, the tool input and the tool output attached. For a nine-hour run it is the only
-view that fits on a screen.
-
-| What you now know | |
-| --- | --- |
-| **turn** | One exchange with the model |
-| **session** | A conversation held across turns |
-| **flow** | A directory of Python driving one or more agents |
-| **epic** | One run of a flow, written down under `~/.humanize/epics/` |
-| `hmz` | The interface |
-| `hmz exec -f FLOW -a CLI/MODEL:EFFORT "task"` | The same flows, unattended |
-| `hmz trace collect` | The run as a timeline |
-
-**Next.** The [User Guide](/user/) has a page per thing humanize does, and its tutorials each
-take a real piece of work from start to finish: [Beat a benchmark](/user/tutorials/take-home),
-[Port a project](/user/tutorials/port-a-project), and [Build a coding
-agent](/user/tutorials/build-an-agent). For the words above, properly defined, read
-[Concepts](/user/concepts).
+**Next.** [`hmz trace collect`](/user/tracing) turns the whole run into one timeline you can
+open in Perfetto. The [User Guide](/user/) has a page per thing humanize does, and its
+tutorials each take a real piece of work start to finish: [Beat a
+benchmark](/user/tutorials/take-home), [Port a project](/user/tutorials/port-a-project), and
+[Build a coding agent](/user/tutorials/build-an-agent). For the words above, properly defined,
+read [Concepts](/user/concepts).
 
 ## Weave a flow
 

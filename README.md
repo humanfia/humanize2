@@ -50,9 +50,9 @@ npm install --global @deepseek-ai/dsh
 dsh web
 ```
 
-Needs Python ≥ 3.12 and at least one supported backend: `agy`, `claude`, `codex`, `grok`,
-`kimi`, `pi`, `qwen`, `opencode`, `mimo` or `zcode` on your PATH — or none of them, since
-DeepSeek Harness arrives with humanize. See
+Needs Python ≥ 3.12 and at least one supported backend: `agy`, `claude`, `codex`,
+`cursor-agent`, `grok`, `kimi`, `pi`, `qwen`, `opencode`, `mimo` or `zcode` on your PATH — or
+none of them, since DeepSeek Harness arrives with humanize. See
 [Installation](https://docs.humanfia.ai/humanize2/user/installation).
 
 ## Usage

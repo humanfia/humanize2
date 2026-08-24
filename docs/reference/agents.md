@@ -139,7 +139,8 @@ it finds out the account went down, how many times it was tried, and where the t
 Two edges worth knowing. A model is the account's: a chain that lands on an account whose
 catalogue does not hold this agent's model fails for a second, unrelated reason, and moving an
 agent's account is not moving its model. And whatever the agent was holding open — a Claude
-process, a Codex server, a dsh runtime — was started as the account it has left, so it is let
+process, a Codex server, a DeepSeek Harness runtime — was started as the account it has left,
+so it is let
 go of as the agent moves and the next turn opens one as whoever the agent now is.
 
 ## A CLI of your own

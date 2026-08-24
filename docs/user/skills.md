@@ -46,8 +46,9 @@ down in `hmz.backends`:
 
 Each backend's own home moves where that backend's variable moves it: `CODEX_HOME`,
 `KIMI_CODE_HOME`, `GROK_HOME` and the rest. opencode and mimocode keep their skills beside
-their configuration rather than their data, so theirs move with `XDG_CONFIG_HOME`. `agy` and
-`zcode` have no variable of their own, so what moves their home is the home itself. `dsh` keeps
+their configuration rather than their data, so theirs move with `XDG_CONFIG_HOME`. Antigravity
+CLI and ZCode have no variable of their own, so what moves their home is the home itself.
+DeepSeek Harness keeps
 none: its command line reads skill directories, and the SDK humanize drives does not.
 
 The same list from Python:
@@ -105,8 +106,9 @@ else maintains is one that keeps up.
 | `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen`, `zcode` | `.agents/skills/`, the directory more than one of these agreed to read |
 | `agy`, `dsh`, `pi` | — none: they carry what their CLI installs, and nothing else |
 
-The three given none read no such directory the way humanize drives them. `dsh`'s SDK reads
-none at all; `agy` is run as `--print` and opens no project to read one from; `pi` reads the
+The three given none read no such directory the way humanize drives them. DeepSeek Harness's
+SDK reads none at all; Antigravity CLI is run as `--print` and opens no project to read one
+from; pi reads the
 workspace's only for a project somebody has approved. A skill copied there would be one no turn
 of that flow would ever load, which is worse than none.
 

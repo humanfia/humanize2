@@ -207,7 +207,7 @@ mirror this directory has never heard of.
 
 ::: details `0 sessions, 0 slices`
 Three usual reasons. You are in a different directory from the one the run happened in. The
-backend was `opencode` or `mimocode`, which keep sessions in a database and have nothing to
+backend was opencode or mimocode, which keep sessions in a database and have nothing to
 gather. Or the run being traced died before it opened a session. See
 [Troubleshooting](/user/troubleshooting#_0-sessions-0-slices).
 :::

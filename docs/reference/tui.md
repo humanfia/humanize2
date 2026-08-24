@@ -597,8 +597,9 @@ CLI lets go of the model**, which belonged to the CLI before it.
 
 **The arrows step a row that is a rung in an order** — the effort, what it may do, swarm mode,
 whether goals are available, whether it may search the web. Everything else opens a sheet of its
-own and comes back. `web search` is a row only for a CLI that can be told: claude, codex, grok,
-qwen, opencode, mimo and zcode. A switch for something the backend would go on doing either
+own and comes back. `web search` is a row only for a CLI that can be told: Claude Code, Codex,
+Grok Build, Qwen Code, opencode, mimocode and ZCode. A switch for something the backend would
+go on doing either
 way is a switch that lies, so for every other CLI the question is not put. `where` is
 a row only for an agent [the flow says may be pointed at a machine](#where-each-agent-works);
 for one the flow put in a container it is read rather than opened, and for one that works here
