@@ -14,16 +14,16 @@ dependencies = [
     # DeepSeek Harness is driven through its own Python SDK, which also brings the runtime
     # its turns are taken on. An ordinary dependency rather than an extra: a backend humanize
     # drives is not a thing an install should be able to have half of.
-    "deepseek-harness-sdk>=0.1.0rc6,<0.2",
+    "deepseek-harness-sdk>=0.1.1rc1,<0.2",
     # A flow says what it can be configured with by declaring a model, and the menu that
     # asks is read off that model: the types, the bounds and the combinations a flow
     # refuses are all written once, where the flow declares them.
     "psutil>=7.2.2",
-    "pydantic>=2.9",
+    "pydantic>=2.13.5",
     "pyfiglet>=1.0",
     # dsh reads a project's `.env` the way its own CLI does, and reading one is somebody
     # else's solved problem.
-    "python-dotenv>=1.1",
+    "python-dotenv>=1.2.3",
     "pyyaml>=6.0.3",
     # Named because the interface imports it directly. It arrives with textual either
     # way, but a dependency you import is one you declare.
@@ -32,7 +32,7 @@ dependencies = [
     # stack nobody sees is a bug nobody fixes. Off until somebody says otherwise, and an
     # ordinary dependency rather than an extra: an install that could be missing the half
     # that reports its own failures is an install whose failures are not reported.
-    "sentry-sdk>=2.20",
+    "sentry-sdk>=2.68.1",
     "textual>=8.2.8",
 ]
 
@@ -45,12 +45,12 @@ Issues = "https://github.com/humanfia/humanize2/issues"
 hmz = "hmz.cli:main"
 
 [build-system]
-requires = ["uv_build>=0.12.3,<0.13.0"]
+requires = ["uv_build>=0.12.7,<0.13.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4",
+    "pre-commit>=4.6.2",
     "pyright>=1.1.411",
     "pytest>=8",
     "pytest-asyncio>=1.4.0",
@@ -58,8 +58,8 @@ dev = [
     "pytest-timeout>=2.3",
     # Exercises dsh's dotenv-compatible native configuration without making the SDK
     # itself part of every development environment.
-    "python-dotenv>=1.1",
-    "ruff>=0.16.2",
+    "python-dotenv>=1.2.3",
+    "ruff>=0.16.5",
 ]
 
 [tool.pytest.ini_options]
