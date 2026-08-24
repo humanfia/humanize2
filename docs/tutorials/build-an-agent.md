@@ -8,7 +8,7 @@ The three phases are three separate flows. That is the point of them: each is se
 own, stops on its own, and hands the next one a file rather than a conversation.
 
 ::: tip Before you start
-Finish the [Quickstart](https://github.com/humanfia/humanize2/blob/main/docs/tutorials/quickstart.md). The third phase needs a builder that can run
+Finish the [Quickstart](quickstart.md). The third phase needs a builder that can run
 permission hooks, which today means `claude` or `codex`; the first two run on anything,
 including DeepSeek Harness.
 :::
