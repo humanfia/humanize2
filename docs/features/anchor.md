@@ -48,7 +48,7 @@ Every trapped call is one of three questions, and the router answers them indepe
 | | |
 | --- | --- |
 | **Paths** | A directory on this machine — the mirror — stands for a path on the target. By default the two are spelled identically, so the agent genuinely believes it is working on the target. |
-| **Programs** | Everything the agent spawns runs on the target, except the agent's own runtime: its binary and its re-execs stay here. |
+| **Programs** | Everything the agent spawns runs on the target, except the agent's own runtime: its launcher, interpreter, native binary, runtime helpers and re-execs stay here. |
 | **Redirects** | A path the agent names may be answered with another one — the credentials of the [account](/features/accounts) a turn runs as, rather than whichever account this machine is signed into. What it is answered with is local, so it never reaches the target either. |
 
 ## The mirror, and why writes are whole files
@@ -75,7 +75,8 @@ there kills its local counterpart the same way.
 
 ## What never leaves this machine
 
-- the agent's own executable, and its re-execs
+- the agent's own runtime executables and re-execs — for an npm-installed Codex, that includes
+  Node, the native CLI and its code-mode host
 - its state directory — the known CLIs are known by name, and any other agent keeping state
   inside the workspace has to be named
 - anything a path is answered with, and the paths that answer it: an agent run as somebody

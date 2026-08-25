@@ -1,9 +1,9 @@
 """Knowing which files belong to the agent rather than to the project.
 
-An agent's own binary, its bundled helpers and its state directory live on
-this machine and must keep working here: rerouting ``~/.codex`` to the target
-would lose the session, and rerouting the agent's own executable would make it
-impossible to start.  Everything else the agent touches belongs to the target.
+An agent's own runtime and state directory live on this machine and must keep
+working here: rerouting ``~/.codex`` to the target would lose the session, and
+rerouting one of the agent's runtime executables would make it impossible to
+start or use its tools.  Everything else the agent touches belongs to the target.
 """
 
 from __future__ import annotations
@@ -97,6 +97,8 @@ COMMON_STATE_PATHS: tuple[str, ...] = (
     "~/.config/humanize",
 )
 
+_CODEX_VENDOR_BIN = os.path.join("vendor", "x86_64-unknown-linux-musl", "bin")
+
 
 @dataclass(slots=True)
 class ResolvedAgent:
@@ -137,14 +139,15 @@ def resolve(command: list[str]) -> ResolvedAgent:
     local_paths = [
         _expand(path) for path in (*profile.state_paths, *COMMON_STATE_PATHS)
     ]
-    # Only the agent's own executable stays here -- enough for it to start and
-    # to re-exec itself.  Bundled helpers such as ripgrep deliberately go to
-    # the target: running them against the partly materialised mirror would
-    # return quietly wrong answers, which is worse than a visible failure.
+    # Only the agent's own runtime stays here. Work helpers such as ripgrep
+    # deliberately go to the target: running them against the partly materialised
+    # mirror would return quietly wrong answers, which is worse than a visible failure.
     local_programs = [located, program]
-    interpreter = _shebang_interpreter(program)
-    if interpreter:
-        local_programs.append(interpreter)
+    shebang = _shebang(program)
+    if shebang:
+        local_programs.append(shebang[0])
+    if profile.name == "codex":
+        local_programs.extend(_codex_runtime_programs(program, shebang))
 
     return ResolvedAgent(
         profile=profile,
@@ -159,14 +162,53 @@ def _expand(path: str) -> str:
     return os.path.normpath(os.path.expanduser(path))
 
 
-def _shebang_interpreter(program: str) -> str | None:
-    """Return the interpreter of a ``#!`` script, so its re-exec stays local."""
+def _shebang(program: str) -> tuple[str, ...]:
+    """Return the command naming a script's interpreter."""
     try:
         with open(program, "rb") as handle:
             first = handle.readline(256)
     except OSError:
-        return None
+        return ()
     if not first.startswith(b"#!"):
-        return None
-    parts = first[2:].decode("utf-8", "replace").strip().split()
-    return parts[0] if parts else None
+        return ()
+    return tuple(first[2:].decode("utf-8", "replace").strip().split())
+
+
+def _codex_runtime_programs(program: str, shebang: tuple[str, ...]) -> list[str]:
+    """Return the Node, native CLI and code-mode host that implement Codex."""
+    programs: list[str] = []
+    node = next((part for part in shebang if os.path.basename(part) == "node"), None)
+    if node:
+        found = shutil.which(node) if os.path.sep not in node else node
+        if found and os.path.exists(found):
+            programs.extend((os.path.abspath(found), os.path.realpath(found)))
+
+    package = os.path.dirname(os.path.dirname(program))
+    candidates = [
+        program,
+        os.path.join(package, _CODEX_VENDOR_BIN, "codex"),
+        os.path.join(
+            package,
+            "node_modules",
+            "@openai",
+            "codex-linux-x64",
+            _CODEX_VENDOR_BIN,
+            "codex",
+        ),
+        os.path.join(
+            os.path.dirname(package),
+            "codex-linux-x64",
+            _CODEX_VENDOR_BIN,
+            "codex",
+        ),
+    ]
+    for candidate in candidates:
+        if os.path.basename(candidate) != "codex" or not os.path.isfile(candidate):
+            continue
+        native = os.path.realpath(candidate)
+        programs.extend((os.path.abspath(candidate), native))
+        for directory in {os.path.dirname(candidate), os.path.dirname(native)}:
+            host = os.path.join(directory, "codex-code-mode-host")
+            if os.path.isfile(host):
+                programs.extend((os.path.abspath(host), os.path.realpath(host)))
+    return programs

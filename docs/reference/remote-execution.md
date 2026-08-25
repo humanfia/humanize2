@@ -83,13 +83,14 @@ the agent once it exits, and when the session ends nothing it started is left ru
   target, and again when the session ends.
 - **Structural changes.** Creating, removing, renaming, linking and changing permissions are
   replayed on the target first, so the target's error is what the agent sees.
-- **Commands.** Everything the agent spawns, including helpers bundled with the agent itself, in
+- **Commands.** Everything the agent spawns, including bundled work helpers such as ripgrep, in
   the target's copy of the working directory.
 - **Network.** Whatever those commands reach.
 
 ## What stays on this machine
 
-- The agent's own executable and its re-execs.
+- The agent's own runtime executables and re-execs. For an npm-installed Codex, that includes
+  Node, the native CLI and its code-mode host.
 - Its state directory. All ten known CLIs are known by name — `agy`, `claude`, `codex`, `dsh`,
   `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen` — as is humanize's own `~/.humanize`; any
   other agent keeping state inside the workspace has to be named with `--local-path`.
