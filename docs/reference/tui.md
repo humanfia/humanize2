@@ -149,6 +149,7 @@ list appears under the editor with a line about each.
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent, marked as it works, with the handovers between them drawn as the arrows joining them. Enter reads an agent. **esc** opens it. |
+| `/btw` | `<question>` | Asks a side question about the running flow from a read-only snapshot of its progress. It runs in a separate session and never steers the flow. |
 | `/details` | `[on\|off]` | Shows or hides everything a turn did on the way to its answer: tool calls, thinking, and whatever a backend printed on its way past. One question — how much of the working to show — so one switch. **Off** to begin with. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
 | `/fallback` | | Where a turn goes when what was taking it cannot: an agent that has nowhere left to run, and an account that has gone down. See [below](#where-a-turn-goes-when-it-cannot-be-taken). |

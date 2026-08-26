@@ -21,6 +21,7 @@ These are for looking things up. If you have not used humanize before, the
 | | |
 | --- | --- |
 | [Talking to a running turn](/guide/steering) | A line typed mid-turn goes *into* it, not after it |
+| [Side questions](/guide/btw) | `/btw`: ask about progress without steering the flow |
 | [Many conversations at once](/guide/conversations) | One transcript, **tab** between the agents that are working |
 | [Showing the working](/guide/details) | `/details`: tool calls and thinking, or only what the agent says |
 | [The shape of a run](/guide/status) | `/status`: who is working, who handed to whom, what it cost |

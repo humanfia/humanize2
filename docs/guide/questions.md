@@ -203,6 +203,7 @@ agent.hooks.on(Moment.NOTIFICATION, lambda occasion: ring_a_bell(occasion.said))
 
 ## See also
 
+- [Side questions](/guide/btw)
 - [Being away](/guide/afk)
 - [Answers in a shape](/guide/shapes)
 - [The person as an agent](/guide/human-agent)

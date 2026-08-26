@@ -63,6 +63,7 @@ from hmz import telemetry
 from hmz.runner import flow_and_agents
 from hmz.settings import Settings
 
+from .btw import AgentProgress, FlowSnapshot, Observation, compact, format_snapshot
 from .complete import about, hinted, offered, takes
 from .discover import installable, installed
 from .history import History
@@ -109,6 +110,7 @@ if TYPE_CHECKING:
 #: run left behind is `/cycles`, which is where the runs of this directory are.
 _OWN = (
     "flow",
+    "btw",
     "flowverses",
     "agents",
     "providers",
@@ -172,6 +174,20 @@ _WHO, _WHAT, _WHERE = 0, 1, 2
 
 #: The flow the interface opens on, which is the one that is only talking to one agent.
 _STARTS_ON = "chat"
+
+#: How much live activity a side question may carry into its isolated context, and how many
+#: side questions may have model turns open at once. Both are bounds on optional observation:
+#: a day-long flow and a pasted row of questions must not grow the interface without limit.
+_BTW_EVENTS = 80
+_BTW_ACTIVE = 4
+
+
+def _quiet_watch(
+    _agent: AgentBase,
+    _session: SessionBase | None,
+    _event: Event,
+) -> None:
+    """Consumes a side agent's events so backend output stays out of the main transcript."""
 
 
 def _where() -> str:
@@ -580,7 +596,20 @@ class Humanize(App[None]):
         for agent in self._agents:
             agent.stop()
         self._agents = []
+        self._close_btw()
         self.exit()
+
+    def _close_btw(self) -> None:
+        """Closes the optional side sessions without touching any flow session."""
+        with self._btw_lock:
+            self._btw_closed = True
+            self._btw_generation += 1
+            held = [session for _, session in self._btw_active.values()]
+            self._btw_active.clear()
+            self._btw_running.clear()
+        for session in held:
+            with contextlib.suppress(Exception):
+                session.close()
 
     def action_interrupt(self) -> None:
         """Takes back the nearest thing there is to take back, on a press or two or three.
@@ -703,6 +732,19 @@ class Humanize(App[None]):
         #: reads the agents' own logs into it while it runs.
         self._monitor = Monitor()
         self._tally = Tally([], self._monitor)
+        #: The task of the run in front of us and a bounded plain record of what its agent
+        #: streams have said. `/btw` reads these once, as a snapshot; it never reaches into a
+        #: flow's conversations for context, because doing that would make the side question a
+        #: turn of the flow. The same lock holds the side sessions, since their threads add and
+        #: remove them while the interface thread may close them on the way out.
+        self._flow_task = ""
+        self._btw_events: deque[Observation] = deque(maxlen=_BTW_EVENTS)
+        self._btw_active: dict[int, tuple[AgentBase, SessionBase]] = {}
+        self._btw_running: set[int] = set()
+        self._btw_lock = threading.Lock()
+        self._btw_serial = 0
+        self._btw_generation = 0
+        self._btw_closed = False
         #: Whether what a turn did on its way to an answer -- the tools it used, the thinking
         #: it did aloud, whatever it printed on its way past -- is shown, which `/details`
         #: toggles. Off, because a flow is watched to see where it has got to: what the
@@ -985,8 +1027,21 @@ class Humanize(App[None]):
 
         Only with `/details` on. What a backend writes on its way past is the working rather
         than the answer -- the same thing its tool rows and its thinking are -- and a flow
-        watched to see where it has got to is one where all of that is in the way.
+        watched to see where it has got to is one where all of that is in the way. The raw
+        line is still retained in the bounded `/btw` snapshot when details are off.
         """
+        if event.text.strip():
+            # Flow-owned progress (for example, a Ralph round counter) is useful to `/btw`
+            # even when `/details` keeps it out of the visible transcript.
+            with self._btw_lock:
+                self._btw_events.append(
+                    Observation(
+                        agent="",
+                        kind="flow",
+                        text=compact(event.text),
+                        at=time.monotonic(),
+                    )
+                )
         if event.text.strip() and self._details:
             for line in escape(event.text.rstrip("\n")).splitlines():
                 self.show(f"[dim]  {_CAME_BACK}  {line}[/]")
@@ -1701,6 +1756,8 @@ class Humanize(App[None]):
             self.action_quit()
         elif name == "clear":
             self.action_clear()
+        elif name == "btw":
+            self.action_btw(" ".join(argv).strip())
         elif name == "flow":
             self.action_flow(argv[0] if argv else "")
         elif name == "agents":
@@ -1742,6 +1799,274 @@ class Humanize(App[None]):
         else:
             telemetry.snag("unknown-command", length=len(name))
             self.show(f"hmz: no such command: /{name}", "red")
+
+    def action_btw(self, question: str = "") -> None:
+        """Answers a side question from a frozen flow snapshot.
+
+        A side question must never become a steer. It is answered by a short-lived clone of
+        one of the flow's coding agents, with read-only permissions and no flow skills, while
+        the primary sessions continue on their own threads. The prompt contains the runtime
+        observations collected by :meth:`_heard`, so the clone does not need to inspect or
+        lock the primary conversation.
+
+        Args:
+          question: What to ask, without the ``/btw`` command name.
+        """
+        question = " ".join(question.split())
+        if not question:
+            self.show("hmz: usage: /btw <question>", "red")
+            return
+        if not self._agents:
+            self.show("hmz: /btw needs a flow that is running", "red")
+            return
+        candidates = self._btw_candidates()
+        if not candidates:
+            self.show(
+                "hmz: /btw needs a coding agent that supports read-only turns", "red"
+            )
+            return
+        with self._btw_lock:
+            if self._btw_closed:
+                return
+            if len(self._btw_running) >= _BTW_ACTIVE:
+                self.show(
+                    f"hmz: /btw already has {_BTW_ACTIVE} questions in progress", "red"
+                )
+                return
+            self._btw_serial += 1
+            request = self._btw_serial
+            generation = self._btw_generation
+            self._btw_running.add(request)
+        try:
+            snapshot = self._btw_snapshot()
+            prompt = format_snapshot(snapshot, question)
+        except Exception as why:  # noqa: BLE001 -- an observation failure must not break the UI
+            with self._btw_lock:
+                self._btw_running.discard(request)
+            self.show(f"hmz: /btw could not read flow progress: {why}", "red")
+            return
+        self.show(f"[dim]btw: checking the flow for {escape(question)}…[/dim]")
+        worker = threading.Thread(
+            target=self._run_btw,
+            args=(request, question, prompt, tuple(candidates), generation),
+            daemon=True,
+            name=f"humanize-btw-{request}",
+        )
+        try:
+            worker.start()
+        except RuntimeError as why:
+            with self._btw_lock:
+                self._btw_running.discard(request)
+            self.show(f"hmz: /btw could not start: {why}", "red")
+
+    def _btw_snapshot(self) -> FlowSnapshot:
+        """Copies the current run into a prompt-sized, immutable observation."""
+        from hmz.agents import HumanAgent
+
+        shape = self._monitor.shape()
+        driven = tuple(self._agents)
+        named = self._named_by
+        agents = tuple(
+            (
+                at,
+                AgentProgress(
+                    agent=agent.id,
+                    model=agent.config.model,
+                    turns=shape.turns.get(agent.id, 0),
+                    working=agent.id in shape.working,
+                ),
+            )
+            for at, agent in enumerate(driven)
+            if not isinstance(agent, HumanAgent)
+            if agent.id
+        )
+        handovers = tuple(
+            sorted(
+                (
+                    sender,
+                    receiver,
+                    count,
+                )
+                for (sender, receiver), count in shape.handovers.items()
+                if count > 0
+            )
+        )
+        with self._btw_lock:
+            observations = tuple(self._btw_events)
+        with self._saying:
+            waiting = len(self._queued) + len(self._given)
+        moment = time.monotonic()
+        ended = self._monitor.until
+        elapsed = (ended if ended is not None else moment) - self._monitor.began
+        spent = tuple(
+            (entry.model, entry.tokens, entry.rate)
+            for entry in self._monitor.spending(now=ended or moment)
+        )
+        # Keep the role separate from the stable id used by the monitor and handover records.
+        labelled = tuple(
+            AgentProgress(
+                agent=item.agent,
+                model=item.model,
+                turns=item.turns,
+                working=item.working,
+                role=named[index] if index < len(named) else "",
+            )
+            for index, item in agents
+        )
+        return FlowSnapshot(
+            flow=self._flowing(),
+            task=self._flow_task,
+            workspace=_where(),
+            elapsed=elapsed,
+            finished=ended is not None,
+            agents=labelled,
+            handovers=handovers,
+            observations=observations,
+            waiting=waiting,
+            spent=spent,
+            waiting_for_input=self._awaiting,
+        )
+
+    def _btw_candidates(self) -> list[AgentBase]:
+        """Orders usable coding agents for a side question, without including the person."""
+        from hmz.agents import HumanAgent
+
+        reading = self._reading()
+        ordered = ([reading] if reading is not None else []) + list(self._agents)
+        candidates: list[AgentBase] = []
+        for agent in ordered:
+            if isinstance(agent, HumanAgent) or agent in candidates:
+                continue
+            candidates.append(agent)
+        return candidates
+
+    def _btw_clone(self, source: AgentBase, request: int) -> AgentBase:
+        """Makes a read-only, skill-free agent that is invisible to the primary run."""
+        from dataclasses import replace
+
+        # `permission` is part of every AgentConfig, including backend-specific subclasses.
+        # A backend that cannot express read-only raises here; the caller tries another agent
+        # rather than silently running a side question with the flow's write permissions.
+        settings: dict[str, object] = {"permission": "read-only", "goals": False}
+        # Claude's optional allow-list can auto-approve a write even in a normal permission
+        # mode. A side question has no reason to carry the flow's explicit tool grants.
+        if hasattr(source.config, "allowed_tools"):
+            settings["allowed_tools"] = ()
+        config = replace(source.config, **settings)
+        try:
+            clone = source.clone(
+                config=config,
+                name=f"btw-{request}",
+                skills=(),
+            )
+        except TypeError:
+            # A third-party AgentBase written before the optional skills argument may still
+            # implement clone(config=, name=). Clear its inherited skills after construction.
+            clone = source.clone(config=config, name=f"btw-{request}")
+            clone.loads(())
+        # A watcher prevents command-backed backends from echoing the side answer to the
+        # interface's captured stdout. It is intentionally not the primary app watcher.
+        clone.watch(_quiet_watch)
+        return clone
+
+    def _btw_cwd(self, source: AgentBase) -> str | None:
+        """Uses an already-open conversation's directory when one is available."""
+        session = self._working_in(source)
+        if session is None:
+            return None
+        try:
+            return session.cwd
+        except (OSError, RuntimeError, ValueError):
+            return None
+
+    def _run_btw(
+        self,
+        request: int,
+        question: str,
+        prompt: str,
+        candidates: tuple[AgentBase, ...] = (),
+        generation: int | None = None,
+    ) -> None:
+        """Runs one isolated side turn and posts only its final display event."""
+        answer = ""
+        failure = ""
+        try:
+            for source in candidates or tuple(self._btw_candidates()):
+                with self._btw_lock:
+                    if self._btw_closed or (
+                        generation is not None and generation != self._btw_generation
+                    ):
+                        return
+                side: AgentBase | None = None
+                session: SessionBase | None = None
+                try:
+                    side = self._btw_clone(source, request)
+                    cwd = self._btw_cwd(source)
+                    session = side.new() if cwd is None else side.new(cwd)
+                    with self._btw_lock:
+                        if self._btw_closed or (
+                            generation is not None
+                            and generation != self._btw_generation
+                        ):
+                            session.close()
+                            return
+                        self._btw_active[request] = (side, session)
+                    answered = session(prompt)
+                    answer = str(answered or "").strip()
+                    if answer:
+                        break
+                    failure = "the side agent returned no answer"
+                except Exception as why:  # noqa: BLE001 -- a backend may fail independently
+                    failure = str(why) or type(why).__name__
+                finally:
+                    if session is not None:
+                        with contextlib.suppress(Exception):
+                            session.close()
+                    elif side is not None:
+                        with contextlib.suppress(Exception):
+                            side.stop()
+                    with self._btw_lock:
+                        held = self._btw_active.get(request)
+                        if held is not None and held[1] is session:
+                            self._btw_active.pop(request, None)
+                if answer:
+                    break
+        finally:
+            with self._btw_lock:
+                self._btw_running.discard(request)
+                closed = self._btw_closed or (
+                    generation is not None and generation != self._btw_generation
+                )
+        if closed:
+            return
+        if answer:
+            self._on_screen(self._btw_answer, question, answer)
+        else:
+            self._on_screen(
+                self._btw_failed,
+                question,
+                failure or "no read-only coding agent is available",
+            )
+
+    def _btw_answer(self, question: str, answer: str) -> None:
+        """Shows a completed side answer in the current transcript."""
+        lines = escape(answer).splitlines() or [""]
+        self._part(
+            None,
+            "\n".join(
+                [
+                    f"[cyan]{_SAID}[/] [dim]btw · {escape(question)}[/] {lines[0]}",
+                    *(f"  {line}" for line in lines[1:]),
+                ]
+            ),
+            packs=False,
+        )
+        self._draw()
+
+    def _btw_failed(self, question: str, failure: str) -> None:
+        """Reports a side-question failure without reporting it as a flow failure."""
+        del question  # The command itself is already in the transcript.
+        self.show(f"hmz: /btw: {failure}", "red")
 
     def action_clear(self) -> None:
         """Clears the screen, and nothing else.
@@ -1797,6 +2122,7 @@ class Humanize(App[None]):
             agent.stop()
         self._agents, self._stopping = [], []
         self._spoke.set()
+        self._close_btw()
 
     def _never_sent(self, because: str) -> None:
         """Puts whatever was still waiting into the transcript, nothing being left to take it.
@@ -2416,6 +2742,16 @@ class Humanize(App[None]):
             return
         agents = list(runner.agents)
         self._agents = self._ran = agents
+        with self._btw_lock:
+            old_side_sessions = [session for _, session in self._btw_active.values()]
+            self._btw_active.clear()
+            self._btw_running.clear()
+            self._flow_task = task
+            self._btw_events.clear()
+            self._btw_generation += 1
+        for session in old_side_sessions:
+            with contextlib.suppress(Exception):
+                session.close()
         # Nothing is left of the flow before this one to press a key about, and what is
         # being read is one of its agents unless it was the transcript they all appear on.
         # Which is where a run is watched from, so it is where a run starts.
@@ -2472,6 +2808,43 @@ class Humanize(App[None]):
 
         self._background(drive)
 
+    def _remember_btw(self, agent: AgentBase, event: Event) -> None:
+        """Keeps a compact progress record for future side questions.
+
+        Reasoning is intentionally omitted: a side question needs observable progress, not a
+        second copy of private chain-of-thought. The event stream still reaches the ordinary
+        transcript exactly as before.
+        """
+        # A stopped flow can take a moment to unwind while a new one is already up. Its old
+        # watcher is still bound to this method, but its events must not become progress for
+        # the new run.
+        if self._agents and not any(agent is held for held in self._agents):
+            return
+        if event.kind not in {
+            "begins",
+            "ends",
+            "failed",
+            "asks",
+            "tool",
+            "text",
+            "result",
+        }:
+            return
+        text = (
+            event.text.split("\n\n", 1)[0]
+            if event.kind == "begins"
+            else "turn ended"
+            if event.kind == "ends"
+            else event.text
+        )
+        text = compact(text)
+        with self._btw_lock:
+            self._btw_events.append(
+                Observation(
+                    agent=agent.id, kind=event.kind, text=text, at=time.monotonic()
+                )
+            )
+
     def _heard(
         self, agent: AgentBase, session: SessionBase | None, event: Event
     ) -> None:
@@ -2500,6 +2873,7 @@ class Humanize(App[None]):
         # what a watcher raises is swallowed, so accounting after it would be lost.
         for model, tokens in event.tokens.items():
             self._monitor.spend(agent.id, tokens, model=model)
+        self._remember_btw(agent, event)
         if event.kind == "took":
             # The agent saying a word put into its turn is now in front of it, which is the
             # one thing that makes a word said rather than posted.

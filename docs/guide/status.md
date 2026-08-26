@@ -23,6 +23,10 @@ so there is nothing to ask. What `/status` draws is kept from **the turns going 
 same `begins`/`ends` events any [watcher](/reference/agents#watching-a-turn-as-it-happens)
 sees.
 
+`/btw` uses this same live observation, together with the task, agent turn counts and handovers,
+to answer a quick question. Its read-only side session receives a frozen snapshot, so asking it
+does not add a message to, pause, or otherwise steer the flow.
+
 That is also why the person, driven as [an agent](/guide/human-agent), is not in the graph.
 Their turns are not bracketed by those events. Counting them would put a human in the handover
 graph and spin a clock at them while they thought.
@@ -87,6 +91,7 @@ sessions, one slice per thing the agent did.
 
 ## See also
 
+- [Side questions](/guide/btw)
 - [Cost and rate](/guide/tally)
 - [Many conversations at once](/guide/conversations)
 - [Tracing](/guide/tracing)
