@@ -201,6 +201,12 @@ for line in sys.stdin:
         send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
     if call["method"] == "turn/start":
         send({"method": "turn/started", "params": {"turnId": "turn_fake"}})
+        if call["params"]["input"][0]["text"] == "recovering":
+            send({"method": "error", "params": {"error": {
+                "message": "Reconnecting... 1/5",
+                "codexErrorInfo": {"responseStreamDisconnected": {
+                    "httpStatusCode": None}},
+            }}})
         if call["params"]["input"][0]["text"] == "asking":
             # A turn stopping to ask its user something, which the server puts to the client
             # as a request of its own and waits on.
@@ -702,6 +708,15 @@ def test_a_codex_turn_says_what_it_is_doing_while_it_is_doing_it(
     # two things done, and the second is not swallowed as one already seen.
     assert ("tool", "WebSearch what a nameless one is") in shown
     assert ("tool", "WebSearch and the one after it") in shown
+
+
+def test_a_codex_turn_that_reconnects_can_still_complete(
+    working: _FakeServer,
+) -> None:
+    """A transient error is superseded when Codex completes the same turn."""
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
+
+    assert session("recovering") == "done"
 
 
 def test_what_a_codex_turn_spent_is_charged_to_the_turn_that_spent_it(

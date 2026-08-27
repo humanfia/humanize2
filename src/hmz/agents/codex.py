@@ -581,16 +581,18 @@ class _AppServer:
                                     running.spends(risen)
                         case "error":
                             failed = json.dumps(told.get("error"))
-                        case "turn/completed" if told.get("turn", {}).get(
-                            "status"
-                        ) not in (None, "completed"):
-                            # A failed or interrupted turn is complete even when the server
-                            # does not follow it with a separate idle notification.
-                            turn_said = told["turn"]
-                            failed = json.dumps(
-                                turn_said.get("error") or turn_said.get("status")
-                            )
-                            break
+                        case "turn/completed":
+                            turn_said = cast("dict[str, Any]", told.get("turn") or {})
+                            if turn_said.get("status") not in (None, "completed"):
+                                # A failed or interrupted turn is complete even when the
+                                # server does not follow it with a separate idle notification.
+                                failed = json.dumps(
+                                    turn_said.get("error") or turn_said.get("status")
+                                )
+                                break
+                            # Codex reports a reconnect attempt as an error notification even
+                            # when a later sampling request completes this same turn.
+                            failed = None
                         case "thread/status/changed" if (
                             begun and told["status"]["type"] == "idle"
                         ):
