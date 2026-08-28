@@ -19,7 +19,7 @@ second directory.
 ## `__init__.py`
 
 Expose `Provider`, `ENV`, and the store: `providers`, `find`, `add`, `remove`, `ways`, `where`,
-`ready`, `environ`, `env_of` and `filled`.
+`ready`, `dials`, `environ`, `env_of` and `filled`.
 
 ## `store.py`
 
@@ -49,6 +49,9 @@ def alone(cli: str) -> Path: ...
 
 
 def points(cli: str, name: str, at: str) -> bool: ...
+
+
+def dials(one: Provider) -> tuple[str, ...]: ...
 ```
 
 - One provider MUST be one directory, under `~/.humanize/providers/<cli>/<name>/`, holding what
@@ -67,6 +70,11 @@ def points(cli: str, name: str, at: str) -> bool: ...
   so that a turn under a provider still traces, still counts and still loads what is installed.
 - `swaps` MUST also answer the same path with the links in it followed, where that is a
   different spelling: a home reached through one is the same file under two names.
+- Where a turn under an account goes MUST be answerable before it is taken. An account
+  pointed at an endpoint says so itself, in what a turn under it runs with; one signed in to
+  the vendor says nothing, and `dials` MUST answer for that one with the addresses
+  `hmz.backends` writes down for its backend. It MUST answer with nothing for an account that
+  was given an endpoint, that endpoint being the account's own and already said.
 - The account this machine is already signed into MUST be an account here too, named `""` --
   which is what `AgentConfig.provider` and `Runs.provider` already call it -- and MUST be
   answered by `find` for every backend, whether or not anything has been written down about

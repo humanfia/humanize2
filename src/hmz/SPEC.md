@@ -161,6 +161,10 @@ load.
 - The efforts MUST be written down, being that backend's own vocabulary rather than a
   catalogue of things that come and go. A rung the backend takes without documenting MUST be
   written down as one, since no listing of the backend's own will ever name it.
+- Where a backend's own vendor answers MUST be written down here, as URLs, for the backends
+  whose it is known. An account signed in to a vendor writes no endpoint down -- the CLI
+  already knows where its vendor is -- so nothing else has it to read, and whatever has to
+  know where a turn will go before taking it has nowhere else to ask.
 - Which credentials are the same credential MUST be written down here too, one entry per
   credential holding every name it goes by. A vendor's key is the vendor's rather than the
   CLI's -- an Anthropic key is one whether Claude Code, pi, opencode or mimocode holds it --

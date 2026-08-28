@@ -438,3 +438,60 @@ def test_a_fallback_written_by_hand_is_read_past_rather_than_losing_the_account(
     assert found is not None
     assert found.fallback == ""
     assert [one.name for one in store.providers("claude")] == ["mine"]
+
+
+def test_an_account_signed_in_to_a_vendor_dials_where_that_backend_says(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """It wrote no endpoint down, so the backend's own is where a turn goes."""
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path))
+    provider = store.add("codex", "mine", way="token")
+    codex = backends.named("codex")
+    assert codex is not None
+
+    assert store.dials(provider) == codex.dials
+    assert store.dials(provider)
+
+
+def test_an_account_pointed_at_an_endpoint_dials_that_and_says_so_itself(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What it was given is the account's own, and is already written down."""
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path))
+    provider = store.add(
+        "codex", "mine", env={"CODEX_PROVIDER_URL": "https://gw.example/v1"}
+    )
+
+    assert store.dials(provider) == ()
+
+
+def test_an_endpoint_on_a_backends_own_command_line_is_one_it_was_pointed_at(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A backend taking settings rather than variables carries it there instead."""
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path))
+    provider = store.Provider(
+        cli="codex",
+        name="mine",
+        args=("-c", "model_providers.humanize.base_url=https://gw.example/v1"),
+    )
+
+    assert store.dials(provider) == ()
+
+
+def test_a_backend_whose_vendor_is_not_written_down_dials_nowhere_yet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Which is a thing this cannot answer, not a backend that reaches nothing."""
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path))
+    provider = store.add("claude", "mine", way="login")
+
+    assert store.dials(provider) == ()
+
+
+def test_an_account_of_no_backend_at_all_dials_nowhere(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path))
+
+    assert store.dials(store.Provider(cli="nope", name="mine")) == ()
