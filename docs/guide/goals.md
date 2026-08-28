@@ -17,6 +17,28 @@ The agent keeps going until it decides the objective has been met, and `pursue` 
 final turn. This is the backend's own goal feature, the one its `/goal` command reaches, not a
 prompt that asks for one. The backend starts the extra turns itself.
 
+## Give a goal more context
+
+Keep source material separate when it is larger than the completion condition, or simply is
+not part of what decides that the work is done:
+
+```python
+agent.pursue(
+    "answer the question, return only the requested JSON, then mark the goal complete",
+    context=f"""Keep this complete question in context for the goal that follows.
+Do not answer it yet.
+
+{question}
+""",
+)
+```
+
+`context` is an ordinary turn in the same conversation immediately before the native goal
+starts. Its answer is not returned; the goal's last answer still is. This lets a backend keep
+the complete task in conversation while receiving only the short completion condition through
+its goal interface. Because this first turn is ordinary, tell the agent what to retain and what
+to defer if work must not start until the goal is active.
+
 ## What `pursue` answers with
 
 A goal takes as many turns of the model as it needs. `pursue` follows the goal across all of
@@ -30,8 +52,8 @@ while True:
     agent.pursue(objective, suppress=True)
 ```
 
-The awaited twin is `agent.apursue(objective)`. A session has both: `session.pursue(...)` and
-`await session.apursue(...)`.
+The awaited twin is `agent.apursue(objective, context=...)`. A session has both:
+`session.pursue(...)` and `await session.apursue(...)`.
 
 ## Which backends have one
 

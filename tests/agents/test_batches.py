@@ -402,14 +402,31 @@ async def test_a_goal_awaited_is_the_backends_own_goal() -> None:
             return f"pursued: {objective}"
 
     class _GoalAgent(_InProcessAgent):
+        pursues: ClassVar[bool] = True
+
         def new(self, cwd: str | os.PathLike[str] | None = None) -> _Goal:
             return _Goal(self, cwd)
 
-    agent = _GoalAgent()
+    context: list[str] = []
+    agent = _GoalAgent(doing=context.append)
 
-    assert await agent.apursue("get it done") == "pursued: get it done"
-    assert await agent.new().apursue("and again") == "pursued: and again"
+    assert (
+        await agent.apursue("get it done", context="the complete task")
+        == "pursued: get it done"
+    )
+    assert (
+        await agent.new().apursue("and again", context="more task material")
+        == "pursued: and again"
+    )
+    assert context == ["the complete task", "more task material"]
     assert agent.goals == ["get it done", "and again"]
+
+    failing = _GoalAgent(doing=_explodes("bad context"))
+    assert (
+        await failing.apursue("must not start", context="bad context", suppress=True)
+        == ""
+    )
+    assert failing.goals == []
 
 
 async def test_awaiting_a_turn_hands_the_loop_back_while_the_turn_takes() -> None:

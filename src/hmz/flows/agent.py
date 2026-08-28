@@ -128,11 +128,23 @@ class Session(Protocol):
         """The same turn, awaited: `await session.aturn(prompt)`."""
         ...
 
-    def pursue(self, objective: str, *, suppress: bool = False) -> str:
+    def pursue(
+        self,
+        objective: str,
+        *,
+        suppress: bool = False,
+        context: str | None = None,
+    ) -> str:
         """Runs the backend's own goal feature in this conversation, until it stops."""
         ...
 
-    async def apursue(self, objective: str, *, suppress: bool = False) -> str:
+    async def apursue(
+        self,
+        objective: str,
+        *,
+        suppress: bool = False,
+        context: str | None = None,
+    ) -> str:
         """The same goal, awaited."""
         ...
 
@@ -325,6 +337,7 @@ class Agent(Protocol):
         objective: str,
         *,
         suppress: bool = False,
+        context: str | None = None,
         cwd: str | os.PathLike[str] | None = None,
     ) -> str:
         """Runs a goal in a session of its own, and keeps nothing."""
@@ -335,6 +348,7 @@ class Agent(Protocol):
         objective: str,
         *,
         suppress: bool = False,
+        context: str | None = None,
         cwd: str | os.PathLike[str] | None = None,
     ) -> str:
         """The same goal, awaited."""

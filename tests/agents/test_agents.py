@@ -454,6 +454,22 @@ def test_claude_pursues_through_its_own_goal_command(clis: _FakeCLIs) -> None:
     ]
 
 
+def test_claude_can_receive_large_goal_context_before_its_short_objective(
+    clis: _FakeCLIs,
+) -> None:
+    """Task material is a remembered turn, not part of Claude's `/goal` command."""
+    session = ClaudeCodeAgent(
+        ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high")
+    ).new()
+    context = "complete task material " * 250
+    session.pursue("return the final answer", context=context)
+
+    assert [call.stdin for call in clis.calls() if call.stdin] == [
+        context,
+        "/goal return the final answer",
+    ]
+
+
 def test_disabled_goals_never_reach_claude(clis: _FakeCLIs, tmp_path: Path) -> None:
     """A goals-off ordinary turn cannot leave HMZ through continuation tools."""
     agent = ClaudeCodeAgent(
@@ -499,8 +515,10 @@ def test_an_anchored_agent_hands_its_whole_turn_to_the_anchor(clis: _FakeCLIs) -
 
 
 def test_a_backend_without_a_goal_feature_says_so() -> None:
+    agent = _EchoAgent(CONFIG)
     with pytest.raises(NotImplementedError):
-        _EchoAgent(CONFIG).new().pursue("the suite passes")
+        agent.new().pursue("the suite passes", context="must not be sent")
+    assert agent.opened == []
 
 
 #: A `claude` that answers with the error it is: `subtype` still reads "success", so the

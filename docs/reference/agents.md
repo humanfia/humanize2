@@ -584,6 +584,11 @@ backend starts them itself; `pursue` follows the goal across all of them and ans
 last. A session that has gone quiet is a goal that has stopped only once the goal itself says
 so.
 
+Pass `context="..."` to send an ordinary turn in the same conversation immediately before
+the goal starts. Its answer is discarded, but the goal can use what that turn put in context;
+only `objective` is sent through the backend's native goal interface. This is useful when a
+large task and its short completion condition should stay separate.
+
 A flow that loops over `pursue` is running the objective again, rather than nudging an agent
 that stopped early.
 
@@ -1196,11 +1201,11 @@ class AgentBase:
 
     # `cwd` is the directory the session it opens works in, or None for the flow's own.
     def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …, cwd: Where = None) -> str | T | None
-    def pursue(objective: str, *, suppress: bool = False, cwd: Where = None) -> str
+    def pursue(objective: str, *, suppress: bool = False, context: str | None = None, cwd: Where = None) -> str
     def new(cwd: Where = None) -> SessionBase
 
     async def aturn(prompt: str, *, suppress: bool = False, schema: type[T] = …, cwd: Where = None) -> str | T | None
-    async def apursue(objective: str, *, suppress: bool = False, cwd: Where = None) -> str
+    async def apursue(objective: str, *, suppress: bool = False, context: str | None = None, cwd: Where = None) -> str
 
     def batch_new(count: int, cwd: Where = None) -> list[SessionBase]
     def batch(prompts, *, suppress: bool = False, schema: type[T] = …, at_once: int = 0, cwd: Where = None) -> list[...]
@@ -1225,10 +1230,10 @@ class SessionBase:
 
     def __call__(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
     def stream(prompt: str, *, schema: type[BaseModel] | None = None) -> Iterator[Event]
-    def pursue(objective: str, *, suppress: bool = False) -> str
+    def pursue(objective: str, *, suppress: bool = False, context: str | None = None) -> str
 
     async def aturn(prompt: str, *, suppress: bool = False, schema: type[T] = …) -> str | T | None
-    async def apursue(objective: str, *, suppress: bool = False) -> str
+    async def apursue(objective: str, *, suppress: bool = False, context: str | None = None) -> str
 
     def interject(text: str) -> None
     def close() -> None

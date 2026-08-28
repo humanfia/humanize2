@@ -691,18 +691,27 @@ class SessionBase(ABC):
             f"{self._agent.id}-turn",
         )
 
-    async def apursue(self, objective: str, *, suppress: bool = False) -> str:
+    async def apursue(
+        self,
+        objective: str,
+        *,
+        suppress: bool = False,
+        context: str | None = None,
+    ) -> str:
         """The same goal as :meth:`pursue`, awaited: `await session.apursue(objective)`.
 
         Args:
           objective: What the agent is to have achieved before it stops.
           suppress: Whether a goal that fails answers with nothing, as for :meth:`pursue`.
+          context: An ordinary turn to add to this conversation before the goal starts, as
+            for :meth:`pursue`.
 
         Returns:
           What :meth:`pursue` would have answered with.
         """
         return await _awaited(
-            lambda: self.pursue(objective, suppress=suppress), f"{self._agent.id}-goal"
+            lambda: self.pursue(objective, suppress=suppress, context=context),
+            f"{self._agent.id}-goal",
         )
 
     def stream(
@@ -1359,7 +1368,13 @@ class SessionBase(ABC):
                 # backend logs it under this id and never says whose it was.
                 self._agent.cycle.opened(self._agent, session_id)
 
-    def pursue(self, objective: str, *, suppress: bool = False) -> str:
+    def pursue(
+        self,
+        objective: str,
+        *,
+        suppress: bool = False,
+        context: str | None = None,
+    ) -> str:
         """Runs the session under a goal, which the agent then keeps itself going toward.
 
         This is the backend's own goal feature rather than a prompt that asks for one: the
@@ -1371,6 +1386,9 @@ class SessionBase(ABC):
           objective: What the agent is to have achieved before it stops.
           suppress: Whether a goal that fails answers with nothing instead of raising, as
             for :meth:`__call__`.
+          context: An ordinary turn to add to this conversation before the goal starts, or
+            None. Its answer is not returned. Use it for task material that the goal needs
+            in context but that is not itself the completion condition.
 
         Returns:
           The agent's response once it stops, stripped, or "" for a goal that failed while
@@ -1385,7 +1403,11 @@ class SessionBase(ABC):
         """
         if not self._agent.goals_enabled:
             raise RuntimeError(f"{self._agent.id}: goals are disabled")
+        if context is not None and not self._agent.pursues:
+            raise NotImplementedError(f"{type(self).__name__} has no goal feature")
         try:
+            if context is not None:
+                self(context)
             return self._pursue(objective)
         except Unrecoverable:
             raise  # not covered by `suppress`, for the reason it is not in a turn
@@ -2905,6 +2927,7 @@ class AgentBase(ABC):
         objective: str,
         *,
         suppress: bool = False,
+        context: str | None = None,
         cwd: str | os.PathLike[str] | None = None,
     ) -> str:
         """Runs a goal in a session of its own, and keeps nothing.
@@ -2913,12 +2936,14 @@ class AgentBase(ABC):
           objective: What the agent is to have achieved before it stops.
           suppress: Whether a goal that fails answers with nothing, as for
             :meth:`SessionBase.pursue`.
+          context: An ordinary turn to add to the goal's conversation first, as for
+            :meth:`SessionBase.pursue`.
           cwd: Where it works, as for :meth:`__call__`.
 
         Returns:
           What the agent answered once it stopped, stripped.
         """
-        return self._opens_at(cwd).pursue(objective, suppress=suppress)
+        return self._opens_at(cwd).pursue(objective, suppress=suppress, context=context)
 
     @overload
     async def aturn(
@@ -2973,6 +2998,7 @@ class AgentBase(ABC):
         objective: str,
         *,
         suppress: bool = False,
+        context: str | None = None,
         cwd: str | os.PathLike[str] | None = None,
     ) -> str:
         """The same goal as :meth:`pursue`, awaited: `await agent.apursue(objective)`.
@@ -2980,12 +3006,16 @@ class AgentBase(ABC):
         Args:
           objective: What the agent is to have achieved before it stops.
           suppress: Whether a goal that fails answers with nothing, as for :meth:`pursue`.
+          context: An ordinary turn to add to the goal's conversation first, as for
+            :meth:`pursue`.
           cwd: Where it works, as for :meth:`__call__`.
 
         Returns:
           What :meth:`pursue` would have answered with.
         """
-        return await self._opens_at(cwd).apursue(objective, suppress=suppress)
+        return await self._opens_at(cwd).apursue(
+            objective, suppress=suppress, context=context
+        )
 
     def batch_new(
         self, count: int, cwd: str | os.PathLike[str] | None = None

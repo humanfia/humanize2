@@ -201,6 +201,13 @@ for line in sys.stdin:
         send({"method": "thread/status/changed", "params": {"status": {"type": "idle"}}})
     if call["method"] == "turn/start":
         send({"method": "turn/started", "params": {"turnId": "turn_fake"}})
+        if call["params"]["input"][0]["text"] == "the complete task material":
+            send({"method": "item/completed",
+                  "params": {"item": {"type": "agentMessage", "text": " ready "}}})
+            send({"method": "turn/completed", "params": {}})
+            send({"method": "thread/status/changed",
+                  "params": {"status": {"type": "idle"}}})
+            continue
         if call["params"]["input"][0]["text"] == "recovering":
             send({"method": "error", "params": {"error": {
                 "message": "Reconnecting... 1/5",
@@ -574,6 +581,32 @@ def test_codex_pursues_by_setting_a_goal_on_the_thread(codex: _FakeServer) -> No
     # The thread is the session, so `codex exec resume` goes on with the one a goal opened.
     assert session.id == "thread_fake"
     assert agent.opened == ["thread_fake"]
+
+
+def test_codex_keeps_goal_context_on_the_thread(codex: _FakeServer) -> None:
+    """The context lands first; only the completion condition becomes Codex's goal."""
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
+
+    assert (
+        session.pursue("return the final answer", context="the complete task material")
+        == "answered"
+    )
+
+    called = codex.calls()
+    starts = [call["params"] for call in called if call.get("method") == "turn/start"]
+    assert [start["input"] for start in starts] == [
+        [{"type": "text", "text": "the complete task material"}],
+        [{"type": "text", "text": "return the final answer"}],
+    ]
+    goals = [
+        call["params"] for call in called if call.get("method") == "thread/goal/set"
+    ]
+    assert goals == [
+        {"threadId": "thread_fake", "objective": "return the final answer"}
+    ]
+    methods = [call.get("method") for call in called]
+    assert methods.count("thread/start") == 1
+    assert methods.count("thread/resume") == 1
 
 
 def test_codex_gives_up_on_a_goal_that_has_gone_quiet(
