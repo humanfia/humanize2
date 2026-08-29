@@ -163,10 +163,10 @@ HmzStack.vue        contributing/architecture
 Four things they are all held to:
 
 - **A drawing says what the code does.** `HmzAnchor` and `HmzSyscalls` route each call the way
-  `specs/src/hmz/coganchor/SPEC.md` and `coganchor/linux/seccomp.py` route it; `HmzStack`'s
-  edges are the `ALLOWED` table in `tests/test_layering.py`; every box in `theme/flows.ts` is a
-  turn a flow really takes; `HmzBackends` is `hmz/backends.py` and which session base each agent
-  class derives from; `HmzAccounts`' waits are the formulas in `fallbacks.py`; every agent on
+  `specs/coganchor.md` and `coganchor/linux/seccomp.py` route it; `HmzStack`'s edges are the
+  `ALLOWED` table in `tests/test_layering.py`; every box in `theme/flows.ts` is a turn a flow
+  really takes; `HmzBackends` is `hmz/backends.py` and which session base each agent class
+  derives from; `HmzAccounts`' waits are the formulas in `fallbacks.py`; every agent on
   `HmzOrchestra` is spelled the way `hmz exec -a` would take it. A diagram that drifts from
   those is a diagram that lies to a reader.
 - **A simulation is not dressed up as a recording.** `HmzOrchestra`, the feature diagrams and
@@ -246,6 +246,6 @@ the nav, the sidebar and the theme's own logo name, VitePress prepends the base 
 
 - **`README.md`** follows [standard-readme](https://github.com/RichardLitt/standard-readme) and
   must not explain how anything works. It links here.
-- **`specs/**/SPEC.md`** are the packages' contracts, in a tree mirroring the repository's own.
-  **Do not modify one** unless you were asked to.
+- **`specs/*.md`** are the packages' contracts, a file for each package that has one, named for
+  the package. **Do not modify one** unless you were asked to.
 - **Docstrings** are Google style and are checked by `ruff`.

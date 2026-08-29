@@ -57,8 +57,8 @@ git switch -c fix/say-what-to-do
 
 And two rules that catch people out:
 
-**Do not modify a `SPEC.md`.** Most packages have one under `specs/`, at the package's own
-path, and it is normative: where these docs say what humanize *does*, a SPEC says what it
+**Do not modify a SPEC.** Most packages have one under `specs/`, in a file named for the
+package, and it is normative: where these docs say what humanize *does*, a SPEC says what it
 *must* do, in MUST/MUST NOT terms. It is the contract and the code is what moves. If the
 contract itself is wrong, propose that separately — `AGENTS.md` says not to change one unless
 you were asked to.

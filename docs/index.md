@@ -249,8 +249,8 @@ library in preference to a custom implementation.
 
 Each package depends only downwards, and a test checks the layering —
 [Architecture](/contributing/architecture) has the layers and the rules that keep them. Most
-packages have a `SPEC.md` under `specs/`, at the package's own path. **Do not modify a
-`SPEC.md`** unless you were asked to: it is the contract, and the code is what has to move.
+packages have a SPEC under `specs/`, in a file named for the package. **Do not modify a SPEC**
+unless you were asked to: it is the contract, and the code is what has to move.
 
 **Next.** [Contributing](/contributing/) is the whole of it, and [Your first
 patch](/contributing/tutorials/first-patch) takes one change from clone to pull request.

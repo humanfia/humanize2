@@ -352,8 +352,7 @@ That cannot reach past you on a machine several people share.
 ## Still stuck
 
 - `--log-level debug` on `hmz anchor`, both ends.
-- The `SPEC.md` under `specs/` says what it is *supposed* to do, normatively.
-  `specs/src/hmz/coganchor/SPEC.md` is the one worth reading when a remote session behaves
-  strangely.
+- The SPECs under `specs/` say what it is *supposed* to do, normatively.
+  `specs/coganchor.md` is the one worth reading when a remote session behaves strangely.
 - [Architecture](/contributing/architecture) says which layer to look in.
 - Ask in [issues](https://github.com/humanfia/humanize2/issues).

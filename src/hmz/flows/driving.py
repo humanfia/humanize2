@@ -86,7 +86,7 @@ _WITH_A_CONFIG = 3
 type Entry = Callable[..., Awaitable[None] | None]
 
 
-class NotAFlow(ValueError):  # noqa: N818  -- the name SPEC.md gives it
+class NotAFlow(ValueError):  # noqa: N818  -- the name the SPEC gives it
     """What a command line named, when it was not a flow for the agents it was given.
 
     Its own kind of error, so that a flow failing as it is imported -- one that reads a prompt

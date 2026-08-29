@@ -6,11 +6,13 @@ For code:
 - PREFER use popular and well-maintained libraries rather than custom implementations.
 - MUST also update `humanfia/flowverse` to ensure them working if any changes affect flow impl.
 
-For `specs/**/SPEC.md`:
+For `specs/*.md`:
 
-- MUST read the SPEC of a directory at that directory's own path under `specs/`.
-- MUST NOT modify any SPEC.md UNLESS explicitly instructed to do so.
-- MUST keep code minimal while strictly adhering to SPEC.md.
+- MUST read a package's SPEC at `specs/`, in a file named for the package: `specs/agents.md`
+  binds `src/hmz/agents`. A package no file is named for is bound by the nearest one above it
+  that has a file, and `specs/SPEC.md` binds `src/hmz` itself.
+- MUST NOT modify any SPEC UNLESS explicitly instructed to do so.
+- MUST keep code minimal while strictly adhering to the SPEC.
 
 For commits:
 
