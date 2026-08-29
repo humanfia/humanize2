@@ -44,6 +44,12 @@ time and reads the plan against the repository. They converge, or the round limi
 `--input` names the draft to plan from, `--discussion` and `--direct` are the two modes, and
 `alternative_plan_language` writes a translated plan beside the plan.
 
+A plan that still says `PENDING` on a `Pending User Decisions` entry stops the run rather
+than finishing it: `rlcr` never waits for a person, so a decision left undecided here would
+idle the loop, not stop it. The plan stays on disk with every position written down —
+answer each `Decision Status` in the file, or run `gen-plan` again with somebody at the
+prompt.
+
 ## 3 · `rlcr`
 
 <HmzFlowShape flow="humanize1-rlcr" />
