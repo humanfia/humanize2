@@ -885,7 +885,7 @@ before the runtime starts unless its effort is `max`, `high` or `off`.
 | `grok` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` — the levels the model itself advertises |
 | `kimi` | `low`, `medium`, `high`, `max`, each also as `swarm…` |
 | `pi` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
-| `qwen` | `low`, `medium`, `high`, `xhigh`, `max` |
+| `qwen` | `none`, `low`, `medium`, `high`, `xhigh`, `max` |
 | `opencode`, `mimo` | the model variant: `minimal`, `low`, `medium`, `high`, `xhigh` |
 | `zcode` | `nothink`, `low`, `high`, `max` on the models that take a thinking budget — `disabled`, `enabled` on the ones that only think or not |
 

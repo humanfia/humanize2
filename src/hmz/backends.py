@@ -352,7 +352,10 @@ _GROK = ("xhigh", "high", "medium", "low")
 
 #: What Qwen Code calls its reasoning levels, hardest first. It has no flag for them -- they
 #: are a setting of its own `settings.json`, which is why a turn is pointed at one of ours.
-_QWEN = ("max", "xhigh", "high", "medium", "low")
+#: `none` is the model asked not to reason at all, which is a rung like any other here: it is
+#: the least of them, not the absence of a setting, and it is the one a model that takes no
+#: reasoning parameter at all is reachable at.
+_QWEN = ("max", "xhigh", "high", "medium", "low", "none")
 
 #: What opencode and mimocode call a reasoning effort: a variant of the model, given as
 #: `--variant`, and provider-specific. These are the ones the models they front take; a
@@ -636,14 +639,12 @@ PROFILES = (
                     Asked(
                         env="CODEX_PROVIDER_KEY", about="the key it takes", secret=True
                     ),
-                    Asked(
-                        env="CODEX_PROVIDER_WIRE",
-                        about="the protocol it speaks: chat or responses",
-                        fixed="chat",
-                    ),
                 ),
                 # Codex takes a provider as settings rather than as variables, and `-c` is
                 # how a setting is given for one run without writing anybody's config file.
+                # The wire is written out rather than asked: codex takes one protocol now,
+                # and refuses to start at all on the other, so a question about it would be
+                # a question with one answer and a way to get a provider that cannot run.
                 args=(
                     "-c",
                     "model_provider=humanize",
@@ -654,7 +655,7 @@ PROFILES = (
                     "-c",
                     "model_providers.humanize.env_key=CODEX_PROVIDER_KEY",
                     "-c",
-                    "model_providers.humanize.wire_api={CODEX_PROVIDER_WIRE}",
+                    "model_providers.humanize.wire_api=responses",
                 ),
             ),
         ),
@@ -733,7 +734,6 @@ PROFILES = (
             "GROK_OAUTH2_ISSUER",
             "GROK_OIDC_CLIENT_ID",
             "GROK_OIDC_ISSUER",
-            "GROK_XAI_API_BASE_URL",
         ),
         ways=(
             Way(
@@ -756,7 +756,7 @@ PROFILES = (
                 about=_GATEWAY,
                 asks=(
                     Asked(
-                        env="GROK_MODELS_BASE_URL",
+                        env="GROK_XAI_API_BASE_URL",
                         about="where it is, as a URL: its models are listed at /models",
                     ),
                     Asked(env="XAI_API_KEY", about="the key it takes", secret=True),

@@ -193,7 +193,7 @@ def test_an_answer_is_filled_into_what_the_backend_takes_on_its_command_line(
     assert (
         "model_providers.humanize.base_url=https://example.invalid/v1" in provider.args
     )
-    assert "model_providers.humanize.wire_api=chat" in provider.args
+    assert "model_providers.humanize.wire_api=responses" in provider.args
     assert provider.env["CODEX_PROVIDER_KEY"] == "not-a-real-key"
 
 

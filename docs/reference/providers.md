@@ -108,12 +108,14 @@ a way that is only answers keeps them as the variables the backend reads them un
 | `device` | The same, from a machine with no browser on it. Runs `codex login --device-auth`. | — |
 | `key` | An OpenAI API key, which codex keeps in its own store. Runs `codex login --with-api-key` and feeds it in. | `OPENAI_API_KEY` |
 | `token` | An access token, which is how an organisation hands one out. Runs `codex login --with-access-token` and feeds it in. | `CODEX_ACCESS_TOKEN` |
-| `gateway` | An endpoint speaking codex's own protocol. | `CODEX_PROVIDER_URL`, `CODEX_PROVIDER_KEY`, `CODEX_PROVIDER_WIRE` (`chat`) |
+| `gateway` | An endpoint speaking codex's own protocol. | `CODEX_PROVIDER_URL`, `CODEX_PROVIDER_KEY` |
 
 Codex takes a provider as settings rather than as variables, so a turn under `gateway` is given
 `-c model_provider=humanize` and the four settings under it on the command line. Nobody's
-`config.toml` is written. The key of the `key` way is read by `codex login` off its standard
-input and kept in codex's own store, so it is not kept a second time as a variable.
+`config.toml` is written. The wire is one of those four and is written out rather than asked:
+codex takes `responses` and refuses to start on anything else. The key of the `key` way is read
+by `codex login` off its standard input and kept in codex's own store, so it is not kept a
+second time as a variable.
 
 **Kimi Code** (`kimi`)
 
@@ -164,7 +166,7 @@ input and kept in codex's own store, so it is not kept a second time as a variab
 | `login` | Sign in to an xAI account, in a browser. Runs `grok login`. | — |
 | `device` | The same, from a machine with no browser on it. Runs `grok login --device-auth`. | — |
 | `key` | An xAI API key, from the console. | `XAI_API_KEY` |
-| `gateway` | An endpoint speaking Grok Build's own protocol; its models are listed at `/models`. | `GROK_MODELS_BASE_URL`, `XAI_API_KEY` |
+| `gateway` | An endpoint speaking Grok Build's own protocol; its models are listed at `/models`. | `GROK_XAI_API_BASE_URL`, `XAI_API_KEY` |
 | `oidc` | Your own identity provider, for an organisation that signs in through one. | `GROK_OIDC_ISSUER`, `GROK_OIDC_CLIENT_ID` |
 
 **Qwen Code** (`qwen`)
