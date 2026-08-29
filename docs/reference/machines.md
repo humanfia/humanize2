@@ -282,7 +282,7 @@ them gets a machine of its own. `start` must take down whatever it created if it
 has to answer for what `start` got as far as creating. `stop` has a do-nothing default, which is
 what `AnchoredConfig` uses.
 
-The contract is `src/hmz/machines/SPEC.md`.
+The contract is `specs/src/hmz/machines/SPEC.md`.
 
 ## API summary
 

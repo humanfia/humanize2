@@ -44,8 +44,8 @@ than by editing a second pin.
 - **Popular, well-maintained libraries** in preference to a custom implementation.
 - **Each package depends only downwards**, which is checked by a test.
   [Architecture](/contributing/architecture) has the layers and the rules that keep them.
-- **Beside most packages there is a `SPEC.md`.** Do not modify one unless you were asked to —
-  it is the contract, and the code is what has to move.
+- **Most packages have a `SPEC.md` under `specs/`**, at the package's own path. Do not modify
+  one unless you were asked to — it is the contract, and the code is what has to move.
 
 ## Documentation
 

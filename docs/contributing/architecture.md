@@ -179,21 +179,27 @@ and it is `coganchor` — an abbreviation, and an easter egg.
 
 ## SPEC.md
 
-Beside the code, and normative. Where this documentation says what humanize *does*, a SPEC says
+Under `specs/`, and normative. Where this documentation says what humanize *does*, a SPEC says
 what it *must* do, in MUST/MUST NOT terms, for whoever is changing it.
+
+`specs/` mirrors the repository's own tree, so the contract for a directory is that directory's
+path with `specs/` in front of it. Together rather than beside the code, because a contract is
+read as a set — what one package may demand of another is a question about several of them at
+once — and because a file under `src/` is a file the wheel ships: a SPEC is for whoever changes
+humanize, not for whoever installs it.
 
 | | |
 | --- | --- |
-| `src/hmz/SPEC.md` | The tree, the top-level modules, and every command line |
-| `src/hmz/agents/SPEC.md` | The agent and session contract every backend keeps |
-| `src/hmz/flows/SPEC.md` | What a flow is, how one is found, what it brings, and what a flowverse holds |
-| `src/hmz/machines/SPEC.md` | What a machine is |
-| `src/hmz/providers/SPEC.md` | Which account an agent runs as, and how a turn is run under it |
-| `src/hmz/coganchor/SPEC.md` | What you are entitled to under an anchor, and what you deliberately are not |
-| `src/hmz/tracing/SPEC.md` | The collect API and how a trace is built |
-| `src/hmz/sdk/SPEC.md` | `Hmz` and everything it hands back |
-| `src/hmz/daemon/SPEC.md` | Holding a run apart from a terminal, and the terminals that read one |
-| `src/hmz/tui/SPEC.md` | Every behaviour the interface must have |
+| `specs/src/hmz/SPEC.md` | The tree, the top-level modules, and every command line |
+| `specs/src/hmz/agents/SPEC.md` | The agent and session contract every backend keeps |
+| `specs/src/hmz/flows/SPEC.md` | What a flow is, how one is found, what it brings, and what a flowverse holds |
+| `specs/src/hmz/machines/SPEC.md` | What a machine is |
+| `specs/src/hmz/providers/SPEC.md` | Which account an agent runs as, and how a turn is run under it |
+| `specs/src/hmz/coganchor/SPEC.md` | What you are entitled to under an anchor, and what you deliberately are not |
+| `specs/src/hmz/tracing/SPEC.md` | The collect API and how a trace is built |
+| `specs/src/hmz/sdk/SPEC.md` | `Hmz` and everything it hands back |
+| `specs/src/hmz/daemon/SPEC.md` | Holding a run apart from a terminal, and the terminals that read one |
+| `specs/src/hmz/tui/SPEC.md` | Every behaviour the interface must have |
 
 `AGENTS.md` says not to modify a SPEC unless you were told to. Change the code to match the
 SPEC; propose the SPEC change separately.
@@ -205,7 +211,7 @@ table in `agents/__init__.py`, which `runner.py` and the interface both read, a 
 it what it runs in `models.py`'s `_READING` table, and its state paths in
 `coganchor/statepaths.py`. Subclass `CommandSessionBase` if a turn is one run of a command
 line, or `StreamSessionBase` if it is one long-lived process spoken to a line at a time —
-`agents/SPEC.md` says which and why.
+`specs/src/hmz/agents/SPEC.md` says which and why.
 
 Then whatever its logs allow, and nothing more: a reader in `tracing/readers/` where a session
 of it can be gathered afterwards, and a branch in `tui/tally.py`'s `_spent` where a row of them

@@ -1424,4 +1424,4 @@ class Unhooked(ValueError): ...   # a moment this backend does not run
 
 `CommandSessionBase` and `StreamSessionBase` are the two shapes a backend is driven in — one
 command per turn, or one long-lived process spoken to a line at a time. Subclass them to add a
-backend; `src/hmz/agents/SPEC.md` is the contract they have to keep.
+backend; `specs/src/hmz/agents/SPEC.md` is the contract they have to keep.

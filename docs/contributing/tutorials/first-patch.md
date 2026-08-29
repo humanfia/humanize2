@@ -57,10 +57,11 @@ git switch -c fix/say-what-to-do
 
 And two rules that catch people out:
 
-**Do not modify a `SPEC.md`.** Beside most packages there is one, and it is normative: where
-these docs say what humanize *does*, a SPEC says what it *must* do, in MUST/MUST NOT terms. It
-is the contract and the code is what moves. If the contract itself is wrong, propose that
-separately — `AGENTS.md` says not to change one unless you were asked to.
+**Do not modify a `SPEC.md`.** Most packages have one under `specs/`, at the package's own
+path, and it is normative: where these docs say what humanize *does*, a SPEC says what it
+*must* do, in MUST/MUST NOT terms. It is the contract and the code is what moves. If the
+contract itself is wrong, propose that separately — `AGENTS.md` says not to change one unless
+you were asked to.
 
 **Each package depends only downwards.** `tests/test_layering.py` holds the table of what each
 layer may import, and fails on an import that climbs, on two layers that name each other, and

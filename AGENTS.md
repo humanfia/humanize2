@@ -6,8 +6,9 @@ For code:
 - PREFER use popular and well-maintained libraries rather than custom implementations.
 - MUST also update `humanfia/flowverse` to ensure them working if any changes affect flow impl.
 
-For `**/SPEC.md`:
+For `specs/**/SPEC.md`:
 
+- MUST read the SPEC of a directory at that directory's own path under `specs/`.
 - MUST NOT modify any SPEC.md UNLESS explicitly instructed to do so.
 - MUST keep code minimal while strictly adhering to SPEC.md.
 

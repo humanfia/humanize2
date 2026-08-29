@@ -248,9 +248,9 @@ annotated in `pyproject.toml`; **Google-style docstrings**; and a popular, well-
 library in preference to a custom implementation.
 
 Each package depends only downwards, and a test checks the layering —
-[Architecture](/contributing/architecture) has the layers and the rules that keep them. Beside
-most packages there is a `SPEC.md`. **Do not modify a `SPEC.md`** unless you were asked to: it
-is the contract, and the code is what has to move.
+[Architecture](/contributing/architecture) has the layers and the rules that keep them. Most
+packages have a `SPEC.md` under `specs/`, at the package's own path. **Do not modify a
+`SPEC.md`** unless you were asked to: it is the contract, and the code is what has to move.
 
 **Next.** [Contributing](/contributing/) is the whole of it, and [Your first
 patch](/contributing/tutorials/first-patch) takes one change from clone to pull request.
