@@ -519,8 +519,6 @@ from hmz.providers import (
     ways,       # every way in one backend offers, and `env` last
     where,      # the directory one is kept in
     environ,    # what a turn under one is run with
-    dials,      # where a turn under one goes that the account itself does not say:
-                #   its backend's own vendor, for an account signed in to it
 )
 
 from hmz.providers.login import (

@@ -35,7 +35,6 @@ __all__ = [
     "alone",
     "chain",
     "copies",
-    "dials",
     "find",
     "points",
     "providers",
@@ -281,42 +280,6 @@ def serves(one: Provider) -> tuple[str, ...]:
         if profile.name != backends.named(one.cli).name  # pyright: ignore[reportOptionalMemberAccess]
         and backends.serves(one.env, profile.name) is not None
     )
-
-
-def dials(one: Provider) -> tuple[str, ...]:
-    """Where a turn under this account goes that the account itself does not say.
-
-    An account pointed at an endpoint is an account that goes there, and it wrote that down
-    when it was made. One signed in to the vendor wrote nothing down, because the CLI it is
-    for already knows where its vendor is -- so that address is written down about the
-    backend, and this is where it is read back.
-
-    Asked by whatever has to know where a turn will go before it is taken: a machine that
-    lets an agent out to its model and nowhere else has only this to build that from.
-
-    Args:
-      one: The account.
-
-    Returns:
-      The vendor's addresses, as URLs, for an account that was signed in to it. Nothing at
-      all for one pointed at an endpoint of its own -- that endpoint is the account's own and
-      is already written down -- and nothing for a backend whose vendor nobody has written
-      down, which is a thing this cannot answer yet rather than a backend reaching nowhere.
-    """
-    profile = backends.named(one.cli)
-    if profile is None or _pointed(one):
-        return ()
-    return profile.dials
-
-
-def _pointed(one: Provider) -> bool:
-    """Whether this account was given an endpoint of its own to dial.
-
-    Read off what a turn under it is run with, which is where an endpoint lands whichever way
-    the account was made: a variable for a backend that takes one, and the backend's own
-    command line for one that takes settings instead.
-    """
-    return any("://" in said for said in (*one.env.values(), *one.args))
 
 
 def copies(one: Provider, cli: str, name: str = "") -> Provider:

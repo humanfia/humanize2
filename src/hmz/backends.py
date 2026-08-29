@@ -203,13 +203,6 @@ class Profile:
         switch onto a cloud. Named so that a turn under a provider can be run without them --
         a key in a shell profile is a key this CLI would rather have than the one it was
         signed in with, and nothing about that reads as wrong until the bill arrives.
-      dials: Where a turn under an account at this backend's own vendor is taken, as URLs.
-        An account made by signing in writes no endpoint down -- the CLI already knows where
-        its vendor is -- so this is the only place that address is said, and a machine that
-        has to know where such a turn goes before taking it has nowhere else to ask. Written
-        as URLs rather than as names, because a scheme is what says the port. Empty for a
-        backend nobody has written its vendor's addresses down for, which is not the same as
-        one that reaches nowhere: it is one this cannot answer for yet.
     """
 
     name: str
@@ -231,7 +224,6 @@ class Profile:
     creds: tuple[str, ...] = ()
     ways: tuple[Way, ...] = ()
     ambient: tuple[str, ...] = ()
-    dials: tuple[str, ...] = ()
 
     def runs(self) -> str:
         """The command that starts this backend, which is its name unless it says otherwise.
@@ -595,13 +587,6 @@ PROFILES = (
         # provider with somebody's copy of it still exported would hand that provider's token
         # to somebody's endpoint.
         ambient=("CODEX_API_KEY", "CODEX_AUTHAPI_BASE_URL", "OPENAI_BASE_URL"),
-        # Where a turn under a ChatGPT account is taken, where one under an API key is
-        # taken, and where either one's credentials are refreshed.
-        dials=(
-            "https://chatgpt.com",
-            "https://api.openai.com",
-            "https://auth.openai.com",
-        ),
         ways=(
             Way(
                 name="login",
