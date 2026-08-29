@@ -8,9 +8,7 @@ For code:
 
 For `specs/*.md`:
 
-- MUST read a package's SPEC at `specs/`, in a file named for the package: `specs/agents.md`
-  binds `src/hmz/agents`. A package no file is named for is bound by the nearest one above it
-  that has a file, and `specs/SPEC.md` binds `src/hmz` itself.
+- MUST strictly adhere to specs at `specs/`.
 - MUST NOT modify any SPEC UNLESS explicitly instructed to do so.
 - MUST keep code minimal while strictly adhering to the SPEC.
 
@@ -20,5 +18,5 @@ For commits:
 
 For docs:
 
-- MUST update docs once any impl changes lead to misalignment between code and docs.
-- MUST adhere to the minimal spec of [Standard Readme](https://raw.githubusercontent.com/RichardLitt/standard-readme/refs/heads/main/spec.md) for all `README.md`.
+- MUST update docs once any impl changes to avoid misalignment between code and docs.
+- MUST adhere to the minimal spec of [Standard Readme](https://raw.githubusercontent.com/RichardLitt/standard-readme/refs/heads/main/spec.md) for `README.md`.
