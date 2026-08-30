@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event, Failed, Question, Usage, say
+from .event import Event, Failed, Question, Saying, Usage, say
 from .hooks import EVERYWHERE, Moment, Occasion
 
 if TYPE_CHECKING:
@@ -413,7 +413,7 @@ class _AppServer:
           subprocess.CalledProcessError: If the turn failed, or the server stopped mid-turn.
         """
         said = ""
-        saying = _Saying()
+        saying = Saying()
         costing = Usage()
         counted = 0
         while (message := self._read()) is not None:
@@ -425,14 +425,16 @@ class _AppServer:
             payload: dict[str, Any] = told.get("payload") or {}
             match told.get("type"):
                 case "model.streaming":
-                    yield from saying.streamed(payload)
+                    yield from _streamed(saying, payload)
                 case "session.updated" if all(name in payload for name in _ANSWERED):
+                    # The one event that names no message: what has just come back is what
+                    # was being streamed.
                     marked = str(payload.get("assistantMessageId") or "")
-                    # The whole message as the server has it, which is what was streamed plus
-                    # whatever arrived in no delta at all.
-                    for event in saying.ended(
-                        marked, str(payload.get("content") or "")
-                    ):
+                    if content := str(payload.get("content") or ""):
+                        # The whole message as the server has it, which is what was streamed
+                        # plus whatever arrived in no delta at all.
+                        saying.whole("text", content, marked)
+                    for event in saying.ended(marked):
                         if event.kind == "text":
                             said = event.text
                         yield event
@@ -447,6 +449,13 @@ class _AppServer:
                 case "turn.failed":
                     raise Failed(1, self._argv, said, json.dumps(payload))
                 case "turn.completed":
+                    # A turn that ended without the event that closes its last message still
+                    # said what that message said, and words held back for a boundary that
+                    # never came are words the turn swallows.
+                    for event in saying.rest():
+                        if event.kind == "text":
+                            said = event.text
+                        yield event
                     # What the whole turn cost, which is what the server adds up rather than
                     # what this saw: a request whose event arrived after the turn's own would
                     # otherwise be a turn that cost less than it did.
@@ -763,97 +772,38 @@ def _settling(
     return calls
 
 
-class _Saying:
-    """What one model's answer has said so far, and what of it has been shown.
+def _streamed(saying: Saying, payload: dict[str, Any]) -> Iterator[Event]:
+    """Reads one piece of a model's answer, and says what that piece is worth showing.
 
-    The words arrive a fragment at a time and are worth one row of a transcript rather than
-    fifty, so they are gathered here and said whole -- at the moment the agent reaches for
-    something, since what it said before reaching is what says why it reached, and again when
-    the answer ends. What has already been shown is remembered so that the end of a message
-    says only the part of it nobody has seen.
+    Args:
+      saying: What that answer has said so far, which the piece is gathered into.
+      payload: The `model.streaming` payload, as read.
+
+    Yields:
+      The reasoning and the words that led up to a tool call, and then the call itself.
     """
-
-    def __init__(self) -> None:
-        """Initializes a reading in which nothing has been said yet."""
-        #: What has been thought and what has been said, by the message each belongs to, and
-        #: how much of the words have been shown.
-        self._thinking: dict[str, str] = {}
-        self._words: dict[str, str] = {}
-        self._shown: dict[str, int] = {}
-        #: Which message is being streamed, because the event that ends one does not name it:
-        #: what has just come back is what the pieces before it were pieces of.
-        self._latest = ""
-
-    def streamed(self, payload: dict[str, Any]) -> Iterator[Event]:
-        """Reads one piece of a model's answer, and says what that piece is worth showing.
-
-        Args:
-          payload: The `model.streaming` payload, as read.
-
-        Yields:
-          The reasoning and the words that led up to a tool call, and then the call itself.
-        """
-        marked = str(payload.get("assistantMessageId") or "")
-        self._latest = marked or self._latest
-        match payload.get("kind"):
-            case "reasoning_delta":
-                self._thinking[marked] = self._thinking.get(marked, "") + str(
-                    payload.get("delta") or ""
-                )
-            case "text_delta":
-                self._words[marked] = self._words.get(marked, "") + str(
-                    payload.get("delta") or ""
-                )
-            case "tool_call":
-                yield from self._upto(marked, self._words.get(marked, ""))
-                called = str(payload.get("toolName") or "tool")
-                given = cast("dict[str, Any]", payload.get("input") or {})
-                about = str(given.get(_ABOUT.get(called, ""), "") or "") or next(
-                    (
-                        value
-                        for value in given.values()
-                        if isinstance(value, str) and value.strip()
-                    ),
-                    "",
-                )
-                yield Event(kind="tool", text=f"{called} {about}".strip()[:120])
-            case _:  # the pieces of a tool's arguments on the way to the call itself
-                pass
-
-    def ended(self, marked: str, content: str) -> Iterator[Event]:
-        """Says whatever of one message has not been said, now that it has ended.
-
-        Args:
-          marked: The message that ended, or "" for the event that names none -- which is the
-            one the server ends every message with, so the one being streamed is the one meant.
-          content: The whole of it, as the server has it -- which is the deltas put back
-            together, and is what a model that streamed nothing said in one piece.
-
-        Yields:
-          The reasoning and the words nobody has seen yet.
-        """
-        marked = marked or self._latest
-        yield from self._upto(marked, content or self._words.get(marked, ""))
-        self._thinking.pop(marked, None)
-        self._words.pop(marked, None)
-        self._shown.pop(marked, None)
-
-    def _upto(self, marked: str, words: str) -> Iterator[Event]:
-        """Says one message as far as it has got, and remembers how far that was.
-
-        Args:
-          marked: The message.
-          words: The whole of what it has said so far.
-
-        Yields:
-          What it thought, the once, and the words beyond the ones already shown.
-        """
-        if thought := self._thinking.pop(marked, "").strip():
-            yield Event(kind="reasoning", text=thought)
-        rest = words[self._shown.get(marked, 0) :]
-        self._shown[marked] = len(words)
-        if said := rest.strip():
-            yield Event(kind="text", text=said)
+    marked = str(payload.get("assistantMessageId") or "")
+    match payload.get("kind"):
+        case "reasoning_delta":
+            saying.delta("reasoning", str(payload.get("delta") or ""), marked)
+        case "text_delta":
+            saying.delta("text", str(payload.get("delta") or ""), marked)
+        case "tool_call":
+            # What it said before reaching for something is what says why it reached.
+            yield from saying.upto(marked)
+            called = str(payload.get("toolName") or "tool")
+            given = cast("dict[str, Any]", payload.get("input") or {})
+            about = str(given.get(_ABOUT.get(called, ""), "") or "") or next(
+                (
+                    value
+                    for value in given.values()
+                    if isinstance(value, str) and value.strip()
+                ),
+                "",
+            )
+            yield Event(kind="tool", text=f"{called} {about}".strip()[:120])
+        case _:  # the pieces of a tool's arguments on the way to the call itself
+            pass
 
 
 def _spent(counted: dict[str, Any]) -> Usage:

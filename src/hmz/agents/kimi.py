@@ -212,6 +212,11 @@ _KINDS = {
 #: is not shown: an image is not a line of a transcript.
 _BLOCKS = {"text": "text", "thinking": "reasoning", "tool_use": "tool"}
 
+#: The blocks whose words go on arriving after the block does, which is what makes the last of
+#: them half a sentence rather than a thing to show. A tool block is named the moment it is
+#: there and grows no further, so a turn that reaches for one says so as it reaches.
+_GROWS = ("text", "thinking")
+
 #: How each rung of the ladder is set on a Kimi session. The daemon takes one of `yolo`,
 #: `manual` and `auto`, and plan mode beside it. `manual` is the one that is never used: it
 #: asks, and a flow running unattended has nobody to answer -- so an agent that is to change
@@ -655,6 +660,27 @@ class KimiCodeCLISession(SessionBase):
                     # aside as seen would be the one the agent had only started saying. Newest
                     # first, and a turn reads forwards; what has been passed on is not passed on
                     # twice.
+                    #
+                    # And a message readable while it is being written grows its last block in
+                    # place, so a block of words at the end of the newest one is half a
+                    # sentence until something follows it: shown as it stands it is a paragraph
+                    # broken across as many parts as the turn was polled, with the rest of it
+                    # never shown at all, the array having grown no longer. So that one waits
+                    # for the block after it, or for the turn to be over. Only that one: every
+                    # earlier block is finished, and a tool block is whole the moment it is
+                    # there -- a turn that reached for something says so as it reaches.
+                    writing = (
+                        ""
+                        if settled
+                        else next(
+                            (
+                                str(one["id"])
+                                for one in said
+                                if one["role"] == "assistant"
+                            ),
+                            "",
+                        )
+                    )
                     for message in reversed(said):
                         if message["role"] != "assistant":
                             # A word put into the turn, spliced into the conversation at the
@@ -671,7 +697,15 @@ class KimiCodeCLISession(SessionBase):
                                 if self.took(words) is not None:
                                     yield Event(kind="took", text=words)
                             continue
-                        for block in message["content"][shown.get(message["id"], 0) :]:
+                        content = message["content"]
+                        ready = len(content) - (
+                            1
+                            if content
+                            and message["id"] == writing
+                            and str(content[-1].get("type")) in _GROWS
+                            else 0
+                        )
+                        for block in content[shown.get(message["id"], 0) : ready]:
                             kind = _BLOCKS.get(str(block.get("type")))
                             # A tool is named by what it is; everything else is what it says,
                             # which a block keeps under its own name -- text under `text`.
@@ -692,7 +726,7 @@ class KimiCodeCLISession(SessionBase):
                                 # the turn itself, and would then be showing it twice.
                                 say(words, sys.stderr)
                             yield Event(kind=kind, text=words)
-                        shown[message["id"]] = len(message["content"])
+                        shown[message["id"]] = ready
                     # And the answer is taken fresh each time, so that it is what the agent ended
                     # up saying rather than what it had said when it was first readable.
                     for (

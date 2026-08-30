@@ -25,7 +25,7 @@ import yaml
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event, Failed, Unrecoverable, Usage, say
+from .event import Event, Failed, Saying, Unrecoverable, Usage, say
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping
@@ -51,6 +51,9 @@ _KEY_REQUIRED = (
     "and create a key account; or set DEEPSEEK_API_KEY before starting hmz."
 )
 _GOAL = "Use create_goal to pursue this objective until it is complete:\n\n{}"
+
+#: Which of a message's streamed pieces are the agent talking, and which of the two it is.
+_CHUNKS = {"text-delta": "text", "reasoning-delta": "reasoning"}
 
 #: What the model says when the conversation no longer fits in it. Read from the message
 #: because that is where the runtime puts it: a turn refused for length is refused at the
@@ -153,7 +156,10 @@ class DshSession(SessionBase):
         answer = ""
         costing = Usage()
         reason: Mapping[str, Any] | None = None
-        streamed: set[tuple[object, object, str]] = set()
+        # The chunks arrive a token at a time and are gathered into the answers they are
+        # pieces of, one answer per step of the turn: a paragraph is worth one row of a
+        # transcript rather than one row a word.
+        saying = Saying()
         anchored = self._agent.anchor is not None
 
         try:
@@ -184,54 +190,37 @@ class DshSession(SessionBase):
                         if kind == "assistant/chunk":
                             chunk = _mapping(data.get("chunk"))
                             block = str(chunk.get("type") or "")
-                            event_kind = {
-                                "text-delta": "text",
-                                "reasoning-delta": "reasoning",
-                            }.get(block)
+                            event_kind = _CHUNKS.get(block)
                             text = chunk.get("text")
                             if (
                                 event_kind is not None
                                 and isinstance(text, str)
                                 and text
                             ):
-                                streamed.add(
-                                    (data.get("turn"), data.get("step"), event_kind)
-                                )
-                                yield self._shows(Event(kind=event_kind, text=text))
+                                saying.delta(event_kind, text, _answer(data))
                         elif kind == "assistant/message":
                             message = _mapping(data.get("message"))
                             content = message.get("content", data.get("content"))
-                            blocks = (
-                                cast("list[object]", content)
-                                if isinstance(content, list)
-                                else []
-                            )
-                            parts: list[str] = []
-                            for raw in blocks:
-                                block = _mapping(raw)
-                                block_kind = block.get("type")
-                                text = block.get("text")
-                                if block_kind == "text" and isinstance(text, str):
-                                    parts.append(text)
-                                event_kind = (
-                                    block_kind
-                                    if block_kind in ("text", "reasoning")
-                                    else None
-                                )
-                                key = (data.get("turn"), data.get("step"), event_kind)
-                                if (
-                                    event_kind is not None
-                                    and isinstance(text, str)
-                                    and text
-                                    and key not in streamed
-                                ):
-                                    yield self._shows(Event(kind=event_kind, text=text))
-                            answer = "".join(parts)
+                            whole = _whole(content)
+                            for block_kind, said in whole.items():
+                                # The chunks put back together, plus whatever arrived in no
+                                # chunk at all -- the runtime hands both over the same way.
+                                saying.whole(block_kind, said, _answer(data))
+                            answer = whole.get("text", "")
+                            for said_event in saying.ended(_answer(data)):
+                                yield self._shows(said_event)
                             usage = _usage(data.get("usage"))
                             if usage.total:
                                 self._spends(usage)
                                 costing = costing + usage
                         elif kind == "tool/call":
+                            # What it said before reaching for something is what says why it
+                            # reached, so the answer so far goes out ahead of the call. The
+                            # one being streamed, rather than whichever step this call names:
+                            # a call that named none would otherwise flush an answer nobody
+                            # is writing, and the words would come out after the call.
+                            for said_event in saying.upto():
+                                yield self._shows(said_event)
                             name = str(data.get("name") or "tool")
                             about = str(data.get("arguments") or "")
                             yield self._shows(
@@ -246,6 +235,10 @@ class DshSession(SessionBase):
                     ):
                         break
 
+            # A runtime that fell idle without closing its last message still said what it
+            # said, and words held back for a boundary that never came would be swallowed.
+            for said_event in saying.rest():
+                yield self._shows(said_event)
             _require_completed(session_id, answer, reason)
             self._adopt(session_id)
             tokens = int(costing.total)
@@ -266,6 +259,13 @@ class DshSession(SessionBase):
             self._shut()
             raise
         except Exception as why:
+            # What it had said before it fell over, which is how far the turn got and is what
+            # the refusal is reported with. Gathered rather than yielded piece by piece, so a
+            # turn that failed mid-sentence would otherwise carry none of it.
+            for said_event in saying.rest():
+                if said_event.kind == "text":
+                    answer = answer or said_event.text
+                yield self._shows(said_event)
             refused = _refusal(session_id, answer, str(why))
             self._failing(why)
             yield self._shows(Event(kind="failed", text=_diagnostic(refused)))
@@ -619,6 +619,42 @@ def _notification(notification: object) -> tuple[str, Mapping[str, Any]]:
 def _mapping(value: object) -> Mapping[str, Any]:
     """Returns a wire object as a mapping, or an empty one for another JSON value."""
     return cast("Mapping[str, Any]", value) if isinstance(value, dict) else {}
+
+
+def _answer(data: Mapping[str, Any]) -> str:
+    """Which of a turn's answers a chunk or a message belongs to.
+
+    A turn is several steps and each of them says something, so the pieces are gathered by the
+    step they are pieces of: a runtime part way through the next answer must not have the last
+    one's words put back on the end of it.
+
+    Args:
+      data: The event's payload, as read.
+
+    Returns:
+      The pair naming it, as one name.
+    """
+    return f"{data.get('turn')}/{data.get('step')}"
+
+
+def _whole(content: object) -> dict[str, str]:
+    """One finished message, as the whole of each kind of thing it said.
+
+    Args:
+      content: The message's blocks, as read.
+
+    Returns:
+      What it said and what it thought, each in one piece and each only where it said any.
+    """
+    blocks = cast("list[object]", content) if isinstance(content, list) else []
+    said: dict[str, str] = {}
+    for raw in blocks:
+        block = _mapping(raw)
+        kind = str(block.get("type") or "")
+        text = block.get("text")
+        if kind in ("text", "reasoning") and isinstance(text, str):
+            said[kind] = said.get(kind, "") + text
+    return said
 
 
 def _receipt(
