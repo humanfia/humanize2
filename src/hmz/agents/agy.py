@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, cast
@@ -36,6 +37,28 @@ _TAKES = ("auto", "bypass")
 
 #: What a step says it is doing, as the one line a row of a transcript has room for.
 _THINKING = "THINKING"
+
+#: How a local command is written: one name, under a plugin's where it has one. A first word
+#: carrying a directory of its own is a path rather than a name, which is the whole of the
+#: difference the CLI itself can see -- so `/tmp` alone still reads as a command here, and
+#: reads as one to the CLI too, which is the transport that has somewhere to say so.
+_COMMANDED = re.compile(r"/[\w.-]+(?::[\w.-]+)*")
+
+
+def _commanded(prompt: str) -> bool:
+    """Whether this prompt is one of the CLI's own commands rather than work for the agent.
+
+    Args:
+      prompt: The input prompt for this turn.
+
+    Returns:
+      Whether to take it through the finite print transport, which is where the CLI expands
+      its own commands. False for a prompt whose first word is a path -- `/tmp/build.log has
+      the failure in it` is a task, and ending the process a conversation is held open on to
+      run it as a command costs a cold start for nothing.
+    """
+    first = prompt.split(maxsplit=1)[:1]
+    return bool(first) and _COMMANDED.fullmatch(first[0]) is not None
 
 
 def _native(
@@ -163,7 +186,7 @@ class AntigravityCLISession(StreamSessionBase):
         """Keeps ordinary turns warm and preserves print-only command behavior."""
         with self._lock:
             try:
-                if schema is not None or prompt.lstrip().startswith("/"):
+                if schema is not None or _commanded(prompt):
                     self._shut()
                     yield from CommandSessionBase._stream(  # noqa: SLF001 -- shared transport
                         cast("CommandSessionBase", self), prompt, schema=schema
@@ -187,6 +210,10 @@ class AntigravityCLISession(StreamSessionBase):
         environment = self._environ() or dict(os.environ)
         provider = self._agent.node()
         native = _native(Path(self.cwd), environment, provider.args)
+        # The account is here and its credential files are not: what a provider points the
+        # CLI's own paths at is read as the turn goes rather than settled when it starts, so
+        # a token refreshing on its own schedule must not end the conversation's process.
+        # An account that actually moved is `elsewhere`, which restarts on its own.
         return (
             self._agent.config,
             self.effort,
@@ -194,7 +221,6 @@ class AntigravityCLISession(StreamSessionBase):
             self._tools,
             environment,
             provider,
-            snapshot({Path(target) for _, target in provider.swaps()}),
             native if native is not None else object(),
         )
 
@@ -253,9 +279,11 @@ class AntigravityCLISession(StreamSessionBase):
             "--model",
             self._agent.config.model,
             # Project selection can replace the CLI's initial cwd with a scratch directory.
-            # Keep this session's workspace explicit, beside any provider-supplied roots.
+            # Keep this session's workspace explicit, beside any provider-supplied roots --
+            # and as the CLI will find it, which for an anchored turn is the mirror rather
+            # than the path on the machine the work lands on.
             "--add-dir",
-            self.cwd,
+            self._workspace(),
             # Nobody is there to answer it: a flow watches its agent rather than gating it.
             "--dangerously-skip-permissions",
         ]
@@ -309,12 +337,7 @@ class AntigravityCLISession(StreamSessionBase):
                 # Only the final structured value is the answer to the requested schema.
                 self._said = json.dumps(told["structured_output"])
             cumulative = self._cost(cast("dict[str, Any]", told.get("usage") or {}))
-            self._costing = Usage(
-                {
-                    name: max(0.0, value - self._previous.get(name, 0.0))
-                    for name, value in cumulative.items()
-                }
-            )
+            self._costing = self._delta(cumulative)
             # Local commands such as /help report zeros, without resetting the resumed
             # conversation's cumulative usage. Omitted counters retain their baseline.
             self._previous = Usage({**self._previous, **cumulative})
@@ -325,6 +348,30 @@ class AntigravityCLISession(StreamSessionBase):
                 self._failed = failed
             elif status and status != "SUCCESS":
                 self._failed = status
+
+    def _delta(self, cumulative: Usage) -> Usage:
+        """This turn's own cost, out of a counter kept for the whole conversation.
+
+        Args:
+          cumulative: What the conversation has spent by the end of this turn, as read.
+
+        Returns:
+          What this turn spent. A counter that went backwards is a count that started again
+          -- a restarted process, an account this turn fell back to -- and the whole of it is
+          this turn's: read as a smaller difference, or clamped to nothing, a turn would be
+          charged as free. Started again once is started again for every kind at once, since
+          it is the count that restarted rather than one column of it: deciding a column at a
+          time would charge the kinds that happened to pass their old total as differences.
+        """
+        restarted = any(
+            value < self._previous.get(name, 0.0) for name, value in cumulative.items()
+        )
+        return Usage(
+            {
+                name: value if restarted else value - self._previous.get(name, 0.0)
+                for name, value in cumulative.items()
+            }
+        )
 
     def _step(self, told: dict[str, Any]) -> Iterator[Event]:
         """Reads one step of the turn, which is a piece of an answer or a tool going by.

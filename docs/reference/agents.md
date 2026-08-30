@@ -1038,15 +1038,20 @@ before the runtime starts unless its effort is `max`, `high` or `off`.
 ask — and nobody is at a prompt to be asked, so `read-only` and `workspace-write` are refused
 where the agent is made rather than quietly run as the rung above. Ordinary Antigravity
 turns reuse the official CLI process through stream-json input. Slash commands and shaped
-answers use separate print commands, then resume the same conversation. Native usage is
-cumulative across that conversation, including process restarts; each result reports the
-increment for its own turn, and local commands such as `/help` preserve that accounting
-baseline. Shaped answers validate the native final `structured_output`, which excludes
-rejected tool attempts and display metadata. Changed configuration, native customizations,
-or flow resources restart the process, and anchored turns always end it for filesystem synchronization.
-Both modes pass the session directory through the CLI's `--add-dir` flag, preserving any
-additional provider directories. This keeps native project selection from replacing the
-session workspace with a scratch directory.
+answers use separate print commands, then resume the same conversation. A slash command is a
+whole first word — `/help`, `/plugin:install` — so a task that merely opens with a path, as
+`/tmp/build.log has the failure in it` does, is ordinary work and keeps the warm process.
+Native usage is cumulative across that conversation, including process restarts; each result
+reports the increment for its own turn, a counter that started again is charged in full, and
+local commands such as `/help` preserve that accounting baseline. Shaped answers validate the
+native final `structured_output`, which excludes rejected tool attempts and display metadata.
+Changed configuration, native customizations, or flow resources restart the process; a
+provider credential refreshing on its own schedule does not, since the account moving is
+watched separately. Anchored turns always end the process for filesystem synchronization.
+Both modes pass the session directory through the CLI's `--add-dir` flag, as the CLI finds it
+— the anchor's mirror for an anchored turn — preserving any additional provider directories.
+This keeps native project selection from replacing the session workspace with a scratch
+directory.
 
 **Grok Build refuses a level the model does not advertise** rather than ignoring it, so a turn
 asked for one fails with the list of the ones that model takes. The shipped models take
@@ -1499,9 +1504,9 @@ a project's own skills for as long as the session lives, and taken away again af
 | Backend | Where a flow's skills are mounted |
 | --- | --- |
 | `claude` | `.claude/skills/` in the workspace |
-| `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen`, `zcode` | `.agents/skills/`, the directory more than one of these agreed to read |
+| `agy`, `codex`, `grok`, `kimi`, `mimo`, `opencode`, `qwen`, `zcode` | `.agents/skills/`, the directory more than one of these agreed to read |
 | `cursor` | `.cursor/skills/` in the workspace |
-| `agy`, `dsh`, `pi` | — none: none of them reads such a directory the way humanize drives it |
+| `dsh`, `pi` | — none: neither reads such a directory the way humanize drives it |
 
 A project's own skill of that name wins: a flow does not write over what the project keeps.
 They go into the workspace on this machine, so an agent [whose turns land
