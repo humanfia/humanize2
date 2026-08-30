@@ -181,6 +181,10 @@ to receive `fast=false` for the default tier because it can otherwise inherit sa
 parameters. A remote or isolated machine keeps the standard behavior; a host installation
 does not establish the runtime on that machine. This does not convert standard Cursor's
 Cursor API-key authentication and RPC transport into an OpenAI-compatible provider.
+A turn run under an hmz provider is run without `CURSOR_LOCAL_AGENT_API_KEY` unless that
+provider set it, the same as every other name Cursor would take an account from: put the
+key in the provider rather than in a shell profile. The endpoint and the authless switch
+are left alone, so a runtime selected by the environment stays selected.
 
 `pi`, `opencode`, `mimo` and `zcode` name a model as `provider/id` — `openai-codex/gpt-5.5`,
 `opencode/big-pickle`, `xiaomi/mimo-v2.5`, `zai/glm-5.3` — because a model there belongs to the

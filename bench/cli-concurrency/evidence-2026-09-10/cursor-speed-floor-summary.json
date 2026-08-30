@@ -1,0 +1,1551 @@
+{
+  "profile": "cursor local",
+  "requirement": "complete-turn latency at most 2.0x the serial control, cold and warm, p50 and p95 -- at least half the speed the same work has with no concurrency",
+  "confirmed_sessions": 11,
+  "official_distribution": {
+    "official_executable": "/tmp/hmz-cursor-local-official/dist-package/cursor-agent-local",
+    "official_executable_sha256": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+    "official_package_sha256": "6357c08a43f4211edc6141e52d9bc7b4f551ae844706a33741affd7bc01f472d",
+    "launcher": "/tmp/cursor-fixture-config/bin/cursor-agent",
+    "settings": "/tmp/cursor-fixture-config/native/cursor/cli-config.json",
+    "standard_cursor_service_auth_covered": false
+  },
+  "standard_cursor_service_auth_covered": false,
+  "note": "This validates the official local distribution's coding tools and conversation resume under concurrency. Standard Cursor authentication and its service RPC are outside this profile and remain blocked on this host.",
+  "original_source_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+  "candidate_source_sha256": {
+    "hmz/agents/cursor.py": "1837074c03fbcc9c13fdf2bb0144463357b385de40b290783ff6b8eb9321b6d7",
+    "hmz/backends.py": "6558deb28103f9420656fab03b96bde9d6d061f678468df740c31ea93ba58103"
+  },
+  "fixture_endpoint": "http://127.0.0.1:18935",
+  "ratio_convention": "worst_* are the largest of cold/warm p50/p95 for that metric; a trial whose control and candidate runs are the same file took its serial control from the same invocation, at three repeats, and is exploratory",
+  "trials": [
+    {
+      "label": "confirmation, five repeats",
+      "sessions": 11,
+      "repeats": 5,
+      "control_repeats": 5,
+      "passes_speed_floor": true,
+      "worst_complete_turn_ratio": 1.997,
+      "worst_startup_ratio": 1.637,
+      "worst_fixed_work_ratio": 4.502,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.379,
+        "cold.first_event_seconds.p95": 1.494,
+        "cold.work_seconds.p50": 2.33,
+        "cold.work_seconds.p95": 4.396,
+        "cold.result_seconds.p50": 1.507,
+        "cold.result_seconds.p95": 1.864,
+        "warm.first_event_seconds.p50": 1.412,
+        "warm.first_event_seconds.p95": 1.637,
+        "warm.work_seconds.p50": 2.279,
+        "warm.work_seconds.p95": 4.502,
+        "warm.result_seconds.p50": 1.51,
+        "warm.result_seconds.p95": 1.997
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 5,
+            "p50": 5.4609257959527895,
+            "p95": 5.593781078932807,
+            "max": 5.593781078932807
+          },
+          "candidate": {
+            "count": 55,
+            "p50": 8.228397893020883,
+            "p95": 10.428479809081182,
+            "max": 10.560860337107442
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 5,
+            "p50": 5.340950822108425,
+            "p95": 5.480726767913438,
+            "max": 5.480726767913438
+          },
+          "candidate": {
+            "count": 55,
+            "p50": 8.064879996934906,
+            "p95": 10.944556218921207,
+            "max": 11.136405332945287
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 5,
+        "candidate": 55
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-v5-control-n11/results.jsonl",
+      "candidate_run": "/tmp/cursor-v5-candidate-n11/results.jsonl",
+      "note": "Screened: sampling /proc for running tasks on cpus 8-11 outside the hmzbench cgroup over ten minutes found only Kubernetes and host daemons, no foreign benchmark. Bracketed by a second set of serial controls afterwards at cold p50 5.525 s against 5.461 s before, so the host did not move under it."
+    },
+    {
+      "label": "confirmation repeated, five repeats",
+      "sessions": 11,
+      "repeats": 5,
+      "control_repeats": 5,
+      "passes_speed_floor": true,
+      "worst_complete_turn_ratio": 1.729,
+      "worst_startup_ratio": 1.527,
+      "worst_fixed_work_ratio": 3.908,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.421,
+        "cold.first_event_seconds.p95": 1.468,
+        "cold.work_seconds.p50": 2.962,
+        "cold.work_seconds.p95": 3.908,
+        "cold.result_seconds.p50": 1.589,
+        "cold.result_seconds.p95": 1.72,
+        "warm.first_event_seconds.p50": 1.443,
+        "warm.first_event_seconds.p95": 1.527,
+        "warm.work_seconds.p50": 3.126,
+        "warm.work_seconds.p95": 3.529,
+        "warm.result_seconds.p50": 1.622,
+        "warm.result_seconds.p95": 1.729
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 5,
+            "p50": 5.197817444917746,
+            "p95": 5.415817486005835,
+            "max": 5.415817486005835
+          },
+          "candidate": {
+            "count": 55,
+            "p50": 8.261484912945889,
+            "p95": 9.315107216010801,
+            "max": 9.399002537014894
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 5,
+            "p50": 5.1604298170423135,
+            "p95": 5.442639864049852,
+            "max": 5.442639864049852
+          },
+          "candidate": {
+            "count": 55,
+            "p50": 8.370901671005413,
+            "p95": 9.408172062016092,
+            "max": 9.476046729949303
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 5,
+        "candidate": 55
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-v6-control-n11/results.jsonl",
+      "candidate_run": "/tmp/cursor-v6-candidate-n11/results.jsonl",
+      "note": "Independent repeat of the confirmation above, run because the first left 0.003 of margin. Bracketed afterwards at cold p50 5.161 s against 5.198 s before."
+    },
+    {
+      "label": "rung above, five repeats",
+      "sessions": 12,
+      "repeats": 5,
+      "control_repeats": 5,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.044,
+      "worst_startup_ratio": 1.637,
+      "worst_fixed_work_ratio": 5.382,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.496,
+        "cold.first_event_seconds.p95": 1.6,
+        "cold.work_seconds.p50": 3.938,
+        "cold.work_seconds.p95": 5.382,
+        "cold.result_seconds.p50": 1.806,
+        "cold.result_seconds.p95": 2.044,
+        "warm.first_event_seconds.p50": 1.525,
+        "warm.first_event_seconds.p95": 1.637,
+        "warm.work_seconds.p50": 4.28,
+        "warm.work_seconds.p95": 4.939,
+        "warm.result_seconds.p50": 1.817,
+        "warm.result_seconds.p95": 1.963
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 5,
+            "p50": 5.1559914810350165,
+            "p95": 5.261742651928216,
+            "max": 5.261742651928216
+          },
+          "candidate": {
+            "count": 60,
+            "p50": 9.309327284514438,
+            "p95": 10.756504879915155,
+            "max": 10.870041489019059
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 5,
+            "p50": 5.176879451028071,
+            "p95": 5.2205525760073215,
+            "max": 5.2205525760073215
+          },
+          "candidate": {
+            "count": 60,
+            "p50": 9.407375406473875,
+            "p95": 10.24661281099543,
+            "max": 10.724757520016283
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 5,
+        "candidate": 60
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-v3-control-n12/results.jsonl",
+      "candidate_run": "/tmp/cursor-v3-candidate-n12/results.jsonl"
+    },
+    {
+      "label": "rung above, five repeats, earlier attempt",
+      "sessions": 12,
+      "repeats": 5,
+      "control_repeats": 5,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.085,
+      "worst_startup_ratio": 1.62,
+      "worst_fixed_work_ratio": 6.178,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.535,
+        "cold.first_event_seconds.p95": 1.62,
+        "cold.work_seconds.p50": 4.762,
+        "cold.work_seconds.p95": 6.178,
+        "cold.result_seconds.p50": 1.865,
+        "cold.result_seconds.p95": 2.085,
+        "warm.first_event_seconds.p50": 1.557,
+        "warm.first_event_seconds.p95": 1.613,
+        "warm.work_seconds.p50": 4.354,
+        "warm.work_seconds.p95": 5.174,
+        "warm.result_seconds.p50": 1.821,
+        "warm.result_seconds.p95": 1.988
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 5,
+            "p50": 5.082744362996891,
+            "p95": 5.142390822060406,
+            "max": 5.142390822060406
+          },
+          "candidate": {
+            "count": 60,
+            "p50": 9.477298530982807,
+            "p95": 10.72005524893757,
+            "max": 10.776739079039544
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 5,
+            "p50": 5.084667459945194,
+            "p95": 5.294034759979695,
+            "max": 5.294034759979695
+          },
+          "candidate": {
+            "count": 60,
+            "p50": 9.25765974202659,
+            "p95": 10.522678561974317,
+            "max": 10.615567069966346
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 5,
+        "candidate": 60
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          16,
+          17,
+          18,
+          19
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-control-n12/results.jsonl",
+      "candidate_run": "/tmp/cursor-candidate-n12/results.jsonl"
+    },
+    {
+      "label": "retained failure, contended cores",
+      "sessions": 11,
+      "repeats": 5,
+      "control_repeats": 5,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 3.197,
+      "worst_startup_ratio": 2.342,
+      "worst_fixed_work_ratio": 11.923,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.835,
+        "cold.first_event_seconds.p95": 2.107,
+        "cold.work_seconds.p50": 9.459,
+        "cold.work_seconds.p95": 11.923,
+        "cold.result_seconds.p50": 2.648,
+        "cold.result_seconds.p95": 3.116,
+        "warm.first_event_seconds.p50": 1.913,
+        "warm.first_event_seconds.p95": 2.342,
+        "warm.work_seconds.p50": 8.842,
+        "warm.work_seconds.p95": 11.195,
+        "warm.result_seconds.p50": 2.711,
+        "warm.result_seconds.p95": 3.197
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 5,
+            "p50": 5.007566876010969,
+            "p95": 5.097715173964389,
+            "max": 5.097715173964389
+          },
+          "candidate": {
+            "count": 55,
+            "p50": 13.257741276989691,
+            "p95": 15.887017107917927,
+            "max": 16.45178127102554
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 5,
+            "p50": 5.016340372036211,
+            "p95": 5.116677618934773,
+            "max": 5.116677618934773
+          },
+          "candidate": {
+            "count": 55,
+            "p50": 13.600513739977032,
+            "p95": 16.35804993205238,
+            "max": 17.041742800036445
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 5,
+        "candidate": 55
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-v3-control-n11/results.jsonl",
+      "candidate_run": "/tmp/cursor-v3-candidate-n11/results.jsonl",
+      "note": "Not a result: this pair ran on cpus 4-7 while a sibling unit's `systemd-run --user --scope` benchmark was scheduled on the same cores. The measurement cgroups are `cpuset.cpus.partition=member` with no `cpuset.cpus.exclusive`, so they confine what is inside them and reserve nothing against what is not. cpu_busy_cores peaked at 3.52 against a 4.0 quota while this pair's own serial controls were normal."
+    },
+    {
+      "label": "retained failure, contended cores",
+      "sessions": 11,
+      "repeats": 5,
+      "control_repeats": 5,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.921,
+      "worst_startup_ratio": 2.069,
+      "worst_fixed_work_ratio": 7.924,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.855,
+        "cold.first_event_seconds.p95": 2.069,
+        "cold.work_seconds.p50": 6.463,
+        "cold.work_seconds.p95": 7.924,
+        "cold.result_seconds.p50": 2.497,
+        "cold.result_seconds.p95": 2.921,
+        "warm.first_event_seconds.p50": 2.008,
+        "warm.first_event_seconds.p95": 2.033,
+        "warm.work_seconds.p50": 7.531,
+        "warm.work_seconds.p95": 6.515,
+        "warm.result_seconds.p50": 2.769,
+        "warm.result_seconds.p95": 2.693
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 5,
+            "p50": 5.453977689961903,
+            "p95": 5.5551684950478375,
+            "max": 5.5551684950478375
+          },
+          "candidate": {
+            "count": 55,
+            "p50": 13.62010077002924,
+            "p95": 16.22473126393743,
+            "max": 16.69456330104731
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 5,
+            "p50": 5.270607104990631,
+            "p95": 5.764963379013352,
+            "max": 5.764963379013352
+          },
+          "candidate": {
+            "count": 55,
+            "p50": 14.594656324014068,
+            "p95": 15.52304473600816,
+            "max": 16.11330429604277
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 5,
+        "candidate": 55
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-v4-control-n11/results.jsonl",
+      "candidate_run": "/tmp/cursor-v4-candidate-n11/results.jsonl",
+      "note": "Second occurrence of the same contention on cpus 4-7, with the same signature."
+    },
+    {
+      "label": "exploratory ladder, three repeats",
+      "sessions": 8,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": true,
+      "worst_complete_turn_ratio": 1.492,
+      "worst_startup_ratio": 1.392,
+      "worst_fixed_work_ratio": 2.493,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.303,
+        "cold.first_event_seconds.p95": 1.365,
+        "cold.work_seconds.p50": 1.886,
+        "cold.work_seconds.p95": 2.493,
+        "cold.result_seconds.p50": 1.386,
+        "cold.result_seconds.p95": 1.492,
+        "warm.first_event_seconds.p50": 1.198,
+        "warm.first_event_seconds.p95": 1.392,
+        "warm.work_seconds.p50": 0.894,
+        "warm.work_seconds.p95": 2.073,
+        "warm.result_seconds.p50": 1.151,
+        "warm.result_seconds.p95": 1.489
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.324940096936189,
+            "p95": 5.425151678966358,
+            "max": 5.425151678966358
+          },
+          "candidate": {
+            "count": 24,
+            "p50": 7.379803319985513,
+            "p95": 8.096831553033553,
+            "max": 8.229792805039324
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.477262341068126,
+            "p95": 5.497027789941058,
+            "max": 5.497027789941058
+          },
+          "candidate": {
+            "count": 24,
+            "p50": 6.304239657532889,
+            "p95": 8.186352707911283,
+            "max": 8.22752957092598
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 24
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-a/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-a/results.jsonl"
+    },
+    {
+      "label": "exploratory ladder, three repeats",
+      "sessions": 16,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.389,
+      "worst_startup_ratio": 1.804,
+      "worst_fixed_work_ratio": 7.239,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.692,
+        "cold.first_event_seconds.p95": 1.772,
+        "cold.work_seconds.p50": 7.239,
+        "cold.work_seconds.p95": 6.822,
+        "cold.result_seconds.p50": 2.34,
+        "cold.result_seconds.p95": 2.389,
+        "warm.first_event_seconds.p50": 1.724,
+        "warm.first_event_seconds.p95": 1.804,
+        "warm.work_seconds.p50": 5.889,
+        "warm.work_seconds.p95": 6.103,
+        "warm.result_seconds.p50": 2.27,
+        "warm.result_seconds.p95": 2.381
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.324940096936189,
+            "p95": 5.425151678966358,
+            "max": 5.425151678966358
+          },
+          "candidate": {
+            "count": 48,
+            "p50": 12.461196766467765,
+            "p95": 12.962144610937685,
+            "max": 13.056294096051715
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.477262341068126,
+            "p95": 5.497027789941058,
+            "max": 5.497027789941058
+          },
+          "candidate": {
+            "count": 48,
+            "p50": 12.433282979473006,
+            "p95": 13.088989284005947,
+            "max": 13.443259224994108
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 48
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-a/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-a/results.jsonl"
+    },
+    {
+      "label": "exploratory ladder, three repeats",
+      "sessions": 9,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": true,
+      "worst_complete_turn_ratio": 1.559,
+      "worst_startup_ratio": 1.424,
+      "worst_fixed_work_ratio": 2.722,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.333,
+        "cold.first_event_seconds.p95": 1.424,
+        "cold.work_seconds.p50": 2.355,
+        "cold.work_seconds.p95": 2.722,
+        "cold.result_seconds.p50": 1.458,
+        "cold.result_seconds.p95": 1.559,
+        "warm.first_event_seconds.p50": 1.302,
+        "warm.first_event_seconds.p95": 1.393,
+        "warm.work_seconds.p50": 1.093,
+        "warm.work_seconds.p95": 2.241,
+        "warm.result_seconds.p50": 1.276,
+        "warm.result_seconds.p95": 1.432
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.193581608938985,
+            "p95": 5.2559706890024245,
+            "max": 5.2559706890024245
+          },
+          "candidate": {
+            "count": 27,
+            "p50": 7.572087758919224,
+            "p95": 8.195847911993042,
+            "max": 8.506197635899298
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.121114543988369,
+            "p95": 5.507357824011706,
+            "max": 5.507357824011706
+          },
+          "candidate": {
+            "count": 27,
+            "p50": 6.535541297052987,
+            "p95": 7.887934988015331,
+            "max": 7.967014509020373
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 27
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          24,
+          25,
+          26,
+          27
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-c/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-c/results.jsonl"
+    },
+    {
+      "label": "exploratory ladder, three repeats",
+      "sessions": 10,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": true,
+      "worst_complete_turn_ratio": 1.522,
+      "worst_startup_ratio": 1.389,
+      "worst_fixed_work_ratio": 2.561,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.324,
+        "cold.first_event_seconds.p95": 1.389,
+        "cold.work_seconds.p50": 2.543,
+        "cold.work_seconds.p95": 2.561,
+        "cold.result_seconds.p50": 1.467,
+        "cold.result_seconds.p95": 1.522,
+        "warm.first_event_seconds.p50": 1.353,
+        "warm.first_event_seconds.p95": 1.336,
+        "warm.work_seconds.p50": 1.82,
+        "warm.work_seconds.p95": 2.169,
+        "warm.result_seconds.p50": 1.403,
+        "warm.result_seconds.p95": 1.376
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.193581608938985,
+            "p95": 5.2559706890024245,
+            "max": 5.2559706890024245
+          },
+          "candidate": {
+            "count": 30,
+            "p50": 7.6167331335600466,
+            "p95": 7.9989881250076,
+            "max": 8.141177036100999
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.121114543988369,
+            "p95": 5.507357824011706,
+            "max": 5.507357824011706
+          },
+          "candidate": {
+            "count": 30,
+            "p50": 7.183622665528674,
+            "p95": 7.578207826940343,
+            "max": 7.738538785954006
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 30
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          24,
+          25,
+          26,
+          27
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-c/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-c/results.jsonl"
+    },
+    {
+      "label": "exploratory ladder, three repeats",
+      "sessions": 11,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": true,
+      "worst_complete_turn_ratio": 1.679,
+      "worst_startup_ratio": 1.457,
+      "worst_fixed_work_ratio": 3.516,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.395,
+        "cold.first_event_seconds.p95": 1.44,
+        "cold.work_seconds.p50": 3.318,
+        "cold.work_seconds.p95": 3.516,
+        "cold.result_seconds.p50": 1.612,
+        "cold.result_seconds.p95": 1.679,
+        "warm.first_event_seconds.p50": 1.457,
+        "warm.first_event_seconds.p95": 1.457,
+        "warm.work_seconds.p50": 3.23,
+        "warm.work_seconds.p95": 3.322,
+        "warm.result_seconds.p50": 1.665,
+        "warm.result_seconds.p95": 1.599
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.193581608938985,
+            "p95": 5.2559706890024245,
+            "max": 5.2559706890024245
+          },
+          "candidate": {
+            "count": 33,
+            "p50": 8.371809161966667,
+            "p95": 8.825217684963718,
+            "max": 8.868458035052754
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.121114543988369,
+            "p95": 5.507357824011706,
+            "max": 5.507357824011706
+          },
+          "candidate": {
+            "count": 33,
+            "p50": 8.528220732929185,
+            "p95": 8.804556477000006,
+            "max": 9.017654979019426
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 33
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          24,
+          25,
+          26,
+          27
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-c/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-c/results.jsonl"
+    },
+    {
+      "label": "retained failure, two of this unit's own benchmarks in flight at once",
+      "sessions": 10,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 3.627,
+      "worst_startup_ratio": 2.877,
+      "worst_fixed_work_ratio": 11.331,
+      "ratios": {
+        "cold.first_event_seconds.p50": 2.432,
+        "cold.first_event_seconds.p95": 2.877,
+        "cold.work_seconds.p50": 11.331,
+        "cold.work_seconds.p95": 6.918,
+        "cold.result_seconds.p50": 3.508,
+        "cold.result_seconds.p95": 3.627,
+        "warm.first_event_seconds.p50": 2.296,
+        "warm.first_event_seconds.p95": 2.543,
+        "warm.work_seconds.p50": 10.362,
+        "warm.work_seconds.p95": 7.842,
+        "warm.result_seconds.p50": 3.357,
+        "warm.result_seconds.p95": 3.121
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.285481911036186,
+            "p95": 6.16736005502753,
+            "max": 6.16736005502753
+          },
+          "candidate": {
+            "count": 30,
+            "p50": 18.540613997494802,
+            "p95": 22.372098515974358,
+            "max": 22.37886624899693
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.505578623036854,
+            "p95": 6.398559590918012,
+            "max": 6.398559590918012
+          },
+          "candidate": {
+            "count": 30,
+            "p50": 18.48438394803088,
+            "p95": 19.968158897943795,
+            "max": 21.631567196920514
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 30
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-b/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-b/results.jsonl",
+      "note": "Not a result: reported worse than sixteen sessions in the same ladder because a second benchmark of this unit's was running in another group at the same time."
+    },
+    {
+      "label": "exploratory ladder, three repeats, same contended window as the row above",
+      "sessions": 12,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.625,
+      "worst_startup_ratio": 2.46,
+      "worst_fixed_work_ratio": 6.772,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.831,
+        "cold.first_event_seconds.p95": 2.46,
+        "cold.work_seconds.p50": 6.128,
+        "cold.work_seconds.p95": 3.731,
+        "cold.result_seconds.p50": 2.469,
+        "cold.result_seconds.p95": 2.625,
+        "warm.first_event_seconds.p50": 1.694,
+        "warm.first_event_seconds.p95": 1.62,
+        "warm.work_seconds.p50": 6.772,
+        "warm.work_seconds.p95": 5.103,
+        "warm.result_seconds.p50": 2.339,
+        "warm.result_seconds.p95": 2.127
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.285481911036186,
+            "p95": 6.16736005502753,
+            "max": 6.16736005502753
+          },
+          "candidate": {
+            "count": 36,
+            "p50": 13.049264478497207,
+            "p95": 16.19223147095181,
+            "max": 16.320049131056294
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.505578623036854,
+            "p95": 6.398559590918012,
+            "max": 6.398559590918012
+          },
+          "candidate": {
+            "count": 36,
+            "p50": 12.876571832515765,
+            "p95": 13.612838986096904,
+            "max": 14.067534578032792
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 36
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-b/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-b/results.jsonl"
+    },
+    {
+      "label": "exploratory ladder, three repeats",
+      "sessions": 12,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.091,
+      "worst_startup_ratio": 1.663,
+      "worst_fixed_work_ratio": 6.071,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.524,
+        "cold.first_event_seconds.p95": 1.663,
+        "cold.work_seconds.p50": 4.285,
+        "cold.work_seconds.p95": 6.071,
+        "cold.result_seconds.p50": 1.818,
+        "cold.result_seconds.p95": 2.091,
+        "warm.first_event_seconds.p50": 1.548,
+        "warm.first_event_seconds.p95": 1.653,
+        "warm.work_seconds.p50": 4.465,
+        "warm.work_seconds.p95": 5.288,
+        "warm.result_seconds.p50": 1.834,
+        "warm.result_seconds.p95": 1.997
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.16200111201033,
+            "p95": 5.187364064971916,
+            "max": 5.187364064971916
+          },
+          "candidate": {
+            "count": 36,
+            "p50": 9.384712969942484,
+            "p95": 10.848391255945899,
+            "max": 10.865058831986971
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.1088765929453075,
+            "p95": 5.15577538695652,
+            "max": 5.15577538695652
+          },
+          "candidate": {
+            "count": 36,
+            "p50": 9.368390218529385,
+            "p95": 10.296813567052595,
+            "max": 10.40090132097248
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 36
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          24,
+          25,
+          26,
+          27
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-d/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-d/results.jsonl"
+    },
+    {
+      "label": "exploratory ladder, three repeats",
+      "sessions": 14,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.285,
+      "worst_startup_ratio": 1.75,
+      "worst_fixed_work_ratio": 6.677,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.625,
+        "cold.first_event_seconds.p95": 1.75,
+        "cold.work_seconds.p50": 6.351,
+        "cold.work_seconds.p95": 6.591,
+        "cold.result_seconds.p50": 2.134,
+        "cold.result_seconds.p95": 2.285,
+        "warm.first_event_seconds.p50": 1.64,
+        "warm.first_event_seconds.p95": 1.7,
+        "warm.work_seconds.p50": 6.143,
+        "warm.work_seconds.p95": 6.677,
+        "warm.result_seconds.p50": 2.132,
+        "warm.result_seconds.p95": 2.189
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.16200111201033,
+            "p95": 5.187364064971916,
+            "max": 5.187364064971916
+          },
+          "candidate": {
+            "count": 42,
+            "p50": 11.01549092901405,
+            "p95": 11.851676029036753,
+            "max": 11.962658616015688
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.1088765929453075,
+            "p95": 5.15577538695652,
+            "max": 5.15577538695652
+          },
+          "candidate": {
+            "count": 42,
+            "p50": 10.893318369460758,
+            "p95": 11.285080305999145,
+            "max": 11.453985069994815
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 42
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          24,
+          25,
+          26,
+          27
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-d/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-d/results.jsonl"
+    },
+    {
+      "label": "exploratory ladder, three repeats, after the occupancy-guard fix",
+      "sessions": 12,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.014,
+      "worst_startup_ratio": 1.654,
+      "worst_fixed_work_ratio": 5.273,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.539,
+        "cold.first_event_seconds.p95": 1.625,
+        "cold.work_seconds.p50": 5.079,
+        "cold.work_seconds.p95": 5.273,
+        "cold.result_seconds.p50": 1.901,
+        "cold.result_seconds.p95": 2.014,
+        "warm.first_event_seconds.p50": 1.582,
+        "warm.first_event_seconds.p95": 1.654,
+        "warm.work_seconds.p50": 4.648,
+        "warm.work_seconds.p95": 5.039,
+        "warm.result_seconds.p50": 1.915,
+        "warm.result_seconds.p95": 1.965
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.055109009030275,
+            "p95": 5.202593269990757,
+            "max": 5.202593269990757
+          },
+          "candidate": {
+            "count": 36,
+            "p50": 9.608844527450856,
+            "p95": 10.47661547397729,
+            "max": 10.544384284992702
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.01626052102074,
+            "p95": 5.150671547045931,
+            "max": 5.150671547045931
+          },
+          "candidate": {
+            "count": 36,
+            "p50": 9.606199907953851,
+            "p95": 10.123413317953236,
+            "max": 10.262713597971015
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 36
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          16,
+          17,
+          18,
+          19
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-e/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-e/results.jsonl"
+    },
+    {
+      "label": "exploratory ladder, three repeats, after the occupancy-guard fix",
+      "sessions": 16,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.594,
+      "worst_startup_ratio": 1.92,
+      "worst_fixed_work_ratio": 9.234,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.758,
+        "cold.first_event_seconds.p95": 1.823,
+        "cold.work_seconds.p50": 9.234,
+        "cold.work_seconds.p95": 8.246,
+        "cold.result_seconds.p50": 2.528,
+        "cold.result_seconds.p95": 2.542,
+        "warm.first_event_seconds.p50": 1.827,
+        "warm.first_event_seconds.p95": 1.92,
+        "warm.work_seconds.p50": 8.54,
+        "warm.work_seconds.p95": 8.368,
+        "warm.result_seconds.p50": 2.547,
+        "warm.result_seconds.p95": 2.594
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.055109009030275,
+            "p95": 5.202593269990757,
+            "max": 5.202593269990757
+          },
+          "candidate": {
+            "count": 48,
+            "p50": 12.777689792972524,
+            "p95": 13.226497637922876,
+            "max": 13.263908302993514
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.01626052102074,
+            "p95": 5.150671547045931,
+            "max": 5.150671547045931
+          },
+          "candidate": {
+            "count": 48,
+            "p50": 12.77814136754023,
+            "p95": 13.360700880992226,
+            "max": 13.398592656012625
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 48
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          16,
+          17,
+          18,
+          19
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-e/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-e/results.jsonl"
+    },
+    {
+      "label": "exploratory ladder, three repeats, after the occupancy-guard fix",
+      "sessions": 20,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 3.036,
+      "worst_startup_ratio": 2.133,
+      "worst_fixed_work_ratio": 11.364,
+      "ratios": {
+        "cold.first_event_seconds.p50": 2.024,
+        "cold.first_event_seconds.p95": 2.065,
+        "cold.work_seconds.p50": 11.364,
+        "cold.work_seconds.p95": 9.889,
+        "cold.result_seconds.p50": 2.977,
+        "cold.result_seconds.p95": 2.957,
+        "warm.first_event_seconds.p50": 2.071,
+        "warm.first_event_seconds.p95": 2.133,
+        "warm.work_seconds.p50": 10.768,
+        "warm.work_seconds.p95": 10.278,
+        "warm.result_seconds.p50": 3.034,
+        "warm.result_seconds.p95": 3.036
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.055109009030275,
+            "p95": 5.202593269990757,
+            "max": 5.202593269990757
+          },
+          "candidate": {
+            "count": 60,
+            "p50": 15.049146801058669,
+            "p95": 15.38162425509654,
+            "max": 15.4651218339568
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.01626052102074,
+            "p95": 5.150671547045931,
+            "max": 5.150671547045931
+          },
+          "candidate": {
+            "count": 60,
+            "p50": 15.21884010406211,
+            "p95": 15.637454467942007,
+            "max": 15.768672346021049
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 60
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          16,
+          17,
+          18,
+          19
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-orig-e/results.jsonl",
+      "candidate_run": "/tmp/cursor-orig-e/results.jsonl"
+    },
+    {
+      "label": "rejected optional profile: NODE_OPTIONS=--v8-pool-size=2 with UV_THREADPOOL_SIZE=2 for control and candidate alike",
+      "sessions": 16,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.601,
+      "worst_startup_ratio": 1.888,
+      "worst_fixed_work_ratio": 8.898,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.742,
+        "cold.first_event_seconds.p95": 1.861,
+        "cold.work_seconds.p50": 8.898,
+        "cold.work_seconds.p95": 8.793,
+        "cold.result_seconds.p50": 2.478,
+        "cold.result_seconds.p95": 2.601,
+        "warm.first_event_seconds.p50": 1.763,
+        "warm.first_event_seconds.p95": 1.888,
+        "warm.work_seconds.p50": 7.711,
+        "warm.work_seconds.p95": 8.016,
+        "warm.result_seconds.p50": 2.437,
+        "warm.result_seconds.p95": 2.542
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.070695357047953,
+            "p95": 5.185209289076738,
+            "max": 5.185209289076738
+          },
+          "candidate": {
+            "count": 48,
+            "p50": 12.565856820961926,
+            "p95": 13.487884013098665,
+            "max": 13.62969906104263
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.119432206032798,
+            "p95": 5.168280225014314,
+            "max": 5.168280225014314
+          },
+          "candidate": {
+            "count": 48,
+            "p50": 12.475578588491771,
+            "p95": 13.138223304064013,
+            "max": 13.389124703011476
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 48
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          28,
+          29,
+          30,
+          31
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-pool2/results.jsonl",
+      "candidate_run": "/tmp/cursor-pool2/results.jsonl",
+      "note": "Peak threads at one session fell from 72 to 55 and the ratio did not improve against the default profile's neighbouring 2.389 at the same width."
+    },
+    {
+      "label": "rejected optional profile: NODE_COMPILE_CACHE pointed at a path Node cannot use, for control and candidate alike",
+      "sessions": 12,
+      "repeats": 3,
+      "control_repeats": 3,
+      "passes_speed_floor": false,
+      "worst_complete_turn_ratio": 2.234,
+      "worst_startup_ratio": 1.809,
+      "worst_fixed_work_ratio": 6.447,
+      "ratios": {
+        "cold.first_event_seconds.p50": 1.552,
+        "cold.first_event_seconds.p95": 1.725,
+        "cold.work_seconds.p50": 5.274,
+        "cold.work_seconds.p95": 6.447,
+        "cold.result_seconds.p50": 1.943,
+        "cold.result_seconds.p95": 2.234,
+        "warm.first_event_seconds.p50": 1.584,
+        "warm.first_event_seconds.p95": 1.809,
+        "warm.work_seconds.p50": 5.215,
+        "warm.work_seconds.p95": 5.482,
+        "warm.result_seconds.p50": 1.965,
+        "warm.result_seconds.p95": 2.096
+      },
+      "complete_turn_seconds": {
+        "cold": {
+          "control": {
+            "count": 3,
+            "p50": 5.3485949989408255,
+            "p95": 5.416984386974946,
+            "max": 5.416984386974946
+          },
+          "candidate": {
+            "count": 36,
+            "p50": 10.391080051951576,
+            "p95": 12.101915563922375,
+            "max": 12.291648614918813
+          }
+        },
+        "warm": {
+          "control": {
+            "count": 3,
+            "p50": 5.338022220064886,
+            "p95": 5.395098511013202,
+            "max": 5.395098511013202
+          },
+          "candidate": {
+            "count": 36,
+            "p50": 10.489754498528782,
+            "p95": 11.308914843015373,
+            "max": 11.822870996082202
+          }
+        }
+      },
+      "correct_task_pairs": {
+        "control": 3,
+        "candidate": 36
+      },
+      "failed_task_pairs": {
+        "control": 0,
+        "candidate": 0
+      },
+      "cleanup_survivors": [],
+      "limits": {
+        "cpu_quota_cores": 4.0,
+        "allowed_cpus": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "memory_max_bytes": 17179869184,
+        "memory_swap_max_bytes": 0
+      },
+      "control_run": "/tmp/cursor-cacheoff/results.jsonl",
+      "candidate_run": "/tmp/cursor-cacheoff/results.jsonl",
+      "note": "Measures what the cache the official launcher already sets is worth at the deciding rung: bundle load at one session rose from 472 ms to 654 ms and this ratio from 2.014 to 2.234."
+    }
+  ]
+}

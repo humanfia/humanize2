@@ -547,3 +547,47 @@ def test_machine_runtime_is_not_inferred_from_the_host(
     )
     assert not _local_runtime(agent, str(tmp_path))
     assert agent._anchor is None  # Detection must not start either machine.
+
+
+def test_a_local_runtime_key_left_about_does_not_outrank_the_provider(
+    cursor: _Calls, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The CLI takes the key its own local runtime is served under from the environment too."""
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize"))
+    monkeypatch.setenv("CURSOR_LOCAL_AGENT_BASE_URL", "http://somebody-else/v1")
+    monkeypatch.setenv("CURSOR_LOCAL_AGENT_API_KEY", "somebody-elses-key")
+    providers.add("cursor", "account", env={"CURSOR_API_KEY": "the-provider-key"})
+    agent = CursorAgent(
+        CursorAgentConfig(model="composer-2.5", effort="", provider="account")
+    )
+    environment = agent.new()._environ()
+
+    assert environment is not None
+    assert environment["CURSOR_API_KEY"] == "the-provider-key"
+    assert "CURSOR_LOCAL_AGENT_API_KEY" not in environment
+    # Which runtime, rather than whose account: taken away, the model spelling this turn
+    # was built with would describe a turn that no longer happens.
+    assert environment["CURSOR_LOCAL_AGENT_BASE_URL"] == "http://somebody-else/v1"
+
+
+def test_a_provider_that_is_the_local_runtime_keeps_what_it_set(
+    cursor: _Calls, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hushed is every name the provider did not set: its own key stands."""
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize"))
+    providers.add(
+        "cursor",
+        "local",
+        env={
+            "CURSOR_LOCAL_AGENT_BASE_URL": "http://127.0.0.1:1/v1",
+            "CURSOR_LOCAL_AGENT_API_KEY": "the-provider-key",
+        },
+    )
+    agent = CursorAgent(
+        CursorAgentConfig(model="composer-2.5", effort="", provider="local")
+    )
+    environment = agent.new()._environ()
+
+    assert environment is not None
+    assert environment["CURSOR_LOCAL_AGENT_BASE_URL"] == "http://127.0.0.1:1/v1"
+    assert environment["CURSOR_LOCAL_AGENT_API_KEY"] == "the-provider-key"
