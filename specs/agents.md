@@ -19,7 +19,8 @@
 ├── opencode.py
 ├── pi.py
 ├── skills.py
-└── tools.py
+├── tools.py
+└── watchdog.py
 ```
 
 ## `__init__.py`
@@ -278,6 +279,107 @@ def skills(backend: str, where: Path | str | None = None) -> list[Skill]:
   person installed is not something a flow is entitled to rewrite, and a list adjusted here
   while the CLI's own list said otherwise would be two answers to one question.
 
+## `watchdog.py`
+
+```python
+WATCHDOG = "HUMANIZE_WATCHDOG"
+
+
+def silence(backend: str) -> float: ...
+
+
+@contextlib.contextmanager
+def held(agent: AgentBase) -> Generator[None]: ...
+
+
+class Watchdog:
+    def __init__(
+        self,
+        session: SessionBase,
+        *,
+        riding: Callable[[], subprocess.Popen[str] | None] | None = None,
+        window: float | None = None,
+    ) -> None: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(self, kind, value, traceback) -> None: ...
+
+    def saw(self) -> None:
+        """The backend said something, so the clock starts again."""
+
+    @contextlib.contextmanager
+    def held(self) -> Generator[None]:
+        """Stops the clock while the turn waits on something that is not its backend."""
+
+    def wedged(self) -> Failed | None:
+        """What the watchdog decided, or None while nothing has gone wrong."""
+```
+
+A turn that has stopped saying anything, noticed and dealt with rather than waited on.
+
+- Every read a turn blocks on MUST be under one of these. A backend that answers ends the turn
+  and a backend that exits fails it, and both are already handled; the third thing a backend
+  can do is stay up, hold its stream open and never write to it again, and no read loop can
+  see that for itself. Unwatched, that is a flow hung until a person notices -- which on a
+  fleet of conversations is hours.
+- The clock MUST be patted by anything the backend sends, a line that turned into no event
+  included: this is liveness rather than progress, and a CLI writing protocol nobody shows is
+  a CLI that has not wedged.
+- A window MUST come from `hmz.backends` rather than being chosen here, and MUST be generous.
+  A turn thinks for minutes and says nothing for most of them, so a window short enough to
+  catch a wedge quickly is a window that kills healthy turns -- and a wedge noticed late costs
+  the time it was wedged, where a healthy turn shot costs the work. `WATCHDOG` MUST override
+  every backend's own, and a window of zero or less MUST mean no watchdog at all.
+- The clock MUST NOT run while the turn is waiting on something that is not its backend. A
+  turn stopped to ask a person is a turn its backend owes nothing -- the CLI is sitting there
+  with nothing being asked of it -- and so is one whose event is in the hands of a watcher or
+  a hook. Counted as silence, somebody taking a quarter of an hour over a permission prompt
+  would have the healthy CLI behind it killed for the delay they caused. Every clock of an
+  agent MUST stop while that agent has a question outstanding, rather than only the one whose
+  session asked: a backend driven through an app server asks from a reader of its own, on
+  behalf of whichever of its threads is running.
+- What is done about a wedge MUST be a ladder, gentlest first: look at the process, ask the
+  turn to stop, put the transport down, kill what is left. Each rung MUST be given a window
+  of its own -- a turn that ends because it was interrupted MUST NOT also be shot for taking a
+  moment over it -- and the ladder MUST end rather than go round again, a read still blocked
+  past a killed process tree being blocked on something the watchdog cannot reach.
+- Looking MUST come before intervening. Thinking and spinning both say nothing, and the one
+  thing that tells them apart from outside is the machine: a process burning processor time,
+  itself or under something it started, MUST be given more windows rather than stopped. The
+  benefit of the doubt MUST run out after a bounded number of them, since one that never does
+  is the same hang wearing patience as a disguise.
+- A process MUST be ended by a signal rather than by shutting the session it belongs to: the
+  turn's own thread is sitting in that process's pipe, and closing a stream out from under a
+  blocked reader is how one hang becomes two. Everything the process started MUST go with it,
+  and MUST be taken down by name before the parent is signalled -- a child reparented as its
+  parent goes is no longer under anything that could be looked up afterwards. What is killed
+  MUST also be waited on, for the reason a dropped session's process is.
+- A turn whose transport is shared -- an app server every conversation with the agent is on --
+  MUST be freed through the session's own `_lets_go` rather than by signalling that process:
+  ending one turn by shooting its siblings' server out from under them is not the watchdog's
+  to do behind the session's back. The same for a turn whose transport is a runtime inside
+  this interpreter, there being no process to signal. Such a transport MUST still be looked at
+  where it is a process, since the look is what tells a long build from a wedge.
+- Every rung MUST say so on the stream the turn is read from, as the retries and the fallbacks
+  do. An intervention nobody can see reads exactly like the stall it was fixing, and an agent
+  quietly restarted under a watcher is a watcher reading a lie.
+- A wedged turn MUST fail as a `Failed` and MUST NOT fail as a `Stopped` or an `Unrecoverable`.
+  It is not a run ended by hand, and the same prompt against a fresh transport is exactly what
+  should be tried -- which is what the retry and fallback ladder above it does with a `Failed`
+  and does with nothing else.
+- That failure MUST say what happened, and MUST replace whatever the freed read raised,
+  whatever kind that is: `exit status -9` and an SDK's own transport error both describe the
+  killing rather than the wedge. It MUST NOT replace a run ended by hand, an answer a turn
+  managed to give after being asked to stop, or a failure the watchdog had no part in -- so
+  only a rung that actually did something MUST arm one. A backend already gone when the clock
+  ran out has a diagnostic of its own, and taking the credit for that would lose it.
+- What the turn had already said MUST survive where the read it replaces carried it: a caller
+  reading a failed turn's output to salvage partial work MUST NOT get less after a wedge than
+  after any other failure.
+- The watchdog MUST NOT act on a turn that has already ended: whatever it reached for then
+  would be the next turn's.
+
 ## `base.py`
 
 ### `AgentBase`
@@ -471,6 +573,9 @@ class SessionBase(ABC):
             why: What it was cut off for.
         """
 
+    def _lets_go(self) -> None:
+        """Puts down the transport this turn is riding, from another thread than its own."""
+
     def pursue(self, objective: str, *, suppress: bool = False) -> str:
         """Runs the session under a goal the agent keeps itself going toward.
 
@@ -561,6 +666,22 @@ class SessionBase(ABC):
   A word that would be answered as a turn of its own once this one ended is a turn queued
   behind rather than a word put in, and MUST be moved into the running turn where the backend
   offers a way -- which every one driven through an app server does.
+- `interrupt` MUST NOT end the conversation, and MUST say why: a turn that ended without a
+  reason reads as a turn that crashed. The turn it stops fails; the session it stops it in
+  MUST still be there, under the id it was opened with, for the next turn to resume. Every
+  session MUST take being asked, since every turn is held by something reachable; a backend
+  that nevertheless has nowhere to take the asking MUST raise `NotImplementedError` rather
+  than pretending, and whatever asked MUST go on to what it does about a turn that cannot be
+  asked rather than treating that as a failure of the turn.
+- `_lets_go` MUST put down whatever transport a turn is riding, called from another thread
+  than the turn's own, and MUST leave the conversation whole: the id has been adopted and the
+  next turn resumes under it, which is what a session whose process restarted has always done.
+  A backend whose turns run on something shared MUST say so here rather than shutting the
+  session, which would put down nothing.
+- Every read a turn blocks on MUST be under a `watchdog.Watchdog`, whichever shape that read
+  has -- a line off a pipe, an event off a queue, a notification off somebody's SDK. A backend
+  that stops answering without exiting is the one failure none of those loops can see, and a
+  turn that cannot end is worse than one that fails.
 - MUST NOT run a session in parallel; use a lock to ensure that only one turn is run at a time.
   The whole of a turn MUST be under it -- the moments it fires and what it says as well as what
   the backend is told -- so that two threads calling one session are two turns one after the
@@ -645,6 +766,10 @@ class StreamSessionBase(SessionBase):
   agent wrote when the session ends, so a process held open past the turn would leave that
   turn's work on this machine. Such a session therefore cannot be talked to between turns, and
   MUST resume rather than reopen on the turn after.
+- Reading the process MUST be under a watchdog, and the process MUST be what the watchdog is
+  told this turn is riding. A backend still holding stdout open and never writing to it again
+  is neither an answer nor an exit, so the `for` over that stream waits for as long as anybody
+  leaves the flow running; ending the process is what gives the read the EOF it is owed.
 
 ### `CommandSessionBase`
 
@@ -689,6 +814,10 @@ class CommandSessionBase(SessionBase):
 - Its exit status MUST be taken through the handle that started it and MUST NOT be reaped any
   other way. A status taken by something that is not its parent is a status the turn's own
   reader never sees, and a turn killed mid-word would then read as one that exited cleanly.
+- Reading MUST be under a watchdog too, told the command's own process. What this loop waits
+  on is a queue the stream pumps fill, and a command that neither writes nor exits owes that
+  queue a last entry it will never put there. A turn ended that way MUST fail with what the
+  watchdog found rather than with the exit status of the killing.
 - Every session that is not one command per turn MUST derive from `SessionBase` instead, so
   that a backend driven another way inherits none of this.
 

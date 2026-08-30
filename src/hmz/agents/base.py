@@ -28,6 +28,7 @@ from .event import Event, Failed, Question, Stopped, Unrecoverable, Usage, say
 from .hooks import EVERYWHERE, Hooks, Moment, Occasion, Verdict
 from .skills import Loaded, mount, unmount
 from .tools import Tool, Toolbox
+from .watchdog import Watchdog, held
 
 if TYPE_CHECKING:
     import asyncio
@@ -564,6 +565,11 @@ class SessionBase(ABC):
         #: held open across their turns borrow that transport for the turns they cannot keep
         #: warm -- and a turn cut off has to reach whichever process is actually holding it.
         self._underway: subprocess.Popen[str] | None = None
+        #: The clock the turn now running is kept under, while one is running. Filed here so
+        #: that whatever knows this turn is waiting on a person rather than on its backend can
+        #: find that clock and stop it: fifteen minutes spent answering a permission prompt is
+        #: not a backend that has wedged.
+        self._watching: Watchdog | None = None
         # A session drops itself from its agent when it is collected, so the agent neither holds
         # a flow's discarded sessions nor has to prune them while someone is reading them.
         agent._hold(self)
@@ -1701,6 +1707,20 @@ class SessionBase(ABC):
         between them.
         """
 
+    def _lets_go(self) -> None:
+        """Puts down whatever transport this turn is riding, from another thread than its own.
+
+        What a watchdog reaches for once asking has not worked: a read blocked on a backend
+        that will never answer ends when the thing it is blocked on ends, and nothing else.
+        The conversation is not ended by it -- the id has been adopted, and the next turn
+        resumes under it, which is what a session whose process was restarted has always done.
+
+        The same as :meth:`_shut` for a session whose transport is its own. A backend whose
+        turns run on something shared -- an app server serving every conversation with the
+        agent -- says so here instead, since shutting the session would put down nothing.
+        """
+        self._shut()
+
     def elsewhere(self) -> bool:
         """Whether what this session is holding open was started under another account.
 
@@ -2077,22 +2097,38 @@ class CommandSessionBase(SessionBase):
                         finally:
                             proc.stdin.close()
                 # Said as it arrives, from whichever stream got there first, until both have
-                # ended -- one None apiece, which is the only thing that ends this turn.
-                for _ in pumps:
-                    while (event := said.get()) is not None:
-                        if type(self).protocol and not self._agent._watchers:
-                            # On stderr, where a backend that writes for a person puts its
-                            # progress: its own stdout is the protocol here, and a turn nobody
-                            # can watch is a flow that reads as hung for as long as it takes.
-                            say(event.text, sys.stderr)
-                        yield event
-                for pump in pumps:
-                    pump.join()
-                status = proc.wait()
-                self._underway = None  # it has ended; there is nothing left to end
+                # ended -- one None apiece, which is the only thing that ends this turn. Under
+                # a clock, since that is the one thing this loop cannot see for itself: a
+                # command that neither writes nor exits owes this queue a None it will never
+                # put there, and the watchdog is what ends the process and so the wait.
+                with Watchdog(self, riding=lambda: proc) as watch:
+                    for _ in pumps:
+                        while (event := said.get()) is not None:
+                            watch.saw()
+                            if type(self).protocol and not self._agent._watchers:
+                                # On stderr, where a backend that writes for a person puts its
+                                # progress: its own stdout is the protocol here, and a turn
+                                # nobody can watch reads as hung for as long as it takes.
+                                say(event.text, sys.stderr)
+                            # The clock stops while whoever is reading this has it: what a
+                            # watcher or a hook does with an event is not the backend's
+                            # silence, and a reader that pauses must not cost the CLI its
+                            # life.
+                            with watch.held():
+                                yield event
+                    for pump in pumps:
+                        pump.join()
+                    status = proc.wait()
+                    self._underway = None  # it has ended; there is nothing left to end
 
             stdout = "".join(out)
             if status != 0:
+                if (wedged := watch.wedged()) is not None:
+                    # Killed by the watchdog, so `exit status -15` is what the killing looked
+                    # like rather than what went wrong; what went wrong is what it says. What
+                    # the command had already written is kept all the same -- it is the last
+                    # thing the agent said before it stopped saying anything.
+                    raise Failed(status, argv, stdout, str(wedged.stderr))
                 raise Failed(status, argv, stdout, "".join(err))
             answered = self._result(stdout)
             if self._id is None:
@@ -2206,59 +2242,72 @@ class StreamSessionBase(SessionBase):
             spent: Counter[str] = Counter()
             costing = Usage()
             settled = False
-            for line in proc.stdout:
-                for event in self._read(line):
-                    if event.kind == "failed":
-                        # The backend answered, and what it answered is that it could not.
-                        # A turn that returned this as its text would be a Ralph loop feeding
-                        # an error message forward as the work of the turn before it.
-                        status = proc.poll() or 1
-                        if self._draining is not None:
-                            # Waited on: what the agent said on its way out is the diagnostic,
-                            # and it may not have been read yet.
-                            self._draining.join(timeout=5)
-                        complained = "".join(self._complaints)
-                        self._shut()
-                        raise Failed(status, argv, event.text, complained)
-                    if event.kind == "result":
-                        said = event.text
-                        # Every answer in the turn cost something, the ones to a word put in
-                        # mid-turn included, and the turn is what all of it is charged to --
-                        # counted by model and by kind, which are the same spending twice.
-                        spent.update(event.tokens)
-                        costing = costing + event.spent
-                        with self._writing:
-                            self._owed -= 1
-                            settled = self._owed <= 0
-                        if settled:
-                            break
-                        # An answer to something put in mid-turn. It is counted and not
-                        # passed on: the agent said these same words as it said them, and
-                        # the turn is watched as it goes -- so passing the answer on here
-                        # would show it a second time. Two things said mid-turn would then
-                        # read as three answers. The turn goes on to whatever it was told
-                        # last, and the answer to that is the one it ends on.
-                        continue
-                    if not self._agent._watchers:
-                        # On stderr, where every other backend puts its progress: stdout is
-                        # the protocol here, and a turn nobody can watch is the point of all
-                        # this. Something watching the agent shows the turn itself, and would
-                        # then be showing it twice.
-                        say(event.text, sys.stderr)
-                    yield event
-                if settled:
-                    break
-            else:
-                # stdout ended instead: the agent is gone, and a turn it never answered is a
-                # failed turn rather than an empty one.
-                status = proc.wait()
-                if self._draining is not None:
-                    # Waited on, because a process that wrote its one explanation and left
-                    # may not have had it read yet -- and that explanation is the diagnostic.
-                    self._draining.join(timeout=5)
-                complained = "".join(self._complaints)
-                self._shut()
-                raise Failed(status or 1, argv, said, complained)
+            # Under a clock, since a read blocked on a pipe is the one thing this loop
+            # cannot see going wrong: a backend still holding stdout open and never
+            # writing to it again is neither an answer nor an exit, and the `for` waits
+            # on it for as long as anybody leaves the flow running. What the watchdog
+            # ends is the process, which is what gives this the EOF it is owed -- and
+            # the failure it then says instead of `exit status -15`.
+            with Watchdog(self, riding=lambda: self._proc) as watch:
+                for line in proc.stdout:
+                    # Every line, whether or not it turns into anything: a backend writing
+                    # protocol nobody shows is a backend that has not wedged.
+                    watch.saw()
+                    for event in self._read(line):
+                        if event.kind == "failed":
+                            # The backend answered, and what it answered is that it could
+                            # not. A turn that returned this as its text would be a Ralph
+                            # loop feeding an error message forward as the turn's own work.
+                            status = proc.poll() or 1
+                            if self._draining is not None:
+                                # Waited on: what the agent said on its way out is the diagnostic,
+                                # and it may not have been read yet.
+                                self._draining.join(timeout=5)
+                            complained = "".join(self._complaints)
+                            self._shut()
+                            raise Failed(status, argv, event.text, complained)
+                        if event.kind == "result":
+                            said = event.text
+                            # Every answer in the turn cost something, the ones to a word put in
+                            # mid-turn included, and the turn is what all of it is charged to --
+                            # counted by model and by kind, which are the same spending twice.
+                            spent.update(event.tokens)
+                            costing = costing + event.spent
+                            with self._writing:
+                                self._owed -= 1
+                                settled = self._owed <= 0
+                            if settled:
+                                break
+                            # An answer to something put in mid-turn. It is counted and not
+                            # passed on: the agent said these same words as it said them, and
+                            # the turn is watched as it goes -- so passing the answer on here
+                            # would show it a second time. Two things said mid-turn would then
+                            # read as three answers. The turn goes on to whatever it was told
+                            # last, and the answer to that is the one it ends on.
+                            continue
+                        if not self._agent._watchers:
+                            # On stderr, where every other backend puts its progress: stdout is
+                            # the protocol here, and a turn nobody can watch is the point of all
+                            # this. Something watching the agent shows the turn itself, and would
+                            # then be showing it twice.
+                            say(event.text, sys.stderr)
+                        with (
+                            watch.held()
+                        ):  # a reader that pauses is not the backend's silence
+                            yield event
+                    if settled:
+                        break
+                else:
+                    # stdout ended instead: the agent is gone, and a turn it never answered is a
+                    # failed turn rather than an empty one.
+                    status = proc.wait()
+                    if self._draining is not None:
+                        # Waited on, because a process that wrote its one explanation and left
+                        # may not have had it read yet -- and that explanation is the diagnostic.
+                        self._draining.join(timeout=5)
+                    complained = "".join(self._complaints)
+                    self._shut()
+                    raise Failed(status or 1, argv, said, complained)
             if self._agent.anchor is not None:
                 # An anchored turn has to be over when it says it is: coganchor pushes what the
                 # agent wrote when the session ends, so a process held open past the turn would
@@ -3466,8 +3515,13 @@ class AgentBase(ABC):
         )
         if self.ask is None:
             return None
+        # And every clock of this agent stops while the person thinks. A turn that has asked
+        # is a turn its backend owes nothing: the CLI is sitting there with nothing being
+        # asked of it, and counting that as silence would have a watchdog kill a healthy
+        # agent for the time somebody took over a permission prompt.
         try:
-            return self.ask(question)
+            with held(self):
+                return self.ask(question)
         except Exception:  # noqa: BLE001 -- whatever was asked failed, and the turn goes on
             return None
 
