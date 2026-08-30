@@ -109,9 +109,13 @@ Which flows are running, innermost last:
 ```python
 from hmz.flows import running
 
-running()                       # one Running(flow, since) apiece, oldest first
+running()                       # one Running(flow, since, depth, under) apiece
 [one.flow for one in running()] # ["chat", "official/rlar"]
 ```
+
+Asked from inside a flow this is the branch that flow is on — the flow somebody started, then
+each flow called to get there, and never a call gathered beside it. Asked from anywhere else it
+is every flow of the run, oldest first, each saying how `deep` it is and what it is `under`.
 
 ## Afterwards
 
