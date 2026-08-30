@@ -31,6 +31,7 @@ from .base import AgentBase, SessionBase
 from .config import PERMISSIONS, AgentConfig
 from .event import Event, Failed, Question, Usage, say
 from .hooks import EVERYWHERE, SUBAGENTS, Moment, Occasion
+from .watchdog import Watchdog
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -1017,34 +1018,45 @@ class CodexSession(SessionBase):
             said = ""
             spent: Mapping[str, int] = {}
             costing = Usage()
-            for event in server.turn(
-                {
-                    "threadId": thread,
-                    "input": [{"type": "text", "text": prompt}],
-                    "model": self._agent.config.model,
-                    "effort": self.effort,
-                    **(
-                        {"outputSchema": schema.model_json_schema()}
-                        if schema is not None
-                        else {}
-                    ),
-                    **server.permitted(
-                        self._agent.config.permission,
-                        self._agent.config.service_tier,
-                    ),
-                },
-                self._running,
-            ):
-                if event.kind == "result":
-                    said, spent, costing = event.text, event.tokens, event.spent
-                    continue
-                if not self._agent._watchers:
-                    # On stderr, where every other backend puts its progress: a turn nobody
-                    # can watch is a flow that reads as hung for as long as the turn takes.
-                    # Something watching the agent shows the turn itself, and would then be
-                    # showing it twice.
-                    say(event.text, sys.stderr)
-                yield event
+            # Under a clock: a turn here waits on a queue the server's reader fills, and
+            # an app server that has stopped filling it without stopping fills it never. The
+            # server's own process is what the clock looks at -- a wedge and a long build
+            # are told apart by what the machine is doing -- but `hmz.backends` says this one
+            # is shared, so the watchdog puts it down through `_lets_go` rather than
+            # signalling it out from under the agent's other conversations.
+            with Watchdog(self, riding=lambda: server._proc) as watch:
+                for event in server.turn(
+                    {
+                        "threadId": thread,
+                        "input": [{"type": "text", "text": prompt}],
+                        "model": self._agent.config.model,
+                        "effort": self.effort,
+                        **(
+                            {"outputSchema": schema.model_json_schema()}
+                            if schema is not None
+                            else {}
+                        ),
+                        **server.permitted(
+                            self._agent.config.permission,
+                            self._agent.config.service_tier,
+                        ),
+                    },
+                    self._running,
+                ):
+                    watch.saw()
+                    if event.kind == "result":
+                        said, spent, costing = event.text, event.tokens, event.spent
+                        continue
+                    if not self._agent._watchers:
+                        # On stderr, where every other backend puts its progress: a turn
+                        # nobody can watch is a flow that reads as hung for as long as the
+                        # turn takes. Something watching the agent shows the turn itself,
+                        # and would then be showing it twice.
+                        say(event.text, sys.stderr)
+                    with (
+                        watch.held()
+                    ):  # a reader that pauses is not the server's silence
+                        yield event
             if not self._agent._watchers:
                 # Where `codex exec` would have put the answer. Something watching the agent
                 # has had it already, as the turn said it.
@@ -1105,6 +1117,17 @@ class CodexSession(SessionBase):
         # was left with, and this session's rung is what its agent is configured for now.
         server.call("thread/resume", {"threadId": thread, **rung})
         return thread
+
+    def _lets_go(self) -> None:
+        """Takes down the app server, which is what a wedged turn here is waiting on.
+
+        The agent's rather than this session's: one server holds every thread of it, so there
+        is nothing of this conversation's own to put down. Every other turn on this agent goes
+        with it, which is why this is the last thing tried rather than the first -- and why
+        the watchdog says whose server it is before it does it. The threads survive on disk:
+        the next turn starts another server and resumes this one by the id it already has.
+        """
+        self._agent._down()
 
     def _pursue(self, objective: str) -> str:
         """Runs the turn under a goal of Codex's own, which its runtime steers until it is met.
@@ -1264,10 +1287,17 @@ class CodexAgent(AgentBase):
         self._down()
 
     def _down(self) -> None:
-        """Takes down the server this agent holds, if it is holding one."""
-        if self._server is not None:
-            self._server.stop()
-            self._server = None
+        """Takes down the server this agent holds, if it is holding one.
+
+        Captured under the lock the server is started under, and stopped outside it: a
+        watchdog reaches this from a thread of its own while a session on another may be
+        starting a replacement, and reading the field twice would either stop the new one or
+        find nothing between the two reads.
+        """
+        with self._serving:
+            server, self._server = self._server, None
+        if server is not None:
+            server.stop()
 
     def new(self, cwd: str | os.PathLike[str] | None = None) -> CodexSession:
         """Opens a new Codex session, in the directory it is given or in this one."""

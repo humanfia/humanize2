@@ -36,6 +36,7 @@ from websockets.sync.client import ClientConnection, connect
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Question, Usage, say
+from .watchdog import Watchdog
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
@@ -503,6 +504,16 @@ class KimiCodeCLISession(SessionBase):
                 {"answers": answers},
             )
 
+    def _lets_go(self) -> None:
+        """Takes down the daemon, which is what a wedged turn here is waiting on.
+
+        The agent's rather than this session's: one daemon serves every conversation with it,
+        so there is nothing of this one's own to put down, and every other turn on this agent
+        goes with it. The sessions survive: the next turn starts another daemon and resumes
+        this one by the id it already has.
+        """
+        self._agent._down()
+
     def _counting(self, server: _AppServer, session: str) -> Usage:
         """What this session has spent since the last time it was asked.
 
@@ -628,115 +639,130 @@ class KimiCodeCLISession(SessionBase):
                 ] = {}  # how much of each message has been passed on
                 settled = False
                 costing = Usage()  # what this turn has come to, added up as it goes
-                while True:
-                    # First of all: a turn that has stopped to ask waits on the answer, so a
-                    # poll that only read messages would be reading a session that has
-                    # stopped moving. A daemon that cannot be asked is not a failed turn.
-                    with contextlib.suppress(subprocess.CalledProcessError):
-                        self._asked(session)
-                    busy = server.call("GET", f"/sessions/{session}/status")["busy"]
-                    # What it has come to so far, asked for each time round rather than once
-                    # at the end: a turn is minutes long, and a rate that only moved when one
-                    # ended would stand still for all of them. A daemon that will not say is
-                    # not a failed turn.
-                    with contextlib.suppress(subprocess.CalledProcessError):
-                        costing = costing + self._counting(server, session)
-                    if goal and not busy:
-                        # A goal runs through the quiet between its turns: Kimi starts the next one
-                        # itself once the session falls still, so a session that has stopped is a
-                        # goal that has stopped only when the goal is no longer being pursued.
-                        pursued = server.call("GET", f"/sessions/{session}/goal")
-                        busy = pursued is not None and pursued["status"] == "active"
-                    said = server.call(
-                        "GET", f"/sessions/{session}/messages?after_id={since}"
-                    )["items"]
-                    # A message is readable while it is still being written, so the turn is read
-                    # again from its own first message every poll rather than once: a message put
-                    # aside as seen would be the one the agent had only started saying. Newest
-                    # first, and a turn reads forwards; what has been passed on is not passed on
-                    # twice.
-                    for message in reversed(said):
-                        if message["role"] != "assistant":
-                            # A word put into the turn, spliced into the conversation at the
-                            # step that takes it in: that splice is the agent saying it has
-                            # it, and is the only thing here that is not the agent talking.
-                            # Read as one, it would show your own words back as the agent's.
-                            if message["id"] not in shown:
-                                shown[message["id"]] = len(message["content"])
-                                words = "".join(
-                                    block.get("text") or ""
-                                    for block in message["content"]
-                                    if block.get("type") == "text"
-                                )
-                                if self.took(words) is not None:
-                                    yield Event(kind="took", text=words)
-                            continue
-                        for block in message["content"][shown.get(message["id"], 0) :]:
-                            kind = _BLOCKS.get(str(block.get("type")))
-                            # A tool is named by what it is; everything else is what it says,
-                            # which a block keeps under its own name -- text under `text`.
-                            words = str(
-                                (
-                                    block.get("tool_name")
-                                    if kind == "tool"
-                                    else block.get(str(block.get("type")))
-                                )
-                                or ""
-                            )
-                            if kind is None or not words.strip():
-                                continue
-                            if not self._agent._watchers:
-                                # On stderr, where every other backend puts its progress: a
-                                # turn nobody can watch is a flow that reads as hung for as
-                                # long as the turn takes. Something watching the agent shows
-                                # the turn itself, and would then be showing it twice.
-                                say(words, sys.stderr)
-                            yield Event(kind=kind, text=words)
-                        shown[message["id"]] = len(message["content"])
-                    # And the answer is taken fresh each time, so that it is what the agent ended
-                    # up saying rather than what it had said when it was first readable.
-                    for (
-                        message
-                    ) in said:  # newest first: the last thing said that has any words
-                        text = "".join(
-                            block["text"]
-                            for block in message["content"]
-                            if block["type"] == "text"
-                        )
-                        if message["role"] == "assistant" and text:
-                            answer = text
-                            break
-                    if settled:
-                        # Taken note of before it is passed on: a turn that landed is a session
-                        # this agent opened, whether or not there is anywhere left to say so.
-                        self._adopt(session)
-                        if not self._agent._watchers:
-                            # Where the CLI would have put the response. Something watching
-                            # the agent has had it already, as the turn said it.
-                            say(answer, sys.stdout)
-                        # What the turn cost: the daemon counts the whole session, so what
-                        # this turn spent is the rise across it, added up as the turn went.
-                        # Asked once more here and never at the cost of the answer -- a turn
-                        # that landed has landed, whatever the daemon then says it came to.
+                # Under a clock. Nothing here blocks forever on its own -- every call
+                # the daemon takes is bounded -- but a session that answers `busy` and
+                # never says another word is a turn that polls until somebody stops it,
+                # which is the same hang read off a different pipe. So the clock is
+                # patted by what the agent says rather than by the daemon answering, and
+                # looks at the daemon's own process before believing anything is wrong.
+                with Watchdog(self, riding=lambda: server._proc) as watch:
+                    while True:
+                        # First of all: a turn that has stopped to ask waits on the answer, so a
+                        # poll that only read messages would be reading a session that has
+                        # stopped moving. A daemon that cannot be asked is not a failed turn.
+                        with contextlib.suppress(subprocess.CalledProcessError):
+                            self._asked(session)
+                        busy = server.call("GET", f"/sessions/{session}/status")["busy"]
+                        # What it has come to so far, asked for each time round rather than once
+                        # at the end: a turn is minutes long, and a rate that only moved when one
+                        # ended would stand still for all of them. A daemon that will not say is
+                        # not a failed turn.
                         with contextlib.suppress(subprocess.CalledProcessError):
                             costing = costing + self._counting(server, session)
-                        spent = (
-                            {self._agent.config.model: int(costing.total)}
-                            if costing.total > 0
-                            else {}
-                        )
-                        yield Event(
-                            kind="result",
-                            text=answer.strip(),
-                            tokens=spent,
-                            spent=costing,
-                        )
-                        return
-                    # A session says it has stopped before the last thing it said can be read
-                    # back, so what it said is read once more after it stops rather than at the
-                    # moment it does -- otherwise a turn returns everything but its answer.
-                    settled = not busy
-                    updates.wait(settled=settled)
+                        if goal and not busy:
+                            # A goal runs through the quiet between its turns: Kimi
+                            # starts the next one itself once the session falls still, so
+                            # a session that has stopped is a goal that has stopped only
+                            # when the goal is no longer being pursued.
+                            pursued = server.call("GET", f"/sessions/{session}/goal")
+                            busy = pursued is not None and pursued["status"] == "active"
+                        said = server.call(
+                            "GET", f"/sessions/{session}/messages?after_id={since}"
+                        )["items"]
+                        # A message is readable while it is still being written, so the
+                        # turn is read again from its own first message every poll rather
+                        # than once: a message put aside as seen would be the one the agent
+                        # had only started saying. Newest first, and a turn reads forwards;
+                        # what has been passed on is not passed on twice.
+                        for message in reversed(said):
+                            if message["role"] != "assistant":
+                                # A word put into the turn, spliced into the conversation at the
+                                # step that takes it in: that splice is the agent saying it has
+                                # it, and is the only thing here that is not the agent talking.
+                                # Read as one, it would show your own words back as the agent's.
+                                if message["id"] not in shown:
+                                    shown[message["id"]] = len(message["content"])
+                                    words = "".join(
+                                        block.get("text") or ""
+                                        for block in message["content"]
+                                        if block.get("type") == "text"
+                                    )
+                                    if self.took(words) is not None:
+                                        watch.saw()
+                                        with watch.held():
+                                            yield Event(kind="took", text=words)
+                                continue
+                            for block in message["content"][
+                                shown.get(message["id"], 0) :
+                            ]:
+                                kind = _BLOCKS.get(str(block.get("type")))
+                                # A tool is named by what it is; everything else is what it says,
+                                # which a block keeps under its own name -- text under `text`.
+                                words = str(
+                                    (
+                                        block.get("tool_name")
+                                        if kind == "tool"
+                                        else block.get(str(block.get("type")))
+                                    )
+                                    or ""
+                                )
+                                if kind is None or not words.strip():
+                                    continue
+                                if not self._agent._watchers:
+                                    # On stderr, where every other backend puts its progress: a
+                                    # turn nobody can watch is a flow that reads as hung for as
+                                    # long as the turn takes. Something watching the agent shows
+                                    # the turn itself, and would then be showing it twice.
+                                    say(words, sys.stderr)
+                                watch.saw()
+                                with watch.held():  # a pause of ours is not its silence
+                                    yield Event(kind=kind, text=words)
+                            shown[message["id"]] = len(message["content"])
+                        # And the answer is taken fresh each time, so that it is what the
+                        # agent ended up saying rather than what it had said when it was
+                        # first readable.
+                        for message in (
+                            said
+                        ):  # newest first: the last thing said that has any words
+                            text = "".join(
+                                block["text"]
+                                for block in message["content"]
+                                if block["type"] == "text"
+                            )
+                            if message["role"] == "assistant" and text:
+                                answer = text
+                                break
+                        if settled:
+                            # Taken note of before it is passed on: a turn that landed is a session
+                            # this agent opened, whether or not there is anywhere left to say so.
+                            self._adopt(session)
+                            if not self._agent._watchers:
+                                # Where the CLI would have put the response. Something watching
+                                # the agent has had it already, as the turn said it.
+                                say(answer, sys.stdout)
+                            # What the turn cost: the daemon counts the whole session, so what
+                            # this turn spent is the rise across it, added up as the turn went.
+                            # Asked once more here and never at the cost of the answer -- a turn
+                            # that landed has landed, whatever the daemon then says it came to.
+                            with contextlib.suppress(subprocess.CalledProcessError):
+                                costing = costing + self._counting(server, session)
+                            spent = (
+                                {self._agent.config.model: int(costing.total)}
+                                if costing.total > 0
+                                else {}
+                            )
+                            yield Event(
+                                kind="result",
+                                text=answer.strip(),
+                                tokens=spent,
+                                spent=costing,
+                            )
+                            return
+                        # A session says it has stopped before the last thing it said can be read
+                        # back, so what it said is read once more after it stops rather than at the
+                        # moment it does -- otherwise a turn returns everything but its answer.
+                        settled = not busy
+                        updates.wait(settled=settled)
 
             finally:
                 if updates is not None:
@@ -807,9 +833,14 @@ class KimiCodeCLIAgent(AgentBase):
     def stop(self) -> None:
         """Takes no further turn, and takes down the server the turn under way is waiting on."""
         super().stop()
-        if self._server is not None:
-            self._server.stop()
-            self._server = None
+        self._down()
+
+    def _down(self) -> None:
+        """Takes down the daemon this agent holds, if it is holding one."""
+        with self._serving:
+            server, self._server, self._server_as = self._server, None, ""
+        if server is not None:
+            server.stop()
 
     def new(self, cwd: str | os.PathLike[str] | None = None) -> KimiCodeCLISession:
         """Opens a new Kimi session, in the directory it is given or in this one."""

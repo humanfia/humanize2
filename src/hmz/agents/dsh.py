@@ -26,6 +26,7 @@ import yaml
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Unrecoverable, Usage, say
+from .watchdog import Watchdog
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping
@@ -168,83 +169,104 @@ class DshSession(SessionBase):
                     notification_subscription=subscribed,
                 )
                 received = False
-                while True:
-                    method, payload = _notification(subscribed.next())
-                    if not received:
-                        if not _receipt(method, payload, session_id, message_id):
-                            continue
-                        received = True
-                    if (
-                        method == "session.event"
-                        and payload.get("sessionId") == session_id
-                    ):
-                        event = _mapping(payload.get("event"))
-                        data = _mapping(event.get("data"))
-                        kind = event.get("type")
-                        if kind == "assistant/chunk":
-                            chunk = _mapping(data.get("chunk"))
-                            block = str(chunk.get("type") or "")
-                            event_kind = {
-                                "text-delta": "text",
-                                "reasoning-delta": "reasoning",
-                            }.get(block)
-                            text = chunk.get("text")
-                            if (
-                                event_kind is not None
-                                and isinstance(text, str)
-                                and text
-                            ):
-                                streamed.add(
-                                    (data.get("turn"), data.get("step"), event_kind)
-                                )
-                                yield self._shows(Event(kind=event_kind, text=text))
-                        elif kind == "assistant/message":
-                            message = _mapping(data.get("message"))
-                            content = message.get("content", data.get("content"))
-                            blocks = (
-                                cast("list[object]", content)
-                                if isinstance(content, list)
-                                else []
-                            )
-                            parts: list[str] = []
-                            for raw in blocks:
-                                block = _mapping(raw)
-                                block_kind = block.get("type")
-                                text = block.get("text")
-                                if block_kind == "text" and isinstance(text, str):
-                                    parts.append(text)
-                                event_kind = (
-                                    block_kind
-                                    if block_kind in ("text", "reasoning")
-                                    else None
-                                )
-                                key = (data.get("turn"), data.get("step"), event_kind)
+                # Under a clock: `next` blocks on the SDK's own subscription, and a
+                # runtime that has stopped publishing without stopping never wakes it.
+                # No process is named -- what holds this turn is a runtime inside this
+                # interpreter -- so the watchdog closes it through `_lets_go`, which is
+                # what makes the subscription give up.
+                with Watchdog(self) as watch:
+                    while True:
+                        method, payload = _notification(subscribed.next())
+                        watch.saw()  # anything at all: the runtime is answering
+                        if not received:
+                            if not _receipt(method, payload, session_id, message_id):
+                                continue
+                            received = True
+                        if (
+                            method == "session.event"
+                            and payload.get("sessionId") == session_id
+                        ):
+                            event = _mapping(payload.get("event"))
+                            data = _mapping(event.get("data"))
+                            kind = event.get("type")
+                            if kind == "assistant/chunk":
+                                chunk = _mapping(data.get("chunk"))
+                                block = str(chunk.get("type") or "")
+                                event_kind = {
+                                    "text-delta": "text",
+                                    "reasoning-delta": "reasoning",
+                                }.get(block)
+                                text = chunk.get("text")
                                 if (
                                     event_kind is not None
                                     and isinstance(text, str)
                                     and text
-                                    and key not in streamed
                                 ):
-                                    yield self._shows(Event(kind=event_kind, text=text))
-                            answer = "".join(parts)
-                            usage = _usage(data.get("usage"))
-                            if usage.total:
-                                self._spends(usage)
-                                costing = costing + usage
-                        elif kind == "tool/call":
-                            name = str(data.get("name") or "tool")
-                            about = str(data.get("arguments") or "")
-                            yield self._shows(
-                                Event(kind="tool", text=f"{name} {about}".rstrip())
-                            )
-                        elif kind == "turn/end":
-                            reason = _mapping(data.get("reason"))
-                    elif (
-                        method == "session.status"
-                        and payload.get("sessionId") == session_id
-                        and payload.get("status") == "idle"
-                    ):
-                        break
+                                    streamed.add(
+                                        (data.get("turn"), data.get("step"), event_kind)
+                                    )
+                                    with watch.held():
+                                        yield self._shows(
+                                            Event(kind=event_kind, text=text)
+                                        )
+                            elif kind == "assistant/message":
+                                message = _mapping(data.get("message"))
+                                content = message.get("content", data.get("content"))
+                                blocks = (
+                                    cast("list[object]", content)
+                                    if isinstance(content, list)
+                                    else []
+                                )
+                                parts: list[str] = []
+                                for raw in blocks:
+                                    block = _mapping(raw)
+                                    block_kind = block.get("type")
+                                    text = block.get("text")
+                                    if block_kind == "text" and isinstance(text, str):
+                                        parts.append(text)
+                                    event_kind = (
+                                        block_kind
+                                        if block_kind in ("text", "reasoning")
+                                        else None
+                                    )
+                                    key = (
+                                        data.get("turn"),
+                                        data.get("step"),
+                                        event_kind,
+                                    )
+                                    if (
+                                        event_kind is not None
+                                        and isinstance(text, str)
+                                        and text
+                                        and key not in streamed
+                                    ):
+                                        with watch.held():
+                                            yield self._shows(
+                                                Event(kind=event_kind, text=text)
+                                            )
+                                answer = "".join(parts)
+                                usage = _usage(data.get("usage"))
+                                if usage.total:
+                                    self._spends(usage)
+                                    costing = costing + usage
+                            elif kind == "tool/call":
+                                name = str(data.get("name") or "tool")
+                                about = str(data.get("arguments") or "")
+                                with watch.held():
+                                    yield self._shows(
+                                        Event(
+                                            kind="tool",
+                                            text=f"{name} {about}".rstrip(),
+                                        )
+                                    )
+                            elif kind == "turn/end":
+                                reason = _mapping(data.get("reason"))
+                        elif (
+                            method == "session.status"
+                            and payload.get("sessionId") == session_id
+                            and payload.get("status") == "idle"
+                        ):
+                            break
 
             _require_completed(session_id, answer, reason)
             self._adopt(session_id)

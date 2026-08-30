@@ -161,6 +161,12 @@ load.
 - The efforts MUST be written down, being that backend's own vocabulary rather than a
   catalogue of things that come and go. A rung the backend takes without documenting MUST be
   written down as one, since no listing of the backend's own will ever name it.
+- How long a turn of a backend may say nothing before it is worth looking at MUST be written
+  down here, and so MUST whether its transport can be put down and started again, whether a
+  conversation of its survives that under the id it was opened with, and whether one transport
+  serves every conversation with an agent rather than one apiece. They are facts about the CLI
+  -- what it streams while it thinks, what it takes on the way back in, what shape it runs in
+  -- and a watchdog that hard-coded them would be a second place for them to be wrong.
 - Which credentials are the same credential MUST be written down here too, one entry per
   credential holding every name it goes by. A vendor's key is the vendor's rather than the
   CLI's -- an Anthropic key is one whether Claude Code, pi, opencode or mimocode holds it --

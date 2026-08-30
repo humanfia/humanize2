@@ -561,6 +561,7 @@ than as a turn that failed.
 | `HUMANIZE_LOG` | `hmz anchor`, `hmz anchor serve` | Default for `--log-level`. |
 | `HUMANIZE_DAEMON` | `hmz` with no command | `off`, `0` or `no` opens the interface in this terminal rather than [holding the run apart from it](/reference/daemon), which is what `--no-daemon` says on the line. Anything else — including empty — is silence, and silence holds the run. |
 | `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/user/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
+| `HUMANIZE_WATCHDOG` | everything that runs a turn | How long a turn may say nothing before [the watchdog looks at it](/reference/agents#when-a-cli-stops-answering), in seconds, overriding each backend's own. `0` turns it off. |
 | `HUMANIZE_SHADOWS` | `hmz anchor`, a container or a machine an agent works on | Where the mirrors coganchor has been pointed at are recorded. Defaults to `~/.cache/humanize/shadows`. |
 | `CLAUDE_CONFIG_DIR` | `hmz trace collect`, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
 | `CODEX_HOME` | same | Codex's home. Defaults to `~/.codex`. |
