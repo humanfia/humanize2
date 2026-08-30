@@ -562,7 +562,7 @@ async def test_a_question_the_agent_itself_put_reaches_the_person() -> None:
 @pytest.mark.timeout(60)
 async def test_the_diagram_reads_an_agent_that_is_not_working() -> None:
     """Stepping is held to the ones thinking, so this reaches the one that has stopped."""
-    from hmz.tui.pick import Status
+    from hmz.tui.pick import Monitoring
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -573,7 +573,7 @@ async def test_the_diagram_reads_an_agent_that_is_not_working() -> None:
         assert app._working_agents() == [one.id]  # so tab cannot reach the second
 
         await driver.press("escape")
-        await until(lambda: isinstance(app.screen, Status), driver)
+        await until(lambda: isinstance(app.screen, Monitoring), driver)
         boxes = app.screen.query_one("#choices", OptionList)
         drawn = [
             str(boxes.get_option_at_index(at).id) for at in range(boxes.option_count)
@@ -591,7 +591,7 @@ async def test_the_diagram_reads_an_agent_that_is_not_working() -> None:
 @pytest.mark.timeout(60)
 async def test_the_diagram_marks_who_is_working_and_who_handed_to_whom() -> None:
     """The shape of a run is not written anywhere: it is read off the turns going past."""
-    from hmz.tui.pick import Status
+    from hmz.tui.pick import Monitoring
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -606,7 +606,7 @@ async def test_the_diagram_marks_who_is_working_and_who_handed_to_whom() -> None
         await driver.pause()
 
         await driver.press("escape")
-        await until(lambda: isinstance(app.screen, Status), driver)
+        await until(lambda: isinstance(app.screen, Monitoring), driver)
         boxes = app.screen.query_one("#choices", OptionList)
         drawn = "\n".join(
             str(boxes.get_option_at_index(at).prompt)

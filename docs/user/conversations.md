@@ -24,7 +24,7 @@ stopped. An agent between its turns stays readable once you are on it — what y
 stays put until you press one of these keys — but it is not stepped onto.
 
 **Every agent there is can still be read**, from the diagram
-[`/status`](/reference/tui#how-the-run-is-going) draws. **esc** opens it, and enter or a click
+[`/monitor`](/reference/tui#watching-the-run) draws. **esc** opens it, and enter or a click
 on a box reads that agent whether or not it is working. That is where the one that has stopped,
 or has not started, is picked out by name rather than stepped past.
 

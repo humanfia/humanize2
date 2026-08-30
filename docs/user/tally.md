@@ -15,7 +15,7 @@ The readout sits under the agent lines, above the editor:
 ```
 
 It is **per model**, since two agents at one model are one bill, and it covers **a recent
-window only**, so a flow that has stopped reads as stopped. [`/status`](/user/status) is the
+window only**, so a flow that has stopped reads as stopped. [`/monitor`](/user/monitor) is the
 fuller version, with the handover graph beside it.
 
 ## Three readings, three questions
@@ -112,5 +112,5 @@ to gather. What their turns cost still reaches a flow: each says it as the turn 
 
 - [Efforts](/user/efforts) — what `juice` responds to
 - [A turn can be cut off](/features/budgets) — the same reading, used as a cap
-- [The shape of a run](/user/status)
+- [Watching a run](/user/monitor)
 - [Agents › What it has cost, and how fast](/reference/agents#what-it-has-cost-and-how-fast)

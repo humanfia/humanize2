@@ -71,6 +71,13 @@ const MOVED_TO_WEAVER = [
   'flowverses',
 ]
 
+// And where a page moved a second time, which overrides the table above: `/status` is
+// `/monitor` now, so the page about it is too, and both of the paths it has had send a reader on.
+const MOVED_AGAIN: Record<string, string> = {
+  'guide/status': 'user/monitor',
+  'user/status': 'user/monitor',
+}
+
 const MOVED: Record<string, string> = {
   ...Object.fromEntries(MOVED_TO_USER.map((page) => [`guide/${page}`, `user/${page}`])),
   ...Object.fromEntries(MOVED_TO_WEAVER.map((page) => [`guide/${page}`, `weaver/${page}`])),
@@ -83,6 +90,7 @@ const MOVED: Record<string, string> = {
   'tutorials/build-an-agent': 'user/tutorials/build-an-agent',
   'tutorials/flow-checked-build': 'weaver/tutorials/checked-build',
   'tutorials/flow-prove': 'weaver/tutorials/prove',
+  ...MOVED_AGAIN,
 }
 
 export default defineConfig({
@@ -262,7 +270,7 @@ export default defineConfig({
             { text: 'Side questions (/btw)', link: '/user/btw' },
             { text: 'Many conversations at once', link: '/user/conversations' },
             { text: 'Showing the working (/details)', link: '/user/details' },
-            { text: 'The shape of a run (/status)', link: '/user/status' },
+            { text: 'Watching a run (/monitor)', link: '/user/monitor' },
             { text: 'The mission board', link: '/user/board' },
             { text: 'Being away (/afk)', link: '/user/afk' },
             { text: 'Falling back', link: '/user/fallback' },

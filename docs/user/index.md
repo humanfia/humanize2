@@ -32,7 +32,7 @@ whole piece of work start to finish; everything under them is for looking up.
 | [Side questions](/user/btw) | `/btw`: ask about progress without steering the flow |
 | [Many conversations at once](/user/conversations) | One transcript, **tab** between the agents that are working |
 | [Showing the working](/user/details) | `/details`: tool calls and thinking, or only what the agent says |
-| [The shape of a run](/user/status) | `/status`: who is working, who handed to whom, what it cost |
+| [Watching a run](/user/monitor) | `/monitor`: who is working, how long for, who handed to whom |
 | [The mission board](/user/board) | Lines you and the flow both write on, and neither waits at |
 | [Being away](/user/afk) | `/afk`: whether an agent may stop and ask you something |
 | [Falling back](/user/fallback) | `/fallback`: where a turn goes when what was taking it cannot |

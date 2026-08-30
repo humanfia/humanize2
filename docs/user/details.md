@@ -73,7 +73,7 @@ agent.watch(looking)
 
 ## See also
 
-- [`/status`](/reference/tui#how-the-run-is-going) — the flow drawn, and who is working
+- [`/monitor`](/reference/tui#watching-the-run) — the flow drawn, and who is working
 - [Cost and rate](/user/tally) — the other readout of a turn in progress
 - [Tracing](/user/tracing) — the whole of it, afterwards
 - [TUI › Commands](/reference/tui#commands)

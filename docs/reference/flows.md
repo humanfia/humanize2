@@ -568,7 +568,7 @@ was given.
 ### The board
 
 Asking stops the turn. **The board does not.** It is a handful of named lines kept beside the
-run and drawn on [`/status`](/user/status) — the flow reads and writes it whenever it likes,
+run and drawn on [`/monitor`](/user/monitor) — the flow reads and writes it whenever it likes,
 the person changes it whenever they like, and neither is ever waiting on the other:
 
 ```python
@@ -752,7 +752,7 @@ the innermost call was importing.
 the flow that was started and each flow called to get here, innermost last — never a sibling
 gathered beside you, and never one level twice. From outside every flow it reports all of them,
 oldest first, each with its `depth` and the flow it is `under` — which is what the interface
-reads to name them on its status line and on `/status`. The [epic](/reference/tracing) records
+reads to name them on its status line and on `/monitor`. The [epic](/reference/tracing) records
 each call and each return. A flow that called another does not read as the flow somebody chose.
 
 **An agent two calls hold at once** goes on writing where they were both called from and
