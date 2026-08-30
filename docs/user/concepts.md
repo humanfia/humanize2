@@ -139,6 +139,11 @@ One file may hold several: `@flow` is the flow it holds under its own name, and 
 `@flow(name="…")` is another, run as `<flow>:<name>`. Three phases of one thing are then one
 thing to write and three to run. Each asks only for the agents it drives.
 
+At the prompt a flow is named by that same name, and a `$` in front of it
+[starts one outright](/reference/tui#starting-a-flow-outright): `$ralph_loop fix the failing
+test` is that flow, run on that line — the menu only opens if this directory has never set
+that flow up.
+
 See [Flows](/reference/flows).
 
 ## Weaver

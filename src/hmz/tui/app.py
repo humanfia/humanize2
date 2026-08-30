@@ -17,8 +17,9 @@ It opens on the flow that is only talking to one agent, so that saying something
 takes to start. A flow is what you reach for once talking to one agent is not the shape of
 the work, and nobody knows that before they have said anything.
 
-The editor means both things at once: a line starting with `/` is a command, and any other
-line is the task if nothing is running yet, or is said to the conversation being read.
+The editor means three things at once: a line starting with `/` is a command, a line starting
+with `$` names a flow to start and what to start it on, and any other line is the task if
+nothing is running yet, or is said to the conversation being read.
 
 Drawn in the terminal's own colours: every surface is the terminal's background and every
 colour is one of the sixteen it already has a setting for, so nothing is read from it and
@@ -31,6 +32,7 @@ import asyncio
 import contextlib
 import functools
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -41,7 +43,7 @@ import weakref
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, cast
 
 import pyfiglet
 from rich.box import ROUNDED
@@ -86,6 +88,7 @@ from .pick import (
     Runs,
     carries_on,
     config_of,
+    model_of,
     opens_on,
     places_of,
     reads,
@@ -177,6 +180,14 @@ _WHO, _WHAT, _WHERE = 0, 1, 2
 
 #: The flow the interface opens on, which is the one that is only talking to one agent.
 _STARTS_ON = "chat"
+
+#: What a `$` may name, which is a flow by the name it is offered under: a letter, then what
+#: the directory holding a flow is called, `<where it came from>/<flow>` for one that says
+#: which place it came from, and `:<inside>` for one of the several a file holds. Only a line
+#: whose `$` is followed by that and then by whitespace or nothing is a flow being started --
+#: anything else after the `$`, a space, a bracket, a figure, nothing at all, names no flow
+#: there could be, and is a line somebody happened to begin with a `$`.
+_NAMED = re.compile(r"[A-Za-z][\w.-]*(?:/[A-Za-z][\w.-]*)*(?::[\w.-]+)?")
 
 #: How much live activity a side question may carry into its isolated context, and how many
 #: side questions may have model turns open at once. Both are bounds on optional observation:
@@ -1494,7 +1505,11 @@ class Humanize(App[None]):
         typed = editor.text
         # At the end of what is being typed, and being typed rather than walked to.
         at_end = editor.cursor_location == editor.document.end and not editor.walking
-        offers = offered(typed, _OWN) if at_end else []
+        # And nothing against a `$` while an agent is waiting on an answer: the next line
+        # typed is that answer, whatever it begins with, so a list that took the enter would
+        # finish a flow's name over an answer nobody ever gave.
+        answering = self._asking is not None and typed.startswith("$")
+        offers = offered(typed, _OWN) if at_end and not answering else []
         # Nothing left to finish, but a command still being written: its own line stays up,
         # since what it takes after its name is written there and is what is wanted just
         # then. Shown and not offered -- `offering` is what says a key is the list's.
@@ -1884,11 +1899,27 @@ class Humanize(App[None]):
 
     @on(Editor.Sent)
     def _sent(self, event: Editor.Sent) -> None:
-        """Takes what was typed as a command, or as something to say to the agent."""
+        """Takes what was typed as a flow to start, as a command, or as something to say."""
         line = event.text
         # Written down whatever it turns out to be: a task, a word put into a running flow,
         # a command. All three were typed, and any of them may be worth typing again.
         self.history.add(line)
+        # A `$` names the flow to run and, after it, what to run it on. Not while a question
+        # is up: the next line typed is the answer to that, whatever it begins with, and an
+        # agent left waiting on an answer that went off to start a flow is a stopped turn.
+        if line.startswith("$") and self._asking is None:
+            named = _NAMED.match(line[1:])
+            # The name, and then whitespace or the end of the line. Matched rather than split
+            # on, so that the space after `$` is not eaten the way splitting on runs of it
+            # would eat it -- `$ ls -la` names nothing -- and so that a prompt written on the
+            # line under the name is the prompt rather than part of it.
+            at = 1 + named.end() if named else 0
+            if named and (at == len(line) or line[at].isspace()):
+                # Written down as it was typed, not as its halves go back together: a prompt
+                # broken under the name is two lines, and one space is not what that was.
+                self._said_by_you(line)
+                self._quick_flow(named.group(), line[at:].strip())
+                return
         if not line.startswith("/"):
             self._said(line)
             return
@@ -2381,21 +2412,44 @@ class Humanize(App[None]):
           named: A flow of your own, as a path, to open the menu already holding.
           opening: Which page to open on, counting from zero.
         """
+        running = bool(self._agents)
+        if named and running:
+            self.show("hmz: a flow is running; no choosing a flow", "red")
+            return
+        chosen = await self._chooses(named, running=running, opening=opening)
+        if chosen is None:
+            return  # walked out without saving, which changes nothing at all
+        self._took_flow(chosen, running=running)
+
+    async def _chooses(
+        self, named: str, *, running: bool, opening: int = 0
+    ) -> Chosen | None:
+        """Puts the flow menu up and answers with whatever it was saved holding.
+
+        Called from a worker, since it waits on a sheet: `/flow` opens it to be answered, and
+        a `$` naming a flow this workspace has never set up opens it for the same reason --
+        one menu either way, so that a flow is set up in one place however it was reached for.
+
+        Args:
+          named: A flow to open the menu already holding, or "" for the one in force.
+          running: Whether a flow is running, which is what shuts the page that chooses one.
+          opening: Which page to open on, counting from zero.
+
+        Returns:
+          The flow, its agents and how the flow itself is set up, or None for a menu walked
+          out of -- which changes nothing at all.
+        """
         # Opened whether or not there is a backend to run one on: which flow to run is worth
         # reading either way, and the sheet an agent is set up on says for itself that there
         # is nothing installed to set it up as.
         agents = installed()
         unavailable = installable()
         agents.update(unavailable)
-        running = bool(self._agents)
-        if named and running:
-            self.show("hmz: a flow is running; no choosing a flow", "red")
-            return
         # What is in hand is what is in hand for the flow the interface is set up on. A menu
         # opened straight into another flow is handed none, and reads what that one was last
         # set up with here -- which is what turning to it would have read.
         holding = self._models if not named or named == self._flow_named else ()
-        chosen = await self.push_screen_wait(
+        return await self.push_screen_wait(
             Flows(
                 named or self._flow_named,
                 holding,
@@ -2407,17 +2461,110 @@ class Humanize(App[None]):
                 opening=opening,
             )
         )
-        if chosen is None:
-            return  # walked out without saving, which changes nothing at all
-        self._took_flow(chosen, running=running)
 
-    def _took_flow(self, chosen: Chosen, *, running: bool) -> None:
+    @work
+    async def _quick_flow(self, named: str, task: str) -> None:
+        """Starts one flow on what was typed after its name, setting it up first if it needs to.
+
+        The whole of what `$ralph_loop fix the build` is: that flow, said that. A
+        flow this workspace has already set up runs on the spot -- the menu would be two pages
+        of answers already given -- and one it has not opens that menu on it, holding the line
+        that was typed until it is saved, since a flow nobody has answered for is a flow with
+        no agents to run on.
+
+        Args:
+          named: The flow, by the name it is offered under.
+          task: What to start it on, or "" for a `$` that named a flow and said nothing after
+            it -- which is choosing that flow and no more, there being nothing to start on.
+
+        Note:
+          The line is already in the transcript: it went down as it was typed, before this.
+        """
+        if not any(one.name == named for one in self.hmz.flows.all()):
+            # Said the way `/nosuchcommand` is: the sigil was meant, and the name after it is
+            # the half to correct. A path is not one of the answers -- it would swallow the
+            # prose after it -- so `/flow` is where a flow of your own by path is reached.
+            telemetry.snag("unknown-flow", length=len(named))
+            self.show(f"hmz: no such flow: {named}", "red")
+            return
+        if self._agents:
+            # The same answer `/flow <name>` gives while one runs, since it is the same thing
+            # being asked for: two ways of choosing a flow that did opposite things would be
+            # one of them ending a day's work on a line meant to queue the next one up.
+            self.show("hmz: a flow is running; no choosing a flow", "red")
+            return
+        chosen = self._remembered_for(named)
+        if chosen is None:
+            chosen = await self._chooses(named, running=False)
+            if chosen is None:
+                # Walked out of the menu, so nothing was chosen and nothing runs. Said, or a
+                # line that was typed to start something would have vanished without a word.
+                self.show("[dim]nothing was set up, so nothing was started[/dim]")
+                return
+        self._took_flow(chosen, running=False, starting=task)
+
+    def _remembered_for(self, flow: str) -> Chosen | None:
+        """What one flow would run as here, or None for one this workspace must be asked about.
+
+        Args:
+          flow: The flow, by the name it is offered under.
+
+        Returns:
+          The flow, its agents and how it is set up -- exactly what the menu would have been
+          saved holding -- or None for a flow to put that menu up about: one this workspace
+          has never set up, one that has grown, lost or renamed an agent since it last was,
+          and one whose kept settings no longer read back through the model it declares now.
+          A settings file is a convenience, and one that no longer fits the flow is a question
+          to ask again rather than a run to start on half an answer. A flow nothing was kept
+          for is not one of those: it takes its own defaults, exactly as it does on a command
+          line with nothing handed to it -- and neither is one that has since dropped its
+          settings altogether, which is a flow nothing is asked about.
+        """
+        places = places_of(flow)
+        if places is None:
+            # A flow that will not load says nothing about what it drives, so nothing here can
+            # tell whether it is set up. Running it is where that is said, exactly as it is
+            # for the flow already in force.
+            return Chosen(flow, tuple(self.settings.agents(flow)))
+        held = self.settings.flows().get(flow)
+        kept = cast("dict[str, Any]", held) if isinstance(held, dict) else {}
+        agents = kept.get("agents")
+        # By what the flow calls each place and in the flow's own order, which is how they
+        # were written down: a flow that grew a reviewer in the middle would otherwise read as
+        # set up and hand the builder's model to it.
+        wanted = [place.name or str(at + 1) for at, place in enumerate(places)]
+        if (
+            not isinstance(agents, dict)
+            or list(cast("dict[str, Any]", agents)) != wanted
+        ):
+            return None
+        runs = self.settings.agents(flow, [place.goals_default for place in places])
+        if len(runs) != len(places):
+            return None  # written by hand, or written by something that writes it otherwise
+        written_ = self.settings.config(flow)
+        config = config_of(flow, written_)
+        if written_ and config is None and model_of(flow) is not None:
+            # Set up with settings this flow no longer accepts, which is one that has
+            # dropped, renamed or retyped a setting since. Nothing here can guess what the
+            # answer that no longer reads was meant to say, so it is asked where it is asked.
+            # A flow that dropped its settings model outright asks nothing, so it is not one
+            # of these: what was kept for it is a dead entry rather than a wrong answer.
+            return None
+        # Through the same settling every other way into the models goes through, or a flow
+        # that has since declared it needs the backend's own goals at a place would run here
+        # with them off and be refused before its first turn.
+        return Chosen(flow, tuple(settled(runs, places)), config)
+
+    def _took_flow(self, chosen: Chosen, *, running: bool, starting: str = "") -> None:
         """Applies what the flow menu was saved with, and writes it down.
 
         Args:
           chosen: The flow, its agents, and how the flow itself is set up.
           running: Whether a flow was running when the menu opened, which is what decides
             between starting fresh and changing the agents under a run.
+          starting: What to start the flow on now that it is set up, for a `$` line that
+            named the flow and said what to do in one go, or "" to leave it waiting to be
+            told -- which is what every other way of choosing a flow leaves it doing.
         """
         places = places_of(chosen.flow)
         same = (chosen.flow, list(chosen.agents), chosen.config) == (
@@ -2444,9 +2591,12 @@ class Humanize(App[None]):
         )
         if running:
             self._reconfigured()
-        elif not same:
+        elif not same and not starting:
             self.show("[dim]say what to do, and the flow starts on it[/dim]")
         self._draw()
+        if starting:
+            # Said already, `$` and all, so it starts rather than being written down twice.
+            self._starts(starting)
 
     def _reconfigured(self) -> None:
         """Sets the agents of a run that is going to what they have just been changed to.
@@ -3274,15 +3424,28 @@ class Humanize(App[None]):
             self._answered.set()  # and the turn waiting on it carries on
         elif self._agents:
             self._interject(text)
-        elif self._set_up:
-            self._said_by_you(text)
-            named = [part for runs in self._models for part in ("-a", runs.spec)]
-            self._flow(["-f", self._flow_named, *named, text])
         else:
+            self._said_by_you(text)
+            self._starts(text)
+
+    def _starts(self, task: str) -> None:
+        """Starts the flow that is chosen on what was said, which is what saying it does.
+
+        Written down here rather than in :meth:`_said` because a `$` line reaches it the other
+        way round -- the flow first and what to do with it after -- and two places starting a
+        flow on different command lines is two things to drift apart.
+
+        Args:
+          task: What to start it on, which is already in the transcript.
+        """
+        if not self._set_up:
             # Typed a task and nothing at all happened, which is the worst of these: it is
             # somebody meeting humanize for the first time and getting a red line for it.
             telemetry.snag("nothing-started", because="no coding agent installed")
             self.show("hmz: no coding agent is installed here", "red")
+            return
+        named = [part for runs in self._models for part in ("-a", runs.spec)]
+        self._flow(["-f", self._flow_named, *named, task])
 
     def _ask(self, agent: AgentBase, question: Question) -> str | None:
         """Puts a question a turn stopped on to whoever is at this prompt, and waits for them.

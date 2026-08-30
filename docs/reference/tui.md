@@ -138,7 +138,8 @@ every terminal keeps for itself and which copies the screen as drawn, wrapping a
 
 ## Commands
 
-A line beginning with `/` is a command; any other line is said to the agent. Type `/` and the
+A line beginning with `/` is a command, a line beginning with `$` [starts a
+flow](#starting-a-flow-outright), and any other line is said to the agent. Type `/` and the
 list appears under the editor with a line about each.
 
 | Command | Takes | What it does |
@@ -163,6 +164,49 @@ which.
 
 **`hmz anchor` is deliberately not here.** It is not a thing to do to a
 flow that is running, and a command that only ever means one thing is a command line.
+
+### Starting a flow outright
+
+`$<flow> <prompt>` is the flow said outright rather than chosen from a menu and then talked
+to. `$ralph_loop fix the failing test` means *run `ralph_loop` on that*. Two answers stand
+between you and a run — which flow, and what to do — and one of them is the same answer every
+morning.
+
+```
+$ralph_loop fix the failing test
+```
+
+What happens next depends on whether this directory has run that flow before:
+
+| | |
+| --- | --- |
+| **Set up here already** | It runs, now. No menu: two pages of answers already given are not two pages to answer again. |
+| **Never set up here** | [`/flow`](#choosing-a-flow) opens with the cursor on that flow. The line you typed is held; the flow runs on it the moment the menu is saved. Walk out without saving and nothing starts, and it says so. |
+| **No such flow** | A line to correct, the way `/nosuchcommand` is. The interface stays up. |
+
+**Set up here** means a remembered agent for every place the flow declares *now* — under the
+name the flow calls that place, and in the flow's own order — and settings the flow still
+accepts. A flow that has grown, lost or renamed an agent since is one you are asked about
+again, rather than one whose new reviewer quietly inherits the builder's model. So are
+settings that no longer read back through the model the flow declares now: nothing can guess
+what an answer that no longer fits was meant to say. A flow you never set any settings for is
+not one of those — it takes its own defaults, exactly as `hmz exec` does with no `-c`.
+
+`$` takes a **name**, not a path: a path holds the slashes, dots and spaces prose does, and one
+taken here would swallow the line after it. `/flow ./flows/mine` is where a flow of your own by
+path is reached.
+
+`$` alone chooses nothing — **a line whose `$` is not followed by something shaped like a flow
+name, and that by whitespace or the end of the line, reaches the conversation like any other
+line**. `$ ls -la`, `$5 says otherwise`, `$(pwd)` and a bare `$` are all said, not started.
+Whitespace rather than a space, so a long prompt broken under the name with **shift+enter** is
+the prompt rather than part of it. A `$` naming a flow and saying nothing after it —
+`$ralph_loop` — chooses that flow and stops there: there is nothing to start it on.
+
+Two things it will not do. It is **refused while a flow is running**, and leaves that run
+exactly as it was: it is choosing a flow, and [the page that chooses one is shut while one
+runs](#choosing-a-flow). And it is **not read as a flow while an agent is waiting on an
+answer** — the next line you type is that answer, whatever it begins with.
 
 ### Leaving, and letting go
 
@@ -431,6 +475,14 @@ in a list under the editor:
 - `/flow ` offers the flows there are — the ones humanize ships, the ones every
   [flowverse](/reference/flows#flowverses) fetched here holds, and your own `local/` and `user/`
   ones under `.humanize/flows` here or in your home directory.
+- `$` offers the same list, under the sigil that [starts one](#starting-a-flow-outright), and
+  only while the word after it is the one being typed: everything past that word is the
+  prompt, which is prose.
+
+A word already written out in full is offered nothing, whether it is a command or a flow.
+Enter over an open list takes what is under the cursor rather than sending the line, so `/flow`
+— with `/flowverses` beside it — and `$rlar` — with `$rlar2` beside it — would otherwise be
+lines nobody could send.
 
 An offer is the whole of what the word becomes, so taking one replaces what was typed rather
 than being appended to it. What is offered is reconsidered when the cursor moves as well as

@@ -28,6 +28,7 @@ whole piece of work start to finish; everything under them is for looking up.
 
 | | |
 | --- | --- |
+| [Starting a flow outright](/reference/tui#starting-a-flow-outright) | `$ralph_loop fix the build`: that flow, on that line, with no menu in between |
 | [Talking to a running turn](/user/steering) | A line typed mid-turn goes *into* it, not after it |
 | [Side questions](/user/btw) | `/btw`: ask about progress without steering the flow |
 | [Many conversations at once](/user/conversations) | One transcript, **tab** between the agents that are working |
