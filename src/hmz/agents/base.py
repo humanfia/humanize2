@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 
     from hmz.backends import Profile
     from hmz.coganchor import AnchorConfig
+    from hmz.fallbacks import Answer
     from hmz.machines import MachineConfig
     from hmz.providers import Provider
 
@@ -54,6 +55,12 @@ class Journal(Protocol):
     def opened(self, agent: AgentBase, session: str) -> None:
         """Writes down a session one of the agents has just opened."""
         ...
+
+
+#: What a turn exits with when there was nothing to run. The shell's own status for a command
+#: it could not find, put on a spawn that came back as a `FileNotFoundError` instead of as a
+#: process -- so that a CLI which is not installed reads as one failure and not as two.
+_NOTHING_TO_RUN = 127
 
 
 def _tee(
@@ -920,24 +927,37 @@ class SessionBase(ABC):
     ) -> Iterator[Event]:
         """One turn, tried again and then run under the next account, until one lands.
 
-        A turn fails for two kinds of reason and only one of them is worth another try: a
-        gateway that answered 503, a subscription that said "too many requests", a socket
-        that closed mid-stream are the same call away from working. So the place this agent
-        runs at says how many times a turn there is tried again and how long to wait between
-        tries -- `hmz.fallbacks`, which is the layer between an agent and its accounts -- and
-        each account names the next, so what a turn walks is a chain of accounts before it is
-        a step to somewhere else.
+        A turn fails for a kind of reason, and each kind has an answer of its own. A gateway
+        that answered 503 is the same call away from working; a subscription that said "too
+        many requests" is that call away once it has been left alone for a while, and then
+        away under an account that has not spent its quota; a key that was refused is refused
+        a minute later too, so the account chain is the whole of the answer and none of the
+        waiting is; a model that has been retired is retired under every account of that CLI,
+        so nothing but another place answers it; opencode's own store being busy is two turns
+        of it racing and is gone in a second. Retried identically -- which is what they all
+        were -- three of those are a flow that makes no progress and one is a flow hammering
+        a service that has just asked it to stop.
 
-        Which kind it was is the backend's to say, since only the backend knows what its own
-        failure means, and it says the second kind by raising `Unrecoverable`. Nothing here
-        reads a message to guess at it, and nothing here tries one of those again: a failure
-        that cannot come out differently, retried on a schedule, is a flow that makes no
-        progress and never stops.
+        So which kind it was is worked out here, out of what the CLI said, how it exited and,
+        for the one backend that keeps it there, its own log: `hmz.backends.trouble` reads it
+        against signatures written down beside everything else that is true of a backend.
+        `hmz.fallbacks.answers` then says what that kind gets -- how few goes it is worth, how
+        long the shortest wait is, whether another account answers it, whether to reopen the
+        transport first -- and the place says the rest, as it always did. Every step of it is
+        narrated as an event, because a recovery nobody can see is indistinguishable from a
+        hang.
+
+        A backend that already knows says so itself, and is believed: `Unrecoverable` for a
+        failure no place could come out of differently, which is raised on rather than
+        counted as an attempt, and `Failed(fault=...)` for one it can name. Guessing is only
+        what is left when the backend has said nothing.
 
         All of it inside the session that was running: the conversation is the backend's own
-        and is named by an id, so the same session carries on under the next account. What a
-        failed try already put on the transcript stays there -- it is how somebody reading it
-        finds out that the account went down and where the turn went next.
+        and is named by an id, so the same session carries on under the next account -- and a
+        transport that was reopened resumes that same conversation, what was lost having been
+        the socket rather than the session. What a failed try already put on the transcript
+        stays there -- it is how somebody reading it finds out that the account went down and
+        where the turn went next.
 
         Args:
           prompt: The input prompt for this turn, as the backend is to be given it.
@@ -948,10 +968,11 @@ class SessionBase(ABC):
 
         Raises:
             subprocess.CalledProcessError: If every try under every account of the chain
-              failed, which is the last of them raised as the turn's own failure -- or at
-              once, without another try or another account, for an `Unrecoverable`: a turn
-              that failed for a reason no other try could come out differently on is a turn
-              that has failed, and trying it again is a loop rather than a recovery.
+              failed, which is the last of them raised as the turn's own failure, carrying
+              which kind of failure it was and what a person does about it -- or at once,
+              without another try or another account, for an `Unrecoverable`: a turn that
+              failed for a reason no other try could come out differently on is a turn that
+              has failed, and trying it again is a loop rather than a recovery.
         """
         from hmz import fallbacks, providers
 
@@ -959,6 +980,10 @@ class SessionBase(ABC):
         # turn that failed under four accounts must not read it four times.
         again_ = fallbacks.tried(self._agent.spec)
         last: subprocess.CalledProcessError | None = None
+        # What the last failure was and what it is owed. A turn that has not failed yet is
+        # owed what a turn has always been owed: the goes the place asked for, the place's
+        # own wait, and the account chain after them.
+        answer = fallbacks.answers("")
         # Which accounts this turn has been under, so that a chain read again between two of
         # them -- another session of this agent moved it, somebody rewrote a fallback -- is
         # walked forwards rather than back onto one that has already failed here.
@@ -969,11 +994,24 @@ class SessionBase(ABC):
                 break
             tried.add(account.name)
             since = time.monotonic()
-            for attempt in range(1, again_.tries + 2):
+            goes, attempt = again_.tries, 0
+            while True:
+                attempt += 1
                 if self._agent._stopped:
                     raise Stopped(f"{self._agent.id} was stopped")
-                waiting = fallbacks.waits(again_.policy, attempt)
                 if attempt > 1:
+                    # The place's wait, floored by what the failure itself asks for and never
+                    # cut short by it: a service that has said there have been too many
+                    # requests is not answered by the first second of an exponential backoff,
+                    # and a place that asked for a backoff against a gateway that is down
+                    # asked for it.
+                    waiting = max(
+                        fallbacks.waits(again_.policy, attempt),
+                        fallbacks.waits(answer.policy, attempt)
+                        if answer.policy
+                        else 0.0,
+                        answer.least,
+                    )
                     # Checked before the wait rather than after it, so that a turn is never
                     # started knowing the time it was given is already spent.
                     if (
@@ -981,14 +1019,9 @@ class SessionBase(ABC):
                         and time.monotonic() - since + waiting > again_.timeout
                     ):
                         break
-                    self._heard(
-                        Event(
-                            kind="tool",
-                            text=f"{self._agent.backend} failed; trying again in "
-                            f"{waiting:.0f}s ({attempt - 1} of {again_.tries})",
-                        )
-                    )
+                    self._narrates(self._recovering(answer, waiting, attempt - 1, goes))
                     time.sleep(waiting)
+                started = time.time()
                 try:
                     yield from self._stream(
                         self._shaped_ask(prompt, schema), schema=schema
@@ -1001,14 +1034,36 @@ class SessionBase(ABC):
                     # later. Tried again, those are a loop that runs until somebody stops
                     # it -- so this one is the turn's own failure, said once.
                     raise
+                except (FileNotFoundError, NotADirectoryError, PermissionError) as gone:
+                    last = self._nothing_ran(gone)
+                    answer = self._trouble(last, within=time.time() - started)
                 except subprocess.CalledProcessError as failed:
                     last = failed
+                    answer = self._trouble(failed, within=time.time() - started)
                 else:
                     return
+                # How many goes this failure is worth here, which the place and the failure
+                # both have a say in: the place asks for as many as it asks for, the failure
+                # floors that where another go is the whole answer, and a failure the same
+                # call cannot come out of differently takes the floor away entirely.
+                goes = 0 if answer.held else max(again_.tries, answer.tries)
+                if answer.reopen:
+                    # The socket rather than the session: what is holding this conversation
+                    # open is let go of, and the next go resumes the conversation by the id
+                    # the backend gave it. A session holding nothing does nothing here.
+                    self._shut()
+                if attempt > goes:
+                    break
             if self._agent._stopped:
                 # Stopped while this turn was waiting to try again, or between accounts.
                 # A run ended by hand is ended, not carried on somewhere else.
                 raise Stopped(f"{self._agent.id} was stopped")
+            if not answer.accounts:
+                # A model that has been retired, a CLI that is not installed: every account
+                # of this backend is offered the same catalogue and none of them is a second
+                # copy of the CLI, so walking them is walking four accounts to be told the
+                # same thing four times. What answers it is another place.
+                break
             if self._agent.node().name != account.name:
                 # Another session of this agent moved it while this turn was running, and it
                 # moved it forwards. Taking the next step from where this turn thought it was
@@ -1021,31 +1076,166 @@ class SessionBase(ABC):
             if instead is None:
                 break
             self._agent.fall_back(instead)
-            self._heard(
-                Event(
-                    kind="tool",
-                    text=f"{self._agent.backend} failed; carrying on as "
-                    f"{instead.name or 'this machine is signed in'}",
-                )
+            self._narrates(
+                f"{self._went(answer)}; carrying on as "
+                f"{instead.name or 'this machine is signed in'}"
             )
-        # Every account of this backend is spent. What is left is another agent -- another
-        # CLI, another model, another effort -- which is a step written down between the two
-        # rather than on either, and is the second thing tried because it is the one that
-        # cannot carry the conversation: no backend takes another backend's session id.
+        # Every account of this backend is spent, or none of them was ever the answer. What
+        # is left is another agent -- another CLI, another model, another effort -- which is a
+        # step written down between the two rather than on either, and is the second thing
+        # tried because it is the one that cannot carry the conversation: no backend takes
+        # another backend's session id.
         stood_in = self._agent.stands_in()
         if stood_in is not None and self._may_stand_in(stood_in):
-            self._heard(
-                Event(
-                    kind="tool",
-                    text=f"{self._agent.backend} has nowhere left to run; carrying on as "
-                    f"{stood_in.spec}",
-                )
+            # What went wrong, where anything here recognised it, and otherwise the line a
+            # turn with nothing left to try has always been narrated with.
+            went = (
+                self._went(answer)
+                if answer.fault
+                else f"{self._agent.backend} has nowhere left to run"
             )
+            self._narrates(f"{went}; carrying on as {stood_in.spec}")
             yield from self._instead(stood_in, prompt, schema=schema)
             return
         if last is None:  # nothing ran at all, which is nothing this can raise about
             raise RuntimeError("no account to take the turn under")
         raise last
+
+    def _narrates(self, text: str) -> None:
+        """Says one step of a recovery where whoever is running the flow can see it.
+
+        To whatever is watching the agent, and -- where nothing is -- on stderr, beside the
+        progress every backend already puts there. A recovery nobody can see is
+        indistinguishable from a hang, and a turn that has just been told to wait half a
+        minute for a rate limit is exactly the turn somebody would otherwise watch do
+        nothing at all.
+
+        Args:
+          text: The line, as :meth:`_recovering` and its like build one.
+        """
+        self._heard(Event(kind="tool", text=text))
+        if not self._agent._watchers:
+            say(text, sys.stderr)
+
+    def _nothing_ran(self, gone: OSError) -> Failed:
+        """A spawn that came back as an error rather than as a process, as a failed turn.
+
+        A CLI that is not installed here does not exit nonzero: there is nothing to exit, so
+        the spawn raises. Left as it is, that is the one failed turn a flow could not carry on
+        past -- a loop written against a failed turn catches `CalledProcessError`, and this is
+        not one. So it becomes one, saying which line installs the CLI.
+
+        Which failure it is depends on what could not be found, and `subprocess` says: the
+        program for one it could not run, the directory for one it could not start in. A
+        workspace that has gone is not a CLI that is missing, and telling somebody to install
+        a CLI they already have would be an answer to a question nobody asked -- so that one
+        is left as a failed turn nothing classified, tried again as any other is.
+
+        Args:
+          gone: What the spawn raised.
+
+        Returns:
+          The failed turn to carry on from.
+        """
+        named = str(gone.filename or "")
+        program = bool(named) and named != self.cwd and not os.path.isdir(named)  # noqa: PTH112
+        return Failed(
+            _NOTHING_TO_RUN if program else 1,
+            [named or self._agent.backend],
+            "",
+            str(gone),
+            fault="missing" if program else "",
+        )
+
+    def _trouble(
+        self, failed: subprocess.CalledProcessError, *, within: float = 0.0
+    ) -> Answer:
+        """Which kind of failure a stopped turn was, and what a turn does about that kind.
+
+        Worked out here rather than where the turn was raised because here is where the
+        three things it takes are all to hand: which backend it was, how the process exited,
+        and -- for the one CLI that answers with a generic error and keeps the status in a
+        log of its own -- what that log has just been written with. The backend is believed
+        first: one that named the kind itself knows something no signature does.
+
+        What is decided is written back onto the failure, so that the turn's own failure says
+        it too. A suppressed turn prints that sentence and nothing else, and `429` there is
+        the difference between an account to attend to and a bug to report.
+
+        Args:
+          failed: What went wrong.
+          within: How long the try that failed took. What bounds the log: these are shared
+            between every session of that CLI on this machine, so a window wider than the try
+            is a window another agent's failure can be read out of -- which, on a machine
+            running nine of them at once, is exactly what would happen.
+
+        Returns:
+          What that kind of failure is owed, with what a person does about it filled in -- the
+          install line for a CLI that is not here, since which line installs it is a fact
+          about that CLI rather than about the kind of failure.
+        """
+        from dataclasses import replace
+
+        from hmz import backends, fallbacks
+
+        backend = self._agent.backend
+        said = failed.fault if isinstance(failed, Failed) else ""
+        fault = said or backends.trouble(
+            backend, failed.stderr, failed.output, status=failed.returncode
+        )
+        if not fault:
+            # The streams said nothing this recognises. Antigravity is why that is not the
+            # end of it: it exits with `Agent execution terminated due to error` and puts the
+            # HTTP status in its own log, so six rate-limited turns of the 2026-09-09
+            # evaluation read as six turns that simply failed. Read last and only here, a log
+            # being a file to open and every other backend saying what happened where it
+            # happened.
+            fault = backends.trouble(
+                backend,
+                journal=backends.journalled(
+                    backend, self._environ() or os.environ, within=within
+                ),
+            )
+        answer = fallbacks.answers(fault)
+        if fault == "missing":
+            answer = replace(answer, fix=backends.installing(backend))
+        if isinstance(failed, Failed):
+            failed.fault, failed.fix = answer.fault, answer.fix
+        return answer
+
+    def _went(self, answer: Answer) -> str:
+        """What went wrong, as the clause every line narrating a recovery is built on.
+
+        Args:
+          answer: What kind of failure it was and what a person does about it.
+
+        Returns:
+          The backend and what happened to it, with the fix in brackets where there is one.
+          For a failure nothing classified it is `<backend> failed`, which is what a recovery
+          has always been narrated as.
+        """
+        said = f"{self._agent.backend} {answer.about}"
+        return f"{said} ({answer.fix})" if answer.fix else said
+
+    def _recovering(self, answer: Answer, waiting: float, taken: int, goes: int) -> str:
+        """The line a watcher is shown when a failed turn is about to be taken again here.
+
+        Args:
+          answer: What kind of failure it was and what is being done about it.
+          waiting: How long the turn waits before this go.
+          taken: How many goes have already been taken beyond the first.
+          goes: How many there are.
+
+        Returns:
+          The text of the `tool` event that narrates it. A recovery nobody can see is
+          indistinguishable from a hang, so every part of what is happening is in it: what
+          went wrong, whether the transport is being reopened onto which conversation, how
+          long the wait is and which go this is.
+        """
+        said = self._went(answer)
+        if answer.reopen:
+            said += f"; reopening and resuming {self._id or 'the conversation'}"
+        return f"{said}; trying again in {waiting:.0f}s ({taken} of {goes})"
 
     def _moving_to(self, stood_in: AgentBase) -> SessionBase:
         """The conversation of the stand-in that this one's turns are taken in.

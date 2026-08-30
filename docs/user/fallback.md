@@ -77,14 +77,61 @@ In order, and it stops at the first thing that works:
 
 1. **Takes the turn.** If it lands, none of the rest happens — nothing is looked up, and no
    stand-in is started.
-2. **Tries again at the same place**, as many times and with whatever wait the step says.
-   Nothing is retried unless you asked for it.
-3. **Walks the account chain**, in the conversation that was running. An agent that has moved
-   stays moved: the account that went down is not one to try again each turn.
-4. **Walks the chain of places**, once there is no account left. The turn is taken in a new
+2. **Works out what went wrong**, out of what the CLI said, how it exited and — for the one
+   backend that keeps it there — its own log. See [what went wrong](#what-went-wrong): each
+   kind gets a different answer, and the three steps below are what that answer is made of.
+3. **Tries again at the same place**, as many times and with whatever wait the step says, plus
+   whatever the failure itself asks for. Nothing is retried unless you asked for it, except
+   the few kinds where another go *is* the answer.
+4. **Walks the account chain**, in the conversation that was running. An agent that has moved
+   stays moved: the account that went down is not one to try again each turn. Skipped for the
+   kinds no account answers.
+5. **Walks the chain of places**, once there is no account left. The turn is taken in a new
    session of an agent at the next place, configured exactly as the agent it left — carrying
    its effort, its permission rung, the skills the flow gave it and the
    [callbacks](/weaver/tools) the agent is offering.
+
+## What went wrong
+
+Two things go wrong is where this page started, and it is truer than that: seven do, and each
+of them takes a different answer. A rate limit wants a long wait and then another account. A
+key that was refused wants no wait at all — it is refused a minute later too — and the account
+chain is the whole of the answer. A model that was retired wants neither, every account of that
+CLI being offered the same catalogue. Retried identically, which is what they all were before
+this, three of those are a flow that makes no progress and one is a flow hammering a service
+that has just asked it to stop.
+
+| What happened | What a turn does about it |
+| --- | --- |
+| **Too many requests** — HTTP 429, a quota spent, `RESOURCE_EXHAUSTED`, `overloaded` | Waits at least 30 seconds, then walks the account chain. The account is spending too fast; the next one is not. |
+| **Refused the credentials** — 401, 403, a login that expired, a model this account is not entitled to | Nothing is tried again here. Walks the account chain, and says that the account it left needs signing in. |
+| **No such model** — 404, a model retired, one the service says does not exist | Nothing here and no account either: they are all offered the same catalogue. Goes straight to the next **place**. |
+| **Its own store was busy** — opencode's `database is locked` | Three goes here, a second apart. Two turns of it are sharing one SQLite database, and that clears itself. |
+| **Lost the connection** — `ECONNRESET`, `EPIPE`, a gateway that went away | Reopens the transport, resumes the conversation by its id, and goes again. What was lost was the socket, not the session. |
+| **Was killed rather than answered** — a signal, an out-of-memory kill | Reopens, waits a second, and says what killed it. The machine may be out of memory. |
+| **Is not installed here** — nothing to run, or nothing that would start | A failed turn that says which line installs it, and goes to the next place. |
+| **Anything else** | Exactly what a failed turn has always done: the goes the step asked for, the step's own wait, and then the account chain. |
+
+Every one of those narrates itself while it happens, so a run that is recovering does not read
+as a run that has hung:
+
+```
+claude is rate-limited (this account has spent its quota; another one, or a wait, is what
+answers it); trying again in 30s (1 of 1)
+claude is rate-limited (…); carrying on as work
+```
+
+Whatever is watching the agent sees those as `tool` events; where nothing is watching, they go
+on stderr beside the progress the backend itself puts there. A turn told to wait half a minute
+is exactly the turn you would otherwise watch do nothing at all.
+
+A backend that already knows which kind it was says so itself and is believed. Nothing guesses
+at a message when the CLI has named the failure.
+
+Antigravity is the exception that needed one: it exits with `Agent execution terminated due to
+error` and puts the HTTP status in `~/.gemini/antigravity-cli/log/`. Its log is read when its
+streams say nothing, which is how a rate-limited turn of it stops reading as a turn that simply
+failed.
 
 The flow sees one turn either way. The events come back through the session it asked, between
 the same `begins` and `ends`, and the transcript says where it was picked up.

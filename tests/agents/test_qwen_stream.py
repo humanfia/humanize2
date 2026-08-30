@@ -199,6 +199,26 @@ def test_session_effort_restarts_without_rewriting_old_settings(qwen: _Qwen) -> 
     assert first["session"] == second["session"]
 
 
+def test_a_provider_error_answered_as_a_landed_turn_is_a_failed_turn(
+    qwen: _Qwen,
+) -> None:
+    """Qwen marks it a success and exits zero, and the whole of its answer is the error.
+
+    A loop handed that as an answer would be running on an error message as the work of the
+    turn before it -- and a 401 that reads as a landed turn is an account nothing ever falls
+    back from, since nothing here would have seen a failure at all.
+    """
+    session = qwen.agent.new()
+
+    with pytest.raises(Failed, match="401 Invalid API key") as refused:
+        session("[API Error: 401 Invalid API key]")
+
+    assert refused.value.fault == "refused"
+    assert (
+        session.named is None
+    )  # and it leaves the conversation unopened, as any failure does
+
+
 def test_failed_opening_turn_does_not_adopt_id_or_leave_process_running(
     qwen: _Qwen,
 ) -> None:

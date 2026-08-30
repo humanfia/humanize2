@@ -167,6 +167,22 @@ load.
   and a CLI that named a vendor's credential after itself named the same thing. Which
   backends read each of them MUST NOT be written down again: it is already written, as what
   each backend's ways ask for and what it says it would take an account from.
+- What a CLI says when a turn of it stops, and which kind of failure each of those makes it,
+  MUST be written down here too. It is a fact about that CLI, and a regex in whichever driver
+  met one first is a fact written down in the last place anybody would look for it. The kinds
+  MUST be named here as well, since it is here that the sameness lives: every one of these
+  CLIs speaks HTTP to a model provider, so a `429` is a `429` whichever of them was holding
+  the socket, and what one says and no other does MUST go on that backend's own profile and be
+  read before the shared ones.
+- Reading a message MUST be the last thing tried and not the first. A process's exit status
+  says on its own that there was nothing to run or that a signal ended it, and a backend that
+  named the kind itself MUST be believed over any reading of what it printed.
+- A CLI that keeps why a turn stopped somewhere other than the streams it answered on MUST
+  have those files written down here, as globs under its home. Antigravity is the one that
+  does. Nothing MUST be read from them for a backend that has none.
+- The one line that installs each of these MUST be written down here, for the turn that failed
+  because there was nothing to run: that line is the whole of what such a turn has to say, and
+  a backend nobody has written one for MUST say so in general terms rather than say nothing.
 
 ## `models.py`
 
@@ -300,6 +316,25 @@ def named(policy: str) -> Policy | None: ...
 
 
 def waits(policy: str, attempt: int, base: float = BASE) -> float: ...
+
+
+@dataclass(frozen=True, slots=True)
+class Answer:
+    fault: str
+    about: str
+    tries: int = 0
+    held: bool = False
+    policy: str = ""
+    least: float = 0.0
+    accounts: bool = True
+    reopen: bool = False
+    fix: str = ""
+
+
+ANSWERS: tuple[Answer, ...]
+
+
+def answers(fault: str) -> Answer: ...
 ```
 
 The layer between an agent and its accounts: where a turn goes when the place taking it cannot
@@ -329,6 +364,29 @@ is not an account going down.
   both. Nothing MUST be retried by default: a turn is taken once, as it always was, since a
   prompt the model refused is the same refusal every time and only the caller knows which of
   its places fails the other way.
+- What each kind of failure gets MUST be written down here, one row per kind, beside the waits
+  it is written in terms of. A place says the shape a turn is retried in and that is the right
+  thing for a place to say, but it is one answer and what stopped the turn is not one question:
+  a rate limit wants a long wait and then another account, a credential that was refused wants
+  no wait at all and the same account chain, a model that has been retired wants neither, and a
+  local store that was busy wants three short goes and nothing else. Retried identically --
+  which is what every one of them was -- three of those are a flow that makes no progress and
+  one is a flow hammering a service that has just asked it to stop.
+- A row MUST be able to floor the goes a place asked for and to take them away entirely, and
+  MUST NOT cap them otherwise: a floor is what a failure that is worth another go needs, and a
+  ceiling would be this file overruling somebody who asked for more. The waits MUST work the
+  same way: a row MAY say the shortest any of them may be and MAY put a policy of its own under
+  the place's, and MUST NOT shorten one -- the first second of an exponential backoff is a
+  second the service has already refused, and a row that cut a place's backoff short would be
+  this file overruling somebody in the one direction that hammers whatever has just failed.
+- A kind nothing recognised MUST get the answer a turn has always had: the goes the place asked
+  for, the place's own wait, and the account chain after them. Whoever is recovering a turn
+  MUST read a row rather than a row and a special case, so `answers` MUST answer with that one
+  rather than with nothing.
+- Which kinds another account answers MUST be written here as well. A model that is gone is
+  gone under every account of that CLI, and a CLI that is not installed is not installed under
+  any of them, so a turn that met one MUST go straight to the chain of places rather than walk
+  every account to be told the same thing again.
 - The waits MUST be the ones everybody uses under the names everybody uses them by, and none
   MUST be invented here: no wait, a constant one, a linear one, exponential backoff, that with
   full jitter, and Fibonacci. A name that is not one of them MUST wait the way the default

@@ -30,6 +30,19 @@ No authorization headers or full request bodies are logged. Request diagnostics 
 message roles, task positions, explicit tool policy, token limits and fixed instruction-hint
 matches. These help distinguish metadata traffic without retaining private prompt text.
 
+The fixture can also answer every model request with a deliberate provider fault, so an
+adapter's error handling can be exercised against the real CLI's own error path rather than a
+mock of one. `--fault none|throttled|refused|retired|dropped` arms one at startup, and
+`POST /fixture/fault {"fault": "..."}` arms one on a running fixture, so a single revision
+walks the whole taxonomy without a restart changing the model map, the provider or anything
+else under measurement. `throttled` answers HTTP 429 with `Retry-After: 1`, `refused` 401 and
+`retired` 404, each in the envelope the protocol being spoken actually uses -- Anthropic's
+`{"type":"error",...}`, Gemini's `RESOURCE_EXHAUSTED`/`UNAUTHENTICATED`/`NOT_FOUND`, OpenAI's
+`{"error":{"type":...}}` -- and `dropped` sets `SO_LINGER` to zero and closes, so the CLI sees
+a real RST rather than a clean shutdown. Faults are recorded in the request journal and are
+never part of a measurement sample: a run with one armed is an error-path check, not a
+throughput one.
+
 Create isolated providers using only dummy keys; this step runs no agent CLI or model call:
 
 ```bash

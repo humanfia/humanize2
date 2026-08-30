@@ -30,15 +30,46 @@ Expose `AgentConfig`, `AgentBase`, `Event`, `Question`, `Stopped`, `Failed`, `Un
 
 ## `event.py`
 
+```python
+class Failed(subprocess.CalledProcessError):
+    def __init__(
+        self,
+        returncode: int,
+        cmd: Sequence[str],
+        output: str | bytes | None = None,
+        stderr: str | bytes | None = None,
+        *,
+        fault: str = "",
+        fix: str = "",
+    ) -> None: ...
+
+    def reads(self) -> str: ...
+```
+
 `Event`, `Question`, `Stopped`, `Usage`, `Failed`, `Unrecoverable` and `say`: what a turn says
 while it runs, what it asks, what it cost, and how it failed -- with no behaviour on them.
 
 - `Failed` MUST be a `subprocess.CalledProcessError` that says what went wrong where whoever it
   happened to can read it: a flow catches turns rather than transports, and the sentence a CLI
   failed with is the whole of what a person needs.
-- `Unrecoverable` MUST be a `Failed` a turn is not taken again for. It is what a backend says
-  of a failure no other try could come out differently on, and nothing outside the backend
-  MUST read a message to guess at one.
+- `Failed` MUST also carry which *kind* of failure it was and what a person does about it, as
+  `hmz.backends.FAULTS` names the kinds, and MUST say both in its message. A kind rather than a
+  sentence, because the answer to each kind is a different answer -- a rate limit is waited out
+  and then taken to another account, a refused credential is not waited out at all, a retired
+  model is answered by another place and by nothing else -- and one that said only a sentence
+  is one every caller would have to read a message to act on. "" MUST mean nobody classified
+  it, which MUST be the failure a turn has always had: tried again exactly as the place says.
+- Which kind it was MUST NOT be worked out here. This is what a turn says and what it cost,
+  with no behaviour on it; deciding takes the backend, the exit status and, for a CLI that
+  keeps its reason in a log of its own, that log -- none of which a value has. A backend that
+  knows MUST be able to say it on the failure it raises, and MUST be believed over any reading
+  of a message.
+- `Unrecoverable` MUST be a `Failed` a turn is not taken again for anywhere: not at this place,
+  not under another account, and not at another place. It is what a backend says of a failure
+  no other try could come out differently on, and nothing outside the backend MUST read a
+  message to guess at one. A kind that is answered by another place -- a model that has been
+  retired, a CLI that is not installed -- MUST NOT be one of these: it is a turn with somewhere
+  left to go.
 
 - An agent that starts an agent of its own MUST say so on the stream a turn is read from, as a
   `subagent` and then a `subagent-ends`, each naming that agent by the backend's own id for it
@@ -376,6 +407,34 @@ class SessionBase(ABC):
   failure until somebody stopped it. Which failures those are is the backend's to say, and
   whatever tries a turn again MUST let one through rather than counting it as an attempt --
   the same failure on a schedule is a flow that makes no progress and never ends.
+- A turn that failed MUST be classified before anything is done about it, and each kind MUST
+  get the answer that kind takes. `hmz.backends.trouble` MUST be what reads it -- against
+  signatures written down beside everything else that is true of a backend -- and
+  `hmz.fallbacks.answers` MUST be what says what the kind is owed. A backend that named the
+  kind itself MUST be believed without any of that: it knows something no signature does.
+- The exit status MUST be read before the streams for the failures where the process never got
+  as far as saying anything: a shell answers 127 for a command it could not find and 126 for
+  one it could not run, and a process that died on a signal has no status but the signal. A
+  spawn that came back as an error rather than as a process -- a CLI that is not installed --
+  MUST become a failed turn of that kind rather than escaping as a transport: a flow catches
+  turns, and a loop written against a failed turn could not carry on past anything else.
+- A backend that keeps why a turn stopped somewhere other than the two streams MUST be read
+  there, and only when the streams have said nothing this recognises. One of them does:
+  Antigravity exits with a generic error and puts the HTTP status in a log of its own, which
+  is how six rate-limited turns of the 2026-09-09 evaluation read as six turns that simply
+  failed. Which files those are MUST be written down on the backend rather than found by the
+  driver, and reading one MUST cost nothing for the backends that have none.
+- Every step of a recovery MUST narrate itself as an event, saying what went wrong, what is
+  being done about it and what a person does about it where there is anything to do. A
+  recovery nobody can see is indistinguishable from a hang, and an account that needs signing
+  in is worth saying so about while the turn is still going rather than only in what it
+  finally failed with. Where nothing is watching the agent it MUST also go on stderr, beside
+  the progress every backend puts there: a turn told to wait half a minute for a rate limit is
+  the one somebody would otherwise watch do nothing at all.
+- A transport reopened MUST resume the conversation by the id the backend gave it. What was
+  lost was the socket and not the session: the conversation is the backend's own, so a turn
+  that reopens starts a process and picks the same conversation up rather than starting a
+  second one.
 - A turn given a `schema` MUST answer with that model or not at all, and the model MUST be the
   whole of what the backend is asked: its fields, their types, which of them are required and
   the line each was declared with are already in it, so nothing about the shape MUST be said

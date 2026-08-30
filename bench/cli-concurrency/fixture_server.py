@@ -14,6 +14,8 @@ import gzip
 import hashlib
 import json
 import resource
+import socket
+import struct
 import sys
 import threading
 import time
@@ -28,6 +30,14 @@ from fixture_wire import response
 
 MAX_BODY = 32 * 1024 * 1024
 HISTORY_LIMIT = 4096
+
+#: Deliberate provider faults, for proving what a CLI does with each of them. The fixture
+#: answers every model request with one of these while it is armed, in the shape the protocol
+#: being spoken actually uses -- a CLI parses its vendor's error envelope, not a generic one.
+FAULTS = ("none", "throttled", "refused", "retired", "dropped")
+
+#: What each fault is, per protocol: the HTTP status, and the vendor's own wording for it.
+FAULT_STATUS = {"throttled": 429, "refused": 401, "retired": 404}
 
 
 def _protocol(path: str) -> str:
@@ -44,16 +54,60 @@ def _protocol(path: str) -> str:
     raise ValueError("Unknown fixture model route")
 
 
+def fault_body(protocol: str, fault: str) -> dict[str, Any]:
+    """The vendor's own error envelope for one deliberate fault.
+
+    Args:
+      protocol: Which wire the CLI is speaking.
+      fault: One of `FAULTS`, other than `none` and `dropped`.
+
+    Returns:
+      The JSON body to answer with.
+    """
+    status = FAULT_STATUS[fault]
+    said = {
+        "throttled": "Rate limit exceeded: too many requests for this API key",
+        "refused": "Invalid API key: unauthorized",
+        "retired": "The model does not exist or you do not have access to it",
+    }[fault]
+    if protocol == "anthropic":
+        kind = {
+            "throttled": "rate_limit_error",
+            "refused": "authentication_error",
+            "retired": "not_found_error",
+        }[fault]
+        return {"type": "error", "error": {"type": kind, "message": said}}
+    if protocol == "gemini":
+        state = {
+            "throttled": "RESOURCE_EXHAUSTED",
+            "refused": "UNAUTHENTICATED",
+            "retired": "NOT_FOUND",
+        }[fault]
+        return {"error": {"code": status, "message": said, "status": state}}
+    kind = {
+        "throttled": "rate_limit_exceeded",
+        "refused": "invalid_api_key",
+        "retired": "model_not_found",
+    }[fault]
+    return {"error": {"message": said, "type": kind, "code": kind, "param": None}}
+
+
 class Fixture(ThreadingHTTPServer):
     """Hold bounded Responses continuation state and nonsecret measurement records."""
 
     daemon_threads = True
     request_queue_size = 256
 
-    def __init__(self, port: int, log: Path, models: list[str]) -> None:
+    def __init__(
+        self, port: int, log: Path, models: list[str], fault: str = "none"
+    ) -> None:
         super().__init__(("127.0.0.1", port), Handler)
         self.log = log
         self.models = models
+        #: Which deliberate fault every model request is answered with, or `none`. Armed on
+        #: the command line or through `POST /fixture/fault`, so one running fixture can be
+        #: walked through the whole taxonomy without a restart changing anything else.
+        self.fault = fault
         self.lock = threading.Lock()
         self.history: OrderedDict[str, Turn] = OrderedDict()
         self.first: set[tuple[str, str]] = set()
@@ -109,6 +163,40 @@ class Handler(BaseHTTPRequestHandler):
             )
         self.wfile.flush()
         self.close_connection = True
+
+    def _faulted(self, protocol: str) -> bool:
+        """Answers this request with the armed fault, if one is armed.
+
+        Args:
+          protocol: Which wire the CLI is speaking, so the envelope is the one it parses.
+
+        Returns:
+          Whether the request was answered here and nothing else should touch it.
+        """
+        fault = self.server.fault
+        if fault == "none":
+            return False
+        if fault == "dropped":
+            # A real reset rather than a clean close: zero-linger makes the kernel send RST,
+            # which is what an `ECONNRESET` in a CLI's log actually is.
+            with contextlib.suppress(OSError):
+                self.connection.setsockopt(
+                    socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0)
+                )
+                self.connection.close()
+            self.close_connection = True
+            return True
+        status = FAULT_STATUS[fault]
+        payload = json.dumps(fault_body(protocol, fault)).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        if fault == "throttled":
+            self.send_header("Retry-After", "1")
+        self.end_headers()
+        self.wfile.write(payload)
+        self.wfile.flush()
+        return True
 
     def do_GET(self) -> None:
         """Expose model discovery and a models.dev-shaped local registry."""
@@ -166,9 +254,13 @@ class Handler(BaseHTTPRequestHandler):
                     "team_blocked": False,
                 }
             )
-        elif path in ("/", "/health"):
+        elif path in ("/", "/health", "/fixture/fault"):
             self._json(
-                {"fixture": True, "purpose": "CLI startup and tool overhead only"}
+                {
+                    "fixture": True,
+                    "purpose": "CLI startup and tool overhead only",
+                    "fault": self.server.fault,
+                }
             )
         else:
             self._json({"error": {"message": "Unknown fixture route"}}, 404)
@@ -209,6 +301,20 @@ class Handler(BaseHTTPRequestHandler):
             "path": self.path.split("?", 1)[0],
             "synthetic_model": True,
         }
+        if record["path"] == "/fixture/fault":
+            # Armed from outside, so one running fixture walks the whole taxonomy without a
+            # restart changing the model map, the provider or anything else under measurement.
+            asked = str(self._body().get("fault") or "none")
+            if asked not in FAULTS:
+                self._json(
+                    {"error": {"message": f"fault must be one of {FAULTS}"}}, 400
+                )
+                return
+            self.server.fault = asked
+            self._json({"fault": asked})
+            record.update(ok=True, armed=asked)
+            self.server.write(record)
+            return
         with self.server.lock:
             self.server.active += 1
             record["active_requests"] = self.server.active
@@ -221,6 +327,9 @@ class Handler(BaseHTTPRequestHandler):
                 if path.endswith("/messages/count_tokens")
                 else _protocol(path)
             )
+            if self._faulted(protocol):
+                record.update(ok=False, fault=self.server.fault)
+                return
             if protocol == "gemini":
                 from fixture_gemini import normalize
 
@@ -290,9 +399,15 @@ def main() -> None:
         "--models",
         default="fixture-model,kimi-k2,claude-sonnet-4-5,gpt-5-codex,deepseek-chat",
     )
+    parser.add_argument(
+        "--fault",
+        default="none",
+        choices=FAULTS,
+        help="answer every model request with a deliberate provider fault",
+    )
     args = parser.parse_args()
     args.log.parent.mkdir(parents=True, exist_ok=True)
-    with Fixture(args.port, args.log, args.models.split(",")) as server:
+    with Fixture(args.port, args.log, args.models.split(","), args.fault) as server:
         sys_message = {
             "url": f"http://127.0.0.1:{server.server_port}",
             "log": str(args.log),
