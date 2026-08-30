@@ -114,7 +114,8 @@ is written to silently.
 **What comes back is what was written, not what was drawn.** A line too long for your terminal is
 drawn over four rows, and copying it gives you the line: no break where the terminal ran out of
 room, and none of the spaces that padded each row out to the edge. A break in what you copy is a
-break that was really there. The same goes for `/export`, which writes the same text to a file.
+break that was really there. The same goes for the transcript `/export` puts in the archive it
+writes.
 
 The box the interface opens with is a picture rather than a line, so dragging across it gives you
 its rows as they are drawn, borders and all.
@@ -144,7 +145,7 @@ list appears under the editor with a line about each.
 | --- | --- | --- |
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Its Agents page saves the complete setup; esc remains the way to save or discard on the way out. |
 | `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
-| `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
+| `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), [export it](/user/export), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/monitor` | | [The run, drawn](#watching-the-run): a box per agent that has worked, marked as it works and saying how long it has been at it, with the handovers between them as the arrows joining them, whatever each started of its own hanging under it, and [the board](/user/board) below. Enter reads an agent or changes a line. **esc** opens it. |
@@ -153,7 +154,7 @@ list appears under the editor with a line about each.
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
 | `/fallback` | | Where a turn goes when what was taking it cannot: an agent that has nowhere left to run, and an account that has gone down. See [below](#where-a-turn-goes-when-it-cannot-be-taken). |
 | `/clear` | | Clears the screen, and nothing else: the transcript being read, not the others, and nothing that is running. |
-| `/export` | | Writes what is on the screen to `.humanize/<datetime>.session.md`, as it was written rather than as it was wrapped: everything drawn there since the last `/clear`, which is every conversation that has been read rather than only the one showing now. |
+| `/export` | | Packages the whole run up as `.humanize/<run>.epic.tar.gz`: its own records, every session log the backends wrote for it as their contents rather than as the links the run keeps, and the transcript beside them — as it was written rather than as it was wrapped, and every conversation that has been read rather than only the one showing now. Credentials are struck out of all of it. See [Exporting a run](/user/export). |
 | `/detach` | | [Lets go of this terminal](/reference/daemon) and leaves the flow running. The run carries on where nothing is reading it, and `hmz` in this directory opens it again from the top. Where nothing is holding the run — `--no-daemon`, or no terminal to hand over to — it says so rather than doing nothing. |
 | `/exit` | | Leaves. With a flow running it asks first what is to become of it: stop it and leave, or leave it running and let go of this terminal. With nothing running it is a window being closed, and asks nothing. |
 
@@ -735,13 +736,14 @@ the run is written under.
 The list is read rather than chosen from, so **enter** opens what there is to do with the run
 under the cursor:
 
-![The menu under one run: carry on from here, collect a trace, and where it is, each with a
-line saying what it does](/demo/epic-does.png)
+![The menu under one run: carry on from here, collect a trace, export it, and where it is,
+each with a line saying what it does](/demo/epic-does.png)
 
 | Row | What it does |
 | --- | --- |
 | **carry on from here** | Runs that run's own flow again, on what that run left behind — which a flow that says it [can be picked up](/reference/flows#a-flow-that-can-be-picked-up) is handed. |
 | **collect a trace** | Gathers **that run's** sessions — and the programs it ran, for a [profiled](/reference/tracing#profiling-a-run) run — into `traces/` inside the run itself, rather than into whatever directory you are standing in. That run's and no others: they are asked for by the ids it wrote down, so a directory run in fifty times has fifty traces and none of them holds another's work. Where it went and what is in it are said under the list, and again in the transcript. |
+| **export it** | Packages **that run** up as one archive to send to somebody else — its own records, every session log the backends wrote for it as their contents rather than as the links the run keeps, and a manifest. There is no transcript in this one: what is on your screen is not that run. Where it landed and how big it came out are said under the list, and again in the transcript. See [Exporting a run](/user/export). |
 | **where it is** | The directory the run is written in, sessions and all, said under the list. |
 
 **Carrying on is offered where the flow says so now**, rather than where the run said so then.

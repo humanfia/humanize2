@@ -216,6 +216,10 @@ class Called(NamedTuple):
         are and where whatever it called in turn is written down.
       began: When it was called.
       ended: When it returned, or "" for a call that never did -- a run killed under it.
+      how: How the call ended -- done, failed or stopped -- read out of its own record, and
+        "" for one that has not ended or was not read as a tree. A call that raised inside a
+        run that carried on is a call that failed and a run that did not, so it is the
+        call's own record that says it rather than the run's.
       calls: What that call called in turn, read out of its own record: a run of flows
         calling flows is a tree, and reading it as a list would say a flow ran under the
         wrong one. Empty unless it was read as one -- :func:`tree`.
@@ -226,6 +230,7 @@ class Called(NamedTuple):
     record: str
     began: str = ""
     ended: str = ""
+    how: str = ""
     calls: tuple[Called, ...] = ()
 
 
@@ -1230,8 +1235,33 @@ def _tree(epic: Path, record: str, walked: frozenset[str]) -> tuple[Called, ...]
         return ()
     walked = walked | {record}
     return tuple(
-        one._replace(calls=_tree(epic, one.record, walked)) if one.record else one
+        one._replace(calls=_tree(epic, one.record, walked), how=_how(epic / one.record))
+        if one.record
+        else one
         for one in _calls(_events(epic / record))
+    )
+
+
+def _how(at: Path) -> str:
+    """How the call written in one record ended, off the record's own closing line.
+
+    The callee's rather than the caller's: what the caller writes is that the call returned,
+    and a call that raised inside a run which carried on is a call that failed and a run that
+    did not.
+
+    Args:
+      at: The record file.
+
+    Returns:
+      What it says it ended as, and "" for a call that never ended -- a run killed under it.
+    """
+    return next(
+        (
+            str(one.get("how") or "")
+            for one in reversed(_events(at))
+            if one.get("event") == "ended"
+        ),
+        "",
     )
 
 
