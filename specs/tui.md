@@ -60,9 +60,50 @@ line, with what the flow is doing beside the transcript.
   are: every surface is the terminal's background and everything drawn is one of the sixteen
   colours the terminal already has a setting for, or a reversal of what is already there. A
   colour of its own would be a guess about the background it lands on.
-- The editor MUST mean both things at once: a line beginning with `/` is a command, and any
-  other line is said to the conversation being read, through `SessionBase.interject`, so that
-  a turn already under way takes it into account rather than being restarted with it.
+- The editor MUST mean three things at once: a line beginning with `/` is a command, a line
+  beginning with `$` names a flow to start and what to start it on, and any other line is said
+  to the conversation being read, through `SessionBase.interject`, so that a turn already
+  under way takes it into account rather than being restarted with it.
+- `$<flow> <prompt>` MUST be the flow said outright: choose that flow, and say that to it. The
+  two answers before a run -- which flow, and what to do -- are one line then, and the first of
+  them is the same answer every morning. Where this workspace has already set that flow up it
+  MUST run on the spot: a menu of two pages of answers already given is a menu nobody would
+  open. Where it has not, the flow menu MUST open on that flow with the line held, and the
+  flow MUST run on it the moment the menu is saved -- a flow with no agents answered for is a
+  flow that stops on its first turn, and a prompt held is a prompt not typed twice.
+- Set up here MUST mean a remembered agent for every place the flow declares now, under the
+  name the flow calls that place and in the flow's own order -- so a flow that has grown,
+  lost or renamed an agent since is one to be asked about rather than one whose reviewer
+  quietly gets the builder's model -- and settings the flow still accepts. Settings that no
+  longer read back through the model the flow declares now MUST be asked again: nothing can
+  guess what an answer that no longer fits was meant to say. A flow nothing was written down
+  for MUST NOT be one of those: it takes its own defaults, as it does on a command line with
+  nothing handed to it.
+- `$` MUST name a flow and MUST NOT take a path: a path holds the slashes, dots and spaces
+  prose does, and one taken here would swallow the line after it. `/flow` is where a flow of
+  your own by path is reached.
+- A `$` naming a flow there is none of MUST be a line to correct, said the way a command that
+  is not one is: the sigil was meant and the name after it is the half to fix.
+- A line whose `$` is not followed by something shaped like a flow's name, and that by
+  whitespace or the end of the line -- nothing at all, a space, a bracket, a figure -- MUST
+  reach the conversation like any other line. `$` is a sigil on a name, and a `$` naming
+  nothing is a shell prompt somebody pasted or a sum of money; a line eaten for the character
+  it opened with is a line nobody could send. Whitespace rather than a space, so that a prompt
+  written on the line under the name is the prompt rather than part of it.
+- A `$` line MUST NOT be read as naming a flow while an agent is waiting on an answer: the
+  next line typed is that answer, whatever it begins with, and a turn left waiting while a
+  flow started elsewhere is a turn nobody ended.
+- A `$` line MUST be refused while a flow is running, and MUST leave that run exactly as it
+  was. It is choosing a flow, and the page that chooses one is shut while one runs; two ways
+  of saying the same thing that did opposite things would be one of them ending a day's work
+  on a line meant to queue the next one up. It MUST NOT quietly become a word put into the
+  running conversation either.
+- A `$` naming a flow and saying nothing after it MUST choose that flow and no more: there is
+  nothing to start it on, and the flow it chose is then waiting to be told, exactly as it is
+  when a flow is chosen any other way.
+- A menu opened by a `$` and walked out of MUST say that nothing was started. Nothing was
+  chosen, so nothing runs -- and a line typed to start something that vanished without a word
+  is a line somebody would type again wondering what became of the first one.
 - Enter MUST send and `shift+enter` MUST break the line, so that a long prompt can be written.
   `ctrl+j` MUST break it too: a terminal reports shift+enter as itself only where it speaks a
   keyboard protocol that can say so, and sends a bare carriage return where it does not --
@@ -347,6 +388,9 @@ adjusted rather than chosen.
   match nobody typed.
 - Choosing a flow MUST read back what that flow was last set up with here, and MUST end on the
   page its agents are on: that is the next thing to answer.
+- The menu MUST be the one place a flow is set up, however it was reached for: `/flow`, and a
+  `$` naming a flow this workspace has never set up. Two screens asking which agents drive a
+  flow would be two to answer differently.
 - A menu MUST NOT be saved holding an agent that names no model: a flow driven by one is a flow
   that stops on its first turn, and the page it would be answered on is the page to be looking
   at when that is said.
@@ -666,13 +710,22 @@ What the editor offers to finish, which is the only way anything is chosen.
 - Nothing MUST be chosen from a dialog. A `/` MUST offer the commands, and a flag MUST offer
   whatever it is for -- the flows below this directory, the backends an agent runs on -- so
   that there is one way to say a thing and it is the way it is written down.
+- A `$` MUST offer the flows there are, which is the same list `/flow ` offers: it names one,
+  so it finishes one. Only while the word after it is the one being typed -- everything past
+  that word is the prompt, which is prose and has nothing to finish it with.
 - An offer MUST be the whole of what the word becomes, so that taking one replaces what was
   typed rather than being appended to it.
-- A command that has been written out MUST be offered nothing: enter over an open list takes
-  what is under the cursor rather than sending the line, so a command that is the start of a
-  longer one -- `/flow`, beside `/flowverses` -- would otherwise be one nobody could send.
+- A word that has been written out in full MUST be offered nothing, whether it is a command or
+  a flow: enter over an open list takes what is under the cursor rather than sending the line,
+  so a command that is the start of a longer one -- `/flow`, beside `/flowverses` -- and a
+  flow that is the start of a longer one would otherwise be ones nobody could send.
 - Finding the flows MUST NOT cost the interface its responsiveness: it reads every Python
   file below this directory, which is far too slow to repeat between keystrokes.
+- Listing the flows there are MUST NOT be done again for every keystroke either: it imports
+  and runs every flow file there is, and a `$` asks for it from the first character of the
+  line. One reading MUST stand for a moment, and MUST be a reading of this directory -- the
+  flows there are change when a flowverse is fetched or a file is written, and neither
+  happens between two keystrokes.
 
 ## `discover.py`
 
