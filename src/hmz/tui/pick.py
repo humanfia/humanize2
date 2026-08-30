@@ -6465,10 +6465,15 @@ class Providers(Drafts[list[str]]):
 
 
 #: What can be done with a run that has already happened: pick it up where it stopped, for a
-#: flow that says it can be, gather what it left behind into a trace, and say where it is
-#: written down. The first is answered outside this module -- starting a flow is the
-#: interface's -- so it is named where it is read.
-carries_on, _COLLECTS, _WHERE_IT_IS = "carry-on", "collect", "where"
+#: flow that says it can be, gather what it left behind into a trace, package the whole of it
+#: up to send somewhere, and say where it is written down. The first is answered outside this
+#: module -- starting a flow is the interface's -- so it is named where it is read.
+carries_on, _COLLECTS, _EXPORTS, _WHERE_IT_IS = (
+    "carry-on",
+    "collect",
+    "export",
+    "where",
+)
 
 #: How much of a task a row of the runs shows, before it is what a run is rather than a line.
 _ENOUGH_TASK = 60
@@ -6575,6 +6580,13 @@ class Does(Picks):
                 _COLLECTS,
                 "collect a trace",
                 "its sessions, and the programs it ran, as one trace to read",
+            )
+        )
+        held.append(
+            (
+                _EXPORTS,
+                "export it",
+                "the whole run as one archive, session logs and all",
             )
         )
         held.append(
@@ -6784,6 +6796,37 @@ class Epics(Sheet[Doing]):
         self._told.append(f"[dim]{escape(str(at))} — {escape(held)}[/dim]")
         self._fill()
 
+    async def _exports(self, ran: Ran) -> None:
+        """Packages one run up as one archive, to send to somebody who was not there.
+
+        No transcript in this one. What is on the screen is the run that is going, and this
+        is a run out of the list -- often one from last week, whose screen is long gone.
+
+        Off the event loop, for the reason a trace is gathered off it: following a day's logs
+        and compressing them is seconds, and an interface that stopped redrawing for them
+        would look as though it had gone away.
+
+        Args:
+          ran: The run.
+        """
+        import asyncio
+
+        from hmz.exporting import sized
+
+        self._said = f"packaging {escape(ran.name)}…"
+        self._fill()
+        try:
+            at, _ = await asyncio.to_thread(_hmz().epics.bundled, ran.at)
+            size = await asyncio.to_thread(lambda: at.stat().st_size)
+        except (OSError, ValueError) as why:
+            self._said = escape(str(why))
+            self._fill()
+            return
+        said = f"{escape(str(at))}{_DOT}{sized(size)}"
+        self._said = said
+        self._told.append(f"[dim]{said}[/dim]")
+        self._fill()
+
     def _follows(self, listing: OptionList) -> None:
         """Takes which run the cursor is on off the list, by the directory it is written in."""
         at = listing.highlighted
@@ -6851,6 +6894,9 @@ class Epics(Sheet[Doing]):
             return
         if said == _COLLECTS:
             await self._collects(ran)
+            return
+        if said == _EXPORTS:
+            await self._exports(ran)
             return
         if said == carries_on and self._underway:
             # Said here rather than on the way out: the question this sheet is asking is

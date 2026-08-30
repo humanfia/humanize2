@@ -68,6 +68,17 @@ ALLOWED: dict[str, set[str]] = {
     # DAG without bending it. And a run that is being profiled samples the programs its
     # agents start, which is `tracing`: what a run left behind, read back.
     "hmz.epic": {"hmz.agents", "hmz.backends", "hmz.tracing"},
+    # One run packaged up to send somewhere, which is that run read back with every link
+    # followed. It names what a run is, the facts about the CLIs that ran it -- where each
+    # keeps its logs, what each is installed as -- the accounts, whose values it strikes out
+    # of everything it carries, and where a profile of a run is written. None of those names
+    # it back, so this widens the DAG without bending it.
+    "hmz.exporting": {
+        "hmz.backends",
+        "hmz.epic",
+        "hmz.providers",
+        "hmz.tracing",
+    },
     # What a flow is written against, which is why it is also the one import a flow needs:
     # the agents it drives, and the facts a loop steers by. A flow that has to know where
     # its own agent keeps its tasks, or what models that account runs, is reading a fact
@@ -130,6 +141,7 @@ ALLOWED: dict[str, set[str]] = {
         "hmz.agents",
         "hmz.backends",
         "hmz.epic",
+        "hmz.exporting",
         "hmz.fallbacks",
         "hmz.flows",
         "hmz.kept",
@@ -151,6 +163,11 @@ ALLOWED: dict[str, set[str]] = {
         # The runs of this directory, which `/epics` lists and picks one up from. It names
         # the agents and the facts about them, both of which are under the interface too.
         "hmz.epic",
+        # How big a bundle came out, which `/export` says of the run on the screen and
+        # `/epics` says of a run out of the list. Writing one is asked of `sdk` like
+        # everything else the interface does rather than draws; how many bytes it came to is
+        # said in words, and one archive said two ways would be two ways to say it.
+        "hmz.exporting",
         # `/fallback` is where it is said what a turn does when the agent taking it cannot,
         # which is the other half of what `/providers` says about an account. It names only
         # `backends`, so this widens the DAG without bending it.

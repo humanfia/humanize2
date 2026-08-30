@@ -40,8 +40,8 @@ its own is in it either.
 
 ## What it is not
 
-- **Not a session log.** For what actually happened, [`/export`](/user/export) writes the
-  transcript and [`hmz trace collect`](/user/tracing) writes the whole run.
+- **Not a session log.** For what actually happened, [`/export`](/user/export) packages the
+  whole run up and [`hmz trace collect`](/user/tracing) draws it as one timeline.
 - **Not shared with the flow.** A flow gets the task it was started with. It cannot read the
   history.
 - **Not on the command line.** `hmz exec` takes its task as an argument. Your shell's own

@@ -2308,20 +2308,63 @@ class Humanize(App[None]):
             self.show(f"[dim]   never sent: {because}[/dim]")
         self._draw()
 
-    def _export(self) -> None:
-        """Writes the transcript beside the trace files, as opencode writes its markdown.
+    @work
+    async def _export(self) -> None:
+        """Packages the whole run up as one archive, transcript and all.
 
-        What was written rather than what was drawn, which is the same thing a selection gives
-        back: a file of lines broken where the terminal happened to run out of room is a file
-        nothing can be read out of again.
+        The screen alone was never the run. What an agent actually did is in the log its
+        backend wrote, which the run points at by a link -- and a link is worth nothing on
+        any machine but this one, so a bundle sent to whoever is being asked to fix something
+        follows every one of them and carries what is behind it. The transcript goes in
+        beside those, as the text it was written as rather than the rows it was drawn as:
+        lines broken where the terminal ran out of room are lines nothing reads back.
+
+        Off the event loop. Following a day's logs and compressing them is seconds, and an
+        interface that stopped redrawing for them would look as though it had gone away.
         """
-        import datetime
+        import asyncio
 
-        stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
-        where = Path(".humanize") / f"{stamp}.session.md"
-        where.parent.mkdir(parents=True, exist_ok=True)
-        where.write_text(self.query_one("#transcript", Transcript).text)
-        self.show(f"[dim]{where}[/dim]")
+        from hmz.exporting import sized
+
+        epic = self._epic()
+        if epic is None:
+            self.show(
+                "hmz: nothing has been run here yet, so there is nothing to export",
+                "red",
+            )
+            return
+        said = self.query_one("#transcript", Transcript).text
+        self.show(f"[dim]packaging {escape(epic.name)}…[/dim]")
+        try:
+            at, _ = await asyncio.to_thread(
+                self.hmz.epics.bundled, epic, transcript=said
+            )
+            size = await asyncio.to_thread(lambda: at.stat().st_size)
+        except (OSError, ValueError) as why:
+            self.show(f"hmz: {escape(str(why))}", "red")
+            return
+        self.show(f"[dim]{escape(str(at))} — {sized(size)}[/dim]")
+
+    def _epic(self) -> Path | None:
+        """The run this interface is showing, by the directory it is written in.
+
+        Asked of the agents rather than of the workspace: the run holds the epic it is
+        writing into, so a flow that is going is exported as itself rather than as whichever
+        directory happens to sort last. Once it has ended the agents still hold it, which is
+        what makes exporting a run that has just finished the same key as exporting one that
+        is still going.
+
+        Returns:
+          It, or the last run of this directory where no flow has been started here yet, or
+          None where nothing has ever been run here.
+        """
+        from hmz.epic import Epic
+
+        for agent in self._ran:
+            if isinstance(agent.epic, Epic):
+                return agent.epic.path
+        found = self.hmz.epics.all()
+        return found[-1] if found else None
 
     @work
     async def action_flow(self, named: str = "", *, opening: int = 0) -> None:

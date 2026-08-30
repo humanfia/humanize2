@@ -132,6 +132,20 @@ def _trace(argv: list[str]) -> int:
     return trace(argv)
 
 
+def _export(argv: list[str]) -> int:
+    """Packages one whole run up as one archive, to send somewhere.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      Zero, once the bundle has been written, or two for a line to correct.
+    """
+    from .export import export
+
+    return export(argv)
+
+
 def _anchor(argv: list[str]) -> int:
     """Runs the agent named on the command line, with its work landing on another machine.
 
@@ -564,6 +578,10 @@ COMMANDS = {
     "trace": (
         _trace,
         "what a run left behind, gathered into a trace to read",
+    ),
+    "export": (
+        _export,
+        "one whole run, packaged up to send to somebody who was not there",
     ),
     "anchor": (_anchor, "run an agent here that acts on another machine"),
     "flowverses": (_flowverses, "the places flows come from"),

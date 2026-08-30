@@ -204,9 +204,24 @@ line, with what the flow is doing beside the transcript.
   editor MUST be copied from the same way, holding a selection of its own so that the screen's
   has nothing in it. That something was copied MUST be said for a moment, since a clipboard is
   written to silently and a gesture that says nothing is one nobody knows worked.
-- What `/export` writes MUST be the text the transcript was written as rather than the rows it
-  was drawn as, for the reason a selection gives back that text: a file of lines broken where
-  the terminal ran out of room is one nothing reads back.
+- `/export` MUST write the whole run rather than the screen: what happened, what each of its
+  sessions was logged as by the backend that ran it, and the transcript beside those. The
+  screen was never the run -- the turns went to a coding agent that wrote its own log, and the
+  run points at that log by a link rather than holding it. A bundle sent to whoever is being
+  asked to fix something MUST therefore follow every one of those links and carry what is
+  behind it, since a link is worth nothing on any machine but the one that made it. It is
+  `hmz.exporting`, which is also what `hmz export` asks: one archive, made one way, whichever
+  way somebody reached it.
+- The transcript that goes in MUST be the text the transcript was written as rather than the
+  rows it was drawn as, for the reason a selection gives back that text: a file of lines
+  broken where the terminal ran out of room is one nothing reads back.
+- It MUST say where the archive landed and how big it came out, and MUST NOT hold the
+  interface still while it is written: following a day's logs and compressing them is seconds,
+  and an interface that stopped redrawing for them would look as though it had gone away.
+- The run it exports MUST be the run this interface is showing, asked of the agents it drove
+  rather than of which directory sorts last -- a flow that is going is exported as itself.
+  A directory nothing has ever been run in MUST be said rather than answered with an archive
+  of no run.
 
 ## `selecting.py`
 
@@ -518,6 +533,12 @@ adjusted rather than chosen.
   a directory holds whoever opened it MUST NOT be offered here at all -- this is a list of
   runs, and a trace that is of none of them has nothing here to hang on; `hmz trace collect
   --all` is where it is asked for.
+- A run MUST also be exportable from here, beside gathering its trace: both are reading one
+  back afterwards, and a report about something that went wrong last week is written about a
+  run out of this list rather than about the one on the screen. What is written MUST be the
+  same archive `/export` writes, less the transcript -- what is on the screen is not that run,
+  which may be a week old, and a screen of somebody else's run in it would be a bundle saying
+  something that is not true.
 - Carrying a run on MUST run that run's own flow, on that run's own agents, with what it was
   asked to do -- what is being picked up is what ran, and an agent swapped under it would be
   a different run wearing its name. It MUST be a run of its own, saying which run it came

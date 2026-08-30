@@ -151,7 +151,7 @@ async def test_a_run_of_a_flow_that_can_be_picked_up_says_so(workspace: Path) ->
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
 
-        assert rows(app) == ["carry-on", "collect", "where"]
+        assert rows(app) == ["carry-on", "collect", "export", "where"]
 
 
 @pytest.mark.timeout(60)
@@ -167,7 +167,7 @@ async def test_a_run_of_a_flow_that_says_nothing_is_a_run_to_read(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
 
-        assert rows(app) == ["collect", "where"]
+        assert rows(app) == ["collect", "export", "where"]
         assert "does not say it can be picked up" in str(
             app.screen.query_one("#tuning", Label).render()
         )
@@ -335,4 +335,4 @@ async def test_a_run_of_a_flow_marked_since_can_be_picked_up_too(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Does), driver)
 
-        assert rows(app) == ["carry-on", "collect", "where"]
+        assert rows(app) == ["carry-on", "collect", "export", "where"]

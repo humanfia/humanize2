@@ -63,6 +63,14 @@ One default integration is switched off for the same reason. `ArgvIntegration` a
 whole task there. It is disabled where the reporter starts. Everything the SDK collects under
 `extra` is dropped again on the way out.
 
+## Sending a run on purpose
+
+None of the above is a way of getting a run to us. When something goes wrong and the shape of
+the failure is not enough, [`/export`](/user/export) packages the whole run up as one archive —
+every record, every session log in full, and a manifest saying what each backend was — for you
+to attach to an issue. It is the other half of this page: what a report never takes, an export
+carries, because you chose to send it. Credentials are struck out of it all the same.
+
 ## The friction it notices
 
 Not everything worth reporting is an error. humanize counts these cases, because each one is

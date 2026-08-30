@@ -1,10 +1,11 @@
-"""The runs of a workspace that have already happened, and the traces gathered of them.
+"""The runs of a workspace that have already happened, and what is gathered out of them.
 
 One run is one epic: a directory holding what happened, what each session was logged to, and
 what a flow that says it can be picked up left behind. What is written down as a run happens
-is :mod:`hmz.epic`; reading the backends' own logs back is :mod:`hmz.tracing`. Both are asked
-here, so that whatever is listing the runs -- a command line, the interface's own `/epics` --
-asks one object about the one workspace it is about.
+is :mod:`hmz.epic`; reading the backends' own logs back is :mod:`hmz.tracing`; packaging one
+whole run up to send somewhere is :mod:`hmz.exporting`. All three are asked here, so that
+whatever is listing the runs -- a command line, the interface's own `/epics` -- asks one
+object about the one workspace it is about.
 """
 
 from __future__ import annotations
@@ -125,6 +126,35 @@ class Epics:
             profile=epic / PROFILE,
         )
         return where, document
+
+    def bundled(
+        self,
+        epic: Path,
+        *,
+        output: str | os.PathLike[str] | None = None,
+        transcript: str | None = None,
+    ) -> tuple[Path, dict[str, Any]]:
+        """Packages one whole run up as one archive, to send to somebody who was not there.
+
+        Everything the run wrote and everything its sessions were logged to, with the links
+        followed: an epic points at the backends' own logs rather than copying them, and a
+        directory of symlinks is a bundle with nothing in it the moment it leaves the machine
+        that made it. Credentials are struck out of every byte of it.
+
+        Args:
+          epic: The run, by the directory it is written in.
+          output: Where to write it -- a file, or a directory to write it into under its own
+            name -- or None for `.humanize/` beside wherever this is being run.
+          transcript: What was on the screen, for an export from the interface, or None from
+            a command line, where nothing was drawn.
+
+        Returns:
+          Where it was written, and the manifest as it was written there -- which is what
+          says what went in, rather than a second reading of the run afterwards.
+        """
+        from hmz.exporting import bundle
+
+        return bundle(epic, output, transcript=transcript)
 
     def trace(
         self,
