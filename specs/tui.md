@@ -97,7 +97,7 @@ line, with what the flow is doing beside the transcript.
   agents going, what somebody is stepping between is the ones thinking. An agent read already
   MUST be left where it is when its turn ends -- it is being read -- but MUST NOT be stepped
   onto again until it is working. Every agent there is MUST still be readable, from the
-  diagram `/status` draws: an agent that has stopped is picked out by name there rather than
+  diagram `/monitor` draws: an agent that has stopped is picked out by name there rather than
   stepped past.
 - Which agent is being read MUST be visible, beside how many conversations it holds, and one
   that is not being read and has said something since it was last looked at MUST be marked as
@@ -168,8 +168,8 @@ line, with what the flow is doing beside the transcript.
   meant by it. A press long enough after the last MUST be the first of its own gesture.
 - `esc` MUST NOT stop a flow. It is pressed to dismiss whatever is on the screen everywhere
   else in this interface, and a key pressed to dismiss things MUST NOT be the key that ends a
-  day's work. It MUST be `/status` instead, which is where the run is read and where the flow
-  is drawn.
+  day's work. It MUST be `/monitor` instead, which is where the run is watched and where the
+  flow is drawn.
 - A line that cannot be carried out MUST be shown and MUST leave the interface up. Only
   `/exit` closes it.
 - `/exit` MUST ask what is to become of a flow that is running, and MUST NOT ask where none
@@ -250,10 +250,12 @@ interface's to hand over.
 ## `pick.py`
 
 The sheets: which flow, how it is set up, what each of its agents is, the agents kept under a
-name, the accounts they run as, and how the run is going. Each MUST be drawn the way Claude
+name, the accounts they run as, and the run as it goes. Each MUST be drawn the way Claude
 Code draws its own `/model` -- a rule across the top, the question and a line about it, the
 choices numbered with a marker against the one under the cursor, and under them whatever is
-adjusted rather than chosen.
+adjusted rather than chosen. The one that is not a question -- `/monitor`, which is the run
+drawn -- MUST keep that frame and drop the numbering: its rows are a picture rather than
+answers to pick between, and a numbered diagram would offer a choice nobody is making.
 
 ### The keys
 
@@ -525,12 +527,21 @@ adjusted rather than chosen.
   where it was asked for, `ctrl+c` twice being what stops one.
 - It MUST be readable while a flow runs: what has already happened does not change under one.
 
-### How the run is going
+### The run, drawn
 
-- `/status` MUST say how the run is going and MUST draw the shape of it, and MUST be what
-  `esc` opens. It is read rather than answered in every other respect, so it MUST NOT be
-  refused while a flow runs and MUST be redrawn while it is open: what it is about moves
+- `/monitor` MUST draw the run and MUST be what `esc` opens. It is called that rather than
+  `/status` because of what it is for: a status is read once and put down, and this is watched
+  while a flow works. It is read rather than answered in every other respect, so it MUST NOT be
+  refused while a flow runs and MUST be redrawn while it is open -- what it is about moves
   without anybody touching it.
+- The diagram MUST be the sheet rather than a header on one. It MUST be given the height the
+  terminal has rather than the few rows a list of choices is held to, since these rows are a
+  picture of the run and one cut off at the fourth of six agents is a picture with the end
+  missing. What is written under it MUST be only what the diagram cannot say -- which flows are
+  running, what this one was set up with, the handovers no arrow could be drawn for, and what
+  has been spent. Anything a box already carries MUST NOT be written again below it: two places
+  saying who is working are two places to keep in step, and one more thing between the picture
+  and the eye.
 - The shape MUST be drawn as a box per agent rather than listed. It is a graph, and a graph
   read as an adjacency list is one nobody reads. The boxes MUST be in the order the flow takes
   its agents, and the handovers between neighbours MUST be the arrows joining them, with how
@@ -538,31 +549,53 @@ adjusted rather than chosen.
   one agent after another. A handover the boxes have no arrow for MUST be said under the
   diagram rather than drawn: a line crossing the page from the first box to the fourth is a
   line nothing in a terminal draws readably.
+- The handover taken most recently MUST be drawn apart from the rest. Where the run just went
+  is the first thing a reader looks for with six boxes on the page, and a picture holding still
+  says it nowhere else.
 - An agent that has not taken a turn MUST NOT be drawn, and one MUST appear as its first turn
   starts. A flow may declare ten agents and reach three of them -- it is a Python file, and it
   may never take the branch the other seven are on -- so what is drawn MUST be what the run is
   *doing* rather than a list of what was configured. Which agents there are MUST therefore be
   asked again as the sheet is redrawn rather than settled when it opened, or a box would appear
-  only to whoever closed the sheet and opened it again.
+  only to whoever closed the sheet and opened it again. A run where none has worked yet MUST
+  say so where the boxes would be, rather than opening on a blank page.
+- Each box MUST say what its agent *is* and what it is *doing now*, and the two MUST be drawn
+  apart. What it runs and how many turns it has taken stand still; whether it is working, how
+  long the open turn has been open -- or how long it has been since its last one ended -- move,
+  and the moving half MUST be kept in one column down the page, that being the half a reader
+  comes back to. Nothing else on the screen carries it: the lines above the prompt say what an
+  agent is, and the status line says only whose turn it is now.
+- Which agents are working MUST be marked on the boxes, and MUST move as they do. It is the
+  one thing on this sheet that changes by itself, and the reason somebody opened it. A
+  transcript that has said something since it was last read MUST be marked on its box too:
+  which box is worth pressing enter on is the question this sheet is answering.
 - An agent one of them started of its own MUST be drawn under the box of the agent that
   started it, without a box of its own, marked as still going or as come back. It is not an
   agent of the flow -- nobody chose what it runs, nothing can be said to it and it has no
   transcript -- so it MUST NOT be a row anything attaches to, and its mark MUST differ from
   the one a flow's own agents wear: a box round it would say it was another agent to read. A
   fleet too long to draw MUST be cut, with a line saying how many were left off.
-- Which agents are working MUST be marked on the boxes, and MUST move as they do. It is the
-  one thing on this sheet that changes by itself, and the reason somebody opened it.
+- Which box the cursor is on MUST be drawn on the box itself rather than left to the row being
+  highlighted. These rows are pictures rather than lines of text, and a highlight that
+  recoloured the row is one the markup inside the picture paints straight over.
+- A redraw that has not changed which agents there are MUST put back the rows that changed
+  rather than building the list again. A clock counting in seconds changes something on nearly
+  every redraw, and a list rebuilt twice a second is one that loses the click somebody is making
+  on it and scrolls out from under anybody reading it.
 - Enter or a click on a box MUST read that agent, whether or not it is working. `tab` is held
   to the ones working, so this is the one place an agent that has stopped is reached. The first
   row MUST be the transcript every agent's work appears on, which is the way back to watching
-  the flow rather than one agent of it.
-- The agents of the last run MUST still be drawn once it is over. Their transcripts are still
-  on the screen and still worth reading back, and a run that has just ended is the one
-  somebody wants to look at.
+  the flow rather than one agent of it, and it MUST say how far the run has got: how many
+  agents are working, how many turns they have taken between them, and how long it has all been
+  going.
+- The agents of the last run MUST still be drawn once it is over, and every clock on the sheet
+  MUST stop where the run stopped rather than counting on after it. Their transcripts are still
+  on the screen and still worth reading back, a run that has just ended is the one somebody
+  wants to look at, and a diagram still counting would say the flow was still doing something.
 
 ### The board
 
-- The board a flow and the person both write on MUST be drawn on this sheet, under the
+- The board a flow and the person both write on MUST be drawn on `/monitor`, under the
   diagram, for a run whose flow talks to the person. It is about the run -- what there is left
   to do belongs beside how far through the run is -- and a board somebody has to go and open is
   a board nobody reads.
@@ -613,6 +646,9 @@ class Shape:
     turns: Mapping[str, int]
     working: frozenset[str]
     handovers: Mapping[tuple[str, str], int]
+    under: Mapping[str, tuple[Under, ...]]
+    since: Mapping[str, float]
+    latest: tuple[str, str] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -622,10 +658,13 @@ class Spend:
     rate: float
 
 
+def lasting(seconds: float) -> str: ...
+
+
 @dataclass
 class Monitor:
-    def begins(self, agent: str, model: str) -> None: ...
-    def ends(self, agent: str) -> None: ...
+    def begins(self, agent: str, model: str, now: float | None = None) -> None: ...
+    def ends(self, agent: str, now: float | None = None) -> None: ...
     def spend(
         self,
         agent: str,
@@ -648,6 +687,10 @@ a flow being a Python file that may branch any way it likes.
   are working, and every handover between them with how often it happened: that directed graph
   is the shape of the run. It MUST be taken whole under the lock, so that what is drawn from
   it is one moment of the run rather than three moments of three counters.
+- It MUST also report how long each agent has been at what it is doing and which handover was
+  the last one taken, worked out where the rest of the graph is taken. The diagram is drawn
+  from `shape` and nothing else, and a clock read outside it would be a box saying a different
+  moment from the arrows above it. Both MUST stop where the run stopped, as the rate does.
 - `spending` MUST be per model rather than per agent, since two agents at one model are one
   bill, and MUST report a rate over a recent window only -- a flow that has stopped reads as
   stopped rather than as whatever it once averaged.

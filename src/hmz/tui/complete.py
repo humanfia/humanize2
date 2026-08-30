@@ -25,7 +25,7 @@ _ABOUT = {
     "fallback": "Where a turn goes when the place taking it cannot take it at all",
     "epics": "The runs of this directory, and what to do with one",
     "settings": "What humanize remembers, here and everywhere",
-    "status": "Show how the run is going, and the board",
+    "monitor": "Watch the run: the flow drawn, and the board",
     "clear": "Clear the screen",
     "details": "Toggle tool calls and thinking",
     "afk": "Toggle whether an agent may ask you",

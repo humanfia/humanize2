@@ -321,7 +321,7 @@ this directory. Find its trajectories with `--session` rather than by workspace.
 
 ## Watching instead
 
-A trace is for after. While a run is going, [`/status`](/user/status) shows the same shape
+A trace is for after. While a run is going, [`/monitor`](/user/monitor) shows the same shape
 live. It is read off the turns going past, never by asking the flow.
 
 ## See also

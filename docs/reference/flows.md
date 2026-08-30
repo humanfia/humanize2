@@ -524,7 +524,7 @@ was given.
 ### The board
 
 Asking stops the turn. **The board does not.** It is a handful of named lines kept beside the
-run and drawn on [`/status`](/user/status) — the flow reads and writes it whenever it likes,
+run and drawn on [`/monitor`](/user/monitor) — the flow reads and writes it whenever it likes,
 the person changes it whenever they like, and neither is ever waiting on the other:
 
 ```python
@@ -681,7 +681,7 @@ async def run(agents: tuple[Agent], task: str) -> None:
 
 **What is running is both of them.** `hmz.flows.running()` reports the flow that was started
 and whatever it called, innermost last; the interface names them on its status line and on
-`/status`, and the [epic](/reference/tracing) records each call and each return. A flow that called
+`/monitor`, and the [epic](/reference/tracing) records each call and each return. A flow that called
 another does not read as the flow somebody chose.
 
 **And each call is written down as a run of its own.** A called flow opens sessions, keeps its

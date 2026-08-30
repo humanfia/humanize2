@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-__all__ = ["Monitor", "Shape", "Spend", "Under", "short", "thousands"]
+__all__ = ["Monitor", "Shape", "Spend", "Under", "lasting", "short", "thousands"]
 
 #: How far back the rate is measured. Five minutes is long enough to carry across the gaps a
 #: flow leaves -- a turn that thinks, a round it sleeps off, a commit it makes -- and short
@@ -26,6 +26,10 @@ _WINDOW = 300.0
 #: Where a count stops fitting and starts being abbreviated.
 _THOUSAND = 1000
 _MILLION = 1_000_000
+
+#: What a clock is read in, in the units the seconds it is given are.
+_MINUTE = 60.0
+_HOUR = 3600.0
 
 
 def thousands(count: int) -> str:
@@ -42,6 +46,26 @@ def thousands(count: int) -> str:
     if count < _MILLION:
         return f"{count / _THOUSAND:.1f}k"
     return f"{count / _MILLION:.2f}M"
+
+
+def lasting(seconds: float) -> str:
+    """How long something has been going, as a box on the diagram says it.
+
+    Args:
+      seconds: How long, in seconds.
+
+    Returns:
+      Seconds under a minute, minutes and seconds under an hour, and hours and minutes above
+      it -- the second figure always two digits, so that a box does not shuffle its contents
+      sideways every time a clock in it ticks past ten.
+    """
+    if seconds < _MINUTE:
+        # Cut rather than rounded: a clock that read 60s for the half-second before it read
+        # 1m00s would be a box counting past the unit it is in.
+        return f"{int(seconds)}s"
+    if seconds < _HOUR:
+        return f"{int(seconds // _MINUTE)}m{int(seconds % _MINUTE):02d}s"
+    return f"{int(seconds // _HOUR)}h{int(seconds % _HOUR // _MINUTE):02d}m"
 
 
 def short(agent: str) -> str:
@@ -96,6 +120,13 @@ class Shape:
       under: The agents each of them has started of its own, oldest first -- the ones still
         going and the ones that have finished, since a fleet that vanished as it landed would
         be a turn nobody could see the shape of afterwards.
+      since: How long each of them has been at what it is doing, in seconds: the turn it has
+        open, or the wait since its last turn ended for one that has stopped. Worked out
+        where the rest of the graph is taken, so that a diagram is one moment of the run
+        rather than a clock per box read at a different one.
+      latest: The handover the flow took most recently, or None before it has taken one. It
+        is what the eye wants first with six boxes on the page -- where the run just went --
+        and nothing else on a still picture says it.
     """
 
     turns: Mapping[str, int]
@@ -104,6 +135,8 @@ class Shape:
     under: Mapping[str, tuple[Under, ...]] = field(
         default_factory=dict[str, tuple[Under, ...]]
     )
+    since: Mapping[str, float] = field(default_factory=dict[str, float])
+    latest: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +178,14 @@ class Monitor:
     fleets: dict[str, dict[str, Under]] = field(
         default_factory=dict[str, dict[str, Under]]
     )
+    #: When the turn each working agent has open began, by agent. Only the ones working are
+    #: in it: a turn that is over is not a clock anybody is reading.
+    opened: dict[str, float] = field(default_factory=dict[str, float])
+    #: And when each one's last turn ended, which is what the clock on a stopped agent counts
+    #: from -- an agent that has been quiet four minutes is the one a reader is looking for.
+    rested: dict[str, float] = field(default_factory=dict[str, float])
+    #: The handover taken most recently, so the arrow it went along can be drawn lit.
+    handed: tuple[str, str] | None = None
     #: Tokens spent per model, all told.
     spent: Counter[str] = field(default_factory=Counter[str])
     #: What each source says has been spent on each model so far. Two of them say: the
@@ -175,29 +216,39 @@ class Monitor:
     _last: str | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def begins(self, agent: str, model: str) -> None:
+    def begins(self, agent: str, model: str, now: float | None = None) -> None:
         """Notes that an agent has started a turn.
 
         Args:
           agent: Whose turn it is.
           model: The model that agent runs at.
+          now: When, defaulting to this moment. Given only so a test can say.
         """
         with self._lock:
             self.models[agent] = model
+            # The clock starts on the first turn an agent has open and not on the second: an
+            # agent driving two sessions at once has been working since the earlier of them
+            # began, and starting it again there would read as a turn that keeps beginning.
+            if not self.working[agent]:
+                self.opened[agent] = time.monotonic() if now is None else now
             self.working[agent] += 1
             self.turns[agent] += 1
             if self._last is not None and self._last != agent:
                 self.handovers[self._last, agent] += 1
+                self.handed = (self._last, agent)
 
-    def ends(self, agent: str) -> None:
+    def ends(self, agent: str, now: float | None = None) -> None:
         """Notes that an agent's turn is over, and that it is the one to hand on from.
 
         Args:
           agent: Whose turn ended.
+          now: When, defaulting to this moment. Given only so a test can say.
         """
         with self._lock:
             if self.working[agent] <= 1:
                 del self.working[agent]
+                self.opened.pop(agent, None)
+                self.rested[agent] = time.monotonic() if now is None else now
             else:
                 self.working[agent] -= 1
             self._last = agent
@@ -350,8 +401,11 @@ class Monitor:
         moment of the run rather than three moments of three counters.
 
         Returns:
-          The graph, which is what the diagram on `/status` is drawn from.
+          The graph, which is what the diagram on `/monitor` is drawn from.
         """
+        # A run that is over is read at its own end, as the rate is: a diagram whose clocks
+        # went on counting after the last turn would say the flow was still doing something.
+        moment = time.monotonic() if self.until is None else self.until
         with self._lock:
             return Shape(
                 turns=dict(self.turns),
@@ -362,4 +416,26 @@ class Monitor:
                     for agent, held in self.fleets.items()
                     if held
                 },
+                since={
+                    agent: max(0.0, moment - self._counting_from(agent))
+                    for agent in self.turns
+                },
+                latest=self.handed,
             )
+
+    def _counting_from(self, agent: str) -> float:
+        """When one agent's clock started, which is what makes its box say a length of time.
+
+        Read under the caller's lock, since it is taken where the rest of the graph is.
+
+        Args:
+          agent: The agent.
+
+        Returns:
+          When its open turn began, or when its last turn ended for one that has stopped --
+          and when the run began for one that has neither, which is an agent whose turns were
+          already going when this started watching.
+        """
+        if (opened := self.opened.get(agent)) is not None:
+            return opened
+        return self.rested.get(agent, self.began)

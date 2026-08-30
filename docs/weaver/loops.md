@@ -87,7 +87,7 @@ It keeps going until you stop it.
 ## Watch the run
 
 ```
-/status
+/monitor
 ```
 
 It shows three things: who is working, every handover between agents with how often it

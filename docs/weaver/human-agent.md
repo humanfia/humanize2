@@ -56,7 +56,7 @@ A `Person` is not a coding agent. It runs no model and spends nothing.
 Its turns are **not bracketed** by the `begins`/`ends` events that say whose turn it is —
 counting them would put the person in the graph of who handed to whom, and spin a clock at
 them while they thought. So the person appears in neither the handover graph of
-[`/status`](/user/status) nor the [cost readout](/user/tally), and the conversation with them
+[`/monitor`](/user/monitor) nor the [cost readout](/user/tally), and the conversation with them
 is not one of the ones [tab steps between](/user/conversations).
 
 It runs no [moments](/weaver/hooks) either. A **moment** is a point in a turn of a model, and
@@ -89,7 +89,7 @@ shape](/weaver/shapes#asking-a-person-a-questionnaire).
 
 Saying something to the person **stops the turn** until they answer. That is right for a
 question and wrong for everything else a run wants from them, so they carry a board as well:
-named lines the flow and the person both write on, drawn on [`/status`](/user/status), where
+named lines the flow and the person both write on, drawn on [`/monitor`](/user/monitor), where
 neither waits on the other.
 
 ```python

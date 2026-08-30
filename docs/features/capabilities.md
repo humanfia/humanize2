@@ -296,6 +296,6 @@ scripted, embedded, or detached work.
 - Shared semantics do not imply identical interaction or backend capability on every surface.
 
 **Learn:** [One system, four ways in](/features/surfaces) · **Use:**
-[Run a flow](/#run-a-flow), [Status](/user/status) · **Reference:**
+[Run a flow](/#run-a-flow), [Monitor](/user/monitor) · **Reference:**
 [SDK](/reference/sdk), [CLI](/reference/cli), [TUI](/reference/tui),
 [Daemon](/reference/daemon)

@@ -33,8 +33,8 @@ from hmz.tui.pick import (
     Clis,
     Confirms,
     Flows,
+    Monitoring,
     Signing,
-    Status,
     Ways,
 )
 from tests.stubs import events as recorded
@@ -395,7 +395,7 @@ def test_only_the_flows_there_are_to_run_are_offered() -> None:
 
 
 @pytest.mark.timeout(60)
-async def test_what_the_flow_did_is_on_status(workspace: Path) -> None:
+async def test_what_the_flow_did_is_on_monitor(workspace: Path) -> None:
     """Who worked, who handed to whom, and what it cost -- none of which the flow reports."""
     written(workspace, "flow", FLOW)
     app = Humanize()
@@ -412,8 +412,8 @@ async def test_what_the_flow_did_is_on_status(workspace: Path) -> None:
         await until(lambda: bool((workspace / "said.txt").exists()), driver)
 
         # Read while the flow is still running, which is the whole point of a sheet for it.
-        app.action_status()
-        await until(lambda: isinstance(app.screen, Status), driver)
+        app.action_monitor()
+        await until(lambda: isinstance(app.screen, Monitoring), driver)
         said = str(app.screen.query_one("#tuning", Label).content)
         assert "flow" in said
         # The flow itself, drawn: the transcript all of them are on, then a box per agent.
@@ -655,13 +655,13 @@ async def test_what_is_running_is_not_swapped_underneath_itself(
 
         assert app._flow_named == "flow"  # nothing got anywhere
         assert app._models == [Runs("claude/m:high")]
-        # And `/status` is not refused either: it is read, so nothing conflicts with it.
-        app.action_status()
-        await until(lambda: isinstance(app.screen, Status), driver)
+        # And `/monitor` is not refused either: it is read, so nothing conflicts with it.
+        app.action_monitor()
+        await until(lambda: isinstance(app.screen, Monitoring), driver)
         assert "flow" in str(app.screen.query_one("#tuning", Label).content)
 
         await driver.press("escape")
-        await until(lambda: not isinstance(app.screen, Status), driver)
+        await until(lambda: not isinstance(app.screen, Monitoring), driver)
         app.action_stop_flow()
         await until(lambda: not app._agents, driver)
 
@@ -755,7 +755,7 @@ async def test_escape_is_how_the_run_is_read_rather_than_how_it_is_stopped(
     workspace: Path,
 ) -> None:
     """A key pressed to dismiss things must not be the key that ends a day's work."""
-    from hmz.tui.pick import Status
+    from hmz.tui.pick import Monitoring
 
     written(workspace, "flow", FLOW)
     app = Humanize()
@@ -770,7 +770,7 @@ async def test_escape_is_how_the_run_is_read_rather_than_how_it_is_stopped(
         held = app._agents
 
         await driver.press("escape")
-        await until(lambda: isinstance(app.screen, Status), driver)
+        await until(lambda: isinstance(app.screen, Monitoring), driver)
 
         assert app._agents is held  # read, and nothing stopped by reading it
         await driver.press("escape")
