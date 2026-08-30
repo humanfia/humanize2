@@ -1409,7 +1409,7 @@ for is granted
 ```
 
 It is found out once per agent rather than once per turn, and the rung you chose is what is
-tried first: an agent set to `auto` in `/agents` asks for `auto` and never sees this.
+tried first: an agent asked for at `permission=auto` asks for `auto` and never sees this.
 
 **Claude Code's `bypass` is humanize doing the asking, not Claude skipping it.** The flag that
 skips it — `--dangerously-skip-permissions` — is one an account can be told to refuse: managed
@@ -1447,8 +1447,7 @@ on.
 **A skill installed on this machine is its CLI's own.** humanize does not switch one off, does
 not write the CLI's settings, and has no per-agent list of them: what you installed is what
 every agent of that CLI carries, installed and switched off where that CLI keeps them. The
-list is readable — the [`skills` row](/reference/tui#what-each-agent-carries) of the sheet an
-agent is set up on shows what it will be carrying — and that is all it is:
+list is readable from Python, and that is all it is:
 
 ```python
 from hmz.agents.skills import skills

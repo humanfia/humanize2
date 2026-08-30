@@ -48,10 +48,8 @@ from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
 from hmz import telemetry
-from hmz.agents import ANYONE, FLOW, PERMISSIONS, SWARM, USER, anchored, driver
-from hmz.agents.skills import Skill, skills
-from hmz.backends import named
-from hmz.kept import Kept, Runs
+from hmz.agents import ANYONE, FLOW, SWARM, USER, anchored, driver
+from hmz.kept import Runs
 from hmz.telemetry import KEPT, SAYS, SENT
 
 from .discover import installed, machines, ready_to_open
@@ -103,22 +101,17 @@ __all__ = [
     "Epics",
     "Failing",
     "Fallbacks",
-    "Fitted",
     "Flows",
     "Flowverses",
     "Held",
     "Holds",
-    "Imports",
     "Leaves",
-    "Names",
     "Picks",
     "Popup",
     "Providers",
-    "Saved",
     "Sheet",
     "Signing",
     "Signs",
-    "Skills",
     "Speaks",
     "Status",
     "Ways",
@@ -307,7 +300,7 @@ def reads(
 
 
 _SHEET = """
-Anchors, Backends, Configures, Flows, Models, Providers, RunsAs, Signing, Skills, Status, Ways {
+Anchors, Backends, Configures, Flows, Models, Providers, RunsAs, Signing, Status, Ways {
     align: center middle; background: $background; }
 #sheet { width: 100%; height: auto; padding: 0; }
 #rule { height: 1; color: $primary; }
@@ -1238,8 +1231,8 @@ class Flows(Drafts[Chosen]):
             "chosen is what it is to do. A flow anywhere else is a path you type."
             if self._tab == _FLOW_PAGE
             else f"What each agent {escape(self._flow)} drives is: the CLI that takes its "
-            "turns, the account they run as, the model at an effort, and what it may do. "
-            "Enter opens one, and save applies the complete flow setup."
+            "turns, the account they run as, and the model at an effort. Enter opens one, "
+            "and save applies the complete flow setup."
         )
         if self._tab != _FLOW_PAGE:
             self.tabbed(self._tab_line())
@@ -1656,7 +1649,7 @@ class Flows(Drafts[Chosen]):
         )
         if chosen is None:
             return  # walked out of it, which leaves that agent as the draft has it
-        self._runs[at] = chosen.runs
+        self._runs[at] = chosen
         self.changed()
         self._fill()
 
@@ -2275,112 +2268,6 @@ class Speaks(Sheet[tuple[str, str]]):
             self._fill()
             return
         self.dismiss((said, name or Path(argv[0]).name))
-
-
-class Skills(Sheet[None]):
-    """What one CLI would load here, shown and not touched.
-
-    A skill installed on this machine is that CLI's own: installed the way it installs one,
-    switched off the way it switches one off, and the same for every agent of every flow.
-    humanize used to switch them per agent and no longer does -- what a person has installed
-    is not something a flow is entitled to rewrite, and a list that could be adjusted here
-    while the CLI's own list said otherwise was two answers to one question.
-
-    So this is a reading: what the agent will be carrying, where each of them came from, and
-    the line saying where to go to change it. What humanize does add is the flow's own
-    skills, which are mounted onto the sessions it opens rather than installed here.
-    """
-
-    LETTERS: ClassVar = frozenset({"search"})
-
-    BINDINGS: ClassVar = [
-        ("escape", "back", "back"),
-        Binding("s", "search", "search", priority=True),
-        # Enter leaves it, as escape does: there is nothing on this sheet to answer with, so
-        # the key that accepts a sheet is the key that closes this one.
-        Binding("enter", "back", "done", priority=True),
-    ]
-
-    def __init__(self, backend: str) -> None:
-        """Initializes the reading.
-
-        Args:
-          backend: The CLI whose skills these are.
-        """
-        super().__init__()
-        self._backend = backend
-        self._found: list[Skill] | None = None
-
-    def _ask(self) -> None:
-        """Says whose skills these are, and who is to be asked to change them."""
-        self.query_one("#asked", Label).update(f"What {self._backend} loads here")
-        self.query_one("#about", Label).update(
-            "The skills this CLI finds, which every agent of it carries. They are its own: "
-            f"install one, or switch one off, the way {escape(self._backend)} itself does "
-            "it. A flow's own skills are mounted onto the sessions it opens and are not "
-            "installed here."
-        )
-        self._fill()
-        self.query_one("#choices", OptionList).focus()
-
-    def _skills(self) -> list[Skill]:
-        """The skills there are to show, read once: this is redrawn per keystroke."""
-        if self._found is None:
-            self._found = skills(self._backend)
-            self._counting = len(str(len(self._found)))
-        return self._found
-
-    def _fill(self) -> None:
-        """Puts the skills up, each with where it came from."""
-        listing = self.query_one("#choices", OptionList)
-        shown = [
-            skill
-            for skill in self._skills()
-            if self.fits(skill.name, skill.about, skill.whose)
-        ]
-        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
-        listing.set_options(
-            Option(
-                self._row(
-                    seen,
-                    skill.name,
-                    f"{skill.about}  ({skill.whose})" if skill.about else skill.whose,
-                    here=seen == at,
-                    inforce=False,
-                ),
-                id=skill.name,
-            )
-            for seen, skill in enumerate(shown)
-        )
-        listing.highlighted = at if shown else None
-        self._drawn = at
-        self.query_one("#tuning", Label).update(
-            f"[$text-muted]{self._said()}[/]" if self._said() else ""
-        )
-        self.query_one("#keys", Label).update(f"Esc to go back{self.searching()}")
-
-    def _said(self) -> str:
-        """The line under the list: where to go to change any of this, or why there is none.
-
-        Returns:
-          That these are the CLI's own and are managed there, for a CLI that keeps skills;
-          that a CLI which keeps none anywhere has none to show; and, where it keeps them
-          and none is installed, that there are none here yet.
-        """
-        profile = named(self._backend)
-        if profile is None or not (
-            profile.skills or profile.shared or profile.config or profile.works
-        ):
-            return f"{escape(self._backend)} keeps no skills of its own here"
-        if not self._skills():
-            return (
-                f"{escape(self._backend)} has none installed here; install one the way "
-                f"{escape(self._backend)} installs one"
-            )
-        return (
-            f"These are {escape(self._backend)}'s own: add one, or switch one off, where "
-            f"{escape(self._backend)} keeps them"
-        )
 
 
 class Anchors(Sheet[str]):
@@ -4286,27 +4173,14 @@ class Reports(Popup):
         )
 
 
-class Fitted(NamedTuple):
-    """One agent as a sheet answered with it: what it is, and what it is called.
-
-    Attributes:
-      runs: The agent itself.
-      name: What it is saved under, for one being edited in the agents menu, and "" for one
-        of a flow's -- an agent of a flow is called what the flow calls it, which is not
-        something anybody here may rename.
-    """
-
-    runs: Runs
-    name: str = ""
-
-
 #: How wide the column of aspect names is on the sheet one agent is set up on, and the column
 #: of their values, so that it reads down three columns: what is being said, what it is, and
 #: what it means. Wide enough for a model id, which is the longest of them by a distance.
 _ASPECT = 12
 _HOW = 34
 
-#: What a switch on that sheet reads as.
+#: What a switch on that sheet reads as. One row is a switch -- whether the turn runs as a
+#: fleet -- and it is a thing about the model rather than about what the agent is allowed.
 _YES, _NO = "on", "off"
 
 #: The account an agent runs as when nobody has chosen one, which is always the first row it
@@ -4317,47 +4191,41 @@ _LOCAL = "as local"
 #: The rows the sheet is made of, by the id each is put up under. In the order they are asked,
 #: which is the order of what depends on what: the CLI settles which accounts and which models
 #: there are, and the account settles which models that CLI will name.
-_IMPORT = "import"
-_NAME = "name"
 _CLI = "cli"
 _ACCOUNT = "provider"
 _MODEL = "model"
 _EFFORT = "effort"
 _SWARM = "swarm"
-_SKILLS = "skills"
-_PERMIT = "permission"
-_GOALS = "goals"
-_SEARCHES = "web search"
 _WHERE = "where"
-_SAVE_AS = "save as"
 
 #: Which of them are stepped along where they stand rather than opened, and which are opened.
-_STEPPED = (_EFFORT, _SWARM, _PERMIT, _GOALS, _SEARCHES)
+_STEPPED = (_EFFORT, _SWARM)
 
 
-class Agent(Drafts[Fitted]):
+class Agent(Drafts[Runs]):
     """Everything one agent is, on one sheet, each row opened or stepped where it stands.
 
     Which is the walk of three sheets that used to ask it, folded into the thing it was asking
-    about. An agent is not three questions -- it is one thing with a CLI, an account, a model
-    at an effort, a set of skills, a rung of what it may do and a machine its work lands on --
-    and asking it as a walk meant that changing the effort of an agent already set up was four
-    keypresses through two sheets that had nothing to say.
+    about. An agent is a CLI, an account, a model at an effort and the machine its work lands
+    on -- and asking that as a walk meant that changing the effort of an agent already set up
+    was four keypresses through two sheets that had nothing to say.
+
+    Four rows and not a dozen, because the rest of what this sheet used to ask is not the
+    agent's to hold. What it may do, which goals it may reach for and whether it searches the
+    web are the flow's, said where the flow declares the place this agent fills; the skills it
+    carries are its CLI's, installed and switched off where that CLI keeps them. A row
+    offering to set any of those would be a second answer to a question already settled.
 
     The order the rows go in is still the order of what depends on what: the CLI settles which
     accounts there are to choose from and which models that CLI will name, and the account
     settles which of them it may name. Changing the CLI therefore lets go of the model, which
     belonged to the CLI before it.
-
-    A saved agent can be copied in at the top and saved as a reusable copy at the bottom. What
-    is imported is a copy: an agent tuned inside a flow is that flow's, and writing the changes
-    back into the thing it was copied from would change every other flow that had imported it.
     """
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
         # The two settings that are a step along rather than a list to open: how hard it
-        # thinks, and what it may do. Both are a handful of rungs in an order, which is what
+        # thinks, and whether one turn is run wide. Both are a rung in an order, which is what
         # an arrow is for. Priority, or the list under the cursor would take them as moving
         # between rows it has none of.
         Binding("left", "easier", "back one", priority=True),
@@ -4370,10 +4238,8 @@ class Agent(Drafts[Fitted]):
         runs: Runs,
         agents: dict[str, tuple[Model, ...]],
         *,
-        place: Place | None = None,
+        place: Place,
         unavailable: frozenset[str] = frozenset(),
-        name: str = "",
-        naming: bool = False,
     ) -> None:
         """Initializes the sheet on what the agent is now.
 
@@ -4381,19 +4247,15 @@ class Agent(Drafts[Fitted]):
           named: What to call the agent being set up, which the question at the top says.
           runs: What it is now, which every row reads back.
           agents: The backends offered here, and what each of them says it runs.
-          place: What the flow declared about this one, or None for a saved agent -- which
-            belongs to no flow and so is asked every question there is.
+          place: What the flow declared about this one. Always one: an agent belongs to the
+            flow that drives it, so there is no agent here with no place to fill.
           unavailable: The optional backends that still need installing.
-          name: What it is saved under, for one being edited in the agents menu.
-          naming: Whether it has a name of its own to be typed, which a flow's agent has not.
         """
         super().__init__()
         self._named = named
         self._agents = dict(agents)
         self._unavailable = unavailable
         self._place = place
-        self._called = name
-        self._is_named = naming
         cli, _, rest = runs.spec.partition("/")
         model, _, effort = rest.rpartition(":")
         # Said outright, all of them: each is read where it is set -- what a CLI runs is
@@ -4405,34 +4267,26 @@ class Agent(Drafts[Fitted]):
         # before the effort is looked for among the ones the model takes.
         self._swarm: bool = effort.startswith(SWARM)
         self._effort: str = effort.removeprefix(SWARM)
-        self._permission = (
-            PERMISSIONS.index(runs.permission)
-            if runs.permission in PERMISSIONS
-            else len(PERMISSIONS) - 1
-        )
         self._provider: str = runs.provider
-        self._goals = True if place is not None and place.goal else runs.goals
-        self._searches = runs.web_search
         self._anchor = runs.anchor
+        #: What it was handed, which is where everything this sheet does not ask comes back
+        #: from. Those are the flow's answers, and carrying them across is how they stay the
+        #: flow's rather than being reset by a sheet that never showed them.
+        self._given = runs
         #: What the chosen CLI says it runs as the chosen account, read once per pair: this
         #: is redrawn each time the cursor moves, and reading it is reading a file.
         self._catalogue: tuple[Model, ...] | None = None
         self._read_for: tuple[str, str] = ("", "")
-        #: What became of asking a CLI what it runs, or of saving this one, said under the
-        #: rows rather than raised at whoever opened the sheet.
+        #: What became of asking a CLI what it runs, said under the rows rather than raised
+        #: at whoever opened the sheet.
         self._said = ""
 
     def _ask(self) -> None:
         """Says whose agent this is, and what setting it up settles."""
         self.query_one("#asked", Label).update(f"Set up {escape(self._named)}")
-        saving = (
-            "Save accepts this setup; save as keeps a reusable copy."
-            if self._place is not None
-            else "Save accepts this setup."
-        )
         self.query_one("#about", Label).update(
             "What this one agent is. Enter opens the row under the cursor, and the arrows "
-            f"step the ones that are a rung rather than a list. {saving}"
+            "step the ones that are a rung rather than a list. Save accepts this setup."
         )
         self._fill()
         self.query_one("#choices", OptionList).focus()
@@ -4445,56 +4299,17 @@ class Agent(Drafts[Fitted]):
           asked. A row nobody is being asked about is not among them: a flow that settled
           where its agent works has not left that question open.
         """
-        rows: list[tuple[str, str, str]] = []
-        if self._is_named:
-            rows.append((_NAME, self._called, "what this agent is saved under"))
-        if self._place is not None:
-            rows.append((_IMPORT, "", "copy a saved agent into this one"))
-        rows.extend(
-            [
-                (_CLI, self._cli or "—", "which coding agent takes its turns"),
-                (_ACCOUNT, self._provider or _LOCAL, "the account those turns run as"),
-                (_MODEL, self._model or "—", "which of that CLI's models it runs"),
-                (_EFFORT, self._effort or "—", "how hard it thinks"),
-            ]
-        )
+        rows: list[tuple[str, str, str]] = [
+            (_CLI, self._cli or "—", "which coding agent takes its turns"),
+            (_ACCOUNT, self._provider or _LOCAL, "the account those turns run as"),
+            (_MODEL, self._model or "—", "which of that CLI's models it runs"),
+            (_EFFORT, self._effort or "—", "how hard it thinks"),
+        ]
         if self._swarms():
             rows.append(
                 (_SWARM, _YES if self._swarm else _NO, "one turn run as a fleet")
             )
-        rows.extend(
-            [
-                (
-                    _SKILLS,
-                    "as its CLI finds them",
-                    "what it will be carrying, which its CLI keeps",
-                ),
-                (
-                    _PERMIT,
-                    PERMISSIONS[self._permission],
-                    "what it may do without being asked",
-                ),
-                (
-                    _GOALS,
-                    _YES if self._goals else _NO,
-                    "required by the flow"
-                    if self._place is not None and self._place.goal
-                    else "whether the backend's own goals are available",
-                ),
-            ]
-        )
-        # Only where that CLI can be told. A row offering to switch off something the
-        # backend would go on doing is a row that lies, so a backend with no way of being
-        # told is one this question is not put about.
-        if self._tellable():
-            rows.append(
-                (
-                    _SEARCHES,
-                    _YES if self._searches else _NO,
-                    "whether it may search the web",
-                )
-            )
-        if self._place is None or pointed(self._place):
+        if pointed(self._place):
             rows.append(
                 (
                     _WHERE,
@@ -4505,8 +4320,6 @@ class Agent(Drafts[Fitted]):
         elif image := _settled(self._place):
             rows.append((_WHERE, f"in a container of {image}", "the flow settled this"))
         rows.append((_SAVE, "", "accept this agent setup"))
-        if self._place is not None:
-            rows.append((_SAVE_AS, "", "save a reusable agent you can import"))
         return rows
 
     def _fill(self) -> None:
@@ -4531,12 +4344,8 @@ class Agent(Drafts[Fitted]):
         self.query_one("#keys", Label).update(
             "←/→ to change · Esc to close"
             if held in _STEPPED
-            else "Type to name it · Esc to close"
-            if held == _NAME
             else "Enter to save · Esc to close"
             if held == _SAVE
-            else "Enter to save a copy · Esc to close"
-            if held == _SAVE_AS
             else "Enter to open · Esc to close"
         )
 
@@ -4555,17 +4364,14 @@ class Agent(Drafts[Fitted]):
         """
         mark = f"{_INDENT}[$primary]{_HERE}[/] " if here else f"{_INDENT}  "
         number = f"{at + 1:>{self._counting}}."
-        # A block where the next letter goes, on the one row that is written rather than
-        # opened: without it a blank name reads as a row nothing can be typed into.
-        caret = "[reverse] [/reverse]" if here and held == _NAME else ""
         # A row that opens something says so, as a menu anywhere says it.
-        opens = "" if held in _STEPPED or held in (_NAME, _SAVE) else " ▸"
+        opens = "" if held in _STEPPED or held == _SAVE else " ▸"
         # Padded on what is shown rather than on what is written: markup is not columns.
         named = escape(held) + " " * max(1, _ASPECT - len(held))
-        room = _HOW - len(value) - len(opens) - (1 if caret else 0)
+        room = _HOW - len(value) - len(opens)
         return (
             f"{mark}[$text-muted]{number}[/] {named}"
-            f"[$secondary]{escape(value)}[/]{caret}[$text-muted]{opens}[/]"
+            f"[$secondary]{escape(value)}[/][$text-muted]{opens}[/]"
             f"{' ' * max(1, room)}[$text-muted]{escape(about)}[/]"
         )
 
@@ -4619,54 +4425,24 @@ class Agent(Drafts[Fitted]):
         # `swarm` in front of the effort is how a fleet is asked for: one turn at one effort,
         # run wide. A model that does not take it is asked for at the effort alone.
         wide = SWARM if self._swarm and self._swarms() else ""
-        return Runs(
+        return self._given._replace(
             spec=f"{self._cli}/{self._model}:{wide}{self._effort}",
             anchor=self._anchor,
-            # Only where it is a narrowing: the loosest rung is what an agent nobody has been
-            # asked about runs at, and saying so is saying nothing.
-            permission=(
-                PERMISSIONS[self._permission]
-                if self._permission < len(PERMISSIONS) - 1
-                else ""
-            ),
             provider=self._provider,
-            goals=self._goals,
-            # On for a CLI that cannot be told, whatever the row said before the CLI was
-            # changed to that one: an agent whose backend has no way of being told is one
-            # that searches the web, and a config saying otherwise is one it would refuse.
-            web_search=self._searches or not self._tellable(),
+            # On for a CLI that cannot be told, whatever the flow asked for: an agent whose
+            # backend has no way of being told is one that searches the web, and a config
+            # saying otherwise is one that backend would refuse.
+            web_search=self._given.web_search or not self._tellable(),
         )
 
     def applied(self) -> None:
-        """Answers with the agent as it now stands, and what it is called."""
-        self.dismiss(Fitted(self._made(), self._called))
+        """Answers with the agent as it now stands."""
+        self.dismiss(self._made())
 
     @property
     def _held(self) -> str:
         """Which row the cursor is on, by id."""
         return self.under()
-
-    def on_key(self, event: events.Key) -> None:
-        """Takes a letter as writing the name, which is the one row that is written.
-
-        There is nothing to search here -- every row is on the screen at once -- so the keys
-        that narrow a list elsewhere are the ones that name this agent.
-
-        Args:
-          event: The key.
-        """
-        if self._held != _NAME:
-            return
-        if event.key == "backspace":
-            self._called = self._called[:-1]
-        elif event.is_printable and event.character:
-            self._called += event.character
-        else:
-            return
-        event.prevent_default()
-        event.stop()
-        self.changed()
-        self._fill()
 
     def action_harder(self) -> None:
         """Steps the row under the cursor one on, where it is one that is stepped."""
@@ -4692,16 +4468,6 @@ class Agent(Drafts[Fitted]):
             self._effort = efforts[min(max(at + by, 0), len(efforts) - 1)]
         elif held == _SWARM:
             self._swarm = not self._swarm
-        elif held == _PERMIT:
-            # Round rather than along: the rungs are four and the way back to the one before
-            # is the way on past the last, which is one key rather than two.
-            self._permission = (self._permission - by) % len(PERMISSIONS)
-        elif held == _GOALS:
-            if self._place is not None and self._place.goal:
-                return  # the flow requires them, so there is nothing here to turn off
-            self._goals = not self._goals
-        elif held == _SEARCHES:
-            self._searches = not self._searches
         else:
             return
         self.changed()
@@ -4722,7 +4488,7 @@ class Agent(Drafts[Fitted]):
         if held == _SAVE:
             self.applied()
             return
-        if held in (_CLI, _ACCOUNT, _MODEL, _SKILLS, _WHERE, _IMPORT, _SAVE_AS):
+        if held in (_CLI, _ACCOUNT, _MODEL, _WHERE):
             self._opens(held)
 
     @work
@@ -4742,14 +4508,8 @@ class Agent(Drafts[Fitted]):
             await self._chose_account(showing)
         elif held == _MODEL:
             await self._chose_model(showing)
-        elif held == _SKILLS:
-            await self._chose_skills(showing)
         elif held == _WHERE:
             await self._chose_where(showing)
-        elif held == _IMPORT:
-            await self._imports(showing)
-        elif held == _SAVE_AS:
-            await self._saves_as(showing)
         self._fill()
 
     async def _chose_cli(self, showing: App[None]) -> None:
@@ -4802,16 +4562,9 @@ class Agent(Drafts[Fitted]):
             self._effort = efforts[0] if efforts else ""
         self.changed()
 
-    async def _chose_skills(self, showing: App[None]) -> None:
-        """Shows what its CLI would load, which is the CLI's own and is not changed here."""
-        if not self._cli:
-            self._said = "choose the coding agent first; the skills are its own"
-            return
-        await showing.push_screen_wait(Skills(self._cli))
-
     async def _chose_where(self, showing: App[None]) -> None:
         """Asks which machine its work lands on, where that is a question anybody is asked."""
-        if self._place is not None and not pointed(self._place):
+        if not pointed(self._place):
             self._said = "the flow settled where this one works"
             return
         where = await showing.push_screen_wait(Anchors(self._named, self._anchor))
@@ -4819,54 +4572,6 @@ class Agent(Drafts[Fitted]):
             return
         self._anchor, self._said = where, ""
         self.changed()
-
-    async def _imports(self, showing: App[None]) -> None:
-        """Copies a saved agent into this one, name and all but the name."""
-        held = _hmz().agents.all()
-        if not held:
-            self._said = "no agents have been saved yet; /agents saves one"
-            return
-        chosen = await showing.push_screen_wait(Imports(held))
-        if chosen is None:
-            return
-        one = next((each for each in held if each.name == chosen), None)
-        if one is None:
-            return
-        cli, _, rest = one.runs.spec.partition("/")
-        model, _, effort = rest.rpartition(":")
-        self._cli, self._model = cli, model
-        self._swarm = effort.startswith(SWARM)
-        self._effort = effort.removeprefix(SWARM)
-        self._provider = one.runs.provider
-        self._permission = (
-            PERMISSIONS.index(one.runs.permission)
-            if one.runs.permission in PERMISSIONS
-            else len(PERMISSIONS) - 1
-        )
-        self._anchor = one.runs.anchor
-        # What the flow requires is the flow's, and is not a thing an import may overwrite.
-        if self._place is None or not self._place.goal:
-            self._goals = one.runs.goals
-        self._searches = one.runs.web_search
-        self._catalogue, self._read_for = None, ("", "")
-        self._said = (
-            f"copied from {escape(chosen)}; changing it here changes only this one"
-        )
-        self.changed()
-
-    async def _saves_as(self, showing: App[None]) -> None:
-        """Writes this agent down under a name, new or one already there."""
-        agents = _hmz().agents
-        if not (self._cli and self._model):
-            self._said = "an agent with no model is not one to save"
-            return
-        name = await showing.push_screen_wait(Names(agents.all(), self._named))
-        if not name:
-            return
-        # Written over where the name is taken, which is what the sheet has just asked, and
-        # in the place it already had rather than at the end of the list.
-        agents.write(name, self._made())
-        self._said = f"saved as {escape(name)}"
 
 
 class Clis(Picks):
@@ -4896,8 +4601,9 @@ class Clis(Picks):
         Args:
           agents: The backends offered here, and what each of them says it runs.
           current: The one it is now.
-          place: What the flow declared about this agent, or None for a saved agent, which
-            belongs to no flow and so is refused nothing.
+          place: What the flow declared about this agent, which is what rules a CLI out, or
+            None where a CLI is being chosen for something that is not a flow's agent --
+            the two ends of a fallback step, which a flow says nothing about.
           unavailable: The optional backends that still need installing.
         """
         super().__init__(current)
@@ -5139,106 +4845,6 @@ class Catalogue(Picks):
         self.query_one("#choices", OptionList).highlighted = 0
         self._drawn = 0
         self._fill()
-
-
-class Imports(Picks):
-    """Which saved agent to copy into the one being set up.
-
-    A copy rather than a link: an agent tuned inside a flow is that flow's, and writing the
-    changes back into the thing it was copied from would change every other flow that had
-    imported it.
-    """
-
-    asked = "Select an agent to copy in"
-    about = (
-        "The agents saved under a name, which /agents keeps. What is copied is everything "
-        "the agent is; changing it afterwards changes this one alone."
-    )
-
-    def __init__(self, held: Sequence[Kept]) -> None:
-        """Initializes the choosing.
-
-        Args:
-          held: The agents written down, in the order they are kept in.
-        """
-        super().__init__()
-        self._held = list(held)
-
-    def rows(self) -> list[tuple[str, str, str]]:
-        """Every agent written down, and what each of them is."""
-        return [(one.name, one.name, reads((), [one.runs])[0]) for one in self._held]
-
-
-class Names(Sheet[str]):
-    """What to save an agent as: a name already there to write over, or one typed.
-
-    Listed rather than typed where there is one to list, because writing over the agent
-    somebody meant is the common half of this: a name typed a second time with a letter
-    different is a second agent nobody wanted.
-    """
-
-    LETTERS: ClassVar = frozenset({"search"})
-
-    BINDINGS: ClassVar = [
-        ("escape", "back", "back"),
-        Binding("s", "search", "search", priority=True),
-    ]
-
-    def __init__(self, held: Sequence[Kept], suggested: str = "") -> None:
-        """Initializes the naming.
-
-        Args:
-          held: The agents written down already, any of which may be written over.
-          suggested: What to offer as a name for a new one, which is what the agent being
-            saved is called where it is called anything.
-        """
-        super().__init__()
-        self._held = list(held)
-        self._suggested = suggested
-
-    def _ask(self) -> None:
-        """Says what saving one does, and puts the names up."""
-        self.query_one("#asked", Label).update("Save this agent as")
-        self.query_one("#about", Label).update(
-            "The name it is imported by. Choosing one already here writes over it; s and "
-            "then a name of your own saves it as a new one."
-        )
-        self._fill()
-        self.query_one("#choices", OptionList).focus()
-
-    def _fill(self) -> None:
-        """Puts the names up, with whatever has been typed among them as a new one."""
-        listing = self.query_one("#choices", OptionList)
-        rows = [(one.name, one.name, reads((), [one.runs])[0]) for one in self._held]
-        shown = [row for row in rows if self.fits(row[1], row[2])]
-        wanted = self._typed.strip() or (
-            "" if shown or self._typed else self._suggested
-        )
-        if wanted and all(row[0] != wanted for row in shown):
-            shown.append((wanted, wanted, "a new one under this name"))
-        self._counting = len(str(max(len(shown), 1)))
-        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
-        listing.set_options(
-            Option(
-                self._row(seen, label, about, here=seen == at, inforce=False),
-                id=f"={answer}",
-            )
-            for seen, (answer, label, about) in enumerate(shown)
-        )
-        listing.highlighted = at if shown else None
-        self._drawn = at
-        self.query_one("#keys", Label).update(
-            f"Enter to save · Esc to go back{self.searching()}"
-        )
-
-    @on(OptionList.OptionSelected)
-    def _took(self, event: OptionList.OptionSelected) -> None:
-        """Answers with the name that was picked.
-
-        Args:
-          event: What was chosen.
-        """
-        self.dismiss(str(event.option.id).removeprefix("="))
 
 
 #: Which of the two things a step says is being answered.
@@ -5575,191 +5181,6 @@ def _falling(step: Step) -> str:
         return goes
     over = f", up to {_lasting(step.timeout)}" if step.timeout else ""
     return f"{step.tries} more tries, {step.policy}{over}{_DOT}{goes}"
-
-
-class Saved(Drafts[list[str]]):
-    """Every agent written down under a name, which is what a flow's agents are imported from.
-
-    An agent is a CLI, an account, a model at an effort and what it may do without being
-    asked, and none of that is a thing about the flow that happens to be driving it. So it is
-    worth saying once and reaching for: the reviewer you always use, the cheap one you fan out
-    across, the one on somebody else's gateway.
-
-    Nothing here is being chosen for anything. What it is for is the three things that can
-    happen to one -- made, set up, taken away -- so those are the keys, and none of them lands
-    until the menu is saved on the way out.
-    """
-
-    TABS: ClassVar = ("Agents",)
-    LETTERS: ClassVar = frozenset({"search", "adding", "drop"})
-
-    BINDINGS: ClassVar = [
-        ("escape", "back", "back"),
-        Binding("tab", "next_tab", "next page", priority=True),
-        Binding("shift+tab", "prev_tab", "previous page", priority=True),
-        Binding("s", "search", "search", priority=True),
-        Binding("a", "adding", "add one", priority=True),
-        Binding("d", "drop", "take one away", priority=True),
-    ]
-
-    def __init__(self, agents: dict[str, tuple[Model, ...]]) -> None:
-        """Reads what has been written down.
-
-        Args:
-          agents: The backends offered here, and what each of them says it runs.
-        """
-        super().__init__()
-        self._agents = dict(agents)
-        #: What the menu is holding, which is what is written down when it is saved.
-        self._held: list[Kept] = list(_hmz().agents.all())
-        #: Which of them the cursor is on, by name.
-        self._was = self._held[0].name if self._held else ""
-        self._said = ""
-
-    def _ask(self) -> None:
-        """Says what these are, and puts them up."""
-        self.query_one("#asked", Label).update("Agents")
-        self.query_one("#about", Label).update(
-            "One named agent apiece: the CLI that takes its turns, the account they run as, "
-            "the model at an effort and what it may do. A flow imports a copy of one where "
-            "its agents are chosen, so changing one here does not change a flow already set "
-            "up with it."
-        )
-        self._fill()
-        self.query_one("#choices", OptionList).focus()
-
-    def _fill(self) -> None:
-        """Puts the agents up, with the marker beside the one the cursor is on."""
-        listing = self.query_one("#choices", OptionList)
-        self._follows(listing)
-        shown = [one for one in self._held if self.fits(one.name, one.runs.spec)]
-        self._counting = len(str(max(len(shown), 1)))
-        if all(one.name != self._was for one in shown):
-            self._was = shown[0].name if shown else ""
-        at = next((seen for seen, one in enumerate(shown) if one.name == self._was), 0)
-        listing.set_options(
-            Option(
-                self._row(
-                    seen,
-                    one.name,
-                    reads((), [one.runs])[0],
-                    here=seen == at,
-                    inforce=False,
-                ),
-                id=f"={one.name}",
-            )
-            for seen, one in enumerate(shown)
-        )
-        listing.highlighted = at if shown else None
-        self._drawn = listing.highlighted
-        self.tabbed(self._tab_line())
-        said = self._said or ("" if self._held else "no agents saved yet; a saves one")
-        self.query_one("#tuning", Label).update(
-            f"[$text-muted]{said}[/]" if said else ""
-        )
-        self.query_one("#keys", Label).update(
-            "Enter to set one up · a adds one · d twice takes one away · "
-            f"Esc to close{self.searching()}"
-        )
-
-    def _follows(self, listing: OptionList) -> None:
-        """Takes which agent the cursor is on off the list, by the name it is kept under.
-
-        Args:
-          listing: The list.
-        """
-        at = listing.highlighted
-        if at is not None and 0 <= at < listing.option_count:
-            named = str(listing.get_option_at_index(at).id or "").removeprefix("=")
-            if named:
-                self._was = named
-
-    def action_adding(self) -> None:
-        """Sets up an agent that is not there yet, and holds it if it is named."""
-        spare = opens_on(self._agents)
-        self._sets(Kept("", spare[0] if spare else Runs("")), new=True)
-
-    def action_drop(self) -> None:
-        """Takes the agent under the cursor away, once d has been pressed twice."""
-        name = self.under()
-        if not name:
-            return
-        if not self._armed(name):
-            self._said = f"press d again to take {escape(name)} away"
-            self._fill()
-            return
-        self._held = [one for one in self._held if one.name != name]
-        self._said = f"{escape(name)} goes when this menu is saved"
-        self.changed()
-        self._fill()
-
-    @on(OptionList.OptionSelected)
-    def _took(self, event: OptionList.OptionSelected) -> None:
-        """Sets up the agent under the cursor.
-
-        Args:
-          event: What was chosen.
-        """
-        name = str(event.option.id or "").removeprefix("=")
-        one = next((each for each in self._held if each.name == name), None)
-        if one is not None:
-            self._sets(one, new=False)
-
-    @work
-    async def _sets(self, one: Kept, *, new: bool) -> None:
-        """Opens one agent, and holds whatever comes back.
-
-        Args:
-          one: The agent as it is now.
-          new: Whether it is one that is not written down yet, which is what decides between
-            adding it and writing over it.
-        """
-        showing = cast(
-            "App[None]",
-            self.app,  # pyright: ignore[reportUnknownMemberType]
-        )
-        fitted = await showing.push_screen_wait(
-            Agent(
-                one.name or "a new agent",
-                one.runs,
-                self._agents,
-                name=one.name,
-                naming=True,
-            )
-        )
-        if fitted is None:
-            return  # walked out of it, which leaves this one as it was
-        named = fitted.name.strip()
-        if not named:
-            self._said = "an agent with no name is not one anything can import"
-            self._fill()
-            return
-        # Written over where it is one already held, and added where it is not -- by the name
-        # it now has, so that renaming one is renaming it rather than making a second. Where
-        # it was in the list is where it stays: a list that reordered itself as an agent was
-        # renamed would move the cursor out from under whoever was reading it.
-        at = next(
-            (seen for seen, each in enumerate(self._held) if each.name == one.name),
-            len(self._held),
-        )
-        held = [each for each in self._held if each.name not in (named, one.name)]
-        at = min(at, len(held)) if not new else len(held)
-        self._held = [*held[:at], Kept(named, fitted.runs), *held[at:]]
-        self._was, self._said = named, ""
-        self.changed()
-        self._fill()
-
-    def applied(self) -> None:
-        """Writes down exactly what the menu is holding, and says what it now holds."""
-        _hmz().agents.keep(self._held)
-        self.dismiss(
-            [
-                f"[dim]{len(self._held)} agents saved: "
-                f"{escape(', '.join(one.name for one in self._held))}[/dim]"
-                if self._held
-                else "[dim]no agents are saved any more[/dim]"
-            ]
-        )
 
 
 #: What can be done to one account, which is what enter opens rather than what a row of

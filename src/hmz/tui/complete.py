@@ -20,7 +20,6 @@ _ABOUT = {
     "flow": "Switch flow",
     "btw": "Ask a side question",
     "flowverses": "Manage the places flows come from",
-    "agents": "Set what each agent runs",
     "providers": "Manage the accounts agents run as",
     "fallback": "Where a turn goes when the place taking it cannot take it at all",
     "epics": "The runs of this directory, and what to do with one",

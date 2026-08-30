@@ -1,10 +1,10 @@
 """One agent of a flow, set up on one sheet reached from the page the flow's agents are on.
 
-Everything an agent is is a row: the CLI that takes its turns, the account they run as, the
-model at an effort, what it is loaded with, what it may do, and -- only where the flow said
-that agent may be pointed at a machine -- where its work lands. Which is the point: an agent
-is one thing rather than three questions, and changing the effort of one already set up is a
-row and an arrow rather than a walk through two sheets that had nothing to say.
+Everything an agent is is a row, and there are four of them: the CLI that takes its turns, the
+account they run as, the model at an effort, and -- only where the flow said that agent may be
+pointed at a machine -- where its work lands. Which is the point: an agent is one thing rather
+than three questions, and changing the effort of one already set up is a row and an arrow
+rather than a walk through two sheets that had nothing to say.
 
 Driven headlessly, as every test of the interface is, so what is checked is where a keystroke
 lands rather than how it is drawn.
@@ -164,21 +164,16 @@ async def test_one_agent_is_one_sheet_of_rows_in_the_order_they_depend(
         await _open(app, driver, "remote")
 
         assert "builder" in _asked(app)
+        # Four rows and where it works, and nothing else: what it may do, the goals it may
+        # reach for and whether it searches the web are the flow's, and the skills it
+        # carries are its CLI's -- none of them is the agent's to be asked about here.
         assert rows(app) == [
-            "import",
             "cli",
             "provider",
             "model",
             "effort",
-            "skills",
-            "permission",
-            "goals",
-            # Only for a CLI that can be told: a switch for something the backend would go
-            # on doing either way would be a switch that lies.
-            "web search",
             "where",
             "save",
-            "save as",
         ]
         # The account nobody chose is always the first row of the list it is chosen from.
         assert "as local" in _value(app, "provider")

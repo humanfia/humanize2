@@ -203,20 +203,6 @@ def _tools(argv: list[str]) -> int:
     return tools(argv)
 
 
-def _agents(argv: list[str]) -> int:
-    """Lists, writes down and takes away the agents kept under a name.
-
-    Args:
-      argv: What followed the command name.
-
-    Returns:
-      Zero, or two for a line to correct.
-    """
-    from .agents import agents
-
-    return agents(argv)
-
-
 def _fallback(argv: list[str]) -> int:
     """Lists, writes down and takes away where one agent's turns go when it cannot run.
 
@@ -370,6 +356,7 @@ def runs_of(parser: ArgumentParser, flow: str, agents: Sequence[str]) -> list[Ru
         different number of them than the flow drives -- each as argparse rejects a line.
     """
     from hmz.kept import Runs
+    from hmz.runner import read_agent
     from hmz.sdk import Hmz
 
     if not agents:
@@ -382,7 +369,7 @@ def runs_of(parser: ArgumentParser, flow: str, agents: Sequence[str]) -> list[Ru
     # correct here rather than one the run finds out about.
     for spec in agents:
         try:
-            hmz.agents.reads(spec)
+            read_agent(spec)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
     try:
@@ -566,7 +553,6 @@ COMMANDS = {
     "anchor": (_anchor, "run an agent here that acts on another machine"),
     "flowverses": (_flowverses, "the places flows come from"),
     "check": (_check, "check a flow before anything runs it"),
-    "agents": (_agents, "the agents written down under a name"),
     "providers": (_providers, "the accounts an agent may be run as"),
     "fallback": (
         _fallback,

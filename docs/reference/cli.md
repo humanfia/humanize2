@@ -370,43 +370,6 @@ So the name `show` prints is always a name `-f` takes — `official/humanize1:ge
 all. Adding one is still trusting that repository with this machine, exactly as installing a
 package is. See [Security](/user/security).
 
-## `hmz agents`
-
-The agents written down under a name, to be reached for from any flow. The same store
-[`/agents`](/reference/tui#agents-kept-under-a-name) keeps, said as arguments instead — for a machine
-being set up, a CI job, or anywhere the interface is not open.
-
-```
-hmz agents list [-q|--quiet]
-hmz agents show <name>
-hmz agents add <name> <cli>[@<provider>]/<model>:<effort> [--anchor <target>] [--no-goals] [--force]
-hmz agents remove <name>
-```
-
-| Line | |
-| --- | --- |
-| `list` | Every one written down, by name and by what it runs. `-q` prints just the names, one a line, for a script to read. |
-| `show <name>` | What one of them is: its CLI, its model at an effort, the account it runs as, what it may do, where it works, and whether its backend's goals are available to it. Its skills are its CLI's own and are not written down here. |
-| `add <name> <agent>` | Writes one down. The agent is spelled exactly as [`-a`](#hmz) spells one, so `claude@work/claude-opus-5:high` names the account too, and the written-out form may name a permission rung. |
-| `remove <name>` | Takes it away. |
-
-What it wrote down is there to be imported the next time a flow's agent is set up — **import**
-on the agent sheet takes a copy of it, so tuning one inside a flow does not rewrite the one it
-came from.
-
-A name already written down is refused rather than quietly written over; `--force` is the line
-that means it. Naming no command at all lists them.
-
-```sh
-hmz agents add reviewer codex@work/gpt-5.6-sol:high --no-goals
-hmz agents add builder claude/claude-opus-5:max --anchor ssh://build-box
-hmz agents list -q
-```
-
-Whose agents they are is not a question here: these are agents kept under a name, not the
-agents of a flow. Which agent drives which flow is remembered per workspace — that is
-`hmz -f <flow> -a <agent>`, or the second page of `/flow`.
-
 ## `hmz providers`
 
 The accounts an agent may be run as: one named set of credentials per provider, kept apart from
@@ -601,7 +564,6 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/acp.json` | a CLI of your own, added where `/providers` asks which CLI | The CLIs of your own that speak the [Agent Client Protocol](/reference/agents#a-cli-of-your-own), as `{name: [argv…]}`. A backend from the moment it is written. |
 | `~/.humanize/models/<cli>.json` | the TUI, **r** | The same, for the CLI as you already run it. |
 | `~/.humanize/settings.yaml` | the TUI | What each workspace was last set up to run and whether its runs are profiled, and the settings that are not a workspace's — `enable_sentry`, the answer to the [reporting](/user/reporting) question. |
-| `~/.humanize/agents.yaml` | `hmz agents`, `/agents` | The agents written down under a name, to be reached for from any flow. |
 | `~/.humanize/history.jsonl` | the TUI | What has been typed at the prompt before, and where. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.sock` | `hmz` with no command | The socket a terminal reaches a [held run](/reference/daemon) through. `0600`. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.json` | the same | Which process is holding it, which workspace, and since when. |
@@ -646,7 +608,6 @@ hmz.verses.add("humanfia/flowverse")
 - `hmz.epics.trace(...)` — [Tracing](/reference/tracing)
 - `hmz.accounts` — [Providers](/reference/providers)
 - `hmz.verses` — [Flowverses](/weaver/flowverses)
-- `hmz.agents` — the agents written down under a name
 
 The layers under it are reachable directly where that is what you want — the SDK composes them
 and restates none of them:

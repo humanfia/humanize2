@@ -33,7 +33,7 @@ export interface Flow {
   name: string
   /** The page under /flows/. */
   link: string
-  /** How many agents it drives, in the words `/agents` would use. */
+  /** How many agents it drives, in the words the Agents page of `/flow` would use. */
   agents: string
   /** One line: what it does. */
   said: string

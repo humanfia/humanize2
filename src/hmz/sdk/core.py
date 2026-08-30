@@ -2,11 +2,11 @@
 
 Everything humanize does is done to one workspace: what was set up to run there, the runs that
 have already happened there, and the flow that is running there now. The things that are not a
-workspace's -- the agents written down under a name, the accounts they run as, where flows come
-from -- are still reached from here, because there is one of each and one place to ask for it.
+workspace's -- the accounts agents run as, where flows come from -- are still reached from
+here, because there is one of each and one place to ask for it.
 
 Each of them is fetched when it is asked for and not before. A command line that only lists the
-agents kept under a name must not load the tracer, the sandbox and every coding agent driver
+places flows come from must not load the tracer, the sandbox and every coding agent driver
 there is to do it, and `hmz anchor` must not load any of this at all.
 """
 
@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from hmz.backends import Profile
     from hmz.runner import Runner
     from hmz.sdk.accounts import Accounts
-    from hmz.sdk.agents import Agents
     from hmz.sdk.epics import Epics
     from hmz.sdk.fallbacks import Fallbacks
     from hmz.sdk.flows import Flows, Flowverses
@@ -50,7 +49,6 @@ class Hmz:
         self._workspace: str | os.PathLike[str] | None = workspace
         self._settings: Settings | None = None
         self._flows: Flows | None = None
-        self._agents: Agents | None = None
         self._accounts: Accounts | None = None
         self._fallbacks: Fallbacks | None = None
         self._epics: Epics | None = None
@@ -91,15 +89,6 @@ class Hmz:
     def verses(self) -> Flowverses:
         """Where flows come from, which is the same store `/flowverses` walks."""
         return self.flows.verses
-
-    @property
-    def agents(self) -> Agents:
-        """The agents written down under a name, to be reached for from any flow."""
-        if self._agents is None:
-            from hmz.sdk.agents import Agents
-
-            self._agents = Agents()
-        return self._agents
 
     @property
     def accounts(self) -> Accounts:
