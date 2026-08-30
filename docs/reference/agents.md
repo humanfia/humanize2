@@ -1047,8 +1047,8 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 
 | | `agy` | `claude` | `codex` | `cursor` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Driven through | its command line, held open for ordinary turns | its command line, held open | its app server | its command line, one run per turn | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, held open for ordinary turns | its command line, one run per turn | its app server |
-| [`interject`](#talking-to-a-turn-already-running) | no | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no | no — a run per turn has ended | no — a second prompt is refused while one is running |
+| Driven through | its command line, held open for ordinary turns | its command line, held open | its app server | its command line, one run per turn | its Python SDK | its command line, held open for ordinary turns | its app server | its command line, held open | its command line, held open for ordinary turns | its command line, one run per turn | its app server |
+| [`interject`](#talking-to-a-turn-already-running) | no | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no | no — a second prompt is a second turn | yes — queued, then steered in | yes — a steer on the running turn | no | no — a run per turn has ended | no — a second prompt is refused while one is running |
 | [`pursue`](#goals) | no | yes | yes | no | yes | no | yes | no | no | no | yes |
 | [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | no | yes |
 | [`SubagentStart`/`SubagentStop`](#not-every-backend-runs-every-moment) | no | yes | yes | yes | no | no | no | no | no | no | no |
@@ -1071,6 +1071,14 @@ for it in the prompt is not the same feature.
 
 A turn that must stay open to be talked to is such a case: a command line run per turn has ended
 by the time there is anything to say to it.
+
+Grok Build serves the same protocol its own IDE clients speak — `grok agent stdio` — so an
+ordinary turn is a `session/prompt` written to a process that is already up rather than a CLI
+started again. What that process cannot be told is what sends a turn back to `grok -p`: it has
+no `--tools`, no `--disallowed-tools` and no `--json-schema`, so a rung that takes tools away,
+an agent told not to search the web, and a turn held to a shape are each one run of the command
+line, resuming the same conversation. The session id is Grok Build's own either way, and each
+transport picks up what the other opened.
 
 ## Answering in a shape
 
