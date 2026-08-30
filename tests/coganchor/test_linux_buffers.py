@@ -143,3 +143,39 @@ os.write(1, payload)
         if child.poll() is None:
             child.kill()
         child.communicate(timeout=5)
+
+
+def test_a_reused_window_reads_each_path_as_itself_and_keeps_none_of_the_last() -> None:
+    """The buffer is read over rather than made afresh, so nothing may survive a read.
+
+    A shorter path after a longer one is the case that catches it: the tail of the one
+    before is still in the buffer, and a reader that did not bound the scan would hand back
+    a path with somebody else's suffix glued onto it.
+    """
+    window = procfs.Peek()
+    held: list[ctypes.Array[ctypes.c_char]] = []
+    for text in (b"/home/somebody/.claude/.credentials.json", b"/tmp/x", b""):
+        storage = ctypes.create_string_buffer(text + b"\0")
+        held.append(storage)  # the reads name it, so it has to outlive them
+        assert window.cstring(os.getpid(), ctypes.addressof(storage)) == text
+
+
+def test_a_window_reads_a_path_that_runs_over_a_page_boundary() -> None:
+    """Reads are cut at page boundaries, so a path that crosses one is more than one read."""
+    window = procfs.Peek()
+    page = os.sysconf("SC_PAGESIZE")
+    text = b"/" + b"a" * 200
+    storage = ctypes.create_string_buffer(3 * page)
+    at = ctypes.addressof(storage)
+    # The second boundary inside the allocation, so that half the path sits either side of it
+    # and the whole of it is still well inside what was allocated.
+    boundary = (at // page + 2) * page
+    start = boundary - len(text) // 2
+    ctypes.memmove(start, text + b"\0", len(text) + 1)
+
+    assert window.cstring(os.getpid(), start) == text
+
+
+def test_a_window_answers_nothing_for_a_pointer_that_names_nothing() -> None:
+    """Several of the trapped syscalls accept a NULL path, and none of them name a file."""
+    assert procfs.Peek().cstring(os.getpid(), 0) is None

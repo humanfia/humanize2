@@ -11,7 +11,9 @@ For SDK backends, an absent executable does not by itself mean the backend is un
 
 The [2026-09-10 mock evaluation](MOCK-RESULTS.md) records confirmed concurrency, all
 trial outcomes and fixture evidence. The [2026-09-09 real-provider evaluation](RESULTS.md)
-retains its historical timing data and provider/access gaps separately.
+retains its historical timing data and provider/access gaps separately. What a turn under an
+account pays for its credential supervisor, and what changing that came to, is measured
+separately in [SUPERVISOR.md](SUPERVISOR.md).
 
 ## Run
 
