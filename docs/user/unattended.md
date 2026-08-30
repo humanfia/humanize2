@@ -156,6 +156,10 @@ The [epic](/user/tracing#what-a-run-writes-down) records that run as **`failed`*
 is for an agent [told to stop by hand](/user/stopping), with ctrl+c twice in the interface or
 `agent.stop()` from inside the flow. Nothing on a command line tells the two apart.
 
+Either way, a flow that says it [can be picked up](/user/resuming) carries on from what that
+run left behind: run the same line again, or type `/resume` in the interface, which takes the
+last run in the directory rather than a flow you name.
+
 ## Opening the interface already set up
 
 `hmz` with `-f`, `-a` and `-c`, but no `exec`, opens the **interface** on that setup rather
@@ -174,4 +178,5 @@ it to cron. What the line says is checked before the interface opens.
 - [Flow settings](/weaver/flow-settings)
 - [Tracing](/user/tracing) — what a run writes down, and reading it back
 - [Stopping](/user/stopping)
+- [Picking a run up](/user/resuming) — carrying a stopped loop on where it left off
 - [humanize in CI](/user/ci)

@@ -46,6 +46,20 @@ To end one turn without ending the run, a flow has
 [`session.interrupt`](/features/budgets#cutting-one-off-by-hand), and a turn can be given a
 [budget](/features/budgets) that cuts it off on its own.
 
+## After a stop
+
+A stop is what makes a run worth picking up. Where the flow says it [can be picked
+up](/user/resuming), **`/resume`** at the prompt carries the last run here on from where it
+stopped — its own flow, its own agents, its own task, and whatever it had written down by the
+time the key was pressed. Nothing carries on by itself: stopped means stopped, and the run that
+carries on is a run somebody asked for.
+
+Wait for it to go, though. A flow told to stop unwinds in its own time and writes down where it
+got to as it goes, so `/resume` in that window is refused with `no picking a run up while the
+flow is still stopping` — picked up from a state still moving under it, the next run would do a
+round the stopped one had already recorded. A flow that will not unwind at all is what the third
+press is for: it leaves nothing reading as a run in progress, and `/resume` is answerable again.
+
 ## What stopping is not
 
 **Not `/clear`.** That clears the screen and nothing else. It clears the conversation being
@@ -103,6 +117,7 @@ hung off it did. `Stopped` is the one exception, and it is let out.
 
 ## See also
 
+- [Picking a run up](/user/resuming) — carrying on from where a stop left it
 - [Talking to a running turn](/user/steering) — when a steer is enough
 - [Being away](/user/afk)
 - [Flows › Stopping](/reference/flows#stopping)
