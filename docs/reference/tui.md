@@ -726,12 +726,14 @@ The `model` row: which of that CLI's models, and under it the effort, stepped wh
    r to ask it again · Enter to choose · Esc to cancel · s to search
 ```
 
-**The list is what that CLI said it runs as the account chosen above it**, not a list written
-into humanize: a CLI ships a model without asking anybody, and which of them you may name
-depends on the account. It is asked the first time the interface opens, and again whenever an
+**The list is what the account chosen above it may name**, not a list written into humanize: a
+CLI ships a model without asking anybody, and which of them you may name depends on the
+account. Where that account points its CLI at an endpoint, the endpoint is what was asked —
+a CLI handed a base URL can only answer with the models it shipped with, which is not what
+your key will run. It is asked the first time the interface opens, and again whenever an
 account is made. **r** asks it again from here, which is where you find out that the model you
-came for is not in the list. A CLI that has never been asked says so where the list would be;
-one that will not answer says why, under the list, and leaves the sheet up.
+came for is not in the list. An account that has never been asked says so where the list would
+be; one where nothing would answer says why, under the list, and leaves the sheet up.
 
 Choosing a model you were not already on starts the effort at the hardest that model takes —
 the one to reach for. Choosing the one you are on leaves the effort where you had it.

@@ -468,15 +468,21 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   here, and one the flow isolates in a container of its own, are each a question nobody is
   being asked.
 - Nothing MUST be typed in that could be found: the CLIs offered MUST be the ones installed
-  here less any the flow ruled out, the models offered MUST be the ones that CLI said it runs
-  as the account chosen for it, and the efforts offered MUST be the ones that model takes.
+  here less any the flow ruled out, the models offered MUST be the ones last said to be
+  runnable as the account chosen for it, and the efforts offered MUST be the ones that model
+  takes.
   Nothing MUST be asked of a CLI while a sheet is being drawn -- starting one costs seconds a
-  prompt has not got -- so what was kept is what is read.
+  prompt has not got -- and nothing MUST be reached over the network there either, for the
+  same reason and with the worse failure: an endpoint that hangs hangs the draw. What was
+  kept is what is read.
 - The models MUST be askable again from the sheet they are chosen on, on `r`, which is the key
   a flowverse is fetched again on. This is where somebody finds out that the model they came
   for is not in the list, and sending them elsewhere to fix it would lose the question they
-  came to answer. Asking MUST NOT stop the interface redrawing, and what came of it MUST be
-  said under the list rather than raised at whoever opened the sheet.
+  came to answer. It is the one place either asking is allowed -- somebody pressed a key and
+  is waiting on the answer, which is what the draw path never has -- so it is where an account
+  on somebody's gateway has its endpoint asked what it serves. Asking MUST NOT stop the
+  interface redrawing, and what came of it MUST be said under the list rather than raised at
+  whoever opened the sheet.
 - A CLI that has never said what it runs as the chosen account MUST say so where the list
   would be, and MUST say which key asks it: an empty list that explains nothing reads as a
   CLI with no models.
