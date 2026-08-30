@@ -10,17 +10,19 @@ and asking what the session has spent are all commands there, and none of them i
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
+
+from hmz import home
 
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Question, Usage
 
 if TYPE_CHECKING:
-    import os
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Mapping
 
 #: What each kind of thing pi says a turn did reads as. A message is a list of parts and pi
 #: says each of them twice -- once as it starts and once with the whole of it -- so only the
@@ -44,6 +46,19 @@ _KINDS = {
     "cache_read": "cacheRead",
     "cache_write": "cacheWrite",
 }
+
+#: Where node is told to keep what it compiled of pi, and so what a second pi reads back
+#: instead of compiling again. A quarter of a pi start is that compiling -- the CLI is one
+#: bundle of some twenty megabytes -- and a session here is a process of its own, so eight
+#: sessions at once on four cores spend their first second compiling the same file eight
+#: times. Node's own cache and none of ours: it keys every entry on the file it came from and
+#: on the node reading it, so an upgrade of either compiles once more and writes the entry
+#: again, and a directory it cannot write leaves the saving unmade and nothing else.
+_COMPILED = "NODE_COMPILE_CACHE"
+
+#: Where that cache goes, under humanize's own home: it outlives one run of one flow, which is
+#: the whole point of it, and it is not the CLI's own directory to put anything in.
+_CACHE = ("compiled", "pi")
 
 #: The tools of pi's own that change something rather than look at something, which is the
 #: whole of what an agent that may change nothing is refused. pi has no permission gate and no
@@ -154,6 +169,22 @@ class PiSession(StreamSessionBase):
             # that change anything is one that can only look, which is the rung asked for.
             argv += ["--exclude-tools", ",".join(_CHANGING)]
         return argv
+
+    def _environment(self) -> Mapping[str, str]:
+        """What a turn is run with: what the provider sets, and where node may cache pi.
+
+        Returns:
+          Those variables. `NODE_COMPILE_CACHE` is left exactly as it was found where
+          somebody has set one already -- whether the provider names it or this process was
+          started with it, theirs is the cache they meant -- and is not set at all for a turn
+          that lands somewhere else, since the path would name a directory on this machine
+          rather than on the one the turn runs on.
+        """
+        added = super()._environment()
+        chosen = added.get(_COMPILED) or os.environ.get(_COMPILED)
+        if chosen or self._agent.anchor is not None:
+            return added
+        return {**added, _COMPILED: str(home().joinpath(*_CACHE))}
 
     def _write(self, text: str, ticket: str = "") -> str:
         """Renders one thing to say as the `prompt` command pi reads it as.
