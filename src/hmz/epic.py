@@ -147,6 +147,11 @@ class Session(NamedTuple):
       at: When it was opened.
       flow: The flow it was opened inside, as that flow was asked for: the run's own, or one
         the run called. "" for a session written down before a run said.
+      parent: The id of the conversation this one was forked from, for a session a flow
+        branched, and "" for one that started from nothing -- which is most of them. Written
+        down because the backend does not: its log shows a session that began knowing things,
+        and only the run can say which conversation it got them from. Which is what makes two
+        branches of one conversation readable afterwards as the branches they were.
     """
 
     agent: str
@@ -156,6 +161,7 @@ class Session(NamedTuple):
     name: str
     at: str = ""
     flow: str = ""
+    parent: str = ""
 
 
 class Drove(NamedTuple):
@@ -801,16 +807,20 @@ class Epic:
         self.write("called", flow=flow, task=task, epic=record)
         return Sub(self, record, flow, agents, task, resumable=resumable)
 
-    def opened(self, agent: AgentBase, session: str) -> None:
+    def opened(self, agent: AgentBase, session: str, parent: str = "") -> None:
         """Writes down a session one of the agents has just opened.
 
         Which agent it was, which CLI took its turns and which account they were taken as:
         the backend's own log says none of those, and two agents at one configuration are one
-        agent to anything reading the logs alone.
+        agent to anything reading the logs alone. And which conversation it was cut from,
+        where it was cut from one: a fork's log opens on an agent that already knows things,
+        and nothing but the run can say where it knew them from.
 
         Args:
           agent: Whose session it is.
           session: The backend's id for it, which is what a trace of the run is gathered by.
+          parent: The id of the conversation it was forked from, or "" for one that
+            started from nothing.
         """
         provider = _provider(agent)
         name = called(agent.id, agent.backend, provider, session)
@@ -825,6 +835,8 @@ class Epic:
             name=name,
             # Where to look for it inside this epic, which is a link and not the log itself.
             where=f"{SESSIONS}/{name}",
+            # Said only where there is one, so that the ordinary line stays the line it was.
+            **({"parent": parent} if parent else {}),
         )
         self.links(name)
 
@@ -1026,7 +1038,8 @@ def sessions(epic: Path) -> list[Session]:
 
     Returns:
       One apiece, saying whose it was, what took its turns, which account they ran as, what
-      the run calls it and which flow it was opened in.
+      the run calls it, which flow it was opened in, and which conversation it was cut from
+      where it was cut from one.
     """
     held: list[Session] = []
     for at in records(epic):
@@ -1062,6 +1075,7 @@ def sessions(epic: Path) -> list[Session]:
                     ),
                     at=str(said.get("at") or ""),
                     flow=flow,
+                    parent=str(said.get("parent") or ""),
                 )
             )
     # By when each was opened rather than by which record it is in: the records are one run,

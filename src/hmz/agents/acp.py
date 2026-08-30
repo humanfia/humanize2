@@ -261,6 +261,7 @@ class AcpSession(SessionBase):
             cwd=None if self._agent.anchor is not None else self._workspace(),
         )
         self._as = self._agent.node().name
+        forking = self._id is None and self._forked_from is not None
         try:
             link.start()
             self._settle(
@@ -277,12 +278,20 @@ class AcpSession(SessionBase):
             opened = self._settle(
                 link,
                 link.send(
-                    "session/new",
+                    # `session/fork` for a conversation cut from another and not yet opened:
+                    # the protocol's own call for it, answering with a session id of its own
+                    # that holds what the named one had got to. An agent that has not
+                    # implemented it answers with an error, which is a refusal read where it
+                    # was asked -- and not two conversations that are quietly one. Only while
+                    # this session has no id: a child that has taken turns of its own is a
+                    # conversation, and forking the parent again would throw those away.
+                    "session/fork" if forking else "session/new",
                     {
                         # Absolute, which the protocol requires, and the one the session works in.
                         "cwd": self._workspace(),
                         # Required even when there are none of them.
                         "mcpServers": [],
+                        **({"sessionId": self._forked_from} if forking else {}),
                     },
                 ),
             )

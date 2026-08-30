@@ -47,6 +47,9 @@ if TYPE_CHECKING:
 #: asked for as 0, so that two flows on one machine cannot collide -- and its token are said.
 _LISTENING = re.compile(r"^Kimi server: (\S+)/#token=(\S+)$")
 
+#: The one line `kimi fork` prints, which is where the session it cut is named.
+_FORKED = re.compile(r"Forked to (\S+)")
+
 #: What an effort is prefixed with to ask for swarm mode: `max` and `swarmmax` are the same
 #: thinking, run as one agent and as a fleet of them.
 SWARM = "swarm"
@@ -580,6 +583,58 @@ class KimiCodeCLISession(SessionBase):
                 said = event.text
         return said.strip()
 
+    def _fork(self, whence: str) -> str:
+        """Cuts a second conversation from one the daemon is holding, as `kimi fork` does.
+
+        The CLI's own command rather than the daemon's route for it: `POST /sessions/<id>
+        ::fork` is dispatched to a manager that knows none of the workspaces the sessions are
+        actually in, and refuses every one of them as a session that does not exist. The
+        command is the same engine doing the same thing from the outside, and it says which
+        session it made on the one line it prints -- which is the whole of what is read back.
+
+        Run as this agent's account and in this conversation's directory, so that a fork is
+        cut where the conversation is and out of the store that account writes.
+
+        Args:
+          whence: The conversation to cut from, by the id the daemon gave it.
+
+        Returns:
+          The new session's id, which is this session's from here on.
+
+        Raises:
+          subprocess.CalledProcessError: If the fork will not run, will not answer, or runs
+            and names no session -- which leaves this session unopened, so the next turn
+            tries again.
+        """
+        argv = self._agent.spawned(
+            ["kimi", "fork", whence, "--yes", "--cwd", self._workspace()], self.cwd
+        )
+        try:
+            ran = subprocess.run(
+                argv,
+                capture_output=True,
+                text=True,
+                check=False,
+                env=self._environ(),
+                # The same ceiling every call to this backend is under: a fork is one read
+                # and one write of a conversation, and a flow waiting forever on one is a
+                # flow that has stopped.
+                timeout=_CALL_SECONDS,
+            )
+        except subprocess.TimeoutExpired as slow:
+            raise Failed(
+                1, argv, "", f"kimi fork took longer than {_CALL_SECONDS:.0f}s"
+            ) from slow
+        found = _FORKED.search(ran.stdout)
+        if ran.returncode != 0 or found is None:
+            raise Failed(
+                ran.returncode or 1,
+                argv,
+                ran.stdout,
+                ran.stderr.strip() or "kimi fork named no session",
+            )
+        return found.group(1)
+
     def _submit(self, prompt: str, *, goal: bool) -> Iterator[Event]:
         """Runs one turn, saying what the agent says as it says it.
 
@@ -618,9 +673,17 @@ class KimiCodeCLISession(SessionBase):
                 # failed leaves the daemon holding a conversation nothing landed in, and resuming
                 # that one would be resuming a turn that never happened.
                 if (session := self._id) is None:
-                    session = server.call(
-                        "POST", "/sessions", {"metadata": {"cwd": self._workspace()}}
-                    )["id"]
+                    # A fork cuts its conversation from the one it came from rather than
+                    # starting one; anything else starts one here.
+                    session = (
+                        self._fork(self._forked_from)
+                        if self._forked_from is not None
+                        else server.call(
+                            "POST",
+                            "/sessions",
+                            {"metadata": {"cwd": self._workspace()}},
+                        )["id"]
+                    )
                 server.call(
                     "POST",
                     f"/sessions/{session}/profile",

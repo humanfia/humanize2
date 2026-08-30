@@ -174,6 +174,10 @@ It is still one run and still one directory: a called flow is part of the run th
 not another run. `hmz.epic.sessions` reads every record, so every session of a run is one list
 however many flows it took, each saying which `flow` opened it.
 
+A session the flow [branched](/weaver/branching) also says `parent`, the id of the conversation
+it was forked from. The backend's own log cannot: it shows a session that opened on an agent
+already knowing things, and only the run knows where it knew them from.
+
 ## Profiling a run
 
 An agent's turn is mostly other programs. It runs the tests, it builds the thing, it greps the

@@ -237,6 +237,16 @@ What a flow drives, written as interfaces and nothing else.
   nowhere -- since two agents at two efforts are two agents, and a trace that read them as one
   would read a comparison as one agent changing its mind. Everything the call does not name
   MUST be the agent it came from, the skills it carries included.
+- A flow that wants two ways out of one conversation MUST be able to branch it, which MUST be
+  `Session.fork`: a second conversation carrying this one's history, going its own way from
+  the moment it was made. It is the other half of `Agent.clone` and MUST NOT share its word --
+  an agent is structure, so its clone knows nothing; a session is history, so its fork knows
+  everything this one knows, and two things sharing one name is a flow author having to be
+  told which is meant. What the child costs MUST be the child's: its own id, its own spending,
+  its own line in the run's record, and nothing spent on the one it came from counted twice. A
+  backend with no fork of its own MUST refuse it where it is asked rather than hand back a
+  second handle on the one conversation, and MUST say beforehand whether it can, so that a
+  flow may ask rather than catch.
 - The drivers MUST answer to it structurally, and `hmz.agents` MUST NOT import it. The arrow
   points one way -- a flow names what it drives, and a driver is written without ever naming a
   flow -- and a driver that inherited from this would be the layer below reaching up. That

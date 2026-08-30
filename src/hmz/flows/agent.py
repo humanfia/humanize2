@@ -69,6 +69,49 @@ class Session(Protocol):
     takes_tools: ClassVar[bool]
 
     @property
+    def forks(self) -> bool:
+        """Whether this backend can carry this conversation into a second one.
+
+        A fact of the backend rather than of this conversation, but asked here because it is
+        here it is acted on: a flow that means to branch asks before it does, rather than
+        catching the refusal on a session it has already spent an hour filling.
+        """
+        ...
+
+    def fork(self) -> Session:
+        """A second conversation carrying this one's history, and its own from here on.
+
+        Which is how a flow tries two ways out of an hour of work without paying for the hour
+        twice::
+
+            careful, quick = session.fork(), session.fork()
+
+        The backend's own fork does the carrying, so the child knows exactly what this
+        conversation knew when it was made and nothing either of them is told afterwards. Its
+        own id, its own spending, its own line in the run's record: nothing spent here is
+        counted there.
+
+        Not `Agent.clone`, which is the other half of the same idea under the other word: an
+        agent is structure, so its clone knows nothing; a session is history, so its fork
+        knows everything this one knows.
+
+        The child must be used before this conversation is given another turn -- the fork is
+        the child's first turn, and one taken later would branch from somewhere nobody chose.
+        A child driven after that is refused rather than cut from the wrong place.
+
+        Returns:
+          The new conversation, which opens with the backend on its first turn -- so a fork
+          nobody uses costs nothing at all.
+
+        Raises:
+          NotImplementedError: If this backend has no fork of its own. `forks` is how to ask
+            first; a second handle on the one conversation is not offered instead.
+          RuntimeError: If no turn has landed here yet, so there is nothing to carry, or if
+            this conversation has moved on since the fork was asked for.
+        """
+        ...
+
+    @property
     def id(self) -> str:
         """What the backend calls this conversation, once a turn has landed in it.
 
