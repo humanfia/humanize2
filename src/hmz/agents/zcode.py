@@ -13,6 +13,14 @@ call, a notification, an answer, a refusal -- and a `jsonrpc` on any of them is 
 outright, so this speaks it as it is. The server also asks things of its client: what the
 runtime may do, whether a high-risk tool is allowed, what to answer a question with. Every one
 of those is answered, because a request left hanging stops the turn waiting behind it.
+
+One server holds every session of its agent, and all of it comes back on the one stream: both
+turns of two sessions running at once, every answer to every call, and the server's own
+questions. So the thread that reads that stream is the thread that sorts it -- an answer to
+whoever made the call it is numbered for, a session's events to the turn running on it -- and
+each turn then waits on its own session rather than on whatever the stream happens to say next.
+Reading it in turn instead would mean holding it for the length of a turn, which is minutes,
+and a second session of the agent would spend them waiting.
 """
 
 # A session and the agent holding it are two halves of one object declared in one
@@ -41,11 +49,17 @@ from .hooks import EVERYWHERE, Moment, Occasion
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
+    from typing import IO
 
     from pydantic import BaseModel
 
 #: How long a server being taken down is given to go before it is left to the operating system.
 _STOP_SECONDS = 5.0
+
+#: How much of a session nobody is reading is kept. A turn reading its own session empties
+#: this as fast as the server fills it and never comes near the bound; what reaches it is a
+#: session with no turn on it, which the server may go on talking about for as long as it runs.
+_BACKLOG = 4096
 
 #: What ZCode is run in at each rung of the ladder. `plan` refuses an edit and refuses a command
 #: it reads as high-risk, and lets it look at anything; `edit` may change the workspace and asks
@@ -181,13 +195,19 @@ class _AppServer:
         #: were still here -- and so that an approval it asks about is answered as the rung
         #: that session runs at, rather than as the loosest one any session of the agent has.
         self.sessions: dict[str, str] = {}
-        self._messages: queue.Queue[dict[str, Any] | None] = queue.Queue()
+        #: Who is waiting for what, so that the one stream can be routed rather than read in
+        #: turn: an answer to whoever made that call, and a session's events to the turn
+        #: running on it. Both are handed out and taken back under `_routing`.
+        self._answers: dict[int, queue.Queue[dict[str, Any] | None]] = {}
+        self._events: dict[str, queue.Queue[dict[str, Any] | None]] = {}
+        #: Which call, once answered, means a session's turn has started -- so that what the
+        #: session said before it is dropped where the order is still known.
+        self._starting: dict[int, str] = {}
+        self._routing = threading.Lock()
+        self._ended = False
         # Read from a thread of its own, so that a turn can wait on the server for a while
         # rather than only for as long as it takes to answer.
         threading.Thread(target=self._pump, daemon=True).start()
-        # One stream, shared by every session of the agent: a call is a write and the reads up
-        # to its answer, and two of them interleaved would each take the other's messages.
-        self._speaking = threading.Lock()
 
     @property
     def _agents(self) -> list[AgentBase]:
@@ -195,28 +215,21 @@ class _AppServer:
         held = [one() for one in self._held]
         return [one for one in held if one is not None]
 
-    def call(self, method: str, params: dict[str, Any]) -> Any:
-        """Makes one call and reads until it is answered.
+    def call(self, method: str, params: dict[str, Any], starts: str = "") -> Any:
+        """Makes one call and waits for the answer to that call.
+
+        Nothing else waits behind it. The number on a call is what its answer comes back
+        under, so a second call made while this one is outstanding is answered on its own
+        number rather than out of the same queue -- which is what the reading below used to
+        have to be serialized to get right.
 
         Args:
           method: The method to call.
           params: What to call it with.
-
-        Returns:
-          What the server answered with.
-
-        Raises:
-          subprocess.CalledProcessError: If it refused the call, or stopped before answering.
-        """
-        with self._speaking:
-            return self._called(method, params)
-
-    def _called(self, method: str, params: dict[str, Any]) -> Any:
-        """Makes that call with the stream already held, and reads until it is answered.
-
-        Args:
-          method: The method to call.
-          params: What to call it with.
+          starts: The session whose turn this call is starting, if it is starting one.
+            Everything that session had said before the server answered this is thrown away
+            as the answer is routed -- on the reading thread, which is the only thread that
+            knows the order the server said them in. A turn begins at its own first word.
 
         Returns:
           What the server answered with.
@@ -225,14 +238,28 @@ class _AppServer:
           subprocess.CalledProcessError: If it refused the call, or stopped before answering.
         """
         ident = next(self._pending)
-        self._write({"id": ident, "method": method, "params": params})
-        # An answer is a frame with no method of its own: the server asks things of us over the
-        # same stream, numbering its own calls, and one of those is not this one.
-        while (message := self._read()) is None or not (
-            message.get("id") == ident and "method" not in message
-        ):
-            pass
-        return self._answer(message, "")
+        waiting: queue.Queue[dict[str, Any] | None] = queue.Queue()
+        with self._routing:
+            # Registered before the call goes out, so that an answer cannot come back to
+            # nobody: the pump reads it on another thread and may be quicker than this one.
+            self._answers[ident] = waiting
+            if starts:
+                self._starting[ident] = starts
+            ended = self._ended
+        try:
+            if ended:
+                raise Failed(
+                    self._proc.poll() or 1,
+                    self._argv,
+                    "",
+                    "app server stopped mid-turn",
+                )
+            self._write({"id": ident, "method": method, "params": params})
+            return self._answer(self._taken(waiting), "")
+        finally:
+            with self._routing:
+                self._answers.pop(ident, None)
+                self._starting.pop(ident, None)
 
     def open(self, workspace: str, held: _Held, *, searches: bool) -> str:
         """Opens a session, at the settings the agent it is for is configured with.
@@ -249,27 +276,26 @@ class _AppServer:
         Raises:
           subprocess.CalledProcessError: If the server refused to open one.
         """
-        with self._speaking:
-            opened = self._called(
-                "session/create",
-                {
-                    "workspace": _workspace(workspace),
-                    "model": {
-                        "providerId": _provider(held.model),
-                        "modelId": _model(held.model),
-                    },
-                    "thoughtLevel": held.effort,
-                    "mode": held.mode,
-                    # A title is a turn of its own on the lite model, and nothing here reads
-                    # one: a session is named by the flow that opened it.
-                    "titleGenerationEnabled": False,
-                    **({} if searches else {"toolDenylist": list(_WEB)}),
+        opened = self.call(
+            "session/create",
+            {
+                "workspace": _workspace(workspace),
+                "model": {
+                    "providerId": _provider(held.model),
+                    "modelId": _model(held.model),
                 },
-            )
-            session = str(opened["session"]["sessionId"])
-            self._called(
-                "session/subscribe", {"sessionId": session, "deliveryKind": _DELIVERY}
-            )
+                "thoughtLevel": held.effort,
+                "mode": held.mode,
+                # A title is a turn of its own on the lite model, and nothing here reads
+                # one: a session is named by the flow that opened it.
+                "titleGenerationEnabled": False,
+                **({} if searches else {"toolDenylist": list(_WEB)}),
+            },
+        )
+        session = str(opened["session"]["sessionId"])
+        self.call(
+            "session/subscribe", {"sessionId": session, "deliveryKind": _DELIVERY}
+        )
         # Everything a settling would say was said in the call that opened it.
         held.told = (held.model, held.effort, held.mode)
         self.sessions[session] = held.mode
@@ -289,9 +315,8 @@ class _AppServer:
         Raises:
           subprocess.CalledProcessError: If the server refused any of it.
         """
-        with self._speaking:
-            for method, params in _settling(session, held):
-                self._called(method, params)
+        for method, params in _settling(session, held):
+            self.call(method, params)
         self.sessions[session] = held.mode
 
     def resume(
@@ -315,25 +340,27 @@ class _AppServer:
         Raises:
           subprocess.CalledProcessError: If the server refused to pick it up.
         """
-        with self._speaking:
-            self._called(
-                "session/resume",
-                {
-                    "sessionId": session,
-                    "workspace": _workspace(workspace),
-                    "thoughtLevel": held.effort,
-                    **({} if searches else {"toolDenylist": list(_WEB)}),
-                },
-            )
-            self._called(
-                "session/subscribe", {"sessionId": session, "deliveryKind": _DELIVERY}
-            )
-            for method, params in _settling(session, held, again=True):
-                self._called(method, params)
+        self.call(
+            "session/resume",
+            {
+                "sessionId": session,
+                "workspace": _workspace(workspace),
+                "thoughtLevel": held.effort,
+                **({} if searches else {"toolDenylist": list(_WEB)}),
+            },
+        )
+        self.call(
+            "session/subscribe", {"sessionId": session, "deliveryKind": _DELIVERY}
+        )
+        for method, params in _settling(session, held, again=True):
+            self.call(method, params)
         self.sessions[session] = held.mode
 
     def turn(self, session: str, prompt: str, held: _Held) -> Iterator[Event]:
         """Sends one turn and says what the agent says as it says it.
+
+        The session's own events are what this reads, so a turn on another session of the
+        agent runs alongside it rather than behind it.
 
         Args:
           session: The session to send it to.
@@ -347,9 +374,11 @@ class _AppServer:
           subprocess.CalledProcessError: If the turn was refused or failed, or the server
             stopped while it was running.
         """
-        with self._speaking:
-            self._called("session/send", {"sessionId": session, "content": prompt})
-            yield from self._reading(session, held)
+        waiting = self._waiting(session)
+        self.call(
+            "session/send", {"sessionId": session, "content": prompt}, starts=session
+        )
+        yield from self._reading(waiting, held)
 
     def pursue(self, session: str, objective: str, held: _Held) -> str:
         """Sets a goal of ZCode's own and lets the turn it starts run to the end.
@@ -365,26 +394,27 @@ class _AppServer:
         Raises:
           subprocess.CalledProcessError: If the goal was refused, or the turn under it failed.
         """
-        with self._speaking:
-            answered: dict[str, Any] = self._called(
-                "session/goal",
-                {"sessionId": session, "action": "set", "objective": objective},
-            )
-            said = str(answered.get("response") or "")
-            if not answered.get("startedTurn"):
-                # A goal recorded rather than run: `plan` is the rung where ZCode writes the
-                # objective down and waits to be let out of it, which is that rung meaning what
-                # it says rather than a goal that failed.
-                return said.strip()
-            watched = self._watched()
-            for event in self._reading(session, held):
-                if event.kind == "result":
-                    return event.text or said.strip()
-                if not watched:
-                    # A goal runs for as long as it takes to be met, and nothing above this
-                    # yields while it does. So its own words are the only sign it is running.
-                    say(event.text, sys.stderr)
+        waiting = self._waiting(session)
+        answered: dict[str, Any] = self.call(
+            "session/goal",
+            {"sessionId": session, "action": "set", "objective": objective},
+            starts=session,
+        )
+        said = str(answered.get("response") or "")
+        if not answered.get("startedTurn"):
+            # A goal recorded rather than run: `plan` is the rung where ZCode writes the
+            # objective down and waits to be let out of it, which is that rung meaning what
+            # it says rather than a goal that failed.
             return said.strip()
+        watched = self._watched()
+        for event in self._reading(waiting, held):
+            if event.kind == "result":
+                return event.text or said.strip()
+            if not watched:
+                # A goal runs for as long as it takes to be met, and nothing above this
+                # yields while it does. So its own words are the only sign it is running.
+                say(event.text, sys.stderr)
+        return said.strip()
 
     def _watched(self) -> bool:
         """Whether something is watching the agents this server runs turns for.
@@ -397,13 +427,15 @@ class _AppServer:
         """
         return any(agent._watchers for agent in self._agents)
 
-    def _reading(self, session: str, held: _Held) -> Iterator[Event]:
+    def _reading(
+        self, waiting: queue.Queue[dict[str, Any] | None], held: _Held
+    ) -> Iterator[Event]:
         """Reads one turn's events off the stream, from the one now running to its last.
 
         Args:
-          session: Whose events these are. One server holds every session of the agent, and a
-            turn on another of them is still on this stream: what is not this session's is not
-            this turn's.
+          waiting: Where this session's events are put as they are read. One server holds
+            every session of the agent, and the pump sorts the one stream into one of these
+            per session, so what arrives here is this session's and no filtering is left.
           held: Whose turn it is, told what each request cost as it lands.
 
         Yields:
@@ -416,12 +448,9 @@ class _AppServer:
         saying = _Saying()
         costing = Usage()
         counted = 0
-        while (message := self._read()) is not None:
+        while True:  # a stopped server raises out of this rather than ending it
+            message = self._taken(waiting, said)
             told: dict[str, Any] = message.get("params") or {}
-            if message.get("method") != "session/event":
-                continue
-            if told.get("sessionId") != session:
-                continue
             payload: dict[str, Any] = told.get("payload") or {}
             match told.get("type"):
                 case "model.streaming":
@@ -474,9 +503,6 @@ class _AppServer:
                     return
                 case _:  # the rest of the stream is not this turn's to show
                     pass
-        raise Failed(
-            self._proc.poll() or 1, self._argv, said, "app server stopped mid-turn"
-        )
 
     def stop(self) -> None:
         """Takes the server and its children down, leaving its sessions on disk."""
@@ -523,9 +549,28 @@ class _AppServer:
             raise Failed(1, self._argv, "", str(gone)) from gone
 
     def _pump(self) -> None:
-        """Reads the server's whole stream, answering what it asks of us as it arrives."""
+        """Reads the server's whole stream, sorting each frame to whoever is waiting for it.
+
+        Which is the whole of what makes two turns of one agent able to run at once: the
+        stream carries both of them and every call anybody makes, and the reader is the one
+        thing that sees all of it, so it is the one thing that can tell them apart.
+        """
         assert self._proc.stdout is not None  # noqa: S101
-        for line in self._proc.stdout:
+        try:
+            self._sorting(self._proc.stdout)
+        finally:
+            # Whatever stopped this -- the stream ending, or a write failing on the way to
+            # answering something the server asked -- everyone waiting is waiting on this
+            # thread. Leaving without telling them would hang every turn of the agent.
+            self._ending()
+
+    def _sorting(self, stream: IO[str]) -> None:
+        """Sorts each frame of the stream until it ends.
+
+        Args:
+          stream: The server's stdout.
+        """
+        for line in stream:
             if not line.strip():
                 continue
             try:
@@ -553,8 +598,93 @@ class _AppServer:
                     }
                 )
                 continue
-            self._messages.put(message)
-        self._messages.put(None)  # it has stopped, and nothing more is coming
+            if "method" not in message:
+                # An answer, which is a frame with no method of its own. It goes to whoever
+                # made the call it is numbered for: only calls of ours carry a number of ours.
+                ident = message.get("id")
+                with self._routing:
+                    answers = (
+                        self._answers.get(ident) if isinstance(ident, int) else None
+                    )
+                    starts = (
+                        self._starting.pop(ident, "") if isinstance(ident, int) else ""
+                    )
+                if starts:
+                    # The call that started a turn has been answered, and everything of that
+                    # session's already read here was said before the turn was. Dropped from
+                    # here, where the order the server said them in is still known, and while
+                    # whoever asked is still waiting on the answer below.
+                    _forget(self._waiting(starts))
+                if answers is not None:
+                    answers.put(message)
+                continue
+            told: dict[str, Any] = message.get("params") or {}
+            if message["method"] == "session/event" and (
+                named := told.get("sessionId")
+            ):
+                # A turn saying something. It goes to that session and no other, which is
+                # what leaves the turn reading it with nothing of anyone else's to skip.
+                waiting = self._waiting(str(named))
+                if waiting.qsize() >= _BACKLOG:
+                    # Nobody is reading this one: a goal ZCode is still working after the turn
+                    # under it ended, a session let go of mid-turn. Keeping every frame of it
+                    # for the life of the server would be a leak, so the oldest goes. A turn
+                    # being read keeps its own queue near empty and never reaches this.
+                    with contextlib.suppress(queue.Empty):
+                        waiting.get_nowait()
+                waiting.put(message)
+
+    def _waiting(self, session: str) -> queue.Queue[dict[str, Any] | None]:
+        """Where one session's events wait to be read, made the first time either side asks.
+
+        Made by whichever side gets there first, since the server may say something about a
+        session before the turn that sent it is back from the call that started it.
+
+        Args:
+          session: The session.
+
+        Returns:
+          That session's events, in the order the server said them.
+        """
+        with self._routing:
+            if (waiting := self._events.get(session)) is None:
+                waiting = self._events[session] = queue.Queue()
+                if self._ended:
+                    waiting.put(None)  # nothing more is coming for this one either
+            return waiting
+
+    def _ending(self) -> None:
+        """Tells everyone still waiting that the stream has stopped, so that nobody hangs."""
+        with self._routing:
+            self._ended = True
+            waiting = [*self._answers.values(), *self._events.values()]
+        for one in waiting:
+            one.put(None)
+
+    def _taken(
+        self, waiting: queue.Queue[dict[str, Any] | None], said: str = ""
+    ) -> dict[str, Any]:
+        """Takes the next frame put here, waiting for one.
+
+        Args:
+          waiting: The queue to take from.
+          said: Whatever the turn had said by now, which a server that dies mid-turn carries
+            as its output: those words are the agent's work either way.
+
+        Returns:
+          The frame. A stopped stream raises rather than answering with nothing.
+
+        Raises:
+          subprocess.CalledProcessError: If the server stopped while this was waiting.
+        """
+        message = waiting.get()
+        if message is None:
+            # So that every later read of this one finds it stopped too.
+            waiting.put(None)
+            raise Failed(
+                self._proc.wait(), self._argv, said, "app server stopped mid-turn"
+            )
+        return message
 
     def _asked(self, message: dict[str, Any]) -> None:
         """Answers the one kind of request that is somebody's rather than the runtime's.
@@ -637,23 +767,6 @@ class _AppServer:
             }
         )
 
-    def _read(self) -> dict[str, Any] | None:
-        """Takes the next frame the server sent.
-
-        Returns:
-          The frame, which is never None in practice: the queue only holds what was read.
-
-        Raises:
-          subprocess.CalledProcessError: If the server stopped mid-turn.
-        """
-        message = self._messages.get()
-        if message is None:
-            self._messages.put(None)  # so that every later read finds it stopped too
-            raise Failed(
-                self._proc.wait(), self._argv, "", "app server stopped mid-turn"
-            )
-        return message
-
     def _answer(self, message: dict[str, Any], said: str) -> Any:
         """Unwraps one answer.
 
@@ -670,6 +783,27 @@ class _AppServer:
         if (refused := message.get("error")) is not None:
             raise Failed(1, self._argv, said, json.dumps(refused))
         return message.get("result")
+
+
+def _forget(waiting: queue.Queue[dict[str, Any] | None]) -> None:
+    """Throws away whatever is waiting for a session, which is nothing this turn said.
+
+    A session's events pile up between its turns -- what the last one said after this client
+    stopped reading it, what a `session/subscribe` replayed -- and a turn that read those
+    would be a turn ending on the one before it.
+
+    Args:
+      waiting: The session's events.
+    """
+    while True:
+        try:
+            if waiting.get_nowait() is None:
+                waiting.put(
+                    None
+                )  # the stream has stopped, which is not ours to throw away
+                return
+        except queue.Empty:
+            return
 
 
 def _workspace(where: str) -> dict[str, str]:

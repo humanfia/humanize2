@@ -74,9 +74,11 @@ to](/features/steering) is such a case: a command line run per turn has ended by
 there is anything to say to it.
 
 Where a server is needed it is started at most once per agent, only when a turn first needs
-one, so a flow that needs none starts none. One server serves every session of its agent, so
-calls on it are serialized: two turns interleaved on one stream would each take the other's
-answers.
+one, so a flow that needs none starts none. One server serves every session of its agent, and
+everything it says comes back on one stream — so that stream is sorted rather than read in
+turn: an answer goes to whoever made the call it is numbered for, and a session's events go to
+the turn running on that session. Two sessions of one agent therefore take their turns at the
+same time, instead of the second waiting out the whole of the first.
 
 ## Skills are read where that CLI reads them
 

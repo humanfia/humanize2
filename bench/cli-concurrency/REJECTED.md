@@ -98,3 +98,42 @@ These routes do not provide a validated replacement for local print-and-resume w
 The benchmark therefore retains the official local print command per turn, including
 its measured startup overhead. Standard Cursor service authentication is evaluated
 separately from the local model fixture.
+
+## ZCode one shared app server for every session
+
+ZCode's driver holds one `zcode app-server --stdio` per agent, and until now held its one
+stream for the length of a whole turn, so a second session of the same agent waited out
+the first. Sorting that stream per session — an answer to whoever made the call it is
+numbered for, a session's events to the turn running on it — removes that wait and lets
+one server carry every session of an agent. Process-identity records confirm it works: at
+four sessions a shared rung retains a single `zcode-cli` for the rung's whole length,
+where four separate agents show one each, and peak RSS grows at about 0.63 GiB a session
+rather than 1.0 — 2.73 GiB at four and 4.84 GiB at eight, against 8.05 GiB.
+
+It is not adopted as the benchmark configuration, because it is much slower for this CLI.
+All figures below are the shipped revision, three repeats, in groups verified free after
+the `hmzbench-run` occupancy fix, each rung against its own fresh serial control.
+
+| Sessions | Cold p50 | Cold p95 | Warm p50 | Warm p95 | Complete-task floor |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 4 | 1.592 | 1.690 | 1.660 | 2.345 | Fail |
+| 6 | 2.054 | 2.436 | 2.623 | 3.350 | Fail |
+| 8 | 2.843 | 3.194 | 4.228 | 5.157 | Fail |
+
+Four sessions already miss the floor where four separate agents pass, and eight take
+17.4 s of wall a repeat against 11.5 s for six separate agents. The warm column is where
+it shows worst, which locates the cost: warm turns do no bundle loading, so what is left
+is the turn's own work, and one server is one Node event loop. ZCode's per-turn work is
+CPU rather than waiting — a task pair costs about 8.1 CPU-seconds — so sharing a server
+trades N bundle loads for a single-threaded ceiling. That is the wrong trade here, though
+the same change would help a backend whose turns mostly wait. Published ZCode rungs
+therefore continue to use one Agent per session.
+
+An earlier exploration of this shape recorded far worse numbers still — a warm p95 of
+17.8x at six sessions and 30.9 s of wall at eight. Those were taken before the benchmark
+occupancy guard was fixed, when a run could land in a group already holding another
+agent's work, and are superseded by the table above rather than retained as measurements.
+
+The stream change itself is kept. It is what a flow holding two sessions on one agent
+needs, and the measurements above are the reason the benchmark does not also adopt the
+shared-server shape it enables.

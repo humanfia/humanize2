@@ -695,8 +695,12 @@ class DummySession(CommandSessionBase): ...
 - Such a server MUST be started at most once per agent, only when a turn first needs one, so
   that a flow which needs none starts none; it MUST be started under the agent's anchor, and
   stopped when the agent is collected or the process exits.
-- One server is shared by every session of its agent, so a call on it MUST be serialized: two
-  turns interleaved on one stream would each take the other's answers.
+- One server is shared by every session of its agent, so what comes back on its one stream
+  MUST be sorted before it is read: an answer to whoever made the call it is numbered for, a
+  session's events to the turn running on that session. Reading that stream as one queue is
+  what would make two turns take each other's messages, and serializing the turns to stop
+  that would make the second session of an agent wait out the whole of the first -- minutes,
+  at the one moment more than one session is the point. A write MUST still be whole.
 - A backend told where to work MUST be told the directory the anchor puts it in, which is the
   workspace itself unless the mirror was put somewhere else, and this one when it is not
   anchored at all.
