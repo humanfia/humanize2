@@ -7,6 +7,7 @@ import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
+from pathlib import Path
 from threading import Barrier
 from typing import TYPE_CHECKING, Any
 
@@ -19,7 +20,6 @@ from hmz.agents.skills import Loaded
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
 
 _FAKE = r"""
@@ -29,7 +29,11 @@ flags = dict(zip(sys.argv, sys.argv[1:]))
 streaming = flags.get("--input-format") == "stream-json"
 assert not (streaming and "--json-schema" in flags)
 ident = flags.get("--resume") or str(uuid.uuid4())
-settings = json.loads(pathlib.Path(os.environ["QWEN_CODE_SYSTEM_SETTINGS_PATH"]).read_text())
+system = pathlib.Path(os.environ["QWEN_CODE_SYSTEM_SETTINGS_PATH"])
+settings = json.loads(system.read_text())
+lowest = pathlib.Path(os.environ.get("QWEN_CODE_SYSTEM_DEFAULTS_PATH")
+  or system.parent / "system-defaults.json")
+defaults = json.loads(lowest.read_text()) if lowest.exists() else None
 skills = sorted(p.parent.name for p in pathlib.Path(".agents/skills").glob("*/SKILL.md"))
 
 
@@ -39,12 +43,14 @@ def emit(record):
 
 def turn(prompt):
     if prompt == "migrate":
-        pathlib.Path(os.environ["QWEN_CODE_SYSTEM_SETTINGS_PATH"]).write_text(
-          json.dumps({**settings, "$version": 4}, indent=2) + "\n")
+        system.write_text(json.dumps({**settings, "$version": 4}, indent=2) + "\n")
+    if prompt == "migrate-defaults":
+        lowest.write_text(json.dumps({**defaults, "$version": 4}, indent=2) + "\n")
     with pathlib.Path(LOG).open("a") as log:
         log.write(json.dumps({"pid": os.getpid(), "argv": sys.argv[1:],
           "prompt": prompt, "effort": settings["model"]["reasoningEffort"],
-          "session": ident, "skills": skills}) + "\n")
+          "session": ident, "skills": skills, "defaults": defaults,
+          "compiled": os.environ.get("NODE_COMPILE_CACHE")}) + "\n")
     emit({"type": "system", "subtype": "init"})
     ledger = pathlib.Path(LOG).with_name(ident + ".usage.json")
     previous = json.loads(ledger.read_text()) if ledger.exists() else {}
@@ -319,6 +325,65 @@ def test_cli_migration_of_generated_effort_file_keeps_process_warm(
     assert first["pid"] == second["pid"]
     assert second["pid"] != third["pid"]
     assert first["session"] == second["session"] == third["session"]
+
+
+def test_headless_defaults_are_written_where_the_cli_reads_them_lowest(
+    qwen: _Qwen,
+) -> None:
+    qwen.agent.new()("first")
+    (call,) = qwen.calls()
+    # The generated pair is shared by every session at one effort and outlives this test,
+    # so only what was asked for is asserted, not the whole file.
+    assert call["defaults"]["general"] == {
+        "preventSystemSleep": False,
+        "enableAutoUpdate": False,
+    }
+
+
+@pytest.mark.parametrize("named", [None, ""])
+def test_cli_migration_of_generated_defaults_file_keeps_process_warm(
+    qwen: _Qwen, monkeypatch: pytest.MonkeyPatch, named: str | None
+) -> None:
+    # Empty reads as unset in Qwen's own resolver, so the generated file is still the one
+    # it migrates -- and watching it would restart an otherwise unchanged CLI every turn.
+    if named is not None:
+        monkeypatch.setenv("QWEN_CODE_SYSTEM_DEFAULTS_PATH", named)
+    session = qwen.agent.new()
+    session("migrate-defaults")
+    session("second")
+    first, second = qwen.calls()
+    assert first["pid"] == second["pid"]
+    assert first["session"] == second["session"]
+
+
+def test_defaults_file_the_environment_names_is_watched_like_any_other(
+    qwen: _Qwen, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    theirs = tmp_path / "their-defaults.json"
+    theirs.write_text('{"general":{"preventSystemSleep":true}}')
+    monkeypatch.setenv("QWEN_CODE_SYSTEM_DEFAULTS_PATH", str(theirs))
+    session = qwen.agent.new()
+    session("first")
+    session("second")
+    theirs.write_text('{"general":{"preventSystemSleep":false}}')
+    session("third")
+    first, second, third = qwen.calls()
+    assert first["defaults"] == {"general": {"preventSystemSleep": True}}
+    assert first["pid"] == second["pid"]
+    assert second["pid"] != third["pid"]
+    assert first["session"] == second["session"] == third["session"]
+
+
+def test_compiled_bundle_is_shared_unless_the_environment_names_its_own(
+    qwen: _Qwen, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    qwen.agent.new()("first")
+    (shared,) = qwen.calls()
+    assert shared["compiled"] == str(Path("~/.cache/humanize/qwen-code").expanduser())
+    monkeypatch.setenv("NODE_COMPILE_CACHE", str(tmp_path / "theirs"))
+    qwen.agent.new()("second")
+    _, theirs = qwen.calls()
+    assert theirs["compiled"] == str(tmp_path / "theirs")
 
 
 def test_usage_counts_each_model_request_once_across_warm_turns(qwen: _Qwen) -> None:

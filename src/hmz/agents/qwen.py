@@ -11,6 +11,9 @@ How hard it thinks is the one setting with no flag. It is a setting of the CLI's
 `settings.json`, and the run is pointed at a file of ours through `QWEN_CODE_SYSTEM_SETTINGS_PATH`
 rather than having it written into the user's -- two agents of one flow may think at two
 efforts, and neither is a reason to change what the person who started the flow has configured.
+Beside that file goes the other end of the same idea: the layer Qwen Code reads under
+everyone, saying what a turn nobody is watching defaults to. Anything they have configured,
+at any layer of their own, still wins.
 """
 
 # pyright: reportPrivateUsage=false
@@ -40,6 +43,36 @@ if TYPE_CHECKING:
 #: what it says outranks the file the person who started the flow has configured.
 _COMMAND = "qwen"
 _SETTINGS = "QWEN_CODE_SYSTEM_SETTINGS_PATH"
+
+#: The other end of that: the layer Qwen Code reads *under* everyone, which it looks for
+#: beside the system settings file -- so pointing one at a file of ours has already moved
+#: this one, and writing it is saying what a turn defaults to rather than what it must be.
+_DEFAULTS = "QWEN_CODE_SYSTEM_DEFAULTS_PATH"
+_DEFAULTS_FILE = "system-defaults.json"
+
+#: What a turn hmz drives defaults to. Neither is about the work, and both are about there
+#: being nobody at a terminal: one keeps the machine awake while a person watches an answer
+#: arrive -- a `systemd-inhibit` and a `sleep infinity` per model response and per tool call,
+#: per session -- and the other would install a new CLI under a conversation the running one
+#: opened. Said at the defaults layer rather than the system one, so a person who has
+#: configured either still gets what they configured.
+_HEADLESS = {"general": {"preventSystemSleep": False, "enableAutoUpdate": False}}
+
+#: The format the files written here are already in, so that Qwen Code has nothing to migrate
+#: and does not rewrite them. Not a nicety: it rewrites by renaming the file aside and a new
+#: one over it, and every session at one effort reads the same two files -- so a first burst
+#: of sessions can have one of them read a name that is briefly nothing and run at the CLI's
+#: own effort with none of this said. A version it does not know is one it leaves alone too,
+#: because what is written here needs none of the migrations it would look for.
+_VERSION = {"$version": 4}
+
+#: Where V8 keeps what it compiled the CLI's bundle into, so the next process to start reads
+#: bytecode rather than compiling the whole bundle again. One directory for the machine: an
+#: entry is keyed by the file, its bytes and the Node version, so two flows, two agents and
+#: two installed versions share it without reading each other's. Node makes it if it is not
+#: there, and a missing or unreadable entry is a compile rather than a failure.
+_COMPILED = "NODE_COMPILE_CACHE"
+_CACHE = "~/.cache/humanize/qwen-code"
 
 #: The tools a turn is not given at each rung of the ladder, by the names Qwen Code calls
 #: them. A rung is said as refusals because the flag that carries the rest is the approval
@@ -76,6 +109,9 @@ def _thinking(effort: str) -> Path:
     so a run is pointed at a file of ours instead of having it written into the user's. The
     system layer, which is the one that outranks what they have configured.
 
+    What a turn defaults to is written beside it, because that is where Qwen Code looks for
+    the defaults layer -- under the settings file it was pointed at, which is this directory.
+
     Args:
       effort: How hard the turn is to think, as Qwen Code words it.
 
@@ -90,7 +126,11 @@ def _thinking(effort: str) -> Path:
             where = Path(tempfile.mkdtemp(prefix="hmz-qwen-"))
             held = where / "settings.json"
             held.write_text(
-                json.dumps({"model": {"reasoningEffort": effort}}), encoding="utf-8"
+                json.dumps({**_VERSION, "model": {"reasoningEffort": effort}}),
+                encoding="utf-8",
+            )
+            (where / _DEFAULTS_FILE).write_text(
+                json.dumps({**_VERSION, **_HEADLESS}), encoding="utf-8"
             )
             _EFFORTS[effort] = held
         return held
@@ -188,22 +228,22 @@ class QwenCodeSession(StreamSessionBase):
         home = Path(environment.get("HOME") or Path.home())
         qwen = cwd / Path(environment.get("QWEN_HOME") or home / ".qwen").expanduser()
         system = cwd / Path(environment[_SETTINGS]).expanduser()
-        defaults = (
-            cwd
-            / Path(
-                environment.get("QWEN_CODE_SYSTEM_DEFAULTS_PATH")
-                or system.parent / "system-defaults.json"
-            ).expanduser()
-        )
+        # Empty reads as unset, which is how Qwen itself reads it: an empty variable leaves
+        # it looking beside the system settings file, which is the file written here.
+        named = environment.get(_DEFAULTS) or ""
+        defaults = cwd / Path(named or system.parent / _DEFAULTS_FILE).expanduser()
         settings = {
             qwen / "settings.json",
             cwd / ".qwen/settings.json",
             system,
             defaults,
         }
-        # Qwen migrates the generated effort file on startup (format and schema version).
-        # Effort is already a separate process input; its own cache file is not a user edit.
-        paths = settings - {system}
+        # Qwen migrates the files hmz generates on startup (format and schema version).
+        # Effort and the headless defaults are already process inputs of their own; their
+        # own cache files are not user edits. A defaults file the environment names is
+        # somebody else's, so it stays watched like every other settings file here.
+        ours = {system} if named else {system, defaults}
+        paths = settings - ours
         roots = (cwd, *cwd.parents, home)
         for root in roots:
             paths.update(root / name for name in ("QWEN.md", "AGENTS.md", ".env"))
@@ -341,8 +381,17 @@ class QwenCodeSession(StreamSessionBase):
         settings: two agents of one flow may be run at two efforts, and neither is a reason to
         change what the person who started the flow has configured. The system layer, because
         that is the one that outranks what they have configured.
+
+        And where the CLI's compiled bundle is kept between processes, unless whoever started
+        the flow has said where themselves: a session a turn is a Node process a turn, and
+        eight of them starting at once compile the same bundle eight times.
         """
-        return {**super()._environment(), _SETTINGS: str(_thinking(self.effort))}
+        held = {**super()._environment(), _SETTINGS: str(_thinking(self.effort))}
+        # Whoever said where, said it: the provider's own variables are in `held` and the
+        # flow's are in this process's environment, and either outranks a cache of ours.
+        if _COMPILED not in held and _COMPILED not in os.environ:
+            held[_COMPILED] = str(Path(_CACHE).expanduser())
+        return held
 
     def _reads(self, line: str, *, error: bool) -> Iterator[Event]:
         """Reads one record Qwen Code wrote, as the things it says the agent did.

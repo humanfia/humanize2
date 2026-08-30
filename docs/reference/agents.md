@@ -921,9 +921,23 @@ asked for one fails with the list of the ones that model takes. The shipped mode
 **Qwen Code has no flag for the effort.** It is a setting of its own `settings.json`, so a turn
 is pointed at a file of humanize's own through `QWEN_CODE_SYSTEM_SETTINGS_PATH` — two agents of
 one flow may think at two efforts, and neither is a reason to rewrite what you have configured.
-Concurrent Qwen sessions share one generated settings file per effort. Ordinary turns in one
+Concurrent Qwen sessions share one generated settings file per effort. Beside it, humanize
+writes Qwen's *lowest* settings layer — the system defaults, which it reads under your own —
+saying that a turn it drives defaults to `general.preventSystemSleep: false` and
+`general.enableAutoUpdate: false`. Neither is about the work: nobody is watching a terminal
+for the answer, so a `systemd-inhibit` and a `sleep infinity` per model response and per
+tool call is churn a session pays for nothing; and an update installed mid-flow would put a
+new CLI under a conversation the running one opened. Set either yourself, at any layer, and
+yours wins. Both generated files carry the settings format version, so Qwen has nothing to
+migrate and does not rewrite a file its own concurrent sessions are reading. Node's compiled
+bundle is kept in `~/.cache/humanize/qwen-code` through `NODE_COMPILE_CACHE`, so sessions
+starting at once read bytecode instead of each compiling the CLI again; a `NODE_COMPILE_CACHE`
+already set, by you or by the provider, is left alone.
+Ordinary turns in one
 Qwen session reuse the installed CLI process through its official stream-json input. Changing its settings, native skills or flow skills restarts it and resumes
-the same conversation. Native settings this reader cannot inspect, including JSON with comments,
+the same conversation. The two generated files are excluded from that check, since they are
+humanize's own rather than yours; a system-defaults file you name with
+`QWEN_CODE_SYSTEM_DEFAULTS_PATH` is yours and is watched like any other settings file. Native settings this reader cannot inspect, including JSON with comments,
 keep a fresh process per turn so custom skill locations cannot be missed. Shaped turns use a
 separate command because Qwen refuses `--json-schema` with stream-json input; anchored turns
 also end their process so the workspace is synchronized. Each turn counts assistant message
