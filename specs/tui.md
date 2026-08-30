@@ -130,6 +130,27 @@ line, with what the flow is doing beside the transcript.
   and a command that only ever means one thing is a command line. Gathering a trace MUST NOT
   be one either -- it is a thing done to a run that has already happened, so it is one of the
   things `/epics` offers about the run under the cursor rather than a command of its own.
+- `/resume` MUST carry the last run in this directory on, as `/epics` carries the run under
+  its cursor on: that run's own flow, on that run's own agents, with what it was asked to do,
+  and on what it left behind. A command of its own unlike a trace, which is a thing done to a
+  run that has already happened: a run picked up is a flow started, which is the one thing
+  this prompt is for, and the last run is not something anybody has to find in a list. It
+  MUST be the last run and no other -- one carried on from the day before yesterday, because
+  yesterday's died early, is a day's work thrown away without anybody being told.
+- Where there is nothing to carry on from it MUST say which reason that is: nothing has been
+  run here, the last run's record cannot be read back, its flow no longer says it can be
+  picked up, that run left nothing behind, or a flow is running now. A run whose flow says it
+  can be picked up and which left nothing behind MUST NOT be started from the top wearing a
+  line saying which run it came from, which would be a record of something that did not
+  happen. Which run is being carried on MUST be said as it starts: somebody who has been away
+  is owed which day's work this is.
+- A flow told to stop and not yet gone MUST refuse it too, and MUST NOT be told that `ctrl+c`
+  twice stops one: that is what was just pressed. A flow unwinds in its own time and writes
+  down where it got to as it goes, so a run picked up from a state still moving under it is
+  a round done twice.
+- A line that named a run MUST be said back rather than dropped. There is nothing to name
+  here -- the last run is the last run -- and an argument quietly ignored is somebody
+  watching a different run start from the one they asked for.
 - Setting the flow up MUST NOT be a command here either: it is asked as the flow is chosen, so
   a command for it would be a second way in to one sheet of one menu -- and one that has to
   say `that flow takes no setting up` for most of the flows there are.

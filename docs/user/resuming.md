@@ -13,7 +13,9 @@ hmz exec -f nightly -a claude/claude-opus-5:high "keep the tests green"
 hmz exec -f nightly -a claude/claude-opus-5:high "keep the tests green"   # round 2, not round 1
 ```
 
-The second run finds what the first left behind, and carries on from round 2.
+The second run finds what the first left behind, and carries on from round 2. In the
+interface, [`/resume`](#picking-one-up-from-the-interface) is that second line typed at the
+prompt.
 
 ## Saying so
 
@@ -85,6 +87,39 @@ they ran in, so another checkout carries on from its own last run there.
 
 It is found by what the state holds rather than by what the run was of — which is what lets a
 flow that was *called* by another be picked up too, under its own name.
+
+## Picking one up from the interface
+
+**`/resume`** carries the last run in this directory on: that run's own flow, on its own
+agents, with what it was asked to do, and on what it left behind. Nothing is named, because
+there is nothing to name — the last run is the last run. Which one that was comes back on the
+line that starts it —
+
+```
+carrying on from 20260910T021407.882Z-a3f19c: nightly on what that run left behind
+```
+
+— because the person typing it has usually been away, and which day's work resumed is the thing
+they need to know first.
+
+It differs from typing the line again in the two ways the prompt makes it differ. It is the
+last run **here**, whatever flow that was, rather than the last run of a flow you named. And it
+is that run and no other: where the last run is not one to carry on it says which reason that
+is rather than reaching past it for an older one, since a loop carried on from the day before
+yesterday, because yesterday's died before it wrote anything down, is a day's work thrown away
+in silence.
+
+| | |
+| --- | --- |
+| `no flow has been run here` | Nothing has ever run in this directory. |
+| `<run> cannot be read back` | Its record is not one: a run that died mid-line left a line rather than an epic. |
+| `<flow> does not say it can be picked up` | Asked of the flow as it stands today, not of what the run recorded. |
+| `<run> left nothing behind` | It stopped before it wrote down where it had got to, or it emptied what it wrote — which is the flow saying the next run starts clean. Say what to do and it starts from the top. |
+| `no picking a run up while a flow is running` | A run picked up is a flow started, and one is going. [ctrl+c twice](/user/stopping) stops it first. |
+| `no picking a run up while the flow is still stopping` | ctrl+c twice was pressed and the flow has not gone yet — it is closing out the turn it was in, and still writing down where it got to. |
+
+`/resume` takes nothing after it: a line that names a run is said back rather than dropped.
+To carry on a run that is **not** the last one, open the list — which is the next section.
 
 ## Carrying an older one on
 
