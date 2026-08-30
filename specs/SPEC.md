@@ -468,7 +468,7 @@ def read_agent(
 
 def flow_and_agents(
     argv: list[str],
-) -> tuple[str, list[AgentBase], str, dict[str, Any] | None]:
+) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, str, bool]:
     """Reads an `hmz exec` line into a flow, the agents, the task, and the flow's setup."""
 
 
@@ -520,6 +520,11 @@ never have reason to name this module.
   into. It MUST NOT load a flow to answer a `--help`, nor refuse a line for a flow it cannot
   read: what a place suggests about goals is a convenience, and reporting the flow is
   `Runner`'s one job.
+- What the line says about who is reading the run MUST be read here too, and handed back with
+  the rest of it. One grammar reads one line: a flag the command peeled off itself would be a
+  flag `hmz exec --help` never listed, and a second reading would be a second way of refusing
+  the same mistake. What is done with it is the command line's -- there is nobody at one when
+  the interface starts a flow from this same line, so the interface ignores it.
 
 ## Commands
 
@@ -547,11 +552,48 @@ hmz [--no-daemon] [<command> [<args>...]]
   is being able to walk away from it, which is not a reason to refuse to open.
 - `__main__.py` MUST run this same command line, so that `python -m hmz` is `hmz`.
 
+### Who is reading
+
+```python
+def terminal(stream: IO[str] | None = None) -> bool: ...
+
+
+def colours(stream: IO[str] | None = None) -> bool: ...
+```
+
+Every command is read twice over: by somebody at a terminal, and by a program. What each of
+them is handed MUST be settled in one place rather than command by command.
+
+- Whether escapes may be written MUST be a question about the stream rather than about the
+  command, and the three conventions MUST answer it before the stream does: `NO_COLOR` says
+  never and MUST win over everything, `TERM=dumb` is a terminal saying it could not read them,
+  and `FORCE_COLOR` says to write them into something that is not a terminal -- which is what
+  a CI log wants. Where none of them says anything, whether a terminal is reading MUST decide.
+- `FORCE_COLOR` MUST NOT make a run believe somebody is watching it. Escapes in a log file are
+  one thing; a piped run rendering itself as though it had a terminal to draw on is another,
+  so the two questions MUST be asked apart.
+- A run that is piped or redirected MUST be written with no escapes in it at all, and MUST
+  stay exactly as scriptable as it was: what a turn answered MUST go on reaching stdout, since
+  that is where every script written against `hmz exec` reads it.
+- Anything a command has to say that is not the answer -- how a run is going, what it is
+  working on, a hint -- MUST go to stderr, and `--json` MUST take stdout for the objects: a
+  single line that is not JSON is a stream that will not parse, so whatever a flow or a layer
+  under it prints MUST be put on stderr for as long as one is being written.
+- `--json` MUST be NDJSON -- one object a line, flushed as it is written -- rather than a
+  document at the end: a run takes an hour, and a program watching one is watching it as it
+  happens. Every object MUST carry the same keys every time, since a schema a program has to
+  guess at is not one it can read.
+- Nothing written for a program MUST say anything a line written for a person would not. An
+  account is still the names of the variables it sets and never their values, and where a
+  flowverse came from is still the URL with whatever was signed into it taken out.
+- Reaching `rich` MUST be left until escapes are actually wanted: a run written plainly, a
+  `--json` run and every listing MUST pay nothing for it.
+
 ## `hmz exec`
 
 ```shell
 hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...]
-         [--container <image>] <task>
+         [--container <image>] [--json] <task>
 ```
 
 Runs a flow in the current directory, on the agents it is given.
@@ -572,6 +614,8 @@ Args:
 - `--container <image>`: Run the whole of it in one container of that image, which is
   `hmz.flows.contained`. A convenience rather than a second way of saying where an agent works:
   it is said once, from outside, about all of them.
+- `--json`: Write the run for a program rather than for a person -- one JSON object on stdout
+  for each thing an agent says, as it says it.
 - `<task>`: What the flow is to have the agents do, as the text itself.
 
 - `<cli>` MUST be one of `claude`, `codex` and `kimi`, each of which MUST also answer to the
@@ -592,11 +636,23 @@ Args:
 - A run put in a container MUST start one container for the whole of it and MUST take it down
   however the run ends, and MUST NOT do either where none was asked for: reading a flow must
   pull no image, and a run that never starts must leave nothing behind.
+- What a run looks like while it happens MUST be drawn from the agents' own event stream --
+  the one the interface draws from -- rather than left to each backend teeing its raw progress
+  to stderr: one run must read as one run, whichever CLIs it was given. Watching an agent is
+  what stops those tees, so the two MUST NOT both be shown.
+- It MUST say which agent is taking a turn and in which of its conversations, what the agent
+  said, what it ran, what it started under it, what a turn cost when it lands, and -- while a
+  terminal is reading -- something that goes on moving: a turn thinks for minutes and says
+  nothing for most of them, and a run that looks hung is one somebody kills.
+- `--json` MUST write every one of those as one object instead, carrying which agent said it,
+  which backend and model it was said on, which conversation, what kind of thing it was, the
+  words themselves, what the turn cost, and when. It MUST NOT write anything a terminal needed
+  and a program does not.
 
 ## `hmz trace`
 
 ```shell
-hmz trace collect [<workspace>] [--epic <epic> | --session <session>[,<session>]... | --all] [--output <output>] [--start <start>] [--end <end>]
+hmz trace collect [<workspace>] [--epic <epic> | --session <session>[,<session>]... | --all] [--output <output>] [--start <start>] [--end <end>] [--json]
 ```
 
 Collects and aggregates what a run left behind -- the agents' own trajectories, and the
@@ -626,6 +682,7 @@ Args:
 - `--output <output>`: The path to the output file where the aggregated trace will be saved. Its directory is created if it does not exist. If not provided, the trace is saved as `traces/<datetime>.trace.json` inside the run it is a trace of -- where `<datetime>` is the UTC moment it was collected, so that collecting twice keeps both -- and, for a trace that is of no one run, in the directory that workspace's runs are kept in. A trace of a run belongs with the run: the sessions it points at and the state it left are already there, and a trace written into whatever directory somebody was standing in is one they have to keep track of themselves. A file named outright still wins, a trace being also a thing to attach to an issue.
 - `--start <start>`: The start time for filtering the session logs, in any wording dateparser understands. If not provided, up to earliest logs are included.
 - `--end <end>`: The end time for filtering the session logs, in any wording dateparser understands. If not provided, up to latest logs are included.
+- `--json`: Say the same thing as one JSON object for a program to read. A job that collects a trace and then wants to know where it went is a job that would otherwise be parsing English.
 
 Prints the output path, which run it is a trace of, and the number of sessions and slices it
 holds -- and the number of programs, for a run that was profiled.
@@ -637,7 +694,7 @@ Environment Variables:
 ## `hmz flowverses`
 
 ```shell
-hmz flowverses [list [-q] | show <name> | add <url> [<name>] | fetch <name> | remove <name>]
+hmz flowverses [list [-q] [--json] | show <name> [--json] | add <url> [<name>] | fetch <name> | remove <name>]
 ```
 
 Where flows come from: what places there are, what one of them holds, and the three things
@@ -660,7 +717,10 @@ that can happen to a flowverse -- added, fetched again, taken away.
 - Nothing MUST print a secret. Where a flowverse came from MUST be printed with whatever was
   signed into the URL taken out: a private one is added as `https://x-access-token:$TOKEN@...`,
   git keeps that verbatim, and this line is printed every time the flowverses are listed -- so
-  a token printed once is a token in the log of every job that ran it.
+  a token printed once is a token in the log of every job that ran it. `--json` MUST be held to
+  the same rule, and MUST say where one came from the same way.
+- `--json` MUST say what a listing says as one object a place, and what `show` says as one
+  object -- the place, and the name and description of every flow it offers.
 - Where one came from MUST be answered from which flowverse it is rather than from whether its
   URL is empty. An empty URL means both "the package's own" and "a directory whose origin could
   not be read", and answering the second with the first puts humanize's name on somebody else's
@@ -686,8 +746,10 @@ Reads a flow for what will not run, before anything runs it.
   run to find out more about.
 - Every finding MUST print one a line -- the file, the line, the severity, the code and what
   is wrong -- with a count under them, and `--json` MUST say the same as one JSON object a
-  line for a script to read. Everything wrong MUST be said at once rather than first-failure
-  first: a checker is asked so that one reading answers for the whole flow.
+  line for a script to read. That shape -- one object a line, and nothing else in the stream --
+  is what every other `--json` here MUST be: this was the first of them, and one shape is one
+  shape whichever command a script is reading. Everything wrong MUST be said at once rather
+  than first-failure first: a checker is asked so that one reading answers for the whole flow.
 - It MUST exit 0 for flows with nothing blocking -- warnings print and pass -- 1 where any
   error was found, or any warning under `--strict`, and 2 for a line to correct or a name no
   flow answers to, refused as argparse refuses one.
@@ -722,7 +784,7 @@ that can happen to one -- written down, taken away.
 ## `hmz providers`
 
 ```shell
-hmz providers [list [<cli>] | ways <cli> | add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] | login <cli>/<name> [-s VAR=VALUE]... | show <cli>/[<name>] | falls-back <cli>/[<name>] [<name>] | remove <cli>/<name>]
+hmz providers [list [<cli>] [--json] | ways <cli> [--json] | add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] | login <cli>/<name> [-s VAR=VALUE]... | show <cli>/[<name>] [--json] | falls-back <cli>/[<name>] [<name>] | remove <cli>/<name>]
 ```
 
 The accounts an agent may be run as: what there is, how a backend can be signed into, and the
@@ -748,7 +810,13 @@ three things that can happen to one -- made, signed in again, taken away.
   MUST NOT be echoed. A line run where nobody is at a terminal MUST answer everything itself:
   a question with no answer and no default MUST be reported rather than waited on.
 - Nothing MUST print a secret. What one holds MUST be shown as the names of the variables it
-  sets and never their values.
+  sets and never their values, and `--json` MUST be held to exactly that: a program reading an
+  account MUST be handed the names too, since a value written for a machine is a value in the
+  same log.
+- The three lines that only say what there is -- what accounts there are, how a backend can be
+  signed into, and what one account holds -- MUST take `--json`. The ones that make, sign in or
+  take away MUST NOT: those ask at the terminal, and a line nobody is at is a line that has to
+  say everything itself.
 - An account that has just been made or signed in again MUST have its CLI asked what it runs
   as that account, and what it said MUST be reported. A CLI that would not answer MUST NOT
   make the line fail: the account was made, which is what the line was for. `--no-login` MUST
@@ -757,7 +825,7 @@ three things that can happen to one -- made, signed in again, taken away.
 ## `hmz fallback`
 
 ```shell
-hmz fallback [list [-q] | show <cli>[@<account>]/<model>:<effort> | add <cli>[@<account>]/<model>:<effort> <cli>[@<account>]/<model>:<effort> | remove <cli>[@<account>]/<model>:<effort>]
+hmz fallback [list [-q] [--json] | show <cli>[@<account>]/<model>:<effort> [--json] | add <cli>[@<account>]/<model>:<effort> <cli>[@<account>]/<model>:<effort> | remove <cli>[@<account>]/<model>:<effort>]
 ```
 
 Where a turn goes when the agent taking it cannot take it at all.
@@ -767,13 +835,15 @@ Where a turn goes when the agent taking it cannot take it at all.
 - An agent MUST be named exactly as `-a` names one, so that a fallback is written the way the
   thing it is about is written.
 - `show` MUST print the whole walk rather than the one step, since the walk is what a failed
-  turn does, and MUST say so where an agent falls back nowhere.
+  turn does, and MUST say so where an agent falls back nowhere. `--json` MUST say one object a
+  place of that walk, in the order it is walked, so that a program reading it reads the same
+  order a turn takes it in.
 - It MUST be the same store the interface's own `/fallback` walks.
 
 ## `hmz daemon`
 
 ```shell
-hmz daemon [list [-q] | status [<workspace>] | start [-f <flow>] [-a <agent>...] | attach [<workspace>] | stop [<workspace>] [--kill]]
+hmz daemon [list [-q] [--json] | status [<workspace>] [--json] | start [-f <flow>] [-a <agent>...] | attach [<workspace>] | stop [<workspace>] [--kill]]
 ```
 
 The runs being held apart from a terminal: which there are, what one of them is doing, and the
@@ -785,7 +855,9 @@ two ways one ends.
   does, and `start` is here for a machine being set up rather than sat at.
 - What is running in one MUST be readable without attaching to it. A line asking is a line
   somebody typed instead of opening the interface, and answering it by opening the interface
-  would be answering a different question.
+  would be answering a different question. It MUST also be readable by something that is not a
+  person: `--json` on the two lines that only say what there is, since a monitor asking which
+  runs are up is exactly the caller that cannot attach.
 - Stopping MUST mean what closing the interface means -- the flow stopped, the interface
   closed -- and MUST wait for it to go. Ending the process holding it MUST be asked for
   outright, and MUST be what is left when the first will not work.

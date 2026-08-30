@@ -59,7 +59,7 @@ class Hmz:
 
     def read(
         self, argv: list[str]
-    ) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, str]: ...
+    ) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, str, bool]: ...
 
     def runner(
         self,

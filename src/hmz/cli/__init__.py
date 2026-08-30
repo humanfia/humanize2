@@ -15,6 +15,10 @@ A command whose line takes a parser of its own has a module of its own here, so 
 one of them costs nothing for the others. `exec` has none: the line it takes is read by
 :func:`hmz.runner.flow_and_agents`, since the terminal interface starts a flow from that
 same line.
+
+:mod:`hmz.cli.output` is the one module every command may reach: who is reading -- somebody at
+a terminal, or a program -- is one question rather than one per command, and it costs nothing
+to ask.
 """
 
 from __future__ import annotations
@@ -81,6 +85,10 @@ def _prepare_textual_terminal(
 def _exec(argv: list[str]) -> int:
     """Drives the flow named on the command line, on the agents it names.
 
+    What the run looks like while it happens is settled here rather than by each backend
+    teeing its own progress: watching the agents is what makes one run read as one run,
+    whichever CLIs it was given, and registering a watcher is what stops those tees.
+
     Args:
       argv: What followed the command name.
 
@@ -91,30 +99,39 @@ def _exec(argv: list[str]) -> int:
     from hmz.flows import NotAFlow
     from hmz.sdk import Hmz
 
+    from .output import Out, Shown
+
     hmz = Hmz()
     # If it has been answered yes, and never otherwise: a run with nobody at a terminal is a
     # run with nobody to ask, and silence is not an answer.
     hmz.reports()
-    path, agents, task, config, container = hmz.read(argv)
-    try:
-        running = hmz.run(path, agents, task, config, container=container)
-    except NotAFlow as error:
-        # A flow that is not there, or one that takes other agents than these, is a command
-        # line that was wrong before anything ran, so it exits as argparse's own rejections
-        # do. What the flow raises for itself is the flow's, and is left to say so itself.
-        print(f"hmz exec: error: {error}", file=sys.stderr)
-        raise SystemExit(2) from error
-    try:
-        running.run()
-    except (KeyboardInterrupt, SystemExit):
-        # Somebody stopping a run is not a run that went wrong.
-        raise
-    except BaseException as why:
-        # Reported and then raised on exactly as it was: what a flow does when it fails is
-        # the flow's business and the person at the terminal's, and this is only humanize
-        # finding out that it happened.
-        telemetry.crash(why, doing="hmz exec")
-        raise
+    path, agents, task, config, container, as_json = hmz.read(argv)
+    with Out(as_json=as_json) as out, Shown(out) as shown:
+        # The agents the line named, and not whatever else the flow turns out to drive: a
+        # flow whose other side is the person drives one more, and with nobody at a prompt
+        # that one answers nothing to every turn it is given. Rows saying so would be the
+        # only thing on the terminal that is about humanize rather than about the run.
+        shown.watches(agents)
+        try:
+            running = hmz.run(path, agents, task, config, container=container)
+        except NotAFlow as error:
+            # A flow that is not there, or one that takes other agents than these, is a
+            # command line that was wrong before anything ran, so it exits as argparse's own
+            # rejections do. What the flow raises for itself is the flow's, and is left to
+            # say so itself.
+            print(f"hmz exec: error: {error}", file=sys.stderr)
+            raise SystemExit(2) from error
+        try:
+            running.run()
+        except (KeyboardInterrupt, SystemExit):
+            # Somebody stopping a run is not a run that went wrong.
+            raise
+        except BaseException as why:
+            # Reported and then raised on exactly as it was: what a flow does when it fails
+            # is the flow's business and the person at the terminal's, and this is only
+            # humanize finding out that it happened.
+            telemetry.crash(why, doing="hmz exec")
+            raise
     return 0
 
 

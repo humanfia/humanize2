@@ -18,7 +18,8 @@ src/hmz/
 ├── telemetry.py      what humanize reports about itself, and whether it does at all
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
 ├── sdk/              humanize as one object: Hmz, which every way in goes through
-├── cli/              the command line: one module per command that has a parser
+├── cli/              the command line: one module per command that has a parser, and
+│                     output.py, which answers whether a person or a program is reading
 ├── daemon/           a run held where a terminal closing cannot end it
 ├── agents/           the contract, and the driver for each backend
 ├── flows/            what a flow is called, where it is found, what it brings, and the three it ships
@@ -226,7 +227,9 @@ them, so one added without them is a site that says there are fewer than there a
 
 **A command.** A module under `cli/` if it takes a parser of its own, a thin wrapper in
 `cli/__init__.py`, and an entry in `COMMANDS`. Import your layer *inside* the function, not at
-the top of the module.
+the top of the module. Write through `cli/output.py` rather than through `print` where the
+command has a `--json` of its own: `Out.row` is one call for the line a person reads and the
+object a program reads, and holding one open is what keeps a stray print out of the stream.
 
 **A flow.** Just a directory: one in `flows/builtin/` for one humanize ships, one in a
 [flowverse](/reference/flows#flowverses)'s own `flows/` for one it offers, one in
