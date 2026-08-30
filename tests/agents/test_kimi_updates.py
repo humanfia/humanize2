@@ -275,7 +275,13 @@ def test_subagent_completion_does_not_settle_the_main_turn() -> None:
             updates.close()
 
 
-def test_notifications_say_which_authoritative_read_is_due() -> None:
+def test_notifications_say_when_a_question_may_be_waiting() -> None:
+    """Only a question is something a turn stops on, so only it is worth bringing forward.
+
+    What a turn has spent and whether it is still running are read a second apart whatever
+    the daemon says: one is a meter and the other is a reading a turn cannot end without.
+    """
+
     def handler(socket: ServerConnection) -> None:
         acknowledge(socket)
         for kind in (
@@ -291,18 +297,18 @@ def test_notifications_say_which_authoritative_read_is_due() -> None:
     with server(handler) as base:
         updates = kimi._Updates(base, "test-token", "ours")
         try:
-            # A listener that has been told nothing yet asks the daemon everything.
-            assert (updates.questioned, updates.stepped) == (True, True)
+            # A listener that has been told nothing yet asks the daemon anyway.
+            assert updates.questioned
             for expected in (
-                (False, False),  # a tool starting moves neither spending nor questions
-                (False, True),  # a step that landed is spending that moved
-                (True, False),  # an approval is a question by another name
-                (True, False),
-                (True, True),  # and one the daemon could not name is both
+                False,  # a tool starting is not a turn stopping to ask
+                False,  # nor is a step that landed
+                True,  # an approval is a question by another name
+                True,
+                True,  # and one the daemon could not finish is asked about too
             ):
-                updates.questioned = updates.stepped = False
+                updates.questioned = False
                 updates.wait(settled=False)
-                assert (updates.questioned, updates.stepped) == expected
+                assert updates.questioned is expected
         finally:
             updates.close()
 
@@ -316,17 +322,20 @@ def test_a_frame_under_an_unknown_name_still_wakes_the_reader(
         socket.recv()
 
     # Without this the reader would wait out the whole recovery interval for a question
-    # the daemon had named something this table has never heard of.
+    # the daemon had named something this table has never heard of. Waking is the whole
+    # of it: the reader then makes its ordinary second's reads, which is where a question
+    # under a name nobody wrote down is found -- and where it was found before there were
+    # notifications at all.
     monkeypatch.setattr(kimi, "_RECOVERY_SECONDS", 30)
     monkeypatch.setattr(kimi, "_POLL_SECONDS", 0.05)
     with server(handler) as base:
         updates = kimi._Updates(base, "test-token", "ours")
         try:
-            updates.questioned = updates.stepped = False
+            updates.questioned = False
             started = kimi.time.monotonic()
             updates.wait(settled=False)
             assert kimi.time.monotonic() - started < 5
-            assert (updates.questioned, updates.stepped) == (True, True)
+            assert not updates.questioned  # coalesced, not brought forward
         finally:
             updates.close()
 
@@ -345,20 +354,27 @@ def test_streamed_chunks_are_coalesced_rather_than_woken_for_one_by_one(
         socket.recv()
 
     # The daemon streams a running command's output a chunk at a time. One wake per chunk
-    # would be four calls per chunk on the daemon every session of the agent shares.
-    monkeypatch.setattr(kimi, "_RECOVERY_SECONDS", 30)
+    # would be four calls per chunk on the daemon every session of the agent shares. The
+    # recovery interval is only wanted longer than the poll interval, so that a wake is a
+    # frame rather than a deadline; the wait after the last chunk is spent waiting it out.
+    monkeypatch.setattr(kimi, "_RECOVERY_SECONDS", 1.0)
     monkeypatch.setattr(kimi, "_POLL_SECONDS", 0.2)
     with server(handler) as base:
         updates = kimi._Updates(base, "test-token", "ours")
         try:
             assert sent.wait(timeout=2)
-            wakes = 0
+            wakes: list[
+                bool
+            ] = []  # and whether each of them said to ask about a question
             deadline = kimi.time.monotonic() + 1.5
             while kimi.time.monotonic() < deadline:
+                updates.questioned = False
                 updates.wait(settled=False)
-                wakes += 1
-            assert wakes <= 12  # twenty-four chunks, at most one wake per poll interval
-            assert (updates.questioned, updates.stepped) == (True, True)
+                wakes.append(updates.questioned)
+            assert len(wakes) <= 12  # two dozen chunks, at most one wake per interval
+            # None of the chunks is a turn stopping to ask. The silence after the last of
+            # them is a listener that may have missed one, and does ask.
+            assert not wakes[0]
         finally:
             updates.close()
 
@@ -380,9 +396,9 @@ def test_streaming_text_alone_does_not_re_arm_the_authoritative_reads(
     with server(handler) as base:
         updates = kimi._Updates(base, "test-token", "ours")
         try:
-            updates.questioned = updates.stepped = False
+            updates.questioned = False
             updates.wait(settled=False)
-            assert (updates.questioned, updates.stepped) == (False, False)
+            assert not updates.questioned
         finally:
             updates.close()
 
@@ -400,19 +416,19 @@ def test_a_listener_that_stops_carrying_events_asks_for_everything(
         updates = kimi._Updates(base, "test-token", "ours")
         try:
             updates.wait(settled=False)
-            updates.questioned = updates.stepped = False
+            updates.questioned = False
             # Silence for a whole recovery interval is a listener that may have missed
-            # something, so the reader goes back to asking the daemon everything.
+            # something, so the reader goes back to asking the daemon anyway.
             updates.wait(settled=False)
-            assert (updates.questioned, updates.stepped) == (True, True)
-            updates.questioned = updates.stepped = False
+            assert updates.questioned
+            updates.questioned = False
             updates.close()
-            assert (updates.questioned, updates.stepped) == (True, True)
-            updates.questioned = updates.stepped = False
+            assert updates.questioned
+            updates.questioned = False
             slept: list[float] = []
             monkeypatch.setattr(kimi.time, "sleep", slept.append)
             updates.wait(settled=False)
             assert slept == [kimi._POLL_SECONDS]
-            assert (updates.questioned, updates.stepped) == (True, True)
+            assert updates.questioned
         finally:
             updates.close()

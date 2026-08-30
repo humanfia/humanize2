@@ -1,0 +1,150 @@
+== level=1 repeat=1 2026-09-10T12:08:30+00:00
+  g1   cpus=0-3     pids=26   mem=7.4  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=9    mem=1.4  G lock=HELD  running
+state n1 r1 bytes=163886 files=53
+== level=4 repeat=1 2026-09-10T12:08:34+00:00
+  g1   cpus=0-3     pids=29   mem=7.3  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=7    mem=1.4  G lock=HELD  running
+state n4 r1 bytes=626389 files=68
+== level=5 repeat=1 2026-09-10T12:08:38+00:00
+  g1   cpus=0-3     pids=16   mem=7.3  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=9    mem=1.4  G lock=HELD  running
+state n5 r1 bytes=794661 files=90
+== level=1 repeat=2 2026-09-10T12:08:42+00:00
+  g1   cpus=0-3     pids=4    mem=7.1  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=8    mem=1.4  G lock=HELD  running
+state n1 r2 bytes=162536 files=52
+== level=4 repeat=2 2026-09-10T12:08:45+00:00
+  g1   cpus=0-3     pids=4    mem=7.1  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=9    mem=1.4  G lock=HELD  running
+state n4 r2 bytes=633965 files=82
+== level=5 repeat=2 2026-09-10T12:08:48+00:00
+  g1   cpus=0-3     pids=7    mem=7.1  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=7    mem=1.4  G lock=HELD  running
+state n5 r2 bytes=790840 files=92
+== level=1 repeat=3 2026-09-10T12:08:52+00:00
+  g1   cpus=0-3     pids=4    mem=7.1  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=9    mem=1.4  G lock=HELD  running
+state n1 r3 bytes=163932 files=53
+== level=4 repeat=3 2026-09-10T12:08:56+00:00
+  g1   cpus=0-3     pids=19   mem=7.3  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=7    mem=1.4  G lock=HELD  running
+state n4 r3 bytes=639689 files=95
+== level=5 repeat=3 2026-09-10T12:09:00+00:00
+  g1   cpus=0-3     pids=16   mem=7.3  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=9    mem=1.4  G lock=HELD  running
+state n5 r3 bytes=789859 files=96
+== level=1 repeat=4 2026-09-10T12:09:05+00:00
+  g1   cpus=0-3     pids=16   mem=7.3  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=7    mem=1.4  G lock=HELD  running
+state n1 r4 bytes=164322 files=53
+== level=4 repeat=4 2026-09-10T12:09:08+00:00
+  g1   cpus=0-3     pids=22   mem=7.3  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=15   mem=2.0  G lock=HELD  running
+state n4 r4 bytes=640792 files=87
+== level=5 repeat=4 2026-09-10T12:09:13+00:00
+  g1   cpus=0-3     pids=19   mem=7.3  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=16   mem=2.1  G lock=HELD  running
+state n5 r4 bytes=807735 files=101
+== level=1 repeat=5 2026-09-10T12:09:18+00:00
+  g1   cpus=0-3     pids=4    mem=7.1  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=0    mem=4.9  G lock=free  OK
+  u17  cpus=12-15   pids=21   mem=2.0  G lock=HELD  running
+state n1 r5 bytes=165073 files=58
+== level=4 repeat=5 2026-09-10T12:09:21+00:00
+  g1   cpus=0-3     pids=7    mem=7.1  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=7    mem=5.3  G lock=HELD  running
+  u17  cpus=12-15   pids=15   mem=1.6  G lock=HELD  running
+state n4 r5 bytes=630336 files=91
+== level=5 repeat=5 2026-09-10T12:09:24+00:00
+  g1   cpus=0-3     pids=4    mem=7.1  G lock=HELD  running
+  g2   cpus=16-19   pids=4    mem=1.7  G lock=HELD  running
+  g3   cpus=20-23   pids=0    mem=1.9  G lock=free  OK
+  g4   cpus=24-27   pids=0    mem=0.8  G lock=free  OK
+  g5   cpus=28-31   pids=0    mem=1.3  G lock=free  OK
+  u15  cpus=4-7     pids=0    mem=3.1  G lock=free  OK
+  u16  cpus=8-11    pids=5    mem=5.0  G lock=HELD  running
+  u17  cpus=12-15   pids=15   mem=2.0  G lock=HELD  running
+state n5 r5 bytes=792574 files=90

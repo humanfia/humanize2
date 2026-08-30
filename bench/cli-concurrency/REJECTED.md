@@ -98,3 +98,25 @@ These routes do not provide a validated replacement for local print-and-resume w
 The benchmark therefore retains the official local print command per turn, including
 its measured startup overhead. Standard Cursor service authentication is evaluated
 separately from the local model fixture.
+
+## Kimi's session status on the notification cadence
+
+Kimi's poll loop reads the daemon four ways. Three of them are now brought forward only
+when the notification stream says so, or made on their own second's cadence otherwise.
+The fourth, `GET /sessions/{id}/status`, was tried the same way — read at once when the
+daemon said `turn.ended`, and a second apart otherwise, with a session that had not been
+read treated as still working so that no turn could end on a reading it did not take.
+
+It was measured and reverted. That read is what paces the round: the loop wakes on every
+notification the daemon sends, and with the status read gated the round had nothing left
+to wait on and spun on the history instead. At eight concurrent sessions the warm phase of
+a rung went from 27 history reads to 88, its mean call latency stayed where it was, and
+the warm turn went from 0.73 s to 1.03 s — a 41% regression on the metric the change was
+meant to improve. Cold went from 2.87 s to 4.06 s in the same instrumented pair.
+
+What was kept from the same experiment is the part that did not pace anything: pending
+questions and session spending, and the profile write a session that already has those
+settings does not need. Together they take the warm phase of an eight-session rung from
+27 question reads, 35 spending reads and 8 profile writes to 8, 16 and none. That is worth
+about two to three per cent of the complete-turn ratio, which is inside this host's noise,
+and it is [reported as such](MOCK-RESULTS.md) rather than as a speed-up.
