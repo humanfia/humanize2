@@ -2,21 +2,75 @@
 
 Every session and every agent tells you what it has spent, how fast it is spending it, and how
 hard it is thinking. Reach for this when you want to know what a run is costing while it is
-still running.
+still running — in tokens, and in money.
 
 ## Try it
 
 The readout sits under the agent lines, above the editor:
 
 ```
-              builder · claude/claude-opus-4-8:high · ● 2 · reading
+              builder · claude/claude-opus-5:high · ● 2 · reading
               reviewer · codex/gpt-5.6-sol:high · ○ 3 · unread
-                       48.2k tokens · 91/s
+                    48.2k tokens · $1.34 · 91/s
 ```
 
 It is **per model**, since two agents at one model are one bill, and it covers **a recent
 window only**, so a flow that has stopped reads as stopped. [`/status`](/user/status) is the
-fuller version, with the handover graph beside it.
+fuller version, one line per model with the handover graph above it.
+
+## The money
+
+**Where the money comes from.** The unit prices are not written down in humanize — vendors move
+them without asking anybody, and a list shipped in a release is wrong the week after it ships.
+They are fetched from [OpenLLMPrices](https://openllmprices.com/), which publishes one JSON
+file of them, and kept under `~/.humanize/prices.json`. The interface fetches it once as it
+opens, on a thread of its own, and refreshes it about once a day. **Nothing you type ever waits
+on that**: what is drawn is read out of the file that is already there.
+
+**A model nobody lists shows tokens and no money at all.** The list covers a few dozen models;
+humanize drives whatever CLI you have installed. So the unlisted model is the ordinary case,
+not the broken one:
+
+```
+   Tokens:   claude-opus-5              48.2k    $1.34     91/s
+             some-local-model            9.1k              12/s
+```
+
+The blank is deliberate. `$0.00` beside a model nobody priced would be a claim about a bill,
+and a false one. Where a run mixes a priced model with an unpriced one, the total above the
+editor is marked `$1.34+`: it is what the priced part came to, and a floor on the whole.
+
+**What the figure is, and what it is not.**
+
+| | |
+| --- | --- |
+| Priced **per kind** | an output token costs five or ten times an input one, so the kinds are billed at their own rates and never at an average |
+| The **standard tier** | a model priced higher above some context length is taken at the price it starts at, so a very long turn cost more than this says |
+| A **floor**, not an invoice | it is what the tokens humanize saw come past come to, at list price, in US dollars — not what your account was charged |
+
+It errs downwards on purpose. A kind of token nobody prices adds nothing rather than being
+guessed at, and a kind only ever stands in for another where standing in cannot overstate: a
+cache write nobody prices separately is taken at the input price, since a cache write is an
+input token and a surcharge on it — while a cache *read* nobody prices is left out, being a
+tenth of an input token, and a turn being mostly cache reads.
+
+A subscription is not metered by the token at all, and an account with negotiated rates is not
+on the list price. Read this as *what this work is worth at the counter*, which is the number
+worth steering by, rather than as a statement from your provider.
+
+**Where a backend does its own accounting in money, believe the backend.** This figure is the
+least authoritative of the three sources humanize has — the vendor's own number beats it, and
+so does the vendor's own token count. It is close: on one measured turn of `claude-haiku-4.5`
+(10 in, 448 out, 35,188 cache-written) Claude Code's own `total_cost_usd` said $0.0472 and this
+said $0.0462 — 2% low, and low in the direction it is meant to err.
+
+**A backend that reports a lump of tokens without saying which kind each was gets no money
+figure either.** Some do: a Codex rollout row may name a total and nothing else. Tokens with no
+bill beside them is the honest reading of that.
+
+**If the file has never been fetched** — a first start, an air-gapped machine, a network that
+was down — everything reads as tokens alone until it lands. Setting `HUMANIZE_PRICES=off` turns
+the fetching off for good; setting it to a path or a URL reads the list from there instead.
 
 ## Three readings, three questions
 
@@ -39,6 +93,39 @@ agent.rate(over=60)
 agent.juice()
 ```
 
+And what any of those came to, in money:
+
+```python
+from hmz import prices
+
+prices.cost(agent.spent(), agent.config.model)   # dollars, or None for an unlisted model
+prices.price("claude-haiku-4-5-20251001")        # Price(model="claude-haiku-4.5", …)
+prices.money(1.34)                               # "$1.34" — and "$0.0012" under a cent
+```
+
+`cost` answers `None` — never `0.0` — for a model nobody lists, so a flow steering by money can
+tell *not priced* from *free*. Neither call touches the network.
+
+`price` matches a model to a listed one by stripping what is known not to be the model — and
+promises no more than that:
+
+| Stripped | Because |
+| --- | --- |
+| a provider or account in front — `anthropic/claude-sonnet-5` | the account is not the model |
+| a gateway route, and the cloud it names — `azure/anthropic/claude-opus-5`, `aws/anthropic/bedrock-claude-opus-5` | where a request goes is not what it costs |
+| a hosted qualifier — `us.anthropic.claude-opus-5-v1:0` | Bedrock's spelling of `claude-opus-5` |
+| a release date or version behind — `claude-haiku-4-5-20251001` | which is `claude-haiku-4.5` |
+| the punctuation two spellings disagree about | `claude-haiku-4-5` and `Claude Haiku 4.5` |
+
+So one model reached three ways is one bill. It does not guess further: a near miss is a miss,
+because the price of the neighbouring model is a wrong answer rather than an approximate one.
+`gpt-5` is not `gpt-5.6-sol`. Behind a gateway offering hundreds of models against a list of a
+few dozen, most of what you run is unmatched — and reads as tokens with no money beside them.
+
+One thing the matching does *not* do is merge the rows. `/status` lists what has been spent
+under each name the backends used, so a model your gateway spells one way and its own log
+spells another is two lines. Each line's money is that line's.
+
 ## `spent` — a mapping of kind to tokens
 
 `input` and `output` are the two that every backend counts, and they sit on the mapping as
@@ -52,6 +139,10 @@ spent.input, spent.output, spent.total       # always
 spent.get("cache_read", 0)                   # for a backend that counts one
 dict(spent)                                  # everything it does count
 ```
+
+The kinds are also what a bill is made of. A reasoning count kept beside the output is bought
+as output. A backend that says what a turn cost without saying which kinds it went on gets no
+bill at all — the tokens are counted and nothing is claimed about them.
 
 The `result` event a turn ends on carries the same reckoning, beside the per-model `tokens` it
 already carried. `result.spent.total` is what `result.tokens` comes to.

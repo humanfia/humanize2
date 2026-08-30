@@ -105,6 +105,10 @@ ALLOWED: dict[str, set[str]] = {
     # asking reads the facts about the CLI and the providers it could be run as. Neither
     # names it back, so this widens the DAG without bending it.
     "hmz.models": {"hmz.backends", "hmz.providers"},
+    # What a token costs in money, fetched from a list somebody else keeps and kept under
+    # humanize's own home. A leaf for the reason `backends` is one: it is read where a
+    # figure is drawn, and reading a price must cost nothing of the layer the price is about.
+    "hmz.prices": set(),
     "hmz.runner": {
         "hmz.agents",
         "hmz.backends",
@@ -159,6 +163,9 @@ ALLOWED: dict[str, set[str]] = {
         # The agents written down under a name, which `/agents` walks and `hmz agents` says
         # from a command line. It names nothing, so this widens the DAG without bending it.
         "hmz.kept",
+        # What a token costs in money, which is drawn everywhere a token count is. It names
+        # nothing above itself, so this widens the DAG without bending it.
+        "hmz.prices",
         # `/providers` is where an account is made and `/agents` is where one is given to an
         # agent, so the interface reads the same leaf the agents do. It names nothing above
         # itself, so this widens the DAG without bending it.

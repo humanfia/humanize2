@@ -886,6 +886,124 @@ async def test_a_flow_that_called_another_names_both_of_them() -> None:
 
 
 @pytest.mark.timeout(60)
+async def test_the_readout_says_what_a_run_cost_in_money_as_well_as_in_tokens(
+    priced: str,
+) -> None:
+    """A token count says how much work was done and nothing about what it came to."""
+    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._agents = [ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))]
+        app._monitor.begins("actor", priced)
+        app._monitor.spend("actor", 1040, kinds={"input": 1000, "output": 40})
+        app._draw()
+        await driver.pause()
+
+        above = str(app.query_one("#above", Static).content)
+
+    assert "1.0k tokens" in above
+    assert "$0.0012" in above  # a thousand in at $1/M and forty out at $5/M
+
+
+@pytest.mark.timeout(60)
+async def test_a_turn_that_lands_carries_the_kinds_its_bill_is_made_of(
+    priced: str,
+) -> None:
+    """The `result` says what it cost by model and by kind, and the money needs both."""
+    from hmz.agents import Event, Usage
+    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model=priced, effort="high"))
+    app = Humanize()
+    async with app.run_test():
+        app._heard(
+            agent,
+            agent.new(),
+            Event(
+                kind="result",
+                text="done",
+                tokens={priced: 1040},
+                spent=Usage(input=1000, output=40),
+            ),
+        )
+
+        (spending,) = app._monitor.spending()
+
+    assert spending.tokens == 1040
+    assert spending.dollars == pytest.approx(1000 / 1e6 * 1 + 40 / 1e6 * 5)
+
+
+@pytest.mark.timeout(60)
+async def test_a_turn_spread_over_two_models_is_counted_and_not_priced(
+    priced: str,
+) -> None:
+    """One turn's kinds do not divide between two models, and nobody said how they would."""
+    from hmz.agents import Event, Usage
+    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model=priced, effort="high"))
+    app = Humanize()
+    async with app.run_test():
+        app._heard(
+            agent,
+            agent.new(),
+            Event(
+                kind="result",
+                text="done",
+                tokens={priced: 1000, "some-lite-model": 40},
+                spent=Usage(input=1000, output=40),
+            ),
+        )
+
+        spending = app._monitor.spending()
+
+    assert sum(one.tokens for one in spending) == 1040
+    assert all(one.dollars is None for one in spending)
+
+
+@pytest.mark.timeout(60)
+async def test_the_tokens_group_on_status_carries_the_bill_beside_the_count(
+    priced: str,
+) -> None:
+    """Per model, since two agents at one model are one bill -- and one bill is money."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._monitor.begins("actor", priced)
+        app._monitor.spend("actor", 1040, kinds={"input": 1000, "output": 40})
+        app.action_status()
+        await until(lambda: isinstance(app.screen, Status), driver)
+
+        said = str(app.screen.query_one("#tuning", Label).content)
+
+    assert priced in said
+    assert "1.0k" in said
+    assert "$0.0012" in said
+
+
+@pytest.mark.timeout(60)
+async def test_a_model_nobody_prices_is_a_token_count_with_no_dollars_beside_it() -> (
+    None
+):
+    """`$0.00` against an unlisted model would be a claim about a bill, and a wrong one."""
+    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._agents = [ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))]
+        app._monitor.begins("actor", "a-model-nobody-lists")
+        app._monitor.spend("actor", 4000, kinds={"input": 3000, "output": 1000})
+        app._draw()
+        await driver.pause()
+
+        above = str(app.query_one("#above", Static).content)
+
+    (counted,) = [line for line in above.splitlines() if "tokens" in line]
+    assert "4.0k tokens" in counted
+    assert "$" not in counted.replace("$text-muted", "")  # a colour is not a currency
+
+
+@pytest.mark.timeout(60)
 async def test_a_turn_that_has_gone_quiet_still_reads_as_one_that_is_running() -> None:
     """A model thinks for minutes without a word, and the clock is what says it is alive."""
     from hmz.agents import Event

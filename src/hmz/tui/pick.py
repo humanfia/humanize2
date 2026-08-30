@@ -52,6 +52,7 @@ from hmz.agents import ANYONE, FLOW, PERMISSIONS, SWARM, USER, anchored, driver
 from hmz.agents.skills import Skill, skills
 from hmz.backends import named
 from hmz.kept import Kept, Runs
+from hmz.prices import money
 from hmz.telemetry import KEPT, SAYS, SENT
 
 from .discover import installed, machines, ready_to_open
@@ -7389,6 +7390,10 @@ class Status(Sheet[str]):
                     "Tokens",
                     [
                         f"{escape(spend.model):<26}{thousands(spend.tokens):>8}"
+                        # Blank rather than nought for a model nobody prices: a run whose
+                        # bill is not known has still cost something, and `$0.00` would say
+                        # it had not.
+                        f"{money(spend.dollars) if spend.dollars is not None else '':>10}"
                         f"   [$text-muted]{spend.rate:.0f}/s[/]"
                         for spend in spending
                     ]

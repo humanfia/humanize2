@@ -49,6 +49,10 @@ def _humanize_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # with `-s` from a real terminal would otherwise leave a detached interface behind it.
     # The tests that are about the holding turn it back on for themselves.
     monkeypatch.setenv("HUMANIZE_DAEMON", "off")
+    # And nothing here fetches the unit prices a bill is worked out from. The interface asks
+    # for those as it opens, which is right at a prompt and wrong in a suite: a test must not
+    # reach anybody's network, and one that is about the fetching points this at a file.
+    monkeypatch.setenv("HUMANIZE_PRICES", "off")
 
 
 @pytest.fixture(autouse=True)

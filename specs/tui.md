@@ -559,6 +559,11 @@ adjusted rather than chosen.
 - The agents of the last run MUST still be drawn once it is over. Their transcripts are still
   on the screen and still worth reading back, and a run that has just ended is the one
   somebody wants to look at.
+- What each model has cost MUST be said in money beside the tokens, wherever the tokens are
+  said -- here, on the lines above the editor, and in the snapshot a side question is answered
+  from. Nobody is watching a token count for its own sake. Where the money is not known the
+  tokens MUST stand alone, and where only some of the models running are priced the figure
+  MUST say that it is a floor rather than pass for the whole bill.
 
 ### The board
 
@@ -620,6 +625,7 @@ class Spend:
     model: str
     tokens: int
     rate: float
+    dollars: float | None = None
 
 
 @dataclass
@@ -632,6 +638,7 @@ class Monitor:
         tokens: int,
         model: str | None = None,
         now: float | None = None,
+        kinds: Mapping[str, float] | None = None,
     ) -> None: ...
     def spending(self, now: float | None = None) -> list[Spend]: ...
     def now_working(self) -> list[str]: ...
@@ -653,6 +660,24 @@ a flow being a Python file that may branch any way it likes.
   stopped rather than as whatever it once averaged.
 - A backend that says what a turn cost MUST be believed over what its agent was configured
   with: a turn that reached for a sub-agent spent it on that model.
+- What has been spent MUST be reported in money as well as in tokens, from `hmz.prices`. A
+  token count says how much work was done and nothing at all about what it came to, and what
+  a run costs while it is still running is the question this whole sheet is here to answer.
+- The money MUST be worked out from the kinds of token, and MUST be taken from whichever
+  source has seen the most of them -- the same source the count itself is taken from, since
+  two sources counting one spend are one bill. A source that reported no kinds MUST leave the
+  money unanswered: a lump of tokens is a lump nobody can price.
+- `dollars` MUST be None rather than nought for a model nobody lists and for a spend nobody
+  broke down, and whatever draws it MUST show the tokens alone. `$0.00` is a claim about a
+  bill, and against an unpriced model it is a false one.
+- It MUST be worked out when what it is made of moves, as the rate is, rather than as the
+  screen is drawn: a screen redrawn twice a second must not read a file twice a second.
+- A backend that states in money what a turn cost MUST be believed over what `hmz.prices`
+  works out from the tokens, for the same reason a backend that says what a turn cost is
+  believed over what its agent was configured with: the vendor's own accounting beats a
+  reckoning made from somebody else's list price. Nothing here states one yet, so nothing is
+  overridden today -- and whoever plumbs one through MUST put it above this rather than
+  beside it.
 
 ## `complete.py`
 
@@ -706,3 +731,9 @@ What a run has cost, read from the logs the agents keep for themselves.
 - What is read MUST be reported as a total rather than as an addition, so that a log read twice
   cannot count a token twice -- and so that the backends' own reports may stand beside it,
   whichever has seen more being what has been spent.
+- What each row cost MUST be reported by kind of token as well as in total, under the names
+  every kind is counted by everywhere else. The kinds are the only reckoning a price can be
+  put against, and a backend that counts its cached reads inside its input MUST have them
+  taken back out rather than billed as both.
+- A row that says what it cost without saying what kinds it went on MUST still be counted and
+  MUST NOT be priced. Tokens with no bill beside them is the honest reading of it.

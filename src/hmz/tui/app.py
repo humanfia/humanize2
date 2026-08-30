@@ -60,6 +60,7 @@ from textual.widgets import OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
 from hmz import telemetry
+from hmz.prices import money, refresh
 from hmz.sdk import Hmz
 
 from .btw import AgentProgress, FlowSnapshot, Observation, compact, format_snapshot
@@ -1038,6 +1039,11 @@ class Humanize(App[None]):
         self.set_interval(_REFRESH, self._draw)
         self._asks_what_runs()
         self._asks_about_reports()
+        # What a token costs in money, fetched here and nowhere else: this is the one part of
+        # humanize that shows a bill, and it is asked for once on a thread of its own so that
+        # nothing drawn afterwards ever waits on a network. What is already kept is served
+        # throughout, including while this is still in the air and including if it never lands.
+        refresh()
         # The editor is the only thing to type at, so it is the only thing that takes focus:
         # a transcript or a list that could hold it would swallow the keystrokes meant for it.
         for elsewhere in self.query("#transcript, #offers"):
@@ -1547,6 +1553,12 @@ class Humanize(App[None]):
         spending = self._monitor.spending()
         spent = sum(spend.tokens for spend in spending)
         rate = sum(spend.rate for spend in spending)
+        # What the run has cost in money, and whether that is the whole of it: a model
+        # nobody prices adds tokens to the count and nothing to the bill, so the figure is
+        # marked as a floor rather than quietly reported as the total.
+        billed = [spend.dollars for spend in spending if spend.dollars is not None]
+        bill = sum(billed) if billed else None
+        floor = "+" if billed and len(billed) < len(spending) else ""
         # Left, first match wins, as opencode's status line resolves it: what is running if
         # anything is, else where this is. Right, the usage. The two ends are pushed apart.
         working = self._monitor.now_working()
@@ -1592,7 +1604,8 @@ class Humanize(App[None]):
             "no agent installed"
         ]
         if spent:
-            lines.append(f"{thousands(spent)} tokens{_DOT}{rate:.0f}/s")
+            costing = f"{money(bill)}{floor}{_DOT}" if bill is not None else ""
+            lines.append(f"{thousands(spent)} tokens{_DOT}{costing}{rate:.0f}/s")
         # Beside it, and cut to what it leaves: the two are one block, and a pinned line
         # the width of the screen would push what the run is running as off the side of it.
         waiting = self._waiting_lines(max(len(line) for line in lines) + 2)
@@ -2050,7 +2063,7 @@ class Humanize(App[None]):
         ended = self._monitor.until
         elapsed = (ended if ended is not None else moment) - self._monitor.began
         spent = tuple(
-            (entry.model, entry.tokens, entry.rate)
+            (entry.model, entry.tokens, entry.rate, entry.dollars)
             for entry in self._monitor.spending(now=ended or moment)
         )
         # Keep the role separate from the stable id used by the monitor and handover records.
@@ -3020,8 +3033,13 @@ class Humanize(App[None]):
         """
         # First, whatever else happens: showing a line raises once the interface has gone, and
         # what a watcher raises is swallowed, so accounting after it would be lost.
+        # The kinds go with the tokens where a turn spent them all on one model, which is the
+        # ordinary turn: `spent` is that whole turn's cost by kind, and there is no saying how
+        # one lot of kinds divides between two models. Without them there is no bill, only a
+        # count -- an input token and an output token differ in price several times over.
+        broken = dict(event.spent) if len(event.tokens) == 1 else None
         for model, tokens in event.tokens.items():
-            self._monitor.spend(agent.id, tokens, model=model)
+            self._monitor.spend(agent.id, tokens, model=model, kinds=broken)
         self._remember_btw(agent, event)
         if event.kind == "took":
             # The agent saying a word put into its turn is now in front of it, which is the
