@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from hmz.agents import (
         AgentConfig,
         Board,
+        Budget,
         Event,
         Hooks,
         Moment,
@@ -97,6 +98,42 @@ class Session(Protocol):
     @property
     def skills(self) -> tuple[str, ...]:
         """The flow's skills this conversation carries, by name, in the flow's own order."""
+        ...
+
+    @property
+    def budget(self) -> Budget | None:
+        """What each turn of this conversation may spend before it is cut off.
+
+        What its agent was set up with, unless this conversation has been told otherwise --
+        which a flow may do while the session is running, and which is where a loop watching
+        what a round costs is when it decides the next one is to be shorter::
+
+            session.budget = Budget(seconds=90, when="immediately", then="end")
+
+        Per turn: every turn starts with the whole of it. None is a turn that runs until it
+        is done, and an empty `Budget()` is how one conversation opts out of the budget its
+        agent carries. The turn already under way keeps the budget it opened with.
+        """
+        ...
+
+    @budget.setter
+    def budget(self, budget: Budget | None) -> None: ...
+
+    def interrupt(self, *, why: str) -> None:
+        """Cuts the turn now running off, wherever it has got to.
+
+        Not the same as stopping the agent, which prevents the *next* turn: this one ends
+        the turn in flight, and the turn still finishes the way every turn finishes -- on one
+        answer, holding what the agent got as far as saying. A session with no turn running
+        is left alone.
+
+        A backend whose turn is held somewhere shared -- an app server serving every session
+        of an agent at once -- stops at the next answer instead of being taken down, since
+        cutting one turn off must not end every other conversation on it.
+
+        Args:
+          why: What it was cut off for, which is what whoever is watching the run reads.
+        """
         ...
 
     @property

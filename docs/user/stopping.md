@@ -38,8 +38,13 @@ A stop leaves the turn where it got to. It does not wait for the turn, because a
 waited would not read as a stop. A model can think for minutes, and a key that took four of
 them to have an effect is a key nobody trusts.
 
-A file the agent had half-written stays half-written. A command it had started keeps running
-until it finishes. What ends is the agent's part in it.
+A file the agent had half-written stays half-written. What ends is the agent's part in it,
+which includes the CLI process the turn was running in and whatever that process had started:
+a stop that left the agent still writing would not be a stop.
+
+To end one turn without ending the run, a flow has
+[`session.interrupt`](/features/budgets#cutting-one-off-by-hand), and a turn can be given a
+[budget](/features/budgets) that cuts it off on its own.
 
 ## What stopping is not
 
