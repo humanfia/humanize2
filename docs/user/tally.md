@@ -111,5 +111,6 @@ to gather. What their turns cost still reaches a flow: each says it as the turn 
 ## See also
 
 - [Efforts](/user/efforts) — what `juice` responds to
+- [A turn can be cut off](/features/budgets) — the same reading, used as a cap
 - [The shape of a run](/user/status)
 - [Agents › What it has cost, and how fast](/reference/agents#what-it-has-cost-and-how-fast)
