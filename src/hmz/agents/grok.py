@@ -116,6 +116,10 @@ class GrokBuildSession(CommandSessionBase):
             argv += ["--json-schema", json.dumps(schema.model_json_schema())]
         if self._id is not None:
             argv += ["--resume", self._id]
+        elif self._forked_from is not None:
+            # A resume told to mint an id rather than reuse the one it was handed: the turns
+            # of the conversation this one was cut from come with it, and what follows is its.
+            argv += ["--resume", self._forked_from, "--fork-session"]
         # Written onto the flag rather than after it: a prompt is a paragraph and may open
         # with a dash, and a value given with an `=` is a value whatever it starts with.
         return [*argv, f"--single={prompt}"], None

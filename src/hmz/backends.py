@@ -186,6 +186,14 @@ class Profile:
         with no way of being told, whose agents go on reaching the web exactly as that CLI
         lets them -- an agent configured not to search on a backend that cannot be told would
         be a setting that lies, so it is refused where it is written instead.
+      forks: Whether this backend can carry a conversation it is already holding into a
+        second one of its own -- `claude --fork-session`, codex's `thread/fork`, `opencode
+        run --fork`, `kimi fork` -- which is the whole of what a session clone is made
+        of. A property of the backend for the reason `searches` is: the CLI is what keeps a
+        conversation, so the CLI is what copies one. False for a backend that can only
+        resume the id it minted, whose sessions refuse to be cloned rather than handing back
+        a second handle on the one conversation -- two flows each continuing what they take
+        to be their own is the failure nothing downstream could explain.
       creds: What a login to this backend leaves behind: the paths it reads its credentials
         back out of and writes its refreshed ones to. One under this backend's home per entry,
         one under the user's own home where the entry starts with `~/` -- which is where some
@@ -221,6 +229,7 @@ class Profile:
     beyond: tuple[str, ...] = ()
     swarms: bool = False
     searches: bool = False
+    forks: bool = False
     creds: tuple[str, ...] = ()
     ways: tuple[Way, ...] = ()
     ambient: tuple[str, ...] = ()
@@ -394,6 +403,9 @@ PROFILES = (
         # `WebSearch` and `WebFetch` are tools like any other to Claude, and
         # `--disallowedTools` is the flag that takes a tool away.
         searches=True,
+        # `--fork-session`, which is `--resume` told to mint an id rather than reuse the
+        # one it was handed: the earlier turns come with it and the next one is its own.
+        forks=True,
         aliases=("claude", "claude-code"),
         home_var="CLAUDE_CONFIG_DIR",
         home_dir=".claude",
@@ -511,6 +523,9 @@ PROFILES = (
     Profile(
         name="agy",
         aliases=("agy", "antigravity"),
+        # `--conversation` picks one back up and that is the whole of what it offers: there
+        # is no flag that says carry this one into another.
+        forks=False,
         # Nothing moves it: no variable of its own, and neither `XDG_CONFIG_HOME` nor the
         # names its siblings use are read. Only the home directory it is under, and a hidden
         # flag. So there is no variable to name here, and `directory()` reads the one place.
@@ -568,6 +583,9 @@ PROFILES = (
         # `tools.web_search` is a setting of the app server, and is sent in both
         # directions: Codex searches nothing until it is asked to.
         searches=True,
+        # `thread/fork` on that same app server: a thread id in, a thread of its own back,
+        # holding what the first one had got to.
+        forks=True,
         aliases=("codex",),
         home_var="CODEX_HOME",
         home_dir=".codex",
@@ -663,6 +681,9 @@ PROFILES = (
     Profile(
         name="dsh",
         aliases=("dsh", "deepseek-harness"),
+        # Its harness names a session and runs turns in it; nothing in the protocol makes a
+        # second one out of the first.
+        forks=False,
         home_var="DSH_HOME",
         home_dir=".dsh",
         # The Python SDK's bundled JSONL persistence groups sessions under one project
@@ -688,6 +709,8 @@ PROFILES = (
         # `web_search` and `web_fetch` are the two Grok Build already names where a
         # rung takes the reaching outside the workspace away.
         searches=True,
+        # `--fork-session`, spelled and meant as Claude's is: resume, but under a new id.
+        forks=True,
         # `grokbuild` among them because that is what the class driving it is called, and an
         # agent names its backend by its own class name.
         aliases=("grok", "grok-build", "grokbuild"),
@@ -775,6 +798,10 @@ PROFILES = (
     Profile(
         name="kimi",
         aliases=("kimi", "kimi-code"),
+        # `kimi fork`, which cuts a second session from one already on disk. The command
+        # rather than its daemon's route for the same thing: that one is dispatched to a
+        # manager knowing none of the workspaces its sessions are in, and refuses them all.
+        forks=True,
         home_var="KIMI_CODE_HOME",
         home_dir=".kimi-code",
         logs=("server/events/{ident}.jsonl",),
@@ -834,6 +861,8 @@ PROFILES = (
     Profile(
         name="pi",
         aliases=("pi",),
+        # `--fork`, which takes the session to carry in and opens the new one on top of it.
+        forks=True,
         home_var="PI_CODING_AGENT_DIR",
         home_dir=".pi/agent",
         # One file per session, named for the moment it opened and the id it was given, under
@@ -885,6 +914,8 @@ PROFILES = (
         # `web_search` and `web_fetch` are what Qwen Code calls the two, and
         # `--exclude-tools` is what it takes a tool away with.
         searches=True,
+        # `--fork-session`, which it takes alongside `--resume` and nowhere else.
+        forks=True,
         aliases=("qwen", "qwen-code"),
         home_var="QWEN_HOME",
         home_dir=".qwen",
@@ -943,6 +974,8 @@ PROFILES = (
         # `webfetch` is the one reaching-out tool opencode names, and its permission
         # table is where each tool is allowed or denied.
         searches=True,
+        # `run --fork`, which forks the session it was given before carrying on in it.
+        forks=True,
         aliases=("opencode",),
         # No home variable of its own: it keeps its data where every other program does, in a
         # directory of its own under the one `XDG_DATA_HOME` names.
@@ -1015,6 +1048,8 @@ PROFILES = (
         name="mimo",
         # mimocode is opencode's, permission table and all.
         searches=True,
+        # And its `--fork` too: the same program under another name.
+        forks=True,
         aliases=("mimo", "mimocode", "mimo-code"),
         home_var="XDG_DATA_HOME",
         home_in="mimocode",
@@ -1066,6 +1101,12 @@ PROFILES = (
         # `WebFetch` and `WebSearch` are the two tools it reaches outside the workspace with,
         # and a session may be opened with a denylist naming them.
         searches=True,
+        # Its app server creates a session and resumes one, and a resumed id is the same
+        # conversation. Whether it has a third call nobody here can say: ZCode has no
+        # officially installable CLI to ask, and a fork written down out of a guess would be
+        # a fact that lies -- so this is the answer that refuses rather than the one that
+        # pretends, until somebody can put the question to the thing itself.
+        forks=False,
         aliases=("zcode", "zcode-cli"),
         # None: its configuration, its sessions and its skills are all under `~/.zcode`, and
         # the one variable it does read moves the part the desktop app shares rather than the
@@ -1134,6 +1175,9 @@ PROFILES = (
         # is `~/.cursor/cli-config.json`, which is the person at this machine's file and not
         # one a driver writes. So web search is refused off here rather than said and ignored.
         searches=False,
+        # `--resume` picks a chat back up under its own id and it has no second spelling:
+        # a conversation of Cursor's is one conversation.
+        forks=False,
         # Installed under two names, `agent` being the one its installer calls primary and
         # `cursor-agent` the one it has always also written. The second, because `agent` is a
         # name anything on a machine could have taken and this one has to be that CLI.
@@ -1310,7 +1354,8 @@ def _speaks(name: str) -> Profile:
     Returns:
       A profile saying the little there is to say: it has no home humanize can find, no logs
       it can read, and one rung of an effort ladder, because the protocol describes none of
-      those. What it does have is a name to be chosen by.
+      those. What it does have is a name to be chosen by, and one thing the protocol does
+      say: `session/fork` is a call in it.
     """
     return Profile(
         name=name,
@@ -1319,6 +1364,11 @@ def _speaks(name: str) -> Profile:
         home_dir="",
         logs=(),
         efforts=(_UNSAID,),
+        # The protocol has the call, which is the most that can be known about a CLI known
+        # only by the protocol it speaks. An agent that has not implemented it refuses where
+        # it is asked rather than here -- which is still a refusal, and still not two flows
+        # sharing one conversation.
+        forks=True,
     )
 
 

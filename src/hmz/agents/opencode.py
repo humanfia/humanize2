@@ -113,6 +113,10 @@ class OpencodeSession(CommandSessionBase):
         ]
         if self._id is not None:
             argv += ["--session", self._id]
+        elif self._forked_from is not None:
+            # `--fork` forks the session it is given and carries on in the fork, so this run
+            # lands in a conversation of its own that starts out knowing what that one knew.
+            argv += ["--session", self._forked_from, "--fork"]
         argv += self._unattended()
         return argv, prompt
 
