@@ -1,28 +1,29 @@
-"""agy: one run of Antigravity CLI per turn, reading the stream of JSON it answers in.
+"""Antigravity CLI held across ordinary turns through its official NDJSON protocol.
 
-Its command line says everything an agent is configured with -- the model, how hard to think,
-the conversation to carry on -- so a turn is one run of it rather than a conversation held open
-on a server. What it writes on stdout with `--output-format stream-json` is a protocol rather
-than the agent talking: one JSON object a line, tagged by `event`, opening on the `init` that
-names the conversation and ending on the `result` that says what the turn came to.
-
-What it may do is the one thing it cannot be told by halves: `--dangerously-skip-permissions`
-is the whole of the lever, so the rungs below it are refused rather than quietly ignored.
+Slash commands and shaped turns use finite commands, preserving the CLI's print-mode
+behavior. Native cumulative usage follows the conversation across both transports and
+process restarts; each result here reports only its own turn's cost.
 """
+
+# pyright: reportPrivateUsage=false
 
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
-from .base import AgentBase, CommandSessionBase
+from ._inputs import snapshot
+from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Usage
 
 if TYPE_CHECKING:
-    import os
     from collections.abc import Iterator
+
+    from pydantic import BaseModel
 
 #: What the CLI is installed as. The tarball calls the file `antigravity` and the installer
 #: puts it down under this name, which is what a command line reaches for.
@@ -37,7 +38,82 @@ _TAKES = ("auto", "bypass")
 _THINKING = "THINKING"
 
 
-class AntigravityCLISession(CommandSessionBase):
+def _native(
+    cwd: Path, environment: dict[str, str], args: tuple[str, ...] = ()
+) -> bytes | None:
+    """Fingerprints native customizations, including inherited external skill roots.
+
+    Runtime databases, caches and logs are not configuration inputs. Missing roots are
+    included so installing a new native skill between turns restarts the held process.
+    """
+    home = Path(environment.get("HOME") or Path.home())
+    directory = "antigravity-cli"
+    extra: list[Path] = []
+    for index, argument in enumerate(args):
+        name, separator, value = argument.partition("=")
+        if name not in ("--app_data_dir", "--add-dir"):
+            continue
+        if not separator and index + 1 < len(args):
+            value = args[index + 1]
+        if name == "--app_data_dir":
+            directory = value
+        else:
+            extra.append(cwd / Path(value).expanduser())
+    native = (home / ".gemini" / directory).resolve()
+    roots = {home / ".gemini/config", native}
+    ancestors = (cwd, *cwd.parents, *extra)
+    roots.update(parent / ".agents" for parent in ancestors)
+    roots.update(parent / ".agent" for parent in ancestors)
+    paths = {
+        parent / name
+        for parent in (*ancestors, home / ".gemini")
+        for name in ("AGENTS.md", "GEMINI.md")
+    }
+    files = ("settings.json", "config.json", "mcp_config.json", "hooks.json")
+    directories = ("skills", "plugins", "agents", "rules", "workflows")
+    for root in roots:
+        paths.update(root / name for name in (*files, *directories))
+    paths.add(native / "builtin")
+    pending = [
+        root / name for root in roots for name in ("skills.json", "plugins.json")
+    ]
+    seen: set[Path] = set()
+    repository = next(
+        (parent for parent in ancestors if (parent / ".git").exists()), cwd
+    )
+    while pending:
+        path = pending.pop()
+        if path in seen:
+            continue
+        seen.add(path)
+        paths.add(path)
+        try:
+            raw: object = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            continue
+        except (OSError, UnicodeError, ValueError):
+            return None
+        if not isinstance(raw, dict):
+            return None
+        config = cast("dict[str, Any]", raw)
+        for kind in ("entries", "inherits"):
+            entries = config.get(kind, [])
+            if not isinstance(entries, list):
+                return None
+            for entry in cast("list[object]", entries):
+                if not isinstance(entry, dict):
+                    return None
+                value = cast("dict[str, Any]", entry).get("path")
+                if not isinstance(value, str):
+                    return None
+                target = repository / Path(value).expanduser()
+                paths.add(target)
+                if kind == "inherits":
+                    pending.append(target)
+    return snapshot(paths)
+
+
+class AntigravityCLISession(StreamSessionBase):
     """An Antigravity conversation, resumed by the id its first turn reported.
 
     The id is minted by `agy` as the conversation opens and named on the line the stream opens
@@ -67,6 +143,86 @@ class AntigravityCLISession(CommandSessionBase):
         self._failed: str | None = None
         #: What the turn now running has cost, which it reports once, at the end.
         self._costing = Usage()
+        self._previous = Usage()
+        self._announced: str | None = None
+        self._launched: tuple[object, ...] | None = None
+        self._requested: tuple[object, ...] = ()
+
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """Keeps ordinary turns warm and preserves print-only command behavior."""
+        with self._lock:
+            try:
+                if schema is not None or prompt.lstrip().startswith("/"):
+                    self._shut()
+                    yield from CommandSessionBase._stream(  # noqa: SLF001 -- shared transport
+                        cast("CommandSessionBase", self), prompt, schema=schema
+                    )
+                else:
+                    self._requested = self._settings()
+                    yield from super()._stream(prompt)
+            except BaseException:
+                self._shut()
+                if self._id is None:
+                    self._previous = Usage()
+                raise
+
+    def _command(self) -> list[str]:
+        """Starts the official stream driver without a finite --print prompt."""
+        argv, _ = self._turn("")
+        return [*argv[:-2], "--input-format", "stream-json"]
+
+    def _settings(self) -> tuple[object, ...]:
+        """Remembers the configuration and resources read when the CLI starts."""
+        environment = self._environ() or dict(os.environ)
+        provider = self._agent.node()
+        native = _native(Path(self.cwd), environment, provider.args)
+        return (
+            self._agent.config,
+            self.effort,
+            self._carrying(),
+            self._tools,
+            environment,
+            provider,
+            snapshot({Path(target) for _, target in provider.swaps()}),
+            native if native is not None else object(),
+        )
+
+    def _stale(self) -> bool:
+        """Restarts before changed native or flow inputs can become stale."""
+        return self._launched is not None and self._launched != self._requested
+
+    def _restarted(self) -> None:
+        """Records process inputs; native usage survives --conversation resumes."""
+        self._launched = self._requested
+
+    def _write(self, text: str, ticket: str = "") -> str:
+        """Encodes one prompt in Antigravity's event-tagged NDJSON format."""
+        del ticket
+        return json.dumps({"event": "user", "message": {"content": text}}) + "\n"
+
+    def interject(self, text: str) -> None:
+        """Keeps steering unsupported: the native protocol has no receipt ticket."""
+        SessionBase.interject(self, text)
+
+    def _read(self, line: str) -> Iterator[Event]:
+        """Reads one native event and commits its conversation only on success."""
+        try:
+            raw: object = json.loads(line)
+        except ValueError:
+            return
+        if not isinstance(raw, dict):
+            return
+        said = cast("dict[str, Any]", raw)
+        yield from self._record(said)
+        if named := said.get("conversation_id"):
+            self._announced = str(named)
+        if said.get("event") == "result":
+            result = self._result(line)
+            if self._id is None:
+                self._adopt(self._announced or self._read_session_id(line))
+            yield result
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
         """Builds the `agy -p` one turn is.
@@ -80,12 +236,17 @@ class AntigravityCLISession(CommandSessionBase):
         """
         self._said, self._failed = "", None
         self._costing = Usage()
+        self._announced = None
         argv = [
             _COMMAND,
             "--output-format",
             "stream-json",
             "--model",
             self._agent.config.model,
+            # Project selection can replace the CLI's initial cwd with a scratch directory.
+            # Keep this session's workspace explicit, beside any provider-supplied roots.
+            "--add-dir",
+            self.cwd,
             # Nobody is there to answer it: a flow watches its agent rather than gating it.
             "--dangerously-skip-permissions",
         ]
@@ -116,9 +277,14 @@ class AntigravityCLISession(CommandSessionBase):
         if error:
             return
         try:
-            said: dict[str, Any] = json.loads(line)
-        except json.JSONDecodeError:
-            return  # not ours: the odd plain line among the JSON
+            raw: object = json.loads(line)
+        except ValueError:
+            return
+        if isinstance(raw, dict):
+            yield from self._record(cast("dict[str, Any]", raw))
+
+    def _record(self, said: dict[str, Any]) -> Iterator[Event]:
+        """Shares native event parsing between persistent and finite transports."""
         kind = str(said.get("event") or "")
         # The payload sits under a key of the event's own name rather than beside it.
         told = cast("dict[str, Any]", said.get(kind) or {})
@@ -126,9 +292,20 @@ class AntigravityCLISession(CommandSessionBase):
             yield from self._step(told)
         elif kind == "result":
             self._said = str(told.get("response") or "")
-            self._costing = self._costing + self._cost(
-                cast("dict[str, Any]", told.get("usage") or {})
+            if self._shaping is not None and "structured_output" in told:
+                # Display text includes rejected finish calls and native tool metadata.
+                # Only the final structured value is the answer to the requested schema.
+                self._said = json.dumps(told["structured_output"])
+            cumulative = self._cost(cast("dict[str, Any]", told.get("usage") or {}))
+            self._costing = Usage(
+                {
+                    name: max(0.0, value - self._previous.get(name, 0.0))
+                    for name, value in cumulative.items()
+                }
             )
+            # Local commands such as /help report zeros, without resetting the resumed
+            # conversation's cumulative usage. Omitted counters retain their baseline.
+            self._previous = Usage({**self._previous, **cumulative})
             # It says how the run ended in a word rather than only in its exit status, and a
             # run that was cancelled or refused is not a turn that landed.
             status = str(told.get("status") or "")
@@ -255,7 +432,7 @@ class AntigravityCLIAgentConfig(AgentConfig):
 
 
 class AntigravityCLIAgent(AgentBase):
-    """Antigravity CLI, driven through its own command line, one run per turn."""
+    """Antigravity CLI, driven through its own persistent stream-json protocol."""
 
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Makes the agent, refusing a rung this backend has no way of running at.

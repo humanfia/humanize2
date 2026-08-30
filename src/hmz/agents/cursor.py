@@ -21,7 +21,10 @@ says it spent and this says nothing about it.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, CommandSessionBase
@@ -30,7 +33,6 @@ from .event import Event, Failed
 from .hooks import EVERYWHERE, SUBAGENTS, Moment
 
 if TYPE_CHECKING:
-    import os
     from collections.abc import Iterator
 
 #: What the CLI is installed as. Its installer writes two names and this is the one that can
@@ -119,6 +121,51 @@ def parameterized(model: str, effort: str, *, fast: bool) -> str:
     return f"{model}[{','.join(said)}]"
 
 
+def _local_runtime(agent: AgentBase, cwd: str) -> bool:
+    """Recognize the installed local runtime at the path this turn actually executes.
+
+    A local package's model IDs belong to its OpenAI-compatible endpoint, where Cursor's
+    parameter brackets are literal text. The standard CLI can inherit saved fast parameters,
+    so it still needs an explicit `fast=false`. Neither an environment flag nor a package
+    name alone establishes which runtime is installed; check its entry point and layout.
+    A machine's executable cannot be identified by inspecting this host's installation.
+    """
+    from hmz.backends import elsewhere
+
+    if agent.config.machine is not None:
+        return False
+    hushed = agent.hushed()
+    environment = {
+        key: value for key, value in os.environ.items() if key not in hushed
+    } | dict(agent.environment())
+    path = os.pathsep.join(
+        str(Path(cwd) / part) for part in os.get_exec_path(environment)
+    )
+    found = shutil.which(elsewhere(_COMMAND) or _COMMAND, path=path)
+    if found is None:
+        return False
+    try:
+        executable = Path(found).resolve(strict=True)
+        if executable.name != "cursor-agent-local":
+            return False
+        package: object = json.loads(
+            executable.with_name("package.json").read_text(encoding="utf-8")
+        )
+        launcher = executable.read_text(encoding="utf-8")
+        return (
+            isinstance(package, dict)
+            and cast("dict[str, object]", package).get("name")
+            == "@anysphere/agent-cli-local-runtime"
+            and '"$SCRIPT_DIR/node"' in launcher
+            and '"$SCRIPT_DIR/index.js"' in launcher
+            and executable.with_name("index.js").is_file()
+            and executable.with_name("node").is_file()
+            and os.access(executable.with_name("node"), os.X_OK)
+        )
+    except (OSError, ValueError, RuntimeError):
+        return False
+
+
 class CursorSession(CommandSessionBase):
     """A Cursor chat, resumed by the id its first turn reported.
 
@@ -159,17 +206,24 @@ class CursorSession(CommandSessionBase):
           argument and reads nothing off a piped stdin.
         """
         self._said, self._failed, self._shown = [], None, set()
+        configured = self._agent.config
+        model = parameterized(
+            configured.model, self.effort, fast=configured.service_tier == "fast"
+        )
+        if (
+            not self.effort
+            and configured.service_tier == "default"
+            and "[" not in configured.model
+            and _local_runtime(self._agent, self.cwd)
+        ):
+            model = configured.model
         argv = [
             _COMMAND,
             "--print",
             "--output-format",
             "stream-json",
             "--model",
-            parameterized(
-                self._agent.config.model,
-                self.effort,
-                fast=self._agent.config.service_tier == "fast",
-            ),
+            model,
             # The workspace it works in is a session's rather than a run's, and Cursor takes
             # it as a flag rather than reading the directory it was started in.
             "--workspace",

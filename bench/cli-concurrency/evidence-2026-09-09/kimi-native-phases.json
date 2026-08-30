@@ -1,0 +1,2168 @@
+{
+  "schema": "kimi-native-phase-public-v1",
+  "status": "Both trials retain failed work-tail verdicts.",
+  "boundary": "Durable native llm.request timestamp immediately before the official requester.request invocation; includes native preparation, inference, tools and later inference. Not independently observed HTTP arrival.",
+  "timestamp_semantics": {
+    "native": "JavaScript Date.now(), integer Unix epoch milliseconds",
+    "harness": "monotonic nanoseconds",
+    "journal": "paired realtime and monotonic timestamps in integer microseconds",
+    "clock_assumption": "No unobserved canceling realtime clock steps between the historical scope-start/end records. Offset spread is reported; this is not a proof of a continuously stable clock."
+  },
+  "percentile_method": {
+    "p50": "median",
+    "p95": "nearest rank ceil(0.95*n), equal to the largest observation for each serial set of3or5"
+  },
+  "native_response_timing_semantics": "Native ttftMs is client first-chunk time minus request start; serverFirstTokenMs is client first-chunk time minus sentAt and still includes transport. streamDurationMs spans received stream chunks. These do not isolate provider computation.",
+  "error_scope": "Native durable request/terminal events and matching diagnostic rows were reconciled. Unlogged internal provider SDK HTTP retries cannot be exhaustively ruled out.",
+  "trials": [
+    {
+      "trial": "two_session",
+      "baseline_concurrency": 1,
+      "candidate_concurrency": 2,
+      "raw_audit_sha256": "27e1557320b9b92808eb5afc87d0c8490788fb79014b9a64ce3383521a78963d",
+      "raw_clock_audit_sha256": "e0657645fff738fb154b20d7a3ab38ff4ad2114c66bbf0632072285f5a80b516",
+      "official_cli_source_sha256": "3f632148344f68c15633215244e1ca8c106116051cd0e744968906773230930a",
+      "clock_bridge": {
+        "same_boot": true,
+        "historical_scope_start_end": true,
+        "start_realtime_us": 1788968900525698,
+        "start_monotonic_us": 507047676593,
+        "end_realtime_us": 1788969917688691,
+        "end_monotonic_us": 508064839586,
+        "epoch_minus_monotonic_ns_used": 1788461852849105000,
+        "observed_offset_min_us": 1788461852849105,
+        "observed_offset_max_us": 1788461852849105,
+        "observed_offset_spread_us": 0
+      },
+      "turns": [
+        {
+          "variant": "baseline",
+          "repeat": 0,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 507375498867486,
+          "first_native_request_epoch_ms": 1788969235673,
+          "first_native_request_monotonic_ns": 507382823895000,
+          "native_turn_ended_epoch_ms": 1788969248035,
+          "native_turn_ended_monotonic_ns": 507395185895000,
+          "hmz_result_monotonic_ns": 507396253321175,
+          "turn_to_first_native_request_seconds": 7.325027514,
+          "first_native_request_to_hmz_result_seconds": 13.429426175,
+          "first_native_request_to_native_end_seconds": 12.362,
+          "native_end_to_hmz_result_seconds": 1.067426175,
+          "hmz_result_seconds": 20.754453688976355,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969238855
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969240468
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969245535
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969246991
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788969248028
+            }
+          ]
+        },
+        {
+          "variant": "baseline",
+          "repeat": 0,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 507396256619167,
+          "first_native_request_epoch_ms": 1788969249160,
+          "first_native_request_monotonic_ns": 507396310895000,
+          "native_turn_ended_epoch_ms": 1788969265698,
+          "native_turn_ended_monotonic_ns": 507412848895000,
+          "hmz_result_monotonic_ns": 507414820898281,
+          "turn_to_first_native_request_seconds": 0.054275833,
+          "first_native_request_to_hmz_result_seconds": 18.510003281,
+          "first_native_request_to_native_end_seconds": 16.538,
+          "native_end_to_hmz_result_seconds": 1.972003281,
+          "hmz_result_seconds": 18.564279114012606,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969250464
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969252067
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969262466
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969264205
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788969265694
+            }
+          ]
+        },
+        {
+          "variant": "baseline",
+          "repeat": 1,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 507415225260548,
+          "first_native_request_epoch_ms": 1788969274454,
+          "first_native_request_monotonic_ns": 507421604895000,
+          "native_turn_ended_epoch_ms": 1788969286700,
+          "native_turn_ended_monotonic_ns": 507433850895000,
+          "hmz_result_monotonic_ns": 507435074149190,
+          "turn_to_first_native_request_seconds": 6.379634452,
+          "first_native_request_to_hmz_result_seconds": 13.46925419,
+          "first_native_request_to_native_end_seconds": 12.246,
+          "native_end_to_hmz_result_seconds": 1.22325419,
+          "hmz_result_seconds": 19.84888864198001,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969281614
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969283335
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969284334
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969286693
+            }
+          ]
+        },
+        {
+          "variant": "baseline",
+          "repeat": 1,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 507435077450077,
+          "first_native_request_epoch_ms": 1788969287978,
+          "first_native_request_monotonic_ns": 507435128895000,
+          "native_turn_ended_epoch_ms": 1788969317631,
+          "native_turn_ended_monotonic_ns": 507464781895000,
+          "hmz_result_monotonic_ns": 507465991924482,
+          "turn_to_first_native_request_seconds": 0.051444923,
+          "first_native_request_to_hmz_result_seconds": 30.863029482,
+          "first_native_request_to_native_end_seconds": 29.653,
+          "native_end_to_hmz_result_seconds": 1.210029482,
+          "hmz_result_seconds": 30.914474404999055,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969296124
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969299749
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969307739
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969317626
+            }
+          ]
+        },
+        {
+          "variant": "baseline",
+          "repeat": 2,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 507466390337797,
+          "first_native_request_epoch_ms": 1788969326890,
+          "first_native_request_monotonic_ns": 507474040895000,
+          "native_turn_ended_epoch_ms": 1788969338187,
+          "native_turn_ended_monotonic_ns": 507485337895000,
+          "hmz_result_monotonic_ns": 507486404893447,
+          "turn_to_first_native_request_seconds": 7.650557203,
+          "first_native_request_to_hmz_result_seconds": 12.363998447,
+          "first_native_request_to_native_end_seconds": 11.297,
+          "native_end_to_hmz_result_seconds": 1.066998447,
+          "hmz_result_seconds": 20.014555650006514,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969328694
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969330371
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969331409
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969336904
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788969338179
+            }
+          ]
+        },
+        {
+          "variant": "baseline",
+          "repeat": 2,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 507486407853344,
+          "first_native_request_epoch_ms": 1788969339307,
+          "first_native_request_monotonic_ns": 507486457895000,
+          "native_turn_ended_epoch_ms": 1788969346403,
+          "native_turn_ended_monotonic_ns": 507493553895000,
+          "hmz_result_monotonic_ns": 507494714192773,
+          "turn_to_first_native_request_seconds": 0.050041656,
+          "first_native_request_to_hmz_result_seconds": 8.256297773,
+          "first_native_request_to_native_end_seconds": 7.096,
+          "native_end_to_hmz_result_seconds": 1.160297773,
+          "hmz_result_seconds": 8.306339428992942,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969340914
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969342256
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969343447
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969344700
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788969346398
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 0,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 507495348933729,
+          "first_native_request_epoch_ms": 1788969355088,
+          "first_native_request_monotonic_ns": 507502238895000,
+          "native_turn_ended_epoch_ms": 1788969368281,
+          "native_turn_ended_monotonic_ns": 507515431895000,
+          "hmz_result_monotonic_ns": 507515492825656,
+          "turn_to_first_native_request_seconds": 6.889961271,
+          "first_native_request_to_hmz_result_seconds": 13.253930656,
+          "first_native_request_to_native_end_seconds": 13.193,
+          "native_end_to_hmz_result_seconds": 0.060930656,
+          "hmz_result_seconds": 20.143891927029472,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969359025
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969364108
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969365018
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969368273
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 0,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 507515494859080,
+          "first_native_request_epoch_ms": 1788969368374,
+          "first_native_request_monotonic_ns": 507515524895000,
+          "native_turn_ended_epoch_ms": 1788969375757,
+          "native_turn_ended_monotonic_ns": 507522907895000,
+          "hmz_result_monotonic_ns": 507522966479805,
+          "turn_to_first_native_request_seconds": 0.03003592,
+          "first_native_request_to_hmz_result_seconds": 7.441584805,
+          "first_native_request_to_native_end_seconds": 7.383,
+          "native_end_to_hmz_result_seconds": 0.058584805,
+          "hmz_result_seconds": 7.47162072500214,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969370088
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969372572
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969374010
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969375753
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 0,
+          "session_index": 1,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 507495349194149,
+          "first_native_request_epoch_ms": 1788969355047,
+          "first_native_request_monotonic_ns": 507502197895000,
+          "native_turn_ended_epoch_ms": 1788969380087,
+          "native_turn_ended_monotonic_ns": 507527237895000,
+          "hmz_result_monotonic_ns": 507527291584800,
+          "turn_to_first_native_request_seconds": 6.848700851,
+          "first_native_request_to_hmz_result_seconds": 25.0936898,
+          "first_native_request_to_native_end_seconds": 25.04,
+          "native_end_to_hmz_result_seconds": 0.0536898,
+          "hmz_result_seconds": 31.94239065097645,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969361005
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969369187
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969378079
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969379056
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788969380083
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 0,
+          "session_index": 1,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 507527294759660,
+          "first_native_request_epoch_ms": 1788969380186,
+          "first_native_request_monotonic_ns": 507527336895000,
+          "native_turn_ended_epoch_ms": 1788969390618,
+          "native_turn_ended_monotonic_ns": 507537768895000,
+          "hmz_result_monotonic_ns": 507537826466577,
+          "turn_to_first_native_request_seconds": 0.04213534,
+          "first_native_request_to_hmz_result_seconds": 10.489571577,
+          "first_native_request_to_native_end_seconds": 10.432,
+          "native_end_to_hmz_result_seconds": 0.057571577,
+          "hmz_result_seconds": 10.53170691698324,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969383967
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969385378
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969386716
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969387745
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788969390612
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 1,
+          "session_index": 1,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 507538298074237,
+          "first_native_request_epoch_ms": 1788969398661,
+          "first_native_request_monotonic_ns": 507545811895000,
+          "native_turn_ended_epoch_ms": 1788969408871,
+          "native_turn_ended_monotonic_ns": 507556021895000,
+          "hmz_result_monotonic_ns": 507556092423872,
+          "turn_to_first_native_request_seconds": 7.513820763,
+          "first_native_request_to_hmz_result_seconds": 10.280528872,
+          "first_native_request_to_native_end_seconds": 10.21,
+          "native_end_to_hmz_result_seconds": 0.070528872,
+          "hmz_result_seconds": 17.79434963496169,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969400669
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969405276
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969406105
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969407769
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788969408861
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 1,
+          "session_index": 1,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 507556094815315,
+          "first_native_request_epoch_ms": 1788969409038,
+          "first_native_request_monotonic_ns": 507556188895000,
+          "native_turn_ended_epoch_ms": 1788969414819,
+          "native_turn_ended_monotonic_ns": 507561969895000,
+          "hmz_result_monotonic_ns": 507562026110498,
+          "turn_to_first_native_request_seconds": 0.094079685,
+          "first_native_request_to_hmz_result_seconds": 5.837215498,
+          "first_native_request_to_native_end_seconds": 5.781,
+          "native_end_to_hmz_result_seconds": 0.056215498,
+          "hmz_result_seconds": 5.931295183021575,
+          "native_model_request_count": 5,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969410239
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969411559
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969412415
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969413344
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788969414814
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 1,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 507538298364837,
+          "first_native_request_epoch_ms": 1788969398618,
+          "first_native_request_monotonic_ns": 507545768895000,
+          "native_turn_ended_epoch_ms": 1788969416895,
+          "native_turn_ended_monotonic_ns": 507564045895000,
+          "hmz_result_monotonic_ns": 507564097996656,
+          "turn_to_first_native_request_seconds": 7.470530163,
+          "first_native_request_to_hmz_result_seconds": 18.329101656,
+          "first_native_request_to_native_end_seconds": 18.277,
+          "native_end_to_hmz_result_seconds": 0.052101656,
+          "hmz_result_seconds": 25.799631819012575,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969401770
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969403410
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969411838
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969416891
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 1,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 507564101255025,
+          "first_native_request_epoch_ms": 1788969416984,
+          "first_native_request_monotonic_ns": 507564134895000,
+          "native_turn_ended_epoch_ms": 1788969430167,
+          "native_turn_ended_monotonic_ns": 507577317895000,
+          "hmz_result_monotonic_ns": 507577372763453,
+          "turn_to_first_native_request_seconds": 0.033639975,
+          "first_native_request_to_hmz_result_seconds": 13.237868453,
+          "first_native_request_to_native_end_seconds": 13.183,
+          "native_end_to_hmz_result_seconds": 0.054868453,
+          "hmz_result_seconds": 13.271508427977096,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969419036
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969427393
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969428268
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969430163
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 2,
+          "session_index": 1,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 507577753955756,
+          "first_native_request_epoch_ms": 1788969437645,
+          "first_native_request_monotonic_ns": 507584795895000,
+          "native_turn_ended_epoch_ms": 1788969446329,
+          "native_turn_ended_monotonic_ns": 507593479895000,
+          "hmz_result_monotonic_ns": 507593542105611,
+          "turn_to_first_native_request_seconds": 7.041939244,
+          "first_native_request_to_hmz_result_seconds": 8.746210611,
+          "first_native_request_to_native_end_seconds": 8.684,
+          "native_end_to_hmz_result_seconds": 0.062210611,
+          "hmz_result_seconds": 15.788149854983203,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969441426
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969443534
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969445125
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969446322
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 2,
+          "session_index": 1,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 507593544179588,
+          "first_native_request_epoch_ms": 1788969446425,
+          "first_native_request_monotonic_ns": 507593575895000,
+          "native_turn_ended_epoch_ms": 1788969452425,
+          "native_turn_ended_monotonic_ns": 507599575895000,
+          "hmz_result_monotonic_ns": 507599626945503,
+          "turn_to_first_native_request_seconds": 0.031715412,
+          "first_native_request_to_hmz_result_seconds": 6.051050503,
+          "first_native_request_to_native_end_seconds": 6.0,
+          "native_end_to_hmz_result_seconds": 0.051050503,
+          "hmz_result_seconds": 6.082765915023629,
+          "native_model_request_count": 4,
+          "native_tool_count": 4,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969448389
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969449961
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969451035
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969452421
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 2,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 507577754213748,
+          "first_native_request_epoch_ms": 1788969437608,
+          "first_native_request_monotonic_ns": 507584758895000,
+          "native_turn_ended_epoch_ms": 1788969449679,
+          "native_turn_ended_monotonic_ns": 507596829895000,
+          "hmz_result_monotonic_ns": 507596902553272,
+          "turn_to_first_native_request_seconds": 7.004681252,
+          "first_native_request_to_hmz_result_seconds": 12.143658272,
+          "first_native_request_to_native_end_seconds": 12.071,
+          "native_end_to_hmz_result_seconds": 0.072658272,
+          "hmz_result_seconds": 19.148339524050243,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969441965
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969444259
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969445453
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969448165
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788969449674
+            }
+          ]
+        },
+        {
+          "variant": "candidate",
+          "repeat": 2,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 507596904495270,
+          "first_native_request_epoch_ms": 1788969449782,
+          "first_native_request_monotonic_ns": 507596932895000,
+          "native_turn_ended_epoch_ms": 1788969456955,
+          "native_turn_ended_monotonic_ns": 507604105895000,
+          "hmz_result_monotonic_ns": 507604160907717,
+          "turn_to_first_native_request_seconds": 0.02839973,
+          "first_native_request_to_hmz_result_seconds": 7.228012717,
+          "first_native_request_to_native_end_seconds": 7.173,
+          "native_end_to_hmz_result_seconds": 0.055012717,
+          "hmz_result_seconds": 7.25641244702274,
+          "native_model_request_count": 4,
+          "native_tool_count": 4,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788969451537
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788969452825
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788969455585
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788969456951
+            }
+          ]
+        }
+      ],
+      "summaries": {
+        "cold.turn_to_first_native_request_seconds.p50": {
+          "baseline": 7.325027514,
+          "candidate": 7.023310248,
+          "candidate_over_baseline": 0.9588100842729476
+        },
+        "cold.turn_to_first_native_request_seconds.p95": {
+          "baseline": 7.650557203,
+          "candidate": 7.513820763,
+          "candidate_over_baseline": 0.9821272573523949
+        },
+        "cold.first_native_request_to_hmz_result_seconds.p50": {
+          "baseline": 13.429426175,
+          "candidate": 12.698794463999999,
+          "candidate_over_baseline": 0.9455947185323426
+        },
+        "cold.first_native_request_to_hmz_result_seconds.p95": {
+          "baseline": 13.46925419,
+          "candidate": 25.0936898,
+          "candidate_over_baseline": 1.8630348381598107
+        },
+        "cold.first_native_request_to_native_end_seconds.p50": {
+          "baseline": 12.246,
+          "candidate": 12.632,
+          "candidate_over_baseline": 1.0315204964886493
+        },
+        "cold.first_native_request_to_native_end_seconds.p95": {
+          "baseline": 12.362,
+          "candidate": 25.04,
+          "candidate_over_baseline": 2.0255622067626597
+        },
+        "cold.native_end_to_hmz_result_seconds.p50": {
+          "baseline": 1.067426175,
+          "candidate": 0.0615706335,
+          "candidate_over_baseline": 0.0576813974980518
+        },
+        "cold.native_end_to_hmz_result_seconds.p95": {
+          "baseline": 1.22325419,
+          "candidate": 0.072658272,
+          "candidate_over_baseline": 0.059397525546182675
+        },
+        "warm.turn_to_first_native_request_seconds.p50": {
+          "baseline": 0.051444923,
+          "candidate": 0.0326776935,
+          "candidate_over_baseline": 0.6351976365092431
+        },
+        "warm.turn_to_first_native_request_seconds.p95": {
+          "baseline": 0.054275833,
+          "candidate": 0.094079685,
+          "candidate_over_baseline": 1.7333623419469213
+        },
+        "warm.first_native_request_to_hmz_result_seconds.p50": {
+          "baseline": 18.510003281,
+          "candidate": 7.334798761,
+          "candidate_over_baseline": 0.3962613431046209
+        },
+        "warm.first_native_request_to_hmz_result_seconds.p95": {
+          "baseline": 30.863029482,
+          "candidate": 13.237868453,
+          "candidate_over_baseline": 0.42892317038159256
+        },
+        "warm.first_native_request_to_native_end_seconds.p50": {
+          "baseline": 16.538,
+          "candidate": 7.2780000000000005,
+          "candidate_over_baseline": 0.44007739750876773
+        },
+        "warm.first_native_request_to_native_end_seconds.p95": {
+          "baseline": 29.653,
+          "candidate": 13.183,
+          "candidate_over_baseline": 0.4445755910025967
+        },
+        "warm.native_end_to_hmz_result_seconds.p50": {
+          "baseline": 1.210029482,
+          "candidate": 0.0556141075,
+          "candidate_over_baseline": 0.04596095246214836
+        },
+        "warm.native_end_to_hmz_result_seconds.p95": {
+          "baseline": 1.972003281,
+          "candidate": 0.058584805,
+          "candidate_over_baseline": 0.029708269537103267
+        }
+      },
+      "recorded_hmz_kimi_source_sha256": {
+        "baseline": "c1c4440ee22f83c452727b3c3436bd96f3cef6679120d34e1e4ebcdbffb7bff7",
+        "candidate": "54860d9ae918816f158ebff1b8dc114076c35ca958c90d8a395b134a62d9bcc4"
+      },
+      "checks": {
+        "turns": 18,
+        "native_requests": 81,
+        "all_turns_completed": true,
+        "all_turns_inside_clock_bridge": true,
+        "phase_equations_recomputed": true,
+        "all_ratios_recomputed_match_raw_audit": true,
+        "native_wire_error_or_retry_count": 0,
+        "native_warning_error_count": 0
+      }
+    },
+    {
+      "trial": "lower_serial",
+      "baseline_concurrency": 1,
+      "candidate_concurrency": 1,
+      "raw_audit_sha256": "8e8d9d231672c73dcc033b6489c8b3895246f610de14348733107f77d261c02a",
+      "raw_clock_audit_sha256": "1df27f3b11eca2f2c0362b9915793a06c704f2989a81ff9d34f392598a8b6bdc",
+      "official_cli_source_sha256": "3f632148344f68c15633215244e1ca8c106116051cd0e744968906773230930a",
+      "clock_bridge": {
+        "same_boot": true,
+        "historical_scope_start_end": true,
+        "start_realtime_us": 1788971921556662,
+        "start_monotonic_us": 510068707558,
+        "end_realtime_us": 1788973181027554,
+        "end_monotonic_us": 511328178449,
+        "epoch_minus_monotonic_ns_used": 1788461852849104000,
+        "observed_offset_min_us": 1788461852849104,
+        "observed_offset_max_us": 1788461852849105,
+        "observed_offset_spread_us": 1
+      },
+      "turns": [
+        {
+          "variant": "baseline",
+          "repeat": 0,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 510815650929372,
+          "first_native_request_epoch_ms": 1788972675407,
+          "first_native_request_monotonic_ns": 510822557896000,
+          "native_turn_ended_epoch_ms": 1788972684917,
+          "native_turn_ended_monotonic_ns": 510832067896000,
+          "hmz_result_monotonic_ns": 510834011193675,
+          "turn_to_first_native_request_seconds": 6.906966628,
+          "first_native_request_to_hmz_result_seconds": 11.453297675,
+          "first_native_request_to_native_end_seconds": 9.51,
+          "native_end_to_hmz_result_seconds": 1.943297675,
+          "hmz_result_seconds": 18.36026430298807,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972677795,
+              "ttftMs": 2364,
+              "streamDurationMs": 17,
+              "serverFirstTokenMs": 2361
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972680593,
+              "ttftMs": 2591,
+              "streamDurationMs": 79,
+              "serverFirstTokenMs": 2590
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972682299,
+              "ttftMs": 1610,
+              "streamDurationMs": 2,
+              "serverFirstTokenMs": 1609
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972683723,
+              "ttftMs": 498,
+              "streamDurationMs": 718,
+              "serverFirstTokenMs": 496
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972684910,
+              "ttftMs": 468,
+              "streamDurationMs": 632,
+              "serverFirstTokenMs": 467
+            }
+          ],
+          "native_logged_ttft_total_seconds": 7.531,
+          "native_logged_stream_total_seconds": 1.448
+        },
+        {
+          "variant": "baseline",
+          "repeat": 0,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 510834014468853,
+          "first_native_request_epoch_ms": 1788972686916,
+          "first_native_request_monotonic_ns": 510834066896000,
+          "native_turn_ended_epoch_ms": 1788972693868,
+          "native_turn_ended_monotonic_ns": 510841018896000,
+          "hmz_result_monotonic_ns": 510842317418570,
+          "turn_to_first_native_request_seconds": 0.052427147,
+          "first_native_request_to_hmz_result_seconds": 8.25052257,
+          "first_native_request_to_native_end_seconds": 6.952,
+          "native_end_to_hmz_result_seconds": 1.29852257,
+          "hmz_result_seconds": 8.30294971697731,
+          "native_model_request_count": 4,
+          "native_tool_count": 3,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972688404,
+              "ttftMs": 477,
+              "streamDurationMs": 1008,
+              "serverFirstTokenMs": 476
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972689515,
+              "ttftMs": 1026,
+              "streamDurationMs": 13,
+              "serverFirstTokenMs": 1025
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972690698,
+              "ttftMs": 1090,
+              "streamDurationMs": 10,
+              "serverFirstTokenMs": 1090
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972693861,
+              "ttftMs": 493,
+              "streamDurationMs": 2528,
+              "serverFirstTokenMs": 492
+            }
+          ],
+          "native_logged_ttft_total_seconds": 3.086,
+          "native_logged_stream_total_seconds": 3.559
+        },
+        {
+          "variant": "baseline",
+          "repeat": 1,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 510842683296359,
+          "first_native_request_epoch_ms": 1788972702503,
+          "first_native_request_monotonic_ns": 510849653896000,
+          "native_turn_ended_epoch_ms": 1788972711549,
+          "native_turn_ended_monotonic_ns": 510858699896000,
+          "hmz_result_monotonic_ns": 510859995467624,
+          "turn_to_first_native_request_seconds": 6.970599641,
+          "first_native_request_to_hmz_result_seconds": 10.341571624,
+          "first_native_request_to_native_end_seconds": 9.046,
+          "native_end_to_hmz_result_seconds": 1.295571624,
+          "hmz_result_seconds": 17.312171264959034,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972704678,
+              "ttftMs": 1562,
+              "streamDurationMs": 606,
+              "serverFirstTokenMs": 1559
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972707346,
+              "ttftMs": 542,
+              "streamDurationMs": 1937,
+              "serverFirstTokenMs": 540
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972708449,
+              "ttftMs": 980,
+              "streamDurationMs": 17,
+              "serverFirstTokenMs": 979
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972710234,
+              "ttftMs": 848,
+              "streamDurationMs": 755,
+              "serverFirstTokenMs": 847
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972711542,
+              "ttftMs": 718,
+              "streamDurationMs": 520,
+              "serverFirstTokenMs": 718
+            }
+          ],
+          "native_logged_ttft_total_seconds": 4.65,
+          "native_logged_stream_total_seconds": 3.835
+        },
+        {
+          "variant": "baseline",
+          "repeat": 1,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 510859998736471,
+          "first_native_request_epoch_ms": 1788972712900,
+          "first_native_request_monotonic_ns": 510860050896000,
+          "native_turn_ended_epoch_ms": 1788972720610,
+          "native_turn_ended_monotonic_ns": 510867760896000,
+          "hmz_result_monotonic_ns": 510869327256441,
+          "turn_to_first_native_request_seconds": 0.052159529,
+          "first_native_request_to_hmz_result_seconds": 9.276360441,
+          "first_native_request_to_native_end_seconds": 7.71,
+          "native_end_to_hmz_result_seconds": 1.566360441,
+          "hmz_result_seconds": 9.328519970003981,
+          "native_model_request_count": 4,
+          "native_tool_count": 4,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972715405,
+              "ttftMs": 980,
+              "streamDurationMs": 1522,
+              "serverFirstTokenMs": 979
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972717730,
+              "ttftMs": 2233,
+              "streamDurationMs": 1,
+              "serverFirstTokenMs": 2232
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972718726,
+              "ttftMs": 900,
+              "streamDurationMs": 11,
+              "serverFirstTokenMs": 899
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972720605,
+              "ttftMs": 575,
+              "streamDurationMs": 1116,
+              "serverFirstTokenMs": 572
+            }
+          ],
+          "native_logged_ttft_total_seconds": 4.688,
+          "native_logged_stream_total_seconds": 2.65
+        },
+        {
+          "variant": "baseline",
+          "repeat": 2,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 510869650399071,
+          "first_native_request_epoch_ms": 1788972729453,
+          "first_native_request_monotonic_ns": 510876603896000,
+          "native_turn_ended_epoch_ms": 1788972738969,
+          "native_turn_ended_monotonic_ns": 510886119896000,
+          "hmz_result_monotonic_ns": 510888054758988,
+          "turn_to_first_native_request_seconds": 6.953496929,
+          "first_native_request_to_hmz_result_seconds": 11.450862988,
+          "first_native_request_to_native_end_seconds": 9.516,
+          "native_end_to_hmz_result_seconds": 1.934862988,
+          "hmz_result_seconds": 18.404359916981775,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972731795,
+              "ttftMs": 1201,
+              "streamDurationMs": 1133,
+              "serverFirstTokenMs": 1199
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972734616,
+              "ttftMs": 605,
+              "streamDurationMs": 2043,
+              "serverFirstTokenMs": 604
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972735684,
+              "ttftMs": 938,
+              "streamDurationMs": 31,
+              "serverFirstTokenMs": 936
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972737410,
+              "ttftMs": 769,
+              "streamDurationMs": 669,
+              "serverFirstTokenMs": 767
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972738961,
+              "ttftMs": 571,
+              "streamDurationMs": 878,
+              "serverFirstTokenMs": 570
+            }
+          ],
+          "native_logged_ttft_total_seconds": 4.084,
+          "native_logged_stream_total_seconds": 4.754
+        },
+        {
+          "variant": "baseline",
+          "repeat": 2,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 510888058115924,
+          "first_native_request_epoch_ms": 1788972740961,
+          "first_native_request_monotonic_ns": 510888111896000,
+          "native_turn_ended_epoch_ms": 1788972747646,
+          "native_turn_ended_monotonic_ns": 510894796896000,
+          "hmz_result_monotonic_ns": 510896358782199,
+          "turn_to_first_native_request_seconds": 0.053780076,
+          "first_native_request_to_hmz_result_seconds": 8.246886199,
+          "first_native_request_to_native_end_seconds": 6.685,
+          "native_end_to_hmz_result_seconds": 1.561886199,
+          "hmz_result_seconds": 8.300666274968535,
+          "native_model_request_count": 4,
+          "native_tool_count": 4,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972742853,
+              "ttftMs": 755,
+              "streamDurationMs": 1134,
+              "serverFirstTokenMs": 754
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972744171,
+              "ttftMs": 1221,
+              "streamDurationMs": 2,
+              "serverFirstTokenMs": 1220
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972745736,
+              "ttftMs": 1470,
+              "streamDurationMs": 16,
+              "serverFirstTokenMs": 1469
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972747641,
+              "ttftMs": 721,
+              "streamDurationMs": 1014,
+              "serverFirstTokenMs": 719
+            }
+          ],
+          "native_logged_ttft_total_seconds": 4.167,
+          "native_logged_stream_total_seconds": 2.166
+        },
+        {
+          "variant": "baseline",
+          "repeat": 3,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 510896895787371,
+          "first_native_request_epoch_ms": 1788972756428,
+          "first_native_request_monotonic_ns": 510903578896000,
+          "native_turn_ended_epoch_ms": 1788972769097,
+          "native_turn_ended_monotonic_ns": 510916247896000,
+          "hmz_result_monotonic_ns": 510918025954069,
+          "turn_to_first_native_request_seconds": 6.683108629,
+          "first_native_request_to_hmz_result_seconds": 14.447058069,
+          "first_native_request_to_native_end_seconds": 12.669,
+          "native_end_to_hmz_result_seconds": 1.778058069,
+          "hmz_result_seconds": 21.130166698014364,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972758334,
+              "ttftMs": 1081,
+              "streamDurationMs": 817,
+              "serverFirstTokenMs": 1079
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972760766,
+              "ttftMs": 2250,
+              "streamDurationMs": 10,
+              "serverFirstTokenMs": 2249
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972761828,
+              "ttftMs": 948,
+              "streamDurationMs": 15,
+              "serverFirstTokenMs": 947
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972769090,
+              "ttftMs": 6434,
+              "streamDurationMs": 611,
+              "serverFirstTokenMs": 6433
+            }
+          ],
+          "native_logged_ttft_total_seconds": 10.713,
+          "native_logged_stream_total_seconds": 1.453
+        },
+        {
+          "variant": "baseline",
+          "repeat": 3,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 510918029230987,
+          "first_native_request_epoch_ms": 1788972770934,
+          "first_native_request_monotonic_ns": 510918084896000,
+          "native_turn_ended_epoch_ms": 1788972777446,
+          "native_turn_ended_monotonic_ns": 510924596896000,
+          "hmz_result_monotonic_ns": 510926327221870,
+          "turn_to_first_native_request_seconds": 0.055665013,
+          "first_native_request_to_hmz_result_seconds": 8.24232587,
+          "first_native_request_to_native_end_seconds": 6.512,
+          "native_end_to_hmz_result_seconds": 1.73032587,
+          "hmz_result_seconds": 8.297990883002058,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972772827,
+              "ttftMs": 572,
+              "streamDurationMs": 1317,
+              "serverFirstTokenMs": 571
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972774429,
+              "ttftMs": 1453,
+              "streamDurationMs": 28,
+              "serverFirstTokenMs": 1452
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972775248,
+              "ttftMs": 739,
+              "streamDurationMs": 2,
+              "serverFirstTokenMs": 739
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972777441,
+              "ttftMs": 978,
+              "streamDurationMs": 965,
+              "serverFirstTokenMs": 977
+            }
+          ],
+          "native_logged_ttft_total_seconds": 3.742,
+          "native_logged_stream_total_seconds": 2.312
+        },
+        {
+          "variant": "baseline",
+          "repeat": 4,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 510926667780423,
+          "first_native_request_epoch_ms": 1788972786911,
+          "first_native_request_monotonic_ns": 510934061896000,
+          "native_turn_ended_epoch_ms": 1788972798908,
+          "native_turn_ended_monotonic_ns": 510946058896000,
+          "hmz_result_monotonic_ns": 510947544501838,
+          "turn_to_first_native_request_seconds": 7.394115577,
+          "first_native_request_to_hmz_result_seconds": 13.482605838,
+          "first_native_request_to_native_end_seconds": 11.997,
+          "native_end_to_hmz_result_seconds": 1.485605838,
+          "hmz_result_seconds": 20.876721414970234,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972789404,
+              "ttftMs": 1502,
+              "streamDurationMs": 982,
+              "serverFirstTokenMs": 1500
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972792982,
+              "ttftMs": 595,
+              "streamDurationMs": 2800,
+              "serverFirstTokenMs": 594
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972794426,
+              "ttftMs": 1328,
+              "streamDurationMs": 13,
+              "serverFirstTokenMs": 1327
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972797833,
+              "ttftMs": 3141,
+              "streamDurationMs": 6,
+              "serverFirstTokenMs": 3140
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972798901,
+              "ttftMs": 512,
+              "streamDurationMs": 468,
+              "serverFirstTokenMs": 511
+            }
+          ],
+          "native_logged_ttft_total_seconds": 7.078,
+          "native_logged_stream_total_seconds": 4.269
+        },
+        {
+          "variant": "baseline",
+          "repeat": 4,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 510947547776996,
+          "first_native_request_epoch_ms": 1788972800454,
+          "first_native_request_monotonic_ns": 510947604896000,
+          "native_turn_ended_epoch_ms": 1788972806438,
+          "native_turn_ended_monotonic_ns": 510953588896000,
+          "hmz_result_monotonic_ns": 510954857139165,
+          "turn_to_first_native_request_seconds": 0.057119004,
+          "first_native_request_to_hmz_result_seconds": 7.252243165,
+          "first_native_request_to_native_end_seconds": 5.984,
+          "native_end_to_hmz_result_seconds": 1.268243165,
+          "hmz_result_seconds": 7.309362169005908,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972802287,
+              "ttftMs": 538,
+              "streamDurationMs": 1292,
+              "serverFirstTokenMs": 537
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972803664,
+              "ttftMs": 1252,
+              "streamDurationMs": 4,
+              "serverFirstTokenMs": 1252
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972804558,
+              "ttftMs": 803,
+              "streamDurationMs": 13,
+              "serverFirstTokenMs": 802
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972806433,
+              "ttftMs": 869,
+              "streamDurationMs": 853,
+              "serverFirstTokenMs": 867
+            }
+          ],
+          "native_logged_ttft_total_seconds": 3.462,
+          "native_logged_stream_total_seconds": 2.162
+        },
+        {
+          "variant": "candidate",
+          "repeat": 0,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 510955585366532,
+          "first_native_request_epoch_ms": 1788972814815,
+          "first_native_request_monotonic_ns": 510961965896000,
+          "native_turn_ended_epoch_ms": 1788972824722,
+          "native_turn_ended_monotonic_ns": 510971872896000,
+          "hmz_result_monotonic_ns": 510971936239408,
+          "turn_to_first_native_request_seconds": 6.380529468,
+          "first_native_request_to_hmz_result_seconds": 9.970343408,
+          "first_native_request_to_native_end_seconds": 9.907,
+          "native_end_to_hmz_result_seconds": 0.063343408,
+          "hmz_result_seconds": 16.35087287600618,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972817076,
+              "ttftMs": 1001,
+              "streamDurationMs": 1253,
+              "serverFirstTokenMs": 999
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972819074,
+              "ttftMs": 719,
+              "streamDurationMs": 1097,
+              "serverFirstTokenMs": 718
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972820728,
+              "ttftMs": 1543,
+              "streamDurationMs": 15,
+              "serverFirstTokenMs": 1542
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972822047,
+              "ttftMs": 725,
+              "streamDurationMs": 420,
+              "serverFirstTokenMs": 724
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972824715,
+              "ttftMs": 1881,
+              "streamDurationMs": 713,
+              "serverFirstTokenMs": 1881
+            }
+          ],
+          "native_logged_ttft_total_seconds": 5.869,
+          "native_logged_stream_total_seconds": 3.498
+        },
+        {
+          "variant": "candidate",
+          "repeat": 0,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 510971939516951,
+          "first_native_request_epoch_ms": 1788972824847,
+          "first_native_request_monotonic_ns": 510971997896000,
+          "native_turn_ended_epoch_ms": 1788972831783,
+          "native_turn_ended_monotonic_ns": 510978933896000,
+          "hmz_result_monotonic_ns": 510978990741266,
+          "turn_to_first_native_request_seconds": 0.058379049,
+          "first_native_request_to_hmz_result_seconds": 6.992845266,
+          "first_native_request_to_native_end_seconds": 6.936,
+          "native_end_to_hmz_result_seconds": 0.056845266,
+          "hmz_result_seconds": 7.0512243150151335,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972827045,
+              "ttftMs": 2003,
+              "streamDurationMs": 183,
+              "serverFirstTokenMs": 2002
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972828342,
+              "ttftMs": 1157,
+              "streamDurationMs": 13,
+              "serverFirstTokenMs": 1156
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972829397,
+              "ttftMs": 959,
+              "streamDurationMs": 13,
+              "serverFirstTokenMs": 958
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972830280,
+              "ttftMs": 748,
+              "streamDurationMs": 9,
+              "serverFirstTokenMs": 747
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972831778,
+              "ttftMs": 629,
+              "streamDurationMs": 796,
+              "serverFirstTokenMs": 628
+            }
+          ],
+          "native_logged_ttft_total_seconds": 5.496,
+          "native_logged_stream_total_seconds": 1.014
+        },
+        {
+          "variant": "candidate",
+          "repeat": 1,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 510979486038236,
+          "first_native_request_epoch_ms": 1788972839533,
+          "first_native_request_monotonic_ns": 510986683896000,
+          "native_turn_ended_epoch_ms": 1788972852020,
+          "native_turn_ended_monotonic_ns": 510999170896000,
+          "hmz_result_monotonic_ns": 510999233570599,
+          "turn_to_first_native_request_seconds": 7.197857764,
+          "first_native_request_to_hmz_result_seconds": 12.549674599,
+          "first_native_request_to_native_end_seconds": 12.487,
+          "native_end_to_hmz_result_seconds": 0.062674599,
+          "hmz_result_seconds": 19.74753236299148,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972843145,
+              "ttftMs": 2799,
+              "streamDurationMs": 805,
+              "serverFirstTokenMs": 2797
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972845233,
+              "ttftMs": 494,
+              "streamDurationMs": 1409,
+              "serverFirstTokenMs": 492
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972847121,
+              "ttftMs": 1216,
+              "streamDurationMs": 579,
+              "serverFirstTokenMs": 1214
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972850538,
+              "ttftMs": 3298,
+              "streamDurationMs": 5,
+              "serverFirstTokenMs": 3297
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972852013,
+              "ttftMs": 660,
+              "streamDurationMs": 730,
+              "serverFirstTokenMs": 660
+            }
+          ],
+          "native_logged_ttft_total_seconds": 8.467,
+          "native_logged_stream_total_seconds": 3.528
+        },
+        {
+          "variant": "candidate",
+          "repeat": 1,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 510999236815858,
+          "first_native_request_epoch_ms": 1788972852124,
+          "first_native_request_monotonic_ns": 510999274896000,
+          "native_turn_ended_epoch_ms": 1788972863700,
+          "native_turn_ended_monotonic_ns": 511010850896000,
+          "hmz_result_monotonic_ns": 511010898839950,
+          "turn_to_first_native_request_seconds": 0.038080142,
+          "first_native_request_to_hmz_result_seconds": 11.62394395,
+          "first_native_request_to_native_end_seconds": 11.576,
+          "native_end_to_hmz_result_seconds": 0.04794395,
+          "hmz_result_seconds": 11.662024091987405,
+          "native_model_request_count": 5,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972853379,
+              "ttftMs": 520,
+              "streamDurationMs": 732,
+              "serverFirstTokenMs": 520
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972855661,
+              "ttftMs": 2162,
+              "streamDurationMs": 14,
+              "serverFirstTokenMs": 2162
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972859370,
+              "ttftMs": 3611,
+              "streamDurationMs": 12,
+              "serverFirstTokenMs": 3610
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972862325,
+              "ttftMs": 2754,
+              "streamDurationMs": 2,
+              "serverFirstTokenMs": 2751
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972863696,
+              "ttftMs": 596,
+              "streamDurationMs": 706,
+              "serverFirstTokenMs": 595
+            }
+          ],
+          "native_logged_ttft_total_seconds": 9.643,
+          "native_logged_stream_total_seconds": 1.466
+        },
+        {
+          "variant": "candidate",
+          "repeat": 2,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 511011426738459,
+          "first_native_request_epoch_ms": 1788972871605,
+          "first_native_request_monotonic_ns": 511018755896000,
+          "native_turn_ended_epoch_ms": 1788972879522,
+          "native_turn_ended_monotonic_ns": 511026672896000,
+          "hmz_result_monotonic_ns": 511026736620476,
+          "turn_to_first_native_request_seconds": 7.329157541,
+          "first_native_request_to_hmz_result_seconds": 7.980724476,
+          "first_native_request_to_native_end_seconds": 7.917,
+          "native_end_to_hmz_result_seconds": 0.063724476,
+          "hmz_result_seconds": 15.309882017027121,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972873426,
+              "ttftMs": 931,
+              "streamDurationMs": 883,
+              "serverFirstTokenMs": 929
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972875435,
+              "ttftMs": 409,
+              "streamDurationMs": 1420,
+              "serverFirstTokenMs": 408
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972877198,
+              "ttftMs": 1661,
+              "streamDurationMs": 2,
+              "serverFirstTokenMs": 1660
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972878380,
+              "ttftMs": 485,
+              "streamDurationMs": 519,
+              "serverFirstTokenMs": 484
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972879515,
+              "ttftMs": 566,
+              "streamDurationMs": 461,
+              "serverFirstTokenMs": 565
+            }
+          ],
+          "native_logged_ttft_total_seconds": 4.052,
+          "native_logged_stream_total_seconds": 3.285
+        },
+        {
+          "variant": "candidate",
+          "repeat": 2,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 511026740057315,
+          "first_native_request_epoch_ms": 1788972879642,
+          "first_native_request_monotonic_ns": 511026792896000,
+          "native_turn_ended_epoch_ms": 1788972885716,
+          "native_turn_ended_monotonic_ns": 511032866896000,
+          "hmz_result_monotonic_ns": 511032916682630,
+          "turn_to_first_native_request_seconds": 0.052838685,
+          "first_native_request_to_hmz_result_seconds": 6.12378663,
+          "first_native_request_to_native_end_seconds": 6.074,
+          "native_end_to_hmz_result_seconds": 0.04978663,
+          "hmz_result_seconds": 6.176625315041747,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972881396,
+              "ttftMs": 553,
+              "streamDurationMs": 1197,
+              "serverFirstTokenMs": 552
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972883070,
+              "ttftMs": 1535,
+              "streamDurationMs": 7,
+              "serverFirstTokenMs": 1534
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972884143,
+              "ttftMs": 981,
+              "streamDurationMs": 12,
+              "serverFirstTokenMs": 981
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972885711,
+              "ttftMs": 693,
+              "streamDurationMs": 710,
+              "serverFirstTokenMs": 691
+            }
+          ],
+          "native_logged_ttft_total_seconds": 3.762,
+          "native_logged_stream_total_seconds": 1.926
+        },
+        {
+          "variant": "candidate",
+          "repeat": 3,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 511033345774826,
+          "first_native_request_epoch_ms": 1788972893268,
+          "first_native_request_monotonic_ns": 511040418896000,
+          "native_turn_ended_epoch_ms": 1788972901880,
+          "native_turn_ended_monotonic_ns": 511049030896000,
+          "hmz_result_monotonic_ns": 511049096664152,
+          "turn_to_first_native_request_seconds": 7.073121174,
+          "first_native_request_to_hmz_result_seconds": 8.677768152,
+          "first_native_request_to_native_end_seconds": 8.612,
+          "native_end_to_hmz_result_seconds": 0.065768152,
+          "hmz_result_seconds": 15.750889325980097,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972895491,
+              "ttftMs": 2073,
+              "streamDurationMs": 142,
+              "serverFirstTokenMs": 2070
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972899369,
+              "ttftMs": 2973,
+              "streamDurationMs": 739,
+              "serverFirstTokenMs": 2972
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972900539,
+              "ttftMs": 1064,
+              "streamDurationMs": 11,
+              "serverFirstTokenMs": 1063
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972901873,
+              "ttftMs": 589,
+              "streamDurationMs": 561,
+              "serverFirstTokenMs": 588
+            }
+          ],
+          "native_logged_ttft_total_seconds": 6.699,
+          "native_logged_stream_total_seconds": 1.453
+        },
+        {
+          "variant": "candidate",
+          "repeat": 3,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 511049099955424,
+          "first_native_request_epoch_ms": 1788972902017,
+          "first_native_request_monotonic_ns": 511049167896000,
+          "native_turn_ended_epoch_ms": 1788972908816,
+          "native_turn_ended_monotonic_ns": 511055966896000,
+          "hmz_result_monotonic_ns": 511056027768037,
+          "turn_to_first_native_request_seconds": 0.067940576,
+          "first_native_request_to_hmz_result_seconds": 6.859872037,
+          "first_native_request_to_native_end_seconds": 6.799,
+          "native_end_to_hmz_result_seconds": 0.060872037,
+          "hmz_result_seconds": 6.927812612964772,
+          "native_model_request_count": 4,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972903614,
+              "ttftMs": 487,
+              "streamDurationMs": 1107,
+              "serverFirstTokenMs": 486
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972904860,
+              "ttftMs": 1106,
+              "streamDurationMs": 13,
+              "serverFirstTokenMs": 1105
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972906066,
+              "ttftMs": 1114,
+              "streamDurationMs": 16,
+              "serverFirstTokenMs": 1113
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972908812,
+              "ttftMs": 495,
+              "streamDurationMs": 2130,
+              "serverFirstTokenMs": 494
+            }
+          ],
+          "native_logged_ttft_total_seconds": 3.202,
+          "native_logged_stream_total_seconds": 3.266
+        },
+        {
+          "variant": "candidate",
+          "repeat": 4,
+          "session_index": 0,
+          "phase": "cold",
+          "turn_started_monotonic_ns": 511056437705690,
+          "first_native_request_epoch_ms": 1788972916609,
+          "first_native_request_monotonic_ns": 511063759896000,
+          "native_turn_ended_epoch_ms": 1788972925896,
+          "native_turn_ended_monotonic_ns": 511073046896000,
+          "hmz_result_monotonic_ns": 511073131735840,
+          "turn_to_first_native_request_seconds": 7.32219031,
+          "first_native_request_to_hmz_result_seconds": 9.37183984,
+          "first_native_request_to_native_end_seconds": 9.287,
+          "native_end_to_hmz_result_seconds": 0.08483984,
+          "hmz_result_seconds": 16.69403015001444,
+          "native_model_request_count": 5,
+          "native_tool_count": 6,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972919276,
+              "ttftMs": 1351,
+              "streamDurationMs": 1309,
+              "serverFirstTokenMs": 1348
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972921548,
+              "ttftMs": 719,
+              "streamDurationMs": 1387,
+              "serverFirstTokenMs": 718
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972922480,
+              "ttftMs": 841,
+              "streamDurationMs": 2,
+              "serverFirstTokenMs": 841
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972924336,
+              "ttftMs": 1285,
+              "streamDurationMs": 432,
+              "serverFirstTokenMs": 1284
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972925889,
+              "ttftMs": 525,
+              "streamDurationMs": 954,
+              "serverFirstTokenMs": 525
+            }
+          ],
+          "native_logged_ttft_total_seconds": 4.721,
+          "native_logged_stream_total_seconds": 4.084
+        },
+        {
+          "variant": "candidate",
+          "repeat": 4,
+          "session_index": 0,
+          "phase": "warm",
+          "turn_started_monotonic_ns": 511073135085336,
+          "first_native_request_epoch_ms": 1788972926038,
+          "first_native_request_monotonic_ns": 511073188896000,
+          "native_turn_ended_epoch_ms": 1788972934449,
+          "native_turn_ended_monotonic_ns": 511081599896000,
+          "hmz_result_monotonic_ns": 511081648762496,
+          "turn_to_first_native_request_seconds": 0.053810664,
+          "first_native_request_to_hmz_result_seconds": 8.459866496,
+          "first_native_request_to_native_end_seconds": 8.411,
+          "native_end_to_hmz_result_seconds": 0.048866496,
+          "hmz_result_seconds": 8.51367716002278,
+          "native_model_request_count": 5,
+          "native_tool_count": 5,
+          "native_terminal_completed": true,
+          "native_wire_error_or_retry_count": 0,
+          "native_warning_error_count": 0,
+          "native_response_steps": [
+            {
+              "step": 1,
+              "epoch_ms": 1788972927500,
+              "ttftMs": 764,
+              "streamDurationMs": 695,
+              "serverFirstTokenMs": 763
+            },
+            {
+              "step": 2,
+              "epoch_ms": 1788972929329,
+              "ttftMs": 1725,
+              "streamDurationMs": 6,
+              "serverFirstTokenMs": 1724
+            },
+            {
+              "step": 3,
+              "epoch_ms": 1788972931488,
+              "ttftMs": 2064,
+              "streamDurationMs": 15,
+              "serverFirstTokenMs": 2063
+            },
+            {
+              "step": 4,
+              "epoch_ms": 1788972932693,
+              "ttftMs": 1069,
+              "streamDurationMs": 14,
+              "serverFirstTokenMs": 1068
+            },
+            {
+              "step": 5,
+              "epoch_ms": 1788972934445,
+              "ttftMs": 729,
+              "streamDurationMs": 951,
+              "serverFirstTokenMs": 728
+            }
+          ],
+          "native_logged_ttft_total_seconds": 6.351,
+          "native_logged_stream_total_seconds": 1.681
+        }
+      ],
+      "summaries": {
+        "cold.turn_to_first_native_request_seconds.p50": {
+          "baseline": 6.953496929,
+          "candidate": 7.197857764,
+          "candidate_over_baseline": 1.0351421504165592
+        },
+        "cold.turn_to_first_native_request_seconds.p95": {
+          "baseline": 7.394115577,
+          "candidate": 7.329157541,
+          "candidate_over_baseline": 0.9912149011841176
+        },
+        "cold.first_native_request_to_hmz_result_seconds.p50": {
+          "baseline": 11.453297675,
+          "candidate": 9.37183984,
+          "candidate_over_baseline": 0.8182656302085504
+        },
+        "cold.first_native_request_to_hmz_result_seconds.p95": {
+          "baseline": 14.447058069,
+          "candidate": 12.549674599,
+          "candidate_over_baseline": 0.8686664467645948
+        },
+        "cold.first_native_request_to_native_end_seconds.p50": {
+          "baseline": 9.516,
+          "candidate": 9.287,
+          "candidate_over_baseline": 0.9759352669188736
+        },
+        "cold.first_native_request_to_native_end_seconds.p95": {
+          "baseline": 12.669,
+          "candidate": 12.487,
+          "candidate_over_baseline": 0.9856342252742916
+        },
+        "cold.native_end_to_hmz_result_seconds.p50": {
+          "baseline": 1.778058069,
+          "candidate": 0.063724476,
+          "candidate_over_baseline": 0.03583936717873301
+        },
+        "cold.native_end_to_hmz_result_seconds.p95": {
+          "baseline": 1.943297675,
+          "candidate": 0.08483984,
+          "candidate_over_baseline": 0.04365766557097332
+        },
+        "warm.turn_to_first_native_request_seconds.p50": {
+          "baseline": 0.053780076,
+          "candidate": 0.053810664,
+          "candidate_over_baseline": 1.0005687608176679
+        },
+        "warm.turn_to_first_native_request_seconds.p95": {
+          "baseline": 0.057119004,
+          "candidate": 0.067940576,
+          "candidate_over_baseline": 1.189456594866395
+        },
+        "warm.first_native_request_to_hmz_result_seconds.p50": {
+          "baseline": 8.246886199,
+          "candidate": 6.992845266,
+          "candidate_over_baseline": 0.847937645465259
+        },
+        "warm.first_native_request_to_hmz_result_seconds.p95": {
+          "baseline": 9.276360441,
+          "candidate": 11.62394395,
+          "candidate_over_baseline": 1.2530716140162108
+        },
+        "warm.first_native_request_to_native_end_seconds.p50": {
+          "baseline": 6.685,
+          "candidate": 6.936,
+          "candidate_over_baseline": 1.03754674644727
+        },
+        "warm.first_native_request_to_native_end_seconds.p95": {
+          "baseline": 7.71,
+          "candidate": 11.576,
+          "candidate_over_baseline": 1.501426718547341
+        },
+        "warm.native_end_to_hmz_result_seconds.p50": {
+          "baseline": 1.561886199,
+          "candidate": 0.04978663,
+          "candidate_over_baseline": 0.031875965119530454
+        },
+        "warm.native_end_to_hmz_result_seconds.p95": {
+          "baseline": 1.73032587,
+          "candidate": 0.060872037,
+          "candidate_over_baseline": 0.03517952199373867
+        }
+      },
+      "recorded_hmz_kimi_source_sha256": {
+        "baseline": "c1c4440ee22f83c452727b3c3436bd96f3cef6679120d34e1e4ebcdbffb7bff7",
+        "candidate": "54860d9ae918816f158ebff1b8dc114076c35ca958c90d8a395b134a62d9bcc4"
+      },
+      "checks": {
+        "turns": 20,
+        "native_requests": 91,
+        "all_turns_completed": true,
+        "all_turns_inside_clock_bridge": true,
+        "phase_equations_recomputed": true,
+        "all_ratios_recomputed_match_raw_audit": true,
+        "native_wire_error_or_retry_count": 0,
+        "native_warning_error_count": 0
+      }
+    }
+  ]
+}

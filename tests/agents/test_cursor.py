@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends, models
+from hmz import backends, models, providers
 from hmz.agents import (
     SUBAGENTS,
     CursorAgent,
@@ -26,7 +26,9 @@ from hmz.agents import (
     Occasion,
     Verdict,
 )
-from hmz.agents.cursor import parameterized
+from hmz.agents.cursor import _local_runtime, parameterized
+from hmz.machines import AnchoredConfig, DockerConfig
+from tests.stubs import HereAnchor
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -338,3 +340,210 @@ def test_web_search_cannot_be_switched_off_and_is_refused_rather_than_ignored() 
 
     with pytest.raises(ValueError, match="no way of being told"):
         CursorAgent(replace(CURSOR, web_search=False))
+
+
+def _install_local(directory: Path, log: Path) -> Path:
+    """Model the official local package layout while recording the ordinary CLI protocol."""
+    package = directory / "dist-package"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text(
+        json.dumps({"name": "@anysphere/agent-cli-local-runtime", "private": True})
+    )
+    (package / "index.js").write_text(_CURSOR_STUB.replace("LOG", repr(str(log))))
+    (package / "node").symlink_to(sys.executable)
+    entry = package / "cursor-agent-local"
+    entry.write_text(
+        '#!/bin/sh\nSCRIPT_DIR="$(dirname "$(readlink -f "$0")")"\n'
+        'exec "$SCRIPT_DIR/node" "$SCRIPT_DIR/index.js" "$@"\n'
+    )
+    entry.chmod(0o755)
+    binaries = directory / "bin"
+    binaries.mkdir()
+    (binaries / "cursor-agent").symlink_to(entry)
+    return binaries
+
+
+@pytest.fixture
+def local_cursor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _Calls:
+    log = tmp_path / "local-calls.jsonl"
+    binaries = _install_local(tmp_path / "local", log)
+    monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.chdir(tmp_path)
+    return _Calls(log)
+
+
+def test_local_external_model_keeps_its_id_and_resumes(local_cursor: _Calls) -> None:
+    session = CursorAgent(CursorAgentConfig(model="external/model-id", effort="")).new()
+    assert session("first") == "first"
+    assert session("second") == "second"
+    first, second = local_cursor.argv()
+    for argv in (first, second):
+        assert argv[argv.index("--model") + 1] == "external/model-id"
+        assert "--trust" in argv
+        assert argv[argv.index("--sandbox") + 1] == "disabled"
+    assert "--resume=chat-0001" in second
+    assert session.id == "chat-0001"
+
+
+@pytest.mark.parametrize(
+    ("model", "effort", "tier", "expected"),
+    [
+        (
+            "external/model-id",
+            "high",
+            "default",
+            "external/model-id[effort=high,fast=false]",
+        ),
+        ("external/model-id", "", "fast", "external/model-id[fast=true]"),
+        (
+            "external/model-id[context=1m]",
+            "high",
+            "fast",
+            "external/model-id[context=1m]",
+        ),
+        (
+            "external/model-id[fast=false]",
+            "",
+            "default",
+            "external/model-id[fast=false]",
+        ),
+    ],
+)
+def test_local_runtime_does_not_discard_explicit_parameters(
+    local_cursor: _Calls, model: str, effort: str, tier: str, expected: str
+) -> None:
+    session = CursorAgent(
+        CursorAgentConfig(model=model, effort=effort, service_tier=tier)
+    ).new()
+    argv, _ = session._turn("hello")
+    assert argv[argv.index("--model") + 1] == expected
+
+
+def test_standard_default_still_overrides_saved_fast(
+    cursor: _Calls, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    native = tmp_path / "native"
+    native.mkdir()
+    (native / "cli-config.json").write_text(
+        json.dumps({"modelParameters": {"composer-2.5": {"fast": True}}})
+    )
+    monkeypatch.setenv("CURSOR_CONFIG_DIR", str(native))
+    # This flag changes the standard CLI's labels, not its runtime implementation.
+    monkeypatch.setenv("CURSOR_AGENT_CLI_LOCAL_MODE", "true")
+    CursorAgent(CursorAgentConfig(model="composer-2.5", effort="")).new()("hello")
+    (argv,) = cursor.argv()
+    assert argv[argv.index("--model") + 1] == "composer-2.5[fast=false]"
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        "missing-package",
+        "invalid-json",
+        "non-object",
+        "standard-package",
+        "name-only",
+        "missing-index",
+        "missing-node",
+        "wrong-entry",
+    ],
+)
+def test_local_detection_requires_the_native_entry_and_package_layout(
+    local_cursor: _Calls, tmp_path: Path, broken: str
+) -> None:
+    package = tmp_path / "local" / "dist-package"
+    metadata = package / "package.json"
+    if broken == "missing-package":
+        metadata.unlink()
+    elif broken == "invalid-json":
+        metadata.write_text("{")
+    elif broken == "non-object":
+        metadata.write_text("[]")
+    elif broken == "standard-package":
+        metadata.write_text(json.dumps({"name": "@anysphere/agent-cli-runtime"}))
+    elif broken == "name-only":
+        (package / "cursor-agent-local").write_text("#!/bin/sh\nexit 0\n")
+    elif broken == "missing-index":
+        (package / "index.js").unlink()
+    elif broken == "missing-node":
+        (package / "node").unlink()
+    else:
+        entry = package / "cursor-agent-local"
+        renamed = entry.rename(package / "cursor-agent")
+        link = tmp_path / "local" / "bin" / "cursor-agent"
+        link.unlink()
+        link.symlink_to(renamed)
+    session = CursorAgent(CursorAgentConfig(model="external/id", effort="")).new()
+    argv, _ = session._turn("hello")
+    assert argv[argv.index("--model") + 1] == "external/id[fast=false]"
+
+
+@pytest.mark.parametrize("child_local", [True, False])
+def test_runtime_selection_follows_provider_path(
+    cursor: _Calls, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, child_local: bool
+) -> None:
+    standard = tmp_path / "bin"
+    local = _install_local(tmp_path / "local", tmp_path / "local-calls.jsonl")
+    inherited = os.environ["PATH"]
+    parent, child = (standard, local) if child_local else (local, standard)
+    monkeypatch.setenv("PATH", f"{parent}{os.pathsep}{inherited}")
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize"))
+    providers.add("cursor", "child", env={"PATH": f"{child}{os.pathsep}{inherited}"})
+    session = CursorAgent(
+        CursorAgentConfig(model="external/id", effort="", provider="child")
+    ).new()
+    argv, _ = session._turn("hello")
+    expected = "external/id" if child_local else "external/id[fast=false]"
+    assert argv[argv.index("--model") + 1] == expected
+
+
+def test_child_relative_path_is_resolved_in_the_session_workspace(
+    cursor: _Calls, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    _install_local(workspace, tmp_path / "local-calls.jsonl")
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize"))
+    providers.add("cursor", "child", env={"PATH": "bin"})
+    session = CursorAgent(
+        CursorAgentConfig(model="external/id", effort="", provider="child")
+    ).new(workspace)
+    argv, _ = session._turn("hello")
+    assert argv[argv.index("--model") + 1] == "external/id"
+
+
+def test_host_install_fallback_matches_the_command_spawned(
+    cursor: _Calls, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local = _install_local(tmp_path / "local", tmp_path / "local-calls.jsonl")
+    standard = tmp_path / "bin" / "cursor-agent"
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize"))
+    providers.add("cursor", "child", env={"PATH": str(local)})
+
+    def fallback(command: str) -> str:
+        assert command == "cursor-agent"
+        return str(standard)
+
+    monkeypatch.setattr(backends, "elsewhere", fallback)
+    session = CursorAgent(
+        CursorAgentConfig(model="external/id", effort="", provider="child")
+    ).new()
+    argv, _ = session._turn("hello")
+    assert argv[argv.index("--model") + 1] == "external/id[fast=false]"
+
+
+@pytest.mark.parametrize("isolated", [False, True])
+def test_machine_runtime_is_not_inferred_from_the_host(
+    local_cursor: _Calls, tmp_path: Path, isolated: bool
+) -> None:
+    machine = (
+        DockerConfig(image="python:3.12")
+        if isolated
+        else AnchoredConfig(
+            anchor=HereAnchor(target="ssh://build-box", workspace="/work")
+        )
+    )
+    agent = CursorAgent(
+        CursorAgentConfig(model="external/id", effort="", machine=machine)
+    )
+    assert not _local_runtime(agent, str(tmp_path))
+    assert agent._anchor is None  # Detection must not start either machine.

@@ -66,7 +66,7 @@ def read_bytes(pid: int, address: int, size: int) -> bytes:
     if size <= 0:
         return b""
     buffer = ctypes.create_string_buffer(size)
-    local = _Iovec(ctypes.cast(buffer, ctypes.c_void_p), size)
+    local = _Iovec(ctypes.addressof(buffer), size)
     remote = _Iovec(ctypes.c_void_p(address), size)
     ctypes.set_errno(0)
     count = _libc.process_vm_readv(
@@ -86,7 +86,7 @@ def write_bytes(pid: int, address: int, data: bytes) -> int:
     if not data:
         return 0
     buffer = ctypes.create_string_buffer(data, len(data))
-    local = _Iovec(ctypes.cast(buffer, ctypes.c_void_p), len(data))
+    local = _Iovec(ctypes.addressof(buffer), len(data))
     remote = _Iovec(ctypes.c_void_p(address), len(data))
     ctypes.set_errno(0)
     count = _libc.process_vm_writev(

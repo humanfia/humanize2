@@ -180,46 +180,55 @@ out("step_finish", {"id": "prt_two", "type": "step-finish", "reason": "stop",
 """
 
 
-#: A `qwen`: it takes the prompt on stdin and answers in the records of one turn, which are
-#: the ones Claude Code's own `stream-json` is made of. A prompt of `boom` comes back as a
-#: result that says it errored, with the exit status still zero, which is how this backend
-#: reports a turn it could not finish; one of `quiet` says nothing at all.
-_QWEN = """
+#: A `qwen`: ordinary turns arrive as NDJSON on an open stdin; shaped turns use
+#: finite plain stdin. Both answer in the same records and report failure in a result.
+_QWEN = r"""
 import json, os, pathlib, sys
 
 log = pathlib.Path(LOG)
-said = sys.stdin.read()
 flags = dict(zip(sys.argv, sys.argv[1:]))
 settings = os.environ.get("QWEN_CODE_SYSTEM_SETTINGS_PATH")
 thinking = pathlib.Path(settings).read_text() if settings else None
-with log.open("a") as stream:
-    json.dump({"argv": sys.argv[1:], "stdin": said, "thinking": thinking,
-               "inherited": os.environ.get("A_THING_THE_FLOW_HAS")}, stream)
-    stream.write("\\n")
-
 session = flags.get("--resume", "ses-qwen-stub")
+total = {}
 
 
 def out(record):
     print(json.dumps({"session_id": session, **record}), flush=True)
 
 
-if said == "quiet":
-    sys.exit(0)
-out({"type": "system", "subtype": "init", "model": flags.get("--model")})
-if said == "boom":
-    out({"type": "result", "subtype": "error_during_execution", "is_error": True,
-         "result": "", "error": {"message": "qwen would not take it"},
-         "usage": {"input_tokens": 1, "output_tokens": 0}})
-    sys.exit(0)
-out({"type": "assistant", "message": {"id": "msg_1", "role": "assistant", "content": [
-    {"type": "thinking", "thinking": "thinking about " + said},
-    {"type": "tool_use", "id": "call_1", "name": "run_shell_command",
-     "input": {"command": "echo " + said}},
-    {"type": "text", "text": said}],
-    "usage": {"input_tokens": 5, "output_tokens": 2, "cache_read_input_tokens": 1}}})
-out({"type": "result", "subtype": "success", "is_error": False, "result": said,
-     "usage": {"input_tokens": 2, "output_tokens": 1}})
+def turn(said):
+    with log.open("a") as stream:
+        json.dump({"argv": sys.argv[1:], "stdin": said, "thinking": thinking,
+                   "inherited": os.environ.get("A_THING_THE_FLOW_HAS"),
+                   "pid": os.getpid()}, stream)
+        stream.write("\n")
+    if said == "quiet":
+        sys.exit(0)
+    out({"type": "system", "subtype": "init", "model": flags.get("--model")})
+    if said == "boom":
+        out({"type": "result", "subtype": "error_during_execution", "is_error": True,
+             "result": "", "error": {"message": "qwen would not take it"},
+             "usage": {"input_tokens": 1, "output_tokens": 0}})
+        return
+    out({"type": "assistant", "message": {"id": "msg_1", "role": "assistant", "content": [
+        {"type": "thinking", "thinking": "thinking about " + said},
+        {"type": "tool_use", "id": "call_1", "name": "run_shell_command",
+         "input": {"command": "echo " + said}},
+        {"type": "text", "text": said}],
+        "usage": {"input_tokens": 5, "output_tokens": 2, "cache_read_input_tokens": 1}}})
+    for key, value in {"input_tokens": 5, "output_tokens": 2,
+                       "cache_read_input_tokens": 1}.items():
+        total[key] = total.get(key, 0) + value
+    out({"type": "result", "subtype": "success", "is_error": False, "result": said,
+         "usage": total})
+
+
+if flags.get("--input-format") == "stream-json":
+    for line in sys.stdin:
+        turn(json.loads(line)["message"]["content"])
+else:
+    turn(sys.stdin.read())
 """
 
 #: A `grok -p`: the prompt is inside the command line, and it answers in the lines of one
@@ -270,12 +279,6 @@ import json, os, pathlib, sys
 log = pathlib.Path(LOG)
 argv = sys.argv[1:]
 flags = dict(zip(sys.argv, sys.argv[1:]))
-said = flags.get("--print", "")
-with log.open("a") as stream:
-    json.dump({"argv": argv, "stdin": said,
-               "inherited": os.environ.get("A_THING_THE_FLOW_HAS")}, stream)
-    stream.write("\\n")
-
 talk = flags.get("--conversation", "conv-agy-stub")
 
 
@@ -283,29 +286,42 @@ def out(line):
     print(json.dumps(line), flush=True)
 
 
-if said == "quiet":
-    sys.exit(0)
-out({"event": "init", "conversation_id": talk,
-     "init": {"cwd": os.getcwd(), "permission_mode": "always-proceed",
-              "model": flags.get("--model")}})
-if said == "boom":
-    out({"event": "result", "result": {"conversation_id": talk, "status": "ERROR",
-         "response": "", "error": "agy would not take it", "num_turns": 0,
-         "usage": {"input_tokens": 1, "output_tokens": 0}}})
-    sys.exit(0)
-out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 0,
-     "state": "ACTIVE", "step_type": "THINKING", "text_delta": "thinking about " + said}})
-out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 1,
-     "state": "ACTIVE", "step_type": "TOOL", "tool_name": "run_command",
-     "tool_info": {"command": "echo " + said}}})
-out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 1,
-     "state": "DONE", "step_type": "TOOL", "tool_name": "run_command"}})
-out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 2,
-     "state": "ACTIVE", "step_type": "RESPONSE", "text_delta": said}})
-out({"event": "result", "result": {"conversation_id": talk, "status": "SUCCESS",
-     "response": said, "num_turns": 1, "duration_seconds": 1,
-     "usage": {"input_tokens": 5, "output_tokens": 2, "thinking_tokens": 1,
-               "cache_read_tokens": 1}}})
+def turn(said):
+    with log.open("a") as stream:
+        json.dump({"argv": argv, "stdin": said, "pid": os.getpid(),
+                   "inherited": os.environ.get("A_THING_THE_FLOW_HAS")}, stream)
+        stream.write("\\n")
+
+    if said == "quiet":
+        sys.exit(0)
+    out({"event": "init", "conversation_id": talk,
+         "init": {"cwd": os.getcwd(), "permission_mode": "always-proceed",
+                  "model": flags.get("--model")}})
+    if said == "boom":
+        out({"event": "result", "result": {"conversation_id": talk, "status": "ERROR",
+             "response": "", "error": "agy would not take it", "num_turns": 0,
+             "usage": {"input_tokens": 1, "output_tokens": 0}}})
+        sys.exit(0)
+    out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 0,
+         "state": "ACTIVE", "step_type": "THINKING", "text_delta": "thinking about " + said}})
+    out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 1,
+         "state": "ACTIVE", "step_type": "TOOL", "tool_name": "run_command",
+         "tool_info": {"command": "echo " + said}}})
+    out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 1,
+         "state": "DONE", "step_type": "TOOL", "tool_name": "run_command"}})
+    out({"event": "step_update", "step_update": {"conversation_id": talk, "step_index": 2,
+         "state": "ACTIVE", "step_type": "RESPONSE", "text_delta": said}})
+    out({"event": "result", "result": {"conversation_id": talk, "status": "SUCCESS",
+         "response": said, "num_turns": 1, "duration_seconds": 1,
+         "usage": {"input_tokens": 5, "output_tokens": 2, "thinking_tokens": 1,
+                   "cache_read_tokens": 1}}})
+
+
+if flags.get("--input-format") == "stream-json":
+    for line in sys.stdin:
+        turn(json.loads(line)["message"]["content"])
+else:
+    turn(flags.get("--print", ""))
 """
 
 
@@ -322,6 +338,7 @@ class _Call:
     #: The settings file a turn was pointed at, for the backend whose effort is written down
     #: rather than given as a flag.
     thinking: str | None = None
+    pid: int | None = None
 
 
 @dataclass(frozen=True)
@@ -619,10 +636,10 @@ def test_a_turn_runs_in_the_flows_own_environment_and_what_it_is_told(
     assert call.allowed is not None
 
 
-def test_qwen_is_one_run_per_turn_resuming_the_session_it_opened(
+def test_qwen_keeps_one_process_for_ordinary_turns(
     stubs: _Stubs,
 ) -> None:
-    """The first turn opens the conversation; every later one resumes the id it reported."""
+    """The first turn initializes the CLI; the next one uses the same process."""
     session = QwenCodeAgent(QWEN).new()
     assert session("hi") == "hi"
     assert session("again") == "again"
@@ -633,7 +650,9 @@ def test_qwen_is_one_run_per_turn_resuming_the_session_it_opened(
     assert "--resume" not in opened.argv
     assert "--output-format" in opened.argv
     assert opened.argv[opened.argv.index("--model") + 1] == "qwen3-coder-plus"
-    assert again.argv[again.argv.index("--resume") + 1] == session.id
+    assert opened.pid == again.pid
+    assert opened.argv == again.argv
+    assert opened.argv[opened.argv.index("--input-format") + 1] == "stream-json"
 
 
 def test_qwen_says_what_the_turn_did_and_what_it_cost(stubs: _Stubs) -> None:
@@ -643,9 +662,9 @@ def test_qwen_says_what_the_turn_did_and_what_it_cost(stubs: _Stubs) -> None:
     kinds = [event.kind for event in said]
     assert kinds == ["reasoning", "tool", "text", "result"]
     assert "run_shell_command echo hi" in said[1].text
-    # Both requests of the turn, the message and the result it ended on.
-    assert said[-1].spent.total == 11
-    assert said[-1].tokens == {"qwen3-coder-plus": 11}
+    # The result summarizes requests already counted from assistant messages.
+    assert said[-1].spent.total == 8
+    assert said[-1].tokens == {"qwen3-coder-plus": 8}
 
 
 def test_qwen_is_told_how_hard_to_think_in_a_settings_file_of_its_own(
@@ -752,7 +771,7 @@ def test_neither_qwen_nor_grok_has_a_goal_feature(stubs: _Stubs) -> None:
         GrokBuildAgent(GROK).new().pursue("the suite passes")
 
 
-def test_agy_is_one_run_per_turn_resuming_the_conversation_it_opened(
+def test_agy_keeps_one_process_for_the_conversation_it_opened(
     stubs: _Stubs,
 ) -> None:
     """Its id is minted by the CLI and named on the line the stream opens with."""
@@ -761,13 +780,15 @@ def test_agy_is_one_run_per_turn_resuming_the_conversation_it_opened(
     assert session("again") == "again"
 
     opened, again = stubs.calls()
-    assert "--print" in opened.argv
+    assert "--input-format" in opened.argv
+    assert "--print" not in opened.argv
     # And no `--effort`: how hard to think is part of the model here, and Antigravity
     # refuses the flag beside every model it lists.
     assert "--effort" not in opened.argv
     assert "--dangerously-skip-permissions" in opened.argv
     assert "--conversation" not in opened.argv
-    assert again.argv[again.argv.index("--conversation") + 1] == session.id
+    assert opened.pid == again.pid
+    assert opened.argv == again.argv
 
 
 def test_agy_says_what_the_turn_did_and_what_it_cost(stubs: _Stubs) -> None:

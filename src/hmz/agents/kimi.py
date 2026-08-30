@@ -30,6 +30,9 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
+from websockets.exceptions import WebSocketException
+from websockets.sync.client import ClientConnection, connect
+
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Question, Usage, say
@@ -66,6 +69,134 @@ class _Running:
 _POLL_SECONDS = 1.0
 _CALL_SECONDS = 60.0
 _STOP_SECONDS = 5.0
+
+#: Event-capable daemons need polling only as recovery while the model is thinking.
+_RECOVERY_SECONDS = 10.0
+
+
+def _update(socket: ClientConnection, deadline: float) -> dict[str, Any]:
+    """Read one bounded event frame, refusing malformed or stalled event streams."""
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError
+    message = json.loads(socket.recv(timeout=remaining))
+    if not isinstance(message, dict):
+        raise TypeError("Kimi event frames must be objects")
+    return cast("dict[str, Any]", message)
+
+
+class _Updates:
+    """Wake a session reader when its official daemon has something new to read.
+
+    REST remains authoritative for history, spending, questions and goals. A refused
+    subscription or a lost connection returns to polling without resubmitting a prompt.
+    """
+
+    def __init__(self, base: str, token: str, session: str) -> None:
+        self._session = session
+        self._socket: ClientConnection | None = None
+        self._contexts = contextlib.ExitStack()
+        self.ended = False
+        try:
+            socket = self._contexts.enter_context(
+                connect(
+                    base.replace("http:", "ws:", 1) + "/ws",
+                    additional_headers={"Authorization": f"Bearer {token}"},
+                    proxy=None,
+                    compression=None,
+                    ping_interval=None,
+                    open_timeout=1,
+                    # A full notification queue can delay its close handshake; REST has
+                    # already settled the turn, so disposing this listener needs little grace.
+                    close_timeout=0.1,
+                )
+            )
+            self._socket = socket
+            socket.send(
+                json.dumps(
+                    {
+                        "type": "subscribe",
+                        "id": "hmz",
+                        "payload": {"session_ids": [session]},
+                    }
+                )
+            )
+            deadline = time.monotonic() + 1
+            while True:
+                message = _update(socket, deadline)
+                if message.get("type") == "ack" and message.get("id") == "hmz":
+                    if message.get("code") != 0:
+                        self.close()
+                    break
+        except (OSError, WebSocketException, ValueError, TypeError):
+            self.close()
+
+    def wait(self, *, settled: bool) -> None:
+        """Wait for progress, falling back to ordinary polling after a disconnect."""
+        socket = self._socket
+        if socket is None:
+            time.sleep(_POLL_SECONDS)
+            return
+        # Keep the extra REST read after completion, without its polling delay once the
+        # daemon has confirmed that this turn's final events have been published.
+        if settled and self.ended:
+            return
+        started = time.monotonic()
+        deadline = started + (_POLL_SECONDS if settled else _RECOVERY_SECONDS)
+        try:
+            while True:
+                message = _update(socket, deadline)
+                if message.get("type") == "ping":
+                    payload = message.get("payload")
+                    if not isinstance(payload, dict) or not isinstance(
+                        nonce := cast("dict[str, Any]", payload).get("nonce"), str
+                    ):
+                        self.close()
+                        return
+                    socket.send(
+                        json.dumps({"type": "pong", "payload": {"nonce": nonce}})
+                    )
+                    continue
+                if message.get("session_id") != self._session:
+                    continue
+                kind = message.get("type")
+                payload = message.get("payload", {})
+                if not isinstance(payload, dict):
+                    self.close()
+                    return
+                main = cast("dict[str, Any]", payload).get("agentId", "main") == "main"
+                if kind in ("assistant.delta", "thinking.delta"):
+                    # Preserve the old display cadence during long streaming messages,
+                    # coalescing token notifications into at most one history read/second.
+                    deadline = min(deadline, started + _POLL_SECONDS)
+                elif kind == "turn.started" and main:
+                    self.ended = False
+                elif kind == "turn.ended":
+                    if main:
+                        self.ended = True
+                    return
+                elif kind in (
+                    "tool.call.started",
+                    "turn.step.completed",
+                    "event.question.requested",
+                    "event.approval.requested",
+                    "prompt.started",
+                    "goal.updated",
+                    "error",
+                ):
+                    return
+        except TimeoutError:
+            return  # Event delivery is never the only way to finish.
+        except (OSError, WebSocketException, ValueError, TypeError):
+            self.close()
+
+    def close(self) -> None:
+        """Release the subscription, including a partially completed handshake."""
+        if self._socket is not None:
+            self._socket = None
+            with contextlib.suppress(OSError, WebSocketException):
+                self._contexts.close()
+
 
 #: What the daemon counts a session's spending in, and what each of those is here. Every kind
 #: of token counts: what a rate is measuring is the traffic, and a cache read crosses the wire
@@ -321,7 +452,7 @@ class KimiCodeCLISession(SessionBase):
           session: The session the turn is running in.
         """
         server = self._agent.server
-        held = server.call("GET", f"/sessions/{session}/questions")
+        held = server.call("GET", f"/sessions/{session}/questions?status=pending")
         # A list or a list under `items`, depending on the daemon: what is wanted is the
         # questions, and a daemon that has none of them has nothing to answer either.
         waiting: list[Any] = (
@@ -461,6 +592,7 @@ class KimiCodeCLISession(SessionBase):
             # a flow watches its agent rather than answering it, as humanize' own flows do.
             **_PERMITTED.get(self._agent.config.permission, _PERMITTED["bypass"]),
         }
+        updates: _Updates | None = None
         with self._lock:  # a conversation is a sequence: one turn at a time
             # A turn that failed is as over as one that landed: neither leaves
             # anything for a word to be steered into.
@@ -481,6 +613,7 @@ class KimiCodeCLISession(SessionBase):
                         | ({"goal_objective": prompt} if goal else {})
                     },
                 )
+                updates = _Updates(server._base, server._token, session)
                 # Said before the prompt goes in, so that a word put in has a session to be
                 # steered into from the moment there is a turn to interrupt.
                 self._running = _Running(session=session, config=turn)
@@ -603,9 +736,11 @@ class KimiCodeCLISession(SessionBase):
                     # back, so what it said is read once more after it stops rather than at the
                     # moment it does -- otherwise a turn returns everything but its answer.
                     settled = not busy
-                    time.sleep(_POLL_SECONDS)
+                    updates.wait(settled=settled)
 
             finally:
+                if updates is not None:
+                    updates.close()
                 self._running = _Running()
 
 

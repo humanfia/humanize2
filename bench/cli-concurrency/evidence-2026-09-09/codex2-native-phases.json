@@ -1,0 +1,607 @@
+{
+  "format": "hmz-codex2-public-phases-v1",
+  "scope": "Five fresh original serial task pairs and ten candidate pairs at concurrency2, separate Agent instances. All30 turns complete correctly; recorded timing failures remain failures.",
+  "private_audit_sha256": "8ef49b480b6b8e421dd715c3d0a1c007d3a8e47d4e8f067b6517ffdc1baefec6",
+  "projection_source_sha256": "8ac53a3a2f640b0c2658b8b485adbc9addc08df8e18945080a92e0cdff72f28a",
+  "production_source_files": [
+    {
+      "file": "agents/codex.py",
+      "original_sha256": "6dd51171eb779c18a46e45045079c68c408ddcbc47461ecabac338476db4a630",
+      "candidate_sha256": "6dd51171eb779c18a46e45045079c68c408ddcbc47461ecabac338476db4a630",
+      "same": true
+    },
+    {
+      "file": "agents/base.py",
+      "original_sha256": "96709f4ccb0642a8680f55d32a25bce6d30f31460bd5aaa5040436d521418eb3",
+      "candidate_sha256": "96709f4ccb0642a8680f55d32a25bce6d30f31460bd5aaa5040436d521418eb3",
+      "same": true
+    },
+    {
+      "file": "agents/config.py",
+      "original_sha256": "5fef2867aa6245ce3116dd7ed61de8abb8bed542a3fa763533eba8ab396d0730",
+      "candidate_sha256": "5fef2867aa6245ce3116dd7ed61de8abb8bed542a3fa763533eba8ab396d0730",
+      "same": true
+    },
+    {
+      "file": "agents/event.py",
+      "original_sha256": "f73273122ec93b964a14c6dd78c4160449b7c3b296a80a71af56c9616bc15670",
+      "candidate_sha256": "f73273122ec93b964a14c6dd78c4160449b7c3b296a80a71af56c9616bc15670",
+      "same": true
+    },
+    {
+      "file": "agents/hooks.py",
+      "original_sha256": "203b0700b676bbfec8b90c392937adf4d052855dfebecb78501ee285c0832395",
+      "candidate_sha256": "203b0700b676bbfec8b90c392937adf4d052855dfebecb78501ee285c0832395",
+      "same": true
+    },
+    {
+      "file": "agents/codenames.py",
+      "original_sha256": "f60914a088c4a6fefe4bfc61118024d35552354303a847355acc0f03100b6b6c",
+      "candidate_sha256": "f60914a088c4a6fefe4bfc61118024d35552354303a847355acc0f03100b6b6c",
+      "same": true
+    },
+    {
+      "file": "agents/skills.py",
+      "original_sha256": "4abb5bb98b851a94c80ca6e904d7a838d52a05b5e36f3849d8cadaf96c9b7d33",
+      "candidate_sha256": "4abb5bb98b851a94c80ca6e904d7a838d52a05b5e36f3849d8cadaf96c9b7d33",
+      "same": true
+    },
+    {
+      "file": "agents/tools.py",
+      "original_sha256": "a55bedbcf23c60f3e4e46ec6bc1ee27a3d8a384bd4106184f9e59cde5c84bd61",
+      "candidate_sha256": "a55bedbcf23c60f3e4e46ec6bc1ee27a3d8a384bd4106184f9e59cde5c84bd61",
+      "same": true
+    },
+    {
+      "file": "agents/__init__.py",
+      "original_sha256": "4b7af4b7eca91e5219815a8d59e909abecea72201079933e4ec25e1477e51cf3",
+      "candidate_sha256": "4b7af4b7eca91e5219815a8d59e909abecea72201079933e4ec25e1477e51cf3",
+      "same": true
+    },
+    {
+      "file": "providers/__init__.py",
+      "original_sha256": "32e6a6c66f8b54c08a3fd6e7f7302929be92751f4f8a414f4666b5a67b10e2fe",
+      "candidate_sha256": "32e6a6c66f8b54c08a3fd6e7f7302929be92751f4f8a414f4666b5a67b10e2fe",
+      "same": true
+    },
+    {
+      "file": "fallbacks.py",
+      "original_sha256": "b04d9cc767534d5f5c0719cb887a06e7a97afe6d891eb100b9123880a5f6f10b",
+      "candidate_sha256": "b04d9cc767534d5f5c0719cb887a06e7a97afe6d891eb100b9123880a5f6f10b",
+      "same": true
+    }
+  ],
+  "official_codex_sha256": "56ef98ab4032d317ab26e9b5e5a175650717351edb16ed9cde0cb6d1734d62da",
+  "clock_bridge": {
+    "same_boot_bracketed": true,
+    "boundary_clock_offset_spread_us": 0,
+    "native_log_precision_ms": 1,
+    "journal_precision_us": 1,
+    "semantics": "Historical scope start/end realtime-minus-monotonic bridge. Delivery is hmz result receipt minus native task_complete log timestamp. Sub-millisecond differences are unresolved; assumes no unobserved canceling realtime steps."
+  },
+  "native_duration_semantics": "Official task duration includes native turn preparation, inference, tools and subsequent inference. It is not exact provider-invocation-to-result time.",
+  "model_response_count_semantics": "Unique completed response IDs from native token-usage records; not exhaustive network-attempt/retry counts.",
+  "provider_request_start_verified": false,
+  "quantile_method": "median p50; nearest-rank p95",
+  "turns": [
+    {
+      "variant": "baseline",
+      "repeat": 0,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 18446,
+      "hmz_result_seconds": 18.990693191008177,
+      "native_completion_relative_to_hmz_start_ms": 18988.010668008177,
+      "delivery_ms": 2.682523,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "baseline",
+      "repeat": 0,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 12033,
+      "hmz_result_seconds": 12.074327688023914,
+      "native_completion_relative_to_hmz_start_ms": 12071.898615023914,
+      "delivery_ms": 2.429073,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "baseline",
+      "repeat": 1,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 15228,
+      "hmz_result_seconds": 15.738384803000372,
+      "native_completion_relative_to_hmz_start_ms": 15735.609676000371,
+      "delivery_ms": 2.775127,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "baseline",
+      "repeat": 1,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 11235,
+      "hmz_result_seconds": 11.27173998899525,
+      "native_completion_relative_to_hmz_start_ms": 11269.99599999525,
+      "delivery_ms": 1.743989,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "baseline",
+      "repeat": 2,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 15001,
+      "hmz_result_seconds": 15.52853715600213,
+      "native_completion_relative_to_hmz_start_ms": 15526.25882800213,
+      "delivery_ms": 2.278328,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "baseline",
+      "repeat": 2,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 12023,
+      "hmz_result_seconds": 12.051067630003672,
+      "native_completion_relative_to_hmz_start_ms": 12048.731701003671,
+      "delivery_ms": 2.335929,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "baseline",
+      "repeat": 3,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 17895,
+      "hmz_result_seconds": 18.419432732043788,
+      "native_completion_relative_to_hmz_start_ms": 18417.09317504379,
+      "delivery_ms": 2.339557,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "baseline",
+      "repeat": 3,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 12826,
+      "hmz_result_seconds": 12.857772064977325,
+      "native_completion_relative_to_hmz_start_ms": 12855.411198977325,
+      "delivery_ms": 2.360866,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "baseline",
+      "repeat": 4,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 15974,
+      "hmz_result_seconds": 16.476114746008534,
+      "native_completion_relative_to_hmz_start_ms": 16473.847446008534,
+      "delivery_ms": 2.2672999999999996,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "baseline",
+      "repeat": 4,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 11466,
+      "hmz_result_seconds": 11.495986229972914,
+      "native_completion_relative_to_hmz_start_ms": 11494.476769972915,
+      "delivery_ms": 1.50946,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 0,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 15280,
+      "hmz_result_seconds": 15.754965924017597,
+      "native_completion_relative_to_hmz_start_ms": 15752.513190017597,
+      "delivery_ms": 2.452734,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 0,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 12779,
+      "hmz_result_seconds": 12.812323065998498,
+      "native_completion_relative_to_hmz_start_ms": 12810.207039998499,
+      "delivery_ms": 2.116026,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 0,
+      "index": 1,
+      "phase": "cold",
+      "native_duration_ms": 13729,
+      "hmz_result_seconds": 14.21375552599784,
+      "native_completion_relative_to_hmz_start_ms": 14211.83994799784,
+      "delivery_ms": 1.915578,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 0,
+      "index": 1,
+      "phase": "warm",
+      "native_duration_ms": 14704,
+      "hmz_result_seconds": 14.733963223989122,
+      "native_completion_relative_to_hmz_start_ms": 14732.138214989121,
+      "delivery_ms": 1.825009,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 1,
+      "index": 1,
+      "phase": "cold",
+      "native_duration_ms": 14700,
+      "hmz_result_seconds": 15.206846207962371,
+      "native_completion_relative_to_hmz_start_ms": 15204.35660796237,
+      "delivery_ms": 2.4896,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 1,
+      "index": 1,
+      "phase": "warm",
+      "native_duration_ms": 12938,
+      "hmz_result_seconds": 12.968857977015432,
+      "native_completion_relative_to_hmz_start_ms": 12966.599904015431,
+      "delivery_ms": 2.258073,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 1,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 15825,
+      "hmz_result_seconds": 16.31320258701453,
+      "native_completion_relative_to_hmz_start_ms": 16310.02423101453,
+      "delivery_ms": 3.178356,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": true
+    },
+    {
+      "variant": "candidate",
+      "repeat": 1,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 12849,
+      "hmz_result_seconds": 12.887930411961861,
+      "native_completion_relative_to_hmz_start_ms": 12885.98023496186,
+      "delivery_ms": 1.950177,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 2,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 15806,
+      "hmz_result_seconds": 16.28931261296384,
+      "native_completion_relative_to_hmz_start_ms": 16287.12542496384,
+      "delivery_ms": 2.187188,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 2,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 14006,
+      "hmz_result_seconds": 14.040964465995785,
+      "native_completion_relative_to_hmz_start_ms": 14038.953725995785,
+      "delivery_ms": 2.01074,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 2,
+      "index": 1,
+      "phase": "cold",
+      "native_duration_ms": 25321,
+      "hmz_result_seconds": 25.836040989961475,
+      "native_completion_relative_to_hmz_start_ms": 25833.761589961476,
+      "delivery_ms": 2.2794,
+      "tool_count": 4,
+      "completed_model_response_count": 5,
+      "ancillary_git_failure": true
+    },
+    {
+      "variant": "candidate",
+      "repeat": 2,
+      "index": 1,
+      "phase": "warm",
+      "native_duration_ms": 16276,
+      "hmz_result_seconds": 16.309225858014543,
+      "native_completion_relative_to_hmz_start_ms": 16306.603666014542,
+      "delivery_ms": 2.622192,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 3,
+      "index": 1,
+      "phase": "cold",
+      "native_duration_ms": 14200,
+      "hmz_result_seconds": 14.673811090004165,
+      "native_completion_relative_to_hmz_start_ms": 14670.872468004165,
+      "delivery_ms": 2.938622,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 3,
+      "index": 1,
+      "phase": "warm",
+      "native_duration_ms": 12190,
+      "hmz_result_seconds": 12.229420250980183,
+      "native_completion_relative_to_hmz_start_ms": 12226.803033980183,
+      "delivery_ms": 2.6172169999999997,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 3,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 16229,
+      "hmz_result_seconds": 16.71475817001192,
+      "native_completion_relative_to_hmz_start_ms": 16711.58740501192,
+      "delivery_ms": 3.170765,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 3,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 13101,
+      "hmz_result_seconds": 13.133206096012145,
+      "native_completion_relative_to_hmz_start_ms": 13131.159133012145,
+      "delivery_ms": 2.0469630000000003,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 4,
+      "index": 1,
+      "phase": "cold",
+      "native_duration_ms": 13295,
+      "hmz_result_seconds": 13.793940793024376,
+      "native_completion_relative_to_hmz_start_ms": 13791.586430024376,
+      "delivery_ms": 2.3543629999999998,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 4,
+      "index": 1,
+      "phase": "warm",
+      "native_duration_ms": 12660,
+      "hmz_result_seconds": 12.694740582024679,
+      "native_completion_relative_to_hmz_start_ms": 12692.96109602468,
+      "delivery_ms": 1.7794860000000001,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 4,
+      "index": 0,
+      "phase": "cold",
+      "native_duration_ms": 13879,
+      "hmz_result_seconds": 14.400883566995617,
+      "native_completion_relative_to_hmz_start_ms": 14396.265972995618,
+      "delivery_ms": 4.617594,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    },
+    {
+      "variant": "candidate",
+      "repeat": 4,
+      "index": 0,
+      "phase": "warm",
+      "native_duration_ms": 13352,
+      "hmz_result_seconds": 13.387274515000172,
+      "native_completion_relative_to_hmz_start_ms": 13385.482989000171,
+      "delivery_ms": 1.7915260000000002,
+      "tool_count": 3,
+      "completed_model_response_count": 4,
+      "ancillary_git_failure": false
+    }
+  ],
+  "summaries": {
+    "baseline": {
+      "cold": {
+        "native_duration_ms": {
+          "count": 5,
+          "p50": 15974,
+          "p95": 18446,
+          "max": 18446
+        },
+        "hmz_result_seconds": {
+          "count": 5,
+          "p50": 16.476114746008534,
+          "p95": 18.990693191008177,
+          "max": 18.990693191008177
+        },
+        "delivery_ms": {
+          "count": 5,
+          "p50": 2.339557,
+          "p95": 2.775127,
+          "max": 2.775127
+        }
+      },
+      "warm": {
+        "native_duration_ms": {
+          "count": 5,
+          "p50": 12023,
+          "p95": 12826,
+          "max": 12826
+        },
+        "hmz_result_seconds": {
+          "count": 5,
+          "p50": 12.051067630003672,
+          "p95": 12.857772064977325,
+          "max": 12.857772064977325
+        },
+        "delivery_ms": {
+          "count": 5,
+          "p50": 2.335929,
+          "p95": 2.429073,
+          "max": 2.429073
+        }
+      }
+    },
+    "candidate": {
+      "cold": {
+        "native_duration_ms": {
+          "count": 10,
+          "p50": 14990.0,
+          "p95": 25321,
+          "max": 25321
+        },
+        "hmz_result_seconds": {
+          "count": 10,
+          "p50": 15.480906065989984,
+          "p95": 25.836040989961475,
+          "max": 25.836040989961475
+        },
+        "delivery_ms": {
+          "count": 10,
+          "p50": 2.471167,
+          "p95": 4.617594,
+          "max": 4.617594
+        }
+      },
+      "warm": {
+        "native_duration_ms": {
+          "count": 10,
+          "p50": 13019.5,
+          "p95": 16276,
+          "max": 16276
+        },
+        "hmz_result_seconds": {
+          "count": 10,
+          "p50": 13.051032036513789,
+          "p95": 16.309225858014543,
+          "max": 16.309225858014543
+        },
+        "delivery_ms": {
+          "count": 10,
+          "p50": 2.0288515,
+          "p95": 2.622192,
+          "max": 2.622192
+        }
+      }
+    }
+  },
+  "candidate_to_original_ratios": {
+    "native_duration_ms": {
+      "cold.p50": 0.9383998998372355,
+      "cold.p95": 1.3727095305215222,
+      "warm.p50": 1.0828828079514263,
+      "warm.p95": 1.2689848744737253
+    },
+    "hmz_result_seconds": {
+      "cold.p50": 0.9395968834060441,
+      "cold.p95": 1.360458026997902,
+      "warm.p50": 1.0829772462665876,
+      "warm.p95": 1.26843326943386
+    }
+  },
+  "ancillary_diagnostics": [
+    {
+      "count": 15,
+      "level": "ERROR",
+      "target": "codex_app_server",
+      "classification": "Native startup sandbox capability diagnostic: bubblewrap requires user namespaces. All runs use the recorded bypass permission; all30 turns complete, with no task refusal."
+    },
+    {
+      "count": 30,
+      "level": "WARN",
+      "target": "codex_core_plugins::manifest",
+      "classification": "Native plugin defaultPrompt metadata exceeds128-character limit; two warnings per server in both variants."
+    },
+    {
+      "count": 1,
+      "level": "WARN",
+      "target": "codex_core::shell_snapshot",
+      "classification": "Cleanup attempted deleting an already absent native shell snapshot (ENOENT). Occurred after the relevant native turn; all benchmark artifacts and owned-process cleanup checks pass."
+    }
+  ],
+  "validations": {
+    "turn_counts_match": true,
+    "unique_turn_keys": true,
+    "tool_and_response_counts_reconciled": true,
+    "delivery_arithmetic_recomputed": true,
+    "native_duration_ratios_recomputed": true,
+    "whole_turn_ratios_match_original_audit": true,
+    "all_compared_codex_source_files_identical": true
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "schema": "cursor-clean-native-task-probe-v1",
+  "benchmark": false,
+  "cpu_affinity": [
+    24,
+    25,
+    26,
+    27
+  ],
+  "native_version": "2026.09.08-6caf4ff",
+  "native_launcher_sha256": "2ccc9a8e167797641448b5e5c936f006ba137a2555f117f38c5eb76a5238a233",
+  "native_index_sha256": "61b58f6a0b9e64970fce5f001526996a786a121f3d8836fa2e1d4b3629f3b02f",
+  "hmz_cursor_source_sha256": "894b109ab2c48a4c707c40efbfb74939771215a98d0a4f22e2d5f0f9e1a6d1a6",
+  "removed_override_presence": {
+    "AGENT_CLI_CREDENTIAL_STORE": false,
+    "CURSOR_AGENT_API_ENDPOINT": false,
+    "CURSOR_AGENT_BASE_URL": false,
+    "CURSOR_AGENT_CLI_LOCAL_MODE": false,
+    "CURSOR_API_ENDPOINT": false,
+    "CURSOR_API_KEY": false,
+    "CURSOR_AUTH_TOKEN": false,
+    "CURSOR_BASE_URL": false,
+    "CURSOR_CONFIG_DIR": false,
+    "CURSOR_DATA_DIR": false
+  },
+  "native_provider": "",
+  "model": "auto",
+  "model_arg_from_unmodified_adapter": "auto[fast=false]",
+  "timeout_seconds": 45,
+  "cleanup_grace_seconds": 5,
+  "parent_environment_unchanged": true,
+  "manual_auth_refresh_or_token_handling": false,
+  "native_turn_attempt_count": 1,
+  "outcome": {
+    "kind": "outcome",
+    "official_standard": true,
+    "provider": "",
+    "model": "auto",
+    "events": {},
+    "result_count": 0,
+    "authentication_required": true,
+    "ok": false,
+    "error_type": "Failed",
+    "quota_or_rate_limit": false,
+    "seconds": 0.6413836440187879
+  },
+  "validation": {
+    "proof_exists": false,
+    "proof_valid": false,
+    "immutable_inputs_unchanged": true,
+    "fresh_workspace": true
+  },
+  "success": false,
+  "timeout": false,
+  "elapsed_seconds": 0.8269438289571553,
+  "cleanup_survivor_count": 0,
+  "native_auth_file_mtime_changed": false,
+  "raw_summary_sha256": "644cdd2bf3abc915ab77f5fc43b5b2cb7dc481a8c96d0345364a865d1ee8d2c6"
+}

@@ -171,6 +171,17 @@ effort and the service tier: `composer-2.5[effort=high,fast=false]`. A model alr
 with a bracket of its own is passed exactly as it was written, so a flow that wanted
 `claude-opus-4-8[context=1m,effort=high]` gets it.
 
+The separately distributed official `cursor-agent-local` runtime can use an
+OpenAI-compatible endpoint through `CURSOR_LOCAL_AGENT_BASE_URL`,
+`CURSOR_LOCAL_AGENT_API_KEY` and `CURSOR_ENABLE_AUTHLESS=1`. When `cursor-agent` resolves to
+that runtime's native launcher and package on the turn's effective PATH, an empty effort
+with the default service tier passes the endpoint's model ID unchanged. Explicit brackets,
+effort and fast service requests retain their existing spelling. Standard Cursor continues
+to receive `fast=false` for the default tier because it can otherwise inherit saved fast
+parameters. A remote or isolated machine keeps the standard behavior; a host installation
+does not establish the runtime on that machine. This does not convert standard Cursor's
+Cursor API-key authentication and RPC transport into an OpenAI-compatible provider.
+
 `pi`, `opencode`, `mimo` and `zcode` name a model as `provider/id` — `openai-codex/gpt-5.5`,
 `opencode/big-pickle`, `xiaomi/mimo-v2.5`, `zai/glm-5.3` — because a model there belongs to the
 provider that serves it, and the CLI is asked for the pair. `qwen` names whatever id the
@@ -891,7 +902,17 @@ before the runtime starts unless its effort is `max`, `high` or `off`.
 
 **Antigravity CLI has one switch for what an agent may do** — approve every tool, or stop and
 ask — and nobody is at a prompt to be asked, so `read-only` and `workspace-write` are refused
-where the agent is made rather than quietly run as the rung above.
+where the agent is made rather than quietly run as the rung above. Ordinary Antigravity
+turns reuse the official CLI process through stream-json input. Slash commands and shaped
+answers use separate print commands, then resume the same conversation. Native usage is
+cumulative across that conversation, including process restarts; each result reports the
+increment for its own turn, and local commands such as `/help` preserve that accounting
+baseline. Shaped answers validate the native final `structured_output`, which excludes
+rejected tool attempts and display metadata. Changed configuration, native customizations,
+or flow resources restart the process, and anchored turns always end it for filesystem synchronization.
+Both modes pass the session directory through the CLI's `--add-dir` flag, preserving any
+additional provider directories. This keeps native project selection from replacing the
+session workspace with a scratch directory.
 
 **Grok Build refuses a level the model does not advertise** rather than ignoring it, so a turn
 asked for one fails with the list of the ones that model takes. The shipped models take
@@ -900,6 +921,16 @@ asked for one fails with the list of the ones that model takes. The shipped mode
 **Qwen Code has no flag for the effort.** It is a setting of its own `settings.json`, so a turn
 is pointed at a file of humanize's own through `QWEN_CODE_SYSTEM_SETTINGS_PATH` — two agents of
 one flow may think at two efforts, and neither is a reason to rewrite what you have configured.
+Concurrent Qwen sessions share one generated settings file per effort. Ordinary turns in one
+Qwen session reuse the installed CLI process through its official stream-json input. Changing its settings, native skills or flow skills restarts it and resumes
+the same conversation. Native settings this reader cannot inspect, including JSON with comments,
+keep a fresh process per turn so custom skill locations cannot be missed. Shaped turns use a
+separate command because Qwen refuses `--json-schema` with stream-json input; anchored turns
+also end their process so the workspace is synchronized. Each turn counts assistant message
+usage once. The terminal summary includes previous requests, so only missing usage fields use
+its increment across turns, including resumed processes. On an externally resumed conversation
+that reports only terminal usage, the first summary has no known baseline and can include
+historical spending; legacy summaries do not identify their counter scope.
 
 **`ultracode`** is Claude Code's `xhigh` thinking with the turn opted into orchestrating a fleet
 of its own. It is more work than any single-agent effort, which is why it sits above `max`.
@@ -982,9 +1013,18 @@ say what each request to the model cost — Claude Code on the message it answer
 Codex on `thread/tokenUsage/updated`, DeepSeek Harness and pi on finalized assistant messages,
 opencode and mimocode on each step, Kimi Code from the session it is polling anyway, ZCode on
 the row its log gains per model request. Antigravity, Grok Build and Qwen Code are the
-exception: each is one run per turn that states its usage only at the end, so what they spent
+exception: their adapters report usage at the end, so what they spent
 lands on the closing `result` and their rate moves a turn at a time rather than a request at a
 time.
+
+Kimi Code uses the official daemon's WebSocket notifications to wake its REST polling.
+It answers the daemon's heartbeat so long turns keep receiving notifications.
+Closing the notification socket uses a 100ms grace period, so unread notifications do not
+hold up a result that REST has already confirmed. The receive queue remains bounded.
+Session history, spending, questions and goals still come from the REST responses.
+Pending user questions are requested with the native `status=pending` filter. If the
+daemon does not support notifications, refuses the connection or loses it, the driver resumes
+its regular polling without submitting the turn again.
 
 **`juice()` is the third reading, and it is not a clock at all.** It is what one turn of the
 *model* came out with — one request and the answer to it, of which a turn a flow asks for is
@@ -1007,8 +1047,8 @@ The `result` event a turn ends on carries the same reckoning as `spent`, beside 
 
 | | `agy` | `claude` | `codex` | `cursor` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Driven through | its command line, one run per turn | its command line, held open | its app server | its command line, one run per turn | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, one run per turn | its command line, one run per turn | its app server |
-| [`interject`](#talking-to-a-turn-already-running) | no — a run per turn has ended | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no — a run per turn has ended | no — a run per turn has ended | no — a second prompt is refused while one is running |
+| Driven through | its command line, held open for ordinary turns | its command line, held open | its app server | its command line, one run per turn | its Python SDK | its command line, one run per turn | its app server | its command line, held open | its command line, held open for ordinary turns | its command line, one run per turn | its app server |
+| [`interject`](#talking-to-a-turn-already-running) | no | yes — answered within the same turn | yes — a steer on the running turn | no — a run per turn has ended | no | no — a run per turn has ended | yes — queued, then steered in | yes — a steer on the running turn | no | no — a run per turn has ended | no — a second prompt is refused while one is running |
 | [`pursue`](#goals) | no | yes | yes | no | yes | no | yes | no | no | no | yes |
 | [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | no | yes |
 | [`SubagentStart`/`SubagentStop`](#not-every-backend-runs-every-moment) | no | yes | yes | yes | no | no | no | no | no | no | no |

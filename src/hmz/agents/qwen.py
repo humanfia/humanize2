@@ -1,8 +1,9 @@
-"""qwen: one run of `qwen` per turn, reading the stream of JSON it answers in.
+"""Qwen Code: one official CLI process held across ordinary conversation turns.
 
 Its command line says everything an agent is configured with except how hard to think -- the
-model, the session to carry on, what it may do without being asked -- so a turn is one run of
-it rather than a conversation held open on a server. What it writes on stdout with
+model, the session to carry on, what it may do without being asked. Its stream-json input
+keeps the CLI initialized between turns. Shaped turns still use a command of their own:
+Qwen refuses `--json-schema` with persistent stream-json input. What it writes on stdout with
 `--output-format stream-json` is a protocol rather than the agent talking: one JSON object a
 line, the session it opened and the answer it ended on among them.
 
@@ -12,21 +13,27 @@ rather than having it written into the user's -- two agents of one flow may thin
 efforts, and neither is a reason to change what the person who started the flow has configured.
 """
 
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import json
+import os
 import tempfile
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
-from .base import AgentBase, CommandSessionBase
+from ._inputs import snapshot
+from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Usage
 
 if TYPE_CHECKING:
-    import os
     from collections.abc import Iterator
+
+    from pydantic import BaseModel
 
 #: What the CLI is installed as, and the variable that points one run at a settings file of
 #: ours. The system layer rather than the user's own: it is read for this process only, and
@@ -59,6 +66,7 @@ _SAYS = {"text": "text", "thinking": "reasoning"}
 #: turn would otherwise leave a directory behind for every turn it ran, and what is in these
 #: files is the effort and nothing else -- so two sessions at one effort are one file.
 _EFFORTS: dict[str, Path] = {}
+_EFFORT_LOCK = threading.Lock()
 
 
 def _thinking(effort: str) -> Path:
@@ -74,20 +82,21 @@ def _thinking(effort: str) -> Path:
     Returns:
       The file's path.
     """
-    held = _EFFORTS.get(effort)
-    if held is None:
-        # Kept for as long as the process runs: a turn reads it as it starts, and every later
-        # turn at this effort reads the same one.
-        where = Path(tempfile.mkdtemp(prefix="hmz-qwen-"))
-        held = where / "settings.json"
-        held.write_text(
-            json.dumps({"model": {"reasoningEffort": effort}}), encoding="utf-8"
-        )
-        _EFFORTS[effort] = held
-    return held
+    with _EFFORT_LOCK:
+        held = _EFFORTS.get(effort)
+        if held is None:
+            # Concurrent first turns must agree on the path as well as its contents: a
+            # changed path would make the next turn restart an otherwise unchanged CLI.
+            where = Path(tempfile.mkdtemp(prefix="hmz-qwen-"))
+            held = where / "settings.json"
+            held.write_text(
+                json.dumps({"model": {"reasoningEffort": effort}}), encoding="utf-8"
+            )
+            _EFFORTS[effort] = held
+        return held
 
 
-class QwenCodeSession(CommandSessionBase):
+class QwenCodeSession(StreamSessionBase):
     """A Qwen Code conversation, resumed by the id its first turn reported.
 
     The id is minted by `qwen` as the session opens, so it is read back out of the turn that
@@ -122,7 +131,163 @@ class QwenCodeSession(CommandSessionBase):
         #: What the turn now running has cost, and which parts of it have been shown -- one
         #: message is said once, and a stream that repeats it would show it twice.
         self._costing = Usage()
+        #: Terminal summaries replay the conversation's totals even after a process restart.
+        self._total = Usage()
         self._shown: set[str] = set()
+        self._announced: str | None = None
+        self._launched: tuple[object, ...] | None = None
+        self._requested: tuple[object, ...] = ()
+
+    def _stream(
+        self, prompt: str, *, schema: type[BaseModel] | None = None
+    ) -> Iterator[Event]:
+        """Keeps plain turns warm, and resumes shaped turns in a command of their own."""
+        if schema is not None:
+            with self._lock:
+                self._shut()
+                # The finite command transport checks the process's exit status after its
+                # result too. Reuse it on this same session state: a helper session would
+                # register a second conversation and count its opening twice.
+                yield from CommandSessionBase._stream(  # noqa: SLF001 -- shared turn transport
+                    cast("CommandSessionBase", self), prompt, schema=schema
+                )
+            return
+        with self._lock:
+            self._requested = self._settings()
+            try:
+                yield from super()._stream(prompt)
+            except BaseException:
+                self._shut()
+                raise
+
+    def _command(self) -> list[str]:
+        """Builds the official NDJSON command with the current turn configuration."""
+        argv, _ = self._turn("")
+        return [*argv, "--input-format", "stream-json"]
+
+    def _settings(self) -> tuple[object, ...]:
+        """The settings and flow resources the process reads when it starts."""
+        environment = self._environ() or dict(os.environ)
+        native = self._native(environment)
+        return (
+            self._agent.config,
+            self.effort,
+            self._carrying(),
+            self._tools,
+            environment,
+            native if native is not None else object(),
+        )
+
+    def _native(self, environment: dict[str, str]) -> bytes | None:
+        """Snapshots native settings and skills without modifying the CLI's own files.
+
+        Settings with syntax this reader cannot interpret still reach Qwen unchanged; their
+        processes restart between turns so undiscovered custom skill paths cannot go stale.
+        """
+        cwd = Path(self.cwd)
+        home = Path(environment.get("HOME") or Path.home())
+        qwen = cwd / Path(environment.get("QWEN_HOME") or home / ".qwen").expanduser()
+        system = cwd / Path(environment[_SETTINGS]).expanduser()
+        defaults = (
+            cwd
+            / Path(
+                environment.get("QWEN_CODE_SYSTEM_DEFAULTS_PATH")
+                or system.parent / "system-defaults.json"
+            ).expanduser()
+        )
+        settings = {
+            qwen / "settings.json",
+            cwd / ".qwen/settings.json",
+            system,
+            defaults,
+        }
+        # Qwen migrates the generated effort file on startup (format and schema version).
+        # Effort is already a separate process input; its own cache file is not a user edit.
+        paths = settings - {system}
+        roots = (cwd, *cwd.parents, home)
+        for root in roots:
+            paths.update(root / name for name in ("QWEN.md", "AGENTS.md", ".env"))
+            paths.update(root / name / "skills" for name in (".qwen", ".agents"))
+        paths.update(
+            qwen / name
+            for name in (
+                "skills",
+                "commands",
+                "agents",
+                "extensions",
+                "QWEN.md",
+                ".env",
+            )
+        )
+        for path in settings:
+            try:
+                raw: object = json.loads(path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                continue
+            except (OSError, UnicodeError, ValueError):
+                return None
+            if not isinstance(raw, dict):
+                return None
+            data = cast("dict[str, Any]", raw)
+            skills = data.get("skills")
+            if isinstance(skills, dict):
+                directories = cast("dict[str, Any]", skills).get("directories", [])
+                if isinstance(directories, list):
+                    paths.update(
+                        cwd / Path(value).expanduser()
+                        for value in cast("list[object]", directories)
+                        if isinstance(value, str)
+                    )
+            context = data.get("context")
+            if isinstance(context, dict):
+                names = cast("dict[str, Any]", context).get("fileName", [])
+                names = [names] if isinstance(names, str) else names
+                if isinstance(names, list):
+                    paths.update(
+                        root / name
+                        for root in roots
+                        for name in cast("list[object]", names)
+                        if isinstance(name, str)
+                    )
+        return snapshot(paths)
+
+    def _stale(self) -> bool:
+        """Restarts before settings or mounted flow resources change."""
+        return self._launched is not None and self._launched != self._requested
+
+    def _restarted(self) -> None:
+        """Records what the newly started process was actually given."""
+        self._launched = self._requested
+
+    def _write(self, text: str, ticket: str = "") -> str:
+        """Encodes the direct-mode user message Qwen queues as one complete turn."""
+        del ticket
+        return (
+            json.dumps({"type": "user", "message": {"role": "user", "content": text}})
+            + "\n"
+        )
+
+    def interject(self, text: str) -> None:
+        """Keeps existing steering behavior until Qwen can acknowledge delivery."""
+        SessionBase.interject(self, text)
+
+    def _read(self, line: str) -> Iterator[Event]:
+        """Finishes a persistent turn when Qwen writes its result record."""
+        try:
+            raw: object = json.loads(line)
+        except ValueError:
+            return
+        if not isinstance(raw, dict):
+            return
+        said = cast("dict[str, Any]", raw)
+        yield from self._record(said)
+        if named := said.get("session_id"):
+            self._announced = str(named)
+        if said.get("type") == "result":
+            result = self._result(line)
+            if self._id is None:
+                self._adopt(self._announced or self._read_session_id(line))
+            yield result
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
         """Builds the `qwen` one turn is, and hands it the prompt on stdin.
@@ -139,6 +304,10 @@ class QwenCodeSession(CommandSessionBase):
         """
         self._said, self._failed, self._shown = "", None, set()
         self._costing = Usage()
+        if self._id is None:
+            # A failed opening turn did not adopt its conversation; retrying opens another.
+            self._total = Usage()
+        self._announced = None
         argv = [
             _COMMAND,
             "--output-format",
@@ -192,6 +361,10 @@ class QwenCodeSession(CommandSessionBase):
             said: dict[str, Any] = json.loads(line)
         except json.JSONDecodeError:
             return  # not ours: the odd plain line among the JSON
+        yield from self._record(said)
+
+    def _record(self, said: dict[str, Any]) -> Iterator[Event]:
+        """Maps the records shared by the finite and persistent protocols."""
         kind = str(said.get("type") or "")
         if kind == "assistant":
             yield from self._message(cast("dict[str, Any]", said.get("message") or {}))
@@ -199,9 +372,18 @@ class QwenCodeSession(CommandSessionBase):
             # The turn's own answer, which is what it ends on. Held rather than shown: the
             # agent already said these words as it said them.
             self._said = str(said.get("result") or "")
-            self._costing = self._costing + self._cost(
-                cast("dict[str, Any]", said.get("usage") or {})
-            )
+            total = self._cost(cast("dict[str, Any]", said.get("usage") or {}))
+            # The terminal record summarizes prior requests, including resumed history.
+            # Message counters are authoritative, even when explicitly zero. Only a kind
+            # absent from them needs the summary's increment as a fallback.
+            missing: dict[str, float] = {}
+            for name, tokens in total.items():
+                if name not in self._costing:
+                    previous = self._total.get(name, 0.0)
+                    missing[name] = tokens - previous if tokens >= previous else tokens
+            self._costing = self._costing + Usage(missing)
+            # Errors also settle the counters: their cost belongs to that failed turn.
+            self._total = Usage({**self._total, **total})
             if said.get("is_error"):
                 failed: dict[str, Any] = said.get("error") or {}
                 self._failed = str(failed.get("message") or "") or json.dumps(said)
@@ -216,11 +398,6 @@ class QwenCodeSession(CommandSessionBase):
           What it said and what it reached for, each part once.
         """
         marked = str(message.get("id") or "")
-        # Counted where it is reported: a message carries the usage of the request that
-        # produced it, so a turn of several is the sum of them rather than the last one.
-        self._costing = self._costing + self._cost(
-            cast("dict[str, Any]", message.get("usage") or {})
-        )
         # A message said twice is the stream repeating itself rather than the agent saying it
         # again -- but only an id tells them apart, so one that names itself with nothing is
         # shown rather than taken for the last one.
@@ -228,6 +405,10 @@ class QwenCodeSession(CommandSessionBase):
             if marked in self._shown:
                 return
             self._shown.add(marked)
+        # Counted once where it is reported: each message carries one request's usage.
+        self._costing = self._costing + self._cost(
+            cast("dict[str, Any]", message.get("usage") or {})
+        )
         for one in cast("list[Any]", message.get("content") or []):
             if not isinstance(one, dict):
                 continue
@@ -262,7 +443,7 @@ class QwenCodeSession(CommandSessionBase):
                     "cache_creation_input_tokens",
                     "thoughts_tokens",
                 )
-                if counted.get(name)
+                if counted.get(name) is not None
             }
         )
 

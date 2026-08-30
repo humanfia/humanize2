@@ -178,7 +178,7 @@ def setoptions(pid: int, options: int = OPTIONS) -> None:
 def getregs(pid: int) -> Registers:
     """Read the registers of a tracee that is stopped."""
     buffer = (ctypes.c_ulonglong * ARCH.register_count)()
-    iov = _Iovec(ctypes.cast(buffer, ctypes.c_void_p), ctypes.sizeof(buffer))
+    iov = _Iovec(ctypes.addressof(buffer), ctypes.sizeof(buffer))
     _ptrace(_GETREGSET, pid, _NT_PRSTATUS, ctypes.addressof(iov))
     return Registers(buffer)
 
@@ -186,7 +186,7 @@ def getregs(pid: int) -> Registers:
 def setregs(pid: int, registers: Registers) -> None:
     """Write registers back, which is how a syscall is answered or redirected."""
     buffer = registers.buffer
-    iov = _Iovec(ctypes.cast(buffer, ctypes.c_void_p), ctypes.sizeof(buffer))
+    iov = _Iovec(ctypes.addressof(buffer), ctypes.sizeof(buffer))
     _ptrace(_SETREGSET, pid, _NT_PRSTATUS, ctypes.addressof(iov))
 
 

@@ -1,0 +1,116 @@
+{
+  "schema": "claude-native-debug-local-public-v1",
+  "raw_validation_sha256": "8f68a12f3b78f3b5d3cb2a67c3fd27c4e6592984f13f1f5dcf9910a3044ab4ad",
+  "synthetic_only": true,
+  "benchmark": false,
+  "native_cli_version": "2.1.266",
+  "native_debug_filter": "api:timing",
+  "native_debug_file_scope": "unique per native process",
+  "native_cli_source_sha256": "19842705e989393fce936804df6d2ab034860e24b8f8880357981d87ffd83fac",
+  "boundary": "Native local pre-dispatch marker timestamp; synchronous setup precedes the native Messages.create call. Not HTTP arrival.",
+  "clock_limits": "Native logger uses millisecond-resolution realtime; fixture records monotonic and then realtime sequentially. Delay between that pair was not separately bounded.",
+  "timing_kind": "Earliest-any-observed-native-dispatch inside the hmz turn window, including auxiliary work. Auxiliary originating-turn ownership and main-work classification are not independently proven.",
+  "processes": [
+    {
+      "variant": "baseline",
+      "loaded_hmz_claude_source_sha256": "2add624c4691c00701d5924c4767f4d50494994a3005b19fc3ccc068004ca5dd",
+      "all_loaded_frozen_source_hashes_match": true,
+      "native_debug_file_sha256": "705dd67fa8ad9fce328cea3f7955f88e570778db66bddcad805f539a7d4f28f2",
+      "native_process_count": 1,
+      "cold_warm_process_reused": true,
+      "dispatch_count": 10,
+      "first_byte_marker_count": 10,
+      "request_counts": {
+        "workload": 8,
+        "auxiliary": 2
+      },
+      "first_cold_marker_is_auxiliary": true,
+      "marker_query_source_or_request_id_available": false,
+      "strict_marker_only_privacy_check": true,
+      "native_process_gone_after_run": true
+    },
+    {
+      "variant": "candidate",
+      "loaded_hmz_claude_source_sha256": "2add624c4691c00701d5924c4767f4d50494994a3005b19fc3ccc068004ca5dd",
+      "all_loaded_frozen_source_hashes_match": true,
+      "native_debug_file_sha256": "409fafdc219c422cbfc92bc9452d9428bfccd6e14c5ddcc219d9eda0aeda63a4",
+      "native_process_count": 1,
+      "cold_warm_process_reused": true,
+      "dispatch_count": 10,
+      "first_byte_marker_count": 10,
+      "request_counts": {
+        "workload": 8,
+        "auxiliary": 2
+      },
+      "first_cold_marker_is_auxiliary": true,
+      "marker_query_source_or_request_id_available": false,
+      "strict_marker_only_privacy_check": true,
+      "native_process_gone_after_run": true
+    }
+  ],
+  "turns": [
+    {
+      "variant": "baseline",
+      "phase": "cold",
+      "ok": true,
+      "result_seconds": 1.4963374930084683,
+      "first_any_fixture_arrival_seconds": 0.792030685,
+      "first_main_fixture_arrival_seconds": 0.929608635,
+      "first_observed_any_native_dispatch_seconds": 0.786745063,
+      "first_observed_any_dispatch_to_hmz_result_seconds": 0.70959243,
+      "first_any_native_dispatch_to_first_any_fixture_arrival_ms": 5.285622,
+      "model_dispatch_count_in_turn_window": 5,
+      "fixture_request_count_in_turn_window": 5
+    },
+    {
+      "variant": "baseline",
+      "phase": "warm",
+      "ok": true,
+      "result_seconds": 0.6236943700350821,
+      "first_any_fixture_arrival_seconds": 0.040761082,
+      "first_main_fixture_arrival_seconds": 0.042413976,
+      "first_observed_any_native_dispatch_seconds": 0.034202444,
+      "first_observed_any_dispatch_to_hmz_result_seconds": 0.589491926,
+      "first_any_native_dispatch_to_first_any_fixture_arrival_ms": 6.558638,
+      "model_dispatch_count_in_turn_window": 5,
+      "fixture_request_count_in_turn_window": 5
+    },
+    {
+      "variant": "candidate",
+      "phase": "cold",
+      "ok": true,
+      "result_seconds": 1.39575225696899,
+      "first_any_fixture_arrival_seconds": 0.672987738,
+      "first_main_fixture_arrival_seconds": 0.804889169,
+      "first_observed_any_native_dispatch_seconds": 0.666615131,
+      "first_observed_any_dispatch_to_hmz_result_seconds": 0.729137126,
+      "first_any_native_dispatch_to_first_any_fixture_arrival_ms": 6.372607,
+      "model_dispatch_count_in_turn_window": 5,
+      "fixture_request_count_in_turn_window": 5
+    },
+    {
+      "variant": "candidate",
+      "phase": "warm",
+      "ok": true,
+      "result_seconds": 0.5629522150265984,
+      "first_any_fixture_arrival_seconds": 0.039648419,
+      "first_main_fixture_arrival_seconds": 0.041825638,
+      "first_observed_any_native_dispatch_seconds": 0.032588072,
+      "first_observed_any_dispatch_to_hmz_result_seconds": 0.530364143,
+      "first_any_native_dispatch_to_first_any_fixture_arrival_ms": 7.060347,
+      "model_dispatch_count_in_turn_window": 5,
+      "fixture_request_count_in_turn_window": 5
+    }
+  ],
+  "checks": {
+    "correct_turns": 4,
+    "total_turns": 4,
+    "native_processes": 2,
+    "all_debug_files_contain_only_allowed_timing_formats": true,
+    "all_native_processes_gone": true,
+    "phase_equations_recomputed": true,
+    "exact_main_request_boundary_validated": false,
+    "auxiliary_originating_turn_validated": false,
+    "real_model_work_speed_verified": false
+  }
+}

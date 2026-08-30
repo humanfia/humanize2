@@ -34,6 +34,7 @@ dependencies = [
     # that reports its own failures is an install whose failures are not reported.
     "sentry-sdk>=2.68.1",
     "textual>=8.2.8",
+    "websockets>=15,<18",
 ]
 
 [project.urls]

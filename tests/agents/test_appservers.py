@@ -116,8 +116,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"busy": not STEERED})
             else:
                 self.reply({"busy": len(POLLS) == 1})
-        elif self.path.endswith("/questions"):
-            # What the turn has stopped to ask, which is nothing unless a test says so.
+        elif self.path.split("?", 1)[0].endswith("/questions"):
+            # The native API requires the pending filter; omitting it is an error.
+            if not self.path.endswith("?status=pending"):
+                self.reply(None, status=400)
+                return
             self.reply({"items": ASKED[:1]})
         elif self.path.endswith("/goal"):
             # Still being pursued the first time it is asked, as a goal is between its turns.

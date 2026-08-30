@@ -1,0 +1,131 @@
+{
+  "revision": "mock-mimo-serial-summary-v4",
+  "synthetic_model": true,
+  "real_model_performance_verified": false,
+  "source_artifact_sha256": "e0ebc1c048ea854a732a8c331a20c527781ce8a0de1c9a3bb2b8ad7795271cac",
+  "summary_source_sha256": "2a69cc7af559313dad0e405599518ed0ed1c7f3df7c9ee94d4b715db0622612d",
+  "default_profiles_only": true,
+  "optional_opencode_database_profile_included": false,
+  "backends": [
+    {
+      "backend": "mimo",
+      "configuration": {
+        "configuration": "default_mock_profile",
+        "optional_database_profile": false,
+        "fresh_original_control_pairs": 5,
+        "fresh_candidate_serial_pairs": 5,
+        "pair_markers_unique": true,
+        "task_workspace_count": 10,
+        "unique_fixture_nonces": 20,
+        "no_pair_marker_reused_from_prior_default_n2": true,
+        "same_route_environment_native_files_as_default_n2": true,
+        "only_profile_file_change_from_default_n2": "candidate source manifest v8 to v9",
+        "prior_default_n2_timing_miss_preserved": true,
+        "prior_results_replaced": false,
+        "serial_condition_only": true,
+        "default_n2_evidence_sha256": "bd8d4ff89a1f5bfd6d1007e37cf1aad76c9a8ffd38666317b895e428da85e2b3"
+      },
+      "batch_label": "mimo_serial_confirmation",
+      "queue_snapshot_sha256": "ada3b952a17f8041236fe68dd90e0abab4deef0b454016060beed07bd353f31d",
+      "profile_sha256": "5a40e07dd5b353a694f8aca22a5ee985a7ae906ef0b0fb4718898b38219d8191",
+      "original": {
+        "concurrency": 1,
+        "status": "completed",
+        "denominators": {
+          "requested_repeats": 5,
+          "started_repeats": 5,
+          "undispatched_repeats": 0,
+          "requested_pairs": 5,
+          "dispatched_pair_slots": 5,
+          "observed_started_item_functions_minimum": 5,
+          "correct_item_records": 5,
+          "failed_item_records": 0,
+          "missing_item_outcomes": 0,
+          "undispatched_pair_slots": 0,
+          "requested_turn_slots": 10,
+          "dispatched_turn_slots": 10,
+          "observed_turn_records": 10,
+          "missing_dispatched_turn_records": 0,
+          "undispatched_turn_slots": 0
+        },
+        "eligible_turns": 10,
+        "recorded_distribution_checks_pass": true
+      },
+      "candidate": {
+        "concurrency": 1,
+        "status": "completed",
+        "denominators": {
+          "requested_repeats": 5,
+          "started_repeats": 5,
+          "undispatched_repeats": 0,
+          "requested_pairs": 5,
+          "dispatched_pair_slots": 5,
+          "observed_started_item_functions_minimum": 5,
+          "correct_item_records": 5,
+          "failed_item_records": 0,
+          "missing_item_outcomes": 0,
+          "undispatched_pair_slots": 0,
+          "requested_turn_slots": 10,
+          "dispatched_turn_slots": 10,
+          "observed_turn_records": 10,
+          "missing_dispatched_turn_records": 0,
+          "undispatched_turn_slots": 0
+        },
+        "eligible_turns": 10,
+        "recorded_distribution_checks_pass": true
+      },
+      "fixture_gate": "pass",
+      "strict_harness_passes": true,
+      "ratios": {
+        "cold.startup_seconds.p50": 0.9698541612158953,
+        "cold.startup_seconds.p95": 0.9589735938628109,
+        "cold.request_to_result_seconds.p50": 0.9198827279316585,
+        "cold.request_to_result_seconds.p95": 0.8857077241152876,
+        "warm.startup_seconds.p50": 1.0180060023783488,
+        "warm.startup_seconds.p95": 0.9883160144629565,
+        "warm.request_to_result_seconds.p50": 1.0051670523717624,
+        "warm.request_to_result_seconds.p95": 1.022965611997127
+      },
+      "failed_fixture_gates": [],
+      "candidate_hmz_source_manifest_sha256": [
+        "5ee79ec884f443dce342aa7183975167197fec434c324225c4387101ab428e94"
+      ],
+      "candidate_loaded_source_counts": [
+        129
+      ],
+      "candidate_final_rung_summaries": 5,
+      "candidate_error_categories": [],
+      "candidate_cleanup_survivors": 0,
+      "candidate_cleanup_unknown_rungs": 0
+    }
+  ],
+  "totals": {
+    "requested_repeats": 10,
+    "started_repeats": 10,
+    "undispatched_repeats": 0,
+    "requested_pairs": 10,
+    "dispatched_pair_slots": 10,
+    "observed_started_item_functions_minimum": 10,
+    "correct_item_records": 10,
+    "failed_item_records": 0,
+    "missing_item_outcomes": 0,
+    "undispatched_pair_slots": 0,
+    "requested_turn_slots": 20,
+    "dispatched_turn_slots": 20,
+    "observed_turn_records": 20,
+    "missing_dispatched_turn_records": 0,
+    "undispatched_turn_slots": 0
+  },
+  "distribution_checks": 24,
+  "compared_backends": 1,
+  "fixture_gate_passes": 1,
+  "fixture_timing_misses": 0,
+  "execution_failures": 0,
+  "strict_harness_failures_preserved": [],
+  "limitations": [
+    "Five fresh original and five fresh candidate serial pairs confirm this serial condition; they do not establish higher concurrency.",
+    "All model replies are deterministic loopback mock responses; no real inference timing is established.",
+    "Strict first-tool-to-stream-exhaustion gates are retained separately from earliest-provider-request-to-result gates.",
+    "Absent item or turn outcomes are unknown and do not become successful samples."
+  ]
+}
