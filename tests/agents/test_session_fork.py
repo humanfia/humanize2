@@ -340,7 +340,6 @@ def _built(session: SessionBase) -> list[str]:
     [
         (_claude, ["--resume", "parent-session", "--fork-session"]),
         (_qwen, ["--resume", "parent-session", "--fork-session"]),
-        (_grok, ["--resume", "parent-session", "--fork-session"]),
         (_pi, ["--fork", "parent-session"]),
     ],
 )
@@ -355,6 +354,29 @@ def test_each_backend_asks_its_own_cli_to_fork(
 
     assert [one for one in argv if one in wanted] == wanted
     assert session.forks is True
+
+
+def test_grok_cuts_its_fork_on_the_command_line_its_transport_falls_back_to() -> None:
+    """Its protocol opens a session or loads one by id, and has no third call.
+
+    So the fork is the command line's `--fork-session`, taken once: it mints the id this
+    conversation is from then on, and every turn after it is an ordinary one on the process
+    that loads what it minted.
+    """
+    session = GrokBuildAgent(GrokBuildAgentConfig(model="m", effort="xhigh")).new()
+    session._forked_from = "parent-session"
+
+    argv = session._turn("hi")[0]
+
+    assert [one for one in argv if one in ("--resume", "--fork-session")] == [
+        "--resume",
+        "--fork-session",
+    ]
+    assert "parent-session" in argv
+    assert session.forks is True
+    # And the held-open transport is what an ordinary turn of it goes to once it has one.
+    session._adopt("cut-session")
+    assert session._forking() is False
 
 
 def test_kimi_cuts_its_fork_with_the_command_its_cli_has_for_it(calls: Path) -> None:

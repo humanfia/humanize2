@@ -824,6 +824,11 @@ class SessionBase(ABC):
   called: a child whose parent has been given a turn since MUST be refused rather than cut
   from where those turns left it. A branch from somewhere nobody chose that reads as the
   branch that was asked for is the failure this exists to prevent.
+- A backend driven two ways MUST cut its fork on whichever of them has the operation, and
+  MUST NOT let the other open a conversation from nothing instead. Grok Build is held open on
+  a protocol whose only calls open a session or load one by id, so its fork is one turn taken
+  on the command line it already falls back to for a shape, and the turns after it are
+  ordinary ones on a process that loads the id that turn minted.
 - A child whose first turn comes back naming the conversation it was cut from MUST raise
   rather than take that id. A CLI that took the fork flag and did not fork is the one way this
   fails with nothing looking wrong, and a session that adopted it would be the second handle

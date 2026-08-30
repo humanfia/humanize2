@@ -140,6 +140,11 @@ class GrokBuildSession(StreamSessionBase):
         by that -- the run resumes it, and the process the next ordinary turn starts loads it
         back.
 
+        So is the first turn of a conversation cut from another. The protocol opens a session
+        or loads one by id and has no third call; `--fork-session` is the command line's, and
+        it is what mints the id this conversation is from then on. One turn that way, and the
+        turns after it are ordinary ones on the process that loads what it minted.
+
         Args:
           prompt: The input prompt for this turn.
           schema: The shape to answer in, or None to take what the agent says.
@@ -147,7 +152,7 @@ class GrokBuildSession(StreamSessionBase):
         Yields:
           What the agent said, and the answer it ended on.
         """
-        if schema is not None or self._withholding():
+        if schema is not None or self._withholding() or self._forking():
             with self._lock:
                 self._shut()
                 # The finite command transport checks the process's exit status after its
@@ -169,6 +174,15 @@ class GrokBuildSession(StreamSessionBase):
                 # back onto a process started afresh.
                 self._shut()
                 raise
+
+    def _forking(self) -> bool:
+        """Whether this turn is the one that cuts this conversation from the one it came from.
+
+        Returns:
+          Whether a fork is still to be made: the protocol has no call for one, so it is made
+          on the command line, once, and never again once the fork has an id of its own.
+        """
+        return self._id is None and self._forked_from is not None
 
     def _withholding(self) -> bool:
         """Whether this agent's rung is one only the command line can say.

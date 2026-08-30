@@ -31,6 +31,7 @@ from hmz.agents import (
     Tool,
 )
 from hmz.agents import codex as appservers
+from hmz.agents import kimi as kimicode
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -144,6 +145,105 @@ class Handler(BaseHTTPRequestHandler):
                 {"type": "thinking", "thinking": "..."},
                 {"type": "tool_use", "tool_name": "Write"},
                 {"type": "text", "text": answer},
+            ]}]})
+
+    def log_message(self, *ignored):
+        pass
+
+
+server = HTTPServer(("127.0.0.1", 0), Handler)
+print(f"Kimi server: http://127.0.0.1:{server.server_port}/#token=secret", flush=True)
+server.serve_forever()
+"""
+
+#: A `kimi web` whose session is not running yet when the prompt lands: the daemon takes a
+#: prompt before it starts on it, so the first reading of a turn just submitted finds a session
+#: that is not busy and a history with nothing in it. That is the moment before the turn, not
+#: the moment after it, and a reader that took it for the end would answer with nothing.
+#: `pending` says which spelling of the question list this one takes -- the filter its
+#: querystring schema requires, or the bare path a daemon that never had that filter takes.
+_KIMI_SLOW_TO_START = """
+import json, os, pathlib, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+LOG = pathlib.Path(sys.argv[0] + ".log")
+PENDING = os.environ.get("KIMI_STANDIN_QUESTIONS", "filtered")
+POLLS = []
+REFUSED = []
+ASKED = [{"question_id": "q_0", "questions": [{
+    "id": "which", "header": "Which", "question": "Which way?",
+    "options": [{"id": "o_l", "label": "left"}, {"id": "o_r", "label": "right"}]}]}]
+
+
+def note(entry):
+    with LOG.open("a") as stream:
+        json.dump(entry, stream)
+        stream.write("\\n")
+
+
+class Handler(BaseHTTPRequestHandler):
+    def envelope(self, said):
+        body = json.dumps(said).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        return body
+
+    def reply(self, data, status=200):
+        body = json.dumps({"code": 0, "msg": "ok", "data": data}).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        sent = json.loads(self.rfile.read(int(self.headers["Content-Length"])) or b"null")
+        note({"path": self.path, "body": sent, "token": self.headers.get("Authorization")})
+        if "/questions/" in self.path:
+            ASKED.clear()
+            self.reply({"resolved": True})
+        elif self.path.endswith("/prompts"):
+            # Taken, not started: the status below says so for one whole reading.
+            self.reply({"prompt_id": "p_1", "user_message_id": "msg_0",
+                        "status": "queued"})
+        elif self.path.endswith("/profile"):
+            self.reply({})
+        else:
+            self.reply({"id": "session_fake"})
+
+    def do_GET(self):
+        note({"path": self.path, "body": None, "token": self.headers.get("Authorization")})
+        if "/status" in self.path:
+            POLLS.append(None)
+            # Quiet before the turn, running through the middle of it, quiet after -- or
+            # working forever, which is what a session waiting on a question nobody can
+            # read does, and is the only way that turn ever ends.
+            self.reply({"busy": PENDING == "neither" or len(POLLS) in (2, 3)})
+        elif self.path.split("?", 1)[0].endswith("/questions"):
+            REFUSED.append(None)
+            filtered = self.path.endswith("?status=pending")
+            # A hiccup on the shared daemon: both spellings refused for one whole round,
+            # and the filter this daemon really does take from then on. Refused inside a
+            # 200, which is how a daemon that could not be reached reads too -- nothing
+            # about it says the spelling was wrong.
+            hiccup = PENDING == "flaky" and len(REFUSED) <= 2
+            takes = {"filtered": filtered, "bare": not filtered, "neither": False,
+                     "flaky": filtered and not hiccup}
+            if hiccup:
+                self.wfile.write(self.envelope({"code": 50000, "msg": "not now"}))
+            elif not takes[PENDING]:
+                self.reply(None, status=400)
+            else:
+                self.reply({"items": ASKED[:1]})
+        elif self.path.endswith("/sessions/session_fake"):
+            self.reply({"id": "session_fake", "usage": {"output_tokens": 100}})
+        elif len(POLLS) < 4:
+            self.reply({"items": []})  # nothing said yet: the turn has only just begun
+        else:
+            self.reply({"items": [{"id": "msg_1", "role": "assistant", "content": [
+                {"type": "text", "text": " answered "},
             ]}]})
 
     def log_message(self, *ignored):
@@ -473,6 +573,16 @@ def kimi(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
 
 
 @pytest.fixture
+def unhurried(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
+    # A tenth of the polling interval, so that the readings this daemon counts out land in
+    # the time a test may take rather than in the time a person would wait for one, and a
+    # recovery window that is still ten of those.
+    monkeypatch.setattr(kimicode, "_POLL_SECONDS", 0.1)
+    monkeypatch.setattr(kimicode, "_RECOVERY_SECONDS", 1.0)
+    return _install("kimi", _KIMI_SLOW_TO_START, tmp_path, monkeypatch)
+
+
+@pytest.fixture
 def codex(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
     return _install("codex", _CODEX, tmp_path, monkeypatch)
 
@@ -513,6 +623,10 @@ def test_kimi_opens_then_resumes(kimi: _FakeServer) -> None:
     assert all(
         prompt["path"] == f"/api/v1/sessions/{session.id}/prompts" for prompt in prompts
     )
+    # The settings are the session's, so the second turn at the same settings is a session
+    # that already has them: one daemon serves every session of its agent, and a call that
+    # changes nothing is a call the others queue behind.
+    assert len(_bodies(kimi, "/profile")) == 1
     assert all(call["token"] == "Bearer secret" for call in calls)
 
 
@@ -563,12 +677,18 @@ def test_kimi_effort_says_how_hard_to_think_and_how_wide(
 
 def test_kimi_pursues_by_setting_a_goal_on_the_session(kimi: _FakeServer) -> None:
     """The goal is the session's, not a `/goal` the model would read as a line of the prompt."""
-    _agent("swarmmax").new().pursue("the suite passes")
+    session = _agent("swarmmax").new()
+    session.pursue("the suite passes")
 
     (profile,), (prompt,) = _bodies(kimi, "/profile"), _bodies(kimi, "/prompts")
     assert profile["agent_config"]["goal_objective"] == "the suite passes"
     # And the objective is the turn as well: what to do, and what it is for.
     assert prompt["content"] == [{"type": "text", "text": "the suite passes"}]
+
+    # A goal is set going rather than held, so the same objective again is asking for it
+    # again -- unlike the settings beside it, which a session that has them already keeps.
+    session.pursue("the suite passes")
+    assert len(_bodies(kimi, "/profile")) == 2
 
 
 def test_kimi_reads_a_message_again_until_it_has_been_finished(
@@ -577,6 +697,90 @@ def test_kimi_reads_a_message_again_until_it_has_been_finished(
     """The daemon hands back a message that is still being written, so once is not enough."""
     # The stand-in has nothing to say the first time it is read, and the answer the second.
     assert _agent().new()("hi") == "answered"
+
+
+def test_kimi_does_not_take_the_quiet_before_a_turn_for_the_quiet_after_it(
+    unhurried: _FakeServer,
+) -> None:
+    """The daemon takes a prompt before it runs it, so the first reading finds it idle.
+
+    One reading of a session that is not busy is not a turn that is over: it is as likely the
+    moment before the turn, when the history holds nothing and the answer would be nothing
+    either. It takes two of them, a wait apart, for what is read back to be this turn.
+    """
+    assert _agent().new()("hi") == "answered"
+
+    polls = [call for call in unhurried.calls() if "/status" in call["path"]]
+    assert len(polls) >= 4  # not ended on the reading taken before the turn began
+
+
+def test_kimi_asks_for_the_questions_the_way_this_daemon_takes_them(
+    unhurried: _FakeServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One daemon's querystring requires the pending filter; another has never had it.
+
+    A turn stopped on a question it cannot read never moves again, so a refusal of the one
+    spelling is answered by asking the other rather than by coming back empty for as long as
+    the turn lasts.
+    """
+    monkeypatch.setenv("KIMI_STANDIN_QUESTIONS", "bare")
+    agent = _agent()
+    agent.ask = lambda question: "right"
+
+    assert agent("hi") == "answered"
+
+    assert _bodies(unhurried, "/questions/q_0") == [
+        {"answers": {"which": {"kind": "single", "option_id": "o_r"}}}
+    ]
+
+
+def test_a_kimi_daemon_that_will_not_be_asked_at_all_is_a_failed_turn(
+    unhurried: _FakeServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Neither spelling answered is a turn that would wait on its question forever."""
+    monkeypatch.setenv("KIMI_STANDIN_QUESTIONS", "neither")
+    agent = _agent()
+
+    with pytest.raises(subprocess.CalledProcessError):
+        agent.new()("hi")
+
+    # And it is the daemon that has stopped answering rather than the turn that has failed,
+    # so the session is left unopened for the next call to retry.
+    assert agent.opened == []
+
+
+def test_one_refused_question_reading_does_not_throw_a_kimi_turn_away(
+    unhurried: _FakeServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One daemon serves every session of its agent, and it hiccups.
+
+    A turn minutes in is not something to abandon over a reading that came back refused
+    once -- it is retried on the next round, and only a daemon that has refused for the
+    whole recovery window has stopped answering.
+    """
+    monkeypatch.setenv("KIMI_STANDIN_QUESTIONS", "flaky")
+    agent = _agent()
+    agent.ask = lambda question: "right"
+
+    assert agent("hi") == "answered"
+
+    assert _bodies(unhurried, "/questions/q_0") == [
+        {"answers": {"which": {"kind": "single", "option_id": "o_r"}}}
+    ]
+    # And the session stays on the spelling this daemon takes. A refusal that carries no
+    # status of its own says nothing about the spelling, and a session moved onto the
+    # unfiltered list by a hiccup would be putting an answered question again every second.
+    asking = [
+        call["path"]
+        for call in unhurried.calls()
+        if call["path"].split("?")[0].endswith("/questions")
+    ]
+    # The first two are the round that hiccupped: the filter, then the other spelling
+    # asked once in case it was the spelling that was wrong. Every one after them is the
+    # filter again.
+    assert [path.endswith("?status=pending") for path in asking[:2]] == [True, False]
+    assert asking[2:]
+    assert all(path.endswith("?status=pending") for path in asking[2:])
 
 
 def test_kimi_pursues_past_a_session_that_has_fallen_still(kimi: _FakeServer) -> None:
