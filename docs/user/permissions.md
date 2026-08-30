@@ -35,8 +35,9 @@ hmz exec: error: bad agent 'cli=codex,model=gpt-5.6-sol,effort=high,permission=r
 permission must be one of read-only, workspace-write, auto, bypass, not 'rdonly'
 ```
 
-At the prompt, it is the `permission` row of the sheet an agent is set up on. Step through it
-with **←/→**.
+There is no row for it at the prompt. What an agent may do is not the agent's to hold — it is
+said on the agent line, or by the flow that declares the agent — so the sheet an agent is set
+up on does not offer it.
 
 ## Why `bypass` is the default
 

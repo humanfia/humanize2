@@ -78,8 +78,8 @@ In Python the account is a field of the config:
 ClaudeCodeAgentConfig(model="claude-opus-5", effort="max", provider="deepseek")
 ```
 
-At the prompt it is the **account** row of the sheet an agent is set up on — the second page of
-`/flow`, or a saved agent in `/agents`. It sits under the `cli` row, because an account belongs
+At the prompt it is the **account** row of the sheet an agent is set up on, which is the second
+page of `/flow`. It sits under the `cli` row, because an account belongs
 to one backend: what signs in to Claude Code is not what signs in to codex. Opening it lists
 that CLI's own accounts with `as local` first:
 

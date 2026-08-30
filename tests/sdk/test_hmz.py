@@ -12,13 +12,12 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
-import pytest
-
-from hmz.kept import Runs
-from hmz.sdk import Hmz, Taken
+from hmz.sdk import Hmz
 
 if TYPE_CHECKING:
     import pathlib
+
+    import pytest
 
 FLOW = """
 from hmz.flows import Agent, flow
@@ -45,7 +44,7 @@ def test_the_workspace_is_wherever_humanize_is_run_when_none_was_given(
 
 
 def test_what_it_is_asked_for_is_what_it_loads() -> None:
-    """A line that lists the agents kept under a name must not pay for the interface."""
+    """A line that lists the places flows come from must not pay for the interface."""
     probe = (
         "import sys\n"
         "from hmz.sdk import Hmz\n"
@@ -58,57 +57,6 @@ def test_what_it_is_asked_for_is_what_it_loads() -> None:
 
     reached = {name.split(".")[1] for name in result.stdout.split()}
     assert reached == {"sdk"}
-
-
-def test_the_agents_written_down_are_the_ones_a_command_line_wrote() -> None:
-    """One store, reached one way, so that what a menu saved a line reads back."""
-    held = Hmz()
-    held.agents.add("mine", "claude/claude-opus-5:high")
-
-    kept = held.agents.find("mine")
-
-    assert kept is not None
-    assert kept.runs.spec == "claude/claude-opus-5:high"
-    assert [one.name for one in held.agents.all()] == ["mine"]
-
-
-def test_a_name_already_written_down_is_its_own_refusal() -> None:
-    """So that a command line can say which flag writes over one and a menu need not."""
-    held = Hmz()
-    held.agents.add("mine", "claude/claude-opus-5:high")
-
-    with pytest.raises(Taken, match="already an agent called mine"):
-        held.agents.add("mine", "codex/gpt-5.6:high")
-
-    written = held.agents.add("mine", "codex/gpt-5.6:high", force=True)
-    assert written.runs.spec == "codex/gpt-5.6:high"
-    assert len(held.agents.all()) == 1
-
-
-def test_one_written_over_keeps_its_place_in_the_list() -> None:
-    """However it was written: a menu and a command line write down the same thing."""
-    held = Hmz()
-    held.agents.add("one", "claude/a:high")
-    held.agents.add("two", "claude/b:high")
-
-    held.agents.write("one", Runs("codex/c:high"))
-
-    assert [each.name for each in held.agents.all()] == ["one", "two"]
-
-
-def test_an_agent_that_is_not_one_says_which_spelling_was_refused() -> None:
-    held = Hmz()
-
-    with pytest.raises(ValueError, match="nosuchcli/model:high"):
-        held.agents.add("mine", "nosuchcli/model:high")
-
-
-def test_taking_one_away_says_whether_there_was_one() -> None:
-    held = Hmz()
-    held.agents.add("mine", "claude/a:high")
-
-    assert held.agents.remove("mine")
-    assert not held.agents.remove("mine")
 
 
 def test_the_places_flows_come_from_are_the_four_that_are_always_there() -> None:

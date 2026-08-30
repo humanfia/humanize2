@@ -13,7 +13,7 @@ src/hmz/
 ├── models.py         what each backend runs, asked of it and kept per account
 ├── epic.py           what one run of one flow was, written down as it happens
 ├── fallbacks.py      where a turn goes when the place taking it cannot take it at all
-├── kept.py           an agent written down under a name: a shape and a file
+├── kept.py           what an agent is, written down: a shape and the two ways it goes
 ├── settings.py       what each workspace was set up to run
 ├── telemetry.py      what humanize reports about itself, and whether it does at all
 ├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line

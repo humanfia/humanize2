@@ -83,7 +83,6 @@ from .pick import (
     Providers,
     Reports,
     Runs,
-    Saved,
     Status,
     carries_on,
     config_of,
@@ -108,14 +107,14 @@ if TYPE_CHECKING:
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
 #: runs on is an agent apiece rather than one model, so its `/models` is the page along from
-#: it -- `/agents` being the ones saved to be imported there. `hmz anchor` is not here: it is
-#: not a thing to do to a flow that is running, and it is a command line of its own. What a
-#: run left behind is `/epics`, which is where the runs of this directory are.
+#: it. There is no command for an agent on its own: an agent belongs to the flow that drives
+#: it, and is set up on the page of `/flow` its agents are on. `hmz anchor` is not here
+#: either: it is not a thing to do to a flow that is running, and it is a command line of its
+#: own. What a run left behind is `/epics`, which is where the runs of this directory are.
 _OWN = (
     "flow",
     "btw",
     "flowverses",
-    "agents",
     "providers",
     "fallback",
     "epics",
@@ -1911,8 +1910,6 @@ class Humanize(App[None]):
             self.action_btw(" ".join(argv).strip())
         elif name == "flow":
             self.action_flow(argv[0] if argv else "")
-        elif name == "agents":
-            self.action_agents()
         elif name == "providers":
             self.action_providers()
         elif name == "fallback":
@@ -2462,24 +2459,6 @@ class Humanize(App[None]):
                 f"[dim]{escape(agent.id)} is {escape(runs.spec)} "
                 "from its next turn[/dim]"
             )
-
-    def action_agents(self) -> None:
-        """Opens the agents saved under a name, which is what `/agents` is for.
-
-        Not the agents of the flow: those are the second page of `/flow`, and are what this
-        run is driven by. These are the ones written down to be imported there -- the reviewer
-        you always use, the cheap one you fan out across, the one on somebody's gateway -- and
-        belong to no flow and no workspace at all.
-        """
-        self._saved_agents()
-
-    @work
-    async def _saved_agents(self) -> None:
-        """Reads the saved agents, and says so where the menu was saved."""
-        agents = installed()
-        agents.update(installable())
-        for one in await self.push_screen_wait(Saved(agents)) or ():
-            self.show(one)
 
     @work
     async def _asks_about_reports(self) -> None:

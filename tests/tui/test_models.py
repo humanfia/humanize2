@@ -153,46 +153,29 @@ def _rows(app: Humanize) -> int:
 
 @pytest.mark.timeout(60)
 @unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
-async def test_goals_are_an_on_off_choice_from_the_agent_place_suggestion(
+async def test_what_the_flow_said_about_goals_survives_the_sheet_untouched(
     _installed: unittest.mock.MagicMock,  # noqa: PT019
     flows: Path,
 ) -> None:
+    """It is not a row, so the sheet carries it across rather than answering it.
+
+    Whether goals are available is the flow's to say, and a sheet that reset it to a default
+    because it never showed it would be a sheet quietly overruling the flow.
+    """
     app = Humanize()
     async with app.run_test() as driver:
         await _to_the_agent(app, driver, "goals_off")
-        await onto(app, driver, "goals")
-        assert "off" in _value(app, "goals")
+        assert "goals" not in rows(app)
 
+        await onto(app, driver, "effort")
         await driver.press("right")
-        await until(lambda: "on" in _value(app, "goals"), driver)
-        await driver.press("right")
-        await until(lambda: "off" in _value(app, "goals"), driver)
+        await driver.pause()
 
         await keeps(app, driver)
         await keeps(app, driver)
 
     assert app._models[0].goals is False
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch("hmz.tui.app.installed", return_value=CLAUDE)
-async def test_a_user_can_override_the_agent_place_suggestion_to_on(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019
-    flows: Path,
-) -> None:
-    app = Humanize()
-    async with app.run_test() as driver:
-        await _to_the_agent(app, driver, "goals_off")
-        await onto(app, driver, "goals")
-        assert "off" in _value(app, "goals")
-        await driver.press("right")
-        await until(lambda: "on" in _value(app, "goals"), driver)
-
-        await keeps(app, driver)
-        await keeps(app, driver)
-
-    assert app._models[0].goals is True
-    assert app.settings.agents("goals_off")[0].goals is True
+    assert app.settings.agents("goals_off")[0].goals is False
 
 
 @pytest.mark.timeout(60)

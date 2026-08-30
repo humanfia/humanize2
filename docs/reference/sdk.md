@@ -32,7 +32,6 @@ a workspace is what loads the tracer.
 | `settings` | [What humanize remembers](/reference/tui#what-it-remembers) about this workspace, as `hmz.settings.Settings`. |
 | `flows` | [The flows there are](#flows), and the places they come from. |
 | `verses` | [Where flows come from](#flowverses) — the same object as `hmz.flows.verses`. |
-| `agents` | [The agents written down under a name](#agents). |
 | `accounts` | [The accounts an agent may be run as](#accounts), and what each backend runs as one. |
 | `fallbacks` | [Where a turn goes](#fallbacks) when the place taking it cannot take it at all. |
 | `epics` | [The runs of this workspace](#epics) that have already happened. |
@@ -113,26 +112,6 @@ walk.
 | `where(name)` | The directory it is kept in. |
 | `plain(url)` | A URL with whatever was signed into it taken out. |
 | `whence(one, nowhere="-")` | Where it came from, as it may be shown to somebody — asked of which flowverse it is rather than of whether its URL is empty. |
-
-## Agents
-
-`hmz.agents` — [the agents written down under a name](/reference/tui#agents-kept-under-a-name),
-which is the same store [`hmz agents`](/reference/cli#hmz-agents) and `/agents` walk. Not the
-agents of a flow.
-
-| | |
-| --- | --- |
-| `reads(spec)` | Reads one agent the way `-a` names one. Raises `ValueError` for one that is not. |
-| `all()` | Every agent written down, in the order they were written down in. |
-| `find(name)` | The one written down under this name, or `None`. |
-| `keep(agents)` | Writes down exactly these and nothing else, which is what a menu saves. |
-| `write(name, runs, *, force=True)` | Writes one down. One written over keeps its place in the list; one that is new goes on the end. |
-| `add(name, spec, *, anchor="", goals=True, web_search=None, force=False)` | The same, out of the way a command line names one. |
-| `remove(name)` | Takes one away. Returns whether there was one. |
-
-`Taken` is raised — a `ValueError` — for a name already written down when `force` is off. What
-to say about it is whoever asked's: a command line says which flag writes over one, and a menu
-that has already asked which name to save over says nothing at all.
 
 ## Accounts
 

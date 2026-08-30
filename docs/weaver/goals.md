@@ -52,10 +52,10 @@ class Agents(NamedTuple):
     reviewer: Annotated[Agent, AgentDefaults(goals=False)]
 ```
 
-The marker only supplies the model picker's initial value. The `goals` row switches the
-selected agent between `on` and `off`, and the resolved value is saved on that agent's
-`AgentConfig`. There is no third state, and the flow does not change an agent after it is made.
-Python callers set the same policy directly:
+The marker settles it. There is no row for it at the prompt — whether goals are available is
+the flow's to say, not the agent's to hold — so the resolved value goes onto that agent's
+`AgentConfig` and stays there. There is no third state, and the flow does not change an agent
+after it is made. Python callers set the same policy directly:
 
 ```python
 agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="high", goals=False))

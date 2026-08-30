@@ -1,27 +1,21 @@
-"""What a CLI would load here: found the way that CLI finds it, shown, and left alone.
+"""What a CLI would load here: found the way that CLI finds it, and left alone.
 
 A skill installed on this machine is the CLI's own -- installed the way that CLI installs
 one and switched off the way that CLI switches one off -- so humanize reads the list and
-changes nothing about it. What it does add to a session is the flow's own skills, which are
-mounted rather than installed and are tested beside the flows.
+changes nothing about it, and there is nowhere in the interface it may be changed from. What
+a run adds to a session is the flow's own skills, which are mounted rather than installed and
+are tested beside the flows.
 """
 
 from __future__ import annotations
 
-import unittest.mock
 from pathlib import Path
 
 import pytest
-from textual.widgets import Label, OptionList
 
 from hmz.agents.skills import Skill, skills
-from hmz.backends import Model
 from hmz.kept import Runs
 from hmz.settings import Settings
-from hmz.tui import Humanize
-from hmz.tui.pick import Agent, Skills
-
-from .test_app import into_agent, into_flows, keeps, opens, rows, until
 
 SKILL = """---
 name: {name}
@@ -275,117 +269,6 @@ def test_a_skill_with_no_front_matter_is_the_directory_it_is_in(homes: Path) -> 
     (where / "SKILL.md").write_text("Just the prose, no front matter.\n")
 
     assert Skill(name="bare", about="", whose="yours") in skills("claude")
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch(
-    "hmz.tui.app.installed",
-    return_value={"kimi": (Model("kimi-code/k3", ("max",)),)},
-)
-async def test_a_cli_with_no_installed_skills_says_so(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
-    homes: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A supported skill directory with no entries is empty rather than unsupported."""
-    monkeypatch.setenv("KIMI_CODE_HOME", str(homes / "kimi-home"))
-    monkeypatch.setattr(Path, "home", lambda: homes / "home")
-    app = Humanize()
-    async with app.run_test() as driver:
-        await into_flows(app, driver)
-        await into_agent(app, driver)
-        await opens(app, driver, "skills")
-        await until(lambda: isinstance(app.screen, Skills), driver)
-        said = str(app.screen.query_one("#tuning", Label).content)
-
-        assert "kimi has none installed here" in said
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch(
-    "hmz.tui.app.installed",
-    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
-)
-async def test_what_an_agent_carries_is_shown_and_not_switched(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
-    homes: Path,
-) -> None:
-    """The row reads, and the sheet it opens reads: neither is a choice anybody is offered."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        await into_flows(app, driver)
-        await into_agent(app, driver)
-        listing = app.screen.query_one("#choices", OptionList)
-        held = listing.get_option_at_index(rows(app).index("skills"))
-        assert "as its CLI finds them" in str(held.prompt)
-
-        await opens(app, driver, "skills")
-        await until(lambda: isinstance(app.screen, Skills), driver)
-        listing = app.screen.query_one("#choices", OptionList)
-        await until(lambda: bool(listing.options), driver)
-        # Every skill the CLI would load, where it came from, and no box to switch.
-        assert [str(option.id) for option in listing.options] == [
-            "hf-cli",
-            "writing",
-            "housekeeping",
-        ]
-        assert not any("[✔]" in str(option.prompt) for option in listing.options)
-        assert not any("[ ]" in str(option.prompt) for option in listing.options)
-        # And the line under them says whose they are and where to go to change one.
-        said = str(app.screen.query_one("#tuning", Label).content)
-        assert "claude's own" in said
-
-        await driver.press("space")  # nothing to switch, and nothing switches
-        await driver.pause()
-        assert not any("[✔]" in str(option.prompt) for option in listing.options)
-
-        await driver.press("enter")
-        await until(lambda: isinstance(app.screen, Agent), driver)
-
-        await keeps(app, driver)
-        await keeps(app, driver)
-
-    # Nothing about the skills rides along with what the agent runs: they are the CLI's,
-    # and reading the list is not a change to the agent.
-    assert app._models == [Runs("claude/claude-opus-5:high")]
-
-
-@pytest.mark.timeout(60)
-@unittest.mock.patch(
-    "hmz.tui.app.installed",
-    return_value={"claude": (Model("claude-opus-5", ("max", "high")),)},
-)
-async def test_the_letters_narrow_the_skills_shown(
-    _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
-    homes: Path,
-) -> None:
-    """A long list is searched here as it is searched everywhere else on these sheets."""
-    app = Humanize()
-    async with app.run_test() as driver:
-        await into_flows(app, driver)
-        await into_agent(app, driver)
-        await opens(app, driver, "skills")
-        await until(lambda: isinstance(app.screen, Skills), driver)
-        listing = app.screen.query_one("#choices", OptionList)
-        await until(lambda: bool(listing.options), driver)
-
-        await driver.press("s")
-        await driver.press(*"hous")
-        await driver.pause()
-        assert [str(option.id) for option in listing.options] == ["housekeeping"]
-
-        # Esc clears the search before it leaves, as it does on every other sheet.
-        await driver.press("escape")
-        await driver.pause()
-        assert [str(option.id) for option in listing.options] == [
-            "hf-cli",
-            "writing",
-            "housekeeping",
-        ]
-        assert isinstance(app.screen, Skills)
-
-        await driver.press("escape")
-        await until(lambda: isinstance(app.screen, Agent), driver)
 
 
 def test_a_workspace_writes_down_no_skills_of_its_own(tmp_path: Path) -> None:
