@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -31,11 +32,33 @@ from hmz.agents import (
     QwenCodeAgent,
     QwenCodeAgentConfig,
 )
+from hmz.flows import NotAFlow
+from hmz.runner import Runner
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 #: The backends that can be told, and the ones that cannot. Read off `hmz.backends` here as
 #: everything else reads it, so a backend that gains a way of being told is a backend this
 #: notices rather than a list to remember.
 TELLABLE = ("claude", "codex", "grok", "qwen", "opencode", "mimo", "zcode")
+
+#: A flow whose one agent reads this repository and nothing else, which is a thing about the
+#: work: it says so where it declares the place, and nobody outside it may say otherwise.
+SEARCHLESS = '''"""A flow whose answers have to be the same tomorrow."""
+
+from typing import Annotated
+
+from hmz.agents import AgentBase, AgentDefaults
+from hmz.flows import flow
+
+
+@flow
+def run(
+    agents: tuple[Annotated[AgentBase, AgentDefaults(web_search=False)]], task: str
+) -> None:
+    agents[0](task)
+'''
 
 
 def test_an_agent_nobody_has_been_asked_about_may_search_the_web() -> None:
@@ -157,11 +180,31 @@ def test_an_agent_that_may_not_search_is_another_agent_at_the_same_model() -> No
     assert config.web_search is True
 
 
-def test_a_line_says_it_the_way_a_line_says_every_other_setting() -> None:
-    """Written out, beside the permission rung and the account it runs as."""
-    assert backends.read("cli=claude,model=m,effort=high,web_search=off")[6] is False
-    assert backends.read("cli=claude,model=m,effort=high,web_search=on")[6] is True
-    # Nobody said, which is not the same as saying on: it is the agent as it comes.
-    assert backends.read("claude/m:high")[6] is None
-    with pytest.raises(ValueError, match="web_search must be on or off"):
-        backends.read("cli=claude,model=m,effort=high,web_search=maybe")
+def test_the_flow_says_it_and_a_line_that_says_it_is_refused() -> None:
+    """A run whose answers have to be the same tomorrow is a thing about the work."""
+    with pytest.raises(ValueError, match="web_search is the flow's to say"):
+        backends.read("cli=claude,model=m,effort=high,web_search=off")
+    with pytest.raises(ValueError, match="web_search is the flow's to say"):
+        backends.read("cli=claude,model=m,effort=high,web_search=on")
+    # And the line that says nothing is the ordinary one: a CLI, a model and an effort.
+    assert backends.read("claude/m:high")[0].name == "claude"
+
+
+def test_what_a_flow_declares_reaches_the_agent(tmp_path: Path) -> None:
+    """Settled onto it before the first turn, over whatever it was made with."""
+    where = tmp_path / "quiet.py"
+    where.write_text(SEARCHLESS)
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+
+    Runner(str(where), [agent])
+
+    assert agent.config.web_search is False
+
+
+def test_a_backend_that_cannot_be_told_cannot_fill_such_a_place(tmp_path: Path) -> None:
+    """Refused where the run is set up, rather than searching on under a flow that says not."""
+    where = tmp_path / "quiet.py"
+    where.write_text(SEARCHLESS)
+
+    with pytest.raises(NotAFlow, match="no way of being told not to search the web"):
+        Runner(str(where), [PiAgent(PiAgentConfig(model="m", effort="high"))])

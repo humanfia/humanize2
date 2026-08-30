@@ -122,7 +122,7 @@ agents of a flow.
 
 | | |
 | --- | --- |
-| `reads(spec)` | Reads one agent the way `-a` names one. Raises `ValueError` for one that is not. |
+| `reads(spec)` | Reads one agent the way `-a` names one: the CLI, model, effort, service tier, account and native pairs. Raises `ValueError` for one that is not, or one saying what the flow says. |
 | `all()` | Every agent written down, in the order they were written down in. |
 | `find(name)` | The one written down under this name, or `None`. |
 | `keep(agents)` | Writes down exactly these and nothing else, which is what a menu saves. |

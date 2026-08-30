@@ -553,6 +553,125 @@ def test_a_called_flow_brings_its_own_skills_and_hands_the_agents_back(
     assert isinstance(agent.loaded[0], Loaded)
 
 
+def test_a_called_flow_says_what_its_agents_may_do_while_it_runs(flows: Path) -> None:
+    """And hands them back as it found them: a call is over when it returns."""
+    written(
+        flows / ".humanize/flows",
+        "strict",
+        '''"""The called one, whose agent may look and not touch."""
+
+from pathlib import Path
+from typing import Annotated
+
+from hmz.agents import AgentBase, AgentDefaults
+from hmz.flows import flow
+
+
+@flow
+def run(
+    agents: tuple[Annotated[AgentBase, AgentDefaults(permission="read-only")]],
+    task: str,
+) -> None:
+    (agent,) = agents
+    Path("inside.txt").write_text(agent.config.permission)
+''',
+    )
+    written(
+        flows / ".humanize/flows",
+        "over",
+        '''"""Says what its agent was allowed, before the call and after it."""
+
+from pathlib import Path
+
+from hmz.agents import AgentBase
+from hmz.flows import flow, load
+
+
+@flow
+def run(agents: tuple[AgentBase], task: str) -> None:
+    (agent,) = agents
+    said = [agent.config.permission]
+    load("strict")(agents, task)
+    said.append(agent.config.permission)
+    Path("allowed.txt").write_text("|".join(said))
+''',
+    )
+    agent = ShellAgent(CONFIG)
+
+    Runner("over", [agent]).run("go")
+
+    assert (flows / "inside.txt").read_text() == "read-only"
+    assert (flows / "allowed.txt").read_text() == "bypass|bypass"
+    assert agent.config.permission == "bypass"
+
+
+def test_a_call_refused_leaves_the_caller_driving_the_agents_it_had(
+    flows: Path,
+) -> None:
+    """A call that never happened has changed nothing about what the caller is driving."""
+    written(
+        flows / ".humanize/flows",
+        "quiet",
+        '''"""Two agents, and neither of them reads the internet."""
+
+from typing import Annotated
+
+from hmz.agents import AgentBase, AgentDefaults
+from hmz.flows import flow
+
+Quiet = Annotated[AgentBase, AgentDefaults(web_search=False)]
+
+
+@flow
+def run(agents: tuple[Quiet, Quiet], task: str) -> None:
+    for agent in agents:
+        agent(task)
+''',
+    )
+    written(
+        flows / ".humanize/flows",
+        "over",
+        '''"""Calls it with one agent that cannot be told, and carries on."""
+
+from pathlib import Path
+
+from hmz.agents import AgentBase
+from hmz.flows import NotAFlow, flow, load
+
+
+@flow
+def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:
+    try:
+        load("quiet")(agents, task)
+    except NotAFlow as refused:
+        Path("refused.txt").write_text(str(refused))
+    Path("after.txt").write_text(
+        ",".join(str(agent.config.web_search) for agent in agents)
+    )
+''',
+    )
+    from hmz.agents import (
+        ClaudeCodeAgent,
+        ClaudeCodeAgentConfig,
+        PiAgent,
+        PiAgentConfig,
+    )
+
+    # One that can be told and one that cannot, in that order: the first is settled, and
+    # put back again when the second is refused.
+    told = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+    cannot = PiAgent(PiAgentConfig(model="m", effort="high"))
+
+    Runner("over", [told, cannot]).run("go")
+
+    assert (
+        "no way of being told not to search the web"
+        in (flows / "refused.txt").read_text()
+    )
+    assert (flows / "after.txt").read_text() == "True,True"
+    assert told.config.web_search is True
+
+
 def test_a_called_flow_can_explicitly_inherit_its_callers_skills(flows: Path) -> None:
     """A wrapper can add a skill without copying the called flow's own bundle."""
     card = "---\nname: {name}\ndescription: does a thing\n---\n\n{says}\n"

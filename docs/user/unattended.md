@@ -47,16 +47,22 @@ mention it.
 
 ## Narrow what an agent may do
 
-Only the written-out form takes it:
+The flow says it, where it declares the agent — not the line that runs it:
+
+```python
+class Agents(NamedTuple):
+    reviewer: Annotated[Agent, AgentDefaults(permission="read-only")]
+```
 
 ```sh
-hmz exec -f ralph_loop \
-    -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only \
+hmz exec -f ./review.py \
+    -a codex/gpt-5.6-sol:high \
     "review this repository and write the findings to REVIEW.md"
 ```
 
-Four rungs exist: `read-only`, `workspace-write`, `auto`, `bypass`. `bypass` is the default. A
-misspelling is refused before any agent runs. See [Permissions](/user/permissions).
+Four rungs exist: `read-only`, `workspace-write`, `auto`, `bypass`. A place that says nothing
+runs at `bypass`, and a rung there is not is refused before any agent runs — by `hmz check`
+without running the flow at all. See [Permissions](/user/permissions).
 
 ## Run with nobody at a prompt
 
@@ -81,7 +87,7 @@ hmz exec: error: official/rlar: the flow drives 2 agents, 1 given
 
 $ hmz exec -f ralph_loop -a claude:high "fix the build"
 hmz exec: error: bad agent 'claude:high': expected CLI[@PROVIDER]/MODEL:EFFORT or
-cli=CLI,model=MODEL,effort=EFFORT[,provider=PROVIDER][,permission=PERMISSION]
+cli=CLI,model=MODEL,effort=EFFORT[,service_tier=SERVICE_TIER][,provider=PROVIDER][,config.KEY=VALUE]
 
 $ hmz exec -f nosuchflow -a claude/claude-opus-5:max "fix the build"
 hmz exec: error: nosuchflow: no flow to read: a flow is a directory with an __init__.py in it

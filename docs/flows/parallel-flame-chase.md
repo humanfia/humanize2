@@ -30,10 +30,10 @@ hmz exec -f official/parallel_flame_chase \
 | `lane_2_actor_a` · `lane_2_actor_b` | Lane 2, alternating, in a snapshot of its own |
 | `lane_3_actor_a` · `lane_3_actor_b` | Lane 3, alternating, in a snapshot of its own |
 
-All seven open with the backend's [goal feature](/features/goals) turned off —
+All seven run with the backend's [goal feature](/features/goals) turned off —
 `AgentDefaults(goals=False)` beside each — because a lane's turn ends where the lane protocol
-says it ends rather than where a model decides it has met the objective. That is what `/agents`
-opens on, not something it holds you to.
+says it ends rather than where a model decides it has met the objective. The flow declares it,
+so it holds for whichever agents the run is given.
 
 ## One writer, and two that cannot write
 

@@ -113,7 +113,15 @@ class Runner:
         """
         from .agents import HumanAgent
         from .epic import resumed
-        from .flows.driving import NotAFlow, carries, declares, lands, readies, set_up
+        from .flows.driving import (
+            NotAFlow,
+            carries,
+            declares,
+            lands,
+            readies,
+            runs_at,
+            set_up,
+        )
 
         run, places, make, setting, mark = declares(flow)
         # Before anything is chosen or opened: an atlas whose body does not compile is a
@@ -147,6 +155,11 @@ class Runner:
                     "were switched off for it"
                 )
             lands(flow, agent, place)
+            # And what the flow says this one may do, whether it has goals and whether it
+            # reads the internet -- over whatever it was made with, because those three are
+            # the flow's and nobody else's: whoever chose the agent chose a CLI, a model, an
+            # effort and an account, and none of that says what the work is.
+            runs_at(flow, agent, place)
         # The person at the prompt is made here rather than given: nobody chooses what they
         # run, so nothing upstream of this was ever asked about them.
         given = iter(agents)
@@ -277,53 +290,30 @@ class Runner:
 
 def read_agent(
     spec: str,
-) -> tuple[
-    backends.Profile,
-    str,
-    str,
-    str,
-    str,
-    str | None,
-    bool | None,
-    tuple[tuple[str, str], ...],
-]:
+) -> tuple[backends.Profile, str, str, str, str, tuple[tuple[str, str], ...]]:
     """Reads and validates one command-line agent specification.
 
     Args:
       spec: The short or written-out form accepted by ``-a``.
 
     Returns:
-      The backend, model, effort, common service tier, provider, optional permission rung,
-      whether it may search the web -- None where nobody said -- and backend-native
-      ``config.KEY`` pairs.
+      The backend, model, effort, common service tier, provider and backend-native
+      ``config.KEY`` pairs. What the agent may do, whether it has goals and whether it may
+      search the web are not among them: those are the flow's, said where it declares the
+      place, and a line that says one is a line to correct.
 
     Raises:
-      ValueError: If the specification is malformed or names no permission rung there is.
+      ValueError: If the specification is malformed, or says what the flow says.
     """
-    from .agents import PERMISSIONS, SERVICE_TIERS
+    from .agents import SERVICE_TIERS
 
-    profile, model, effort, service_tier, provider, permission, searches, overrides = (
-        backends.read(spec)
-    )
+    profile, model, effort, service_tier, provider, overrides = backends.read(spec)
     if service_tier not in SERVICE_TIERS:
         raise ValueError(
             f"service_tier must be one of {', '.join(SERVICE_TIERS)}, "
             f"not {service_tier!r}"
         )
-    if permission is not None and permission not in PERMISSIONS:
-        raise ValueError(
-            f"permission must be one of {', '.join(PERMISSIONS)}, not {permission!r}"
-        )
-    return (
-        profile,
-        model,
-        effort,
-        service_tier,
-        provider,
-        permission,
-        searches,
-        overrides,
-    )
+    return (profile, model, effort, service_tier, provider, overrides)
 
 
 def flow_and_agents(
@@ -373,8 +363,7 @@ def flow_and_agents(
         metavar="CLI/MODEL:EFFORT",
         help="one agent, repeated once for each the flow drives, in the order it takes "
         "them; also written cli=CLI,model=MODEL,effort=EFFORT with optional "
-        "service_tier=SERVICE_TIER, permission=PERMISSION, web_search=on|off and "
-        "backend-native config.KEY=VALUE. CLI is one of "
+        "service_tier=SERVICE_TIER and backend-native config.KEY=VALUE. CLI is one of "
         f"{', '.join(sorted(one.name for one in backends.profiles()))}",
     )
     parser.add_argument(
@@ -408,51 +397,25 @@ def flow_and_agents(
     # should not have paid for three backends to say what it takes.
     from .agents import driver
 
-    # A command-line agent has no picker to resolve a place's initial suggestion, so resolve
-    # it here before constructing the config. Leave malformed or missing flows for Runner to
-    # report in its usual place; their agents use the ordinary on default in the meantime.
-    from .flows.driving import wanted
-
-    try:
-        places = wanted(args.flow)
-    except Exception:  # noqa: BLE001 -- reading it is a convenience; running it is the report
-        # Anything at all, because a flow is a Python file and reading one runs it: a flow
-        # that opens a prompt beside it and does not find it raises whatever that raised, and
-        # a line read for its goal defaults must not be where that lands. `Runner` loads it
-        # again a moment later, in the one place that reports it as a line to correct.
-        places = ()
     agents: list[AgentBase] = []
-    for at, spec in enumerate(args.agents):
+    for spec in args.agents:
         try:
-            (
-                profile,
-                model,
-                effort,
-                service_tier,
-                provider,
-                permission,
-                searches,
-                overrides,
-            ) = read_agent(spec)
+            profile, model, effort, service_tier, provider, overrides = read_agent(spec)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
         agent, config = driver(profile.name)
         # Named rather than looked up: an account that is not there is caught by the agent
         # the first time it needs one, which says whose it was and what it was called.
-        goals = places[at].goals_default if at < len(places) else True
         extra: dict[str, Any] = {"service_tier": service_tier}
-        if permission is not None:
-            extra["permission"] = permission
-        if searches is not None:
-            extra["web_search"] = searches
         if overrides and profile.name == "codex":
             extra["overrides"] = overrides
         elif overrides:
             extra["allowed_tools"] = tuple(value for _key, value in overrides)
         try:
-            configured = config(
-                model=model, effort=effort, provider=provider, goals=goals, **extra
-            )
+            # What it may do, whether it has goals and whether it may search the web are
+            # left as they come: `Runner` settles all three from what the flow declared,
+            # which is the one place any of them is said.
+            configured = config(model=model, effort=effort, provider=provider, **extra)
             agents.append(agent(configured))
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")

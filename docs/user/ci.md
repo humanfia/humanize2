@@ -71,14 +71,23 @@ meant, and the turn would be taken as the wrong account with nothing looking wro
 
 ## Narrow what it may do
 
+What an agent may do is declared by the flow, not by the line that runs it, so narrowing it on
+a runner means writing it into the flow the runner runs:
+
+```python
+# .humanize/flows/nightly/__init__.py
+class Agents(NamedTuple):
+    worker: Annotated[Agent, AgentDefaults(permission="workspace-write")]
+```
+
 ```sh
 hmz exec -f nightly \
-    -a cli=claude,model=claude-opus-5,effort=high,provider=ci,permission=workspace-write \
+    -a cli=claude,model=claude-opus-5,effort=high,provider=ci \
     "$(cat TASK.md)"
 ```
 
-`bypass` is the default. On a runner, `workspace-write` costs you nothing and bounds the blast
-radius to the checkout. See [Permissions](/user/permissions).
+A place that says nothing runs at `bypass`. On a runner, `workspace-write` costs you nothing
+and bounds the blast radius to the checkout. See [Permissions](/user/permissions).
 
 ## Write the workflow
 
@@ -118,7 +127,7 @@ jobs:
       - name: Run the loop
         run: |
           hmz exec -f nightly \
-            -a cli=claude,model=claude-opus-5,effort=high,provider=ci,permission=workspace-write \
+            -a cli=claude,model=claude-opus-5,effort=high,provider=ci \
             "$(cat TASK.md)"
 
       - name: Collect the trace

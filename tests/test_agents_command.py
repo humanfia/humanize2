@@ -108,12 +108,16 @@ def test_an_agent_that_is_not_one_is_refused_where_it_was_typed(
     assert Templates().all() == []
 
 
-def test_a_permission_no_rung_answers_to_is_refused(
+def test_a_rung_is_not_a_thing_an_agent_is_written_down_with(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert run("add", "mine", "cli=claude,model=m,effort=high,permission=whatever") == 1
+    """What an agent may do is the flow's, said where the flow declares the place."""
+    assert (
+        run("add", "mine", "cli=claude,model=m,effort=high,permission=read-only") == 1
+    )
 
-    assert "permission must be one of" in capsys.readouterr().err
+    assert "is the flow's to say" in capsys.readouterr().err
+    assert Templates().all() == []
 
 
 def test_a_codex_override_is_not_written_down_under_a_name(
