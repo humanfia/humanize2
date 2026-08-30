@@ -45,7 +45,7 @@ from hmz.epic import Epic, sessions
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
     from pathlib import Path
 
 CONFIG = AgentConfig(model="m", effort="high")
@@ -89,9 +89,16 @@ class _Fake:
 
     def __init__(self) -> None:
         self.called: list[tuple[str, dict[str, Any]]] = []
+        self.held: dict[str, dict[str, Any]] = {}
 
     def permitted(self, permission: str, tier: str) -> dict[str, Any]:
         return {"approvalPolicy": permission, "serviceTier": tier}
+
+    def holds(self, thread: str, rung: Mapping[str, Any]) -> bool:
+        return self.held.get(thread) == dict(rung)
+
+    def holding(self, thread: str, rung: Mapping[str, Any]) -> None:
+        self.held[thread] = dict(rung)
 
     def call(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         self.called.append((method, params))

@@ -259,6 +259,59 @@ for line in sys.stdin:
 """
 
 
+#: A `codex app-server` that will not finish either turn until both of them have started, and
+#: names the thread on every notification the way a real one does. One conversation apiece, so
+#: what is read back says whose it was. A driver that ran the turns of one server one after the
+#: other would leave the first waiting for a second that cannot start, which is the whole point.
+_CODEX_TOGETHER = """
+import json, pathlib, sys, threading
+
+LOG = pathlib.Path(sys.argv[0] + ".log")
+THREADS = []
+BOTH = threading.Barrier(2)
+WRITING = threading.Lock()
+
+
+def send(message):
+    with WRITING:
+        sys.stdout.write(json.dumps(message) + "\\n")
+        sys.stdout.flush()
+
+
+def answer(thread, paired):
+    if paired:
+        BOTH.wait(timeout=20)
+    send({"method": "item/completed", "params": {"threadId": thread, "item": {
+        "type": "agentMessage", "text": "at once on " + thread}}})
+    send({"method": "turn/completed", "params": {"threadId": thread}})
+    send({"method": "thread/status/changed",
+          "params": {"threadId": thread, "status": {"type": "idle"}}})
+
+
+for line in sys.stdin:
+    call = json.loads(line)
+    with LOG.open("a") as stream:
+        json.dump(call, stream)
+        stream.write("\\n")
+    if "id" not in call or "method" not in call:
+        continue
+    if call["method"] == "thread/start":
+        THREADS.append("thread_%d" % len(THREADS))
+        send({"jsonrpc": "2.0", "id": call["id"],
+              "result": {"thread": {"id": THREADS[-1]}}})
+        send({"method": "thread/status/changed",
+              "params": {"threadId": THREADS[-1], "status": {"type": "idle"}}})
+        continue
+    send({"jsonrpc": "2.0", "id": call["id"], "result": {}})
+    if call["method"] == "turn/start":
+        named = call["params"]["threadId"]
+        send({"method": "turn/started",
+              "params": {"threadId": named, "turnId": "turn_" + named}})
+        paired = call["params"]["input"][0]["text"] == "together"
+        threading.Thread(target=answer, args=(named, paired), daemon=True).start()
+"""
+
+
 #: A `codex app-server` that runs a turn the way a working one goes: it reaches for things, it
 #: thinks, it says what it spent, and only at the end does it answer. Every message is shaped as
 #: `codex app-server generate-json-schema` says the real one shapes it -- the items carry what
@@ -429,6 +482,11 @@ def working(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
     return _install("codex", _CODEX_WORKING, tmp_path, monkeypatch)
 
 
+@pytest.fixture
+def together(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
+    return _install("codex", _CODEX_TOGETHER, tmp_path, monkeypatch)
+
+
 def test_kimi_opens_then_resumes(kimi: _FakeServer) -> None:
     session = _agent().new()
     assert session("hi") == "answered"
@@ -590,17 +648,70 @@ def test_codex_gives_up_on_a_goal_that_has_gone_quiet(
     assert session.pursue("stuck") == "answered"  # the turn is lost, the loop is not
 
 
-def test_codex_resumes_the_thread_a_later_goal_is_set_on(codex: _FakeServer) -> None:
-    """A goal is set on a thread the server holds, and one it opened earlier it has let go."""
+def test_reading_a_codex_agents_server_does_not_start_one_a_read(
+    together: _FakeServer,
+) -> None:
+    """Asking an agent for its server is not a turn, so it neither takes one nor starts one.
+
+    A caller with something to ask of Codex reads that; a turn asks the agent for one instead,
+    which is what says a server is busy for as long as the turn takes.
+    """
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high"))
+    assert agent.server is agent.server is agent.server
+
+    assert agent.new()("first") == "at once on thread_0"
+
+    # One server, however many times it was asked for: each starts by introducing itself.
+    assert [call["method"] for call in together.calls()].count("initialize") == 1
+
+
+@pytest.mark.timeout(60)
+def test_two_codex_sessions_of_one_agent_take_their_turns_at_the_same_time(
+    together: _FakeServer,
+) -> None:
+    """One server holds two conversations, and runs a turn of each at once.
+
+    The stand-in finishes neither turn until both have begun, so a driver that ran the second
+    behind the first would never reach the second at all. What each turn is told is picked
+    apart as it is read, which is what lets them overlap on the one stream.
+    """
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high"))
+    opened = agent.new()
+    assert opened("first") == "at once on thread_0"  # opened, and its server now idle
+
+    # The second conversation is opened on that same idle server, and its turn is under way
+    # before the first says anything -- so the first has to share the server rather than wait.
+    beside = agent.new()
+    said: list[str] = []
+    running = threading.Thread(
+        target=lambda: said.append(beside("together")), daemon=True
+    )
+    running.start()
+    for _ in range(500):
+        if beside._running.turn is not None:
+            break
+        time.sleep(0.02)
+
+    assert opened("together") == "at once on thread_0"
+    running.join(timeout=20)
+    assert said == ["at once on thread_1"]
+    # One server, two threads: the second was opened where the first already was.
+    assert [call["method"] for call in together.calls()].count("thread/start") == 2
+
+
+def test_codex_carries_on_the_thread_a_later_goal_is_set_on(codex: _FakeServer) -> None:
+    """A goal is set on the thread this session already is, on the server already holding it.
+
+    Neither opened again nor picked up again: picking a thread up reads the whole conversation
+    back off the disk, and the server it was opened on has never let go of it.
+    """
     session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
     session.pursue("the suite passes")
     session.pursue("and stays passing")
 
     methods = [call["method"] for call in codex.calls()]
-    assert (
-        methods.count("thread/start") == 1
-    )  # one thread, resumed rather than reopened
-    assert methods.count("thread/resume") == 1
+    assert methods.count("thread/start") == 1
+    assert methods.count("thread/resume") == 0
 
 
 def test_codex_runs_where_the_path_it_was_started_with_does_not_name_it(
@@ -804,7 +915,7 @@ def test_a_codex_turn_ignores_what_another_thread_is_saying(codex: _FakeServer) 
     server = session._agent.server
 
     # A straggler from a thread this turn is not on, of the kind that would otherwise end it.
-    server._messages.put(
+    server._route(
         {
             "method": "thread/status/changed",
             "params": {"status": {"type": "idle"}, "threadId": "somebody_else"},
@@ -937,6 +1048,16 @@ def test_codex_can_disable_goals_before_its_server_starts(
             started.append(argv)
             self._held: list[Any] = []
 
+        def take(self) -> bool:
+            """Nothing runs on it, so it is always free for the turn that asked."""
+            return True
+
+        def share(self) -> None:
+            """Nothing runs on it, so there is nothing to run beside."""
+
+        def give(self) -> None:
+            """Nothing took it, so there is nothing to hand back."""
+
         def stop(self) -> None:
             """Nothing was started, so there is nothing to take down."""
 
@@ -976,6 +1097,16 @@ def test_codex_passes_allowlisted_overrides_to_its_app_server(
             del env
             started.append(argv)
             self._held: list[Any] = []
+
+        def take(self) -> bool:
+            """Nothing runs on it, so it is always free for the turn that asked."""
+            return True
+
+        def share(self) -> None:
+            """Nothing runs on it, so there is nothing to run beside."""
+
+        def give(self) -> None:
+            """Nothing took it, so there is nothing to hand back."""
 
         def stop(self) -> None:
             """Nothing was started, so there is nothing to take down."""
@@ -1044,6 +1175,16 @@ def test_codex_refuses_to_disable_goals_after_its_server_starts(
         ) -> None:
             del argv, env
             self._held: list[Any] = []
+
+        def take(self) -> bool:
+            """Nothing runs on it, so it is always free for the turn that asked."""
+            return True
+
+        def share(self) -> None:
+            """Nothing runs on it, so there is nothing to run beside."""
+
+        def give(self) -> None:
+            """Nothing took it, so there is nothing to hand back."""
 
         def stop(self) -> None:
             """Nothing was started, so there is nothing to take down."""
