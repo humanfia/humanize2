@@ -18,6 +18,7 @@ from hmz.coganchor.linux.syscalls import NR
 __all__ = [
     "MAX_ARG_STRLEN",
     "PATH_MAX",
+    "Peek",
     "TraceeGoneError",
     "fd_target",
     "read_bytes",
@@ -125,6 +126,80 @@ def read_cstring(pid: int, address: int, limit: int = PATH_MAX) -> str | None:
         address += span
         remaining -= span
     return b"".join(parts).decode("utf-8", "surrogateescape")
+
+
+class Peek:
+    """One buffer, read into over and over, for a tracer that reads a path per stop.
+
+    A supervisor reads one path out of a stopped process and drops it, tens of thousands of
+    times a session. A buffer apiece is a page allocated, cleared and collected each time --
+    and between two stops the tracee runs, so what that costs is not the allocation but the
+    cache it displaces. So the buffer is the reader's, and only the bytes up to the
+    terminator come back: the bytes, since the path a tracer is looking for is a path it can
+    recognise without ever decoding it.
+
+    Not shared: it is read over by every call, so two tracers are two of these -- which is
+    what each of them already is.
+    """
+
+    __slots__ = ("_at", "_buffer", "_here", "_local", "_remote", "_size", "_there")
+
+    def __init__(self, size: int = PATH_MAX) -> None:
+        """Initializes a window big enough for one path.
+
+        Args:
+          size: The most to read, which is what a path may be.
+        """
+        self._size = size
+        # One byte over, so that a read filling the whole of it still has a terminator to
+        # stop at: what comes back is the bytes before the first NUL, and a buffer with no
+        # NUL in it at all would be read past its own end.
+        self._buffer = ctypes.create_string_buffer(size + 1)
+        self._at = ctypes.addressof(self._buffer)
+        self._local = _Iovec(self._at, size)
+        self._remote = _Iovec(None, 0)
+        # And the references the call is handed, made once beside what they refer to rather
+        # than once a read: they stay good for as long as the vectors do, which is for as
+        # long as this window does.
+        self._here = ctypes.byref(self._local)
+        self._there = ctypes.byref(self._remote)
+
+    def cstring(self, pid: int, address: int) -> bytes | None:
+        """Read a NUL-terminated string, stopping at the first unreadable page.
+
+        Args:
+          pid: The process whose memory to read.
+          address: Where the string starts in it.
+
+        Returns:
+          The bytes before its terminator, or None for a NULL pointer -- which several
+          syscalls accept. Never longer than this window: a path longer than `PATH_MAX` is
+          one the kernel will refuse anyway.
+        """
+        if address == 0:
+            return None
+        buffer = self._buffer
+        filled = 0
+        while filled < self._size:
+            span = min(self._size - filled, _PAGE_SIZE - (address % _PAGE_SIZE))
+            self._local.base = self._at + filled
+            self._local.len = span
+            self._remote.base = address
+            self._remote.len = span
+            ctypes.set_errno(0)
+            count = _libc.process_vm_readv(pid, self._here, 1, self._there, 1, 0)
+            if count <= 0:
+                break
+            filled += count
+            # Where this read stopped, so that `value` -- which scans in C from the start of
+            # the buffer -- cannot run past it into whatever the last path left behind.
+            buffer[filled] = 0
+            said = buffer.value
+            if len(said) < filled:
+                return said  # its own terminator, inside what was read
+            address += count
+        buffer[filled] = 0
+        return buffer.value
 
 
 def read_string_array(

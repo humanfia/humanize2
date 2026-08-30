@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
@@ -47,6 +46,7 @@ from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
 CONFIG = AgentConfig(model="m", effort="high")
 OPENCODE = OpencodeAgentConfig(model="opencode/big-pickle", effort="high")

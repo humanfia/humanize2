@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import signal
 from typing import TYPE_CHECKING, Any
 
@@ -51,6 +52,14 @@ _RESOLVE_CONFINED = 0x08 | 0x10
 #: and a fixed few kilobytes would be written past the end of it, into whatever the allocator
 #: happened to put there.
 _RED_ZONE = 128
+
+#: What a path has to hold for the kernel to read it as something other than what it says: a
+#: doubled separator, a `.` or a `..` of its own, or a separator on the end. A path with none
+#: of them is already the path that will be resolved, so it can be held against the table as
+#: the bytes that were read -- no decoding, no normalising, no path objects. Which is nearly
+#: every path a CLI names, and the difference between a session's tens of thousands of stops
+#: costing a comparison each and costing the whole of that.
+_UNTIDY = re.compile(rb"//|/\.\.?(?:/|\Z)|/\Z")
 
 #: Where each trapped syscall keeps the paths it names, as `(descriptor argument, path
 #: argument)` pairs -- the descriptor being None for a call that has none and resolves against
@@ -102,12 +111,24 @@ class Tracing:
           swaps: Which paths are answered by which others.
         """
         self._swaps = swaps
+        #: Every path this table could answer, as the bytes a process names one with. A path
+        #: that does not start with one of them is not one of the provider's, whatever else
+        #: it is: `Swaps.swap` answers a path that is one of these, is inside one, or is one
+        #: with another suffix, and each of those starts with the path itself.
+        self._prefixes = tuple(os.fsencode(named) for named, _ in swaps.pairs)
         #: Every process being watched, and whether it has been attached to yet: a child
         #: reports itself before its parent's fork event arrives, and the first stop of one
         #: is where its options are set.
         self._watching: dict[int, bool] = {}
         #: What to plant at the exit stop of a syscall that was cancelled, by process.
         self._owed: dict[int, int] = {}
+        #: The registers of whichever process is stopped now, and the window its paths are
+        #: read through. One apiece rather than one per stop: a session stops this loop tens
+        #: of thousands of times, the tracee runs between any two of them, and what an
+        #: allocation costs there is the cache it displaces rather than the allocation. Both
+        #: are read over at every stop and read before they are used, so nothing carries.
+        self._registers = ptrace.blank()
+        self._peek = procfs.Peek()
         self._root = 0
         self._status = 1
 
@@ -195,15 +216,20 @@ class Tracing:
     def _syscall(self, pid: int) -> None:
         """Rewrites the paths one stopped syscall names, and lets it run."""
         try:
-            registers = ptrace.getregs(pid)
+            registers = ptrace.getregs(pid, self._registers)
         except OSError:
             return
         taken = (
             0  # what the paths already planted have used, so two do not overwrite one
         )
         for descriptor, argument in _PATHS.get(registers.syscall_number, ()):
+            raw = self._peek.cstring(pid, registers.arg(argument))
+            # An empty path names the descriptor itself rather than a file, and a path that
+            # is the program's own is the whole of what a stop usually is.
+            if not raw or self._theirs(raw):
+                continue
             try:
-                named = self._named(pid, registers, descriptor, argument)
+                named = self._named(pid, registers, descriptor, raw)
             except (OSError, ValueError):
                 continue  # a process that went away mid-read is not one to fail a call for
             if named is None:
@@ -245,8 +271,31 @@ class Tracing:
             return False
         return bool(int.from_bytes(raw, "little") & _RESOLVE_CONFINED)
 
+    def _theirs(self, raw: bytes) -> bool:
+        """Whether a path is the program's own, decided on the bytes it named it with.
+
+        The cheap half of the answer, and the one nearly every path gets: a path that is
+        already absolute and already tidy is the path the kernel will resolve, so if it does
+        not begin with one this table could answer, nothing else about it has to be worked
+        out. A tracee stops here tens of thousands of times a session and this is the whole
+        of what happens at almost all of them.
+
+        Args:
+          raw: The path, as the bytes it was read as.
+
+        Returns:
+          True for a path this run will not answer. False for one that may be answered and
+          for one whose spelling has to be resolved before that can be said -- both of which
+          go on to :meth:`_named`, which is the exact answer.
+        """
+        return (
+            raw[:1] == b"/"
+            and not raw.startswith(self._prefixes)
+            and _UNTIDY.search(raw) is None
+        )
+
     def _named(
-        self, pid: int, registers: Registers, descriptor: int | None, argument: int
+        self, pid: int, registers: Registers, descriptor: int | None, raw: bytes
     ) -> str | None:
         """The absolute path one argument names, resolved as the kernel would resolve it.
 
@@ -255,17 +304,15 @@ class Tracing:
           registers: Its registers at the stop.
           descriptor: Which argument holds the directory to resolve against, or None for a
             call that resolves against the process's own directory.
-          argument: Which argument holds the path.
+          raw: The path it named, as the bytes it named it with.
 
         Returns:
-          The path, or None where there is nothing to resolve -- an empty path, which names
-          the descriptor itself, or a directory that cannot be read back.
+          The path, or None where there is nothing to resolve -- a directory that cannot be
+          read back.
         """
-        raw = procfs.read_cstring(pid, registers.arg(argument))
-        if not raw:
-            return None
-        if raw.startswith("/"):
-            return os.path.normpath(raw)
+        said = raw.decode("utf-8", "surrogateescape")
+        if said.startswith("/"):
+            return os.path.normpath(said)
         at = _AT_FDCWD if descriptor is None else registers.signed_arg(descriptor)
         under = (
             procfs.working_directory(pid)
@@ -274,7 +321,7 @@ class Tracing:
         )
         if not under.startswith("/"):
             return None  # a descriptor that is not a directory of this filesystem
-        return os.path.normpath(os.path.join(under, raw))
+        return os.path.normpath(os.path.join(under, said))
 
     def _plant(
         self, pid: int, registers: Registers, taken: int, argument: int, path: str

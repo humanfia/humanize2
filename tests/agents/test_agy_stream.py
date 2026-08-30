@@ -336,6 +336,20 @@ def test_native_home_flag_tracks_custom_settings_without_runtime_databases(
     assert agy_driver._native(tmp_path, environment, args) != before
 
 
+def test_a_data_directory_flag_with_nothing_after_it_names_nothing(
+    tmp_path: Path,
+) -> None:
+    """An empty value is not the whole of `~/.gemini`, which is a home read every turn."""
+    home = tmp_path / "home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/antigravity-cli/settings.json").write_text("{}")
+    environment = {"HOME": str(home)}
+
+    assert agy_driver._native(tmp_path, environment, ("--app_data_dir",)) == (
+        agy_driver._native(tmp_path, environment, ())
+    )
+
+
 @pytest.mark.parametrize(
     ("prompt", "shaped"),
     [("read-workspace", False), ("read-workspace", True), ("/read-workspace", False)],
