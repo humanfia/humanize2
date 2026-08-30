@@ -923,10 +923,10 @@ class Humanize(App[None]):
         if not self._models:
             self._models = self.settings.agents(
                 self._flow_named,
-                tuple(place.goals_default for place in self._wanted),
+                tuple(place.goals for place in self._wanted),
             ) or opens_on(
                 backends,
-                goals=self._wanted[0].goals_default if self._wanted else True,
+                goals=self._wanted[0].goals if self._wanted else True,
             )
             # If the flow would not load, `_places_of` falls back to agents already in hand;
             # the remembered ones were not in hand on the first read.
@@ -1091,7 +1091,7 @@ class Humanize(App[None]):
             if not self._models:
                 self._models = opens_on(
                     installed(),
-                    goals=self._wanted[0].goals_default if self._wanted else True,
+                    goals=self._wanted[0].goals if self._wanted else True,
                 )
             self._draw()
 
@@ -2569,7 +2569,7 @@ class Humanize(App[None]):
             or list(cast("dict[str, Any]", agents)) != wanted
         ):
             return None
-        runs = self.settings.agents(flow, [place.goals_default for place in places])
+        runs = self.settings.agents(flow, [place.goals for place in places])
         if len(runs) != len(places):
             return None  # written by hand, or written by something that writes it otherwise
         written_ = self.settings.config(flow)
@@ -3158,7 +3158,9 @@ class Humanize(App[None]):
             self.show("hmz: a flow is already running", "red")
             return
         try:
-            path, chosen, task, _, container = self.hmz.read(argv)
+            # `--json` says how a run is written for whoever is at a command line, and there
+            # is nobody at one here: the interface draws the same events itself.
+            path, chosen, task, _, container, _ = self.hmz.read(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
         try:

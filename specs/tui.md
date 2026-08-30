@@ -196,8 +196,10 @@ line, with what the flow is doing beside the transcript.
   a command for it would be a second way in to one sheet of one menu -- and one that has to
   say `that flow takes no setting up` for most of the flows there are.
 - A turn MUST be shown as it happens: that the agent has started one, which agent it is, and
-  what it says. It MUST be shown once -- a backend teeing to stderr for the benefit of a plain
-  terminal MUST NOT also be shown here. A turn thinks for minutes and says nothing for most of
+  what it says. It MUST be shown once -- a backend tees to stderr only where nothing is
+  watching the agent, and here something is. `hmz exec` watches its agents for the same
+  reason and gets the same stream, so what a run looks like there and what it looks like here
+  are one reading rather than two. A turn thinks for minutes and says nothing for most of
   them, so the line saying one has started is the whole of what a flow looks like while it
   works.
 - What the agent said MUST be one part of the transcript per thing it said, and never one per

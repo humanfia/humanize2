@@ -88,6 +88,13 @@ def trace(argv: list[str]) -> int:
     collecting.add_argument(
         "--end", help="Latest session time to include, e.g. 'yesterday 18:00'."
     )
+    collecting.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Say where it went and what it holds as one JSON object, for a program to "
+        "read.",
+    )
     args = parser.parse_args(argv)
     if args.doing is None:
         parser.print_help()
@@ -112,6 +119,8 @@ def _collect(said: Namespace, parser: ArgumentParser) -> int:
     """
     from hmz.cli import many
     from hmz.sdk import Hmz
+
+    from .output import Out
 
     runs = Hmz(said.workspace).epics
     wider = bool(said.sessions or said.everything)
@@ -145,10 +154,16 @@ def _collect(said: Namespace, parser: ArgumentParser) -> int:
     programs = (
         f", {many(summary['programs'], 'program')}" if summary.get("programs") else ""
     )
-    print(
-        f"{output}{where}: {many(summary.get('sessions', '0'), 'session')}, "
-        f"{many(summary.get('slices', '0'), 'slice')}{programs}"
-    )
+    with Out(as_json=said.as_json) as out:
+        out.row(
+            f"{output}{where}: {many(summary.get('sessions', '0'), 'session')}, "
+            f"{many(summary.get('slices', '0'), 'slice')}{programs}",
+            output=str(output),
+            epic=ran.name if ran is not None else "",
+            sessions=int(summary.get("sessions", 0)),
+            slices=int(summary.get("slices", 0)),
+            programs=int(summary.get("programs", 0)),
+        )
     return 0
 
 

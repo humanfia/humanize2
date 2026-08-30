@@ -56,9 +56,21 @@ def providers(argv: list[str]) -> int:
 
     listing = doing.add_parser("list", help="what providers there are")
     listing.add_argument("cli", nargs="?", default="", help="only this backend's")
+    listing.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="one JSON object per account, one a line, for a program to read",
+    )
 
     offered = doing.add_parser("ways", help="how one backend can be signed into")
     offered.add_argument("cli", help="the backend")
+    offered.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="one JSON object per way in, one a line, for a program to read",
+    )
 
     making = doing.add_parser("add", help="make one, and sign it in")
     making.add_argument("provider", metavar="CLI/NAME", help="what to call it")
@@ -105,6 +117,13 @@ def providers(argv: list[str]) -> int:
         metavar="CLI/NAME",
         help="the account, or `CLI/` for the one this machine is already signed into",
     )
+    showing.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="the whole of it as one JSON object, for a program to read -- the names of "
+        "the variables it sets, never their values",
+    )
 
     dropping = doing.add_parser("remove", help="take one away, credentials and all")
     dropping.add_argument("provider", metavar="CLI/NAME")
@@ -128,10 +147,11 @@ def providers(argv: list[str]) -> int:
     )
 
     args = parser.parse_args(argv)
+    machine = getattr(args, "as_json", False)
     if args.doing in (None, "list"):
-        return _list(getattr(args, "cli", ""))
+        return _list(getattr(args, "cli", ""), as_json=machine)
     if args.doing == "ways":
-        return _ways(args.cli)
+        return _ways(args.cli, as_json=machine)
     try:
         # `claude/` is the account this machine is already signed into: a thing to show
         # and to point somewhere, and not one to make or take away.
@@ -139,7 +159,7 @@ def providers(argv: list[str]) -> int:
     except ValueError as why:
         parser.error(str(why))
     if args.doing == "show":
-        return _show(cli, name)
+        return _show(cli, name, as_json=machine)
     if args.doing == "remove":
         return _remove(cli, name)
     if args.doing == "add":
@@ -276,9 +296,11 @@ def _also(cli: str) -> list[Provider]:
     ]
 
 
-def _list(cli: str) -> int:
+def _list(cli: str, *, as_json: bool = False) -> int:
     """Prints every provider there is, or one backend's."""
     from hmz import backends
+
+    from .output import Out
 
     if cli and backends.named(cli) is None:
         # Said rather than answered with everybody's: a name no backend answers to reads as
@@ -290,46 +312,91 @@ def _list(cli: str) -> int:
     # And the account this machine is signed into, wherever it says something about itself:
     # a chain in force is a thing to see, and it is an account here too.
     mine = _also(cli)
-    if not found and not mine:
-        whose = f"no {cli} providers yet" if cli else "no providers yet"
-        print(f"{whose}; try `hmz providers add {cli or 'claude'}/mine`")
-        return 0
-    for provider in [*found, *mine]:
-        variables = ", ".join(sorted(provider.env)) or "-"
-        way = provider.way or "as local"
-        said = f"{provider.cli}/{provider.name}  {way:10} {variables}"
-        if provider.fallback:
-            said += f"  falls back to {provider.fallback}"
-        print(said)
-        # Under the row rather than after it: it is about the account above rather than
-        # another account, and a row this ran onto the end of would be a row nobody reads.
-        if moved := _tries_moved(provider):
-            print(f"  {moved}")
+    with Out(as_json=as_json) as out:
+        if not found and not mine:
+            whose = f"no {cli} providers yet" if cli else "no providers yet"
+            out.note(f"{whose}; try `hmz providers add {cli or 'claude'}/mine`")
+            return 0
+        for provider in [*found, *mine]:
+            variables = ", ".join(sorted(provider.env)) or "-"
+            way = provider.way or "as local"
+            said = f"{provider.cli}/{provider.name}  {way:10} {variables}"
+            if provider.fallback:
+                said += f"  falls back to {provider.fallback}"
+            moved = _tries_moved(provider)
+            out.row(
+                said,
+                cli=provider.cli,
+                name=provider.name,
+                way=provider.way,
+                # The names, never the values, here as everywhere: this is read into a log,
+                # and a key printed once is a key in every job that ran the line.
+                sets=sorted(provider.env),
+                falls_back=provider.fallback,
+                moved=moved,
+            )
+            # Under the row rather than after it: it is about the account above rather than
+            # another account, and a row this ran onto the end of would be a row nobody reads.
+            if moved:
+                out.note(f"  {moved}")
     return 0
 
 
-def _ways(cli: str) -> int:
+def _ways(cli: str, *, as_json: bool = False) -> int:
     """Prints how one backend can be signed into."""
+    from .output import Out
+
     offered = _accounts().ways(cli)
     if not offered:
         print(f"hmz: {cli}: no such coding agent", file=sys.stderr)
         return 1
-    for way in offered:
-        asks = ", ".join(one.env for one in way.asks) or "-"
-        runs = " ".join(way.argv) if way.argv else "-"
-        print(f"{way.name:10} {way.about}")
-        print(f"{'':10} asks: {asks}")
-        print(f"{'':10} runs: {runs}")
+    with Out(as_json=as_json) as out:
+        for way in offered:
+            asks = ", ".join(one.env for one in way.asks) or "-"
+            runs = " ".join(way.argv) if way.argv else "-"
+            out.row(
+                f"{way.name:10} {way.about}",
+                way=way.name,
+                about=way.about,
+                asks=[one.env for one in way.asks],
+                runs=list(way.argv),
+            )
+            out.note(f"{'':10} asks: {asks}")
+            out.note(f"{'':10} runs: {runs}")
     return 0
 
 
-def _show(cli: str, name: str) -> int:
+def _show(cli: str, name: str, *, as_json: bool = False) -> int:
     """Prints what one provider holds, saying nothing a secret is."""
+    from .output import Out
+
     accounts = _accounts()
     provider = accounts.find(cli, name)
     if provider is None:
         print(f"hmz: no provider {cli}/{name}", file=sys.stderr)
         return 1
+    if as_json:
+        with Out(as_json=True) as out:
+            out.record(
+                cli=provider.cli,
+                name=provider.name,
+                way=provider.way,
+                made=provider.made,
+                at=str(provider.at),
+                falls_back=provider.fallback,
+                # The names of the variables it sets, and never their values -- the one rule
+                # this command has, and the one a program reading it must not be able to
+                # break either.
+                sets=sorted(provider.env),
+                adds=list(provider.args),
+                answers=[
+                    {"named": named, "instead": instead}
+                    for named, instead in provider.swaps()
+                ],
+                also_runs=list(accounts.serves(provider)),
+                moved=_tries_moved(provider),
+            )
+        return 0
     print(f"provider    {provider.cli}/{provider.name}")
     print(f"way         {provider.way or 'as this machine is signed in'}")
     print(f"made        {provider.made or '-'}")

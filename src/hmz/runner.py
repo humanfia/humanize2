@@ -323,7 +323,7 @@ def read_agent(
 
 def flow_and_agents(
     argv: list[str],
-) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, str]:
+) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, str, bool]:
     """Reads an `hmz exec` line into a flow, the agents to drive it, the task, and its setup.
 
     A flow says how many agents it drives, and this is where they come from: one for each, in
@@ -335,8 +335,8 @@ def flow_and_agents(
     Returns:
       The flow's path, the agents to drive it with, the task, what to set the flow up with --
       the YAML file `-c` named, read but not yet checked against the flow's own model, or
-      None where the line named none -- and the image to run the whole of it in, or "" for a
-      run on this machine.
+      None where the line named none -- the image to run the whole of it in, or "" for a run
+      on this machine, and whether a program is reading the run rather than a person.
 
     Raises:
       SystemExit: If the line does not name a flow and an agent apiece, or names a config
@@ -387,6 +387,13 @@ def flow_and_agents(
         "reaches it through hmz.flows.container()",
     )
     parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="write the run as NDJSON on stdout -- one object per thing an agent says, "
+        "flushed as it is said -- for a program to read instead of a person",
+    )
+    parser.add_argument(
         "task",
         help="what the flow is to have the agents do, after -- if it starts with a dash",
     )
@@ -424,7 +431,7 @@ def flow_and_agents(
             agents.append(agent(configured))
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
-    return args.flow, agents, args.task, held, args.container
+    return args.flow, agents, args.task, held, args.container, args.as_json
 
 
 def set_up_from(said: str | os.PathLike[str]) -> dict[str, Any]:

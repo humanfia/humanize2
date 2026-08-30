@@ -12,6 +12,31 @@ specific to GitHub Actions.
 | **The person** | A `Person` answers nothing, so a conversation flow does the one thing it was given and returns. |
 | **Settings** | `hmz exec` reads nothing and remembers nothing. The line is the whole configuration. |
 | **Stopping** | Nobody is there to stop it. A `while True` flow will run until the job's timeout, so give it a bound. |
+| **The log** | A job log is not a terminal, so the run is written to stderr with no escape sequences in it. Set `FORCE_COLOR: "1"` on the job for colour a log viewer renders; `NO_COLOR` turns it off whatever else is set. |
+
+## Watch the run from the job
+
+The job log gets the run as it happens: which agent is working, what it said, the tools it
+ran, and what each turn cost. Nothing has to be switched on.
+
+For a step that reads the run rather than displays it, `--json` writes
+[NDJSON](https://github.com/ndjson/ndjson-spec) on stdout — one object per thing an agent
+says, flushed as it is said, and nothing else in the stream:
+
+```sh
+hmz exec -f nightly -a claude@ci/claude-opus-5:high --json "$(cat TASK.md)" \
+    | tee run.ndjson \
+    | jq -r 'select(.kind == "tool") | .text'
+```
+
+```sh
+# what the whole run cost, in tokens
+jq -s 'map(.spent.input // 0) | add' run.ndjson
+```
+
+The keys are in the [CLI reference](/reference/cli#watching-a-run). Without `--json`, what
+each turn answered is on stdout and the run itself on stderr, so `> answer.txt` gets the
+answers alone.
 
 ## Bound the run
 
