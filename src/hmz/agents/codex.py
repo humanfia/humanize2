@@ -33,7 +33,7 @@ from .event import Event, Failed, Question, Usage, say
 from .hooks import EVERYWHERE, SUBAGENTS, Moment, Occasion
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator, Mapping, Sequence
+    from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 
     from pydantic import BaseModel
 
@@ -45,6 +45,10 @@ _OVERRIDE_KEYS = frozenset({"model_context_window", "model_auto_compact_token_li
 #: What the server calls a turn stopping to ask its user something. Every other request it
 #: makes of a client is an approval, which an unattended flow does not stop for.
 _ASKS = "item/tool/requestUserInput"
+
+#: Where one reader's share of the server's stream is put. It ends in None once the server
+#: has stopped, so that a reader waiting on a message that is never coming is told so instead.
+type _Mailbox = queue.SimpleQueue[dict[str, Any] | None]
 
 
 @dataclass
@@ -231,6 +235,12 @@ class _AppServer:
             it would have been asked for failing at the first one instead.
         """
         self._argv = argv
+        #: The account this server was started as and the names of the flow's own callbacks it
+        #: was told about, written by whoever started it: an agent that has fallen back since,
+        #: or whose flow offers another list now, starts another rather than going on talking
+        #: to this one. Kept here rather than on the agent, so that two starting at once cannot
+        #: leave the agent believing either of them is the other.
+        self.knows: tuple[str, tuple[str, ...]] = ("", ())
         #: Whose turns run here, so that what is teed can be what nobody is watching. Held
         #: weakly: the agent holds the server, and the finalizer that takes the server down is
         #: the agent's -- so a server holding its agent back would be an agent nothing could
@@ -257,13 +267,27 @@ class _AppServer:
         #: What each thread has spent so far, by kind, as the server counts it: a running
         #: total, so what one turn cost is the rise across it.
         self._counted: dict[str, Counter[str]] = {}
-        self._messages: queue.Queue[dict[str, Any] | None] = queue.Queue()
+        #: What each thread this server has open was opened or picked back up under, so that
+        #: a turn asking for exactly that does not ask the server to read the thread again.
+        self._holding: dict[str, dict[str, Any]] = {}
+        #: Where each reader's messages are put on the way past: by the id of the call that
+        #: asked, and by the thread whose turn it is running. One stream is shared by every
+        #: session of the agent, so it is taken apart here rather than queued behind a lock --
+        #: two turns reading one queue would each take the other's messages, and two turns
+        #: taking it in turns would make sharing a server cost what starting one saved.
+        self._waiting: dict[int, _Mailbox] = {}
+        self._listening: dict[str, _Mailbox] = {}
+        self._routing = threading.Lock()  # those two books, and whether it has stopped
+        self._gone = False
+        #: How many turns are running here, counted under `_routing`. A conversation belongs
+        #: to the server that opened it -- Codex refuses to pick a thread up anywhere else
+        #: while the first server still holds its rollout open -- so this is not a lock: it
+        #: says which server a conversation with none yet should be opened on, and every turn
+        #: of one that already has a server runs there whatever else is running there too.
+        self._turns = 0
         # Read from a thread of its own, so that a turn can wait on the server for a while
         # rather than only for as long as it takes.
         threading.Thread(target=self._pump, daemon=True).start()
-        # One stream, shared by every session of the agent: a call is a write and the reads
-        # up to its answer, and two of them interleaved would each take the other's messages.
-        self._speaking = threading.Lock()
         # What this client calls itself on the wire, which the server records against every
         # session it opens. The project's own name, so that a thread found in Codex's logs
         # says what drove it rather than what the layer driving it was once called.
@@ -275,6 +299,57 @@ class _AppServer:
         """Whose turns run here, and still exist: an agent that has gone is not one to tell."""
         held = [one() for one in self._held]
         return [one for one in held if one is not None]
+
+    def take(self) -> bool:
+        """Takes this server for one turn, if there is no turn running on it already.
+
+        Returns:
+          Whether it was idle. A conversation told no is opened somewhere else rather than
+          waiting: what it would wait for is the whole of the turn ahead of it.
+        """
+        with self._routing:
+            if self._turns:
+                return False
+            self._turns += 1
+            return True
+
+    def share(self) -> None:
+        """Takes it for a turn of a conversation that already lives here.
+
+        Whether or not a turn is running: the thread is written by this server and by no
+        other, so this is the only server the turn can run on. Two turns of one server run at
+        the same time -- what each is told is picked apart as it is read -- so what sharing
+        costs is the moments Codex opens and picks up threads one at a time.
+        """
+        with self._routing:
+            self._turns += 1
+
+    def give(self) -> None:
+        """Hands one turn's hold back, so an idle server can take the next conversation."""
+        with self._routing:
+            self._turns = max(0, self._turns - 1)
+
+    def holds(self, thread: str, rung: Mapping[str, Any]) -> bool:
+        """Whether this server already has that thread open, at that rung.
+
+        Args:
+          thread: The thread to ask about.
+          rung: What a turn of it would be run at.
+
+        Returns:
+          Whether it is open here at exactly that, which is the case where picking it up
+          again would say nothing this server has not already been told.
+        """
+        return self._holding.get(thread) == dict(rung)
+
+    def holding(self, thread: str, rung: Mapping[str, Any]) -> None:
+        """Remembers that this server has that thread open at that rung.
+
+        Args:
+          thread: The thread just started or picked back up here.
+          rung: What it was started or picked up under.
+        """
+        self._holding[thread] = dict(rung)
 
     def permitted(self, permission: str, service_tier: str) -> dict[str, Any]:
         """What a call of this server is told an agent at that rung may do.
@@ -367,17 +442,16 @@ class _AppServer:
         Raises:
           subprocess.CalledProcessError: If it refused the call, or stopped before answering.
         """
-        with self._speaking:
-            ident = next(self._pending)
+        ident = next(self._pending)
+        # Said where the answer is to be put before it is asked for, rather than after: the
+        # stream is read by a thread of its own, and an answer that came back first would
+        # otherwise be routed to nobody and waited for forever.
+        with self._mailbox(ident=ident) as mailbox:
             self._write(
                 {"jsonrpc": "2.0", "id": ident, "method": method, "params": params}
             )
-            # An answer is a message with no method of its own: the server asks things of us
-            # over the same stream, numbering its own calls, and one of those is not this one.
-            while (message := self._read()) is None or not (
-                message.get("id") == ident and "method" not in message
-            ):
-                pass
+            while (message := self._take(mailbox)) is None:
+                pass  # a read with no deadline ends in a message or in the server stopping
             return self._answer(message, "")
 
     def pursue(self, params: dict[str, Any]) -> str:
@@ -404,8 +478,9 @@ class _AppServer:
         Raises:
           subprocess.CalledProcessError: If the turn was refused, or the server stopped.
         """
-        with self._speaking:
-            ident = next(self._pending)
+        thread = str(params["threadId"])
+        ident = next(self._pending)
+        with self._mailbox(ident=ident, thread=thread) as mailbox:
             self._write(
                 {
                     "jsonrpc": "2.0",
@@ -419,7 +494,9 @@ class _AppServer:
             )
             idle = False
             said = ""
-            while (message := self._read(_QUIET_SECONDS if idle else None)) is not None:
+            while (
+                message := self._take(mailbox, _QUIET_SECONDS if idle else None)
+            ) is not None:
                 if message.get("id") == ident and "method" not in message:
                     self._answer(message, said)
                 match message.get("method"):
@@ -455,9 +532,9 @@ class _AppServer:
           subprocess.CalledProcessError: If the turn was refused, failed, or was interrupted,
             or if the server stopped.
         """
-        thread = params["threadId"]
-        with self._speaking:
-            ident = next(self._pending)
+        thread = str(params["threadId"])
+        ident = next(self._pending)
+        with self._mailbox(ident=ident, thread=thread) as mailbox:
             self._write(
                 {
                     "jsonrpc": "2.0",
@@ -475,15 +552,14 @@ class _AppServer:
             costing = Usage()
             started: set[Any] = set()  # the items this turn has already shown
             try:
-                while (message := self._read()) is not None:
+                while (message := self._take(mailbox)) is not None:
                     if message.get("id") == ident and "method" not in message:
                         self._answer(message, said)
+                    # Whose a message is was settled where it was read: one that names a
+                    # thread reached this turn only if it named this one, and one that names
+                    # none reached it only because it is the single turn this server is
+                    # running -- so everything read here is this turn's to act on.
                     told: dict[str, Any] = message.get("params") or {}
-                    # One server holds every session of the agent, and a turn one of them
-                    # abandoned still says so on this stream. What is not this thread's is
-                    # not this turn's.
-                    if told.get("threadId") not in (None, thread):
-                        continue
                     named_turn: dict[str, Any] = told.get("turn") or {}
                     if turn := told.get("turnId") or named_turn.get("id"):
                         running.turn = str(turn)
@@ -714,8 +790,80 @@ class _AppServer:
         except OSError as gone:
             raise Failed(1, self._argv, "", str(gone)) from gone
 
+    @contextlib.contextmanager
+    def _mailbox(
+        self, ident: int | None = None, thread: str | None = None
+    ) -> Generator[_Mailbox]:
+        """Says where one reader's messages go, for as long as it is reading them.
+
+        Args:
+          ident: The id of the call whose answer this reader is waiting for, if it made one.
+          thread: The thread whose notifications are this reader's, if it is running a turn.
+
+        Yields:
+          Where those messages arrive.
+        """
+        mailbox: _Mailbox = queue.SimpleQueue()
+        with self._routing:
+            if self._gone:
+                # Registered after the stream ended: nothing more is coming, and a reader
+                # that waited for it would wait for as long as its turn is allowed to take.
+                mailbox.put(None)
+            if ident is not None:
+                self._waiting[ident] = mailbox
+            if thread is not None:
+                self._listening[thread] = mailbox
+        try:
+            yield mailbox
+        finally:
+            with self._routing:
+                if ident is not None:
+                    self._waiting.pop(ident, None)
+                # Only if it is still this reader's: a session whose turn ended after the
+                # next one on the same thread began must not take the new one's stream away.
+                if thread is not None and self._listening.get(thread) is mailbox:
+                    del self._listening[thread]
+
+    def _route(self, message: dict[str, Any]) -> None:
+        """Hands one message to whoever it belongs to.
+
+        An answer goes to the call that asked for it, and a notification to the turn of the
+        thread it names. A message naming no thread -- a warning about the installation, a
+        rate limit nothing did -- goes to the one turn reading where there is one, which is
+        what a stream held alone would have handed it. Where more than one turn is reading it
+        goes nowhere: there is nothing in such a message saying whose it is, and a turn ended
+        or failed by another conversation's word is worse than one that never heard it.
+
+        An answer nobody is waiting for is dropped too: a steer is answered the moment the
+        server binds it, and what says the model has it is the item the turn plays back.
+
+        Args:
+          message: The message read.
+        """
+        told: dict[str, Any] = message.get("params") or {}
+        thread = told.get("threadId")
+        with self._routing:
+            if (ident := message.get("id")) is not None:
+                if (answering := self._waiting.get(int(ident))) is not None:
+                    answering.put(message)
+                return
+            if thread is not None:
+                running = self._listening.get(str(thread))
+                reading = [running] if running is not None else []
+            elif len(self._listening) == 1:
+                reading = list(self._listening.values())
+            else:
+                reading = []
+        for mailbox in reading:
+            mailbox.put(message)
+
     def _pump(self) -> None:
-        """Reads the server's whole stream, teeing the agent's words to ours as they arrive."""
+        """Reads the server's whole stream, handing each message on to whoever it is for.
+
+        Teeing the agent's words to ours as they arrive, and answering what the server asks
+        of us on threads of their own: what nobody may wait on here is this loop, which is the
+        one reader of a stream every turn of this server is being told things over.
+        """
         assert self._proc.stdout is not None  # noqa: S101
         for line in self._proc.stdout:
             message: dict[str, Any] = json.loads(line)
@@ -752,8 +900,12 @@ class _AppServer:
             ):
                 # So that a goal running for an hour stays as watchable as a turn that prints.
                 say(message["params"]["delta"], sys.stderr, end="")
-            self._messages.put(message)
-        self._messages.put(None)  # it has stopped, and nothing more is coming
+            self._route(message)
+        with self._routing:
+            self._gone = True
+            everyone = [*self._waiting.values(), *self._listening.values()]
+        for mailbox in everyone:
+            mailbox.put(None)  # it has stopped, and nothing more is coming
 
     def _approve(self, message: dict[str, Any]) -> None:
         """Grants something the agent asked to be allowed to do, unless a hook refuses.
@@ -849,10 +1001,13 @@ class _AppServer:
         """
         return any(agent._watchers for agent in self._agents)
 
-    def _read(self, timeout: float | None = None) -> dict[str, Any] | None:
-        """Takes the next message the server sent.
+    def _take(
+        self, mailbox: _Mailbox, timeout: float | None = None
+    ) -> dict[str, Any] | None:
+        """Takes the next message this reader was handed.
 
         Args:
+          mailbox: Where this reader's messages are put.
           timeout: How long to wait for one, or None to wait for as long as it takes.
 
         Returns:
@@ -862,11 +1017,11 @@ class _AppServer:
           subprocess.CalledProcessError: If the server stopped mid-turn.
         """
         try:
-            message = self._messages.get(timeout=timeout)
+            message = mailbox.get(timeout=timeout)
         except queue.Empty:
             return None
         if message is None:
-            self._messages.put(None)  # so that every later read finds it stopped too
+            mailbox.put(None)  # so that every later read finds it stopped too
             raise Failed(
                 self._proc.wait(), self._argv, "", "app server stopped mid-turn"
             )
@@ -978,6 +1133,9 @@ class CodexSession(SessionBase):
         super().__init__(agent, cwd)
         #: The turn under way, which is what a word put in has to name.
         self._running = _Running()
+        #: Where this conversation was last picked up, asked for again by name when the next
+        #: turn wants a server: a thread taken to another one is read back off the disk there.
+        self._on: _AppServer | None = None
 
     @property
     def named(self) -> str | None:
@@ -1001,50 +1159,56 @@ class CodexSession(SessionBase):
           subprocess.CalledProcessError: If the turn was refused, or the server stopped.
         """
         with self._lock:  # a conversation is a sequence: one turn at a time
-            # Read once and held for the whole turn: asking the agent for its server again
-            # may be starting another one, and the thread this turn is on is the first one's.
-            server = self._agent.server
-            thread = self._thread(server)
-            # Known before the turn starts, so a word put in has a thread to name even though
-            # the session is only opened once the turn has landed. The book goes with it: the
-            # server reads every session's stream, and only this one knows what it put in.
-            # The server too, so a steer goes to the one running this rather than to whichever
-            # is the agent's by the time somebody types.
-            self._running.on = server
-            self._running.thread = thread
-            self._running.took = self.took
-            self._running.spends = self._spends
-            said = ""
-            spent: Mapping[str, int] = {}
-            costing = Usage()
-            for event in server.turn(
-                {
-                    "threadId": thread,
-                    "input": [{"type": "text", "text": prompt}],
-                    "model": self._agent.config.model,
-                    "effort": self.effort,
-                    **(
-                        {"outputSchema": schema.model_json_schema()}
-                        if schema is not None
-                        else {}
-                    ),
-                    **server.permitted(
-                        self._agent.config.permission,
-                        self._agent.config.service_tier,
-                    ),
-                },
-                self._running,
-            ):
-                if event.kind == "result":
-                    said, spent, costing = event.text, event.tokens, event.spent
-                    continue
-                if not self._agent._watchers:
-                    # On stderr, where every other backend puts its progress: a turn nobody
-                    # can watch is a flow that reads as hung for as long as the turn takes.
-                    # Something watching the agent shows the turn itself, and would then be
-                    # showing it twice.
-                    say(event.text, sys.stderr)
-                yield event
+            # Taken once and held for the whole turn: asking the agent for a server again may
+            # be starting another one, and the thread this turn is on is the first one's.
+            server = self._agent._taken(self._on)
+            try:
+                self._on = server
+                thread = self._thread(server)
+                # Known before the turn starts, so a word put in has a thread to name even
+                # though the session is only opened once the turn has landed. The book goes
+                # with it: the server reads every session's stream, and only this one knows
+                # what it put in. The server too, so a steer goes to the one running this
+                # rather than to whichever the agent hands out by the time somebody types.
+                self._running.on = server
+                self._running.thread = thread
+                self._running.took = self.took
+                self._running.spends = self._spends
+                said = ""
+                spent: Mapping[str, int] = {}
+                costing = Usage()
+                for event in server.turn(
+                    {
+                        "threadId": thread,
+                        "input": [{"type": "text", "text": prompt}],
+                        "model": self._agent.config.model,
+                        "effort": self.effort,
+                        **(
+                            {"outputSchema": schema.model_json_schema()}
+                            if schema is not None
+                            else {}
+                        ),
+                        **server.permitted(
+                            self._agent.config.permission,
+                            self._agent.config.service_tier,
+                        ),
+                    },
+                    self._running,
+                ):
+                    if event.kind == "result":
+                        said, spent, costing = event.text, event.tokens, event.spent
+                        continue
+                    if not self._agent._watchers:
+                        # On stderr, where every other backend puts its progress: a turn
+                        # nobody can watch is a flow that reads as hung for as long as the
+                        # turn takes. Something watching the agent shows the turn itself, and
+                        # would then be showing it twice.
+                        say(event.text, sys.stderr)
+                    yield event
+            finally:
+                # Back for the next turn that wants one, whether this one ended or was
+                # abandoned: a server nobody hands back is one the agent starts another beside.
+                server.give()
             if not self._agent._watchers:
                 # Where `codex exec` would have put the answer. Something watching the agent
                 # has had it already, as the turn said it.
@@ -1091,7 +1255,7 @@ class CodexSession(SessionBase):
             self._agent.config.permission, self._agent.config.service_tier
         )
         if (thread := self._id) is None:
-            return str(
+            started = str(
                 server.call(
                     "thread/start",
                     {
@@ -1101,9 +1265,18 @@ class CodexSession(SessionBase):
                     },
                 )["thread"]["id"]
             )
+            server.holding(started, rung)
+            return started
+        if server.holds(thread, rung):
+            # Already open here, at the rung this turn asks for. Picking a thread up reads it
+            # off the disk again -- minutes of conversation read back to say what it already
+            # says -- and the rung is sent with the turn as well as with the thread, so saying
+            # it again here would change nothing but the wait.
+            return thread
         # Said again on the way back in: a thread picked up is picked up under the settings it
         # was left with, and this session's rung is what its agent is configured for now.
         server.call("thread/resume", {"threadId": thread, **rung})
+        server.holding(thread, rung)
         return thread
 
     def _pursue(self, objective: str) -> str:
@@ -1120,19 +1293,25 @@ class CodexSession(SessionBase):
             leaving the session unopened so that the next call retries it.
         """
         with self._lock:  # a conversation is a sequence: one turn at a time
-            server = self._agent.server
-            config = self._agent.config
-            thread = self._thread(server)
-            server.call("thread/goal/set", {"threadId": thread, "objective": objective})
-            answer = server.pursue(
-                {
-                    "threadId": thread,
-                    "input": [{"type": "text", "text": objective}],
-                    "model": config.model,
-                    "effort": self.effort,
-                    **server.permitted(config.permission, config.service_tier),
-                }
-            )
+            server = self._agent._taken(self._on)
+            try:
+                self._on = server
+                config = self._agent.config
+                thread = self._thread(server)
+                server.call(
+                    "thread/goal/set", {"threadId": thread, "objective": objective}
+                )
+                answer = server.pursue(
+                    {
+                        "threadId": thread,
+                        "input": [{"type": "text", "text": objective}],
+                        "model": config.model,
+                        "effort": self.effort,
+                        **server.permitted(config.permission, config.service_tier),
+                    }
+                )
+            finally:
+                server.give()
             self._adopt(thread)
             return answer
 
@@ -1163,14 +1342,15 @@ class CodexAgent(AgentBase):
           name: What to call this agent, defaulting to one nothing else answers to.
         """
         super().__init__(config, name=name)
-        self._server: _AppServer | None = None
-        #: Which account the server up now was started as, so that an agent which has fallen
-        #: back starts another rather than going on talking to one signed in as somebody else.
-        self._server_as = ""
-        #: Which of the flow's own callbacks the server now up was told about, by the names
-        #: it was told them under: an app server is told about its tool servers where it is
-        #: started, so one whose list has moved since has never heard of what is offered now.
-        self._server_tools: tuple[str, ...] = ()
+        #: The servers this agent has started, oldest first. As many as it has ever had
+        #: conversations opened at once, and no more: a conversation is opened on a server
+        #: nothing is running on, so a flow taking its turns one after another has exactly one
+        #: however many sessions it opens and drops.
+        self._servers: list[_AppServer] = []
+        #: Whether this agent has ever started one, which a server let go of is not enough to
+        #: say: what goals cannot be disabled after is a server having run with them on, and
+        #: one dropped for an account that moved is still up and still holding conversations.
+        self._ever = False
         self._serving = threading.Lock()
 
     def disable_goals(self) -> None:
@@ -1183,7 +1363,7 @@ class CodexAgent(AgentBase):
           RuntimeError: If this agent's app server has already started with goals enabled.
         """
         with self._serving:
-            if self._server is not None and self.goals_enabled:
+            if self._ever and self.goals_enabled:
                 raise RuntimeError(
                     f"{self.id}: goals must be disabled before its first turn"
                 )
@@ -1191,83 +1371,160 @@ class CodexAgent(AgentBase):
 
     @property
     def server(self) -> _AppServer:
-        """The app server this agent's turns run on, started the first time one is needed.
+        """One of this agent's app servers, started the first time one is needed.
 
-        One per agent rather than one per session, so a flow that drops a session a turn does
-        not start a server a turn; it is taken down when the agent is collected, or at exit for
-        one held to the end. An anchored agent starts it through coganchor, which leaves the
-        server here, holding the thread, and its work on the target -- the same split ``codex
-        exec`` runs under. A flow that never sets a goal never starts one.
+        Whichever of them is up, and without saying a turn is running on it: this is for a
+        caller with something to ask of Codex rather than a turn to run. A turn asks through
+        :meth:`_taken`, which is what says a server is busy for as long as the turn takes.
         """
-        with (
-            self._serving
-        ):  # two sessions of one agent share the server rather than start two
-            # By name, and read once for both the deciding and the starting: what a running
-            # server can be wrong about is which callbacks it enumerated, and a flow that
-            # builds an equal list of them afresh each turn has changed nothing.
-            offering = tuple(sorted(one.name for one in self.toolbox.offered()))
-            if self._server is not None and (
-                self._server_as != self.node().name or self._server_tools != offering
-            ):
-                # Started as an account this agent has since left, or knowing a list of the
-                # flow's callbacks that is not the list it is offering now. Let go of rather
-                # than taken down: a turn on another thread may still be talking to it, and it
-                # is stopped by its own finalizer when the agent is collected either way.
-                self._server, self._server_as = None, ""
-            if self._server is None:
-                argv = ["codex", "app-server"]
-                if not self.goals_enabled:
-                    # Per server rather than in config, so this flow changes no other Codex
-                    # session belonging to the user.
-                    argv += ["--disable", "goals"]
-                # Said in both directions rather than only when it is off: Codex searches
-                # nothing until it is asked to, so an agent that may search the web has to
-                # say so here for `web_search` to mean on every backend what it says.
-                argv += [
-                    "-c",
-                    f"tools.web_search={'true' if self.config.web_search else 'false'}",
-                ]
-                argv += ["--stdio"]
-                for key, value in getattr(self.config, "overrides", ()):
-                    # The same `-c` Codex's own client takes, scoped to this server: a
-                    # window asked for here is this agent's, and the user's config.toml is
-                    # left exactly as it was.
-                    argv += ["-c", f"{key}={value}"]
-                if offering:
-                    # The flow's own callbacks, as the one thing Codex takes a tool it was
-                    # not shipped with on. Scoped to this server for the reason the overrides
-                    # are: nothing of the user's `config.toml` is written, and no other Codex
-                    # they are running is told about a tool that belongs to this flow.
-                    held = self.toolbox.command()
-                    argv += [
-                        "-c",
-                        f"mcp_servers.humanize.command={json.dumps(held[0])}",
-                        "-c",
-                        f"mcp_servers.humanize.args={json.dumps(held[1:])}",
-                    ]
-                # Read before the environment is built out of it: a fallback landing
-                # between the two reads would name the account this server is *not* signed
-                # into, and a server that believes it is already elsewhere is one nothing ever
-                # starts again.
-                account = self.node().name
-                self._server = _AppServer(self.spawned(argv), self._environ())
-                self._server_as, self._server_tools = account, offering
-                self._server._held.append(weakref.ref(self))
-                # Held by the finalizer alone, which is what takes the server down: when the
-                # agent is collected, and at exit for one held to the end.
-                weakref.finalize(self, self._server.stop)
-            return self._server
+        with self._serving:
+            knows = self._knowing()
+            if self._servers:
+                return self._servers[0]
+        return self._start(knows)
+
+    def _taken(self, held: _AppServer | None = None) -> _AppServer:
+        """The app server a turn about to start runs on, started if none of this agent's is free.
+
+        A conversation belongs to the server that opened it: Codex will not pick a thread up
+        on a second server while the first still holds its rollout open, so a session goes
+        back to the one it was opened on for every turn it ever takes. What is chosen here is
+        therefore where a session with no server yet is opened -- one nothing is running on,
+        and one more only when every server this agent has is busy. So an agent runs as many
+        as it has ever had conversations going at once: one for a flow that takes its turns in
+        sequence however many sessions it opens and drops, and one apiece for a fleet that
+        opens them all at once and works them all at once.
+
+        They are taken down when the agent is collected, or at exit for one held to the end.
+        An anchored agent starts them through coganchor, which leaves the server here, holding
+        the thread, and its work on the target -- the same split ``codex exec`` runs under. A
+        flow that never sets a goal never starts one.
+
+        Args:
+          held: The server this session was opened on, if it has been opened: every later turn
+            of it runs there, beside whatever else that server is running.
+
+        Returns:
+          The server, held for one turn until :meth:`_AppServer.give` hands it back.
+        """
+        with self._serving:
+            knows = self._knowing()
+            if held is not None and held in self._servers:
+                held.share()
+                return held
+            for one in self._servers:
+                if one.take():
+                    return one
+        server = self._start(knows)
+        server.share()
+        return server
+
+    def _knowing(self) -> tuple[str, tuple[str, ...]]:
+        """What a server started now would know, dropping this agent's that know otherwise.
+
+        Held with :attr:`_serving`. Read once for both the deciding and the starting: what a
+        running server can be wrong about is which callbacks it enumerated, and a flow that
+        builds an equal list of them afresh each turn has changed nothing.
+
+        Returns:
+          The account to start one as, and the names of the flow's own callbacks to tell it
+          about. A server started as an account this agent has since left, or knowing a list
+          of callbacks that is not the list it is offering now, is let go of rather than taken
+          down: a turn on another thread may still be talking to it, and it is stopped by its
+          own finalizer when the agent is collected either way.
+        """
+        offering = tuple(sorted(one.name for one in self.toolbox.offered()))
+        # Read before the environment is built out of it: a fallback landing between the two
+        # reads would name the account the new server is *not* signed into, and a server that
+        # believes it is already elsewhere is one nothing ever starts again.
+        knows = (self.node().name, offering)
+        self._servers = [one for one in self._servers if one.knows == knows]
+        return knows
+
+    def _start(self, knows: tuple[str, tuple[str, ...]]) -> _AppServer:
+        """Starts one more app server for this agent and remembers it.
+
+        Called with :attr:`_serving` let go of: a server takes a moment to answer for the
+        first time, and a fleet opening its sessions at once would otherwise start them in a
+        queue, each session waiting out every start before its own.
+
+        Args:
+          knows: The account to start it as and the callbacks to tell it about, as
+            :meth:`_knowing` read them. Kept on the server rather than on the agent, so that
+            two starting at once cannot leave the agent believing either is the other's.
+
+        Returns:
+          The server, which no turn has taken yet.
+        """
+        server = _AppServer(self.spawned(self._argv(knows[1])), self._environ())
+        server.knows = knows
+        with self._serving:
+            self._servers.append(server)
+            self._ever = True
+        server._held.append(weakref.ref(self))
+        # Held by the finalizer alone, which is what takes the server down: when the
+        # agent is collected, and at exit for one held to the end.
+        weakref.finalize(self, server.stop)
+        return server
+
+    def _argv(self, offering: tuple[str, ...]) -> list[str]:
+        """The command that starts one more app server for this agent.
+
+        Args:
+          offering: The names of the flow's own callbacks this server is to be told about,
+            read by the caller so that the deciding and the starting see one list.
+
+        Returns:
+          The command, before whatever the agent's provider and anchor wrap it in.
+        """
+        argv = ["codex", "app-server"]
+        if not self.goals_enabled:
+            # Per server rather than in config, so this flow changes no other Codex
+            # session belonging to the user.
+            argv += ["--disable", "goals"]
+        # Said in both directions rather than only when it is off: Codex searches
+        # nothing until it is asked to, so an agent that may search the web has to
+        # say so here for `web_search` to mean on every backend what it says.
+        argv += [
+            "-c",
+            f"tools.web_search={'true' if self.config.web_search else 'false'}",
+        ]
+        argv += ["--stdio"]
+        for key, value in getattr(self.config, "overrides", ()):
+            # The same `-c` Codex's own client takes, scoped to this server: a
+            # window asked for here is this agent's, and the user's config.toml is
+            # left exactly as it was.
+            argv += ["-c", f"{key}={value}"]
+        if offering:
+            # The flow's own callbacks, as the one thing Codex takes a tool it was
+            # not shipped with on. Scoped to this server for the reason the overrides
+            # are: nothing of the user's `config.toml` is written, and no other Codex
+            # they are running is told about a tool that belongs to this flow.
+            held = self.toolbox.command()
+            argv += [
+                "-c",
+                f"mcp_servers.humanize.command={json.dumps(held[0])}",
+                "-c",
+                f"mcp_servers.humanize.args={json.dumps(held[1:])}",
+            ]
+        return argv
 
     def stop(self) -> None:
-        """Takes no further turn, and takes down the server the turn under way is waiting on."""
+        """Takes no further turn, and takes down the servers a turn under way is waiting on."""
         super().stop()
         self._down()
 
     def _down(self) -> None:
-        """Takes down the server this agent holds, if it is holding one."""
-        if self._server is not None:
-            self._server.stop()
-            self._server = None
+        """Takes down every server this agent holds.
+
+        Taken under the lock they are started under and stopped outside it: a session on
+        another thread may be starting one while this runs, and a list read twice would either
+        stop that one or leave it running with nothing holding it.
+        """
+        with self._serving:
+            servers, self._servers = self._servers, []
+        for server in servers:
+            server.stop()
 
     def new(self, cwd: str | os.PathLike[str] | None = None) -> CodexSession:
         """Opens a new Codex session, in the directory it is given or in this one."""

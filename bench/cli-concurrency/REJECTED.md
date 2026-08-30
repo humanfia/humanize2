@@ -98,3 +98,37 @@ These routes do not provide a validated replacement for local print-and-resume w
 The benchmark therefore retains the official local print command per turn, including
 its measured startup overhead. Standard Cursor service authentication is evaluated
 separately from the local model fixture.
+
+## Codex on one app server per agent
+
+Making the shared app server's stream safe for concurrent readers is adopted; keeping one
+server per agent alongside it is not. Codex opens and picks a thread up one at a time
+whatever else it is running, so every conversation after the first waits out the ones ahead
+of it before it can say its first word. Four conversations opened at once on one server each
+waited 1.32 to 1.54 seconds for `thread/start` and finished staggered, while the four turns
+that followed overlapped and ended within 32 milliseconds of each other. The same shape holds
+with and without the credential supervisor in front of the server, so the serialization is
+inside the app server rather than in anything humanize wraps it in.
+
+| Sessions | Worst complete-task ratio | Cold p50 |
+| ---: | ---: | ---: |
+| 2 | 1.384 | 1.508 s |
+| 3 | 2.034 | 2.207 s |
+| 4 | 2.716 | 2.946 s |
+| 6 | 4.064 | 4.400 s |
+| 8 | 4.872 | 5.308 s |
+
+All these task pairs passed their functional checks. The adopted driver starts one more
+server when every server the agent has is running a turn, which is a server per conversation
+worked at once and exactly one for a flow that takes its turns in sequence. A first prototype
+that also let a conversation move to whichever server was free failed instead of queueing:
+Codex refuses `thread/resume` on a second server with `thread ... already has an active
+writer` while the first still holds that rollout open. Five of sixteen items failed that way
+before a session was pinned to the server it was opened on.
+
+Removing the live `item/agentMessage/delta` tee was measured as a separate candidate and
+rejected as immaterial: 2.512 s cold p50 at eight sessions without it against 2.459 s with
+it, both inside the run-to-run spread of the serial control. It is retained for the reason it
+was written. Raw evidence is in the [complete-task floor
+summary](evidence-2026-09-10/codex-complete-task-floor-summary.json), under
+`exploratory_ladders`, with the journal hash of each run directory.

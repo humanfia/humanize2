@@ -10,7 +10,7 @@ Each row passed five candidate repetitions against five fresh original serial co
 | --- | ---: | ---: | ---: | --- | --- |
 | agy | 9 | 1.648 | 0.468 | Pass | [Data](evidence-2026-09-10/selected-stage6-summary.json) |
 | claude | 2 | 0.951 | 0.839 | Pass | [Data](evidence-2026-09-10/selected-stage4-summary.json) |
-| codex | 5 | 1.637 | 0.940 | Fail | [Data](evidence-2026-09-10/selected-stage4-summary.json) |
+| codex | 6 | — | — | — | [Data](evidence-2026-09-10/codex-complete-task-floor-summary.json) |
 | cursor local | 4 | 1.055 | 1.082 | Pass | [Data](evidence-2026-09-10/selected-stage5-summary.json) |
 | dsh | 3 | 1.217 | 0.881 | Pass | [Data](evidence-2026-09-10/selected-stage3-summary.json) |
 | grok | 5 | 1.156 | 1.077 | Pass | [Data](evidence-2026-09-10/selected-stage4-summary.json) |
@@ -22,13 +22,15 @@ Each row passed five candidate repetitions against five fresh original serial co
 | zcode | 4 | 1.279 | 0.936 | Fail | [Data](evidence-2026-09-10/selected-stage5-summary.json) |
 | opencode / optional workspace DB | 2 | 1.095 | 0.985 | Pass | [Data](evidence-2026-09-10/selected-stage3-summary.json) |
 
+Codex's row is the exception and its ratio columns are empty on purpose: it is measured against the [complete-task floor](#codex-under-the-complete-task-floor) — cold and warm p50 and p95 of the whole turn, at most 2× a fresh original serial control — and against nothing else. Its startup and fixed-work columns were not measured for that row and the legacy verdict was not taken.
+
 Exact ratios, original/candidate phase distributions, all repeat denominators and the selected source references are in [the machine-readable result](results-2026-09-10.json). The retained trial sequence follows; `P` is a primary pass, `T` a timing miss, and `E` an execution failure. An entry `6×5 P` means six concurrent sessions and five repetitions. Three-repeat passes remain exploratory.
 
 | CLI / profile | Recorded candidate trials |
 | --- | --- |
 | agy | 2×3 P; 4×3 P; 8×3 P; 16×3 T; 12×3 T; 10×3 T; 9×5 P |
 | claude | 2×3 P; 4×3 T; 3×3 P; 3×5 T; 2×5 P |
-| codex | 2×3 P; 4×3 P; 8×3 T; 6×3 T; 5×5 P |
+| codex | 4×3 P; 5×3 P; 6×3 P; 7×3 P; 8×3 P; 9×3 P; 10×3 T; 7×5 P; 7×5 T; 7×5 T; 7×5 P; 6×5 P; 6×5 P; 6×5 P; 6×5 P; 5×5 P; 5×5 P |
 | cursor | 2×3 P; 4×3 P; 8×3 T; 6×3 T; 5×5 T; 4×5 P |
 | dsh | 2×3 P; 4×3 T; 3×3 P; 3×5 P |
 | grok | 2×3 P; 4×3 P; 8×3 T; 6×3 T; 5×5 P |
@@ -62,7 +64,25 @@ Cursor uses the unchanged official local distribution `2026.09.08-6caf4ff` with 
 
 OpenCode's default shared SQLite database failed during the first two-session candidate repetition, before any model request. The controller stopped that case and retained its missing and undispatched work. A separate, optional native `OPENCODE_DB` launcher selects one persistent database per canonical task workspace for both original and candidate. Its interpreter startup and database initialization are included in timing. This condition changes benchmark configuration, not the production driver; it does not replace the failed default trial. The initial three-repeat isolated comparison passed all gates and verified nine distinct databases with cold/warm native conversation continuity; the later five-repeat confirmation also passed.
 
-Codex and ZCode use separate Agent instances. Other backends use multiple Sessions on one Agent. Antigravity receives the same explicit workspace argument in original and candidate; its first native formatting-only settings rewrite is retained as a stopped provenance trial and subsequent locks pin the rewritten bytes.
+ZCode uses separate Agent instances. Codex no longer does: its complete-task-floor row is measured with multiple Sessions on one Agent, which is `run.py`'s default and the shape a flow actually runs. Other backends use multiple Sessions on one Agent. Antigravity receives the same explicit workspace argument in original and candidate; its first native formatting-only settings rewrite is retained as a stopped provenance trial and subsequent locks pin the rewritten bytes.
+
+## Codex under the complete-task floor
+
+Codex's row is measured against one requirement: complete-task p50 and p95, cold and warm, at most 2× a fresh original serial control — a run still at least half the speed it has with no concurrency. The startup and fixed-work gates the other rows report were not measured for it. All twelve confirmations below ran after the `hmzbench-run` occupancy guard was corrected, each in whichever measurement group was free and each with that group's four exclusive physical cores rather than the 8–11 the other rows used; every earlier codex figure in this file predates that correction and is superseded. Its original source is `48d1559805cbdb083958bf381a2ff57c183f96ab`, not the commit the other rows compare against, and every control below was run from that snapshot rather than reused. Every turn retained across every codex rung passed each item check: changed source with untouched fixture and checker, a fresh execution proof, the turn-two conversation marker, exactly one result, at least one tool, and no cleanup survivor in any rung.
+
+The driver changed. `codex app-server` runs the turns of separate conversations at the same time, but the driver held its stdio stream for the whole of a turn, so every session of one agent queued behind the one in front. That is why the earlier codex rows were taken with `--instances separate` — one agent, and so one server, per session. Measured with the default `--instances shared`, which is what a flow with one agent and several sessions actually runs, the original driver **confirms at one session**: two sessions is 2.171× at five repetitions, and throughput stays at about one task per second from two sessions to seven. The driver now hands each message read off that stream to whoever it belongs to — the call that asked for it, or the turn of the thread it names — so turns of one server overlap. Codex will not pick a thread up on a second server while the first still holds its rollout open (`thread ... already has an active writer`, retained from the first pooling prototype), so a session keeps the server it was opened on for life and is opened on one no turn is running on; one more server is started, outside the agent's lock, only when every server it has is busy. A thread the server already holds at the rung the turn asks for is no longer picked up again.
+
+| Profile | Source | Sessions | Worst complete-task × | Verdict |
+| --- | --- | ---: | ---: | --- |
+| shared (`run.py` default) | original | 2 | 2.171 | Fail |
+| separate (earlier codex rows) | original | 7 | 1.992 | Pass |
+| shared (`run.py` default) | candidate | 7 | 1.684 / 2.132 / 2.213 / 1.846 | Pass, fail, fail, pass |
+| shared (`run.py` default) | candidate | 6 | 1.554 / 1.472 / 1.589 / 1.404 | Pass, pass, pass, pass |
+| shared (`run.py` default) | candidate | 5 | 1.163 / 1.270 | Pass, pass |
+
+Six is published: four five-repeat confirmations, all passing, none discarded. Seven is not: it passed twice and failed twice, and both failures are retained. The verdict at seven turns on the serial control rather than on the concurrent group — a five-observation nearest-rank p95 is the largest of five, and those five-sample cold controls ranged from 1.09 s to 1.94 s across the day while the concurrent groups pooled 35 turns apiece. The three-repeat ladder taken beside these confirmations passes as far as nine (1.986×) against its own faster control, which is the same variance read from the other side. The published boundary is what these repetitions support, not a maximum.
+
+Where the remaining cold cost is: at eight sessions almost the whole complete-task penalty sits before the first event, which goes from 1.092 s serial to 2.161 s, while the interval from that event to the result goes only from 0.405 s to 0.498 s. Eight app servers booting at once cost 0.535 s against 0.271 s for one, and the credential supervisor's interpreter is 0.027 s of that, so roughly a quarter of the penalty is boots and the rest is eight first model round trips and eight per-conversation setups contending for four cores. Two mechanisms were measured and rejected. Teeing the live `item/agentMessage/delta` to stderr costs nothing detectable: 2.512 s cold p50 at eight sessions without it against 2.459 s with it, both inside the run-to-run spread. And one shared server with the stream demultiplexed but no second server is far worse than a server per busy conversation — 4.87× at eight sessions, 5.31 s cold p50 — because Codex opens and picks up threads one at a time however many turns it is running: four conversations opened at once on one server each waited 1.32 to 1.54 s for `thread/start` and finished staggered, while the four turns that followed overlapped and ended within 32 ms of each other. That is identical with and without the credential supervisor, so the serialization is inside the app server rather than in anything humanize wraps it in.
 
 ## Implementation and validation
 
