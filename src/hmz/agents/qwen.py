@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 import threading
 from dataclasses import dataclass
@@ -55,6 +56,14 @@ _WITHHELD = {
 #: The two that reach the web, by the names Qwen Code calls them, taken away at every rung
 #: for an agent told not to search it rather than only at the one that already refuses them.
 _WEB_TOOLS = ("web_search", "web_fetch")
+
+#: What Qwen Code answers with when the request behind the turn never landed: the provider's
+#: own error, as the whole of the agent's text, inside a `result` record that says the turn
+#: succeeded and an exit status of zero. A loop handed that as an answer would be running on
+#: an error message as the work of the turn before it -- and a 401 that reads as a landed turn
+#: is an account nothing ever falls back from. The whole of the answer and not a mention of
+#: one: an agent that wrote about an API error would have written something else beside it.
+_REFUSED = re.compile(r"^\[API Error:(?P<said>.*)\]$", re.DOTALL)
 
 #: What each kind of thing said reads as. `assistant` carries the agent talking and the tools
 #: it reached for in the one message; `result` is the turn's own answer and is read for what
@@ -460,8 +469,13 @@ class QwenCodeSession(StreamSessionBase):
             subprocess.CalledProcessError: If the turn failed. Qwen Code says so in its own
               records as well as in its exit status -- a model that refused comes back as an
               exit of zero -- and a loop fed that as an answer would be running on it as the
-              work of the turn.
+              work of the turn. Sometimes it says so in neither: a request the provider
+              answered 401 or 429 comes back as a `result` marked a success whose whole text
+              is the error, which is read here as the failure it is.
         """
+        refused = _REFUSED.match(self._said.strip())
+        if self._failed is None and refused is not None:
+            self._failed = refused["said"].strip()
         if self._failed is not None:
             raise Failed(1, [_COMMAND], self._said, self._failed)
         if not transcript.strip():

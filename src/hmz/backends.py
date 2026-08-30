@@ -19,7 +19,9 @@ purpose does: driving in :mod:`hmz.agents`, reading back in :mod:`hmz.tracing`.
 from __future__ import annotations
 
 import os
+import re
 import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -29,15 +31,20 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ALIKE",
+    "FAULTS",
     "PROFILES",
+    "SIGNS",
     "UNKNOWN",
     "Asked",
     "Model",
     "Profile",
+    "Sign",
     "Way",
     "alike",
     "elsewhere",
     "forget",
+    "installing",
+    "journalled",
     "named",
     "profiles",
     "program",
@@ -45,6 +52,7 @@ __all__ = [
     "remember",
     "serves",
     "speaking",
+    "trouble",
 ]
 
 
@@ -104,6 +112,133 @@ class Way:
     sets: tuple[tuple[str, str], ...] = ()
     args: tuple[str, ...] = ()
     stdin: str = ""
+
+
+#: Every kind of failure a turn of one of these CLIs comes to a stop at, in the order a
+#: message is read for them -- the most particular first, so that a line saying both `429` and
+#: `timeout` is read as the rate limit it is rather than as the wire going quiet.
+#:
+#: A kind rather than a message, because the answer to each of them is a different answer:
+#: waiting is what a rate limit wants and what a revoked key would only make longer; another
+#: account is what a refused credential wants and what a retired model has no use for; another
+#: place is what a CLI that is not installed wants and no account of it can give. Before this
+#: there were two -- a turn that failed and a turn that could not come out differently -- so
+#: every one of these was retried the same way, and a 401 was tried five times on a schedule.
+#:
+#: What each of them means:
+#:
+#: - `contended`: two turns at one local store. opencode's SQLite is shared across workspaces,
+#:   and the loser of a race says `database is locked` before it has spoken to any provider.
+#: - `throttled`: too many requests, or a quota spent. The whole account rather than the one
+#:   call, which is why waiting comes first and another account after it.
+#: - `refused`: the credential, not the request -- 401, 403, a login that has expired. The
+#:   same key a second later is the same answer, so nothing here is tried again.
+#: - `retired`: a model that is gone, or one this account was never entitled to. No account of
+#:   this CLI has it either, so what answers it is another place.
+#: - `missing`: nothing to run. The CLI is not installed, or will not start.
+#: - `killed`: the process died rather than answered -- a signal, an out-of-memory kill.
+#: - `dropped`: the wire. A connection reset, a broken pipe, a gateway that went away.
+FAULTS = (
+    "contended",
+    "throttled",
+    "refused",
+    "retired",
+    "missing",
+    "killed",
+    "dropped",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class Sign:
+    """One thing a CLI says when a turn stops, and which kind of failure that makes it.
+
+    Written down here, beside everything else that is true of a backend, rather than as a
+    regex in whichever driver met it first: what a CLI says when it fails is a fact about that
+    CLI, and a fact about a CLI is written down once.
+
+    Attributes:
+      fault: The kind, as :data:`FAULTS` names them.
+      says: What to look for in what it said, as a regular expression read without case. It is
+        searched for rather than matched, these being sentences inside a stream rather than
+        the whole of one.
+    """
+
+    fault: str
+    says: str
+
+
+#: What these CLIs say when a turn stops, for the failures every one of them can have.
+#:
+#: Every one of them is a program that speaks HTTP to a model provider, so the statuses and
+#: the vendors' own words for them are shared: a `429` is a `429` whichever CLI was holding
+#: the socket. What one CLI says and no other does goes on that backend's own profile, in
+#: `signs`, and is read first.
+SIGNS: tuple[Sign, ...] = (
+    # Two turns at one store rather than anything to do with an account: opencode keeps its
+    # sessions in a SQLite database shared across workspaces, and the loser of that race is
+    # told so before it has spoken to a provider at all. Transient, and nothing else fixes it.
+    Sign("contended", r"database (is|table .{0,40} is) locked"),
+    Sign("contended", r"SQLITE_BUSY"),
+    # Too many requests, under every name the services put on it. `RESOURCE_EXHAUSTED` is
+    # Google's word for that status, `insufficient_quota` OpenAI's, and `overloaded_error`
+    # what Anthropic answers 529 with -- each of them answered by waiting rather than by
+    # asking again now, and then by an account that has not spent its quota.
+    Sign("throttled", r"\b429\b"),
+    Sign("throttled", r"\b529\b"),
+    Sign("throttled", r"too many requests"),
+    Sign("throttled", r"rate[ _-]?limit"),
+    Sign("throttled", r"quota"),
+    Sign("throttled", r"resource[ _-]?exhausted"),
+    Sign("throttled", r"overloaded"),
+    Sign("throttled", r"usage limit"),
+    Sign("throttled", r"insufficient[ _-]balance"),
+    Sign("throttled", r"credit balance is too low"),
+    # The credential rather than the request. Another try with the same one is the same
+    # answer, so the tries here are worth none at all and the account chain is the whole of
+    # the answer -- with a word to say that the one it left needs signing in again.
+    Sign("refused", r"\b40[13]\b"),
+    Sign("refused", r"unauthori[sz]ed|unauthenticated"),
+    Sign("refused", r"authentication (is )?(required|failed|error)"),
+    Sign("refused", r"invalid[ _-]?api[ _-]?key"),
+    Sign("refused", r"permission[ _-]?denied"),
+    Sign("refused", r"(not|no longer) (logged|signed) in"),
+    Sign("refused", r"not logged into"),
+    Sign("refused", r"please (run )?(login|log ?in|sign ?in)"),
+    Sign("refused", r"no credential"),
+    Sign("refused", r"(token|credentials?|session) (has |have )?expired"),
+    Sign("refused", r"forbidden"),
+    # An entitlement rather than a model that has gone: the model is real and this account
+    # cannot have it, which is what the account chain is for.
+    Sign("refused", r"is not supported when using"),
+    # A model that is gone, or one this account was never entitled to. No other account of
+    # this CLI has it either, so this is the one failure an account chain cannot answer.
+    Sign("retired", r"\b404\b"),
+    Sign("retired", r"model[ _-]?not[ _-]?found"),
+    Sign("retired", r"(unknown|unsupported|invalid|no such) model"),
+    Sign(
+        "retired",
+        r"model[^.]{0,80}?(does not exist|is not available|was not found"
+        r"|is not supported|retired|deprecated)",
+    ),
+    Sign("retired", r"does not exist or you do not have access"),
+    # The process died rather than answered. Reopening is what answers it, and saying which
+    # signal did it is the difference between a bug report and a machine that is out of memory.
+    Sign("killed", r"out of memory|\bOOM\b|oom-?kill"),
+    Sign("killed", r"SIG(KILL|SEGV|ABRT|BUS)"),
+    Sign("killed", r"reached heap limit"),
+    Sign("killed", r"segmentation fault"),
+    # The wire. What answers it is a new transport and the conversation resumed by its id --
+    # the session is the backend's own, so nothing about it was lost when the socket was.
+    Sign("dropped", r"ECONNRESET|EPIPE|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENOTFOUND"),
+    Sign("dropped", r"connection (was )?(reset|closed|refused|aborted|error|failed)"),
+    Sign("dropped", r"APIConnectionError"),
+    Sign("dropped", r"broken pipe|socket hang ?up|premature close"),
+    Sign("dropped", r"fetch failed"),
+    Sign("dropped", r"\b50[234]\b"),
+    Sign("dropped", r"bad gateway|service unavailable|gateway time-?out"),
+    Sign("dropped", r"timed out|timeout"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,6 +366,18 @@ class Profile:
         switch onto a cloud. Named so that a turn under a provider can be run without them --
         a key in a shell profile is a key this CLI would rather have than the one it was
         signed in with, and nothing about that reads as wrong until the bill arrives.
+      signs: What this CLI says when a turn stops that no other one says, and which kind of
+        failure each of those makes it. Read before :data:`SIGNS`, which is what every one of
+        them says. Empty for a backend whose failures read like everybody else's.
+      journal: The files this backend writes its own log to under its home, as globs -- for a
+        CLI that keeps why a turn stopped somewhere other than the two streams it answered on.
+        Antigravity is the one that does: it exits with a generic error and puts the HTTP
+        status in here, so a turn rate-limited by it reads as a turn that simply failed unless
+        this is looked at. Empty for the backends that say what went wrong where it happened.
+      installs: The one line that puts this CLI on this machine, for the failure where there
+        is nothing to run. A turn that fails for a missing CLI is a turn whose whole answer is
+        that line, and a person reading `agy: not installed` should not also have to go and
+        look it up. Empty for a backend whose install nobody has written down here.
     """
 
     name: str
@@ -256,6 +403,9 @@ class Profile:
     creds: tuple[str, ...] = ()
     ways: tuple[Way, ...] = ()
     ambient: tuple[str, ...] = ()
+    signs: tuple[Sign, ...] = ()
+    journal: tuple[str, ...] = ()
+    installs: str = ""
 
     def runs(self) -> str:
         """The command that starts this backend, which is its name unless it says otherwise.
@@ -269,14 +419,25 @@ class Profile:
         """
         return self.command or self.name
 
-    def directory(self) -> Path:
+    def directory(self, environment: Mapping[str, str] | None = None) -> Path:
         """Where this backend keeps its state and its logs, wherever it has been moved to.
+
+        Args:
+          environment: The environment to read that from, or None for this process's own.
+            A turn runs under its provider's environment rather than under ours, so whatever
+            wants the home a *turn* wrote to has to say which environment that turn had --
+            including its `HOME`, which is the only thing that moves the home of a backend
+            with no variable of its own.
 
         Returns:
           The home directory. It may not exist: a backend that has never run has none.
         """
-        moved = os.environ.get(self.home_var)
-        return Path(moved) / self.home_in if moved else Path.home() / self.home_dir
+        said = environment if environment is not None else os.environ
+        moved = said.get(self.home_var) if self.home_var else ""
+        if moved:
+            return Path(moved) / self.home_in
+        under = said.get("HOME") if environment is not None else ""
+        return (Path(under) if under else Path.home()) / self.home_dir
 
     @staticmethod
     def configuration() -> Path:
@@ -423,6 +584,7 @@ _ZCODE = ("max", "high", "low", "enabled", "nothink", "disabled")
 PROFILES = (
     Profile(
         name="claude",
+        installs="npm i -g @anthropic-ai/claude-code",
         # `WebSearch` and `WebFetch` are tools like any other to Claude, and
         # `--disallowedTools` is the flag that takes a tool away.
         searches=True,
@@ -551,6 +713,12 @@ PROFILES = (
         # None: a conversation here is rows of a SQLite database whose payloads are protobuf,
         # so there is no log to read a run's cost out of as it is spent, and none to gather.
         logs=(),
+        # The one backend here that fails without saying why. It exits with `Agent execution
+        # terminated due to error` on both streams and puts the HTTP status in its own log --
+        # which is how six rate-limited turns of the 2026-09-09 evaluation read as six turns
+        # that simply failed. `cli.log` is the symlink to the newest; the dated ones are what
+        # a run that has since restarted left behind, and the newest of those is this turn's.
+        journal=("cli.log", "log/cli-*.log"),
         efforts=_AGY,
         # One place: the `skills/` of its own home, which is the global customization root it
         # loads whatever else it is doing. Its other root is `.agents` under the workspace,
@@ -597,6 +765,7 @@ PROFILES = (
     ),
     Profile(
         name="codex",
+        installs="npm i -g @openai/codex",
         # `tools.web_search` is a setting of the app server, and is sent in both
         # directions: Codex searches nothing until it is asked to.
         searches=True,
@@ -702,6 +871,10 @@ PROFILES = (
         # of its own three minutes. A turn quiet for twice that is the runtime having stopped
         # answering rather than the model still thinking, so there is nothing to wait for.
         silence=360.0,
+        installs="pip install 'deepseek-harness-sdk'",
+        # Its own sentence for the one credential it takes, which names neither a status nor
+        # a login: an SDK rather than a CLI, so nothing about it reads like HTTP.
+        signs=(Sign("refused", r"needs a DeepSeek API key"),),
         aliases=("dsh", "deepseek-harness"),
         home_var="DSH_HOME",
         home_dir=".dsh",
@@ -725,6 +898,7 @@ PROFILES = (
     ),
     Profile(
         name="grok",
+        installs="npm i -g @xai-official/grok",
         # `web_search` and `web_fetch` are the two Grok Build already names where a
         # rung takes the reaching outside the workspace away.
         searches=True,
@@ -816,6 +990,7 @@ PROFILES = (
         name="kimi",
         # One daemon per agent serves every conversation with it, as Codex's app server does.
         shares=True,
+        installs="npm i -g @moonshot-ai/kimi-code",
         aliases=("kimi", "kimi-code"),
         home_var="KIMI_CODE_HOME",
         home_dir=".kimi-code",
@@ -875,6 +1050,7 @@ PROFILES = (
     ),
     Profile(
         name="pi",
+        installs="npm i -g @earendil-works/pi-coding-agent",
         aliases=("pi",),
         home_var="PI_CODING_AGENT_DIR",
         home_dir=".pi/agent",
@@ -924,6 +1100,7 @@ PROFILES = (
     ),
     Profile(
         name="qwen",
+        installs="npm i -g @qwen-code/qwen-code",
         # `web_search` and `web_fetch` are what Qwen Code calls the two, and
         # `--exclude-tools` is what it takes a tool away with.
         searches=True,
@@ -982,6 +1159,7 @@ PROFILES = (
     ),
     Profile(
         name="opencode",
+        installs="npm i -g opencode-ai",
         # `webfetch` is the one reaching-out tool opencode names, and its permission
         # table is where each tool is allowed or denied.
         searches=True,
@@ -1055,6 +1233,7 @@ PROFILES = (
     ),
     Profile(
         name="mimo",
+        installs="npm i -g @mimo-ai/cli",
         # mimocode is opencode's, permission table and all.
         searches=True,
         aliases=("mimo", "mimocode", "mimo-code"),
@@ -1174,6 +1353,7 @@ PROFILES = (
     ),
     Profile(
         name="cursor",
+        installs="curl https://cursor.com/install -fsS | bash",
         # Its own command line has no way of taking a tool away: what an agent may reach for
         # is `~/.cursor/cli-config.json`, which is the person at this machine's file and not
         # one a driver writes. So web search is refused off here rather than said and ignored.
@@ -1474,6 +1654,159 @@ def named(backend: str) -> Profile | None:
       Its profile, or None for a name no backend answers to.
     """
     return next((one for one in profiles() if backend in one.aliases), None)
+
+
+#: What a process's exit status says on its own, before anything it wrote is read. A shell
+#: answers 127 for a command it could not find and 126 for one it could not run, and a process
+#: that died on a signal has no exit status at all -- Python reports that as the negative of
+#: the signal, and a shell as 128 plus it. None of those is a sentence to be read: the process
+#: never got as far as saying anything, so the status is the whole of what there is.
+#:
+#: Held to the signals there actually are, which is what keeps it from reading a status that
+#: is not one. Not every backend here exits: kimi is driven through a daemon and reports the
+#: HTTP status of the call it made, so a rate-limited turn of it arrives as 429 -- and 429 is
+#: greater than 128. No real HTTP status falls between 128 and 192, so bounding this to the
+#: 64 signals a machine has is what tells the two apart.
+_CANNOT_RUN = (126, 127)
+_SIGNALLED = 128
+_SIGNALS = 64
+
+#: How much of the end of a stream is read for what a turn failed with. Long enough for the
+#: last few lines of a protocol, and short enough that the transcript in front of them cannot
+#: supply a word the failure did not: an agent asked to write a rate limiter says `rate limit`
+#: in prose, and a turn of it that failed for something else must not read as throttled.
+_READ = 4096
+
+
+def trouble(
+    backend: str, *said: str | bytes | None, status: int = 0, journal: str = ""
+) -> str:
+    """Which kind of failure a stopped turn was, out of what the CLI said about it.
+
+    One classifier rather than a regex wherever a driver first met one: every one of these
+    CLIs speaks HTTP to a model provider, so a `429` reads the same whichever of them was
+    holding the socket, and what one of them says and no other does is written on that
+    backend's own profile.
+
+    Args:
+      backend: The CLI, by any name it answers to. One nothing answers to is read by the
+        signatures every backend shares, which is what an added CLI has.
+      said: What it wrote, in the order to read it -- the stream it complains on first, since
+        that is where a CLI puts the sentence it is failing with and a protocol stream is a
+        wall of JSON the same sentence may also be buried in.
+      status: How it exited, for the failures where it never got as far as saying anything.
+      journal: What it wrote to a log of its own, read last: a CLI that exits with a generic
+        error and keeps the status in its own log is one whose streams say nothing, so this is
+        looked at only when they did not.
+
+    Returns:
+      One of :data:`FAULTS`, or "" for a failure nothing here recognises -- which is a turn
+      tried again exactly as it always was, rather than one guessed at.
+    """
+    if status in _CANNOT_RUN:
+        return "missing"
+    if status < 0 or _SIGNALLED < status <= _SIGNALLED + _SIGNALS:
+        return "killed"
+    profile = named(backend)
+    # The end of each: what a turn failed with is the last thing it said, and the megabyte of
+    # transcript in front of that is where a false reading would come from -- an agent asked
+    # to write a rate limiter says `rate limit` in prose.
+    streams = [
+        (one.decode("utf-8", "replace") if isinstance(one, bytes) else one or "")[
+            -_READ:
+        ]
+        for one in (*said, journal)
+    ]
+    # This backend's own signatures across every stream before any of the shared ones, rather
+    # than both together: a CLI that has a sentence of its own for a failure knows better than
+    # a word that happens to be in the same line -- dsh says `needs a DeepSeek API key`, and a
+    # line that also mentions a quota is not a quota that was spent.
+    for signs in ((profile.signs if profile is not None else ()), SIGNS):
+        for held in streams:
+            for fault in FAULTS:
+                if held and any(
+                    one.fault == fault and re.search(one.says, held, re.IGNORECASE)
+                    for one in signs
+                ):
+                    return fault
+    return ""
+
+
+#: How far back a CLI's own log is read for a reason its streams did not carry, and how much
+#: of the end of it. A log is appended to for as long as that CLI runs, so one nothing has
+#: written to for five minutes is not the one this turn stopped in.
+_LATELY = 300.0
+_TAILED = 65536
+
+
+def journalled(
+    backend: str,
+    environment: Mapping[str, str] | None = None,
+    *,
+    within: float = _LATELY,
+) -> str:
+    """The end of a CLI's own log, for one that keeps why a turn stopped only in there.
+
+    Antigravity is the reason this exists: it exits with `Agent execution terminated due to
+    error`, writes nothing about the status on either stream, and puts the HTTP 429 that
+    actually stopped it in a log of its own. A turn of it that was rate-limited reads as a
+    turn that simply failed unless somebody goes and looks.
+
+    Args:
+      backend: The CLI, by any name it answers to.
+      environment: What the turn ran with, since a home is moved by a variable and a turn
+        under a provider runs with that provider's environment rather than with ours.
+      within: How recently the log must have been written to count as this turn's. Whoever
+        is classifying a failure should pass how long that turn actually took: these logs are
+        shared between every session of that CLI on this machine, so a window wider than the
+        turn is a window somebody else's turn can be read out of.
+
+    Returns:
+      The end of the newest one, and "" for a backend that keeps no such log, one that has
+      not written to it lately, and one whose log cannot be read.
+    """
+    profile = named(backend)
+    if profile is None or not profile.journal:
+        return ""
+    home = profile.directory(environment)
+    now = time.time()
+    found: list[tuple[float, Path]] = []
+    for glob in profile.journal:
+        for at in home.glob(glob):
+            try:
+                when = at.stat().st_mtime
+            except OSError:
+                continue
+            if now - when <= within:
+                found.append((when, at))
+    if not found:
+        return ""
+    newest = max(found)[1]
+    try:
+        with newest.open("rb") as reading:
+            reading.seek(max(0, newest.stat().st_size - _TAILED))
+            return reading.read().decode("utf-8", "replace")
+    except OSError:
+        return ""
+
+
+def installing(backend: str) -> str:
+    """The line that puts one of these CLIs on this machine.
+
+    Args:
+      backend: The CLI, by any name it answers to.
+
+    Returns:
+      The command, or a line saying to install it for a backend whose own nobody has written
+      down here. Never "": a turn that failed for a missing CLI has nothing else to say, and
+      an empty half-sentence would be worse than a general one.
+    """
+    profile = named(backend)
+    if profile is not None and profile.installs:
+        return profile.installs
+    return (
+        f"install {profile.name if profile is not None else backend} and put it on PATH"
+    )
 
 
 #: Where a coding agent's CLI lands when it is installed, besides wherever `PATH` names. A flow
