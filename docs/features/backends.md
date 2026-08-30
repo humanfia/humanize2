@@ -76,13 +76,14 @@ there is anything to say to it.
 Where a server is needed it is started only when a turn first needs one, so a flow that needs
 none starts none, and one server serves more than one session of its agent. Where the backend
 takes one turn at a time, that is one server per agent and calls on it are serialized: two
-turns interleaved on one stream would each take the other's answers. Codex runs the turns of
-separate conversations at the same time, so its driver hands each message read back to whoever
-it belongs to instead — the call that asked for it, or the turn of the thread it names. A
-conversation there belongs to the server that opened it, and a session is opened on a server no
-turn is running on: an agent runs one server for a flow that takes its turns in sequence,
-however many sessions it opens and drops, and one apiece for a fleet that works its sessions at
-once.
+turns interleaved on one stream would each take the other's answers. Codex and ZCode run the
+turns of separate conversations at the same time, so their drivers sort the one stream instead
+of reading it in turn — an answer goes to whoever made the call it is numbered for, and a
+session's events go to the turn running on that session, so the second session of an agent
+does not wait out the whole of the first. On Codex a conversation belongs to the server that
+opened it, and a session is opened on a server no turn is running on: an agent runs one server
+for a flow that takes its turns in sequence, however many sessions it opens and drops, and one
+apiece for a fleet that works its sessions at once.
 
 ## Skills are read where that CLI reads them
 
