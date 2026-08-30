@@ -66,9 +66,9 @@ def run(agents: tuple[AgentBase], task: str) -> None:
     agent(task)
 '''
 
-#: The same ordinary loop, but one whose agent place initially suggests goals off. Whoever
-#: chooses the agent may still explicitly switch it back on.
-GOALS_OFF = '''"""A loop that owns its continuations unless its agent is set otherwise."""
+#: The same ordinary loop, declared without goals: this one owns its continuations, and
+#: nobody outside it has any say in that.
+GOALS_OFF = '''"""A loop that owns its continuations, and says so where it declares its agent."""
 
 from typing import Annotated
 
@@ -84,7 +84,9 @@ def run(
     agent(task)
 '''
 
-#: A required goal is more specific than an off suggestion and therefore starts on.
+#: A required goal is the more particular of the two things a flow can write, and wins.
+#: Written both ways at once is a flow the checker has something to say about; read back, it
+#: is a place run under a goal.
 REQUIRED_WHILE_OFF = PURSUING.replace(
     "from hmz.agents import AgentBase, Goal",
     "from hmz.agents import AgentBase, AgentDefaults, Goal",
@@ -113,21 +115,22 @@ def test_a_place_that_said_nothing_is_driven_by_turns(tmp_path: Path) -> None:
     (place,) = wanted(_written(tmp_path, PLAIN, "plain"))
 
     assert place.goal is False
-    assert place.goals_default is True
+    assert place.goals is True
 
 
-def test_an_agent_place_suggests_the_initial_goal_choice(tmp_path: Path) -> None:
+def test_a_place_declares_whether_its_agent_has_goals(tmp_path: Path) -> None:
+    """Which is the flow's to say: nobody else is asked, so nobody else can answer."""
     (place,) = wanted(_written(tmp_path, GOALS_OFF, "goals_off"))
 
     assert place.goal is False
-    assert place.goals_default is False
+    assert place.goals is False
 
 
-def test_a_required_goal_always_starts_on(tmp_path: Path) -> None:
+def test_a_required_goal_is_a_goal(tmp_path: Path) -> None:
     (place,) = wanted(_written(tmp_path, REQUIRED_WHILE_OFF, "required"))
 
     assert place.goal is True
-    assert place.goals_default is True
+    assert place.goals is True
 
 
 def test_an_agent_whose_backend_has_no_goal_feature_is_refused(tmp_path: Path) -> None:
@@ -169,34 +172,42 @@ def test_a_flow_that_asks_nothing_takes_any_of_them(tmp_path: Path) -> None:
     assert len(runner.agents) == 1
 
 
-def test_runner_does_not_apply_the_agent_place_suggestion(tmp_path: Path) -> None:
+def test_the_runner_settles_goals_from_what_the_flow_declared(tmp_path: Path) -> None:
+    """Over whatever the agent was made with: the flow says, and it says for the run."""
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="low"))
 
     Runner(_written(tmp_path, GOALS_OFF, "goals_off"), [agent])
 
-    assert agent.config.goals is True
-    assert agent.goals_enabled
+    assert agent.config.goals is False
+    assert not agent.goals_enabled
 
 
-def test_exec_resolves_the_agent_place_suggestion_into_its_config(
-    tmp_path: Path,
-) -> None:
-    where = _written(tmp_path, GOALS_OFF, "goals_off")
+def test_a_flow_that_says_nothing_leaves_its_agent_as_it_came(tmp_path: Path) -> None:
+    """Goals on is the loosest of the two, and a declaration only ever tightens.
 
-    _, agents, _, _, _ = flow_and_agents(
-        ["-f", where, "-a", "claude/m:low", "the task"]
-    )
-
-    assert agents[0].config.goals is False
-
-
-def test_an_explicit_off_choice_is_the_agent_runtime_policy(tmp_path: Path) -> None:
+    Which is what keeps a call from handing itself more than it was given: a flow that
+    mentions nothing declares the loosest of each, and if that settled anything then calling
+    one would switch goals back on for an agent somebody switched them off for.
+    """
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="low", goals=False))
 
     Runner(_written(tmp_path, PLAIN, "plain"), [agent])
 
     assert agent.config.goals is False
     assert not agent.goals_enabled
+
+
+def test_an_exec_line_leaves_goals_to_the_flow(tmp_path: Path) -> None:
+    """The line names a CLI, a model and an effort; the flow says what the work is."""
+    where = _written(tmp_path, GOALS_OFF, "goals_off")
+
+    _, agents, _, _, _ = flow_and_agents(
+        ["-f", where, "-a", "claude/m:low", "the task"]
+    )
+    assert agents[0].config.goals is True
+
+    Runner(where, agents)
+    assert agents[0].config.goals is False
 
 
 def test_a_required_goal_cannot_be_switched_off(tmp_path: Path) -> None:

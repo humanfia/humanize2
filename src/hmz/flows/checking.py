@@ -272,6 +272,7 @@ def _rules(whole: _Whole) -> tuple[Finding, ...]:
     for one in whole.read:
         found.extend(_imports(one))
         found.extend(_marks(one))
+        found.extend(_declares(one))
         found.extend(_hooks(one, declared))
         found.extend(_functions(one, asks, whole.declared))
     return tuple(found)
@@ -714,6 +715,78 @@ def _marks(read: _Read) -> Iterator[Finding]:
 def _said_name(name: str) -> str:
     """How a flow's name reads in a finding about two of them."""
     return f"called {name!r}" if name else "the one their file holds under its own name"
+
+
+def _declares(read: _Read) -> Iterator[Finding]:
+    """What a flow says its agents run at, held to what can actually be said.
+
+    Read wherever it is written rather than only on the entry point: a flow declares its
+    places in a NamedTuple beside the function as often as inside its annotation, and both
+    are the same declaration reaching the same agent.
+
+    Args:
+      read: The file.
+
+    Yields:
+      `unknown-permission` for a rung no backend has a word for, which is a run refused as
+      the flow loads, and `goals-both-ways` for a place declared under a goal and without
+      goals at once -- the flow saying two things about one agent, of which only one can be
+      done.
+    """
+    from hmz.agents import PERMISSIONS
+
+    for node in ast.walk(read.tree):
+        if isinstance(node, ast.Call) and _tip(node.func) == "AgentDefaults":
+            for said in node.keywords:
+                if (
+                    said.arg == "permission"
+                    and isinstance(said.value, ast.Constant)
+                    and said.value.value not in PERMISSIONS
+                ):
+                    yield Finding(
+                        "unknown-permission",
+                        "error",
+                        read.where,
+                        node.lineno,
+                        f"{said.value.value!r} is no rung there is -- what an agent may "
+                        f"do is one of {', '.join(PERMISSIONS)}, and a flow declaring "
+                        "anything else is refused before its first turn",
+                    )
+        if (
+            isinstance(node, ast.Subscript)
+            and _tip(node.value) == "Annotated"
+            and _goal_written(node)
+            and _goals_off(node)
+        ):
+            yield Finding(
+                "goals-both-ways",
+                "error",
+                read.where,
+                node.lineno,
+                "this place is run under a goal and declared without goals -- a required "
+                "goal is a goal, so drop one of the two rather than leaving the flow to "
+                "say which it meant",
+            )
+
+
+def _goal_written(node: ast.Subscript) -> bool:
+    """Whether one `Annotated` place says its agent is run under a backend goal."""
+    return any(_tip(one) == "Goal" for one in _elements(node.slice)[1:])
+
+
+def _goals_off(node: ast.Subscript) -> bool:
+    """Whether one `Annotated` place declares that its agent has no goals."""
+    return any(
+        isinstance(one, ast.Call)
+        and _tip(one.func) == "AgentDefaults"
+        and any(
+            said.arg == "goals"
+            and isinstance(said.value, ast.Constant)
+            and said.value.value is False
+            for said in one.keywords
+        )
+        for one in _elements(node.slice)[1:]
+    )
 
 
 def _sized(mark: _Mark, read: _Read) -> Iterator[Finding]:

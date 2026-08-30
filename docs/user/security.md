@@ -12,16 +12,20 @@ on.** An agent under a flow edits files, runs commands and makes commits without
 [`/afk`](/user/afk) governs whether an agent may stop and ask you a *question*. It does not
 govern whether the agent may act. Nothing does.
 
-You can narrow [what an agent may do at all](/user/permissions) — four rungs, set per agent:
+A flow can narrow [what its agents may do at all](/user/permissions) — four rungs, declared
+beside the agent it drives:
 
-```sh
-hmz exec -f ralph_loop \
-    -a cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only \
-    "review this repository"
+```python
+class Agents(NamedTuple):
+    reviewer: Annotated[Agent, AgentDefaults(permission="read-only")]
 ```
 
-`bypass` is the default. Reach for `read-only` when you want a second agent to look at a change
-without being able to touch it.
+A place that says nothing declares `bypass`, the loosest rung, which settles nothing: an agent
+already on a tighter rung stays on it, and a flow you call runs at your rung or tighter rather
+than at its own. Reach for `read-only` where a flow has a second
+agent look at a change without being able to touch it. It is the flow's to say and not the
+line's: what an agent may do is a thing about the work, so **the flow you run is what decides
+what its agents may do to your workspace**. Read one before you run it.
 
 Drive a flow only in a workspace you are willing to have rewritten. That includes [a container
 of the agent's own](/user/containers), which confines the agent to that image but mounts your

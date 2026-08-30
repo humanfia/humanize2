@@ -136,8 +136,8 @@ DEEPSEEK_API_KEY=sk-… hmz exec -f ralph_loop \
 ```
 
 The other official model is `deepseek-v4-pro`. The efforts are `max`, `high` and `off`. The
-current SDK exposes no per-session permission or skill controls, so DeepSeek Harness agents
-must use the default `permission="bypass"`.
+current SDK exposes no per-session permission or skill controls, so DeepSeek Harness can only
+fill a place the flow left at `bypass`.
 
 To run one CLI as **more than one** account at a time, use [providers](/user/providers). It is
 a separate store, made with `hmz providers add` rather than by signing the CLI in twice.

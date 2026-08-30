@@ -52,7 +52,14 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from hmz.agents import AgentBase, AgentConfig, Isolated, Moment, Remote
+    from hmz.agents import (
+        AgentBase,
+        AgentConfig,
+        AgentDefaults,
+        Isolated,
+        Moment,
+        Remote,
+    )
     from hmz.agents.base import Journal
     from hmz.agents.skills import Loaded
     from hmz.epic import Epic, Sub
@@ -80,6 +87,7 @@ __all__ = [
     "readies",
     "resumes",
     "running",
+    "runs_at",
     "set_up",
     "wanted",
 ]
@@ -396,15 +404,19 @@ class Place(NamedTuple):
       goal: Whether the flow runs this one under the backend's own goal feature, which it
         said by writing `Annotated[Agent, Goal]` where it declared the place. Only four
         backends have one, so a flow built on it is not a flow any agent can drive.
-      goals_default: Whether the agent picker initially offers backend goals on or off for
-        this place, which a flow may suggest with `AgentDefaults(goals=False)`. Once selected,
-        the effective value belongs to the agent's config. A required `Goal` always starts on.
       where: Where the agent filling it may work, which the flow said the same way -- `Remote`
         for one that may be pointed at another machine, an `Isolated` for one that works in a
         container the flow itself names the image of. None for a place the flow said nothing
         about, which runs here and may not be sent anywhere: a flow is written for a shape of
         work, and where its agents work is the flow's to say rather than a setting somebody
         reaches for.
+      permission: What the agent filling it may do without being asked, which the flow said
+        with `AgentDefaults(permission=...)` beside the place. `bypass` for a place that said
+        nothing, which is the loosest rung there is and so settles nothing: what an agent
+        already carries is never loosened to reach one of these.
+      goals: Whether the backend's own goal feature is available to it, said the same way.
+        A place run under a `Goal` has them, whatever else it wrote.
+      web_search: Whether it may search the web, said the same way.
     """
 
     name: str
@@ -412,7 +424,18 @@ class Place(NamedTuple):
     moments: frozenset[Moment]
     where: type[Remote] | Remote | Isolated | None = None
     goal: bool = False
-    goals_default: bool = True
+    permission: str = "bypass"
+    goals: bool = True
+    web_search: bool = True
+
+    @property
+    def goals_default(self) -> bool:
+        """What the agent picker called `goals` while a picker still decided it.
+
+        Nothing decides it now but the flow, so this answers the declaration itself. Here
+        only for the sheet rows that still read it, and goes when they do.
+        """
+        return self.goals
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
@@ -883,11 +906,15 @@ class _Claim(NamedTuple):
       record: Where that call is written down, or None for a call nobody is keeping a record
         of.
       skills: What the called flow works by, which its agents carry while it runs.
+      config: What that call settled the agent to run as: the rung it may work at, its
+        goals and its searching. The person at the prompt's is what it already was, that
+        being a place a flow says none of these about.
     """
 
     on: Running
     record: Sub | None
     skills: tuple[Loaded, ...]
+    config: AgentConfig
 
 
 class _Claimed(NamedTuple):
@@ -896,11 +923,14 @@ class _Claimed(NamedTuple):
     Attributes:
       was: Where it was writing before the first of them took it.
       carried: What it was carrying then.
+      ran: What it was set up as then, which is what it goes back to once every call that
+        took it has let go.
       held: Every call that has it now, in the order they took it.
     """
 
     was: Journal | None
     carried: tuple[Loaded, ...]
+    ran: AgentConfig
     held: list[_Claim]
 
 
@@ -978,9 +1008,16 @@ def _points(agent: Agent, claimed: _Claimed) -> None:
         )
     if found is None:
         agent.epic, skills = claimed.was, claimed.carried
+        runs = claimed.ran
     else:
         agent.epic, skills = found.record, found.skills
+        runs = found.config
     _settles(agent).loads(skills)
+    if agent.config != runs:
+        # What it may do, whether it has goals and whether it reads the internet: the call
+        # holding it said them, and a call that has ended said them no longer. Nothing here
+        # can be refused -- every one of these was accepted on the way in.
+        _settles(agent).reconfigure(runs)
 
 
 def _takes(
@@ -988,6 +1025,7 @@ def _takes(
     started: Running,
     record: Sub | None,
     skills: Sequence[tuple[Loaded, ...]],
+    runs: Sequence[AgentConfig],
 ) -> None:
     """Hands the agents to a call: its record to write into, its flow's skills to carry.
 
@@ -996,14 +1034,15 @@ def _takes(
       started: What :func:`entered` answered with.
       record: Where the call is written down, or None for one nobody is keeping a record of.
       skills: What each of the agents is to carry, in the order they were given.
+      runs: What each of them was set up as before this call, in the same order.
     """
     with _TELLING:
         _WRITTEN[id(started)] = record
-        for agent, carrying in zip(driven, skills, strict=True):
+        for agent, carrying, was in zip(driven, skills, runs, strict=True):
             held = _CLAIMED.setdefault(
-                id(agent), _Claimed(agent.epic, agent.loaded, [])
+                id(agent), _Claimed(agent.epic, agent.loaded, was, [])
             )
-            held.held.append(_Claim(started, record, carrying))
+            held.held.append(_Claim(started, record, carrying, agent.config))
             _points(agent, held)
 
 
@@ -1034,6 +1073,8 @@ def _gives_back(driven: Sequence[Agent], started: Running) -> Sub | None:
             del _CLAIMED[id(agent)]
             agent.epic = held.was
             _settles(agent).loads(held.carried)
+            if agent.config != held.ran:
+                _settles(agent).reconfigure(held.ran)
     return record
 
 
@@ -1229,13 +1270,19 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
                 run,
                 driven,
                 named,
+                places,
                 task,
                 settings,
                 resumable=mark.resumable,
                 inherit=inherit_skills,
             )
         started, held = _begins(
-            named, driven, task, resumable=mark.resumable, inherit=inherit_skills
+            named,
+            places,
+            driven,
+            task,
+            resumable=mark.resumable,
+            inherit=inherit_skills,
         )
         try:
             answered = run(driven, task, *settings, *held)
@@ -1279,6 +1326,7 @@ def _awaits(run: Entry) -> bool:
 
 def _begins(
     named: str,
+    places: tuple[Place, ...],
     driven: tuple[Agent, ...],
     task: str,
     *,
@@ -1289,6 +1337,7 @@ def _begins(
 
     Args:
       named: The flow being called, as it was asked for.
+      places: What it declared, which is what says how its agents run while it has them.
       driven: The agents it is being handed.
       task: What it was called with.
       resumable: Whether it says it can be picked up again.
@@ -1297,6 +1346,9 @@ def _begins(
     Returns:
       What :func:`entered` answered with, and what the flow is to be called with after the
       task and its settings.
+
+    Raises:
+      NotAFlow: If one of the agents cannot be told what the flow says its place runs at.
     """
     # Where it is written down, which is under the flow running here rather than under
     # whatever the agents happen to be writing to: two calls sharing one agent leave it
@@ -1317,7 +1369,11 @@ def _begins(
         # flow opens sessions and calls flows of its own, and what it did is its own rather
         # than a run's that happened to start it.
         writing = _opened(under, driven, named, task, resumable=resumable)
-        _takes(driven, started, writing, carrying)
+        # And what it says its agents may do, whether they have goals and whether they read
+        # the internet, which are the called flow's for the length of the call: they are
+        # handed back as they came, as they are with the skills and the record.
+        were = _settled(named, places, driven)
+        _takes(driven, started, writing, carrying, were)
     except BaseException:
         # A record that could not be opened is a call that never started: leaving it on the
         # branch would put every later call of this task under a flow that is not running.
@@ -1330,6 +1386,7 @@ async def _running(
     run: Entry,
     driven: tuple[Agent, ...],
     named: str,
+    places: tuple[Place, ...],
     task: str,
     settings: tuple[Any, ...],
     *,
@@ -1342,12 +1399,15 @@ async def _running(
       run: The flow's entry point.
       driven: The agents it was called with.
       named: The flow, as it was asked for.
+      places: What it declared.
       task: What it was called with.
       settings: What it was set up with, or nothing for a flow that takes none.
       resumable: Whether it says it can be picked up again.
       inherit: Whether the calling flow's skills stay reachable inside it.
     """
-    started, held = _begins(named, driven, task, resumable=resumable, inherit=inherit)
+    started, held = _begins(
+        named, places, driven, task, resumable=resumable, inherit=inherit
+    )
     try:
         # Asked of the answer all the same: what says it has to be awaited is what it was
         # written as, and a flow is what it does when it is called.
@@ -1512,6 +1572,40 @@ def _handed(
     return make(driven)
 
 
+def _settled(
+    flow: str,
+    places: tuple[Place, ...],
+    driven: Sequence[Agent],
+) -> tuple[AgentConfig, ...]:
+    """Sets every agent of a called flow up as that flow says its places run.
+
+    Args:
+      flow: The flow being called, for what a refusal says.
+      places: What it declared.
+      driven: The agents it is being called with, in the order it declared them.
+
+    Returns:
+      What each of them was set up as before this, in the same order, to be handed back when
+      the call ends -- the person among them left alone, who takes no turn a rung means
+      anything about.
+
+    Raises:
+      NotAFlow: If one of them cannot be told what the flow says its place runs at. The ones
+        settled before it are put back first: a call that never happened must leave the flow
+        that tried it driving the agents it had, exactly as a refused config does.
+    """
+    were: list[AgentConfig] = []
+    try:
+        for agent, place in zip(driven, places, strict=True):
+            were.append(agent.config if place.person else runs_at(flow, agent, place))
+    except NotAFlow:
+        for agent, was in zip(driven, were, strict=False):
+            if agent.config != was:
+                _settles(agent).reconfigure(was)
+        raise
+    return tuple(were)
+
+
 def _differently(
     flow: str,
     places: tuple[Place, ...],
@@ -1651,6 +1745,61 @@ def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
             f"{flow}: {called} runs on this machine -- this flow does not say it works "
             "anywhere else, so it cannot be pointed at one"
         )
+
+
+def runs_at(flow: str | os.PathLike[str], agent: Agent, place: Place) -> AgentConfig:
+    """Settles what one agent may do, whether it has goals and whether it reads the internet.
+
+    The three things a flow says about the work rather than about the agent, and the flow is
+    the only one that says them: whoever chose the agent chose a CLI, a model, an effort and
+    an account, and a rung typed there would be somebody outside the flow deciding what the
+    flow's reviewer is allowed to rewrite. So a place carries them, and this is where they
+    reach the agent -- before its first turn, over whatever it was constructed with.
+
+    Tighter only, never looser. A place that declares nothing declares the loosest of each --
+    `bypass`, goals on, the web readable -- and what an agent already carries is never
+    loosened to reach it, so a flow declaring nothing runs its agents at exactly what they
+    came with. It is the same rule that makes a call safe: a flow running at `read-only` that
+    called one which declared nothing would otherwise run that one at `bypass`, and calling a
+    flow somebody else wrote would be how a person's `read-only` gets undone.
+
+    Args:
+      flow: The flow, for what a refusal says.
+      agent: The agent filling the place.
+      place: What the flow declared.
+
+    Returns:
+      What the agent was set up as before this, so that a flow which called another can hand
+      it back exactly as it found it.
+
+    Raises:
+      NotAFlow: If the backend has no way of being told what the flow said -- a CLI that
+        cannot be told not to search the web is a CLI that would go on searching, which is a
+        declaration that lies rather than one that holds.
+    """
+    from dataclasses import replace
+
+    from hmz.agents import PERMISSIONS
+
+    was = agent.config
+    wanted = replace(
+        was,
+        permission=min(was.permission, place.permission, key=PERMISSIONS.index),
+        # A place run under a goal has one whatever the agent came with: an agent with goals
+        # switched off is refused where the place is filled rather than quietly run without.
+        goals=place.goals if place.goal else (was.goals and place.goals),
+        web_search=was.web_search and place.web_search,
+    )
+    if wanted == was:
+        return was
+    try:
+        _settles(agent).reconfigure(wanted)
+    except ValueError as refused:
+        raise NotAFlow(
+            f"{flow}: {place.name or 'the agent'} cannot be run as this flow declares "
+            f"-- {refused}"
+        ) from refused
+    return was
 
 
 def _unfetched(named: str) -> str:
@@ -1826,7 +1975,7 @@ def _place(name: str, kind: object) -> Place:
     moments = frozenset(_moments(kind))
     where = _where(kind)
     goal = _goal(kind)
-    goals_default = _goals_default(kind)
+    runs = _runs(kind)
     if get_origin(kind) is Annotated:
         kind = get_args(kind)[0]
     return Place(
@@ -1835,7 +1984,12 @@ def _place(name: str, kind: object) -> Place:
         moments=moments,
         where=where,
         goal=goal,
-        goals_default=True if goal else goals_default,
+        permission=runs.permission,
+        # A place the flow runs under a goal has one: `Goal` is the more particular of the
+        # two things it wrote, and a flow that asked for both ways at once is a flow the
+        # checker says so about rather than one that quietly does neither.
+        goals=True if goal else runs.goals,
+        web_search=runs.web_search,
     )
 
 
@@ -1876,20 +2030,24 @@ def _goal(kind: object) -> bool:
     return any(said is Goal for said in get_args(kind)[1:])
 
 
-def _goals_default(kind: object) -> bool:
-    """The initial on/off choice a flow suggests for this agent's goals.
+def _runs(kind: object) -> AgentDefaults:
+    """What a flow said the agent filling a place runs at.
 
-    The suggestion is picker metadata, not runtime policy. The picker resolves it into the
-    boolean on `AgentConfig` before constructing the agent.
+    Args:
+      kind: What the flow annotated the place with.
+
+    Returns:
+      The `AgentDefaults` it wrote beside the type, and the ordinary one -- `bypass`, goals
+      on, the web readable -- for a place it wrote none beside, which settles nothing: those
+      are the loosest of each, and what an agent carries is never loosened.
     """
     from hmz.agents import AgentDefaults
 
-    if get_origin(kind) is not Annotated:
-        return True
-    for said in get_args(kind)[1:]:
-        if isinstance(said, AgentDefaults):
-            return said.goals
-    return True
+    if get_origin(kind) is Annotated:
+        for said in get_args(kind)[1:]:
+            if isinstance(said, AgentDefaults):
+                return said
+    return AgentDefaults()
 
 
 def _moments(kind: object) -> tuple[Moment, ...]:

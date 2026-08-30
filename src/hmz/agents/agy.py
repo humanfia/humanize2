@@ -448,12 +448,16 @@ class AntigravityCLIAgentConfig(AgentConfig):
 class AntigravityCLIAgent(AgentBase):
     """Antigravity CLI, driven through its own persistent stream-json protocol."""
 
-    def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
-        """Makes the agent, refusing a rung this backend has no way of running at.
+    def _serves(self, config: AgentConfig) -> None:
+        """Refuses a rung this backend has no way of running at, wherever the config arrives.
+
+        Here rather than only where the agent is made, because what an agent may do is the
+        flow's: a flow declaring a reviewer that may not write settles that onto whatever
+        agent it was handed, and a rung refused at construction but taken quietly a moment
+        later would be a declaration that lies about the turn.
 
         Args:
-          config: What its turns run at.
-          name: What the flow calls it, or None for one of its own.
+          config: What its turns are to run at.
 
         Raises:
           ValueError: If it was configured to be allowed less than everything. Antigravity CLI
@@ -461,12 +465,12 @@ class AntigravityCLIAgent(AgentBase):
             to be asked, so a rung it cannot express is said here rather than quietly run as
             the rung above it.
         """
+        super()._serves(config)
         if config.permission not in _TAKES:
             raise ValueError(
                 f"{_COMMAND} runs at {' or '.join(_TAKES)} only, "
                 f"not {config.permission}: it has no way of being allowed less"
             )
-        super().__init__(config, name=name)
 
     def new(self, cwd: str | os.PathLike[str] | None = None) -> AntigravityCLISession:
         """Opens a new Antigravity conversation, in the directory it is given or in this one."""
