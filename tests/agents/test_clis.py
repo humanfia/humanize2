@@ -48,7 +48,7 @@ AGY = AntigravityCLIAgentConfig(model="gemini-3.5-flash-medium", effort="high")
 #: it with the events one agent run is made of. A prompt of `boom` is refused outright and one
 #: of `wrong` comes back as a request that errored, which are the two ways a turn fails here.
 _PI = """
-import json, pathlib, queue, sys, threading
+import json, os, pathlib, queue, sys, threading
 
 log = pathlib.Path(LOG)
 lines = queue.Queue()
@@ -74,7 +74,8 @@ def take(waiting=None):
 
 def note(argv, said):
     with log.open("a") as stream:
-        json.dump({"argv": argv, "stdin": said}, stream)
+        json.dump({"argv": argv, "stdin": said,
+                   "compiled": os.environ.get("NODE_COMPILE_CACHE")}, stream)
         stream.write("\\n")
 
 
@@ -339,6 +340,9 @@ class _Call:
     #: rather than given as a flag.
     thinking: str | None = None
     pid: int | None = None
+    #: Where the turn was told to keep what its runtime compiled, for the backend that is
+    #: started often enough for compiling its own bundle again to be worth avoiding.
+    compiled: str | None = None
 
 
 @dataclass(frozen=True)
@@ -422,6 +426,30 @@ def test_pi_can_be_talked_to_while_a_turn_is_running(stubs: _Stubs) -> None:
         "steer actually, stop",
     ]
     assert session("after") == "after"  # the stream is still in step for the next turn
+
+
+def test_pi_gives_node_one_place_to_keep_what_it_compiled(
+    stubs: _Stubs, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every session compiles the same bundle, so the first does it and the rest read it."""
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize"))
+    monkeypatch.delenv("NODE_COMPILE_CACHE", raising=False)
+    assert PiAgent(PI).new()("hi") == "hi"
+
+    launch = stubs.calls()[0]
+    assert launch.compiled == str(tmp_path / "humanize" / "compiled" / "pi")
+
+
+def test_pi_leaves_a_compile_cache_somebody_else_chose(
+    stubs: _Stubs, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Theirs is the cache they meant, and one turn is not the place to overrule it."""
+    monkeypatch.setenv("HUMANIZE_HOME", str(tmp_path / "humanize"))
+    monkeypatch.setenv("NODE_COMPILE_CACHE", str(tmp_path / "mine"))
+    assert PiAgent(PI).new()("hi") == "hi"
+
+    launch = stubs.calls()[0]
+    assert launch.compiled == str(tmp_path / "mine")
 
 
 def test_pi_that_never_opened_cannot_be_talked_to() -> None:
