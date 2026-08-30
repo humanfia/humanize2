@@ -18,6 +18,7 @@
 ├── kept.py
 ├── machines
 ├── models.py
+├── prices.py
 ├── providers
 ├── runner.py
 ├── sdk
@@ -229,6 +230,91 @@ What each backend runs, asked of that backend and kept until it is asked again.
   model takes, in the ladder's own order, and MUST be the whole ladder where it said nothing
   of that model -- a model it says nothing about is one it will take any of them for.
 - A catalogue that has never been asked for MUST be empty rather than guessed at.
+
+## `prices.py`
+
+```python
+SOURCE: str
+WHENCE: str
+STALE: float
+
+
+@dataclass(frozen=True, slots=True)
+class Price:
+    model: str
+    provider: str
+    per_million: Mapping[str, float]
+
+
+def where() -> Path: ...
+def price(model: str) -> Price | None: ...
+def cost(usage: Mapping[str, float], model: str) -> float | None: ...
+def money(dollars: float) -> str: ...
+def refresh(*, wait: bool = False) -> bool: ...
+```
+
+What a token costs in money, so that everywhere tokens are counted can also say what they came
+to.
+
+- A unit price MUST NOT be written down here, for the reason a model id MUST NOT be written
+  down in `backends.py`: the vendors move them without asking anybody, and a list written into
+  this package is wrong the week after it is written. It MUST be fetched from a source that
+  keeps them, and what was fetched MUST be kept under humanize's own home.
+- Reading a price MUST cost one file read and no network at all. Nothing drawn at a prompt may
+  cost the interface its responsiveness, and a bill is drawn beside every token count there is
+  -- so `price` and `cost` MUST answer off what was already kept, and fetching MUST happen only
+  where somebody asked for it and on a thread of its own.
+- Every way the fetch can go wrong MUST leave what was kept still being served. No network, a
+  source that is down, a document this cannot read: a price list able to stop a run, or to
+  empty itself because somebody's wifi dropped, would be worth less than no price list.
+  Fetching MUST be conditional on what is already here, the file being megabytes, and MUST be
+  refusable outright by an environment variable -- an air-gapped install and this suite both
+  need a humanize that reaches for nothing.
+- **A model nobody lists MUST answer nothing rather than nothing spent.** Coverage is a few
+  dozen models and humanize drives whatever CLI is installed, so the unlisted model is the
+  ordinary case; `$0.00` beside its tokens would be a claim about a bill, and a false one.
+  Whatever draws a figure MUST show the tokens alone.
+- A price MUST be per kind of token and MUST be applied per kind. An input token and an output
+  token of one model differ in price several times over, so a lump of tokens nobody broke down
+  is a lump nobody may price, and MUST answer nothing rather than nought. A kind a backend
+  counts beside the output rather than inside it MUST be bought as output.
+- **Every figure MUST be a floor.** A kind that is not priced MUST add nothing rather than be
+  guessed at, and a kind MUST only stand in for another where standing in cannot overstate: a
+  cache write is an input token and a surcharge on it, so the input price is a floor on one,
+  while a cache read is a tenth of an input token and a turn is mostly cache reads -- pricing
+  one as input would put the bill several times over the truth, which is the one direction
+  this must never go.
+- Matching a humanize model to a listed one MUST be exact once both are stripped of what is
+  not the model, and MUST promise no more than that. What is stripped MUST be the things that
+  are known not to be the model: the provider, account or gateway route written in front, the
+  cloud a route names, the release date or version written behind, and the punctuation two
+  spellings disagree about. `claude-opus-5`, `anthropic/claude-opus-5`,
+  `azure/anthropic/claude-opus-5`, `aws/anthropic/bedrock-claude-opus-5` and
+  `us.anthropic.claude-opus-5-v1:0` are one model and one bill; `claude-haiku-4-5-20251001` is
+  the model the source lists as `claude-haiku-4.5`.
+- It MUST NOT guess beyond that, and a near miss MUST be a miss. `gpt-5` is not `gpt-5.6-sol`.
+  The price of the neighbouring model is a wrong bill rather than an approximate one, and a
+  gateway offering hundreds of models against a source listing dozens means most of what runs
+  is unmatched -- which MUST read as tokens without a price, never as `$0.00`.
+- Where a model is priced in tiers -- by context length, by how long a cache is held -- the
+  first the source gives MUST be taken, that being the standard price. Nothing here knows how
+  long a prompt was, and the tier above is the dearer one.
+- Which version of the source is current MUST be settled by the date on it rather than by
+  where it sits in the file. A source that one day appended its snapshots instead of
+  prepending them would otherwise have humanize quietly serving three-year-old prices.
+- A document that is not priced in dollars per million tokens MUST be refused whole and MUST
+  leave what was kept in place. Showing the wrong money is worse than showing none.
+- **What this works out is the least authoritative source there is of what a run cost.** It is
+  a reckoning humanize made, from somebody else's list price, of tokens it was told about --
+  where a backend states a turn's cost in money it is the vendor's own accounting, and MUST be
+  believed over this wherever it does. That is the same ordering `tui.md` already holds to for
+  the tokens: a backend that says what a turn cost is believed over what its agent was
+  configured with, and a source that has seen further is believed over one that has not. This
+  is a third source and it goes underneath both. What is drawn MUST therefore read as an
+  estimate at list price rather than as a bill: a subscription is not metered by the token at
+  all, and a negotiated rate is not the list one. Measured against Claude Code's own
+  `total_cost_usd` on one real turn -- 10 in, 448 out, 35,188 cache-written -- this came to
+  $0.0462 against its $0.0472, which is 2% low and low in the right direction.
 
 ## `kept.py`
 

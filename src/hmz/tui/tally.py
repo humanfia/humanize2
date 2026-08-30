@@ -36,7 +36,71 @@ __all__ = ["Tally"]
 _EVERY = 1.0
 
 
-def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
+#: What each backend's log calls each kind of token. A kind is named the same thing wherever
+#: it is counted, so that one flow reading two backends reads one word for one thing -- and
+#: so that the prices, which are per kind, can be put against any of them. Codex's rollout is
+#: the odd one out: its `input_tokens` has the cached reads inside it, so the read is taken
+#: back out rather than paid for twice.
+_KINDS: dict[str, tuple[tuple[str, str], ...]] = {
+    "claude": (
+        ("input", "input_tokens"),
+        ("output", "output_tokens"),
+        ("cache_read", "cache_read_input_tokens"),
+        ("cache_write", "cache_creation_input_tokens"),
+    ),
+    "dsh": (
+        ("input", "inputTokens"),
+        ("output", "outputTokens"),
+        ("cache_read", "cacheReadTokens"),
+        ("cache_write", "cacheWriteTokens"),
+    ),
+    "zcode": (("input", "inputTokens"), ("output", "outputTokens")),
+    "codex": (
+        ("input", "input_tokens"),
+        ("output", "output_tokens"),
+        ("cache_read", "cached_input_tokens"),
+    ),
+    "kimi": (
+        ("input", "inputOther"),
+        ("output", "output"),
+        ("cache_read", "inputCacheRead"),
+        ("cache_write", "inputCacheCreation"),
+    ),
+}
+
+
+def _kinds(backend: str, usage: dict[str, Any]) -> dict[str, float]:
+    """One row's usage, under the names every kind is counted by here.
+
+    Args:
+      backend: Whose log the row came out of.
+      usage: The usage as that backend wrote it.
+
+    Returns:
+      Tokens by kind, holding only the kinds this backend actually reported -- a kind that is
+      not here is one it does not report, which is not the same as one it reports as nothing.
+    """
+    broken = {
+        kind: float(usage.get(named) or 0)
+        for kind, named in _KINDS.get(backend, ())
+        if usage.get(named)
+    }
+    if backend == "codex" and "cache_read" in broken:
+        # Codex counts its cached reads inside the input rather than beside it, and a token
+        # priced as an input and again as a cached read is a token billed twice. A prompt
+        # that was wholly cached leaves no plain input at all, and is written down as having
+        # none rather than as having nought of it.
+        rest = broken.get("input", 0.0) - broken["cache_read"]
+        if rest > 0:
+            broken["input"] = rest
+        else:
+            broken.pop("input", None)
+    return broken
+
+
+def _spent(
+    backend: str, row: dict[str, Any]
+) -> tuple[str | None, int, dict[str, float]]:
     """What one row of a log says was spent, read as that backend writes it.
 
     Every one of them is per request rather than a running total, so a session's spending is
@@ -52,36 +116,31 @@ def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
       row: The row, as read.
 
     Returns:
-      The model it names, or None to leave that to whoever asked, and how many tokens the
-      request cost -- zero for a row that is not one of these.
+      The model it names, or None to leave that to whoever asked; how many tokens the request
+      cost -- zero for a row that is not one of these -- and what those tokens were, kind by
+      kind, which is the only reckoning a price can be put against.
     """
     if backend == "claude":
         message: dict[str, Any] = row.get("message") or {}
         usage: dict[str, Any] = message.get("usage") or {}
-        return str(message.get("model") or "") or None, sum(
-            int(usage.get(name) or 0)
-            for name in (
-                "input_tokens",
-                "output_tokens",
-                "cache_read_input_tokens",
-                "cache_creation_input_tokens",
-            )
+        broken = _kinds(backend, usage)
+        return (
+            str(message.get("model") or "") or None,
+            int(sum(broken.values())),
+            broken,
         )
     if backend == "dsh":
         if row.get("type") != "assistant/message":
-            return None, 0
+            return None, 0, {}
         data: dict[str, Any] = row.get("data") or {}
         message = data.get("message") or {}
         source: dict[str, Any] = message.get("source") or {}
         usage = data.get("usage") or {}
-        return str(source.get("model") or "") or None, sum(
-            int(usage.get(name) or 0)
-            for name in (
-                "inputTokens",
-                "outputTokens",
-                "cacheReadTokens",
-                "cacheWriteTokens",
-            )
+        broken = _kinds(backend, usage)
+        return (
+            str(source.get("model") or "") or None,
+            int(sum(broken.values())),
+            broken,
         )
     if backend == "zcode":
         # One row per request the turn made, the whole of what was sent and what came back.
@@ -91,28 +150,32 @@ def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
         counting: dict[str, Any] = answered.get("usage") or {}
         ran: dict[str, Any] = row.get("model") or {}
         named = f"{ran.get('providerId', '')}/{ran.get('modelId', '')}".strip("/")
-        return named or None, sum(
-            int(counting.get(name) or 0) for name in ("inputTokens", "outputTokens")
-        )
+        broken = _kinds(backend, counting)
+        return named or None, int(sum(broken.values())), broken
     envelope: dict[str, Any] = row.get("envelope") or {}
     payload: dict[str, Any] = row.get("payload") or envelope.get("payload") or {}
     if backend == "codex":
         info: dict[str, Any] = payload.get("info") or {}
         counted: dict[str, Any] = info.get("last_token_usage") or {}
-        return None, int(counted.get("total_tokens") or 0)
+        # The total is Codex's own rather than what the kinds add up to: a rollout row naming
+        # only the total still says what that request cost, and that is what is counted.
+        return None, int(counted.get("total_tokens") or 0), _kinds(backend, counted)
     spent: dict[str, Any] = payload.get("usage") or {}
-    return None, sum(
-        int(spent.get(name) or 0)
-        for name in ("inputOther", "output", "inputCacheRead", "inputCacheCreation")
-    )
+    broken = _kinds("kimi", spent)
+    return None, int(sum(broken.values())), broken
 
 
 @dataclass
 class _Reading:
-    """One log being read: how far into it we are, and what it has come to so far."""
+    """One log being read: how far into it we are, and what it has come to so far.
+
+    Kept by model and then by kind, a bill needing the kinds and a sub-agent on a cheaper
+    model being its own line. The kind called `` is what a row counted without saying what
+    kind of token it was, which is the one part of a total that cannot be priced.
+    """
 
     at: int = 0
-    spent: Counter[str] = field(default_factory=Counter[str])
+    spent: dict[str, Counter[str]] = field(default_factory=dict[str, Counter[str]])
 
 
 class Tally:
@@ -170,11 +233,18 @@ class Tally:
                 for pattern in profile.logs:
                     for path in sorted(home.glob(pattern.format(ident=ident))):
                         self._take(path, profile.name, agent.config.model)
-        totals: Counter[str] = Counter()
+        totals: dict[str, Counter[str]] = {}
         for reading in self._read.values():
-            totals.update(reading.spent)
-        for model, total in totals.items():
-            self._monitor.counted("read", model, total)
+            for model, broken in reading.spent.items():
+                totals.setdefault(model, Counter()).update(broken)
+        for model, broken in totals.items():
+            # The kind with no name goes along with the rest: it is what a row counted
+            # without saying what it went on, and leaving it out here would price the whole
+            # of a total against the part of it somebody did break down.
+            kinds = {kind: float(count) for kind, count in broken.items()}
+            self._monitor.counted(
+                "read", model, sum(broken.values()), kinds=kinds or None
+            )
 
     def _take(self, path: Path, backend: str, model: str) -> None:
         """Reads one log on from wherever this last left it.
@@ -201,6 +271,11 @@ class Tally:
                 continue
             if not isinstance(loaded, dict):
                 continue
-            named, tokens = _spent(backend, cast("dict[str, Any]", loaded))
+            named, tokens, broken = _spent(backend, cast("dict[str, Any]", loaded))
             if tokens > 0:
-                reading.spent[named or model] += tokens
+                counted = reading.spent.setdefault(named or model, Counter())
+                counted.update({kind: int(count) for kind, count in broken.items()})
+                # Whatever the kinds did not account for still cost something, and is put
+                # under no kind at all rather than guessed at as one.
+                if (rest := tokens - int(sum(broken.values()))) > 0:
+                    counted[""] += rest
