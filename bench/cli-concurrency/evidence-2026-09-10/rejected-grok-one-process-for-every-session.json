@@ -1,0 +1,58 @@
+{
+ "revision": "grok-one-process-for-every-session-probe-v1",
+ "synthetic_model": true,
+ "real_model_performance_verified": false,
+ "backend": "grok",
+ "condition": "A diagnostic probe outside the hmz adapter and outside the benchmark harness. It drives grok agent stdio over the Agent Client Protocol directly, once with one process per session and once with every session opened on a single process, against the same deterministic fixture, the same workload and the same four-CPU measurement group. Its numbers are not benchmark samples: no hmz event stream, no credential supervisor, no resource sampler and no harness validation are in them.",
+ "probe_script_sha256": "1c7e2d1f725a97718b0d506ec20425dbb1273a5a29fc739fd7ce9d06cfbff7bc",
+ "measurement_group_cpus": "0-3",
+ "each_case_verified": "every cold and warm task pair passed the harness workload checker",
+ "observations": [
+  {
+   "shared": false,
+   "n": 20,
+   "wall": 6.435,
+   "all_ok": true,
+   "cold_p50": 2.496,
+   "cold_max": 2.733,
+   "warm_p50": 1.497,
+   "warm_max": 1.716,
+   "setup_max": 0.989
+  },
+  {
+   "shared": true,
+   "n": 20,
+   "wall": 2.818,
+   "all_ok": true,
+   "cold_p50": 1.705,
+   "cold_max": 1.708,
+   "warm_p50": 1.049,
+   "warm_max": 1.205,
+   "setup_max": 0.533
+  },
+  {
+   "shared": false,
+   "n": 24,
+   "wall": 6.522,
+   "all_ok": true,
+   "cold_p50": 2.854,
+   "cold_max": 3.141,
+   "warm_p50": 1.353,
+   "warm_max": 1.577,
+   "setup_max": 1.168
+  },
+  {
+   "shared": true,
+   "n": 24,
+   "wall": 2.384,
+   "all_ok": true,
+   "cold_p50": 1.461,
+   "cold_max": 1.466,
+   "warm_p50": 0.909,
+   "warm_max": 0.978,
+   "setup_max": 0.584
+  }
+ ],
+ "outcome": "not adopted",
+ "why": "One process for every session removes every process start but the first, and at the rung where the adopted transport stops it is about a third faster on both turns. It is retained as measured headroom rather than taken: one process serving many conversations couples their failures, and the win only arrives for a flow that shares one Agent across its sessions."
+}

@@ -87,6 +87,42 @@ improvement. This setting is not adopted as a production default or recommended 
 The thread reduction is consistent with two fewer workers per process; individual thread
 ownership and per-thread CPU time were not sampled.
 
+## Grok one process for every session
+
+Grok Build serves the Agent Client Protocol, and the protocol opens a session on a running
+agent rather than being one: `session/new` names a working directory, so a single
+`grok agent stdio` can hold every conversation a flow has open. The adopted transport does not
+do that. It holds one process per conversation, so a session still pays one process start, and
+at the rung where it stops that start is what is left.
+
+A probe measured the alternative directly, outside the adapter and outside the harness: the
+same workload, the same fixture and the same four-CPU measurement group, once with a process
+per session and once with every session opened on one. Every cold and warm pair passed the
+workload checker in both.
+
+| Sessions | Processes | Cold p50 | Warm p50 | Wall |
+| ---: | --- | ---: | ---: | ---: |
+| 20 | one per session | 2.496 | 1.497 | 6.435 |
+| 20 | one for all | 1.705 | 1.049 | 2.818 |
+| 24 | one per session | 2.854 | 1.353 | 6.522 |
+| 24 | one for all | 1.461 | 0.909 | 2.384 |
+
+These are seconds, and they are not benchmark samples: no hmz event stream, no credential
+supervisor, no resource sampler and no harness validation are in them. They say what the
+remaining headroom is, not what a driver would measure.
+
+It was not adopted. One process serving many conversations couples what happens to them: a
+process that goes away takes every session on it. An early sixteen-session run of this probe
+did exactly that — the process exited and every waiter hung — but that run predates the
+measurement-group isolation fix, its stderr was discarded, and it is not among the retained
+observations; it did not recur afterwards at sixteen, twenty, twenty-four, thirty-two or
+forty-eight. Recovery is available, since the protocol will `session/load` a conversation back
+onto a new process, but it was neither written nor measured. The win also only arrives for a
+flow that shares one Agent across its sessions, and a driver whose concurrency depends on how
+the caller happened to make its agents is a weaker claim than the one being published. The
+[retained probe](evidence-2026-09-10/rejected-grok-one-process-for-every-session.json) keeps
+the condition, the script hash and the four observations in the table above.
+
 ## Cursor local runtime reuse
 
 Cursor documents a persistent [`agent acp` transport](https://cursor.com/docs/cli/acp)

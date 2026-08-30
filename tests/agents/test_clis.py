@@ -31,6 +31,7 @@ from hmz.agents import (
     PiAgentConfig,
     QwenCodeAgent,
     QwenCodeAgentConfig,
+    Unrecoverable,
 )
 from hmz.machines import AnchoredConfig
 from tests.stubs import HereAnchor
@@ -254,7 +255,8 @@ import json, os, pathlib, sys
 log = pathlib.Path(LOG)
 argv = sys.argv[1:]
 flags = dict(zip(sys.argv, sys.argv[1:]))
-session = flags.get("--resume", "ses-grok-stub")
+session = os.environ.get("A_SESSION_THE_TEST_NAMED") or flags.get(
+    "--resume", "ses-grok-stub")
 spent = {"input_tokens": 5, "output_tokens": 2, "cache_read_input_tokens": 1}
 
 
@@ -275,7 +277,7 @@ def told(kind, **rest):
 
 
 if argv[:1] == ["agent"] and "stdio" in argv:
-    for line in sys.stdin:
+    while line := sys.stdin.readline():
         asked = json.loads(line)
         at, method = asked.get("id"), asked.get("method")
         if method == "initialize":
@@ -286,6 +288,11 @@ if argv[:1] == ["agent"] and "stdio" in argv:
             continue
         if method == "session/load":
             session = asked["params"]["sessionId"]
+            noted("load " + session)
+            if session == "gone":
+                out({"jsonrpc": "2.0", "id": at,
+                     "error": {"code": -32001, "message": "no such session"}})
+                continue
             out({"jsonrpc": "2.0", "id": at, "result": {}})
             continue
         said = asked["params"]["prompt"][0]["text"]
@@ -295,6 +302,20 @@ if argv[:1] == ["agent"] and "stdio" in argv:
         if said == "boom":
             out({"jsonrpc": "2.0", "id": at,
                  "error": {"code": -32000, "message": "grok would not take it"}})
+            continue
+        if said == "ask":
+            # A tool call put in front of the client anyway, which it answers by the kind
+            # of the option rather than by taking whichever came first.
+            out({"jsonrpc": "2.0", "id": 9001,
+                 "method": "session/request_permission",
+                 "params": {"sessionId": session, "options": [
+                     {"optionId": "no", "kind": "reject_once"},
+                     {"optionId": "yes", "kind": "allow_always"}]}})
+            chosen = json.loads(sys.stdin.readline())
+            told("agent_message_chunk", content={
+                "type": "text",
+                "text": chosen["result"]["outcome"]["optionId"]})
+            out({"jsonrpc": "2.0", "id": at, "result": {"stopReason": "end_turn"}})
             continue
         told("agent_thought_chunk",
              content={"type": "text", "text": "thinking about " + said})
@@ -796,6 +817,43 @@ def test_grok_runs_a_shaped_turn_as_the_command_that_carries_the_shape(
     assert json.loads(shaped.argv[shaped.argv.index("--json-schema") + 1])["title"] == (
         "_Shape"
     )
+
+
+def test_grok_loads_the_conversation_back_onto_the_process_after_a_shaped_turn(
+    stubs: _Stubs,
+) -> None:
+    """The two transports pick up what the other opened, by the id Grok Build minted."""
+    session = GrokBuildAgent(GROK).new()
+    assert session("hi") == "hi"
+    assert session("again", schema=_Shape) == _Shape(value="again")
+    assert session("third") == "third"
+
+    opened, shaped, loaded, third = stubs.calls()
+    assert opened.argv[-1] == "stdio"
+    assert shaped.argv[shaped.argv.index("--resume") + 1] == session.id
+    # A process is a transport: the one this turn started is handed the conversation the
+    # command line was resuming a moment ago rather than opening a second one.
+    assert loaded.stdin == f"load {session.id}"
+    assert third.argv[-1] == "stdio"
+    assert opened.pid != third.pid
+
+
+def test_grok_says_once_that_a_conversation_it_cannot_load_is_gone(
+    stubs: _Stubs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another try is refused the same way: the conversation is not there under that id."""
+    monkeypatch.setenv("A_SESSION_THE_TEST_NAMED", "gone")
+    session = GrokBuildAgent(GROK).new()
+    assert session("hi") == "hi"
+    assert session("again", schema=_Shape) == _Shape(value="again")
+
+    with pytest.raises(Unrecoverable):
+        session("third")
+
+
+def test_grok_grants_a_tool_call_it_is_asked_to_permit(stubs: _Stubs) -> None:
+    """By the kind of the option: an id is the agent's own word for what it offers."""
+    assert GrokBuildAgent(GROK).new()("ask") == "yes"
 
 
 def test_grok_takes_a_withheld_rung_on_the_command_line_that_can_say_it(

@@ -13,7 +13,7 @@ Each row passed five candidate repetitions against five fresh original serial co
 | codex | 5 | 1.637 | 0.940 | Fail | [Data](evidence-2026-09-10/selected-stage4-summary.json) |
 | cursor local | 4 | 1.055 | 1.082 | Pass | [Data](evidence-2026-09-10/selected-stage5-summary.json) |
 | dsh | 3 | 1.217 | 0.881 | Pass | [Data](evidence-2026-09-10/selected-stage3-summary.json) |
-| grok | 5 | 1.156 | 1.077 | Pass | [Data](evidence-2026-09-10/selected-stage4-summary.json) |
+| grok | 20 | — | — | — | [Data](evidence-2026-09-10/grok-held-open-transport-summary.json) |
 | kimi | 2 | 1.573 | 0.317 | Fail | [Data](evidence-2026-09-10/selected-stage4-summary.json) |
 | mimo | 1 | 1.018 | 1.023 | Pass | [Data](evidence-2026-09-10/mimo-serial-confirmation-summary.json) |
 | opencode | 1 | 0.998 | 1.068 | Fail | [Data](evidence-2026-09-10/opencode-default-serial-confirmation-summary.json) |
@@ -21,6 +21,15 @@ Each row passed five candidate repetitions against five fresh original serial co
 | qwen | 6 | 0.938 | 0.998 | Pass | [Data](evidence-2026-09-10/selected-stage5-summary.json) |
 | zcode | 4 | 1.279 | 0.936 | Fail | [Data](evidence-2026-09-10/selected-stage5-summary.json) |
 | opencode / optional workspace DB | 2 | 1.095 | 0.985 | Pass | [Data](evidence-2026-09-10/selected-stage3-summary.json) |
+
+Grok Build's row is measured against the complete-task floor alone: cold and warm p50 and
+nearest-rank p95 of turn start to the hmz result, each at most 2× five fresh original serial
+controls. The startup and fixed-work columns are the earlier gates and are not evaluated for
+it. Its worst complete-task ratio at twenty sessions is 1.701. Twenty is published rather
+than the twenty-two that also passed five repetitions, because a separate five-repeat trial
+of twenty-two missed on cold p95 at 2.050 and twenty passed every trial it was given. Its
+ratios, controls and serial-control drift are in
+[its evidence](evidence-2026-09-10/grok-held-open-transport-summary.json).
 
 Exact ratios, original/candidate phase distributions, all repeat denominators and the selected source references are in [the machine-readable result](results-2026-09-10.json). The retained trial sequence follows; `P` is a primary pass, `T` a timing miss, and `E` an execution failure. An entry `6×5 P` means six concurrent sessions and five repetitions. Three-repeat passes remain exploratory.
 
@@ -32,6 +41,7 @@ Exact ratios, original/candidate phase distributions, all repeat denominators an
 | cursor | 2×3 P; 4×3 P; 8×3 T; 6×3 T; 5×5 T; 4×5 P |
 | dsh | 2×3 P; 4×3 T; 3×3 P; 3×5 P |
 | grok | 2×3 P; 4×3 P; 8×3 T; 6×3 T; 5×5 P |
+| grok / held-open protocol transport | 8×3 P; 12×3 P; 16×3 P; 20×3 P; 22×3 P; 24×3 T; 26×3 T; 28×3 T; 22×5 T; 23×5 T; 20×5 P; 20×5 P; 22×5 P; 24×5 T |
 | kimi | 2×3 P; 4×3 T; 3×3 P; 3×5 T; 2×5 P |
 | mimo | 2×3 T; 1×5 P |
 | opencode | 2×3 E; 1×5 P |
@@ -39,6 +49,7 @@ Exact ratios, original/candidate phase distributions, all repeat denominators an
 | qwen | 2×3 P; 4×3 P; 8×3 T; 6×3 P; 7×5 T; 6×5 P |
 | zcode | 2×3 P; 4×3 P; 8×3 T; 6×3 T; 5×5 T; 4×5 P |
 | grok / rejected optional native worker pool size 2 | 6×3 T |
+| grok / rejected one process for every session | probe only, 20 and 24 |
 | mimo / rejected optional per workspace native database | 2×3 T |
 | opencode / optional per workspace native database | 4×3 T; 3×3 T; 2×5 P |
 
@@ -68,6 +79,20 @@ Codex and ZCode use separate Agent instances. Other backends use multiple Sessio
 
 Qwen and Antigravity reuse official streaming CLI processes for ordinary turns, resume finite structured-output turns and restart when native settings or skills change. Antigravity also keeps finite slash commands. Usage handling and native structured-result/workspace behavior retain dedicated regression coverage. The Linux supervisors remove temporary ctypes pointer cycles without changing the flow API.
 
+Grok Build is driven through the Agent Client Protocol it already serves its own IDE clients
+on: `grok agent stdio` is one process for the conversation, `session/new` opens it and each
+ordinary turn is a `session/prompt` written to a process that is already up. The rungs that
+take tools away, an agent told not to search the web, and a turn held to a shape have no flag
+on that process and still run `grok -p --resume`; the session id is Grok Build's own either
+way and each transport loads what the other opened. Against the same five serial controls,
+measured back to back in one group, the original passed fourteen sessions at 1.856 and failed
+sixteen at 2.077 while the candidate passed twenty at 1.701 and failed twenty-four at 2.128.
+Warm turns carry the change: a warm complete task is 0.551× the original serial control at
+twenty sessions and 0.418× at sixteen, where the original's own warm turn is already 2.077×
+at sixteen. Neither ladder is monotone at these sample counts — the original passes fourteen
+and misses twelve at 2.007 in the same session — so a rung either side of a boundary is
+within the movement of the p95 estimate rather than outside it.
+
 Kimi wakes authoritative REST reads from official WebSocket notifications, answers native heartbeats and retains polling recovery. Mock profiling exposed a full receive queue delaying socket disposal by one second after a completed turn. The bounded receive queue stays unchanged; a 100 ms close grace removes approximately 900 ms from that wait. Separate instrumented before/after task probes verified cleanup and exact task proofs; those timings are diagnostic only and excluded from performance gates.
 
 See [fixture reproduction](DETERMINISTIC.md), [the general runner](RUNNING.md) and [rejected process-reuse experiments](REJECTED.md). `uv run pytest` passed 2,239 tests with 77 skips and 41 warnings in 716.87 seconds, including the 58 benchmark tests. `uv run pre-commit run --all-files` also passed. Skips cover opt-in live-agent checks and unavailable Docker/localhost SSH; no live-agent tests were enabled for mock profiling. Native feature and flow contract checks from the earlier evaluation remain separately documented in [the historical report](RESULTS.md). The production flow implementation/API is unchanged.
@@ -75,6 +100,8 @@ See [fixture reproduction](DETERMINISTIC.md), [the general runner](RUNNING.md) a
 ## Remaining measured costs
 
 The [CPU phase comparison](evidence-2026-09-10/diagnostics/cli-cpu-phases.json) and its [input provenance](evidence-2026-09-10/diagnostics/cli-cpu-phases-provenance.json) cover selected four/eight-session trials. At eight sessions, Qwen, Grok and Pi approach the four-core quota during portions of fixed work. Peak memory in these cases stays well below 16 GiB, with no recorded OOM events. Fixture processing remains a few milliseconds per turn. Shared process-tree samples overlap concurrent turns; they cannot attribute CPU to an individual session or prove which native function is expensive.
+
+Grok Build's remaining cost at its own boundary is the one process start a session still pays. A cold complete task at twenty sessions is 1.610× the original serial control where the warm one is 0.495×, and the phase split of a cold turn is the process boot the protocol's `initialize` waits on: 0.245 s of a 0.384 s cold turn serially and 0.292 s at twenty sessions, against 27 ms for `grok --version`, so what it costs is the agent coming up rather than the 150 MiB executable loading. Opening every session on one process removes all but the first of those boots and measured about a third faster on both turns at twenty and twenty-four sessions. It is retained as measured headroom that was not taken, in [rejected experiments](REJECTED.md).
 
 Lowering Grok's native worker count reduced threads but did not improve absolute task timing. MiMo's per-workspace database profile also missed the fixed-work gate. Both are retained as [rejected experiments](REJECTED.md), alongside OpenCode/MiMo server-reuse prototypes and the Cursor local persistence investigation. [MiMo's native phase diagnostic](evidence-2026-09-10/diagnostics/mimo-default-n2-native-phases.json) locates most of its two-session increase between tool requests; it does not establish SQLite contention as the cause. [Kimi's cleanup diagnostic](evidence-2026-09-10/diagnostics/kimi-notification-cleanup.json) isolates the adopted close-grace improvement.
 

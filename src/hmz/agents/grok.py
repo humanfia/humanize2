@@ -23,15 +23,21 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
+import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
+# What the protocol says a thing is, what a client may do, how a tool call is permitted and
+# what ends a turn having answered are the protocol's rather than Grok Build's, so they are
+# taken from the ACP client every such CLI here is driven through rather than said again.
+from .acp import _ANSWERED, _CAPABILITIES, _GRANTS, _VERSION
+from .acp import _SAYS as _TOLD
 from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
 from .config import AgentConfig
-from .event import Event, Failed, Usage
+from .event import Event, Failed, Unrecoverable, Usage
 
 if TYPE_CHECKING:
-    import os
     import subprocess
     from collections.abc import Iterator
 
@@ -57,23 +63,20 @@ _WEB_TOOLS = ("web_search", "web_fetch")
 #: again: it was shown when it started, and a row per status is a transcript of statuses.
 _SAYS = {"text": "text", "thought": "reasoning"}
 
-#: And the same two under the names the protocol gives them. `grok -p` writes these same
-#: updates with `sessionUpdate` flattened to `type` and the words moved onto `data`, so the
-#: two transports are one stream said twice -- which is why a turn reads the same on either.
-_TOLD = {"agent_message_chunk": "text", "agent_thought_chunk": "reasoning"}
+#: `grok -p` writes the protocol's own `session/update` with `sessionUpdate` flattened onto
+#: `type` and the words moved onto `data`: the two transports are one stream said twice, which
+#: is why a turn reads the same on either and why `_TOLD` above is the protocol's own table.
 
-#: The version of the protocol this speaks, and what this client says it can do -- which is
-#: nothing beyond being talked to. A client that says it reads files or holds terminals is one
-#: the agent will ask to do those things, and the agent has this machine already.
-_VERSION = 1
-_CAPABILITIES = {
-    "fs": {"readTextFile": False, "writeTextFile": False},
-    "terminal": False,
-}
+#: How long a new process has to say what protocol it speaks and open the session. Generous,
+#: because a machine holding twenty of these is a machine where starting one is slow; finite,
+#: because a process that fills the pipe nobody is draining yet before it answers is a process
+#: nothing will ever hear from, and a turn waiting on that one never ends at all.
+_HANDSHAKE = 120.0
 
-#: The reasons a turn can end having answered. The rest are a turn that did not, and a flow
-#: told otherwise would be running on an answer nobody gave.
-_ANSWERED = ("end_turn", "max_tokens")
+#: And how long to wait for what a process that has stopped said on its way out. Short, and on
+#: a thread of its own: a stream is spent when every holder of its write end has let go, and
+#: Grok Build has a leader of its own that would be handed one.
+_WAITING = 5.0
 
 
 class GrokBuildSession(StreamSessionBase):
@@ -194,7 +197,10 @@ class GrokBuildSession(StreamSessionBase):
             self._agent.config,
             self.effort,
             self._carrying(),
-            self._environ(),
+            # The whole environment rather than what the provider adds to it: an agent whose
+            # provider adds nothing is handed this process's own, and a flow that moved one of
+            # the twelve variables Grok Build reads would otherwise move nothing at all.
+            self._environ() or dict(os.environ),
         )
 
     def _stale(self) -> bool:
@@ -219,6 +225,11 @@ class GrokBuildSession(StreamSessionBase):
             # Everything is approved without being asked: nobody is at a prompt here, and a
             # turn waiting on an approval is a flow that stopped.
             "--yolo",
+            # And one process per conversation, said rather than left to the config file: a
+            # leader is one backend shared by every client that asks for it, and a flow whose
+            # sessions all landed on one because of a line in `~/.grok/config.toml` would be
+            # running something other than what it was measured as.
+            "--no-leader",
             "stdio",
         ]
 
@@ -239,27 +250,41 @@ class GrokBuildSession(StreamSessionBase):
         proc = self._proc
         if proc is None:  # pragma: no cover -- a process is up whenever this is called
             return
-        self._settle(
-            proc,
-            self._ask(
-                "initialize",
-                {
-                    "protocolVersion": _VERSION,
-                    "clientCapabilities": _CAPABILITIES,
-                    "clientInfo": {"name": "humanize", "version": "1"},
-                },
-            ),
-        )
-        # Absolute, which the protocol requires, and the one the session works in. Loaded
-        # rather than opened once this conversation has an id: a process is a transport, and
-        # starting another must not start another conversation.
-        where: dict[str, Any] = {"cwd": self._workspace(), "mcpServers": []}
-        if self._id is not None:
+        # Nothing is draining the process's other stream yet -- that reader starts once this
+        # returns -- so a process that fills that pipe before it answers is one this would
+        # wait on forever. Ended instead, which makes it a failed turn rather than a flow
+        # that stopped: stdout ends with the process, and stdout is what is read below.
+        watchdog = threading.Timer(_HANDSHAKE, _ended, args=(proc,))
+        watchdog.daemon = True
+        watchdog.start()
+        try:
             self._settle(
-                proc, self._ask("session/load", {"sessionId": self._id, **where})
+                proc,
+                self._ask(
+                    "initialize",
+                    {
+                        "protocolVersion": _VERSION,
+                        "clientCapabilities": _CAPABILITIES,
+                        "clientInfo": {"name": "humanize", "version": "1"},
+                    },
+                ),
             )
-            return
-        opened = self._settle(proc, self._ask("session/new", where))
+            # Absolute, which the protocol requires, and the one the session works in. Loaded
+            # rather than opened once this conversation has an id: a process is a transport,
+            # and starting another must not start another conversation. A load the agent
+            # refuses is refused again on the next try -- the conversation is not there under
+            # that id -- so it is said once rather than tried down the whole chain.
+            where: dict[str, Any] = {"cwd": self._workspace(), "mcpServers": []}
+            if self._id is not None:
+                self._settle(
+                    proc,
+                    self._ask("session/load", {"sessionId": self._id, **where}),
+                    refused=Unrecoverable,
+                )
+                return
+            opened = self._settle(proc, self._ask("session/new", where))
+        finally:
+            watchdog.cancel()
         if not (named := str(opened.get("sessionId") or "")):
             raise Failed(1, self._command(), "", f"{_COMMAND} named no session")
         self._adopt(named)
@@ -283,12 +308,20 @@ class GrokBuildSession(StreamSessionBase):
         )
         return self._at
 
-    def _settle(self, proc: subprocess.Popen[str], at: int) -> dict[str, Any]:
+    def _settle(
+        self,
+        proc: subprocess.Popen[str],
+        at: int,
+        *,
+        refused: type[Failed] = Failed,
+    ) -> dict[str, Any]:
         """Reads until one request is answered, and answers what is asked on the way.
 
         Args:
           proc: The process now up, whose stdout the answer is coming down.
           at: The id the request went under.
+          refused: What to raise where this asking is one whose refusal another try would
+            only be refused again.
 
         Returns:
           What it answered with.
@@ -302,30 +335,51 @@ class GrokBuildSession(StreamSessionBase):
                 continue
             if (method := said.get("method")) is not None:
                 if (asked := said.get("id")) is not None:
-                    self._refuse(asked, str(method))
+                    self._answers(
+                        asked,
+                        str(method),
+                        cast("dict[str, Any]", said.get("params") or {}),
+                    )
                 continue  # everything the turn is told is read by the turn, not here
             if said.get("id") != at:
                 continue
             if (why := said.get("error")) is not None:
-                raise Failed(1, self._command(), "", _why(why))
+                raise refused(1, self._command(), "", _why(why))
             return cast("dict[str, Any]", said.get("result") or {})
-        # stdout ended instead, so the process is going: what it said on its way out is the
-        # diagnostic, and nobody is draining it yet -- the reader starts once this returns.
-        with contextlib.suppress(OSError, ValueError):
-            if proc.stderr is not None:
-                self._complaints.append(proc.stderr.read())
-                proc.stderr.close()
-        raise Failed(
-            proc.poll() or 1, self._command(), "", "".join(self._complaints).strip()
+        # stdout ended instead, so the process is going, and what it said on its way out is
+        # the diagnostic. Nobody is draining that stream yet, so it is read here -- briefly,
+        # and on a thread, since whatever the agent left holding the write end holds it open.
+        raise refused(
+            proc.poll() or 1, self._command(), "", _left(proc, self._complaints)
         )
 
-    def _refuse(self, at: object, method: str) -> None:
-        """Answers something the agent asked us, which is that this client does not do it.
+    def _answers(self, at: object, method: str, params: dict[str, Any]) -> None:
+        """Answers something the agent asked us, rather than leaving it waiting on us.
+
+        A tool call it asks permission for is granted: `--yolo` approves what a rung leaves,
+        but a hook of Grok Build's own can put a call in front of the client anyway, and a
+        flow watches its agent rather than gating it. Granted by the *kind* of the option
+        rather than by its id, which is the agent's own word for it.
 
         Args:
           at: The id it asked under.
-          method: What it asked for, which goes back as the message of a `method not found`.
+          method: What it asked for.
+          params: What it asked with, which carries the options for a permission.
         """
+        if method == "session/request_permission":
+            self._send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": at,
+                        "result": {"outcome": _permits(params)},
+                    }
+                )
+                + "\n"
+            )
+            return
+        # Everything else is something this client said it could not do, and an agent asking
+        # anyway is told so in the protocol's own words rather than left waiting.
         self._send(
             json.dumps(
                 {
@@ -400,7 +454,9 @@ class GrokBuildSession(StreamSessionBase):
             # than which of the two it came under.
             yield from self._told(cast("dict[str, Any]", said.get("params") or {}))
             if (asked := said.get("id")) is not None:
-                self._refuse(asked, str(method))
+                self._answers(
+                    asked, str(method), cast("dict[str, Any]", said.get("params") or {})
+                )
             return
         if said.get("id") != self._asked:
             return  # an answer to something else, which this turn is not waiting on
@@ -419,8 +475,11 @@ class GrokBuildSession(StreamSessionBase):
         update = cast("dict[str, Any]", params.get("update") or {})
         kind = str(update.get("sessionUpdate") or "")
         if kind == "tool_call":
+            # A call the agent gave no id is shown as it comes: there is nothing to tell it
+            # from the next one, and folding them all onto one blank id would show the first
+            # and silently drop every call after it.
             marked = str(update.get("toolCallId") or "")
-            if marked not in self._shown:
+            if not marked or marked not in self._shown:
                 self._shown.add(marked)
                 yield Event(kind="tool", text=_called(update))
         elif kind == "response_completed":
@@ -522,7 +581,7 @@ class GrokBuildSession(StreamSessionBase):
             self._failed = str(said.get("message") or "") or json.dumps(said)
         elif kind == "tool_call":
             marked = str(said.get("toolCallId") or "")
-            if marked not in self._shown:
+            if not marked or marked not in self._shown:
                 self._shown.add(marked)
                 yield Event(kind="tool", text=_called(said))
         elif kind == "usage":
@@ -613,6 +672,67 @@ class GrokBuildSession(StreamSessionBase):
         raise ValueError(f"{_COMMAND} named no session")
 
 
+def _ended(proc: subprocess.Popen[str]) -> None:
+    """Ends a process that has stopped answering, so that reading it ends too.
+
+    Args:
+      proc: The process, which may have gone on its own already.
+    """
+    with contextlib.suppress(OSError):
+        proc.kill()
+
+
+def _left(proc: subprocess.Popen[str], held: list[str]) -> str:
+    """What a process that has stopped writing said on its way out.
+
+    Read on a thread and waited on only briefly: a stream is spent when every holder of its
+    write end has let go of it, and a backend that started a daemon of its own handed that
+    end to the daemon -- so reading to the end of it is a wait on that rather than on this.
+
+    Args:
+      proc: The process, whose stderr nobody is draining yet.
+      held: What it has complained of so far, which this adds to.
+
+    Returns:
+      The whole of it, as the diagnostic of a turn that never started.
+    """
+
+    def reading() -> None:
+        with contextlib.suppress(OSError, ValueError):
+            if proc.stderr is not None:
+                held.append(proc.stderr.read())
+
+    reader = threading.Thread(target=reading, daemon=True)
+    reader.start()
+    reader.join(timeout=_WAITING)
+    return "".join(held).strip()
+
+
+def _permits(params: dict[str, Any]) -> dict[str, Any]:
+    """Grants a tool call, by the kind of the option rather than by its name.
+
+    Args:
+      params: What was asked, which carries the options the agent offers.
+
+    Returns:
+      The outcome to answer with: the first option that grants it, whatever was offered
+      where none of them does, and a cancellation where nothing was offered at all. Answered
+      either way, because the turn is not this client's to leave hanging.
+    """
+    offered = [
+        cast("dict[str, Any]", one)
+        for one in cast("list[Any]", params.get("options") or [])
+        if isinstance(one, dict)
+    ]
+    chosen = next(
+        (one for kind in _GRANTS for one in offered if one.get("kind") == kind),
+        next(iter(offered), None),
+    )
+    if chosen is None:
+        return {"outcome": "cancelled"}
+    return {"outcome": "selected", "optionId": str(chosen.get("optionId"))}
+
+
 def _parsed(line: str) -> dict[str, Any] | None:
     """One line of either stream as the object it carries, or None for one that is not ours.
 
@@ -658,7 +778,10 @@ def _called(said: dict[str, Any]) -> str:
     Returns:
       What it reached for and what with.
     """
-    given: dict[str, Any] = said.get("rawInput") or {}
+    # What a call was given is the agent's own to shape, and a turn must not fail on the
+    # shape of a line it was only going to show: anything but an object carries no names.
+    raw: object = said.get("rawInput")
+    given = cast("dict[str, Any]", raw) if isinstance(raw, dict) else {}
     named = str(said.get("toolName") or said.get("title") or said.get("kind") or "tool")
     about = next(
         (

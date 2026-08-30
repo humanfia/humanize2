@@ -1,0 +1,687 @@
+{
+ "revision": "grok-held-open-transport-v1",
+ "synthetic_model": true,
+ "real_model_performance_verified": false,
+ "backend": "grok",
+ "gate": {
+  "metric": "complete task, turn start to the hmz result",
+  "quantiles": [
+   "p50",
+   "p95"
+  ],
+  "phases": [
+   "cold",
+   "warm"
+  ],
+  "limit": 2.0,
+  "note": "The 0.5x speed floor. The deleted startup and fixed-work gates are not evaluated here."
+ },
+ "measurement_group": {
+  "cpus": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "note": "Original controls, original rungs and candidate rungs ran back to back inside one cgroup, so no group-to-group difference enters the ratios. Serial control drift across the session is reported."
+ },
+ "original": {
+  "git_commit": "fdc81b0d539d04ea9c691bfc2b6c3cd9e213bd75",
+  "loaded_from": {
+   "hmz_file": "/tmp/grok-origin-src/src/hmz/__init__.py",
+   "grok_adapter_sha256": "2143f658a3b148aff56c352d37e0add1fecafcbbfb6b2a92e0802a54e263bd26"
+  },
+  "serial_control": {
+   "concurrency": 1,
+   "repeats": 5,
+   "correct_item_records": 5,
+   "failed_item_records": 0,
+   "cleanup_survivors": [],
+   "watchdog_killed": false,
+   "complete_task_seconds": {
+    "cold": {
+     "p50": 2.8742746410425752,
+     "p95": 2.9522708900040016
+    },
+    "warm": {
+     "p50": 3.1820571599528193,
+     "p95": 3.2074116099392995
+    }
+   },
+   "evidence_directories": [
+    "/tmp/grok-h2h-final/original/grok-n1-r0",
+    "/tmp/grok-h2h-final/original/grok-n1-r1",
+    "/tmp/grok-h2h-final/original/grok-n1-r2",
+    "/tmp/grok-h2h-final/original/grok-n1-r3",
+    "/tmp/grok-h2h-final/original/grok-n1-r4"
+   ]
+  },
+  "trailing_serial_control": {
+   "concurrency": 1,
+   "repeats": 3,
+   "correct_item_records": 3,
+   "failed_item_records": 0,
+   "cleanup_survivors": [],
+   "watchdog_killed": false,
+   "complete_task_seconds": {
+    "cold": {
+     "p50": 2.7879452080233023,
+     "p95": 2.9604697450995445
+    },
+    "warm": {
+     "p50": 3.090559971984476,
+     "p95": 3.2851510089822114
+    }
+   },
+   "evidence_directories": [
+    "/tmp/grok-h2h-final/original-after/grok-n1-r0",
+    "/tmp/grok-h2h-final/original-after/grok-n1-r1",
+    "/tmp/grok-h2h-final/original-after/grok-n1-r2"
+   ]
+  },
+  "serial_control_drift": {
+   "cold.result_seconds.p50": 0.9699647932780846,
+   "cold.result_seconds.p95": 1.0027771350939723,
+   "warm.result_seconds.p50": 0.9712459005702776,
+   "warm.result_seconds.p95": 1.024237425219142
+  },
+  "rungs": [
+   {
+    "concurrency": 12,
+    "repeats": 5,
+    "correct_item_records": 60,
+    "failed_item_records": 0,
+    "cleanup_survivors": [],
+    "watchdog_killed": false,
+    "complete_task_seconds": {
+     "cold": {
+      "p50": 4.924245171539951,
+      "p95": 5.926200877060182
+     },
+     "warm": {
+      "p50": 5.11608398455428,
+      "p95": 6.23754642799031
+     }
+    },
+    "evidence_directories": [
+     "/tmp/grok-h2h-final/original/grok-n12-r0",
+     "/tmp/grok-h2h-final/original/grok-n12-r1",
+     "/tmp/grok-h2h-final/original/grok-n12-r2",
+     "/tmp/grok-h2h-final/original/grok-n12-r3",
+     "/tmp/grok-h2h-final/original/grok-n12-r4"
+    ],
+    "ratios_to_serial_control": {
+     "cold.result_seconds.p50": 1.7132131708032596,
+     "cold.result_seconds.p95": 2.007336419271522,
+     "warm.result_seconds.p50": 1.607791352381029,
+     "warm.result_seconds.p95": 1.9447290172115939
+    },
+    "passes": false
+   },
+   {
+    "concurrency": 14,
+    "repeats": 5,
+    "correct_item_records": 70,
+    "failed_item_records": 0,
+    "cleanup_survivors": [],
+    "watchdog_killed": false,
+    "complete_task_seconds": {
+     "cold": {
+      "p50": 5.286037828947883,
+      "p95": 5.480836680042557
+     },
+     "warm": {
+      "p50": 5.538850506010931,
+      "p95": 5.91937011689879
+     }
+    },
+    "evidence_directories": [
+     "/tmp/grok-h2h-final/original/grok-n14-r0",
+     "/tmp/grok-h2h-final/original/grok-n14-r1",
+     "/tmp/grok-h2h-final/original/grok-n14-r2",
+     "/tmp/grok-h2h-final/original/grok-n14-r3",
+     "/tmp/grok-h2h-final/original/grok-n14-r4"
+    ],
+    "ratios_to_serial_control": {
+     "cold.result_seconds.p50": 1.8390858526415894,
+     "cold.result_seconds.p95": 1.8564816320209452,
+     "warm.result_seconds.p50": 1.7406508518197252,
+     "warm.result_seconds.p95": 1.8455286806830553
+    },
+    "passes": true
+   },
+   {
+    "concurrency": 16,
+    "repeats": 5,
+    "correct_item_records": 80,
+    "failed_item_records": 0,
+    "cleanup_survivors": [],
+    "watchdog_killed": false,
+    "complete_task_seconds": {
+     "cold": {
+      "p50": 5.832848344463855,
+      "p95": 6.031045210896991
+     },
+     "warm": {
+      "p50": 6.188790465472266,
+      "p95": 6.6607465129345655
+     }
+    },
+    "evidence_directories": [
+     "/tmp/grok-h2h-final/original/grok-n16-r0",
+     "/tmp/grok-h2h-final/original/grok-n16-r1",
+     "/tmp/grok-h2h-final/original/grok-n16-r2",
+     "/tmp/grok-h2h-final/original/grok-n16-r3",
+     "/tmp/grok-h2h-final/original/grok-n16-r4"
+    ],
+    "ratios_to_serial_control": {
+     "cold.result_seconds.p50": 2.0293288126245748,
+     "cold.result_seconds.p95": 2.042849533664852,
+     "warm.result_seconds.p50": 1.9449023554196707,
+     "warm.result_seconds.p95": 2.0766734435623686
+    },
+    "passes": false
+   }
+  ]
+ },
+ "candidate": {
+  "git_commit": "fdc81b0d539d04ea9c691bfc2b6c3cd9e213bd75",
+  "loaded_from": {
+   "hmz_file": "/home/nvidia/humanize2/.claude/worktrees/agent-a06e05a3e8c8cd412/src/hmz/__init__.py",
+   "grok_adapter_sha256": "6c4ba3955dcebb93223f642ecf7ae0bc778c571ca9d5221b0fc1c5a09d406737"
+  },
+  "rungs": [
+   {
+    "concurrency": 12,
+    "repeats": 5,
+    "correct_item_records": 60,
+    "failed_item_records": 0,
+    "cleanup_survivors": [],
+    "watchdog_killed": false,
+    "complete_task_seconds": {
+     "cold": {
+      "p50": 2.53400539298309,
+      "p95": 2.8231748439138755
+     },
+     "warm": {
+      "p50": 0.83591601398075,
+      "p95": 0.9336676449747756
+     }
+    },
+    "evidence_directories": [
+     "/tmp/grok-h2h-final/candidate/grok-n12-r0",
+     "/tmp/grok-h2h-final/candidate/grok-n12-r1",
+     "/tmp/grok-h2h-final/candidate/grok-n12-r2",
+     "/tmp/grok-h2h-final/candidate/grok-n12-r3",
+     "/tmp/grok-h2h-final/candidate/grok-n12-r4"
+    ],
+    "ratios_to_serial_control": {
+     "cold.result_seconds.p50": 0.8816156107002842,
+     "cold.result_seconds.p95": 0.9562722897389843,
+     "warm.result_seconds.p50": 0.26269673106473806,
+     "warm.result_seconds.p95": 0.2910969212936301
+    },
+    "passes": true
+   },
+   {
+    "concurrency": 16,
+    "repeats": 5,
+    "correct_item_records": 80,
+    "failed_item_records": 0,
+    "cleanup_survivors": [],
+    "watchdog_killed": false,
+    "complete_task_seconds": {
+     "cold": {
+      "p50": 3.524065527948551,
+      "p95": 3.831572409020737
+     },
+     "warm": {
+      "p50": 1.199815749481786,
+      "p95": 1.3414184160064906
+     }
+    },
+    "evidence_directories": [
+     "/tmp/grok-h2h-final/candidate/grok-n16-r0",
+     "/tmp/grok-h2h-final/candidate/grok-n16-r1",
+     "/tmp/grok-h2h-final/candidate/grok-n16-r2",
+     "/tmp/grok-h2h-final/candidate/grok-n16-r3",
+     "/tmp/grok-h2h-final/candidate/grok-n16-r4"
+    ],
+    "ratios_to_serial_control": {
+     "cold.result_seconds.p50": 1.2260712590326022,
+     "cold.result_seconds.p95": 1.297839037059212,
+     "warm.result_seconds.p50": 0.3770566300888121,
+     "warm.result_seconds.p95": 0.41822459326692935
+    },
+    "passes": true
+   },
+   {
+    "concurrency": 20,
+    "repeats": 5,
+    "correct_item_records": 100,
+    "failed_item_records": 0,
+    "cleanup_survivors": [],
+    "watchdog_killed": false,
+    "complete_task_seconds": {
+     "cold": {
+      "p50": 4.627475986490026,
+      "p95": 5.0211463019950315
+     },
+     "warm": {
+      "p50": 1.5755015914910473,
+      "p95": 1.7688304190523922
+     }
+    },
+    "evidence_directories": [
+     "/tmp/grok-h2h-final/candidate/grok-n20-r0",
+     "/tmp/grok-h2h-final/candidate/grok-n20-r1",
+     "/tmp/grok-h2h-final/candidate/grok-n20-r2",
+     "/tmp/grok-h2h-final/candidate/grok-n20-r3",
+     "/tmp/grok-h2h-final/candidate/grok-n20-r4"
+    ],
+    "ratios_to_serial_control": {
+     "cold.result_seconds.p50": 1.60996305656147,
+     "cold.result_seconds.p95": 1.700774247714181,
+     "warm.result_seconds.p50": 0.4951204558231152,
+     "warm.result_seconds.p95": 0.5514822025246293
+    },
+    "passes": true
+   },
+   {
+    "concurrency": 22,
+    "repeats": 5,
+    "correct_item_records": 110,
+    "failed_item_records": 0,
+    "cleanup_survivors": [],
+    "watchdog_killed": false,
+    "complete_task_seconds": {
+     "cold": {
+      "p50": 5.181099460518453,
+      "p95": 5.607730268966407
+     },
+     "warm": {
+      "p50": 1.7615144714945927,
+      "p95": 1.9814455290324986
+     }
+    },
+    "evidence_directories": [
+     "/tmp/grok-h2h-final/candidate/grok-n22-r0",
+     "/tmp/grok-h2h-final/candidate/grok-n22-r1",
+     "/tmp/grok-h2h-final/candidate/grok-n22-r2",
+     "/tmp/grok-h2h-final/candidate/grok-n22-r3",
+     "/tmp/grok-h2h-final/candidate/grok-n22-r4"
+    ],
+    "ratios_to_serial_control": {
+     "cold.result_seconds.p50": 1.8025763392739436,
+     "cold.result_seconds.p95": 1.8994633209145675,
+     "warm.result_seconds.p50": 0.5535772561422847,
+     "warm.result_seconds.p95": 0.617770891298232
+    },
+    "passes": true
+   },
+   {
+    "concurrency": 24,
+    "repeats": 5,
+    "correct_item_records": 120,
+    "failed_item_records": 0,
+    "cleanup_survivors": [],
+    "watchdog_killed": false,
+    "complete_task_seconds": {
+     "cold": {
+      "p50": 5.746584798034746,
+      "p95": 6.28148772707209
+     },
+     "warm": {
+      "p50": 1.9542869735159911,
+      "p95": 2.144687499036081
+     }
+    },
+    "evidence_directories": [
+     "/tmp/grok-h2h-final/candidate/grok-n24-r0",
+     "/tmp/grok-h2h-final/candidate/grok-n24-r1",
+     "/tmp/grok-h2h-final/candidate/grok-n24-r2",
+     "/tmp/grok-h2h-final/candidate/grok-n24-r3",
+     "/tmp/grok-h2h-final/candidate/grok-n24-r4"
+    ],
+    "ratios_to_serial_control": {
+     "cold.result_seconds.p50": 1.999316528760908,
+     "cold.result_seconds.p95": 2.127679999941867,
+     "warm.result_seconds.p50": 0.6141583495454769,
+     "warm.result_seconds.p95": 0.6686661270383908
+    },
+    "passes": false
+   }
+  ]
+ },
+ "provenance": {
+  "harness_source_sha256": {
+   "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+   "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+   "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+   "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+   "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+   "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+   "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+   "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+   "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+   "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+   "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+   "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+   "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+   "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+   "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+   "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+   "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+   "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+   "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+   "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+   "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+  },
+  "sampler_revision": "counter-before-timestamp-v2",
+  "installed_official_cli": {
+   "command": "grok",
+   "executable": "/usr/bin/grok",
+   "efforts": [
+    "xhigh",
+    "high",
+    "medium",
+    "low"
+   ],
+   "resolved_executable": "/usr/lib/node_modules/@xai-official/grok/bin/grok-native",
+   "sha256": "a31a1c270246beb8e18f1fce91121a5e83d9ba8f51a8b24346bbc75fe727bdf5"
+  },
+  "fixture_endpoint": "http://127.0.0.1:18934"
+ },
+ "confirmed": {
+  "original_sessions": 14,
+  "candidate_sessions": 20,
+  "highest_passing_candidate_rung_here": 22,
+  "note": "Twenty is published rather than the twenty-two that passes here: a separate five-repeat trial of twenty-two missed on cold p95 at 2.050, and twenty passed every five-repeat trial it was given. The original's own rungs are not monotone either -- fourteen passes at 1.856 while twelve misses at 2.007 in the same session -- so a p95 over these sample counts moves by more than the gap between adjacent rungs."
+ },
+ "corroboration": {
+  "note": "Earlier five-repeat trials of the same transport, each against its own five fresh serial controls in its own measurement group. They ran an earlier snapshot of the adapter, before the review fixes, and their loaded source hash says which.",
+  "trials": [
+   {
+    "loaded_from": {
+     "hmz_file": "/home/nvidia/humanize2/.claude/worktrees/agent-a06e05a3e8c8cd412/src/hmz/__init__.py",
+     "grok_adapter_sha256": "b7013845c148b2b278cca24d6da3f7ba2970f79b498f97aaef00e193c998e14e"
+    },
+    "serial_control": {
+     "concurrency": 1,
+     "repeats": 5,
+     "correct_item_records": 5,
+     "failed_item_records": 0,
+     "cleanup_survivors": [],
+     "watchdog_killed": false,
+     "complete_task_seconds": {
+      "cold": {
+       "p50": 2.808454200043343,
+       "p95": 2.95816489495337
+      },
+      "warm": {
+       "p50": 2.995173478964716,
+       "p95": 3.2108530070399866
+      }
+     },
+     "evidence_directories": [
+      "/tmp/grok-h2h/original/grok-n1-r0",
+      "/tmp/grok-h2h/original/grok-n1-r1",
+      "/tmp/grok-h2h/original/grok-n1-r2",
+      "/tmp/grok-h2h/original/grok-n1-r3",
+      "/tmp/grok-h2h/original/grok-n1-r4"
+     ]
+    },
+    "serial_control_drift": {
+     "cold.result_seconds.p50": 0.9927132153357291,
+     "cold.result_seconds.p95": 0.9466922742695864,
+     "warm.result_seconds.p50": 1.0060287997290478,
+     "warm.result_seconds.p95": 0.9572860963558697
+    },
+    "rung": {
+     "concurrency": 20,
+     "repeats": 5,
+     "correct_item_records": 100,
+     "failed_item_records": 0,
+     "cleanup_survivors": [],
+     "watchdog_killed": false,
+     "complete_task_seconds": {
+      "cold": {
+       "p50": 4.438106837042142,
+       "p95": 4.795540691004135
+      },
+      "warm": {
+       "p50": 1.5491920790518634,
+       "p95": 1.6677123949630186
+      }
+     },
+     "evidence_directories": [
+      "/tmp/grok-h2h/candidate/grok-n20-r0",
+      "/tmp/grok-h2h/candidate/grok-n20-r1",
+      "/tmp/grok-h2h/candidate/grok-n20-r2",
+      "/tmp/grok-h2h/candidate/grok-n20-r3",
+      "/tmp/grok-h2h/candidate/grok-n20-r4"
+     ],
+     "ratios_to_serial_control": {
+      "cold.result_seconds.p50": 1.5802667663135288,
+      "cold.result_seconds.p95": 1.6211201407958455,
+      "warm.result_seconds.p50": 0.5172294993702143,
+      "warm.result_seconds.p95": 0.5193985496397561
+     },
+     "passes": true
+    }
+   },
+   {
+    "loaded_from": {
+     "hmz_file": "/home/nvidia/humanize2/.claude/worktrees/agent-a06e05a3e8c8cd412/src/hmz/__init__.py",
+     "grok_adapter_sha256": "b7013845c148b2b278cca24d6da3f7ba2970f79b498f97aaef00e193c998e14e"
+    },
+    "serial_control": {
+     "concurrency": 1,
+     "repeats": 5,
+     "correct_item_records": 5,
+     "failed_item_records": 0,
+     "cleanup_survivors": [],
+     "watchdog_killed": false,
+     "complete_task_seconds": {
+      "cold": {
+       "p50": 2.7952651859959587,
+       "p95": 2.8175254309317097
+      },
+      "warm": {
+       "p50": 2.966442672070116,
+       "p95": 2.974299228983
+      }
+     },
+     "evidence_directories": [
+      "/tmp/grok-confirm20/original/grok-n1-r0",
+      "/tmp/grok-confirm20/original/grok-n1-r1",
+      "/tmp/grok-confirm20/original/grok-n1-r2",
+      "/tmp/grok-confirm20/original/grok-n1-r3",
+      "/tmp/grok-confirm20/original/grok-n1-r4"
+     ]
+    },
+    "serial_control_drift": {
+     "cold.result_seconds.p50": 0.9985143648989188,
+     "cold.result_seconds.p95": 0.9912121723106585,
+     "warm.result_seconds.p50": 1.0129184073601318,
+     "warm.result_seconds.p95": 1.0439981397068638
+    },
+    "rung": {
+     "concurrency": 20,
+     "repeats": 5,
+     "correct_item_records": 100,
+     "failed_item_records": 0,
+     "cleanup_survivors": [],
+     "watchdog_killed": false,
+     "complete_task_seconds": {
+      "cold": {
+       "p50": 4.35159689252032,
+       "p95": 4.683010709006339
+      },
+      "warm": {
+       "p50": 1.5826485645375215,
+       "p95": 1.6869105939986184
+      }
+     },
+     "evidence_directories": [
+      "/tmp/grok-confirm20/candidate/grok-n20-r0",
+      "/tmp/grok-confirm20/candidate/grok-n20-r1",
+      "/tmp/grok-confirm20/candidate/grok-n20-r2",
+      "/tmp/grok-confirm20/candidate/grok-n20-r3",
+      "/tmp/grok-confirm20/candidate/grok-n20-r4"
+     ],
+     "ratios_to_serial_control": {
+      "cold.result_seconds.p50": 1.5567742603891217,
+      "cold.result_seconds.p95": 1.662100599907538,
+      "warm.result_seconds.p50": 0.5335173268098516,
+      "warm.result_seconds.p95": 0.567162368049775
+     },
+     "passes": true
+    }
+   },
+   {
+    "loaded_from": {
+     "hmz_file": "/home/nvidia/humanize2/.claude/worktrees/agent-a06e05a3e8c8cd412/src/hmz/__init__.py",
+     "grok_adapter_sha256": "b7013845c148b2b278cca24d6da3f7ba2970f79b498f97aaef00e193c998e14e"
+    },
+    "serial_control": {
+     "concurrency": 1,
+     "repeats": 5,
+     "correct_item_records": 5,
+     "failed_item_records": 0,
+     "cleanup_survivors": [],
+     "watchdog_killed": false,
+     "complete_task_seconds": {
+      "cold": {
+       "p50": 2.794433329021558,
+       "p95": 2.814120347960852
+      },
+      "warm": {
+       "p50": 2.924358109012246,
+       "p95": 2.981617545010522
+      }
+     },
+     "evidence_directories": [
+      "/tmp/grok-confirm/original/grok-n1-r0",
+      "/tmp/grok-confirm/original/grok-n1-r1",
+      "/tmp/grok-confirm/original/grok-n1-r2",
+      "/tmp/grok-confirm/original/grok-n1-r3",
+      "/tmp/grok-confirm/original/grok-n1-r4"
+     ]
+    },
+    "serial_control_drift": {
+     "cold.result_seconds.p50": 0.9992016671227797,
+     "cold.result_seconds.p95": 0.9953007276555769,
+     "warm.result_seconds.p50": 1.0114687701545222,
+     "warm.result_seconds.p95": 0.9934301329055377
+    },
+    "rung": {
+     "concurrency": 22,
+     "repeats": 5,
+     "correct_item_records": 110,
+     "failed_item_records": 0,
+     "cleanup_survivors": [],
+     "watchdog_killed": false,
+     "complete_task_seconds": {
+      "cold": {
+       "p50": 5.050473167444579,
+       "p95": 5.7688419430051
+      },
+      "warm": {
+       "p50": 1.840530643472448,
+       "p95": 2.1450428990647197
+      }
+     },
+     "evidence_directories": [
+      "/tmp/grok-confirm/candidate/grok-n22-r0",
+      "/tmp/grok-confirm/candidate/grok-n22-r1",
+      "/tmp/grok-confirm/candidate/grok-n22-r2",
+      "/tmp/grok-confirm/candidate/grok-n22-r3",
+      "/tmp/grok-confirm/candidate/grok-n22-r4"
+     ],
+     "ratios_to_serial_control": {
+      "cold.result_seconds.p50": 1.8073335709937837,
+      "cold.result_seconds.p95": 2.0499627697817817,
+      "warm.result_seconds.p50": 0.6293793628763612,
+      "warm.result_seconds.p95": 0.7194225505730145
+     },
+     "passes": false
+    }
+   },
+   {
+    "loaded_from": {
+     "hmz_file": "/home/nvidia/humanize2/.claude/worktrees/agent-a06e05a3e8c8cd412/src/hmz/__init__.py",
+     "grok_adapter_sha256": "b7013845c148b2b278cca24d6da3f7ba2970f79b498f97aaef00e193c998e14e"
+    },
+    "serial_control": {
+     "concurrency": 1,
+     "repeats": 5,
+     "correct_item_records": 5,
+     "failed_item_records": 0,
+     "cleanup_survivors": [],
+     "watchdog_killed": false,
+     "complete_task_seconds": {
+      "cold": {
+       "p50": 2.794433329021558,
+       "p95": 2.814120347960852
+      },
+      "warm": {
+       "p50": 2.924358109012246,
+       "p95": 2.981617545010522
+      }
+     },
+     "evidence_directories": [
+      "/tmp/grok-confirm/original/grok-n1-r0",
+      "/tmp/grok-confirm/original/grok-n1-r1",
+      "/tmp/grok-confirm/original/grok-n1-r2",
+      "/tmp/grok-confirm/original/grok-n1-r3",
+      "/tmp/grok-confirm/original/grok-n1-r4"
+     ]
+    },
+    "serial_control_drift": {
+     "cold.result_seconds.p50": 0.9992016671227797,
+     "cold.result_seconds.p95": 0.9953007276555769,
+     "warm.result_seconds.p50": 1.0114687701545222,
+     "warm.result_seconds.p95": 0.9934301329055377
+    },
+    "rung": {
+     "concurrency": 23,
+     "repeats": 5,
+     "correct_item_records": 115,
+     "failed_item_records": 0,
+     "cleanup_survivors": [],
+     "watchdog_killed": false,
+     "complete_task_seconds": {
+      "cold": {
+       "p50": 5.231828978983685,
+       "p95": 5.692176509066485
+      },
+      "warm": {
+       "p50": 1.893969877040945,
+       "p95": 2.0608435759786516
+      }
+     },
+     "evidence_directories": [
+      "/tmp/grok-confirm/candidate/grok-n23-r0",
+      "/tmp/grok-confirm/candidate/grok-n23-r1",
+      "/tmp/grok-confirm/candidate/grok-n23-r2",
+      "/tmp/grok-confirm/candidate/grok-n23-r3",
+      "/tmp/grok-confirm/candidate/grok-n23-r4"
+     ],
+     "ratios_to_serial_control": {
+      "cold.result_seconds.p50": 1.8722325290958206,
+      "cold.result_seconds.p95": 2.0227196442366475,
+      "warm.result_seconds.p50": 0.6476531965097349,
+      "warm.result_seconds.p95": 0.6911830725665317
+     },
+     "passes": false
+    }
+   }
+  ]
+ },
+ "journal_sha256": {
+  "/tmp/grok-h2h-final/original/results.jsonl": "9605b99985834b7ec4ea987ec81ba1fdf631ed6cc7c8f746f91ca5ff6166b7e3",
+  "/tmp/grok-h2h-final/candidate/results.jsonl": "188b9b0a480316f6d8bbeaec69edba82e30314be67c6e9943fda359e48ace4f8",
+  "/tmp/grok-h2h-final/original-after/results.jsonl": "a0fa8c8d85b4b74f640e134b7e12cfaff1d873b69e42b2703883cd5d44f21b97"
+ }
+}
