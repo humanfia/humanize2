@@ -1216,33 +1216,50 @@ def tree(epic: Path) -> tuple[Called, ...]:
       in turn under `calls`. Two calls going at once are two of these, with times that
       overlap and a record apiece -- which is what tells them from one another.
     """
-    return _tree(epic, JOURNAL, frozenset())
+    return _tree(epic, _events(epic / JOURNAL), JOURNAL, frozenset())
 
 
-def _tree(epic: Path, record: str, walked: frozenset[str]) -> tuple[Called, ...]:
+def _tree(
+    epic: Path,
+    events: Sequence[dict[str, Any]],
+    record: str,
+    walked: frozenset[str],
+) -> tuple[Called, ...]:
     """What one record of an epic called, and what each of those called in turn.
+
+    Each record is read the once and both answers taken off that reading: what it called, and
+    how it ended. A run five flows deep is that many files, and reading each of them twice
+    over is the whole of the walk paid for twice.
 
     Args:
       epic: The epic's directory.
-      record: The record to read, by its name inside that directory.
+      events: What that record holds, already read.
+      record: The record, by its name inside that directory.
       walked: The records already read on the way here, so that an epic somebody wrote by
         hand into a ring is read once rather than forever.
 
     Returns:
       One apiece, in the order that record called them.
     """
-    if record in walked:
-        return ()
     walked = walked | {record}
-    return tuple(
-        one._replace(calls=_tree(epic, one.record, walked), how=_how(epic / one.record))
-        if one.record
-        else one
-        for one in _calls(_events(epic / record))
-    )
+    held: list[Called] = []
+    for one in _calls(events):
+        if not one.record:
+            held.append(one)
+            continue
+        said = _events(epic / one.record)
+        held.append(
+            one._replace(
+                calls=()
+                if one.record in walked
+                else _tree(epic, said, one.record, walked),
+                how=_how(said),
+            )
+        )
+    return tuple(held)
 
 
-def _how(at: Path) -> str:
+def _how(events: Sequence[dict[str, Any]]) -> str:
     """How the call written in one record ended, off the record's own closing line.
 
     The callee's rather than the caller's: what the caller writes is that the call returned,
@@ -1250,7 +1267,7 @@ def _how(at: Path) -> str:
     did not.
 
     Args:
-      at: The record file.
+      events: What that record holds, already read.
 
     Returns:
       What it says it ended as, and "" for a call that never ended -- a run killed under it.
@@ -1258,7 +1275,7 @@ def _how(at: Path) -> str:
     return next(
         (
             str(one.get("how") or "")
-            for one in reversed(_events(at))
+            for one in reversed(events)
             if one.get("event") == "ended"
         ),
         "",

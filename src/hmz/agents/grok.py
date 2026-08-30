@@ -33,7 +33,13 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 # taken from the ACP client every such CLI here is driven through rather than said again.
 from .acp import _ANSWERED, _CAPABILITIES, _GRANTS, _VERSION
 from .acp import _SAYS as _TOLD
-from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
+from .base import (
+    AgentBase,
+    CommandSessionBase,
+    SessionBase,
+    StreamSessionBase,
+    _ended,
+)
 from .config import AgentConfig
 from .event import Event, Failed, Saying, Unrecoverable, Usage
 
@@ -165,7 +171,7 @@ class GrokBuildSession(StreamSessionBase):
         with self._lock:
             self._requested = self._settings()
             self._said, self._failed, self._shown = [], None, set()
-            self._costing = Usage()
+            self._costing, self._saying = Usage(), Saying()
             try:
                 yield from super()._stream(prompt)
             except BaseException:
@@ -270,7 +276,9 @@ class GrokBuildSession(StreamSessionBase):
         # Nothing is draining the process's other stream yet -- that reader starts once this
         # returns -- so a process that fills that pipe before it answers is one this would
         # wait on forever. Ended instead, which makes it a failed turn rather than a flow
-        # that stopped: stdout ends with the process, and stdout is what is read below.
+        # that stopped: stdout ends with the process, and stdout is what is read below. The
+        # tree rather than the one process, which is what `_ended` is: a launcher killed over
+        # a runtime still holding the inherited stdout leaves this read exactly as blocked.
         watchdog = threading.Timer(_HANDSHAKE, _ended, args=(proc,))
         watchdog.daemon = True
         watchdog.start()
@@ -478,6 +486,10 @@ class GrokBuildSession(StreamSessionBase):
         if said.get("id") != self._asked:
             return  # an answer to something else, which this turn is not waiting on
         self._asked = None
+        # And whatever the last response held back: nothing follows it to close it, the thing
+        # that ends it being the turn's own answer, and words held back for a boundary that
+        # never came are words the turn would swallow.
+        yield from self._saying.rest()
         yield self._answered(said)
 
     def _told(self, params: dict[str, Any]) -> Iterator[Event]:
@@ -498,6 +510,8 @@ class GrokBuildSession(StreamSessionBase):
             marked = str(update.get("toolCallId") or "")
             if not marked or marked not in self._shown:
                 self._shown.add(marked)
+                # What it said before reaching for something is what says why it reached.
+                yield from self._saying.upto()
                 yield Event(kind="tool", text=_called(update))
         elif kind == "response_completed":
             # Told as each response lands rather than once the run is over, which is what a
@@ -506,6 +520,9 @@ class GrokBuildSession(StreamSessionBase):
             self._costing = self._costing + self._cost(
                 cast("dict[str, Any]", update.get("usage") or {})
             )
+            # And a response that has been counted is a response that has finished saying
+            # what it had to say, so this is where its words are whole.
+            yield from self._saying.ended()
         elif (says := _TOLD.get(kind)) is not None:
             words = str(
                 cast("dict[str, Any]", update.get("content") or {}).get("text") or ""
@@ -513,7 +530,9 @@ class GrokBuildSession(StreamSessionBase):
             if words:
                 if says == "text":
                     self._said.append(words)
-                yield Event(kind=says, text=words)
+                # Gathered rather than said: the protocol sends an answer a fragment at a
+                # time, and a fragment shown on its own is one row of a transcript a word.
+                self._saying.delta(says, words)
 
     def _answered(self, said: dict[str, Any]) -> Event:
         """The turn's answer, out of what `session/prompt` came back with.
@@ -699,16 +718,6 @@ class GrokBuildSession(StreamSessionBase):
             if said is not None and (named := said.get("sessionId")):
                 return str(named)
         raise ValueError(f"{_COMMAND} named no session")
-
-
-def _ended(proc: subprocess.Popen[str]) -> None:
-    """Ends a process that has stopped answering, so that reading it ends too.
-
-    Args:
-      proc: The process, which may have gone on its own already.
-    """
-    with contextlib.suppress(OSError):
-        proc.kill()
 
 
 def _left(proc: subprocess.Popen[str], held: list[str]) -> str:

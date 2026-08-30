@@ -40,6 +40,8 @@ def fallback(argv: list[str]) -> int:
     """
     from hmz.sdk import Hmz
 
+    from .output import asked_as_json, reads_json
+
     steps = Hmz().fallbacks
     parser = argparse.ArgumentParser(
         prog="hmz fallback",
@@ -54,20 +56,13 @@ def fallback(argv: list[str]) -> int:
         action="store_true",
         help="one place a line, and nothing else",
     )
-    listing.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="one JSON object per step, one a line, for a program to read",
-    )
+    reads_json(listing, "one JSON object per step, one a line, for a program to read")
 
     showing = doing.add_parser("show", help="the places one turn would walk, in order")
     showing.add_argument("place", metavar=_PLACE, help="the place the turn starts at")
-    showing.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="one JSON object per place of the walk, one a line, for a program to read",
+    reads_json(
+        showing,
+        "one JSON object per place of the walk, one a line, for a program to read",
     )
 
     adding = doing.add_parser(
@@ -107,7 +102,7 @@ def fallback(argv: list[str]) -> int:
     )
 
     args = parser.parse_args(argv)
-    machine = getattr(args, "as_json", False)
+    machine = asked_as_json(args)
     if args.doing in (None, "list"):
         return _list(steps, quiet=getattr(args, "quiet", False), as_json=machine)
     if args.doing == "show":

@@ -451,8 +451,13 @@ class KimiCodeCLISession(SessionBase):
         #: total for the whole conversation, so what one turn cost is the rise across it.
         self._counted: Counter[str] = Counter()
         #: What the daemon was last told this session runs at, so a turn at the same
-        #: settings does not tell it again.
+        #: settings does not tell it again -- and which daemon was told it. Both, because a
+        #: profile is state that daemon holds rather than a fact about the session: an agent
+        #: that fell back, or whose daemon the watchdog put down, is served by one that was
+        #: never told, and a cache that outlived the thing it describes would leave that
+        #: turn running at the CLI's own settings instead of at this agent's.
         self._profile: dict[str, Any] = {}
+        self._profiled: _AppServer | None = None
         #: How this daemon takes the pending-question list -- its own querystring says
         #: `status` is required, and a build that never had it refuses the same thing.
         #: Whichever answered is kept rather than found again every poll.
@@ -777,7 +782,8 @@ class KimiCodeCLISession(SessionBase):
                             {"metadata": {"cwd": self._workspace()}},
                         )["id"]
                     )
-                    self._profile = {}  # a session of its own is a session set nothing yet
+                    # A session of its own is a session set nothing yet.
+                    self._profile, self._profiled = {}, None
                 # The settings are the session's rather than the turn's, which is the whole
                 # reason there is a server here -- so a second turn at the same settings is
                 # a session that already has them. Said again only when it would say
@@ -786,13 +792,13 @@ class KimiCodeCLISession(SessionBase):
                 # is the exception: it is something the runtime is set going on rather than
                 # a setting it holds, and the same objective again is asking for it again.
                 profile = turn | ({"goal_objective": prompt} if goal else {})
-                if goal or profile != self._profile:
+                if goal or profile != self._profile or server is not self._profiled:
                     server.call(
                         "POST",
                         f"/sessions/{session}/profile",
                         {"agent_config": profile},
                     )
-                    self._profile = profile
+                    self._profile, self._profiled = profile, server
                 updates = _Updates(server._base, server._token, session)
                 # Said before the prompt goes in, so that a word put in has a session to be
                 # steered into from the moment there is a turn to interrupt.

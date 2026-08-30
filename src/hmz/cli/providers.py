@@ -47,6 +47,8 @@ def providers(argv: list[str]) -> int:
     """
     import argparse
 
+    from .output import asked_as_json, reads_json
+
     parser = argparse.ArgumentParser(
         prog="hmz providers",
         description="The accounts an agent may be run as: one named set of credentials per "
@@ -56,21 +58,13 @@ def providers(argv: list[str]) -> int:
 
     listing = doing.add_parser("list", help="what providers there are")
     listing.add_argument("cli", nargs="?", default="", help="only this backend's")
-    listing.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="one JSON object per account, one a line, for a program to read",
+    reads_json(
+        listing, "one JSON object per account, one a line, for a program to read"
     )
 
     offered = doing.add_parser("ways", help="how one backend can be signed into")
     offered.add_argument("cli", help="the backend")
-    offered.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="one JSON object per way in, one a line, for a program to read",
-    )
+    reads_json(offered, "one JSON object per way in, one a line, for a program to read")
 
     making = doing.add_parser("add", help="make one, and sign it in")
     making.add_argument("provider", metavar="CLI/NAME", help="what to call it")
@@ -117,11 +111,9 @@ def providers(argv: list[str]) -> int:
         metavar="CLI/NAME",
         help="the account, or `CLI/` for the one this machine is already signed into",
     )
-    showing.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="the whole of it as one JSON object, for a program to read -- the names of "
+    reads_json(
+        showing,
+        "the whole of it as one JSON object, for a program to read -- the names of "
         "the variables it sets, never their values",
     )
 
@@ -147,7 +139,7 @@ def providers(argv: list[str]) -> int:
     )
 
     args = parser.parse_args(argv)
-    machine = getattr(args, "as_json", False)
+    machine = asked_as_json(args)
     if args.doing in (None, "list"):
         return _list(getattr(args, "cli", ""), as_json=machine)
     if args.doing == "ways":

@@ -116,10 +116,26 @@ def silence(backend: str) -> float:
       The window, in seconds: what the environment says if it says anything, and otherwise
       what is written down about that backend. Zero or less for a watchdog turned off.
     """
+    return _window(_profiled(backend))
+
+
+def _window(profile: backends.Profile) -> float:
+    """The same, off a profile already in hand.
+
+    Read this way by the watchdog itself, which holds the profile anyway: asking for a
+    backend by name reads every added CLI back off the disk, and a turn that did it twice
+    would pay for that reading twice for one answer.
+
+    Args:
+      profile: What is written down about the backend.
+
+    Returns:
+      The window, in seconds. Zero or less for a watchdog turned off.
+    """
     if said := os.environ.get(WATCHDOG, "").strip():
         with contextlib.suppress(ValueError):
             return float(said)
-    return _profiled(backend).silence
+    return profile.silence
 
 
 @contextlib.contextmanager
@@ -237,9 +253,7 @@ class Watchdog:
         self._session = session
         self._riding = riding
         self._profile = _profiled(session._agent.backend)
-        self._silence = (
-            window if window is not None else silence(session._agent.backend)
-        )
+        self._silence = window if window is not None else _window(self._profile)
         now = time.monotonic()
         #: When the backend last said anything, which is what a person is told about, and
         #: when the window now running started, which is what the ladder is timed by. Two
@@ -268,9 +282,12 @@ class Watchdog:
         #: looked up later: a child outlives the parent it is reparented away from.
         self._kin: list[psutil.Process] = []
         #: What this turn is to fail with, once the watchdog has decided it is wedged. A
-        #: `Failed` rather than a `Stopped`: a wedged CLI is worth another go, and the retry
-        #: and fallback ladder above only walks for a turn that failed. Not `Unrecoverable`
-        #: either -- the whole point is that the same prompt to a fresh transport works.
+        #: `Failed` rather than a `Stopped`: a wedged CLI is worth another go, and a loop
+        #: written against a failed turn is what takes it -- a stop is what such a loop is
+        #: written to stop on. Not `Unrecoverable` either: the whole point is that the same
+        #: prompt to a fresh transport works. The retry ladder inside the turn is not the
+        #: one that walks -- a turn ended by hand is not a turn to take again under the next
+        #: account -- so what takes it again is the flow, which reads this and knows why.
         self._verdict: Failed | None = None
         self._done = threading.Event()
         self._thread: threading.Thread | None = None
@@ -453,6 +470,11 @@ class Watchdog:
           window a person spends watching nothing happen.
         """
         why = f"no output for {self._quiet()}"
+        # Said before the asking rather than after it: asking is what frees the read, so the
+        # turn's own thread may be out of it and reading why it stopped before this line
+        # would otherwise have run -- and a turn that finds itself cut off by nobody in
+        # particular answers with what a cut-off leaves, which here is nothing at all.
+        self._session._wedged = True
         try:
             self._session.interrupt(why=why)
         except NotImplementedError:
@@ -627,6 +649,10 @@ class Watchdog:
         self._verdict = Failed(
             1, [backend], "", f"the watchdog stopped this turn: {backend} {self._why}"
         )
+        # And said on the session, where the turn's own reader is: what a turn cut off by a
+        # budget or by a person answers with is what the agent had said, and this turn's
+        # backend had stopped saying anything. So this one fails rather than answering.
+        self._session._wedged = True
 
     def _says(self, what: str) -> None:
         """Puts one step of the ladder on the stream this turn is being read from.

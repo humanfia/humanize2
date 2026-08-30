@@ -568,6 +568,13 @@ class SessionBase(ABC):
         #: cut off once is not a session that can never take another turn.
         self._over = ""
         self._cut = ""
+        #: And whether the one that cut it off was the watchdog, which is the one cut-off a
+        #: turn does not answer to. A budget spent and a person's `interrupt` both leave a
+        #: turn that landed -- half an answer is still an answer -- but a backend that had
+        #: stopped saying anything said nothing to answer with, and a `result` of "" handed
+        #: to a loop is an empty turn read as the agent's work. So that one fails, which is
+        #: what the flow driving it already knows how to catch. Cleared as a turn opens.
+        self._wedged = False
         #: What the agent has said in the turn now running, kept so that a turn cut off part
         #: way through can still answer with it. Cleared as each turn opens: what is held is
         #: one turn's words, which its backend is holding anyway.
@@ -1150,6 +1157,7 @@ class SessionBase(ABC):
             # a reason set in that window and cleared afterwards is a cut-off that quietly
             # never happened.
             self._over = self._cut = ""
+            self._wedged = False
             self._sofar = []
             self._working = True
             try:
@@ -1261,7 +1269,14 @@ class SessionBase(ABC):
                     # taken away, which is what `_cut` says and a spent budget on its own
                     # does not: anything else is a turn that failed on its own account, and
                     # is raised as one.
-                    if not self._cut:
+                    #
+                    # A watchdog is raised as one too. It ends a turn whose backend had
+                    # stopped saying anything, so what it leaves behind is whatever the agent
+                    # had got as far as saying and usually nothing at all -- and a `result`
+                    # of "" is a loop running on an empty turn as the work of the turn before
+                    # it. What the watchdog put in place of the wreckage says what happened,
+                    # and a flow that catches a failed turn is what acts on it.
+                    if not self._cut or self._wedged:
                         raise
                     why = self._cutting()
                     # A line apiece, which is what each of these is: a block of the
@@ -2191,11 +2206,13 @@ class SessionBase(ABC):
         # turns left it. Weak, because a child is not a reason for its parent to stay alive.
         made._forked_at = (weakref.ref(self), self._turns)
         # What this conversation is running by goes with it, since that is what the child is
-        # a continuation of: the effort it has got to, and the skills it is carrying now
-        # rather than the ones the flow started it on. The callbacks too, offered again on
-        # the new session so that the toolbox holds an entry for each of the two.
+        # a continuation of: the effort it has got to, what each of its turns may spend, and
+        # the skills it is carrying now rather than the ones the flow started it on. The
+        # callbacks too, offered again on the new session so that the toolbox holds an entry
+        # for each of the two.
         made._skills = self._skills
         made._effort = self._effort
+        made._budget = self._budget
         if self._tools:
             made.offers(self._tools)
         return made

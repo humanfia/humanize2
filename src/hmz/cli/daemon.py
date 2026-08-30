@@ -33,6 +33,8 @@ def daemon(argv: list[str]) -> int:
     """
     import argparse
 
+    from .output import asked_as_json, reads_json
+
     parser = argparse.ArgumentParser(
         prog="hmz daemon",
         description="The runs being held apart from a terminal: one per directory, holding "
@@ -47,21 +49,11 @@ def daemon(argv: list[str]) -> int:
         action="store_true",
         help="just the directories, one a line, for a script to read",
     )
-    listing.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="one JSON object per run, one a line, for a program to read",
-    )
+    reads_json(listing, "one JSON object per run, one a line, for a program to read")
 
     showing = doing.add_parser("status", help="what one of them is doing")
     showing.add_argument("workspace", nargs="?", default=None, help="which directory")
-    showing.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="the whole of it as one JSON object, for a program to read",
-    )
+    reads_json(showing, "the whole of it as one JSON object, for a program to read")
 
     starting = doing.add_parser("start", help="hold a run here, without reading it")
     starting.add_argument(
@@ -90,7 +82,7 @@ def daemon(argv: list[str]) -> int:
     )
 
     args = parser.parse_args(argv)
-    machine = getattr(args, "as_json", False)
+    machine = asked_as_json(args)
     if args.doing in (None, "list"):
         return _list(quiet=getattr(args, "quiet", False), as_json=machine)
     if args.doing == "start":

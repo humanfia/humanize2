@@ -44,6 +44,8 @@ def trace(argv: list[str]) -> int:
     """
     import argparse
 
+    from .output import reads_json
+
     parser = argparse.ArgumentParser(
         prog="hmz trace",
         description="What a run left behind: the agents' own trajectories, and the programs "
@@ -88,11 +90,9 @@ def trace(argv: list[str]) -> int:
     collecting.add_argument(
         "--end", help="Latest session time to include, e.g. 'yesterday 18:00'."
     )
-    collecting.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="Say where it went and what it holds as one JSON object, for a program to "
+    reads_json(
+        collecting,
+        "Say where it went and what it holds as one JSON object, for a program to "
         "read.",
     )
     args = parser.parse_args(argv)
