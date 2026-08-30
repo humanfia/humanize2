@@ -4835,9 +4835,10 @@ class Catalogue(Picks):
     async def action_refresh(self) -> None:
         """Asks this CLI what it runs as this account, and puts up what it answers.
 
-        Off the event loop, because asking means starting a coding agent and some of them take
-        the better part of a minute over it: an interface that stopped redrawing while it ran
-        would be one that looked as though it had gone away.
+        Off the event loop, because asking means starting a coding agent -- some of them take
+        the better part of a minute over it -- or reaching an endpoint that may not answer at
+        all: an interface that stopped redrawing while either ran would be one that looked as
+        though it had gone away.
         """
         import asyncio
 

@@ -86,8 +86,9 @@ capabilities, identities, conversations, and ways of collaborating with a person
 - App servers, streaming command-line adapters, and Agent Client Protocol (ACP) servers keep
   their own transport semantics behind that contract.
 - A capability matrix says what each backend can do, so a flow can reject an incompatible one.
-- Models are usually discovered for the account that will run them; a backend that cannot list
-  them starts from a small advisory catalogue.
+- Models are usually discovered for the account that will run them — from the endpoint that
+  account points its backend at where it names one, and from the backend itself where it does
+  not; a backend that can do neither starts from a small advisory catalogue.
 - Shaped answers are reconstructed into the same typed result where a backend supports them.
 
 **Learn:** [Many backends, one agent](/features/backends),

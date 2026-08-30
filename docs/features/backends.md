@@ -28,17 +28,33 @@ humanize asks it under that account and keeps the answer:
 - **It is asked as the account whose it would be** — under that account's own credential paths and
   variables, and without the ones its backend would otherwise take an account from. Which is
   exactly how a turn of that account is run. Two accounts of one CLI are two catalogues.
+- **An account on somebody's endpoint is asked the endpoint**, not the CLI. A coding agent
+  handed a base URL answers with the models *it* ships — it has nothing that goes and looks at
+  the other end — so that answer is wrong the moment it is given, and refreshing it changes
+  nothing. `GET {base}/v1/models` under the account's own credentials is what a turn could
+  actually name: for a gateway that routes to several clouds, that means route-prefixed ids
+  like `azure/anthropic/claude-haiku-4-5` rather than the vendor's own spelling.
 - **Kept with the account**, so taking the account away takes its catalogue with it.
-- **Never asked at a prompt.** Asking is a coding agent starting up, which costs seconds a
-  prompt does not have; reading what was kept costs one file read.
+- **Never asked at a prompt.** Asking is a coding agent starting up, or a request to somebody's
+  endpoint, and neither is a thing to do while a list is being drawn; reading what was kept
+  costs one file read and reaches nothing.
 - **An account is asked as soon as it is made**, that being the first moment there is anything
   to ask. A backend that would not answer leaves the account made — an account whose models are
   not known yet is one to ask again, not one that failed.
 
+The endpoint is asked only where the account sets the variable that backend routes its turns
+by, and only where its ids are ids that CLI could name. `pi`, `opencode`, `mimocode` and
+`zcode` name a model `provider/id` out of several endpoints at once, so one endpoint's ids
+would be a list they cannot use, and their own answer is already the account's. Where the
+variable is unset, where the endpoint will not answer, or where what comes back is not a list
+of models, the CLI is asked exactly as before: an endpoint that is down is one to ask again,
+not a reason to have no catalogue.
+
 DeepSeek Harness and Qwen Code cannot list their models dynamically. Their adapters provide
 small advisory catalogues instead: the official DeepSeek adapter's current models, and the
 models Qwen Code ships pointed at. Those lists make initial setup possible; they are not proof
-of what an account or compatible endpoint will accept.
+of what an account or compatible endpoint will accept — which is why an account of either that
+names an endpoint is asked the endpoint instead.
 
 To a catalogue that *was* discovered, nothing is added. Claude Code may report a custom alias
 without proving the account can run it, so the alias is preserved exactly as that account

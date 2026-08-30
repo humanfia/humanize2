@@ -160,6 +160,13 @@ load.
 - A model id MUST NOT be written down here, nor anywhere else in this package. What a CLI
   runs is not a fact that keeps: it ships models without asking anybody, and which of them an
   account may name is that account's. `models.py` is what asks.
+- Which one of a backend's variables says where a turn of it actually goes MUST be written
+  down here, out of the several base URLs its ways and its ambient names between them list.
+  It is a fact about the CLI -- which of them it reads to route a request -- and it is what
+  lets `models.py` ask an account's own endpoint what it serves rather than ask a CLI that
+  can only answer with the models it shipped with. It MUST be empty for a backend whose
+  endpoint's ids are not ids a turn of it could name: one that spells a model `provider/id`
+  out of several endpoints at once, or one whose endpoint speaks a protocol of its own.
 - What a CLI can be told and what it cannot MUST be written down here rather than on the class
   that drives it -- whether it can be told its agents may not search the web, whether it can
   carry a conversation it is holding into a second one -- so that whatever refuses a flow the
@@ -214,15 +221,36 @@ What each backend runs, asked of that backend and kept until it is asked again.
   own dump of what it is configured with. It MUST NOT be a list written down here: a list is
   wrong the day the CLI ships a model, and says nothing about which of them this account may
   actually name.
+- Except where the account points its backend at an endpoint of somebody else's, which the
+  backend MUST NOT be asked about: a CLI handed a base URL answers with the models it ships,
+  having nothing that goes and looks at the other end, so that answer is wrong the moment it
+  is given and a refresh changes nothing. The endpoint MUST be asked instead -- `GET
+  {base}/v1/models`, under that account's own credentials -- and what it serves is what a
+  turn could name. Which variable carries that endpoint MUST be `backends.py`'s to say, one
+  per backend, and MUST be empty for a backend whose endpoint's ids are not ids a turn of it
+  could name.
+- The backend MUST be asked where there is no such variable set, where the endpoint will not
+  answer, and where what came back is not a list of models. An endpoint that is down is one
+  to ask again, never a reason to leave an account with no catalogue at all.
+- The credential the endpoint is asked under MUST be the account's own, read out of the
+  environment a turn of it would run with, and MUST reach nothing but that one request: not
+  the catalogue, not a log, not the message raised when the endpoint refuses, and not another
+  host. A redirect off the host the account named MUST NOT be followed -- the headers go again
+  wherever the request is sent, so following one would hand somebody's key to somewhere the
+  account never named, and a catalogue is not worth that.
 - It MUST be asked as the account whose it would be: under that provider's own credential
   paths and variables, and without the ones its backend would take another account from --
-  which is how a turn of that account is run. What is kept MUST be kept per account, two
-  accounts of one CLI being two catalogues.
+  which is how a turn of that account is run. That environment MUST be resolved once and read
+  by both ways of asking, so that the endpoint asked and the backend started are the same
+  account. What is kept MUST be kept per account, two accounts of one CLI being two
+  catalogues.
 - What is kept for a provider MUST be kept with that provider, so that taking the account
   away takes its catalogue with it. The account nobody chose keeps its own under humanize's
   home.
-- Asking MUST NOT happen at a prompt: it is a coding agent starting up. Reading what was kept
-  MUST cost one file read.
+- Asking MUST NOT happen at a prompt: it is a coding agent starting up, or a request to
+  somebody's endpoint, and neither is a thing to do while a sheet is being drawn. `ask` is
+  the explicit refresh behind `r` and behind `hmz providers`, never the drawing of a list.
+  Reading what was kept MUST cost one file read and MUST reach nothing.
 - An account MUST be asked as soon as it is made, since that is the first moment there is
   anything to ask. A backend that would not answer MUST leave the account made: an account
   whose models are not known yet is one to ask again, not one that failed.
