@@ -73,6 +73,23 @@ _STOP_SECONDS = 5.0
 #: Event-capable daemons need polling only as recovery while the model is thinking.
 _RECOVERY_SECONDS = 10.0
 
+#: What each frame the daemon names says is worth reading back off it: whether spending may
+#: have moved, and whether a question may be waiting to be answered. REST stays authoritative
+#: for both -- these only say which of those reads is worth the shared daemon's time, and a
+#: frame listed here is one the reader wakes for at once. A frame under no name here means
+#: both and is coalesced instead: the daemon streams a running command's output and a tool
+#: call's arguments a chunk at a time, and a reader woken per chunk would spend the daemon
+#: every session of the agent shares on one session's `cat`.
+_MEANS = {
+    "tool.call.started": (False, False),
+    "prompt.started": (False, False),
+    "goal.updated": (False, False),
+    "turn.step.completed": (True, False),
+    "event.question.requested": (False, True),
+    "event.approval.requested": (False, True),
+    "error": (True, True),
+}
+
 
 def _update(socket: ClientConnection, deadline: float) -> dict[str, Any]:
     """Read one bounded event frame, refusing malformed or stalled event streams."""
@@ -90,6 +107,9 @@ class _Updates:
 
     REST remains authoritative for history, spending, questions and goals. A refused
     subscription or a lost connection returns to polling without resubmitting a prompt.
+    It also says *which* of those authoritative reads is due: one daemon serves every
+    session of its agent, so a reader that asked it all four questions on every wake would
+    be spending the shared daemon's time on answers nothing had changed.
     """
 
     def __init__(self, base: str, token: str, session: str) -> None:
@@ -97,6 +117,12 @@ class _Updates:
         self._socket: ClientConnection | None = None
         self._contexts = contextlib.ExitStack()
         self.ended = False
+        #: Whether a question may be waiting to be answered, and whether spending may have
+        #: moved. True to begin with and true again whenever this listener stops carrying
+        #: events: what is not being told is asked for, which is the polling this backend
+        #: ran on before there were notifications at all.
+        self.questioned = True
+        self.stepped = True
         try:
             socket = self._contexts.enter_context(
                 connect(
@@ -135,6 +161,10 @@ class _Updates:
         """Wait for progress, falling back to ordinary polling after a disconnect."""
         socket = self._socket
         if socket is None:
+            # Nothing is being told, so everything is asked: this is the plain polling the
+            # backend ran on before there were notifications, and it asks the daemon the
+            # whole set every time round.
+            self.questioned = self.stepped = True
             time.sleep(_POLL_SECONDS)
             return
         # Keep the extra REST read after completion, without its polling delay once the
@@ -143,6 +173,7 @@ class _Updates:
             return
         started = time.monotonic()
         deadline = started + (_POLL_SECONDS if settled else _RECOVERY_SECONDS)
+        told = False  # whether the daemon said anything at all before the deadline
         try:
             while True:
                 message = _update(socket, deadline)
@@ -159,6 +190,7 @@ class _Updates:
                     continue
                 if message.get("session_id") != self._session:
                     continue
+                told = True  # a heartbeat says the daemon is there, not that this turn moved
                 kind = message.get("type")
                 payload = message.get("payload", {})
                 if not isinstance(payload, dict):
@@ -169,29 +201,45 @@ class _Updates:
                     # Preserve the old display cadence during long streaming messages,
                     # coalescing token notifications into at most one history read/second.
                     deadline = min(deadline, started + _POLL_SECONDS)
-                elif kind == "turn.started" and main:
-                    self.ended = False
+                elif kind == "turn.started":
+                    # An agent beginning is not yet anything to read back: what it goes on
+                    # to do is, and that arrives under its own name.
+                    if main:
+                        self.ended = False
                 elif kind == "turn.ended":
                     if main:
                         self.ended = True
+                    self.stepped = True
                     return
-                elif kind in (
-                    "tool.call.started",
-                    "turn.step.completed",
-                    "event.question.requested",
-                    "event.approval.requested",
-                    "prompt.started",
-                    "goal.updated",
-                    "error",
-                ):
+                elif (means := _MEANS.get(str(kind))) is not None:
+                    self.stepped = self.stepped or means[0]
+                    self.questioned = self.questioned or means[1]
                     return
+                else:
+                    # Everything else this session is told is progress, whatever the daemon
+                    # calls it: a list of the frames worth waking for is a list that goes
+                    # stale, and a question arriving under a name written down before the
+                    # daemon had it would be a turn that stopped to ask and was never read
+                    # again. So it is read back -- at the cadence a stream of them can
+                    # afford, which is the one the streamed text already goes at.
+                    self.stepped = self.questioned = True
+                    deadline = min(deadline, started + _POLL_SECONDS)
         except TimeoutError:
+            # Silence for as long as that is a listener that may have missed something, so
+            # the reader goes back to asking the daemon everything. A deadline reached with
+            # frames still arriving is not silence: it is the coalescing above, and what
+            # those frames meant has already been said.
+            if not told:
+                self.questioned = self.stepped = True
             return  # Event delivery is never the only way to finish.
         except (OSError, WebSocketException, ValueError, TypeError):
             self.close()
 
     def close(self) -> None:
         """Release the subscription, including a partially completed handshake."""
+        # Said before the socket goes, so that a reader still in its turn asks the daemon
+        # everything from here on rather than trusting a listener that has stopped.
+        self.questioned = self.stepped = True
         if self._socket is not None:
             self._socket = None
             with contextlib.suppress(OSError, WebSocketException):
@@ -628,19 +676,49 @@ class KimiCodeCLISession(SessionBase):
                 ] = {}  # how much of each message has been passed on
                 settled = False
                 costing = Usage()  # what this turn has come to, added up as it goes
+                # When each of the two authoritative readings was last made, so that a turn
+                # told nothing about either still makes them at the cadence it made them at
+                # before there were notifications at all. What the daemon says brings one
+                # forward; nothing the daemon says can put one off.
+                read_at = {"asked": 0.0, "counted": 0.0}
+
+                def due(what: str, *, told: bool) -> bool:
+                    if not told and time.monotonic() - read_at[what] < _POLL_SECONDS:
+                        return False
+                    read_at[what] = time.monotonic()
+                    return True
+
                 while True:
                     # First of all: a turn that has stopped to ask waits on the answer, so a
                     # poll that only read messages would be reading a session that has
                     # stopped moving. A daemon that cannot be asked is not a failed turn.
-                    with contextlib.suppress(subprocess.CalledProcessError):
-                        self._asked(session)
+                    # Asked at once when the daemon has said there may be something to
+                    # answer, and a second apart when it has not: one daemon serves every
+                    # session of the agent, and asking it per notification what it has
+                    # already said it has none of is the one cost here that buys nothing.
+                    # Taken off the book before the reading rather than after, so that a
+                    # question raised while it runs is a question read next time round
+                    # rather than one this turn waits on forever; a reading that failed
+                    # puts it back.
+                    if due("asked", told=updates.questioned):
+                        updates.questioned = False
+                        try:
+                            self._asked(session)
+                        except subprocess.CalledProcessError:
+                            updates.questioned = True
                     busy = server.call("GET", f"/sessions/{session}/status")["busy"]
                     # What it has come to so far, asked for each time round rather than once
                     # at the end: a turn is minutes long, and a rate that only moved when one
                     # ended would stand still for all of them. A daemon that will not say is
-                    # not a failed turn.
-                    with contextlib.suppress(subprocess.CalledProcessError):
-                        costing = costing + self._counting(server, session)
+                    # not a failed turn. Spending moves a step at a time, so it is read when
+                    # a step has landed -- and what a skipped reading would have added is
+                    # still in the total, which is read once more as the turn settles.
+                    if due("counted", told=updates.stepped):
+                        updates.stepped = False
+                        try:
+                            costing = costing + self._counting(server, session)
+                        except subprocess.CalledProcessError:
+                            updates.stepped = True
                     if goal and not busy:
                         # A goal runs through the quiet between its turns: Kimi starts the next one
                         # itself once the session falls still, so a session that has stopped is a

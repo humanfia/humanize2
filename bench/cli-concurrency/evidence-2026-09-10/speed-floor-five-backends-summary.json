@@ -1,0 +1,5205 @@
+{
+ "backends": [
+  {
+   "backend": "claude",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 1.690042631,
+      "p50": 1.361024227,
+      "p95": 1.666320248
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.012396124,
+      "p50": 0.008466889,
+      "p95": 0.012016174000000001
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 0.8639380749129139,
+      "p50": 0.7233333120823711,
+      "p95": 0.8464562959115394
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 35,
+     "max": 2.324190955958329,
+     "p50": 2.0391514870570973,
+     "p95": 2.298238907009363
+    },
+    "concurrency": 7,
+    "correct_item_records": 35,
+    "eligible_turns": 70,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "claude-sonnet-4-5",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 0.075322049,
+      "p50": 0.038636651,
+      "p95": 0.068464687
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.013287129,
+      "p50": 0.008763121,
+      "p95": 0.013008104
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 0.5539518210345782,
+      "p50": 0.3695061139949714,
+      "p95": 0.5211883250291292
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 35,
+     "max": 0.5978023640345782,
+     "p50": 0.40546063403598964,
+     "p95": 0.5602267340291291
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 1.278160693,
+      "p50": 0.826516195,
+      "p95": 1.278160693
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.008619255,
+      "p50": 0.0082975,
+      "p95": 0.008619255
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.41363713692965354,
+      "p50": 0.3576478789934908,
+      "p95": 0.41363713692965354
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 1.6555742690106854,
+     "p50": 1.2374092729296535,
+     "p95": 1.6555742690106854
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "claude-sonnet-4-5",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.039529608,
+      "p50": 0.030175235,
+      "p95": 0.039529608
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.011586226,
+      "p50": 0.009054045,
+      "p95": 0.011586226
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.36461266402428644,
+      "p50": 0.30005931094967364,
+      "p95": 0.36461266402428644
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 0.39421857602428645,
+     "p50": 0.33214144594967365,
+     "p95": 0.39421857602428645
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.6467000105182452,
+    "cold.first_provider_request_seconds.p95": 1.3036860366038496,
+    "cold.fixture_work_overhead_seconds.p50": 2.022473372743071,
+    "cold.fixture_work_overhead_seconds.p95": 2.0463740325508892,
+    "cold.result_seconds.p50": 1.6479199983924984,
+    "cold.result_seconds.p95": 1.3881823063019167,
+    "warm.first_provider_request_seconds.p50": 1.280409282645189,
+    "warm.first_provider_request_seconds.p95": 1.731984971872223,
+    "warm.fixture_work_overhead_seconds.p50": 1.2314435863546507,
+    "warm.fixture_work_overhead_seconds.p95": 1.4294301225763606,
+    "warm.result_seconds.p50": 1.2207468805245865,
+    "warm.result_seconds.p95": 1.4211068886683196
+   },
+   "run": "claude",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "claude",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 40,
+      "max": 2.545375153,
+      "p50": 1.630308013,
+      "p95": 2.264061012
+     },
+     "fixture_processing_seconds": {
+      "count": 40,
+      "max": 0.012885752,
+      "p50": 0.009054638,
+      "p95": 0.012235019
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 40,
+      "max": 1.277843505890223,
+      "p50": 0.9042220605376226,
+      "p95": 1.1903156899640654
+     },
+     "requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 40,
+     "max": 3.4905017130076885,
+     "p50": 2.502548144024331,
+     "p95": 3.401878032949753
+    },
+    "concurrency": 8,
+    "correct_item_records": 40,
+    "eligible_turns": 80,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "claude-sonnet-4-5",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 40,
+      "max": 0.084687282,
+      "p50": 0.045543392,
+      "p95": 0.069823788
+     },
+     "fixture_processing_seconds": {
+      "count": 40,
+      "max": 0.01389961,
+      "p50": 0.0091655015,
+      "p95": 0.012582632
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 40,
+      "max": 0.726582487980579,
+      "p50": 0.4356481725269843,
+      "p95": 0.6650465590097236
+     },
+     "requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 40,
+     "max": 0.774821629980579,
+     "p50": 0.48003642598632723,
+     "p95": 0.7302423790097237
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 1.278160693,
+      "p50": 0.826516195,
+      "p95": 1.278160693
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.008619255,
+      "p50": 0.0082975,
+      "p95": 0.008619255
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.41363713692965354,
+      "p50": 0.3576478789934908,
+      "p95": 0.41363713692965354
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 1.6555742690106854,
+     "p50": 1.2374092729296535,
+     "p95": 1.6555742690106854
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "claude-sonnet-4-5",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.039529608,
+      "p50": 0.030175235,
+      "p95": 0.039529608
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.011586226,
+      "p50": 0.009054045,
+      "p95": 0.011586226
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.36461266402428644,
+      "p50": 0.30005931094967364,
+      "p95": 0.36461266402428644
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 0.39421857602428645,
+     "p50": 0.33214144594967365,
+     "p95": 0.39421857602428645
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.972505829725454,
+    "cold.first_provider_request_seconds.p95": 1.7713430121888438,
+    "cold.fixture_work_overhead_seconds.p50": 2.5282466740256533,
+    "cold.fixture_work_overhead_seconds.p95": 2.8776809036044075,
+    "cold.result_seconds.p50": 2.022409399033654,
+    "cold.result_seconds.p95": 2.0548024311724773,
+    "warm.first_provider_request_seconds.p50": 1.5092970112743116,
+    "warm.first_provider_request_seconds.p95": 1.766366820536141,
+    "warm.fixture_work_overhead_seconds.p50": 1.451873535096039,
+    "warm.fixture_work_overhead_seconds.p95": 1.8239809656348789,
+    "warm.result_seconds.p50": 1.445277100585221,
+    "warm.result_seconds.p95": 1.852379424567593
+   },
+   "run": "claude",
+   "source": "candidate",
+   "speed_floor_gate": "timing_miss",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "claude",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 50,
+      "max": 2.831519569,
+      "p50": 1.9286031045,
+      "p95": 2.643753429
+     },
+     "fixture_processing_seconds": {
+      "count": 50,
+      "max": 0.011478302,
+      "p50": 0.0079173225,
+      "p95": 0.010976991
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 50,
+      "max": 1.2507242929463958,
+      "p50": 1.0040054465229118,
+      "p95": 1.17447136405941
+     },
+     "requests": {
+      "count": 50,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 50,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 50,
+     "max": 3.883689488051459,
+     "p50": 2.9298442489816807,
+     "p95": 3.616486652987078
+    },
+    "concurrency": 10,
+    "correct_item_records": 50,
+    "eligible_turns": 100,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "claude-sonnet-4-5",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 50,
+      "max": 0.091372348,
+      "p50": 0.0455461885,
+      "p95": 0.085317645
+     },
+     "fixture_processing_seconds": {
+      "count": 50,
+      "max": 0.013418181999999999,
+      "p50": 0.0089678655,
+      "p95": 0.011501304
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 50,
+      "max": 0.6831337890144842,
+      "p50": 0.48727628398484535,
+      "p95": 0.6566987239969889
+     },
+     "requests": {
+      "count": 50,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 50,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 50,
+     "max": 0.7382456950144842,
+     "p50": 0.540348959970288,
+     "p95": 0.692160633043386
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 1.278160693,
+      "p50": 0.826516195,
+      "p95": 1.278160693
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.008619255,
+      "p50": 0.0082975,
+      "p95": 0.008619255
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.41363713692965354,
+      "p50": 0.3576478789934908,
+      "p95": 0.41363713692965354
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 1.6555742690106854,
+     "p50": 1.2374092729296535,
+     "p95": 1.6555742690106854
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "claude-sonnet-4-5",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.039529608,
+      "p50": 0.030175235,
+      "p95": 0.039529608
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.011586226,
+      "p50": 0.009054045,
+      "p95": 0.011586226
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.36461266402428644,
+      "p50": 0.30005931094967364,
+      "p95": 0.36461266402428644
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 0.39421857602428645,
+     "p50": 0.33214144594967365,
+     "p95": 0.39421857602428645
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 2.333412359209731,
+    "cold.first_provider_request_seconds.p95": 2.0684045781401603,
+    "cold.fixture_work_overhead_seconds.p50": 2.8072456331865583,
+    "cold.fixture_work_overhead_seconds.p95": 2.8393760114898727,
+    "cold.result_seconds.p50": 2.3677244975262455,
+    "cold.result_seconds.p95": 2.184430333740429,
+    "warm.first_provider_request_seconds.p50": 1.509389686608903,
+    "warm.first_provider_request_seconds.p95": 2.158322566720115,
+    "warm.fixture_work_overhead_seconds.p50": 1.6239332232105672,
+    "warm.fixture_work_overhead_seconds.p95": 1.8010858886493502,
+    "warm.result_seconds.p50": 1.6268639959258866,
+    "warm.result_seconds.p95": 1.7557788372731182
+   },
+   "run": "claude",
+   "source": "candidate",
+   "speed_floor_gate": "timing_miss",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "dsh",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 60,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 60,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 60,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 60,
+      "max": 3.757664842,
+      "p50": 2.5720345465000003,
+      "p95": 3.703195416
+     },
+     "fixture_processing_seconds": {
+      "count": 60,
+      "max": 0.005061304,
+      "p50": 0.0021636134999999997,
+      "p95": 0.004491471
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 60,
+      "max": 0.4828550190199947,
+      "p50": 0.3722053460182566,
+      "p95": 0.47078632297228395
+     },
+     "requests": {
+      "count": 60,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 60,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 60,
+     "max": 4.191734937950969,
+     "p50": 2.965181191917509,
+     "p95": 4.086314700893126
+    },
+    "concurrency": 12,
+    "correct_item_records": 60,
+    "eligible_turns": 120,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "off",
+     "model": "deepseek-chat",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 60,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 60,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 60,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 60,
+      "max": 0.050169774,
+      "p50": 0.024264466,
+      "p95": 0.042106358
+     },
+     "fixture_processing_seconds": {
+      "count": 60,
+      "max": 0.005133597,
+      "p50": 0.0026702975,
+      "p95": 0.003909945
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 60,
+      "max": 0.4561042430459693,
+      "p50": 0.24910453548185318,
+      "p95": 0.3847908220107596
+     },
+     "requests": {
+      "count": 60,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 60,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 60,
+     "max": 0.4950963930459693,
+     "p50": 0.2779930535471067,
+     "p95": 0.4127668240107596
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 2.683750675,
+      "p50": 2.120571383,
+      "p95": 2.683750675
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.00307274,
+      "p50": 0.002659454,
+      "p95": 0.00307274
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.2284328749536244,
+      "p50": 0.2192787839579795,
+      "p95": 0.2284328749536244
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 2.9121835499536246,
+     "p50": 2.3364617039915174,
+     "p95": 2.9121835499536246
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "off",
+     "model": "deepseek-chat",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.025301539,
+      "p50": 0.019246711,
+      "p95": 0.025301539
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.005537563,
+      "p50": 0.003035949,
+      "p95": 0.005537563
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.19886482200579136,
+      "p50": 0.1955879159968897,
+      "p95": 0.19886482200579136
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 0.22342106804717332,
+     "p50": 0.2148346269968897,
+     "p95": 0.22342106804717332
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.2128969423615013,
+    "cold.first_provider_request_seconds.p95": 1.3798582150333318,
+    "cold.fixture_work_overhead_seconds.p50": 1.6974070144861004,
+    "cold.fixture_work_overhead_seconds.p95": 2.0609394469507123,
+    "cold.result_seconds.p50": 1.269090431421115,
+    "cold.result_seconds.p95": 1.4031789654735876,
+    "warm.first_provider_request_seconds.p50": 1.2607071410798447,
+    "warm.first_provider_request_seconds.p95": 1.6641816926630433,
+    "warm.fixture_work_overhead_seconds.p50": 1.2736192530719255,
+    "warm.fixture_work_overhead_seconds.p95": 1.9349365972809092,
+    "warm.result_seconds.p50": 1.2939862508809223,
+    "warm.result_seconds.p95": 1.847483890478975
+   },
+   "run": "dsh",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "dsh",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 50,
+      "max": 3.308761848,
+      "p50": 2.824685116,
+      "p95": 3.218598677
+     },
+     "fixture_processing_seconds": {
+      "count": 50,
+      "max": 0.007242468,
+      "p50": 0.0026419729999999997,
+      "p95": 0.003619523
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 50,
+      "max": 0.4769739450306383,
+      "p50": 0.34505492349863554,
+      "p95": 0.46621084090858744
+     },
+     "requests": {
+      "count": 50,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 50,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 50,
+     "max": 3.6142901310231537,
+     "p50": 3.1973810649942607,
+     "p95": 3.5948572719935328
+    },
+    "concurrency": 10,
+    "correct_item_records": 50,
+    "eligible_turns": 100,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "off",
+     "model": "deepseek-chat",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 50,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 50,
+      "max": 0.041640904,
+      "p50": 0.025875414,
+      "p95": 0.038096829
+     },
+     "fixture_processing_seconds": {
+      "count": 50,
+      "max": 0.006067715,
+      "p50": 0.0027592785,
+      "p95": 0.00405443
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 50,
+      "max": 0.3789515010183967,
+      "p50": 0.2249863944824038,
+      "p95": 0.3692082550363468
+     },
+     "requests": {
+      "count": 50,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 50,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 50,
+     "max": 0.4205924050183967,
+     "p50": 0.2533672180143185,
+     "p95": 0.3937215970363468
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 2.683750675,
+      "p50": 2.120571383,
+      "p95": 2.683750675
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.00307274,
+      "p50": 0.002659454,
+      "p95": 0.00307274
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.2284328749536244,
+      "p50": 0.2192787839579795,
+      "p95": 0.2284328749536244
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 2.9121835499536246,
+     "p50": 2.3364617039915174,
+     "p95": 2.9121835499536246
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "off",
+     "model": "deepseek-chat",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.025301539,
+      "p50": 0.019246711,
+      "p95": 0.025301539
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.005537563,
+      "p50": 0.003035949,
+      "p95": 0.005537563
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.19886482200579136,
+      "p50": 0.1955879159968897,
+      "p95": 0.19886482200579136
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 0.22342106804717332,
+     "p50": 0.2148346269968897,
+     "p95": 0.22342106804717332
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.3320396279251308,
+    "cold.first_provider_request_seconds.p95": 1.199291240793074,
+    "cold.fixture_work_overhead_seconds.p50": 1.5735900996457486,
+    "cold.fixture_work_overhead_seconds.p95": 2.04090957137074,
+    "cold.result_seconds.p50": 1.368471419639356,
+    "cold.result_seconds.p95": 1.234419881278012,
+    "warm.first_provider_request_seconds.p50": 1.344407052197126,
+    "warm.first_provider_request_seconds.p95": 1.5057119252706326,
+    "warm.fixture_work_overhead_seconds.p50": 1.1503082556796689,
+    "warm.fixture_work_overhead_seconds.p95": 1.856579013384251,
+    "warm.result_seconds.p50": 1.1793593125841237,
+    "warm.result_seconds.p95": 1.7622402420581753
+   },
+   "run": "dsh",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "dsh",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 80,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 80,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 80,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 80,
+      "max": 4.099593307,
+      "p50": 3.132709396,
+      "p95": 3.863051321
+     },
+     "fixture_processing_seconds": {
+      "count": 80,
+      "max": 0.006257889,
+      "p50": 0.0024871875,
+      "p95": 0.004130694
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 80,
+      "max": 0.7657579780099772,
+      "p50": 0.5283846850168628,
+      "p95": 0.6934714189136648
+     },
+     "requests": {
+      "count": 80,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 80,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 80,
+     "max": 4.336151854018681,
+     "p50": 3.7786115980125032,
+     "p95": 4.218354027019814
+    },
+    "concurrency": 16,
+    "correct_item_records": 80,
+    "eligible_turns": 160,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "off",
+     "model": "deepseek-chat",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 80,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 80,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 80,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 80,
+      "max": 0.086986497,
+      "p50": 0.0297418405,
+      "p95": 0.05560781
+     },
+     "fixture_processing_seconds": {
+      "count": 80,
+      "max": 0.006697463,
+      "p50": 0.00265209,
+      "p95": 0.004838597
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 80,
+      "max": 0.6916136929897301,
+      "p50": 0.3374098999920376,
+      "p95": 0.4699109749652795
+     },
+     "requests": {
+      "count": 80,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 80,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 80,
+     "max": 0.7175865609897301,
+     "p50": 0.37767158047063276,
+     "p95": 0.4969465499743819
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 2.683750675,
+      "p50": 2.120571383,
+      "p95": 2.683750675
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.00307274,
+      "p50": 0.002659454,
+      "p95": 0.00307274
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.2284328749536244,
+      "p50": 0.2192787839579795,
+      "p95": 0.2284328749536244
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 2.9121835499536246,
+     "p50": 2.3364617039915174,
+     "p95": 2.9121835499536246
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "off",
+     "model": "deepseek-chat",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.025301539,
+      "p50": 0.019246711,
+      "p95": 0.025301539
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.005537563,
+      "p50": 0.003035949,
+      "p95": 0.005537563
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.19886482200579136,
+      "p50": 0.1955879159968897,
+      "p95": 0.19886482200579136
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 0.22342106804717332,
+     "p50": 0.2148346269968897,
+     "p95": 0.22342106804717332
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.4772949503676291,
+    "cold.first_provider_request_seconds.p95": 1.4394225801172829,
+    "cold.fixture_work_overhead_seconds.p50": 2.4096480082547216,
+    "cold.fixture_work_overhead_seconds.p95": 3.0357776614003162,
+    "cold.result_seconds.p50": 1.6172366923700374,
+    "cold.result_seconds.p95": 1.4485192827515936,
+    "warm.first_provider_request_seconds.p50": 1.545294699961983,
+    "warm.first_provider_request_seconds.p95": 2.197803461678754,
+    "warm.fixture_work_overhead_seconds.p50": 1.725106064310247,
+    "warm.fixture_work_overhead_seconds.p95": 2.3629668144705587,
+    "warm.result_seconds.p50": 1.7579641873844691,
+    "warm.result_seconds.p95": 2.224260023094403
+   },
+   "run": "dsh",
+   "source": "candidate",
+   "speed_floor_gate": "timing_miss",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "kimi",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 40,
+      "max": 81.561269795,
+      "p50": 79.5156560995,
+      "p95": 81.217864428
+     },
+     "fixture_processing_seconds": {
+      "count": 40,
+      "max": 0.010452679,
+      "p50": 0.0053214025,
+      "p95": 0.007182454
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 40,
+      "max": 2.6160764979859437,
+      "p50": 1.7262301034812637,
+      "p95": 2.4774963260048253
+     },
+     "requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 40,
+     "max": 82.91684148495551,
+     "p50": 81.45899102801923,
+     "p95": 82.90257424698211
+    },
+    "concurrency": 8,
+    "correct_item_records": 40,
+    "eligible_turns": 80,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 40,
+      "max": 1.131586697,
+      "p50": 0.570994032,
+      "p95": 1.109260475
+     },
+     "fixture_processing_seconds": {
+      "count": 40,
+      "max": 0.008243529999999999,
+      "p50": 0.0053966759999999996,
+      "p95": 0.007923885
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 40,
+      "max": 2.2620829179443396,
+      "p50": 1.7557268609810062,
+      "p95": 2.2166130279995513
+     },
+     "requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 40,
+     "max": 2.886680625961162,
+     "p50": 2.4320797244436108,
+     "p95": 2.8050165730528533
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 65.250520438,
+      "p50": 55.049748954,
+      "p95": 65.250520438
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.005332203,
+      "p50": 0.0049832109999999995,
+      "p95": 0.005332203
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 1.1052902150107045,
+      "p50": 0.8928731619624131,
+      "p95": 1.1052902150107045
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 66.24543887609616,
+     "p50": 56.155039169010706,
+     "p95": 66.24543887609616
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.566812558,
+      "p50": 0.249347104,
+      "p95": 0.566812558
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.005360349,
+      "p50": 0.005051779,
+      "p95": 0.005360349
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 1.1377764369614296,
+      "p50": 0.9708061590622871,
+      "p95": 1.1377764369614296
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 1.537618717062287,
+     "p50": 1.3596293829614297,
+     "p95": 1.537618717062287
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.4444326742696667,
+    "cold.first_provider_request_seconds.p95": 1.2447083009118973,
+    "cold.fixture_work_overhead_seconds.p50": 1.9333430290224494,
+    "cold.fixture_work_overhead_seconds.p95": 2.241489422740281,
+    "cold.result_seconds.p50": 1.4506087473797467,
+    "cold.result_seconds.p95": 1.2514457697539154,
+    "warm.first_provider_request_seconds.p50": 2.289956541865431,
+    "warm.first_provider_request_seconds.p95": 1.9570146415139942,
+    "warm.fixture_work_overhead_seconds.p50": 1.8085246417028122,
+    "warm.fixture_work_overhead_seconds.p95": 1.9481973399970263,
+    "warm.result_seconds.p50": 1.7887813803687154,
+    "warm.result_seconds.p95": 1.8242601640620024
+   },
+   "run": "kimi",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "kimi",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 75.408122576,
+      "p50": 71.169695451,
+      "p95": 75.308935806
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.011293292,
+      "p50": 0.005622315,
+      "p95": 0.008798393
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 2.329811252004532,
+      "p50": 1.6723294989787405,
+      "p95": 2.2480721849329512
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 35,
+     "max": 76.78157110000029,
+     "p50": 72.9645858790027,
+     "p95": 76.75674295797944
+    },
+    "concurrency": 7,
+    "correct_item_records": 35,
+    "eligible_turns": 70,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 1.383652997,
+      "p50": 0.639855534,
+      "p95": 1.235199699
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.011225254,
+      "p50": 0.005360328,
+      "p95": 0.009183359
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 2.1447452800546793,
+      "p50": 1.7226294360241592,
+      "p95": 2.134462784975193
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 35,
+     "max": 2.5858688059961423,
+     "p50": 2.3367172309663147,
+     "p95": 2.5385914319194853
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 65.250520438,
+      "p50": 55.049748954,
+      "p95": 65.250520438
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.005332203,
+      "p50": 0.0049832109999999995,
+      "p95": 0.005332203
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 1.1052902150107045,
+      "p50": 0.8928731619624131,
+      "p95": 1.1052902150107045
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 66.24543887609616,
+     "p50": 56.155039169010706,
+     "p95": 66.24543887609616
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.566812558,
+      "p50": 0.249347104,
+      "p95": 0.566812558
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.005360349,
+      "p50": 0.005051779,
+      "p95": 0.005360349
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 1.1377764369614296,
+      "p50": 0.9708061590622871,
+      "p95": 1.1377764369614296
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 1.537618717062287,
+     "p50": 1.3596293829614297,
+     "p95": 1.537618717062287
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.2928250682935893,
+    "cold.first_provider_request_seconds.p95": 1.1541507301471616,
+    "cold.fixture_work_overhead_seconds.p50": 1.8729754350586472,
+    "cold.fixture_work_overhead_seconds.p95": 2.0339202812097446,
+    "cold.result_seconds.p50": 1.2993417324382952,
+    "cold.result_seconds.p95": 1.1586721178124182,
+    "warm.first_provider_request_seconds.p50": 2.5661237838158324,
+    "warm.first_provider_request_seconds.p95": 2.1792031273237953,
+    "warm.fixture_work_overhead_seconds.p50": 1.7744319192289293,
+    "warm.fixture_work_overhead_seconds.p95": 1.87599489287679,
+    "warm.result_seconds.p50": 1.7186427862250777,
+    "warm.result_seconds.p95": 1.6509888984504668
+   },
+   "run": "kimi",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "mimo",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 40,
+      "max": 6.610376065,
+      "p50": 5.733689416,
+      "p95": 6.384750161
+     },
+     "fixture_processing_seconds": {
+      "count": 40,
+      "max": 0.00838548,
+      "p50": 0.005356995,
+      "p95": 0.008017273
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 40,
+      "max": 1.8000043250058386,
+      "p50": 1.278347293520134,
+      "p95": 1.5613683541130792
+     },
+     "requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 40,
+     "max": 8.036579528008588,
+     "p50": 7.083948832470924,
+     "p95": 7.499123657005839
+    },
+    "concurrency": 8,
+    "correct_item_records": 40,
+    "eligible_turns": 80,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 40,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 40,
+      "max": 7.462446352,
+      "p50": 6.6326808625,
+      "p95": 7.269367906
+     },
+     "fixture_processing_seconds": {
+      "count": 40,
+      "max": 0.012989899999999999,
+      "p50": 0.0057440275,
+      "p95": 0.008124215
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 40,
+      "max": 2.9905955370370805,
+      "p50": 1.9321935149669835,
+      "p95": 2.8901389250995244
+     },
+     "requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 40,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 40,
+     "max": 9.576834703912027,
+     "p50": 8.680535440566018,
+     "p95": 9.319143452099524
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 4.887588825,
+      "p50": 4.023819628,
+      "p95": 4.887588825
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.00820088,
+      "p50": 0.006155323,
+      "p95": 0.00820088
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.7526118499995054,
+      "p50": 0.5152394399598972,
+      "p95": 0.7526118499995054
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 5.640200674999505,
+     "p50": 4.539059067959897,
+     "p95": 5.640200674999505
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 4.664139913,
+      "p50": 3.834831979,
+      "p95": 4.664139913
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.006450439,
+      "p50": 0.00478723,
+      "p95": 0.006450439
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.9271527490850353,
+      "p50": 0.6965283620396434,
+      "p95": 0.9271527490850353
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 5.360668275039643,
+     "p50": 4.492631005006842,
+     "p95": 5.360668275039643
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.4249369867629662,
+    "cold.first_provider_request_seconds.p95": 1.3063190030106513,
+    "cold.fixture_work_overhead_seconds.p50": 2.4810742237039,
+    "cold.fixture_work_overhead_seconds.p95": 2.074599747684155,
+    "cold.result_seconds.p50": 1.5606646061239384,
+    "cold.result_seconds.p95": 1.3295845465651799,
+    "warm.first_provider_request_seconds.p50": 1.729588388440838,
+    "warm.first_provider_request_seconds.p95": 1.558565575131794,
+    "warm.fixture_work_overhead_seconds.p50": 2.7740342249796446,
+    "warm.fixture_work_overhead_seconds.p95": 3.117219819443636,
+    "warm.result_seconds.p50": 1.9321719123809495,
+    "warm.result_seconds.p95": 1.73842942222173
+   },
+   "run": "mimo",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "mimo",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 6.224206775,
+      "p50": 4.984618192,
+      "p95": 6.131006069
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.009541211,
+      "p50": 0.0049976180000000005,
+      "p95": 0.009383586
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 1.3700719138881716,
+      "p50": 1.1067765659683735,
+      "p95": 1.302234718955483
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 35,
+     "max": 7.199393723974936,
+     "p50": 6.091394757968374,
+     "p95": 7.173248257022351
+    },
+    "concurrency": 7,
+    "correct_item_records": 35,
+    "eligible_turns": 70,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 6.650011633,
+      "p50": 5.610713411,
+      "p95": 6.641409148
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.008698879,
+      "p50": 0.005412684,
+      "p95": 0.008405315
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 2.80156623999299,
+      "p50": 1.7491625920159706,
+      "p95": 2.3518505830151106
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 35,
+     "max": 8.547502584988251,
+     "p50": 7.404148033005185,
+     "p95": 8.46277501701843
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 4.887588825,
+      "p50": 4.023819628,
+      "p95": 4.887588825
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.00820088,
+      "p50": 0.006155323,
+      "p95": 0.00820088
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.7526118499995054,
+      "p50": 0.5152394399598972,
+      "p95": 0.7526118499995054
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 5.640200674999505,
+     "p50": 4.539059067959897,
+     "p95": 5.640200674999505
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 4.664139913,
+      "p50": 3.834831979,
+      "p95": 4.664139913
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.006450439,
+      "p50": 0.00478723,
+      "p95": 0.006450439
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.9271527490850353,
+      "p50": 0.6965283620396434,
+      "p95": 0.9271527490850353
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 5.360668275039643,
+     "p50": 4.492631005006842,
+     "p95": 5.360668275039643
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.2387777417541839,
+    "cold.first_provider_request_seconds.p95": 1.2544029967578134,
+    "cold.fixture_work_overhead_seconds.p50": 2.1480819986422577,
+    "cold.fixture_work_overhead_seconds.p95": 1.730287290794503,
+    "cold.result_seconds.p50": 1.3419950405505918,
+    "cold.result_seconds.p95": 1.2718072760811796,
+    "warm.first_provider_request_seconds.p50": 1.4630923705979662,
+    "warm.first_provider_request_seconds.p95": 1.4239300861213253,
+    "warm.fixture_work_overhead_seconds.p50": 2.511258244953442,
+    "warm.fixture_work_overhead_seconds.p95": 2.5366376633581087,
+    "warm.result_seconds.p50": 1.6480650257618719,
+    "warm.result_seconds.p95": 1.578679109174284
+   },
+   "run": "mimo",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "opencode",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 30,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 30,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 30,
+      "max": 1,
+      "p50": 1.0,
+      "p95": 1
+     },
+     "first_provider_request_seconds": {
+      "count": 30,
+      "max": 4.353657195,
+      "p50": 3.5096709825000003,
+      "p95": 4.292969704
+     },
+     "fixture_processing_seconds": {
+      "count": 30,
+      "max": 0.005893658,
+      "p50": 0.0034287090000000003,
+      "p95": 0.005350491
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 30,
+      "max": 2.166543651089638,
+      "p50": 1.7479753465525416,
+      "p95": 2.0873890229166188
+     },
+     "requests": {
+      "count": 30,
+      "max": 5,
+      "p50": 5.0,
+      "p95": 5
+     },
+     "workload_requests": {
+      "count": 30,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 30,
+     "max": 6.187974208965898,
+     "p50": 5.3125360700068995,
+     "p95": 6.020419020089321
+    },
+    "concurrency": 6,
+    "correct_item_records": 30,
+    "eligible_turns": 60,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 30,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 30,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 30,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 30,
+      "max": 4.69106024,
+      "p50": 4.0653478775,
+      "p95": 4.480534181
+     },
+     "fixture_processing_seconds": {
+      "count": 30,
+      "max": 0.004764971,
+      "p50": 0.0031694675,
+      "p95": 0.004690871
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 30,
+      "max": 1.4289526990011514,
+      "p50": 0.823610765516825,
+      "p95": 1.4010789100384549
+     },
+     "requests": {
+      "count": 30,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 30,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 30,
+     "max": 5.384309410001151,
+     "p50": 4.913697724463418,
+     "p95": 5.230780697078444
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 1,
+      "p50": 1,
+      "p95": 1
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 2.000451825,
+      "p50": 1.949832474,
+      "p95": 2.000451825
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.004445262,
+      "p50": 0.003567318,
+      "p95": 0.004445262
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 1.2728130059664835,
+      "p50": 1.0730686289960252,
+      "p95": 1.2728130059664835
+     },
+     "requests": {
+      "count": 5,
+      "max": 5,
+      "p50": 5,
+      "p95": 5
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 3.2371054319664836,
+     "p50": 3.073520453996025,
+     "p95": 3.2371054319664836
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 2.42372184,
+      "p50": 2.366691346,
+      "p95": 2.42372184
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.003995116999999999,
+      "p50": 0.003537177,
+      "p95": 0.003995116999999999
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.6925038470416824,
+      "p50": 0.6532696289251976,
+      "p95": 0.6925038470416824
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 3.1107437630416825,
+     "p50": 3.0199609749251977,
+     "p95": 3.1107437630416825
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.7999859112511634,
+    "cold.first_provider_request_seconds.p95": 2.146000043765113,
+    "cold.fixture_work_overhead_seconds.p50": 1.6289501895027596,
+    "cold.fixture_work_overhead_seconds.p95": 1.6399809030326526,
+    "cold.result_seconds.p50": 1.7284856728706093,
+    "cold.result_seconds.p95": 1.8598155502250737,
+    "warm.first_provider_request_seconds.p50": 1.7177347119517459,
+    "warm.first_provider_request_seconds.p95": 1.8486173235951864,
+    "warm.fixture_work_overhead_seconds.p50": 1.2607516545226263,
+    "warm.fixture_work_overhead_seconds.p95": 2.0232074031411447,
+    "warm.result_seconds.p50": 1.6270732520260884,
+    "warm.result_seconds.p95": 1.6815209144593097
+   },
+   "run": "opencode",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "opencode",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 25,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 25,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 25,
+      "max": 1,
+      "p50": 1,
+      "p95": 1
+     },
+     "first_provider_request_seconds": {
+      "count": 25,
+      "max": 3.853157541,
+      "p50": 2.767282162,
+      "p95": 3.730667594
+     },
+     "fixture_processing_seconds": {
+      "count": 25,
+      "max": 0.005407261,
+      "p50": 0.003688999,
+      "p95": 0.005241836
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 25,
+      "max": 1.911308413023633,
+      "p50": 1.4183856470133565,
+      "p95": 1.7178329070516565
+     },
+     "requests": {
+      "count": 25,
+      "max": 5,
+      "p50": 5,
+      "p95": 5
+     },
+     "workload_requests": {
+      "count": 25,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 25,
+     "max": 5.124275592970662,
+     "p50": 4.2028274609474465,
+     "p95": 5.092986691975966
+    },
+    "concurrency": 5,
+    "correct_item_records": 25,
+    "eligible_turns": 50,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 25,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 25,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 25,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 25,
+      "max": 3.928217419,
+      "p50": 3.387598545,
+      "p95": 3.884059813
+     },
+     "fixture_processing_seconds": {
+      "count": 25,
+      "max": 0.004425183,
+      "p50": 0.003043932,
+      "p95": 0.004408232
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 25,
+      "max": 1.0859110509959184,
+      "p50": 0.6895313429797585,
+      "p95": 0.9097724829911757
+     },
+     "requests": {
+      "count": 25,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 25,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 25,
+     "max": 4.486924118013121,
+     "p50": 4.042312316945754,
+     "p95": 4.46565341996029
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 1,
+      "p50": 1,
+      "p95": 1
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 2.000451825,
+      "p50": 1.949832474,
+      "p95": 2.000451825
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.004445262,
+      "p50": 0.003567318,
+      "p95": 0.004445262
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 1.2728130059664835,
+      "p50": 1.0730686289960252,
+      "p95": 1.2728130059664835
+     },
+     "requests": {
+      "count": 5,
+      "max": 5,
+      "p50": 5,
+      "p95": 5
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 3.2371054319664836,
+     "p50": 3.073520453996025,
+     "p95": 3.2371054319664836
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 2.42372184,
+      "p50": 2.366691346,
+      "p95": 2.42372184
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.003995116999999999,
+      "p50": 0.003537177,
+      "p95": 0.003995116999999999
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.6925038470416824,
+      "p50": 0.6532696289251976,
+      "p95": 0.6925038470416824
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 3.1107437630416825,
+     "p50": 3.0199609749251977,
+     "p95": 3.1107437630416825
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.4192409855206873,
+    "cold.first_provider_request_seconds.p95": 1.8649124899571126,
+    "cold.fixture_work_overhead_seconds.p50": 1.321803292619237,
+    "cold.fixture_work_overhead_seconds.p95": 1.349634941659994,
+    "cold.result_seconds.p50": 1.367431101843867,
+    "cold.result_seconds.p95": 1.5733150492049521,
+    "warm.first_provider_request_seconds.p50": 1.4313647407911718,
+    "warm.first_provider_request_seconds.p95": 1.6025187993519918,
+    "warm.fixture_work_overhead_seconds.p50": 1.0555080359609263,
+    "warm.fixture_work_overhead_seconds.p95": 1.3137435797326562,
+    "warm.result_seconds.p50": 1.338531309016627,
+    "warm.result_seconds.p95": 1.4355581044688097
+   },
+   "run": "opencode",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "opencode",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 20,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 20,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 20,
+      "max": 1,
+      "p50": 1.0,
+      "p95": 1
+     },
+     "first_provider_request_seconds": {
+      "count": 20,
+      "max": 2.64324701,
+      "p50": 2.4903919525,
+      "p95": 2.637748399
+     },
+     "fixture_processing_seconds": {
+      "count": 20,
+      "max": 0.0052105319999999995,
+      "p50": 0.0033238670000000003,
+      "p95": 0.004470346
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 20,
+      "max": 1.377651642988433,
+      "p50": 1.195641505539716,
+      "p95": 1.3541164249589115
+     },
+     "requests": {
+      "count": 20,
+      "max": 5,
+      "p50": 5.0,
+      "p95": 5
+     },
+     "workload_requests": {
+      "count": 20,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 20,
+     "max": 3.9016997469589114,
+     "p50": 3.670363900018856,
+     "p95": 3.8696932540042326
+    },
+    "concurrency": 4,
+    "correct_item_records": 20,
+    "eligible_turns": 40,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 20,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 20,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 20,
+      "max": 0,
+      "p50": 0.0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 20,
+      "max": 3.087886852,
+      "p50": 2.829488143,
+      "p95": 3.05978178
+     },
+     "fixture_processing_seconds": {
+      "count": 20,
+      "max": 0.004990295,
+      "p50": 0.0030452975000000004,
+      "p95": 0.004696047
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 20,
+      "max": 1.124476622001135,
+      "p50": 0.7278197739928431,
+      "p95": 0.8464106520284025
+     },
+     "requests": {
+      "count": 20,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 20,
+      "max": 4,
+      "p50": 4.0,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 20,
+     "max": 3.866677718004212,
+     "p50": 3.5995527884806506,
+     "p95": 3.7956226529786363
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "8-11",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/hmzbench/u16"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/hmzbench"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 1,
+      "p50": 1,
+      "p95": 1
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 2.000451825,
+      "p50": 1.949832474,
+      "p95": 2.000451825
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.004445262,
+      "p50": 0.003567318,
+      "p95": 0.004445262
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 1.2728130059664835,
+      "p50": 1.0730686289960252,
+      "p95": 1.2728130059664835
+     },
+     "requests": {
+      "count": 5,
+      "max": 5,
+      "p50": 5,
+      "p95": 5
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 3.2371054319664836,
+     "p50": 3.073520453996025,
+     "p95": 3.2371054319664836
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "minimal",
+     "model": "fixture/fixture-model",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 2.42372184,
+      "p50": 2.366691346,
+      "p95": 2.42372184
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.003995116999999999,
+      "p50": 0.003537177,
+      "p95": 0.003995116999999999
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.6925038470416824,
+      "p50": 0.6532696289251976,
+      "p95": 0.6925038470416824
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 3.1107437630416825,
+     "p50": 3.0199609749251977,
+     "p95": 3.1107437630416825
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.2772338063439188,
+    "cold.first_provider_request_seconds.p95": 1.31857631662787,
+    "cold.fixture_work_overhead_seconds.p50": 1.1142265026034461,
+    "cold.fixture_work_overhead_seconds.p95": 1.0638769549111355,
+    "cold.result_seconds.p50": 1.194188864188897,
+    "cold.result_seconds.p95": 1.1954177382642317,
+    "warm.first_provider_request_seconds.p50": 1.1955459032637201,
+    "warm.first_provider_request_seconds.p95": 1.2624310799625422,
+    "warm.fixture_work_overhead_seconds.p50": 1.1141184922224234,
+    "warm.fixture_work_overhead_seconds.p95": 1.2222468591968072,
+    "warm.result_seconds.p50": 1.1919202990925435,
+    "warm.result_seconds.p95": 1.220165639508437
+   },
+   "run": "opencode",
+   "source": "candidate",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "kimi",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 27.728760553,
+      "p50": 22.839427584,
+      "p95": 27.581582463
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.012242144,
+      "p50": 0.005152203,
+      "p95": 0.010555268
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 2.096034478984187,
+      "p50": 1.2924125509908038,
+      "p95": 1.9096317190563354
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 35,
+     "max": 28.760622887057252,
+     "p50": 23.865810160990804,
+     "p95": 28.570434033987112
+    },
+    "concurrency": 7,
+    "correct_item_records": 35,
+    "eligible_turns": 70,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 0.715728727,
+      "p50": 0.303965296,
+      "p95": 0.666537715
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.021069384,
+      "p50": 0.00604398,
+      "p95": 0.017328791
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 1.53374045694693,
+      "p50": 1.226918827989381,
+      "p95": 1.4863926799950895
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 35,
+     "max": 1.791385896038264,
+     "p50": 1.5701773860491812,
+     "p95": 1.755973430001177
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      0,
+      1,
+      2,
+      3
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/run-r2de345dea51c4b0f830b48d1e33b896b.scope"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/user.slice/user-1000.slice"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/user.slice"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 19.978419009,
+      "p50": 17.700147523,
+      "p95": 19.978419009
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.005825424,
+      "p50": 0.005163147,
+      "p95": 0.005825424
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.7254165660264604,
+      "p50": 0.6916464059657166,
+      "p95": 0.7254165660264604
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 20.70383557502646,
+     "p50": 18.397149096010253,
+     "p95": 20.70383557502646
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.179839178,
+      "p50": 0.164678866,
+      "p95": 0.179839178
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.0059063959999999995,
+      "p50": 0.00509806,
+      "p95": 0.0059063959999999995
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.7058356320370169,
+      "p50": 0.591578157083012,
+      "p95": 0.7058356320370169
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 0.8856748100370169,
+     "p50": 0.7520986489253119,
+     "p95": 0.8856748100370169
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.2903523857257064,
+    "cold.first_provider_request_seconds.p95": 1.3805688253197053,
+    "cold.fixture_work_overhead_seconds.p50": 1.868603002695088,
+    "cold.fixture_work_overhead_seconds.p95": 2.632462240994203,
+    "cold.result_seconds.p50": 1.2972558974458999,
+    "cold.result_seconds.p95": 1.3799585072270164,
+    "warm.first_provider_request_seconds.p50": 1.8458063465168626,
+    "warm.first_provider_request_seconds.p95": 3.706298718736359,
+    "warm.fixture_work_overhead_seconds.p50": 2.073975878418405,
+    "warm.fixture_work_overhead_seconds.p95": 2.1058623460329033,
+    "warm.result_seconds.p50": 2.087727970649645,
+    "warm.result_seconds.p95": 1.982639011634288
+   },
+   "run": "kimi-original-contended",
+   "source": "original 48d1559, superseded contended cpuset 0-3",
+   "speed_floor_gate": "timing_miss",
+   "startup_and_fixed_work_gate": "timing_miss"
+  },
+  {
+   "backend": "kimi",
+   "candidate": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 34.248502572,
+      "p50": 32.892322645,
+      "p95": 34.066288586
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.011919833000000001,
+      "p50": 0.005754624,
+      "p95": 0.010130255
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 1.85491677208568,
+      "p50": 1.4070545679099027,
+      "p95": 1.763203651959813
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 35,
+     "max": 35.2821002980927,
+     "p50": 34.25254529004451,
+     "p95": 35.265529226046056
+    },
+    "concurrency": 7,
+    "correct_item_records": 35,
+    "eligible_turns": 70,
+    "errors": [],
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 35,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 35,
+      "max": 1.199518662,
+      "p50": 0.369064496,
+      "p95": 1.071883702
+     },
+     "fixture_processing_seconds": {
+      "count": 35,
+      "max": 0.018930738,
+      "p50": 0.006331212,
+      "p95": 0.017295972
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 35,
+      "max": 1.762188074995342,
+      "p50": 1.2985690919822115,
+      "p95": 1.6467545740326717
+     },
+     "requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 35,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 35,
+     "max": 2.2275003540562466,
+     "p50": 1.716659217956476,
+     "p95": 2.1889847440179437
+    }
+   },
+   "git_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+   "harness_source_sha256": {
+    "fixture_gemini.py": "95ead35cbb17fe132268ca077d3c4874e16f3f5c95063555827ca34a17371520",
+    "fixture_metrics.py": "8a8c0c5ecacc8083694bb037e1242b9246662803370294dfb67fea0fce786940",
+    "fixture_plan.py": "a7b63212bc134e7e8b5dde3a6a7dbb5961920552d06e964a461e6e5dc059a64c",
+    "fixture_server.py": "019ffb2765992d9890a6910b0e31408d1f040bb1574797b3172cad8c89dfb10d",
+    "fixture_wire.py": "6364ebdf23f29b32e8eb73c9be182e8909754a106f468bd1ab65c92e15e2e363",
+    "metrics.py": "e6d05d63c9324b0b8e61c5c54f0d3c5e2196c5dd5daddba83e5871fa417d9b84",
+    "recover_usage.py": "850fd28e88e821624e00158e44c695028382aa54b0d33e89571244abef43b618",
+    "run.py": "07ea0655672316e9231239f37b18cda0e7ee579267490f29e69babc8df394b28",
+    "setup_fixture.py": "654feca5572f9d9f057f1da0a446c1fa47191869352b0d83a1df4c15139259f5",
+    "setup_opencode_database.py": "ab2434a266dfb018caf56135fc77edf56989f681ddf571c0163ec0b5320d3e7e",
+    "setup_zcode_fixture.py": "731557727fb786ee33b96d48e7383211a7dce1107da95feba0a5ba1aab5f634f",
+    "test_agy_workspace.py": "4b66571bf48e12adc0286783396cda5214b7e08376a4d0a1af1c65d6745cf76c",
+    "test_fixture.py": "e1d5ffffd591bba683b437faa48e4d7be0e368aa476edf55780c0aa4d0e81083",
+    "test_fixture_gemini.py": "26a497b21343baa9cba3b834681c8a9329e68142c505b37001e372d6631b691b",
+    "test_fixture_metrics.py": "11cef3db340382dec057cdeba6b11a38b4f642ee553dd611f68cc33cebdff009",
+    "test_fixture_setup.py": "6bd4bf2cd7cf3c4a4b2da7cd3d459acbec51fa8eab50daf2f4ee4b1b0f5d926c",
+    "test_metrics.py": "d4fc819acd855071c8b20cb36d709b7e95cdccf9599a1da2d716bf89c3f54f4f",
+    "test_opencode_database.py": "bdddb277291e0af4891973b23d931235857688b22e4d75eb443400b8c6200d02",
+    "test_rate_limit.py": "6214540d99cf96c1a88a4b458752ad666b10ec10bc5372f398cbda3220a62a0f",
+    "test_usage_cleanup.py": "66b785c964d6cd0f731b58eb4d5eb76542934ea14e2388697a5d1b9bba32065a",
+    "workload.py": "70b3994dcd2e49f489748fe46aa9d344dc985cb888869e12d7c4432d91d4ab2b"
+   },
+   "limits": {
+    "effective": {
+     "allowed_cpus": [
+      0,
+      1,
+      2,
+      3
+     ],
+     "cpu_quota_cores": 4.0,
+     "memory_max_bytes": 17179869184,
+     "memory_swap_max_bytes": 0
+    },
+    "hierarchy": [
+     {
+      "cpu.max": "400000 100000",
+      "cpuset.cpus.effective": "",
+      "memory.max": "17179869184",
+      "memory.swap.max": "0",
+      "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/run-r5c90aa434c80434ea023ab9fe22a6aea.scope"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/user.slice/user-1000.slice"
+     },
+     {
+      "cpu.max": "max 100000",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "max",
+      "memory.swap.max": "max",
+      "path": "/sys/fs/cgroup/user.slice"
+     },
+     {
+      "cpu.max": "",
+      "cpuset.cpus.effective": "0-63",
+      "memory.max": "",
+      "memory.swap.max": "",
+      "path": "/sys/fs/cgroup"
+     }
+    ],
+    "valid_4cpu_16gib": true
+   },
+   "limits_valid": true,
+   "original": {
+    "cold": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 30.060236524,
+      "p50": 28.060653797,
+      "p95": 30.060236524
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.005228676,
+      "p50": 0.004977883000000001,
+      "p95": 0.005228676
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.9841309070808997,
+      "p50": 0.9684102749551364,
+      "p95": 0.9841309070808997
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 31.0443674310809,
+     "p50": 28.97478566400241,
+     "p95": 31.0443674310809
+    },
+    "concurrency": 1,
+    "correct_item_records": 5,
+    "eligible_turns": 10,
+    "failed_item_records": 0,
+    "failed_turns": 0,
+    "partial": false,
+    "repeats": 5,
+    "requested_repeats": 5,
+    "settings": {
+     "effort": "low",
+     "model": "__kimi_env_model__",
+     "permission": "bypass",
+     "provider": "cli-fixture",
+     "web_search": true
+    },
+    "warm": {
+     "auxiliary_cancelled_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_failed_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "auxiliary_requests": {
+      "count": 5,
+      "max": 0,
+      "p50": 0,
+      "p95": 0
+     },
+     "first_provider_request_seconds": {
+      "count": 5,
+      "max": 0.220514692,
+      "p50": 0.164666848,
+      "p95": 0.220514692
+     },
+     "fixture_processing_seconds": {
+      "count": 5,
+      "max": 0.007255407,
+      "p50": 0.0058149180000000005,
+      "p95": 0.007255407
+     },
+     "fixture_work_overhead_seconds": {
+      "count": 5,
+      "max": 0.9820190700389065,
+      "p50": 0.7376016189143019,
+      "p95": 0.9820190700389065
+     },
+     "requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     },
+     "workload_requests": {
+      "count": 5,
+      "max": 4,
+      "p50": 4,
+      "p95": 4
+     }
+    },
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 1.1131860660389066,
+     "p50": 0.8805536609143019,
+     "p95": 1.1131860660389066
+    }
+   },
+   "ratios": {
+    "cold.first_provider_request_seconds.p50": 1.1721866098685327,
+    "cold.first_provider_request_seconds.p95": 1.1332674830685905,
+    "cold.fixture_work_overhead_seconds.p50": 1.4529529521721436,
+    "cold.fixture_work_overhead_seconds.p95": 1.7916352786742327,
+    "cold.result_seconds.p50": 1.18215008342923,
+    "cold.result_seconds.p95": 1.135971905510274,
+    "warm.first_provider_request_seconds.p50": 2.2412798962423817,
+    "warm.first_provider_request_seconds.p95": 4.860826697207096,
+    "warm.fixture_work_overhead_seconds.p50": 1.7605290697349805,
+    "warm.fixture_work_overhead_seconds.p95": 1.676906919910862,
+    "warm.result_seconds.p50": 1.9495225494537423,
+    "warm.result_seconds.p95": 1.9664140711059146
+   },
+   "run": "kimi-superseded-contended",
+   "source": "candidate before review, superseded contended cpuset 0-3",
+   "speed_floor_gate": "pass",
+   "startup_and_fixed_work_gate": "timing_miss"
+  }
+ ],
+ "canonical_artifact_sha256": "5b584dde4fd617db725398082fb9ce43130fcaffa7825faec30e618eed375819",
+ "conditions": {
+  "discarded_trials": "A ladder that shared cpuset 8-11 with another unit's harness; a kimi comparison begun before the candidate source was final; a batch of rungs that ran after the fixture server was killed. All were repeated rather than reported.",
+  "fixture_endpoint": "http://127.0.0.1:18916",
+  "fixture_host_cpus": "outside the group",
+  "fixture_restart": "The fixture server was killed once mid-session and restarted from unchanged source, so the fixture revision is the same for every retained trial.",
+  "harness_arguments": "defaults for --timeout (240) and --grace (10); no retained rung used a grace above the harness's 45-second watchdog margin",
+  "integrity": "No retained rung recorded watchdog_killed, a cleanup survivor, a turn without a result, or a pidfd wait fallback.",
+  "measured_on": "2026-09-10",
+  "original_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+  "orphans": "Two processes of this unit's own, survivors of a batch killed when the fixture server died, sat in scopes pinned to 0-3 for about eighty minutes at near-zero CPU and were reaped before the final runs.",
+  "resource_group": "/sys/fs/cgroup/hmzbench/u16 via hmzbench-in: cpuset.cpus 8-11 exclusive (cgroup v2 cpuset, not task affinity), cpu.max 400000/100000, memory.max 16 GiB, memory.swap.max 0. The harness recorded valid_4cpu_16gib true for every rung.",
+  "serialization": "One run.py at a time; hmzbench-in refuses to start while the group holds a process.",
+  "speed_floor": "Complete-turn latency, from turn submission to the result and startup included, at most 2x the serial control of the same source, for cold and warm p50 and p95 alike. Throughput is not the reading: N sessions always finish more work than one.",
+  "superseded_condition": "Earlier figures from this unit were taken on cpuset 0-3 with taskset plus a systemd user scope, while sibling units' benchmarks held neighbouring quads. They are systematically pessimistic and are not reported. Every backend cleared a higher width once the cores were exclusive: claude 6 to 7, dsh 8 to 12, mimo 5 to 8, opencode 4 to 6.",
+  "synthetic_model": true,
+  "validity_checks_retained": "All items correct, a fresh execution proof per turn, immutable task inputs, the turn-two marker recalled from the conversation alone, exactly one result, at least one tool event, no cleanup survivors, no watchdog kill."
+ },
+ "limitations": [
+  "Synthetic loopback responses. No real-model throughput, provider limit or reasoning quality is established.",
+  "Kimi, mimo and opencode are confirmed widths rather than boundaries: the width above each was never tried. The run that would have tried mimo 9 and opencode 7 was stopped when this unit was asked to hand over.",
+  "Five-repeat groups pool more observations than five serial controls, so their p95 estimators carry different uncertainty.",
+  "Kimi's serial cold-startup control rose monotonically across five trials on this host, 17.7 to 28.1 to 38.4 to 43.1 to 55.1 seconds, while the CLI's own home grew past 265 MB and 3,900 files. No cause was established. Kimi rungs are comparable only to the serial controls taken beside them.",
+  "The kimi driver change's measured result is its call count against the shared daemon, 79 daemon calls per cold/warm task pair before and 43 after, taken from an instrumented probe rather than from these rungs. No timing improvement is claimed.",
+  "Mixed-backend concurrency is not measured here."
+ ],
+ "real_model_performance_verified": false,
+ "revision": "speed-floor-five-backends-v2-isolated-cgroup",
+ "synthetic_model": true
+}
