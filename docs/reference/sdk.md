@@ -92,7 +92,7 @@ run.wait(timeout=60)
 | `configures(named)` | What it can be [set up with](/reference/flows#settings-of-the-flow-s-own), or `None`. |
 | `resumes(named)` | Whether it says it can be [picked up](/user/resuming). |
 | `fork(named, into=None)` | Copies it into this project's own flows, whole. |
-| `running()` | Every flow running in this process now, the one started first and whatever it called. |
+| `running()` | The branch of flows this is asked from, or every flow of the run from outside one. |
 | `set_up_from(path)` | Reads a flow's YAML setup file. |
 | `verses` | [Where flows come from](#flowverses). |
 

@@ -170,9 +170,25 @@ A record of a called flow holds the same events as the run's own. Its `began` al
 as the shape it ran in. Its `ended` says how *the call* ended — a call that raised is `failed`
 inside a run that may still be `done`.
 
+**Records nest.** A call made from inside a called flow is written under *that* flow's record,
+so a recursion five levels deep with two branches at every level reads back as the tree it ran
+as rather than as thirty-one things one run did. `hmz.epic.tree` reads it that way:
+
+```python
+from hmz.epic import tree
+
+for one in tree(epic):                 # the calls the run itself made
+    print(one.flow, one.record, len(one.calls))   # and what each of those called in turn
+```
+
+Two calls that ran at once are two of these, with `began` and `ended` that overlap and a
+`record` apiece — which is what tells them from one another, the flow's name being the same
+name.
+
 It is still one run and still one directory: a called flow is part of the run that called it,
 not another run. `hmz.epic.sessions` reads every record, so every session of a run is one list
-however many flows it took, each saying which `flow` opened it.
+however many flows it took, each saying which `flow` opened it and which `record` — which is
+to say which *call* of that flow — it was opened in.
 
 A session the flow [branched](/weaver/branching) also says `parent`, the id of the conversation
 it was forked from. The backend's own log cannot: it shows a session that opened on an agent

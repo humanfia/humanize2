@@ -101,6 +101,28 @@ await agent.abatch(prompts)              # agent.batch(prompts)
 The difference is where the waiting happens. The turn runs on a thread of its own, and the loop
 is handed straight back.
 
+## Gather whole flows
+
+`load` answers with a flow to run, and a coroutine flow is awaited by whoever called it — so
+whole flows gather the same way turns do:
+
+```python
+await asyncio.gather(
+    load("official/rlar")([agents[0].clone()], one),
+    load("official/rlar")([agents[1].clone()], two),
+)
+```
+
+Each gathered call is a **branch of the run in its own right**: its own record in the epic, its
+own skills, its own settings, its own line in `running()`, and its own unwinding if the run is
+stopped. Neither is under the other, and neither can see the other in `running()` — from inside
+a flow that is the branch you are on and nothing else.
+
+**Give each branch an agent of its own.** Two branches driving one agent are two flows sharing
+one, and a session it opens then belongs to neither: humanize writes it where they were both
+called from rather than guessing. See [a flow that calls a
+flow](/weaver/calling-flows#run-several-calls-at-once).
+
 ## Run one agent in several directories
 
 A worktree per task, a checkout per shard: **a session apiece**, and their turns going

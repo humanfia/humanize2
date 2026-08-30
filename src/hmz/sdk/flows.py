@@ -342,7 +342,13 @@ class Flows:
         return fork(named, into)
 
     def running(self) -> tuple[Running, ...]:
-        """Every flow running in this process now, the one started first and what it called."""
+        """Every flow running in this process now: the branch inside one, all of them outside.
+
+        Asked from inside a flow it answers with the branch that flow is on -- the one
+        somebody started, then each flow called to get there. Asked from anywhere else it
+        answers with every flow of the run, oldest first, each saying how deep it is and
+        what called it.
+        """
         from hmz.flows import running
 
         return running()
