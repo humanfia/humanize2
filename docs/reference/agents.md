@@ -547,6 +547,13 @@ mapping of model to tokens spent.
 | `failed` | The turn closed the other way, carrying what went wrong in place of an answer. |
 | `took` | A word [put into the running turn](#talking-to-a-turn-already-running) is now in front of the model, and is what the event carries. |
 
+A `text` or `reasoning` event is **one whole thing the agent said**, never one of the fragments
+it streamed. Most backends send their words a token at a time; humanize gathers those and hands
+over the utterance they came to — as the agent reaches for a tool, since what it said before
+reaching is what says why it reached, and again as the message ends. So a paragraph is one
+event, and a turn of ten tool calls is ten or so events rather than several thousand. If you
+want the tokens as they land, read them from the backend yourself; a flow reads what was said.
+
 A watcher sees three more that a stream does not: `begins` and `ends`, which bracket the turn,
 and `asks`, which is the agent stopping to ask its user something.
 

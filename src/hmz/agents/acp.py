@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
-from .event import Event, Failed
+from .event import Event, Failed, Saying
 
 if TYPE_CHECKING:
     import os
@@ -232,6 +232,9 @@ class AcpSession(SessionBase):
         """
         super().__init__(agent, cwd)
         self._link: AcpConnection | None = None
+        #: The chunks a turn arrives in, gathered into the messages they are chunks of: ACP
+        #: says an agent's words a fragment at a time, and a fragment is not a thing to show.
+        self._saying = Saying()
 
     def _connection(self) -> AcpConnection:
         """The agent, started and initialized and holding a session, made on first use.
@@ -406,12 +409,14 @@ class AcpSession(SessionBase):
         """
         kind = str(update.get("sessionUpdate") or "")
         if kind == "tool_call":
+            # What it said before reaching for something is what says why it reached.
+            yield from self._saying.upto()
             named = str(update.get("title") or update.get("kind") or "tool")
             yield Event(kind="tool", text=named[:120])
         elif (says := _SAYS.get(kind)) is not None:
             content = cast("dict[str, Any]", update.get("content") or {})
             if words := str(content.get("text") or ""):
-                yield Event(kind=says, text=words)
+                self._saying.delta(says, words)
 
     def _stream(
         self, prompt: str, *, schema: type[BaseModel] | None = None
@@ -432,6 +437,7 @@ class AcpSession(SessionBase):
         """
         del schema
         link = self._connection()
+        self._saying = Saying()
         said: list[str] = []
         try:
             at = link.send(
@@ -445,18 +451,30 @@ class AcpSession(SessionBase):
                 if event.kind == "text":
                     said.append(event.text)
                 yield event
+            # And whatever the last message of the turn held back: nothing follows it to
+            # close it, the thing that ends it being the turn's own answer.
+            for event in self._saying.rest():
+                if event.kind == "text":
+                    said.append(event.text)
+                yield event
             answered = link.answers.pop(at)
         except _Stopped as gone:
             link.stop()
             self._link = None
+            # What it had said before it went is what says how far it got, and is the whole of
+            # the diagnostic for an agent that stopped mid-sentence.
+            said += [one.text for one in self._saying.rest() if one.kind == "text"]
             raise Failed(
-                1, list(cast("AcpAgent", self._agent).command), "".join(said), str(gone)
+                1,
+                list(cast("AcpAgent", self._agent).command),
+                "\n".join(said),
+                str(gone),
             ) from gone
         if isinstance(answered, Exception):
             raise Failed(
                 1,
                 list(cast("AcpAgent", self._agent).command),
-                "".join(said),
+                "\n".join(said),
                 str(answered),
             )
         why = str(cast("dict[str, Any]", answered).get("stopReason") or "")
@@ -464,10 +482,10 @@ class AcpSession(SessionBase):
             raise Failed(
                 1,
                 list(cast("AcpAgent", self._agent).command),
-                "".join(said),
+                "\n".join(said),
                 f"the turn ended on {why}",
             )
-        yield Event(kind="result", text="".join(said).strip())
+        yield Event(kind="result", text="\n".join(said).strip())
 
     def interject(self, text: str) -> None:
         """Says something to the turn already running, which ACP has no way of doing.
