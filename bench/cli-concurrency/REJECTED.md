@@ -98,3 +98,49 @@ These routes do not provide a validated replacement for local print-and-resume w
 The benchmark therefore retains the official local print command per turn, including
 its measured startup overhead. Standard Cursor service authentication is evaluated
 separately from the local model fixture.
+
+## Antigravity: capping the Go runtime's procs
+
+Antigravity CLI is a Go executable, so `GOMAXPROCS` bounds the scheduler and garbage
+collector it starts. Inside four CPUs the runtime picks four, and sixteen concurrent
+sessions therefore ask for sixty-four workers on four cores. An optional profile set
+`GOMAXPROCS=2` in the environment every session inherits, changing nothing else, and was
+compared with the default sixteen-session trial against the same original serial controls.
+
+It is not a saving. Cold complete-task p50 went from 3.262x to 3.389x of the serial control
+and warm p50 from 2.695x to 2.837x; the rung's own CPU seconds per task pair did not fall.
+One of the forty-eight task pairs also failed, on the watchdog, after the harness's whole
+240-second item timeout. Whatever the sixteen processes are contending for, it is not the
+Go scheduler's worker count, and halving it costs a turn. Both trials predate the
+measurement-group corrections described in [the mock evaluation](MOCK-RESULTS.md); they are
+kept for the direction they establish, not for their absolute ratios.
+
+## Antigravity: a cheaper boot from its own command line
+
+Half of what a concurrent Antigravity rung spends is the official binary starting: 0.33 to
+0.47 CPU seconds per session, against roughly 0.8 for a whole cold-and-warm task pair, and
+the driver's own share of that pair is 0.014. Five launch shapes were timed five times each
+at rest -- the benchmark's own command line, then that command without `--add-dir`, with
+`--disable-slash-commands`, with `--log-file /dev/null`, with both, and with
+`--new-project`. Every one of them lands between 0.416 and 0.476 CPU seconds, which is one
+population. The number of conversations already in the application data directory does not
+move it either: a directory holding 124 of them boots in 0.330-0.356 against 0.362-0.374
+for an empty one.
+
+`--disable-slash-commands` is refused on its own terms as well: it also disables skill
+expansion, and `specs/agents.md` says a driver MUST NOT switch a skill of its CLI on or off.
+There is no flag that makes this CLI boot for less, so a session's boot is the floor of what
+a cold turn under concurrency costs.
+
+## Antigravity: taking the native fingerprint off the cold path
+
+Every ordinary turn fingerprints the CLI's settings, skills and plugins before the process
+starts, so that one installed between turns restarts it. Moving that snapshot to just after
+the spawn would let the boot and the walk overlap, and would take the walk out of the
+moment every session at once is starting a process.
+
+It buys nothing worth its risk. The whole fingerprint measures **1.55 ms per turn** in the
+fixture's configuration, so at ten sessions the serialized worst case is about 15 ms of a
+1.5-second cold turn. Against that, a snapshot taken after the spawn records a skill
+installed in that window as one the process was already started with, and the next turn
+would not restart for it -- losing exactly the guarantee the fingerprint exists to give.
