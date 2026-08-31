@@ -69,6 +69,38 @@ faster under the account this machine is already signed into than under one huma
 and why a flow running many sessions of an account at once is doing the same work in the same
 four cores as its agents.
 
+## A credential read a thousand times is one that should be in memory
+
+Of the path syscalls a pi turn makes, more than half ask about one file: its `auth.json`, six to
+eight hundred times, for a token of a few hundred bytes that did not change. Answering each of
+those with the provider's directory is putting the same question to a filesystem eight hundred
+times.
+
+So the file is copied once into memory — a directory of the run's own on `/dev/shm`, at `0700`,
+holding files at `0600` — and the reads are answered there. The writes are not: a call that could
+change a credential is answered with the provider's own file, because a refreshed token has to be
+durable the moment the CLI writes it. Staging the write and copying it back at the end of the
+turn would lose the refresh of a turn that was killed, and two agents of one account would race
+over whose copy landed last. Writes are rare and reads are thousands, so the rare one goes to the
+safe place.
+
+A write drops the copy, so the next read makes a new one out of what was just written — otherwise
+the CLI would read back the token it had itself replaced. A copy is also held against the file it
+was made from about once a second, which is what keeps two agents of one account honest: the
+other one's refresh is a write this run never saw.
+
+The copies go when the turn does. A turn usually ends by killing the process it ran in, and a
+killed process runs no teardown, so they are swept from both ends: by whoever did the killing
+once the process has been waited on, and by the next turn before it copies anything of its own.
+A directory whose process is still running is left alone — it belongs to a turn that is reading
+from it.
+
+What this buys is not the stop. The stop is still the kernel's and is still nearly all of what a
+redirected turn costs: about thirty microseconds, against the one microsecond a warm page cache
+takes to answer a `statx`. What it buys is that the answer no longer depends on the filesystem
+the account's directory sits on — a home on a network filesystem, or a disk something else is
+hammering, answers that same question in milliseconds, eight hundred times a turn.
+
 ## The environment is part of the account
 
 A CLI reads a key, a token or an endpoint out of the environment, and it does not care whether

@@ -12,6 +12,11 @@ Only those paths. Everything else the agent does is untouched and runs at native
 the agent is told none of it: what it reads back is a credentials file at the name it wrote,
 and what it writes when a token is refreshed lands where it read from.
 
+Where it reads it back from is memory. These CLIs ask about a credential hundreds of times a
+turn and change it once in a while, so a read is answered with a copy on tmpfs that is made
+once -- :mod:`hmz.providers._staging` -- and a write with the provider's own file, which is
+where a refreshed token has to be durable the moment it is written.
+
 Two supervisors cannot be nested -- a process has one tracer -- so a turn that is also
 anchored is not wrapped in this: the anchor is told the same swaps and its own supervisor
 makes them. This is the case where the agent runs on this machine, which is most of them.
@@ -29,7 +34,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-__all__ = ["Swaps", "command", "read", "run"]
+__all__ = ["Swaps", "command", "read", "run", "swept"]
 
 #: `AT_FDCWD`, the directory descriptor that means "wherever the process is".
 _AT_FDCWD = -100
@@ -174,7 +179,33 @@ def run(swaps: Swaps, argv: Sequence[str]) -> int:
         except BaseException as why:  # noqa: BLE001
             os.write(2, f"hmz: cannot run {argv[0]}: {why}\n".encode())
         os._exit(127)
-    return tracing.watch(pid)
+    try:
+        return tracing.watch(pid)
+    finally:
+        # The copies this run answered reads with, which are a secret in memory that belongs
+        # to nothing once the program is over. A signal aimed here is passed on to the
+        # program rather than acted on, so this runs for every way a run ends but the one
+        # that runs nothing at all -- and what that leaves is swept up by the next run.
+        tracing.close()
+
+
+def swept(pid: int) -> None:
+    """Takes away what a supervisor that was killed left of a credential in memory.
+
+    A turn is ended by killing the process it ran in, and `SIGKILL` runs no teardown of its
+    own, so whoever ended one says so here: the copies it was answering reads from are a
+    secret that belongs to nothing the moment that process is gone.
+
+    Nothing at all for a turn that ran without a supervisor, which is most of them, and
+    nothing for a process id that is somebody's again -- one still running is one still
+    reading what is in there.
+
+    Args:
+      pid: The process the turn ran in, after it has been waited on.
+    """
+    from ._staging import swept as sweep
+
+    sweep(pid)
 
 
 def failed(status: int) -> int:

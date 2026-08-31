@@ -18,6 +18,7 @@ supervisor: this is the file the redirect is tested in, so it is the file they c
 from __future__ import annotations
 
 import errno
+import os
 import platform
 import signal
 import subprocess
@@ -313,6 +314,70 @@ def test_a_process_started_below_the_program_is_answered_too(account: Account) -
     )
 
     assert done.stdout == PROVIDER, done.stderr
+
+
+#: What a program prints to say which file it was really given: the fd it opened, read back
+#: through `/proc`, which is the path the kernel resolved rather than the one it named.
+_WHICH = (
+    "import os, sys\n"
+    "handle = os.open(sys.argv[1], int(sys.argv[2]))\n"
+    "print(os.readlink(f'/proc/self/fd/{handle}'))\n"
+)
+
+
+@traced
+@pytest.mark.timeout(60)
+def test_a_credential_read_over_and_over_is_read_out_of_memory(
+    account: Account,
+) -> None:
+    """Pi asks about its token eight hundred times a turn, and it does not change."""
+    done = account.run(
+        sys.executable,
+        "-c",
+        _WHICH + "print(open(sys.argv[1]).read())\n",
+        str(account.named),
+        str(os.O_RDONLY),
+    )
+
+    given, said = done.stdout.splitlines()[:2]
+    assert given.startswith("/dev/shm/hmz-"), done.stderr
+    assert said == PROVIDER  # and what it holds is the provider's, not this machine's
+    # And it is gone when the run is: a copy of a secret belongs to nothing afterwards.
+    assert not Path(given).exists()
+    assert not Path(given).parent.exists()
+
+
+@traced
+@pytest.mark.timeout(60)
+def test_a_credential_opened_for_writing_is_given_the_providers_own_file(
+    account: Account,
+) -> None:
+    """A refreshed token has to be durable the moment it is written, not at teardown."""
+    done = account.run(
+        sys.executable,
+        "-c",
+        _WHICH,
+        str(account.named),
+        str(os.O_WRONLY | os.O_CREAT),
+    )
+
+    assert done.stdout.strip() == str(account.instead), done.stderr
+
+
+@traced
+@pytest.mark.timeout(60)
+def test_a_credential_written_through_is_read_back_as_it_was_written(
+    account: Account,
+) -> None:
+    """Cache coherence, in the place it matters: a CLI must not read its own stale token."""
+    done = account.run(
+        "sh",
+        "-c",
+        f'cat "{account.named}"; printf refreshed > "{account.named}"; '
+        f'cat "{account.named}"',
+    )
+
+    assert done.stdout == f"{PROVIDER}refreshed", done.stderr
 
 
 @traced
