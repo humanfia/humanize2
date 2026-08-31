@@ -19,6 +19,7 @@ from hmz.agents import AgentConfig, Stopped
 from hmz.epic import JOURNAL, called, epics, linked, opened, read, sessions
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, events, written
+from tests.supervising import traced
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -220,6 +221,7 @@ def test_a_session_is_named_for_whose_it_is_what_ran_it_and_which_account(
     assert one.name == called("builder", "claude", "", "the-session")
 
 
+@traced
 def test_a_session_says_which_account_took_its_turns(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

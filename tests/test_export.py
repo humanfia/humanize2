@@ -21,6 +21,7 @@ from hmz.epic import epics, sessions
 from hmz.exporting import MANIFEST, REDACTED, TRANSCRIPT, bundle, logged, plain, sized
 from hmz.runner import Runner
 from tests.stubs import ShellAgent, written
+from tests.supervising import traced
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -238,6 +239,7 @@ def test_a_backend_that_logs_nothing_says_so_rather_than_carrying_nothing(
     assert said["backends"]["opencode"]["logs"] is False
 
 
+@traced
 def test_no_account_variable_rides_along(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

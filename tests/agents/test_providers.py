@@ -22,6 +22,7 @@ from hmz.agents import AgentConfig, ClaudeCodeAgent, ClaudeCodeAgentConfig
 from hmz.backends import named
 from hmz.machines import MachineBase, MachineConfig
 from tests.stubs import HereAnchor, ShellAgent, ShellSession
+from tests.supervising import traced
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -66,6 +67,7 @@ def test_an_agent_with_no_provider_is_run_exactly_as_it_was() -> None:
     assert agent.new()("echo hi") == "hi"
 
 
+@traced
 def test_a_provider_that_is_variables_is_what_the_turn_is_run_with(home: Path) -> None:
     """A key, an endpoint, an account on somebody's cloud: every CLI reads one as a variable."""
     providers.add(
@@ -90,6 +92,7 @@ def test_a_provider_that_is_variables_is_what_the_turn_is_run_with(home: Path) -
     assert agent.new()('printf %s "$PATH"') == os.environ["PATH"]  # and keeps its own
 
 
+@traced
 @pytest.mark.timeout(120, method="thread")
 def test_a_turn_under_a_provider_reads_that_providers_credentials(home: Path) -> None:
     """The whole errand: the CLI names its own path and is answered with the provider's."""
@@ -108,6 +111,7 @@ def test_a_turn_under_a_provider_reads_that_providers_credentials(home: Path) ->
     }
 
 
+@traced
 @pytest.mark.timeout(120, method="thread")
 def test_what_a_turn_under_a_provider_writes_lands_in_that_provider(home: Path) -> None:
     """A token refreshed mid-run is written back where it was read from, which is the provider."""
@@ -122,6 +126,7 @@ def test_what_a_turn_under_a_provider_writes_lands_in_that_provider(home: Path) 
     ).read_text() == '{"token": "this machine"}'
 
 
+@traced
 @pytest.mark.timeout(180, method="thread")
 def test_two_agents_of_one_cli_under_two_providers_are_two_accounts(home: Path) -> None:
     """The flame-chase case: one flow, one CLI, two accounts, at the same time."""
@@ -140,6 +145,7 @@ def test_two_agents_of_one_cli_under_two_providers_are_two_accounts(home: Path) 
     assert [json.loads(one)["account"] for one in said] == ["first", "second"]
 
 
+@traced
 @pytest.mark.timeout(180, method="thread")
 def test_two_accounts_run_at_the_same_time_without_reading_each_others(
     home: Path,
@@ -172,6 +178,7 @@ def test_two_accounts_run_at_the_same_time_without_reading_each_others(
     assert [json.loads(one)["account"] for one in said] == ["first", "second"]
 
 
+@traced
 def test_a_key_left_lying_about_does_not_outrank_the_account_it_was_told(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -195,6 +202,7 @@ def test_a_key_left_lying_about_does_not_outrank_the_account_it_was_told(
     assert agent.new()('printf %s "$PATH"') == os.environ["PATH"]
 
 
+@traced
 def test_a_provider_keeps_the_variables_it_set_itself(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

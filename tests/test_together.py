@@ -24,6 +24,7 @@ from hmz.coganchor import AnchorConfig
 from hmz.machines import AnchoredConfig
 from tests.coganchor.conftest import VIRTUAL_WORKSPACE
 from tests.stubs import written
+from tests.supervising import traced
 from tests.tracing.conftest import labels
 
 if TYPE_CHECKING:
@@ -139,6 +140,7 @@ def test_a_flow_is_traced_as_the_agents_it_ran(
     }
 
 
+@traced
 @pytest.mark.timeout(180)
 def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
     sandbox: Path, tmp_path: Path
@@ -186,6 +188,7 @@ def test_an_anchored_flow_leaves_its_work_there_and_its_trajectory_here(
     }
 
 
+@traced
 @pytest.mark.timeout(180)
 def test_one_flow_runs_two_agents_of_one_cli_as_two_accounts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
