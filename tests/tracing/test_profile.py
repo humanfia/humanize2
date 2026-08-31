@@ -52,7 +52,12 @@ def test_the_programs_a_run_starts_are_written_down(tmp_path: pathlib.Path) -> N
     # Two commands rather than one, and the second a builtin that starts nothing. A shell
     # given a single simple command may `exec` it and cease to be a process of its own, which
     # one of these systems does and the other does not -- and this test is about the shell.
-    said = "sleep 0.4; :"
+    #
+    # A whole second of it, for the reason the sampled flow beside this file runs for one: a
+    # program that lives for a handful of sample periods is a program a loaded machine misses
+    # altogether, and a test of the sampler must not be a test of what else the machine is
+    # doing.
+    said = "sleep 1; :"
     held = _ran(tmp_path, "sh", "-c", said)
 
     # By the tail of what it was started with, since the head of it is the platform's: one
@@ -75,7 +80,9 @@ def test_a_program_is_written_down_as_it_goes_rather_than_at_the_end(
     one = Profiler(tmp_path / PROFILE, every=0.01)
     one.start()
     try:
-        said = "sleep 0.1; :"  # two, so the shell does not `exec` the one and vanish
+        # Two, so the shell does not `exec` the one and vanish -- and a second of it, so the
+        # sampler has a hundred goes at seeing it rather than ten.
+        said = "sleep 1; :"
         subprocess.run(["sh", "-c", said], check=False, capture_output=True)
         time.sleep(0.1)
         # Nothing has stopped it, and the program it saw is already written down --
