@@ -49,7 +49,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     # Room for the slower of the two systems and for every test that has to time out before
     # the run can say so: a job killed at the wall reports nothing about what it was doing.
-    timeout-minutes: 30
+    # macOS spends about four seconds apiece on the suites that spawn a CLI per test, which
+    # is most of the difference between the two.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -77,7 +79,10 @@ jobs:
 
       # Everything except the `agent`-marked tests, which drive real coding agents and
       # need `--run-agents`. `-ra` in pyproject names whatever got skipped.
+      # `--durations` because the two systems are not the same speed and the difference is
+      # not spread evenly: a suite that spawns a CLI per test costs far more on one of them,
+      # and a list of the slowest twenty-five is how that stays visible.
       - name: pytest
         run: >
-          uv run --frozen pytest -q
+          uv run --frozen pytest -q --durations=25
           --cov=hmz --cov-report=term-missing --cov-report=xml
