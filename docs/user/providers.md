@@ -119,6 +119,14 @@ Files are `0600` in a directory at `0700`, and they keep the names the CLI gave 
 the CLI writes them: a login run for a provider is the CLI's own login with those paths pointed
 here.
 
+**A credential is read out of memory and written to disk.** These CLIs ask about their token
+hundreds of times in a single turn — pi asks about its `auth.json` six to eight hundred times —
+and change it once in a while. So the file is copied once into memory when the turn first reads
+it, and every read after that is answered there; a write goes straight to the file above, where
+a refreshed token is durable the moment it lands, and the copy is dropped so the next read makes
+a new one. The copy is the turn's own, at `0600` in a directory at `0700` that goes away when the
+turn does.
+
 **A turn under a provider is run with the other accounts' variables unset.** An
 `ANTHROPIC_API_KEY` left in a shell profile is a key the CLI would rather have than the
 credential file it was signed in with, and the turn would be taken as the wrong account with

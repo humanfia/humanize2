@@ -81,6 +81,15 @@ Provider credentials are copies of the CLI's own credential files. humanize keep
 with the *other* accounts' variables unset. So an `ANTHROPIC_API_KEY` left in a shell profile
 cannot silently outrank the account the agent was told to run as.
 
+While a turn is running, the credential it reads is also held in memory — a directory of that
+turn's own under `/dev/shm`, at `0700`, holding files at `0600`, under a name that cannot be
+guessed. `/dev/shm` is shared between everyone on the machine, so the directory is made rather
+than opened: a name somebody else got in first with is refused and another taken, and nobody
+else can list it or read what is in it. It is unlinked when the turn ends — by the turn itself
+where it exits, and by whoever ended it where it was killed, since a killed process runs no
+teardown of its own. Anything a killed *driver* leaves behind is swept away by the next turn on
+that machine, and `/dev/shm` is empty again after a reboot either way.
+
 ## Reporting something
 
 Open an issue at [humanfia/humanize2](https://github.com/humanfia/humanize2/issues). If it is a

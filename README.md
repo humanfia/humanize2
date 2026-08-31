@@ -38,7 +38,13 @@ Three things to know before pointing one at a repository you care about. Each is
 
 ```sh
 pip install git+https://github.com/humanfia/humanize2.git
+# or, in an isolated environment
+pipx install git+https://github.com/humanfia/humanize2.git
+uv tool install git+https://github.com/humanfia/humanize2.git
 ```
+
+We recommend installing with `pipx` or `uv tool`, which give `hmz` an isolated environment of
+its own; `pip install` of the same URL works too.
 
 DeepSeek Harness arrives with humanize: its Python SDK and the runtime its turns are taken on
 are ordinary dependencies, so there is nothing extra to install for it.
