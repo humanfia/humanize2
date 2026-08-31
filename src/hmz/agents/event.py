@@ -27,11 +27,6 @@ __all__ = [
     "say",
 ]
 
-#: The kinds every backend here counts, and which of them each also counts beside those. A
-#: kind is named the same thing wherever it is counted, so that one flow reading two backends
-#: reads one word for one thing.
-COMMON = ("input", "output")
-
 
 class Usage(Mapping[str, float]):
     """Tokens, by the kind each of them went on.

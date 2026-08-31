@@ -7,19 +7,22 @@ import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
-from pathlib import Path
 from threading import Barrier
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import BaseModel
 
+from hmz import home
 from hmz.agents import Failed, QwenCodeAgent, QwenCodeAgentConfig
 from hmz.agents import qwen as backend
 from hmz.agents.skills import Loaded
+from hmz.machines import AnchoredConfig
+from tests.stubs import HereAnchor
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
 
 _FAKE = r"""
@@ -399,11 +402,28 @@ def test_compiled_bundle_is_shared_unless_the_environment_names_its_own(
 ) -> None:
     qwen.agent.new()("first")
     (shared,) = qwen.calls()
-    assert shared["compiled"] == str(Path("~/.cache/humanize/qwen-code").expanduser())
+    # Under humanize's own home, as pi keeps its own: a path outside it would be a cache an
+    # isolated run still wrote into whoever is sitting here's real one.
+    assert shared["compiled"] == str(home() / "compiled" / "qwen")
     monkeypatch.setenv("NODE_COMPILE_CACHE", str(tmp_path / "theirs"))
     qwen.agent.new()("second")
     _, theirs = qwen.calls()
     assert theirs["compiled"] == str(tmp_path / "theirs")
+
+
+def test_an_anchored_turn_is_given_no_compile_cache(qwen: _Qwen) -> None:
+    """It runs on another machine, where a path named from this one is somebody else's."""
+    anchored = QwenCodeAgent(
+        QwenCodeAgentConfig(
+            model="test-model",
+            effort="low",
+            machine=AnchoredConfig(
+                anchor=HereAnchor(target="ssh://box", workspace="/srv")
+            ),
+        )
+    )
+    anchored.new()("first")
+    assert all(one["compiled"] is None for one in qwen.calls())
 
 
 def test_usage_counts_each_model_request_once_across_warm_turns(qwen: _Qwen) -> None:

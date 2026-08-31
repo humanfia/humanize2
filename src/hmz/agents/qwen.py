@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
+from hmz import home
+
 from ._inputs import snapshot
 from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
 from .config import AgentConfig
@@ -73,7 +75,7 @@ _VERSION = {"$version": 4}
 #: two installed versions share it without reading each other's. Node makes it if it is not
 #: there, and a missing or unreadable entry is a compile rather than a failure.
 _COMPILED = "NODE_COMPILE_CACHE"
-_CACHE = "~/.cache/humanize/qwen-code"
+_CACHE = ("compiled", "qwen")
 
 #: The tools a turn is not given at each rung of the ladder, by the names Qwen Code calls
 #: them. A rung is said as refusals because the flag that carries the rest is the approval
@@ -234,8 +236,8 @@ class QwenCodeSession(StreamSessionBase):
         processes restart between turns so undiscovered custom skill paths cannot go stale.
         """
         cwd = Path(self.cwd)
-        home = Path(environment.get("HOME") or Path.home())
-        qwen = cwd / Path(environment.get("QWEN_HOME") or home / ".qwen").expanduser()
+        theirs = Path(environment.get("HOME") or Path.home())
+        qwen = cwd / Path(environment.get("QWEN_HOME") or theirs / ".qwen").expanduser()
         system = cwd / Path(environment[_SETTINGS]).expanduser()
         # Empty reads as unset, which is how Qwen itself reads it: an empty variable leaves
         # it looking beside the system settings file, which is the file written here.
@@ -253,7 +255,7 @@ class QwenCodeSession(StreamSessionBase):
         # somebody else's, so it stays watched like every other settings file here.
         ours = {system} if named else {system, defaults}
         paths = settings - ours
-        roots = (cwd, *cwd.parents, home)
+        roots = (cwd, *cwd.parents, theirs)
         for root in roots:
             paths.update(root / name for name in ("QWEN.md", "AGENTS.md", ".env"))
             paths.update(root / name / "skills" for name in (".qwen", ".agents"))
@@ -403,9 +405,15 @@ class QwenCodeSession(StreamSessionBase):
         held = {**super()._environment(), _SETTINGS: str(_thinking(self.effort))}
         # Whoever said where, said it: the provider's own variables are in `held` and the
         # flow's are in this process's environment, and either outranks a cache of ours.
-        if _COMPILED not in held and _COMPILED not in os.environ:
-            held[_COMPILED] = str(Path(_CACHE).expanduser())
-        return held
+        # And not for an anchored turn: it runs on another machine, where a path named from
+        # this one is a directory that is either absent there or somebody else's.
+        if (
+            held.get(_COMPILED)
+            or os.environ.get(_COMPILED)
+            or self._agent.anchor is not None
+        ):
+            return held
+        return {**held, _COMPILED: str(home().joinpath(*_CACHE))}
 
     def _reads(self, line: str, *, error: bool) -> Iterator[Event]:
         """Reads one record Qwen Code wrote, as the things it says the agent did.

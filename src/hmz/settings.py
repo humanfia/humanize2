@@ -18,11 +18,10 @@ had no second agent at all. And keyed by what the flow calls each one where it c
 anything, so that a flow which grows an agent in the middle does not silently hand the
 reviewer's model to the builder.
 
-Beside that, and in a file of its own, the agents that were written down to be used again:
-what an agent is -- a CLI, an account, a model at an effort, what it may do -- is worth saying
-once and reaching for from every flow that needs one like it. Those are not a workspace's, and
-not any flow's: an agent kept under a name is a template, and a flow that imports one takes a
-copy rather than a link.
+There is nowhere else an agent is written down. What an agent is -- a CLI, an account, a model
+at an effort -- is short enough now that a template kept under a name was more to hold in step
+than it saved, and an agent belongs to the flow that drives it: it is set up where the flow is
+set up, and remembered here against that flow's own name for it.
 """
 
 from __future__ import annotations

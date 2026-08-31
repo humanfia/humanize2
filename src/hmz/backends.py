@@ -1528,6 +1528,15 @@ def _spoken() -> Path:
     return home() / _SPOKEN
 
 
+#: What was read out of the added-backends file last time, and the moment the file carried
+#: then. Held because this is asked far more often than it changes: every turn builds a
+#: watchdog, every keystroke of a sheet that lists backends asks again, and each ask was
+#: opening and parsing the file afresh. Re-read when the file under it has moved, which is
+#: what `remember` and `forget` do -- the only two things that write it.
+_added: dict[str, tuple[str, ...]] | None = None
+_added_at: tuple[int, int] | None = None
+
+
 def speaking() -> dict[str, tuple[str, ...]]:
     """Every CLI somebody has added, and the command that starts each one.
 
@@ -1538,11 +1547,24 @@ def speaking() -> dict[str, tuple[str, ...]]:
     """
     import json
 
+    global _added, _added_at
+    at = _spoken()
     try:
-        held = json.loads(_spoken().read_text(encoding="utf-8"))
+        moved = at.stat()
+        stamp = (moved.st_mtime_ns, moved.st_size)
+    except OSError:
+        # No file is an answer, and a cheap one: nothing has been added.
+        _added, _added_at = {}, None
+        return {}
+    if _added is not None and stamp == _added_at:
+        return _added
+    try:
+        held = json.loads(at.read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        _added, _added_at = {}, stamp
         return {}
     if not isinstance(held, dict):
+        _added, _added_at = {}, stamp
         return {}
     found: dict[str, tuple[str, ...]] = {}
     for name, argv in cast("dict[str, object]", held).items():
@@ -1551,6 +1573,7 @@ def speaking() -> dict[str, tuple[str, ...]]:
         given = tuple(str(one) for one in cast("list[object]", argv))
         if given:
             found[name] = given
+    _added, _added_at = found, stamp
     return found
 
 
