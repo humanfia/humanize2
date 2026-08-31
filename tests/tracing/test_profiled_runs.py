@@ -26,16 +26,16 @@ if TYPE_CHECKING:
 
 CONFIG = AgentConfig(model="m", effort="high")
 
-#: A flow whose agent runs a program, which is what a turn mostly is.
+#: What the turn runs: a shell running a sleep, which is two programs, and the profile has to
+#: hold both of them.
 #:
-#: The sleep is a second rather than the tenth of one it takes to say what is being checked:
-#: what reads it is a sampler, taking one every :data:`hmz.tracing.profile.EVERY`, and a
-#: program that lives for a handful of those is one a loaded machine can miss altogether.
-#: Twenty samples is the difference between a test of the profiler and a test of the clock.
-#: What the turn runs, which is a shell running a sleep -- two programs, and the profile has
-#: to hold both.
+#: A second rather than the tenth of one it takes to say what is being checked. What reads it
+#: is a sampler, taking one every :data:`hmz.tracing.profile.EVERY`, and a program that lives
+#: for a handful of those is one a loaded machine can miss altogether. Twenty samples is the
+#: difference between a test of the profiler and a test of the clock.
 SAID = "sleep 1; echo the-session"
 
+#: A flow whose agent runs a program, which is what a turn mostly is.
 FLOW = f"""
 from hmz.agents import AgentBase
 from hmz.flows import flow
