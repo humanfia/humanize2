@@ -18,7 +18,10 @@ from hmz import backends
 from hmz.agents import AcpAgent, AcpAgentConfig, driver
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
+
+    from hmz.agents.acp import AcpSession
 
 #: An agent that speaks ACP: it answers the handshake, opens a session, and takes a turn --
 #: saying a thought, a tool call it asks permission for, and the answer it ends on. A prompt
@@ -110,6 +113,21 @@ def _agent(added: str) -> AcpAgent:
     )
 
 
+@pytest.fixture
+def session(added: str) -> Iterator[AcpSession]:
+    """One conversation on the stand-in agent, ended however the test ends.
+
+    The process is the session here: ACP opens one and holds the agent up between turns, so
+    a test that takes a turn and walks away leaves that process running for as long as the
+    suite does. Every test below that actually takes one comes through this.
+    """
+    held = _agent(added).new()
+    try:
+        yield held
+    finally:
+        held.close()
+
+
 def test_an_added_cli_is_written_down_and_read_back(added: str) -> None:
     """It outlives the run: a CLI is installed on a machine, not in one directory."""
     assert backends.speaking()[added] == ("my-agent", "--acp")
@@ -138,9 +156,10 @@ def test_an_added_cli_can_be_taken_away_again(added: str) -> None:
     assert backends.forget(added) is False
 
 
-def test_a_turn_opens_a_session_and_says_what_the_agent_said(added: str) -> None:
+def test_a_turn_opens_a_session_and_says_what_the_agent_said(
+    session: AcpSession,
+) -> None:
     """The handshake, the session, and the turn taken on it, in that order."""
-    session = _agent(added).new()
     said = list(session.stream("hi"))
 
     kinds = [event.kind for event in said]
@@ -150,21 +169,55 @@ def test_a_turn_opens_a_session_and_says_what_the_agent_said(added: str) -> None
     assert session.id == "ses-acp-1"
 
 
-def test_the_session_is_held_open_across_turns(added: str) -> None:
+def test_the_session_is_held_open_across_turns(session: AcpSession) -> None:
     """ACP opens a conversation once and prompts it many times."""
-    session = _agent(added).new()
     assert session("hi") == "hi"
     assert session("again") == "again"
     assert session.id == "ses-acp-1"
 
 
-def test_a_tool_call_is_permitted_by_the_kind_of_the_option(added: str) -> None:
+def test_a_tool_call_is_permitted_by_the_kind_of_the_option(
+    session: AcpSession,
+) -> None:
     """Never by its id: one agent calls it `proceed_once` and another `allow-once`.
 
     The stand-in offers the refusal first and carries the turn on only for the grant, so a
     client that picked whichever option came first would end this turn on a refusal.
     """
-    assert _agent(added).new()("hi") == "hi"
+    assert session("hi") == "hi"
+
+
+def test_ending_a_conversation_ends_the_agent_that_was_holding_it(added: str) -> None:
+    """The process is the session, so a conversation let go of is a process left running."""
+    held = _agent(added).new()
+    assert held("hi") == "hi"
+    link = held._link
+    assert link is not None
+    running = link.proc
+    assert running is not None
+    assert running.poll() is None
+
+    held.close()
+
+    assert running.wait(timeout=10) is not None
+    assert held._link is None
+
+
+def test_a_conversation_closed_twice_is_not_a_second_thing_to_end(added: str) -> None:
+    held = _agent(added).new()
+    assert held("hi") == "hi"
+
+    held.close()
+    held.close()  # the absence of a raised error is the whole assertion
+
+
+def test_a_conversation_dropped_without_a_turn_in_it_never_started(added: str) -> None:
+    """Nothing is spawned until the first turn, so there is nothing to end either."""
+    held = _agent(added).new()
+
+    held.close()
+
+    assert held._link is None
 
 
 def test_a_turn_that_ended_on_a_refusal_is_a_failed_turn(added: str) -> None:
