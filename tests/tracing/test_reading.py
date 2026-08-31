@@ -10,7 +10,7 @@ others -- and the shapes that matter are the ones somebody's log turns out to ha
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from hmz.tracing.session import label, mapping, records, summarize, text_of, truncate
 
@@ -77,10 +77,9 @@ def test_a_string_that_fits_is_left_alone() -> None:
 
 
 def test_a_wide_list_says_how_many_more_there_were() -> None:
-    said = truncate(list(range(500)))
+    said = cast("list[Any]", truncate(list(range(500))))
 
-    assert isinstance(said, list)
-    assert said[-1].startswith("… (+")
+    assert str(said[-1]).startswith("… (+")
     assert len(said) < 500
 
 
