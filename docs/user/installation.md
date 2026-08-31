@@ -20,6 +20,10 @@ Linux on x86-64 here plus `python3` on the far machine.
 pip install git+https://github.com/humanfia/humanize2.git
 ```
 
+```sh [pipx]
+pipx install git+https://github.com/humanfia/humanize2.git
+```
+
 ```sh [uv tool]
 uv tool install git+https://github.com/humanfia/humanize2.git
 ```
@@ -32,7 +36,11 @@ uv sync
 
 :::
 
-Either way the command is `hmz`:
+We recommend `pipx` or `uv tool`: both give `hmz` an isolated environment of its own and put
+it on your `PATH` from every directory, whereas `pip` installs into whichever environment is
+active at the time.
+
+Whichever way, the command is `hmz`:
 
 ```sh
 hmz --version
