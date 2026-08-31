@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import socketserver
 import subprocess
 import sys
 import threading
@@ -661,7 +662,19 @@ def endpoint(
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
             """Nothing: a suite is not somewhere a web server keeps a log."""
 
-    running = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    class Serving(ThreadingHTTPServer):
+        """The same, without the reverse lookup it names itself by.
+
+        On a machine whose resolver has nothing to say about `127.0.0.1` that lookup blocks
+        for the resolver's own timeout, which is half a minute.
+        """
+
+        def server_bind(self) -> None:
+            socketserver.TCPServer.server_bind(self)
+            host, port = self.server_address[:2]
+            self.server_name, self.server_port = str(host), int(port)
+
+    running = Serving(("127.0.0.1", 0), Handler)
     reader = threading.Thread(target=running.serve_forever, daemon=True)
     reader.start()
     try:

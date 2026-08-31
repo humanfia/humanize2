@@ -11,6 +11,7 @@ from __future__ import annotations
 import http.server
 import json
 import socket
+import socketserver
 import threading
 from typing import TYPE_CHECKING, Any
 
@@ -399,7 +400,19 @@ class _Source:
             def log_message(self, format: str, *args: object) -> None:  # noqa: A002
                 """Nothing: a suite is not a place for an access log."""
 
-        self._server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        class Serving(http.server.ThreadingHTTPServer):
+            """The same, without the reverse lookup it names itself by.
+
+            On a machine whose resolver has nothing to say about `127.0.0.1` that lookup
+            blocks for the resolver's own timeout, which is half a minute.
+            """
+
+            def server_bind(self) -> None:
+                socketserver.TCPServer.server_bind(self)
+                host, port = self.server_address[:2]
+                self.server_name, self.server_port = str(host), int(port)
+
+        self._server = Serving(("127.0.0.1", 0), Handler)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
 
