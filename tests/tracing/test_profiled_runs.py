@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 CONFIG = AgentConfig(model="m", effort="high")
 
 #: A flow whose agent runs a program, which is what a turn mostly is.
+#:
+#: The sleep is a second rather than the tenth of one it takes to say what is being checked:
+#: what reads it is a sampler, taking one every :data:`hmz.tracing.profile.EVERY`, and a
+#: program that lives for a handful of those is one a loaded machine can miss altogether.
+#: Twenty samples is the difference between a test of the profiler and a test of the clock.
 FLOW = """
 from hmz.agents import AgentBase
 from hmz.flows import flow
@@ -34,7 +39,7 @@ from hmz.flows import flow
 
 @flow
 def run(agents: tuple[AgentBase], task: str) -> None:
-    agents[0].new()("sleep 0.2; echo the-session")
+    agents[0].new()("sleep 1; echo the-session")
 """
 
 
@@ -97,6 +102,9 @@ def test_the_programs_and_the_sessions_are_one_document(
     names = [one["args"]["name"] for one in events if one["name"] == "process_name"]
     assert any(name.startswith("sh · ") for name in names)
     # And the whole of it is one span of time: the programs are where the turns are, rather
-    # than at some other point on the clock.
+    # than at some other point on the clock. Not a span with anything in it, though -- what
+    # bounds it is a sampler, and a sampler that caught both of these programs in the one
+    # sample gives an instant rather than a stretch, which is a fast machine rather than a
+    # wrong answer.
     began, ended = document["otherData"]["start"], document["otherData"]["end"]
-    assert began < ended
+    assert began <= ended
