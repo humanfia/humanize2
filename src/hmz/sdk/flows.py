@@ -191,10 +191,10 @@ class Flows:
           named: The flow, by the name it is offered under or by a path to a file.
 
         Returns:
-          The path, as a string.
-
-        Raises:
-          NotAFlow: If nothing of that name is a flow.
+          The path to run, resolved -- and `named` itself where nothing answers to it, so
+          that whatever asked hears the name back rather than an exception it would have to
+          tell apart from a flow that is genuinely called that. Whether a flow is there is
+          answered by what comes back being a file.
         """
         from hmz.flows import find
 
@@ -331,10 +331,15 @@ class Flows:
           into: Where to put it, defaulting to this project's own flows.
 
         Returns:
-          The name it is offered under from now on, which is the one it already had.
+          The directory it was copied to, spelled as it was reached -- this project's own
+          flows are named from the project, so a copy that went there is named from there
+          too. The name it is offered under from now on is the one it already had, yours
+          being looked in first: `official/rlar` forked is `rlar`.
 
         Raises:
-          NotAFlow: If nothing of that name is a flow.
+          ValueError: If nothing of that name is a flow, or there is already one of that
+            name here -- which is a copy to edit, run or take away rather than one to write
+            over.
           OSError: If it cannot be copied.
         """
         from hmz.flows import fork

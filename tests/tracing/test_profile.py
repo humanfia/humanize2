@@ -17,6 +17,7 @@ import pytest
 
 from hmz.tracing import chrome
 from hmz.tracing.profile import PROFILE, Process, Profiler, Thread, read
+from tests.sampling import sampled
 
 if TYPE_CHECKING:
     import pathlib
@@ -41,6 +42,7 @@ def _ran(at: pathlib.Path, *said: str) -> list[Process]:
     return read(at)
 
 
+@sampled
 @pytest.mark.timeout(60)
 def test_the_programs_a_run_starts_are_written_down(tmp_path: pathlib.Path) -> None:
     """Which is the whole of it: what ran, what started it, and how long it took.
@@ -49,10 +51,21 @@ def test_the_programs_a_run_starts_are_written_down(tmp_path: pathlib.Path) -> N
     under this process, and a suite that runs flows on threads of its own has other shells
     of its own going at the same time.
     """
-    said = "sleep 0.4"
+    # Two commands rather than one, and the second a builtin that starts nothing. A shell
+    # given a single simple command may `exec` it and cease to be a process of its own, which
+    # one of these systems does and the other does not -- and this test is about the shell.
+    #
+    # A whole second of it, for the reason the sampled flow beside this file runs for one: a
+    # program that lives for a handful of sample periods is a program a loaded machine misses
+    # altogether, and a test of the sampler must not be a test of what else the machine is
+    # doing.
+    said = "sleep 1; :"
     held = _ran(tmp_path, "sh", "-c", said)
 
-    shell = next(one for one in held if one.argv == ("sh", "-c", said))
+    # By the tail of what it was started with, since the head of it is the platform's: one
+    # system's `/bin/sh` is another's `bash`, and one of them records the path it resolved
+    # to where the other records the word that was typed.
+    shell = next(one for one in held if one.argv[-2:] == ("-c", said))
     # Timed against the clock the rest of a trace is timed by, rather than against the
     # machine's idea of when it booted -- which is out by half a second on an ordinary one.
     assert 0.2 <= shell.ended - shell.began <= 5.0
@@ -61,6 +74,7 @@ def test_the_programs_a_run_starts_are_written_down(tmp_path: pathlib.Path) -> N
     assert [one.name for one in held if one.ppid == shell.pid] == ["sleep"]
 
 
+@sampled
 @pytest.mark.timeout(60)
 def test_a_program_is_written_down_as_it_goes_rather_than_at_the_end(
     tmp_path: pathlib.Path,
@@ -69,14 +83,19 @@ def test_a_program_is_written_down_as_it_goes_rather_than_at_the_end(
     one = Profiler(tmp_path / PROFILE, every=0.01)
     one.start()
     try:
-        subprocess.run(["sh", "-c", "sleep 0.1"], check=False, capture_output=True)
+        # Two, so the shell does not `exec` the one and vanish -- and a second of it, so the
+        # sampler has a hundred goes at seeing it rather than ten.
+        said = "sleep 1; :"
+        subprocess.run(["sh", "-c", said], check=False, capture_output=True)
         time.sleep(0.1)
-        # Nothing has stopped it, and the program it saw is already written down.
-        assert any(each.name == "sh" for each in read(tmp_path))
+        # Nothing has stopped it, and the program it saw is already written down --
+        # found by what it was given rather than by what this system calls its shell.
+        assert any(each.argv[-2:] == ("-c", said) for each in read(tmp_path))
     finally:
         one.stop()
 
 
+@sampled
 @pytest.mark.timeout(60)
 def test_a_profile_holds_the_threads_of_what_it_saw(tmp_path: pathlib.Path) -> None:
     """A track is a thread, so a program with two of them is a process with two tracks."""
@@ -90,7 +109,12 @@ def test_a_profile_holds_the_threads_of_what_it_saw(tmp_path: pathlib.Path) -> N
         "held.join()\n",
     )
 
-    one = next(each for each in held if each.threads)
+    one = next((each for each in held if each.threads), None)
+    if one is None:
+        # "Nothing at all where the platform will not say", which the sampler promises and
+        # which is what a system that does not hand over another program's threads gets.
+        # Asked by looking rather than by naming the system, as everything here is.
+        pytest.skip("this platform does not say what another program's threads are")
     assert len(one.threads) >= 1
     assert one.threads[0].tid == one.pid  # the one that ran main
 

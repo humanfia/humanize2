@@ -14,8 +14,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from tests.supervising import WITHOUT_BINDINGS, traced
+
+if (
+    WITHOUT_BINDINGS
+):  # what is imported below is the binding itself, so it is asked first
+    pytest.skip(WITHOUT_BINDINGS, allow_module_level=True)
+
 from hmz.coganchor.linux import procfs, ptrace
-from tests.providers.test_redirect import traced
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

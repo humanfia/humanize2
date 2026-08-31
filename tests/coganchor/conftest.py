@@ -32,6 +32,7 @@ from hmz.coganchor.proto import Channel
 from hmz.coganchor.remote import RemoteClient
 from hmz.coganchor.serve.exports import ExportTable
 from hmz.coganchor.serve.server import Server
+from tests.supervising import WITHOUT
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -112,7 +113,15 @@ def _decode(
 
 @pytest.fixture
 def anchorage(tmp_path: Path) -> Anchorage:
-    """A fresh target/mirror pair for one test."""
+    """A fresh target/mirror pair for one test.
+
+    The agent half of a session is a seccomp filter and a ptrace supervisor, so a machine
+    that cannot trace cannot have one. The serving half is portable on purpose and is
+    reached through `link` below, which every other test here uses and which asks nothing
+    of the kernel.
+    """
+    if WITHOUT:
+        pytest.skip(WITHOUT)
     target = tmp_path / "target"
     mirror = tmp_path / "mirror"
     target.mkdir()

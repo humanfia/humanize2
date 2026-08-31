@@ -50,6 +50,7 @@ class _Verdict(BaseModel):
 #: recording each one. A prompt of `boom` is refused, which is how a failed turn is spelled.
 _KIMI = """
 import json, pathlib, sys
+import socketserver
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 LOG = pathlib.Path(sys.argv[0] + ".log")
@@ -151,7 +152,17 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-server = HTTPServer(("127.0.0.1", 0), Handler)
+
+class Server(HTTPServer):
+    def server_bind(self):
+        # Skip the reverse lookup `HTTPServer` does to name itself. On a machine whose
+        # resolver has nothing to say about 127.0.0.1 it blocks for that resolver's timeout,
+        # which is half a minute -- once per process, and this is a process per test.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+server = Server(("127.0.0.1", 0), Handler)
 print(f"Kimi server: http://127.0.0.1:{server.server_port}/#token=secret", flush=True)
 server.serve_forever()
 """
@@ -164,6 +175,7 @@ server.serve_forever()
 #: querystring schema requires, or the bare path a daemon that never had that filter takes.
 _KIMI_SLOW_TO_START = """
 import json, os, pathlib, sys
+import socketserver
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 LOG = pathlib.Path(sys.argv[0] + ".log")
@@ -250,7 +262,17 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-server = HTTPServer(("127.0.0.1", 0), Handler)
+
+class Server(HTTPServer):
+    def server_bind(self):
+        # Skip the reverse lookup `HTTPServer` does to name itself. On a machine whose
+        # resolver has nothing to say about 127.0.0.1 it blocks for that resolver's timeout,
+        # which is half a minute -- once per process, and this is a process per test.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+server = Server(("127.0.0.1", 0), Handler)
 print(f"Kimi server: http://127.0.0.1:{server.server_port}/#token=secret", flush=True)
 server.serve_forever()
 """
@@ -569,6 +591,14 @@ def _bodies(server: _FakeServer, path: str) -> list[dict[str, Any]]:
 
 @pytest.fixture
 def kimi(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeServer:
+    # The same shortening `unhurried` below does, and for the same reason. This stand-in
+    # serves the REST the daemon serves and not the socket it notifies over, so every read
+    # here is the plain polling the backend ran on before there were notifications -- one
+    # read a second, and a turn is many reads. That is a cadence rather than anything under
+    # test: what these check is which calls were made, not how long apart. Fifty-two tests
+    # in ten seconds rather than sixty.
+    monkeypatch.setattr(kimicode, "_POLL_SECONDS", 0.1)
+    monkeypatch.setattr(kimicode, "_RECOVERY_SECONDS", 1.0)
     return _install("kimi", _KIMI, tmp_path, monkeypatch)
 
 

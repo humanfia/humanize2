@@ -19,6 +19,7 @@ from hmz import cli
 from hmz.coganchor import AnchorConfig, check, connect
 from hmz.coganchor.argv import parser
 from tests.coganchor.conftest import DEFAULT_TIMEOUT, REPO_ROOT, Anchorage
+from tests.supervising import traced
 
 #: Every setting at once, none of them left at its default. The token is spelled the way one
 #: in eighty of `secrets.token_urlsafe`'s are, and the paths hold a space, because a setting
@@ -153,6 +154,7 @@ def test_settings_no_session_could_run_under_are_refused_as_they_are_written(
         AnchorConfig(**settings)
 
 
+@traced
 def test_connect_refuses_to_run_nothing() -> None:
     """Refused before a mirror is prepared or a target dialled, so nothing is left half done."""
     with pytest.raises(ValueError, match="no agent"):

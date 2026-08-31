@@ -1,6 +1,6 @@
 # The second gate. The first is `.pre-commit-config.yaml`; this runs the same hooks over
 # every file rather than the ones one commit touched, and it is the only place the tests
-# run, on every Python the package claims.
+# run -- on every Python the package claims, and on both systems it is installed on.
 
 name: CI
 
@@ -45,15 +45,28 @@ jobs:
         run: uv build
 
   test:
-    name: test (python ${{ matrix.python }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    name: test (${{ matrix.os }}, python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    # Both systems finish in about a quarter of an hour. Twice that, because a job killed at
+    # the wall reports nothing at all about what it was doing -- which is the one outcome
+    # worth spending minutes to avoid, and the one this matrix spent a morning learning.
+    # What bounds a single test is `timeout` in pyproject.toml, not this.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         # Every stable minor at or above the floor `requires-python` sets. A new one
         # ships, a new one goes here -- that is what the README promises.
         python: ["3.12", "3.13", "3.14"]
+        # Both systems humanize is installed on. The half that runs an agent under an
+        # anchor is a seccomp filter and a ptrace supervisor, which is Linux on x86-64
+        # and says so by skipping everywhere else; everything above it -- the interface,
+        # the flows, the backends, the daemon, the serving half of an anchor -- is meant
+        # to work on either, and this is what holds it to that.
+        #
+        # `macos-latest` rather than a pinned Intel runner: the DeepSeek runtime, which
+        # is an ordinary dependency, publishes a macOS wheel for arm64 alone.
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -66,7 +79,10 @@ jobs:
 
       # Everything except the `agent`-marked tests, which drive real coding agents and
       # need `--run-agents`. `-ra` in pyproject names whatever got skipped.
+      # `--durations` because the two systems are not the same speed and the difference is
+      # not spread evenly: a suite that spawns a CLI per test costs far more on one of them,
+      # and a list of the slowest twenty-five is how that stays visible.
       - name: pytest
         run: >
-          uv run --frozen pytest -q
+          uv run --frozen pytest -q --durations=25 --timeout-method=thread
           --cov=hmz --cov-report=term-missing --cov-report=xml
