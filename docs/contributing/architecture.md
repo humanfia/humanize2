@@ -256,4 +256,6 @@ Run them through `uv run`, not `uvx`: the lockfile pins the versions the hooks a
   pyright rule or it does not exist.
 - Google-style docstrings, and type annotations everywhere.
 
-CI runs all of it over every file, and the tests on each Python the package claims.
+CI runs all of it over every file, and the tests on each Python the package claims, on both
+Linux and macOS. The tests that run an agent under an anchor need Linux on x86-64 and skip
+aloud anywhere else; the serving half, and everything above it, is held to both.

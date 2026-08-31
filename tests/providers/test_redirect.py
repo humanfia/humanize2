@@ -11,19 +11,17 @@ this process ptrace a child of its own. Whether it can is answered by running on
 by asking what the kernel is -- a container without `CAP_SYS_PTRACE` has every module and can
 supervise nothing -- and where it cannot, those tests say so and skip.
 
-`traced` and `cred` are imported by the login and command-line suites, which spawn the same
-supervisor: this is the file the redirect is tested in, so it is the file they come from.
+Whether this machine can trace, and how `hmz cred` is spawned, are `tests/supervising.py`'s:
+three suites and a conftest ask, and a conftest cannot import a test module.
 """
 
 from __future__ import annotations
 
 import errno
 import os
-import platform
 import signal
 import subprocess
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,66 +29,7 @@ import pytest
 
 from hmz import cli
 from hmz.providers import redirect
-
-#: What the machine itself is signed in as, which a turn under a provider must never see.
-MACHINE = '{"token": "the one at this machine"}'
-
-#: What the provider is signed in as, which is what every read below has to come back with.
-PROVIDER = '{"token": "the provider"}'
-
-#: How long a supervised program is given before the run is taken to have hung.
-PATIENCE = 45
-
-
-def cred(
-    argv: list[str], *, stdin: str = "", timeout: int = PATIENCE
-) -> subprocess.CompletedProcess[str]:
-    """Runs `hmz cred` as a turn under a provider runs it: its own process, on its own.
-
-    Args:
-      argv: What follows the command name -- the swaps, `--`, and the program.
-      stdin: What to write to the program's standard input.
-      timeout: How long to wait before taking the run to have hung.
-
-    Returns:
-      What the run came to, with its output read back.
-    """
-    return subprocess.run(
-        [sys.executable, "-m", "hmz", "cred", *argv],
-        input=stdin,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        check=False,
-    )
-
-
-def _cannot_trace() -> str:
-    """Why a redirected run cannot be watched on this machine, or "" where one can.
-
-    Answered by running one: the modules import on any Linux, and whether the kernel will
-    hand over a tracee is a question only the attempt asks.
-    """
-    if sys.platform != "linux":
-        return "a redirected run is a Linux seccomp filter and a ptrace supervisor"
-    if platform.machine() != "x86_64":
-        return f"the register map is x86-64 only, and this host is {platform.machine()}"
-    with tempfile.TemporaryDirectory() as folder:
-        named, instead = Path(folder) / "named", Path(folder) / "instead"
-        named.write_text(MACHINE)
-        instead.write_text(PROVIDER)
-        try:
-            done = cred([f"--map={named}={instead}", "--", "cat", str(named)])
-        except (OSError, subprocess.SubprocessError) as why:
-            return f"a supervisor could not be started here: {why}"
-    if done.stdout != PROVIDER:
-        return f"nothing is traced here: {done.stderr.strip() or done.returncode}"
-    return ""
-
-
-#: Why the end-to-end tests cannot run here, and the mark that leaves them out when so.
-WITHOUT = _cannot_trace()
-traced = pytest.mark.skipif(bool(WITHOUT), reason=WITHOUT or "this machine can trace")
+from tests.supervising import MACHINE, PATIENCE, PROVIDER, cred, traced
 
 
 @dataclass(frozen=True)

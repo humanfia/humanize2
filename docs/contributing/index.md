@@ -29,8 +29,10 @@ Installing the hooks once means every commit is checked before it is made.
 | `uv run pytest` | The tests, against [stand-in agents](/reference/flows#testing-a-flow) |
 | `uv run pytest --run-agents` | Also the `agent`-marked tests, which drive the real coding agent CLIs and spend real tokens |
 
-Both of the first two have to pass. CI runs them over every file and on each Python the package
-claims, and never runs the third. `ruff` and `pyright` come from this project's own environment
+Both of the first two have to pass. CI runs them over every file, on each Python the package
+claims and on both Linux and macOS, and never runs the third. What a machine cannot do it says
+so and skips: running an agent under an anchor is a seccomp filter and a ptrace supervisor, so
+those tests are Linux on x86-64's, and everything above them is held to both systems. `ruff` and `pyright` come from this project's own environment
 rather than one pre-commit builds, so bump them with `uv lock --upgrade-package ruff` rather
 than by editing a second pin.
 
