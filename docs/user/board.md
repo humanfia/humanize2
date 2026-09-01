@@ -40,8 +40,20 @@ def run(agents: Agents, task: str) -> None:
 ```
 
 ```sh
-hmz -f board_loop -a claude/claude-opus-5:max
+hmz
 ```
+
+Then name the flow on the line you were going to type anyway:
+
+```
+$board_loop write the parser
+```
+
+`board_loop` is this project's own flow, so it sits under **local** in
+[`/flow`](/reference/tui#choosing-a-flow) — and since nothing here has run it before, naming it
+on the line opens that menu with the cursor on it. Say what the one agent runs,
+`claude/claude-opus-5:max` or whatever you have, and save: the line you already typed is what
+it starts on.
 
 Press **esc** for `/monitor`. Under the diagram is the board. Add a second line to `todo` while
 the loop is working through the first, and it is picked up on the next round — nothing was

@@ -818,7 +818,8 @@ class Humanize(App[None]):
         """Initializes an interface holding no agents, because nothing is running yet.
 
         Args:
-          flow: The flow to open on, which is what `hmz -f` names -- or "" to open on what
+          flow: The flow to open on, which is what a run being picked up names -- or "" to
+            open on what
             this workspace was last set up to run, and on the one that only talks to one
             agent where it has run nothing.
           agents: What each of that flow's agents runs, in the order it takes them, or

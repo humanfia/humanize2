@@ -152,7 +152,7 @@ list appears under the editor with a line about each.
 | `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), [export it](/user/export), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/resume` | | Carries [the last run here](#carrying-the-last-one-on-outright) on: that run's own flow, on its own agents, with what it was asked to do, and on what it left behind. The same thing `/epics` offers of the run under its cursor, without the list — there is only ever one last run. Where there is nothing to carry on from it says which reason that is. |
-| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
+| `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, or pointed at what it falls back to. How often a failed turn is taken again is not here: that is said of a [place](#where-a-turn-goes-when-it-cannot-be-taken) rather than of an account. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/monitor` | | [The run, drawn](#watching-the-run): a box per agent that has worked, marked as it works and saying how long it has been at it, with the handovers between them as the arrows joining them, whatever each started of its own hanging under it, and [the board](/user/board) below. Enter reads an agent or changes a line. **esc** opens it. |
 | `/btw` | `<question>` | Asks a side question about the running flow from a read-only snapshot of its progress. It runs in a separate session and never steers the flow. |
@@ -161,7 +161,7 @@ list appears under the editor with a line about each.
 | `/fallback` | | Where a turn goes when what was taking it cannot: an agent that has nowhere left to run, and an account that has gone down. See [below](#where-a-turn-goes-when-it-cannot-be-taken). |
 | `/clear` | | Clears the screen, and nothing else: the transcript being read, not the others, and nothing that is running. |
 | `/export` | | Packages the whole run up as `.humanize/<run>.epic.tar.gz`: its own records, every session log the backends wrote for it as their contents rather than as the links the run keeps, and the transcript beside them — as it was written rather than as it was wrapped, and every conversation that has been read rather than only the one showing now. Credentials are struck out of all of it. See [Exporting a run](/user/export). |
-| `/detach` | | [Lets go of this terminal](/reference/daemon) and leaves the flow running. The run carries on where nothing is reading it, and `hmz` in this directory opens it again from the top. Where nothing is holding the run — `--no-daemon`, or no terminal to hand over to — it says so rather than doing nothing. |
+| `/detach` | | [Lets go of this terminal](/reference/daemon) and leaves the flow running. The run carries on where nothing is reading it, and `hmz` in this directory opens it again from the top. Where nothing is holding the run — no terminal to hand over to, or a machine whose [`HUMANIZE_DAEMON`](/reference/cli#environment-variables) says not to — it says so rather than doing nothing. |
 | `/exit` | | Leaves. With a flow running it asks first what is to become of it: stop it and leave, or leave it running and let go of this terminal. With nothing running it is a window being closed, and asks nothing. |
 
 `/details` and `/afk` flip when given nothing, and take `on` or `off` when you want to say
@@ -232,8 +232,9 @@ Closing the interface is not, on its own, a thing to do to a run.
 Enter to choose · Esc to stay here
 ```
 
-Where the run is not being held — `--no-daemon`, or output going to a file — the second answer
-is staying here instead: an answer that cannot be carried out is not one to offer.
+Where the run is not being held — output going to a file, or a machine whose
+[`HUMANIZE_DAEMON`](/reference/cli#environment-variables) says not to hold one — the second
+answer is staying here instead: an answer that cannot be carried out is not one to offer.
 
 `ctrl+c` twice is still what stops a flow, and is not what lets go of a terminal. **ctrl+q**
 puts the same question `/exit` does, rather than leaving outright: a key bound to leaving is a
@@ -589,8 +590,9 @@ account or allowed too much is something you find out halfway through a run. Wha
 reaches the agents that are running, each of them from its next turn on. A CLI you changed is
 the one thing that cannot be swapped under a flow already holding that agent, and says so.
 
-The same places are on the command line as [`hmz flowverses`](/reference/cli#hmz-flowverses), for a
-machine being set up or a script.
+This menu is the only way in that is typed. A machine being set up or a script reaches the
+same places through [`Hmz().verses`](/reference/sdk) — `add`, `fetch`, `remove` and `holds`,
+which are these keys under another name.
 
 **s** starts a search, and what is typed into it narrows by name. What each flow says about
 itself is beside its name, and is not searched: a subsequence of a sentence matches nearly
@@ -830,11 +832,12 @@ picked up is a flow started, and there is one going. It is said under the list r
 shutting the menu, since the question the menu is asking is still worth answering: `a flow is
 running; ctrl+c twice stops it before another can be picked up`.
 
-A directory nothing has ever been run in says so under the empty list. The same trace is
-[`hmz trace collect`](/reference/cli#hmz-trace-collect) on a command line, with `--epic` to
-name which run. A trace of what a directory holds whoever opened it — a session no flow ever
-drove — is `--all` or `--session` there, and is not offered here at all: this is a list of runs,
-and a trace of none of them has nothing here to hang on.
+A directory nothing has ever been run in says so under the empty list. This row is the only
+way in that is typed; the same trace is [`Hmz().epics.traced(epic)`](/reference/sdk) from
+Python, which is what this row calls. A trace of what a directory holds whoever opened it —
+a session no flow ever drove — is `Hmz().epics.trace()` with no `sessions=`, and is not
+offered here at all: this is a list of runs, and a trace of none of them has nothing here to
+hang on.
 
 ### Carrying the last one on outright
 
@@ -883,26 +886,31 @@ and a asking which backend a new one is for](/demo/accounts.gif)
 
 | Key | What it does |
 | --- | --- |
-| **enter** | Opens what there is to do with the one under the cursor: correct what it holds, sign it in again, say what it falls back to, say how a failed turn under it is tried again |
+| **enter** | Opens what there is to do with the one under the cursor: correct what it holds, sign it in again, say what it falls back to |
 | **a** | Makes one: which CLI, then how to sign in, then what that way asks. The list of CLIs is also where a CLI of your own that speaks ACP is written down |
 | **d** **d** | Takes it away, credentials and all |
 | **esc** | Closes the menu, asking about anything it is holding |
 
-![What enter opens on one account: correct what it holds, sign it in again, what it falls back
-to, and how it is tried again](/demo/account-does.png)
+![What enter opens on one account: correct what it holds, sign it in again, and what it
+falls back to](/demo/account-does.png)
 
-Four questions about one account are a menu rather than four letters to read off the bottom of
-the screen — while **enter**, which every list already means, was doing one of them.
+Three questions about one account are a menu rather than three letters to read off the
+bottom of the screen — while **enter**, which every list already means, was doing one of
+them.
 
 The last row under each CLI is the account this machine is already signed into — the CLI as
 you run it, which is what an agent nobody gave an account runs as, and where that agent's
-chain begins. Where it falls back to and how it is tried again are what it takes; correcting
-it and signing it in are not offered at all, and the menu says why under the two rows that are
-left. **d** says the same thing: humanize did not make that account and keeps no credentials
+chain begins. Where it falls back to is the one of the three it takes; correcting it and
+signing it in are not offered at all, and the menu says why under the row that is left.
+**d** says the same thing: humanize did not make that account and keeps no credentials
 for it.
 
-Taking one away, saying where it falls back to, saying how it is tried again and correcting
-what one holds are **held until the menu is saved**. Making one and signing one in are not: both own the terminal while they run,
+An account written down before retrying became a thing about a place still holds the tries
+somebody set on it, and this menu says under the list that they are no longer read: tries
+that have quietly stopped happening are worse than tries nobody ever set.
+
+Taking one away, saying where it falls back to and correcting what one holds are **held
+until the menu is saved**. Making one and signing one in are not: both own the terminal while they run,
 and something that has already happened is not a draft.
 
 Making one is three questions rather than one form, because each is only answerable once the one
@@ -918,7 +926,9 @@ than in the CLI's. What came of it is a line in the transcript.
 Nothing here is refused while a flow is running. An agent reads the account it was configured
 with once, so one made or taken away now is one the next run sees.
 
-The same accounts are on the command line as [`hmz providers`](/reference/providers#hmz-providers).
+This menu is the only way in that is typed. The same accounts are
+[`Hmz().accounts`](/reference/sdk) from Python, for a machine being set up without a
+terminal to walk.
 
 ## Where a turn goes when it cannot be taken
 
@@ -957,9 +967,8 @@ Everything is held until the menu is saved on the way out, as everything on a me
 ```
 
 A place cannot fall back to itself, and a chain that comes round on itself ends at the second
-sight of a place. The same steps are on the command line as
-[`hmz fallback`](/reference/cli#hmz-fallback), and what they mean is
-[Falling back](/user/fallback).
+sight of a place. The same steps are [`Hmz().fallbacks`](/reference/sdk) from Python, and what
+they mean is [Falling back](/user/fallback).
 
 ## What humanize remembers
 
@@ -1026,8 +1035,10 @@ It opens as the flow is chosen — enter on a flow that takes settings puts it u
 it lands on the Agents page — and what it answers is held with the rest of that menu until the
 menu is saved: setting a flow up is a thing about the flow rather than about what runs it. A
 flow that takes no settings is not asked, so the walk is the same either way. There is no
-command for it: choosing the flow again is how you answer it again. `hmz -f <flow> -c
-<setup.yaml>` opens the interface already set up. See [CLI › hmz](/reference/cli#hmz).
+command for it, here or on a line: choosing the flow again is how you answer it again, and
+what you answered is what the next `hmz` in this directory opens on. A setup file is
+[`hmz exec -c <setup.yaml>`](/reference/cli#hmz-exec), which runs the flow rather than
+opening on it.
 
 Nothing in the interface knows what any of the settings mean. The types say how a value moves,
 and the flow's own model says which combinations it will not take — so a flow that refuses

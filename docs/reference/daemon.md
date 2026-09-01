@@ -24,40 +24,43 @@ terminal is your ssh session or one of these is not something it is told.
 | `ctrl+c` twice | Stops the flow, as it always did. It is not what lets go of a terminal. |
 | `ctrl+q` | The same question `/exit` puts, rather than leaving outright. |
 
-## From a command line
+## From outside the interface
 
-See [`hmz daemon`](/reference/cli#hmz-daemon).
+[`hmz`](/reference/cli#hmz) in a directory is the whole of it at a terminal: it reads whichever
+run is being held here, and starts one where none is. There is nothing else to type, because
+there is nothing else a person sitting at one of these wants — reading it is what they came for,
+and letting go of it is `/detach` once they are in.
 
-```sh
-hmz daemon list           # what runs are being held on this machine
-hmz daemon status         # what the one in this directory is doing
-hmz daemon start          # hold one here without reading it
-hmz daemon attach         # read it from this terminal, which `hmz` alone does
-hmz daemon stop           # stop the flow and close the interface
-hmz daemon stop --kill    # end the process holding both, for one that will not go
-```
+Everything else there is to ask of a held run — what is being held on this machine, what one of
+them is doing, letting go of every terminal on it, stopping it — is [asked in Python](#python).
+Those are things a program does to a run it is looking after, and a program is not sitting at a
+terminal to be shown a screen.
 
 ## What kind of terminal it draws for
 
 A held run holds one pseudoterminal for its whole life, and takes its kind from the terminal it
 was started on — the `TERM` of the shell that first ran `hmz` here. A terminal of another kind
-that reads it later is drawn for in that first one's language. `hmz daemon status` says which,
-under `drawing for`; `hmz daemon stop` and a fresh `hmz` is how it changes.
+that reads it later is drawn for in that first one's language. [`status()`](#python) says which,
+under `term`; stopping the held run and opening `hmz` again on a terminal of the kind you
+want is how it changes.
 
 Its size is not like that: every terminal that arrives says how big it is, and the run is laid
 out again for it.
 
 ## When a run is not held
 
-The interface is opened in this process — exactly as it always was — where there is no terminal
-to hand over to, or where you say so:
+The interface is opened in this process — exactly as it always was — where there is nowhere to
+hand a run over to. Nothing on the line asks for it: what holding a run apart buys is being able
+to close the terminal and still have the run, which is not something worth giving up one run at
+a time.
 
-- `--no-daemon` on the `hmz` line.
-- `HUMANIZE_DAEMON` set to `off`, `0` or `no` in the environment, which is what this
-  repository's own test suite sets. It answers for `hmz`; `hmz daemon start` is a line that
-  asks for a run to be held outright, and holds one whatever the variable says.
-- Output going to a file, or input coming from a pipe: a held run is read by a terminal
-  proxying to it, so there has to be one.
+- **Output going to a file, or input coming from a pipe.** A held run is read by a terminal
+  proxying to it, so there has to be one on both ends — which is also why a suite driving the
+  interface itself gets it in this process.
+- **`HUMANIZE_DAEMON` set to `off`, `0` or `no`** in the environment, which is what this
+  repository's own test suite sets: the machine saying once that runs here are not held, rather
+  than every line saying it again. `hmz.daemon.start` asks for a run to be held outright, and
+  holds one whatever the variable says.
 - Anything at all that stops one being held — a machine that will not fork, a home directory
   that cannot be written, a socket that will not bind. It is said on stderr and then done
   without. What is lost is being able to walk away from the run, which is not a reason to
@@ -70,14 +73,10 @@ the run, so there is nothing to let go of.
 
 Two runs of one project in one directory would be two flows writing over each other's
 [epic](/reference/tracing#epics), so there is one daemon per workspace and `hmz` reads the one
-that is there. A line that also says what to run — `hmz -f rlar` — while one is being held is a
-line to correct: a run that is set up is set up, and two answers to how it is set up would be
-one of them silently losing.
-
-```console
-$ hmz -f official/rlar
-hmz: error: a run is already being held here, and it is set up as it was set up; `hmz` reads it, and `hmz daemon stop` ends it
-```
+that is there. The line says nothing about what to run — which flow, what drives it and what it
+is set up with are [chosen at the prompt](/reference/tui#setting-a-flow-up) and remembered — so a
+terminal arriving at a run already being held brings no second answer to how that run is set up,
+and there is nothing for the one already running to lose to.
 
 ## What is on disk
 

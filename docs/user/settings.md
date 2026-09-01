@@ -1,8 +1,7 @@
 # What a project remembers
 
 Opening the interface again in the same project finds it set up the way you left it. Reach for
-this when you want to see what a directory remembers, change it or override it for a single
-run.
+this when you want to see what a directory remembers, change it, or have it forget.
 
 What it remembers:
 
@@ -92,22 +91,25 @@ is profiled too — it says nothing about what runs, only about whether what run
 What is sampled, what that costs while the flow runs, and what a trace then makes of it are
 [Tracing › Profiling a run](/user/tracing#profiling-a-run).
 
-## Overriding it for one run
+## Changing what it opens on
 
-The line beats what was remembered, and it starts nothing. The interface opens ready, and the
-first thing you say is still what starts it:
+It is changed where it was set in the first place. [`/flow`](/reference/tui#choosing-a-flow)
+chooses the flow; its **Agents** page says what each of that flow's agents runs, where its
+turns land and which account it runs as; and a flow with
+[settings of its own](/reference/tui#setting-a-flow-up) asks them as it is chosen. Saving that
+menu is what gets written down, so the next `hmz` in this directory opens on exactly what you
+left — and opening is all it does. The interface comes up ready and the first thing you say is
+still what starts it.
 
-```sh
-hmz -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:high
-```
+Saving is also where it is all checked, before any of it lands: the flow itself is loaded,
+every agent is validated, and a flow that will not take some combination of its own settings
+says so in its own words. What is wrong is a menu to correct rather than a run that falls over
+half an hour in.
 
-```sh
-hmz -f official/humanize1:rlcr -c setup.yaml
-```
-
-What the line says is checked **before** the interface opens, for a flow that will not load, a
-config the flow refuses, or the wrong number of agents. A line that is wrong is a line, not a
-sheet to walk back out of.
+There is no line that answers any of this instead. What a project is set up to run is a thing
+about the project, which is why it is remembered rather than typed again every morning; a setup
+file for a flow that takes settings is [`hmz exec -c <setup.yaml>`](/reference/cli#hmz-exec),
+which runs the flow rather than opening on it.
 
 `hmz exec` is set up from none of this. What it runs is what the line names, so an unattended
 run inherits nothing of what this project was last set up with, which is the point of it. It

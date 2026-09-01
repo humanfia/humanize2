@@ -75,11 +75,10 @@ Pass the file to `hmz exec` with `-c`:
 hmz exec -f pair -c setup.yaml -a claude/claude-opus-5:max "$(cat TASK.md)"
 ```
 
-Or open the interface already set up, without starting anything:
-
-```sh
-hmz -f pair -c setup.yaml
-```
+At the prompt there is no file to pass: the same answers are typed on the sheet.
+[`/flow`](/reference/tui#choosing-a-flow), choose `pair`, and
+[what it takes](/reference/tui#setting-a-flow-up) is the page before its agents — answered once
+and [remembered](/user/settings) for every run of it after.
 
 ## Fall back when `None` arrives
 
@@ -152,7 +151,7 @@ another model is refused before its first turn, as one handed the wrong number o
 ## What you get for free
 
 - A sheet, with the right widget per type.
-- `-c setup.yaml` on both `hmz exec` and `hmz`.
+- `-c setup.yaml` on `hmz exec`, and the same answers on the sheet at the prompt.
 - Validation, in your own words, at the moment somebody types it.
 - [Remembered per flow](/user/settings), so twenty settings are not twenty questions every
   morning.

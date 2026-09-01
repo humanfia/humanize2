@@ -42,21 +42,21 @@ tool call rather than the process.
 tracing.collect(workspace=None, *, sessions=None, agents=None, output=None, start=None, end=None, profile=None)
 ```
 
-Carries out `hmz trace collect` and returns the trace as a document. The command line is a shell around it.
+Gathers the sessions asked for and returns the trace as a document. `hmz.sdk.Epics.trace` and `hmz.sdk.Epics.traced` are shells around it, and what the interface offers on a run is reached through them.
 
 Args:
 
-- `workspace`: Same as `<workspace>`.
-- `sessions`: Same as `--session`, as a comma separated string or as an iterable of ids. Nothing at all is every session of the workspace; an empty iterable is no session at all, which is what a trace of a run that opened none holds -- naming sessions is a filter, and naming none of them MUST NOT read as naming all of them.
-- `agents`: What each agent of a flow opened, as a mapping of the agent's name to the ids the backends gave the sessions it opened, which is what an agent reports as its `id` and its `opened`. The command line has no agents to name, so it never passes any.
-- `output`: Same as `--output`, except that no file is written if it is not provided.
-- `start`: Same as `--start`.
-- `end`: Same as `--end`.
+- `workspace`: The workspace whose sessions are to be read. Nothing at all where the sessions are asked for by id alone, since a workspace would narrow those to the ones recorded there.
+- `sessions`: Which sessions to collect, as a comma separated string or as an iterable of ids. Nothing at all is every session of the workspace; an empty iterable is no session at all, which is what a trace of a run that opened none holds -- naming sessions is a filter, and naming none of them MUST NOT read as naming all of them.
+- `agents`: What each agent of a flow opened, as a mapping of the agent's name to the ids the backends gave the sessions it opened, which is what an agent reports as its `id` and its `opened`. A trace of a run takes this from what that run wrote down; a trace of sessions no run drove has none to name.
+- `output`: Where to write the trace. No file is written if it is not provided.
+- `start`: The earliest moment to keep, in any wording dateparser understands.
+- `end`: The latest.
 - `profile`: The programs the run started while it ran, as the profile an epic holds or as the records themselves. Nothing for a run that was not profiled, which is every run until a workspace says otherwise.
 
 Returns the trace document, whose `otherData` reports what was asked for and what was collected.
 
-Raises `ValueError` if a time cannot be read or a named session is empty. The command line reports these as usage errors.
+Raises `ValueError` if a time cannot be read or a named session is empty.
 
 Workflow:
 

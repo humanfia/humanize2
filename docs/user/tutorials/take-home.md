@@ -203,12 +203,16 @@ thing is not a result.
 ## Step 6 — read the run back
 
 ```sh
-hmz trace collect
+hmz
 ```
 
-Open the file it names in [ui.perfetto.dev](https://ui.perfetto.dev). Each agent is a process
-and each of its turns is a track, so the two appear as two lanes taking it in turns. Click any
-slice to see the prompt, the reasoning, the tool call and the tool output that produced it.
+`/epics` is every run of a flow in this directory, newest first. Press **enter** on the one at
+the top — the loop you have just stopped — and take *collect a trace*: it gathers that run's
+own sessions into `traces/` inside the run, and says under the list where the file went.
+
+Open that file in [ui.perfetto.dev](https://ui.perfetto.dev). Each agent is a process and each
+of its turns is a track, so the two appear as two lanes taking it in turns. Click any slice to
+see the prompt, the reasoning, the tool call and the tool output that produced it.
 
 For a run measured in hours, this is where you find out which turn actually moved the number —
 and which four turns after it were an expensive way of confirming the fifth.

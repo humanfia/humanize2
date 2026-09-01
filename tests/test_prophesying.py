@@ -420,7 +420,7 @@ def run(agents: tuple[Agent], task: str) -> None:
 
 
 def test_the_stricter_reading_is_the_one_an_atlas_gets(tmp_path: Path) -> None:
-    """`hmz check` asks one question, and an atlas is what decides which reading answers."""
+    """Checking asks one question, and an atlas is what decides which reading answers."""
     body = '''@atlas
 def run(agents: Agents, task: str) -> None:
     """Says it."""

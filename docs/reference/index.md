@@ -28,4 +28,4 @@ a quickstart apiece: [run a flow](/#run-a-flow), [weave a flow](/#weave-a-flow),
 | [Machines](/reference/machines) | Where an agent's turns land — here, a container, or a machine already running |
 | [Providers](/reference/providers) | Which account an agent runs as, kept apart from the CLI's own |
 | [Remote execution](/reference/remote-execution) | `hmz anchor`: an agent on this machine whose work lands on another |
-| [Tracing](/reference/tracing) | `hmz trace collect`, and the one timeline it makes of a run |
+| [Tracing](/reference/tracing) | The sessions and the programs a run left behind, gathered into one timeline of it |

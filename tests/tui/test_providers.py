@@ -125,7 +125,7 @@ def _kept(cli: str, name: str = "") -> tuple[Model, ...]:
 
 
 def _account(name: str = "deepseek", cli: str = "claude") -> providers.Provider:
-    """Writes one account down, as `hmz providers add` does, signing nothing in.
+    """Writes one account down, as `a` on the accounts menu does, signing nothing in.
 
     And with the models that account runs already asked for, which is what making one does:
     a walk that has to press a key before there is anything to choose from is a walk nobody

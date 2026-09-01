@@ -2,8 +2,8 @@
 
 hmz exec -f ralph_loop -a claude/MODEL:high "$(cat TASK.md)"
 
-Add `-c budget.yaml` to hold it to something other than the budget it comes with, and
-`hmz -f ralph_loop -c budget.yaml` opens the interface on the same setup.
+Add `-c budget.yaml` to hold it to something other than the budget it comes with; at the
+prompt, `/flow` asks the same thing on the sheet that opens as the flow is chosen.
 
 Nothing carries over inside a run, and two things carry between runs: which round it is on,
 kept as `rounds`, and what it has spent, kept as `output`. A loop like this is left going for

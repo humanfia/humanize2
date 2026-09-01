@@ -18,8 +18,8 @@ their run on purpose, prompts and output and all, because a report of a bug with
 it is a report nobody can develop against -- so the contents are theirs to send. Credentials
 are nobody's to send. Every byte written here goes through :func:`plain` first: the values of
 every account's variables struck out literally, the shapes the vendors mint keys in struck out
-by pattern, and anything signed into a URL taken out the way `hmz flowverses` takes it out of
-the one it prints. A token in a bundle is a token in an issue tracker, forever.
+by pattern, and anything signed into a URL taken out the way a flowverse's own URL is taken
+apart before it is shown. A token in a bundle is a token in an issue tracker, forever.
 
 Less what the run is read by. `input_tokens` is how these backends write down what a turn
 cost, and an account may hold the model to ask for -- a bundle with the bill or the model
@@ -138,8 +138,8 @@ _ROUGHLY = 10.0
 #: credentials alone. Two promises, deliberately not one regular expression.
 _SCRUBS: tuple[tuple[re.Pattern[str], str], ...] = (
     # A user and a password signed into a URL, which is how a private flowverse is added and
-    # how several of these gateways are configured. `hmz flowverses` takes exactly this out
-    # of the URL it prints, for the reason it gives: a token on a screen is a token in a
+    # how several of these gateways are configured. `/flowverses` takes exactly this out of
+    # the URL it shows, for the reason it gives: a token on a screen is a token in a
     # photograph, and a token in an archive is one in whatever issue the archive is attached
     # to. Only the run immediately after `//`, so a comment holding an address is left alone.
     (re.compile(r"(?<=//)[^/\s@\"'<>]+(?=@)"), REDACTED),

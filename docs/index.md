@@ -39,47 +39,30 @@ git add -A && git commit -qm "a calculator with a bug in it"
 
 Both ways below run the same flow, `ralph_loop`: it gives the agent the same task over and over
 in a fresh conversation each time, so it restarts from the task and the repository rather than
-from a context window full of its own earlier attempts. Pick the tab for the CLI you have.
+from a context window full of its own earlier attempts.
 
 ### At the prompt
 
-::: code-group
-
-```sh [Claude Code]
-hmz -f ralph_loop -a claude/claude-opus-4-8:high
+```sh
+hmz
 ```
 
-```sh [Codex]
-hmz -f ralph_loop -a codex/gpt-5.6-sol:high
-```
-
-```sh [Antigravity CLI]
-hmz -f ralph_loop -a agy/gemini-3.7-flash-high:high
-```
-
-```sh [Qwen Code]
-hmz -f ralph_loop -a qwen/qwen3-coder-plus:high
-```
-
-```sh [Kimi Code]
-hmz -f ralph_loop -a kimi/kimi-code/k3:high
-```
-
-```sh [Grok Build]
-hmz -f ralph_loop -a grok/grok-4.6:high
-```
-
-```sh [ZCode]
-hmz -f ralph_loop -a zcode/zai/glm-5.3:high
-```
-
-:::
-
-That opens the terminal interface, set up and waiting. Type the task and press enter:
+That opens the terminal interface, on nothing in particular. Say which flow and what it is to
+do, on one line:
 
 ```
-Fix the bug in calc.py.
+$ralph_loop Fix the bug in calc.py.
 ```
+
+`$` names a flow, and this directory has never run that one, so `/flow` opens with the cursor
+already on it and your line held. Two pages answer what runs it: which flow, and then what its
+one agent is — the CLI you are already logged into, which of its models, and how hard it should
+think. The models offered are the ones **your account** may name, asked of the CLI itself
+rather than written into humanize. `save` on the last row starts the flow, on the line you
+typed.
+
+You answer that once. What you chose is remembered for this directory, so the next `hmz` here
+opens on it and `Fix the bug in calc.py.` is the whole of what you type.
 
 The agent takes a **turn** — one exchange with the model, which may run tools and may take
 minutes — and then the loop gives it the same task again. Type another line while it is working
@@ -123,9 +106,12 @@ hmz exec -f ralph_loop -a zcode/zai/glm-5.3:high "Fix the bug in calc.py."
 :::
 
 `-f` names the flow and `-a` names one agent, written `cli/model:effort` — the CLI that runs
-the turn, the model it asks for, and how hard that model should think. A Ralph loop does not
-stop on its own, which is what it is for: **ctrl+c** at the command line when you have seen
-enough. Every round is written down, so stopping loses nothing.
+the turn, the model it asks for, and how hard that model should think. A flow that drives
+several takes several, separated by commas or given an `-a` apiece; the fuller spelling, which
+also says [which account](/user/providers) and which of the flow's places an agent fills, is
+`[name=]cli[@account]/model:effort`. A Ralph loop does not stop on its own, which is what it
+is for: **ctrl+c** at the command line when you have seen enough. Every round is written down,
+so stopping loses nothing.
 
 Either way, check the work:
 
@@ -150,9 +136,9 @@ those tabs, is in [Many backends, one agent](/features/backends);
 [Installation](/user/installation) is how to sign each one in.
 :::
 
-**Next.** [`hmz trace collect`](/user/tracing) turns the whole run into one timeline you can
-open in Perfetto. The [User Guide](/user/) has a page per thing humanize does, and its
-tutorials each take a real piece of work start to finish: [Beat a
+**Next.** [`/epics`](/user/tracing) lists the runs of this directory and turns any one of them
+into a timeline you can open in Perfetto. The [User Guide](/user/) has a page per thing
+humanize does, and its tutorials each take a real piece of work start to finish: [Beat a
 benchmark](/user/tutorials/take-home), [Port a project](/user/tutorials/port-a-project), and
 [Build a coding agent](/user/tutorials/build-an-agent). For the words above, properly defined,
 read [Concepts](/user/concepts).
@@ -212,13 +198,16 @@ session("keep going")    # resumes it, the first turn still in context
 
 Read a flow for what will not run, before anything runs it:
 
-```sh
-hmz check twice
+```python
+from hmz.sdk import Hmz
+
+for found in Hmz().flows.check("local/twice"):
+    print(f"{found.severity}: {found.code}: {found.said}")
 ```
 
-```console
-hmz check: 0 errors, 0 warnings
-```
+Nothing printed is a flow with nothing wrong with it. `local/` is this project's own flows,
+which is where `.humanize/flows/twice` is offered from. See
+[Checking a flow](/weaver/checking-flows).
 
 **Next.** The [Weaver Guide](/weaver/) is what a flow may do and how to write one — loops,
 settings, goals, shapes, hooks, worktrees. [Build under

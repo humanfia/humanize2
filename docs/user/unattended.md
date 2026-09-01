@@ -6,14 +6,17 @@ job wants. Reach for it once a run is the same run every time.
 ## The shape of the line
 
 ```sh
-hmz exec -f <flow> -a <agent> [-a <agent>...] "<task>"
+hmz exec -f <flow> -a <spec>[,<spec>...] [-a ...] "<task>"
 ```
 
 | | |
 | --- | --- |
 | `-f` | the flow, by name or by path |
-| `-a` | **one agent**, repeated once for each the flow drives, in the order it takes them |
+| `-a` | the agents, separated by commas and the option repeated as often as suits — one for each the flow drives, in the order it takes them |
 | the last argument | the task, as the text itself |
+
+A flow of four agents is one option or four, whichever reads better in the line you are
+writing; every `-a` adds to the same list in the order they were written.
 
 ```sh
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
@@ -21,15 +24,27 @@ hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 
 ## Write an agent
 
-An agent is a CLI, a model and an effort. Two spellings mean exactly the same thing:
+An agent is a CLI, an account, a model and an effort, and there is one way to write one:
+
+```
+[<name>=]<cli>[@<provider>]/<model>:<effort>
+```
 
 ```
 claude/claude-opus-4-8:high
-cli=claude,model=claude-opus-4-8,effort=high
+claude@deepseek/claude-opus-4-8:high
+reviewer=codex/gpt-5.6-sol:max
 ```
 
-The written-out form exists because a model or an effort may hold the punctuation the short
-form separates on, and because some settings have no unambiguous short spelling.
+`@` names the [account](/user/providers) the turns run as — the account, not the model. `=` in
+front names **which of the flow's agents this one is**, by the name the flow calls that place:
+name every agent on the line or none of them, since an agent with no name fills the flow's next
+place, and that cannot be counted while the others are filled by name.
+
+```console
+$ hmz exec -f official/rlar -a actor=claude/claude-opus-5:max -a codex/gpt-5.6-sol:high "fix the build"
+hmz exec: error: name every agent or none of them: an agent that names no place fills the flow's next one, which cannot be counted while the others are filled by name
+```
 
 Read an agent from both ends: the CLI comes first, and the effort comes after the **last**
 colon. That is why a model with slashes in it works:
@@ -62,8 +77,8 @@ hmz exec -f ./review.py \
 
 Four rungs exist: `read-only`, `workspace-write`, `auto`, `bypass`. A place that says nothing
 declares `bypass`, the loosest of them, which leaves its agent at whatever it came with; a
-declaration only ever tightens. A rung there is not is refused before any agent runs — by
-`hmz check` without running the flow at all. See [Permissions](/user/permissions).
+declaration only ever tightens. A rung there is not is refused before any agent runs. See
+[Permissions](/user/permissions).
 
 ## Run with nobody at a prompt
 
@@ -127,11 +142,18 @@ $ hmz exec -f official/rlar -a claude/claude-opus-5:max "fix the build"
 hmz exec: error: official/rlar: the flow drives 2 agents, 1 given
 
 $ hmz exec -f ralph_loop -a claude:high "fix the build"
-hmz exec: error: bad agent 'claude:high': expected CLI[@PROVIDER]/MODEL:EFFORT or
-cli=CLI,model=MODEL,effort=EFFORT[,service_tier=SERVICE_TIER][,provider=PROVIDER][,config.KEY=VALUE]
+hmz exec: error: bad agent 'claude:high': expected [NAME=]CLI[@PROVIDER]/MODEL:EFFORT
 
 $ hmz exec -f nosuchflow -a claude/claude-opus-5:max "fix the build"
 hmz exec: error: nosuchflow: no flow to read: a flow is a directory with an __init__.py in it
+```
+
+A line written the way the old one was gets told so in as many words rather than being read as
+a CLI with an odd name in it:
+
+```console
+$ hmz exec -f ralph_loop -a cli=claude,model=claude-opus-5,effort=high "fix the build"
+hmz exec: error: bad agent 'cli=claude': cli= is gone: an agent is written CLI[@PROVIDER]/MODEL:EFFORT, and `=` names the place it fills, as in reviewer=claude/MODEL:EFFORT
 ```
 
 Everything that can be known before the first turn is checked before the first turn: an hour
@@ -200,17 +222,16 @@ Either way, a flow that says it [can be picked up](/user/resuming) carries on fr
 run left behind: run the same line again, or type `/resume` in the interface, which takes the
 last run in the directory rather than a flow you name.
 
-## Opening the interface already set up
+## Checking a line before it goes into cron
 
-`hmz` with `-f`, `-a` and `-c`, but no `exec`, opens the **interface** on that setup rather
-than running it. Nothing is started. The first thing you say is still what starts it.
+There is no line that opens the interface on a setup: `hmz` with no command opens on whatever
+that directory was [last set up to run](/reference/tui#what-it-remembers), and the flow, its
+agents and its settings are chosen at the prompt. So a line bound for cron is checked by
+running it — everything knowable before the first turn is refused before the first turn, which
+is why the refusals above cost two seconds rather than forty minutes.
 
-```sh
-hmz -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:high
-```
-
-This is useful for a run that is always the same run, and for checking a line before committing
-it to cron. What the line says is checked before the interface opens.
+For a run that is always the same run, set it up once at the prompt and leave it: `hmz` in that
+directory opens on it every morning, and the line stays in cron for the nights nobody is there.
 
 ## See also
 

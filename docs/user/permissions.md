@@ -42,8 +42,9 @@ first turn. Run it with the ordinary line — a CLI, a model and an effort apiec
 hmz exec -f ./review.py -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:high "$(cat TASK.md)"
 ```
 
-A rung no backend has a word for is caught by [`hmz check`](/reference/cli#hmz-check) without
-running the flow, and again as the flow loads:
+A rung no backend has a word for is caught by
+[`Hmz().flows.check`](/reference/sdk) without running the flow, and again as the flow
+loads:
 
 ```console
 review.py:9: error: unknown-permission: 'rdonly' is no rung there is -- what an agent may
@@ -57,9 +58,9 @@ refused before its first turn
 flow as the place to say it:
 
 ```console
-hmz exec: error: bad agent 'cli=codex,model=gpt-5.6-sol,effort=high,permission=read-only':
-permission is the flow's to say, written beside the agent where the flow declares it -- not on
-the line that runs the flow
+$ hmz exec -f ./review.py -a codex/gpt-5.6-sol:high,permission=read-only "$(cat TASK.md)"
+hmz exec: error: bad agent 'permission=read-only': permission is the flow's to say, written
+beside the agent where the flow declares it -- not on the line that runs the flow
 ```
 
 There is no row for it on the sheet an agent is set up on, either. An agent is a CLI, an
