@@ -136,9 +136,17 @@ class DshAgent(AgentBase):
           config: What its turns are to run at.
 
         Raises:
-          ValueError: If it was allowed anything other than everything. The preview SDK
-            exposes no per-session sandbox or approval control, so a tighter rung is a
-            setting it would have to ignore.
+          ValueError: If it was allowed anything other than everything. Two reasons, and the
+            second is the one a reader keeps rediscovering: the preview SDK exposes no
+            per-session sandbox or approval control -- `initialize` carries the cwd, the
+            provider and the model, and the runtime answers no other method that could carry
+            one -- and the composition pinned in `dsh.cordis.yml` mounts `dsh-bash-local` and
+            `dsh-fs-local`, the unconfined executors, and none of `dsh-sandbox-*`,
+            `dsh-user-approval` or `dsh-permission-presets`. So bypass is not a tighter rung
+            being quietly ignored: it is what these turns already run at, and mounting the
+            presets to get another would introduce the fail-closed Bash it would seem to
+            prevent, since local confinement refuses the tool outright on a host with neither
+            bwrap nor Landlock.
         """
         super()._serves(config)
         if config.permission != "bypass":
@@ -339,6 +347,28 @@ class DshSession(SessionBase):
     def _pursue(self, objective: str) -> str:
         """Runs the objective through Harness's persisted same-session goal service."""
         return self(_GOAL.format(objective))
+
+    def interject(self, text: str) -> None:
+        """Says nothing to a turn already running: the SDK can only queue another behind it.
+
+        Written out though the base refuses already, and in the same words: this is the one
+        backend here whose SDK looks like it could be talked to -- it holds a session open
+        and takes prompts on it -- so the reason it cannot belongs where somebody about to
+        add it will read it, rather than in a tracker.
+
+        Args:
+          text: What would have been said.
+
+        Raises:
+          NotImplementedError: Always. `session/prompt` is the runtime's `followup`, which
+            leaves the word in the `next-turn` inbox -- the prompts awaiting individual turns
+            -- so it is answered on its own once this turn is over rather than put into it.
+            The runtime's `steer`, which does reach the turn under way, is not on the SDK's
+            JSON-RPC surface: the server answers `initialize`, `session/prompt` and
+            `shutdown` and refuses every other method. A flow told a turn queued behind was a
+            word put in would be watching the wrong turn for it.
+        """
+        SessionBase.interject(self, text)
 
     def _validate(self) -> None:
         """Refuses settings the SDK cannot faithfully apply.
