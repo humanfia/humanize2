@@ -172,6 +172,50 @@ a time, which is what most of them want.
 Write the flow as a plain `def run` unless it has something to wait for. Both are flows; neither
 is the newer one.
 
+## Agents whose count is learned at runtime
+
+A flow still declares a fixed number of agents, because that is what somebody can configure
+before it starts. One declared agent may be a **template** for a fan-out whose size becomes known
+only after a turn. `spawn` clones that template under names the flow supplies and registers the
+new agents with the running flow:
+
+```python
+import asyncio
+from typing import NamedTuple
+
+from hmz.flows import Agent, flow, spawn
+
+
+class Agents(NamedTuple):
+    triage: Agent
+    expert: Agent
+
+
+@flow
+async def run(agents: Agents, task: str) -> None:
+    specialties = await agents.triage.aturn(task, schema=Specialties)
+    experts = spawn(
+        agents.expert,
+        (f"expert-{at:02d}-{role.slug}" for at, role in enumerate(specialties.roles, 1)),
+    )
+    opinions = await asyncio.gather(
+        *(expert.aturn(role.prompt) for expert, role in zip(experts, specialties.roles, strict=True))
+    )
+```
+
+Each spawned agent inherits the template's backend, model, effort, provider, permission,
+machine and flow Skills. It starts with no sessions, hooks or watchers, and its name must be
+non-empty and unique across the whole run, including flows this one called. Passing no names is
+a valid fan-out of zero.
+
+When called inside a running flow, the agents join that run before `spawn` returns. They appear
+in the terminal, `Runner.agents`, the SDK's `Run.agents`, and the run's cycle; stopping the run
+stops them too. A spawned agent belongs to the flow record that made it and is stopped when that
+record ends, while the agents selected before the run keep their existing reusable lifetime.
+
+Called outside a run, `spawn` is simply a named group of `clone` calls. There is then no run to
+register or clean them up, so whoever drives those agents owns their lifetime.
+
 ## How many agents, and what they are for
 
 The count is checked before the first turn:

@@ -109,6 +109,7 @@ as it goes — a run that died is a run whose cycle still says what it got to.
 | `event` | Written | Carries |
 | --- | --- | --- |
 | `began` | when the flow starts | `flow`, `task`, `workspace`, whether the flow is `resumable`, the run it was `picked_up` from where there was one, and one entry per agent with its `agent` id, `backend`, `model`, `effort`, `permission`, `provider`, `goals` and whether it was the `person` at the prompt |
+| `spawned` | when a flow adds an agent after it began | the template in `parent` and the new agent's backend, model and configuration; one made by a called flow also names that flow and its record |
 | `opened` | each time an agent opens a session | `agent`, `backend`, `provider`, `session`, the `name` the run gives it and `where` its links are |
 | `called` | when the flow calls another flow | `flow`, `task`, and the `cycle` — the record that call was written to |
 | `returned` | when that call returns, however it ended | `flow` and the same `cycle` |

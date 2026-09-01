@@ -98,12 +98,21 @@ from .tally import Tally
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+    from typing import Protocol
 
     from pydantic import BaseModel
 
     from hmz.agents import AgentBase, Board, Event, Question, SessionBase
     from hmz.flows import Place
     from hmz.sdk import Session
+
+    class _Runner(Protocol):
+        """The run controls the TUI needs without naming the runner layer."""
+
+        def stop(self) -> None: ...
+
+        def watch_agents(self, listener: Callable[[AgentBase], None]) -> None: ...
+
 
 #: What the editor understands, named as opencode names them, one step along: what answers
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
@@ -844,6 +853,9 @@ class Humanize(App[None]):
         self._session = session
         #: The agents of the flow running now, which is who a typed line is said to.
         self._agents: list[AgentBase] = []
+        #: The controller of that run. Unlike an agent list snapshot, this also catches an
+        #: agent registered at the same moment the run is being stopped.
+        self._runner: _Runner | None = None
         #: What the flow has done so far, which is what the right-hand column shows, and who
         #: reads the agents' own logs into it while it runs.
         self._monitor = Monitor()
@@ -2251,8 +2263,11 @@ class Humanize(App[None]):
         kept as the ones stopping, since a flow unwinds in its own time and the press after
         this one is the one that does not wait for it. Silent when nothing is running.
         """
-        for agent in self._agents:
-            agent.stop()
+        if self._runner is not None:
+            self._runner.stop()
+        else:
+            for agent in self._agents:
+                agent.stop()
         if self._agents:
             self.show("[dim]— stopping the flow —[/dim]")
         # Held by identity, so that the run's own thread can say when it has finished
@@ -2269,8 +2284,12 @@ class Humanize(App[None]):
         waiting on a prompt that is not there, holding a backend open behind it. Said to
         nobody rather than to the transcript, which has gone with everything else.
         """
-        for agent in self._agents:
-            agent.stop()
+        if self._runner is not None:
+            self._runner.stop()
+        else:
+            for agent in self._agents:
+                agent.stop()
+        self._runner = None
         self._agents, self._stopping = [], []
         self._spoke.set()
         self._close_btw()
@@ -2890,6 +2909,7 @@ class Humanize(App[None]):
             self.show(f"hmz: {why}", "red")
             return
         agents = list(runner.agents)
+        self._runner = runner
         self._agents = self._ran = agents
         with self._btw_lock:
             old_side_sessions = [session for _, session in self._btw_active.values()]
@@ -2912,9 +2932,27 @@ class Humanize(App[None]):
         # go: a backend only says what a turn cost once the turn is over, and a turn is long.
         self._tally = Tally(agents, self._monitor)
         self._tally.watch()
+        tally = self._tally
         with self._saying:
             self._queued, self._given, self._handed = [], [], False
 
+        def joined(agent: AgentBase) -> None:
+            # This callback runs on the flow's thread, before the new agent can take its first
+            # turn. Keep the same list object: the run-ending and stop paths use its identity
+            # to avoid clearing whichever flow may have started since.
+            if self._agents is not agents and self._stopping is not agents:
+                agent.stop()
+                return
+            agents.append(agent)
+            tally.add(agent)
+            agent.watch(self._heard)
+            agent.waiting = self._at_turn_start
+            agent.ask = functools.partial(self._ask, agent)
+            agent.prompting = functools.partial(self._listen, agent)
+            if self._stopping is agents:
+                agent.stop()
+
+        runner.watch_agents(joined)
         for agent in agents:
             agent.watch(self._heard)
             # Whichever turn starts next takes the oldest line that was held.
@@ -2926,7 +2964,7 @@ class Humanize(App[None]):
         self._draw()
 
         # This run's, whatever is being watched by the time it ends.
-        watching, tally = self._monitor, self._tally
+        watching = self._monitor
 
         def drive() -> int:
             try:
@@ -2953,6 +2991,8 @@ class Humanize(App[None]):
                     # nowhere: a flow that ends of its own accord strands the pin exactly as
                     # one that is stopped does.
                     self._on_screen(self._never_sent, "the flow ended first")
+                if self._runner is runner:
+                    self._runner = None
             return 0
 
         self._background(drive)

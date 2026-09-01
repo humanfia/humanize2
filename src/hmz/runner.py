@@ -13,6 +13,8 @@ not this one.
 
 from __future__ import annotations
 
+import contextlib
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -20,7 +22,7 @@ from hmz import backends
 
 if TYPE_CHECKING:
     import os
-    from collections.abc import Awaitable, Sequence
+    from collections.abc import Awaitable, Callable, Sequence
 
     from pydantic import BaseModel
 
@@ -167,6 +169,10 @@ class Runner:
         # whoever started the flow reaches for: the person the flow talks to is among them,
         # having been made here rather than chosen.
         self._driven = tuple(driven)
+        self._agents_lock = threading.Lock()
+        self._all_agents = list(self._driven)
+        self._agent_watchers: list[Callable[[AgentBase], None]] = []
+        self._stopping = False
         # And the same agents as the flow declared them: a flow whose agents are a NamedTuple
         # reaches them by name, and one that unpacks a plain tuple sees no difference.
         self._agents = make(driven)
@@ -195,7 +201,42 @@ class Runner:
         one more agent than anybody chose, and whatever is driving the flow has to reach
         that one too -- it is the one thing here that answers with what was typed.
         """
-        return self._driven
+        with self._agents_lock:
+            return tuple(self._all_agents)
+
+    def watch_agents(self, listener: Callable[[AgentBase], None]) -> None:
+        """Calls ``listener`` for each agent the flow adds while it is running.
+
+        The agents declared by the flow are already available through :attr:`agents`; this
+        watches only agents made later with :func:`hmz.flows.spawn`.
+        """
+        with self._agents_lock:
+            self._agent_watchers.append(listener)
+
+    def _joined(self, agents: tuple[AgentBase, ...]) -> None:
+        """Makes newly spawned agents visible to controllers of this runner."""
+        with self._agents_lock:
+            self._all_agents.extend(agents)
+            listeners = tuple(self._agent_watchers)
+            stopping = self._stopping
+        for agent in agents:
+            for listener in listeners:
+                # Watching a run is observational. A broken display callback must not turn a
+                # successfully admitted agent into a failed flow.
+                with contextlib.suppress(Exception):
+                    listener(agent)
+            if stopping:
+                with contextlib.suppress(Exception):
+                    agent.stop()
+
+    def stop(self) -> None:
+        """Stops every agent in this run, including ones it adds concurrently."""
+        with self._agents_lock:
+            self._stopping = True
+            agents = tuple(self._all_agents)
+        for agent in agents:
+            with contextlib.suppress(Exception):
+                agent.stop()
 
     def run(self, task: str) -> None:
         """Runs the flow in this directory, for as long as it keeps running.
@@ -223,6 +264,8 @@ class Runner:
         # rather than a flow it was told about and a flow it was not.
         started = entered(self._flow, self._driven)
         picked_up = self._picked_up
+        with self._agents_lock:
+            self._all_agents = list(self._driven)
         try:
             # One container for the run, started here rather than where the runner was made:
             # reading a flow must not pull an image, and a run that never starts must not
@@ -242,6 +285,7 @@ class Runner:
                     # minute. Read here rather than in the cycle, which is the run written down
                     # rather than the settings under it.
                     profile=Settings().profiling,
+                    joined=self._joined,
                 ) as cycle,
             ):
                 for agent in self._driven:
@@ -273,6 +317,10 @@ class Runner:
                     _finished(running_now)
         finally:
             left(started)
+            with self._agents_lock:
+                # A Runner may be used for another run after this one unwinds. Keep the
+                # stop request scoped to this run; the next run can admit fresh clones.
+                self._stopping = False
 
 
 def read_agent(

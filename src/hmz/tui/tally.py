@@ -126,6 +126,7 @@ class Tally:
           monitor: What to tell, as the total each model has cost.
         """
         self._agents = list(agents)
+        self._agents_lock = threading.Lock()
         self._monitor = monitor
         self._read: dict[Path, _Reading] = {}
         self._stop = threading.Event()
@@ -148,6 +149,11 @@ class Tally:
         """Stops reading, once the run this was watching is over."""
         self._stop.set()
 
+    def add(self, agent: AgentBase) -> None:
+        """Includes an agent the flow added after this tally started watching."""
+        with self._agents_lock:
+            self._agents.append(agent)
+
     def read(self) -> None:
         """Reads whatever has been appended since the last read, and says what it comes to.
 
@@ -155,7 +161,9 @@ class Tally:
         business reading, a row half written. What a run costs is worth nothing at the price
         of the run, so anything that goes wrong is left for the next read to find gone.
         """
-        for agent in self._agents:
+        with self._agents_lock:
+            agents = tuple(self._agents)
+        for agent in agents:
             profile = backends.named(agent.backend)
             if profile is None:
                 continue

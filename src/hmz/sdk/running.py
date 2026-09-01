@@ -110,8 +110,7 @@ class Run:
         The turn running now is closed out first: a flow told to stop unwinds in its own time.
         :meth:`close` is what does not wait for it.
         """
-        for agent in self.agents:
-            agent.stop()
+        self._runner.stop()
 
     def close(self) -> None:
         """Closes every conversation still open, which is the backend's process going.

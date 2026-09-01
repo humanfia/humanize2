@@ -79,6 +79,7 @@ from .driving import (
     load,
     resumes,
     running,
+    spawn,
     wanted,
 )
 from .verses import (
@@ -244,6 +245,7 @@ __all__ = [
     "resumes",
     "running",
     "shipped",
+    "spawn",
     "sub",
     "told",
     "wanted",

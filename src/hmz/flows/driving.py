@@ -39,7 +39,7 @@ from typing import (
 from hmz import telemetry
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Generator, Sequence
+    from collections.abc import Awaitable, Callable, Generator, Iterable, Sequence
 
     from pydantic import BaseModel
 
@@ -72,6 +72,7 @@ __all__ = [
     "resumes",
     "running",
     "set_up",
+    "spawn",
     "wanted",
 ]
 
@@ -445,6 +446,68 @@ def wanted(flow: str | os.PathLike[str]) -> tuple[Place, ...]:
       NotAFlow: If the file is not there, or is not a flow.
     """
     return tuple(place for place in declares(flow)[1] if not place.person)
+
+
+def spawn(template: Agent, names: Iterable[str]) -> tuple[Agent, ...]:
+    """Makes runtime agents from one configured template and joins them to its run.
+
+    A flow declares the agents it needs before it starts. Some work only reveals its fan-out
+    after a turn has landed, such as a triage agent choosing which specialists are needed. The
+    flow declares one template for that role, then expands it once the work is known::
+
+        experts = spawn(agents.expert, (f"expert-{at + 1}" for at in range(len(tasks))))
+        await asyncio.gather(
+            *(expert.aturn(task) for expert, task in zip(experts, tasks, strict=True))
+        )
+
+    Each result is a distinct agent with the template's backend, configuration, machine and
+    skills. When the template belongs to a running flow, the new agents join that same cycle:
+    their sessions are traced under their own names and stopping the run stops them too.
+
+    Args:
+      template: The agent whose settled configuration each new agent inherits.
+      names: One non-empty, unique name per agent to create. The iterable's length is the
+        runtime fan-out.
+
+    Returns:
+      The new agents, in the same order as ``names``.
+
+    Raises:
+      ValueError: If a name is empty or repeated, or collides with an agent already in the run.
+    """
+    requested = tuple(str(name).strip() for name in names)
+    if any(not name for name in requested):
+        raise ValueError("spawned agent names must not be empty")
+    if len(set(requested)) != len(requested):
+        raise ValueError("spawned agent names must be unique")
+
+    creating: list[Agent] = []
+    try:
+        for name in requested:
+            creating.append(template.clone(name=name))  # noqa: PERF401 -- cleanup needs partial clones
+    except BaseException:
+        for agent in creating:
+            with contextlib.suppress(Exception):
+                agent.stop()
+        raise
+    made = tuple(creating)
+    if template.cycle is None:
+        return made
+    joins = getattr(template.cycle, "spawned", None)
+    if callable(joins):
+        try:
+            joins(template, made)
+        except BaseException:
+            for agent in made:
+                with contextlib.suppress(Exception):
+                    agent.stop()
+            raise
+    else:
+        # A flow may be driven under a journal of its own. It can still trace the sessions even
+        # when that journal predates runtime agent registration.
+        for agent in made:
+            agent.cycle = template.cycle
+    return made
 
 
 def declares(

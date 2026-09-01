@@ -53,7 +53,7 @@ holding.
 
 | | |
 | --- | --- |
-| `agents` | Every agent it drives, the person the flow talks to among them. |
+| `agents` | Every agent it drives, the person the flow talks to and any runtime-spawned agents among them. The tuple grows as the flow adds agents and remains inspectable after it ends. |
 | `running` | Whether the flow is still going. `False` before it is started. |
 | `raised` | Whatever the flow raised, for a run started on a thread and now over. |
 | `run()` | Runs the flow here, until it returns. |

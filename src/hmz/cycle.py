@@ -51,7 +51,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Self, cast
 from hmz import backends, home
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from .agents import AgentBase
     from .tracing.profile import Profiler
@@ -578,6 +578,7 @@ class Cycle:
         resumable: bool = False,
         picked_up: str = "",
         profile: bool = False,
+        joined: Callable[[tuple[AgentBase, ...]], None] | None = None,
     ) -> None:
         """Opens a cycle, and writes down what it is a run of.
 
@@ -594,6 +595,8 @@ class Cycle:
           profile: Whether to sample the programs the agents start while the run goes, so
             that what a turn spent its minutes on is in the run's trace beside the turn. A
             setting of the workspace, asked of it by whoever opens the cycle.
+          joined: What to tell when the flow adds runtime agents, for whoever is watching or
+            controlling the run. The agents have joined the cycle before this is called.
         """
         self._begin(
             home()
@@ -609,6 +612,7 @@ class Cycle:
             (workspace or Path.cwd()).resolve(),
             flow,
             agents,
+            joined=joined,
         )
         #: The programs this run starts, sampled while it runs, or None for a run nobody
         #: asked to profile -- which is every run until somebody says otherwise.
@@ -630,6 +634,9 @@ class Cycle:
         workspace: Path,
         flow: str,
         agents: Sequence[AgentBase],
+        *,
+        under: Cycle | None = None,
+        joined: Callable[[tuple[AgentBase, ...]], None] | None = None,
     ) -> None:
         """Settles what is written down, and where.
 
@@ -643,6 +650,8 @@ class Cycle:
           workspace: Where the run is happening.
           flow: The flow this is a record of, as it was named.
           agents: The agents it is being run with, in the order it takes them.
+          under: The record this one is nested under, or None for the root run.
+          joined: What the root run tells when runtime agents join it.
         """
         self._at = at
         self._journal = journal
@@ -650,6 +659,18 @@ class Cycle:
             threading.Lock()
         )  # sessions open on whichever thread a turn runs on
         self._agents = list(agents)
+        self._agents_lock = threading.Lock()
+        self._spawned: list[AgentBase] = []
+        if under is None:
+            # A called flow has a record of its own, but agents spawned inside it still belong
+            # to the run as a whole. This root inventory is what makes names unique across the
+            # whole tree and lets whoever started the run stop every agent it owns.
+            self._root = self
+            self._run_agents = list(agents)
+            self._run_agents_lock = threading.Lock()
+            self._joined = joined
+        else:
+            self._root = under.root
         #: Every session this run has opened, by the name it was written down under, so that
         #: the links can be made again as the backends go on writing to them.
         self._sessions: dict[str, tuple[str, str]] = {}
@@ -679,6 +700,73 @@ class Cycle:
     def workspace(self) -> Path:
         """Where this run is happening, which is what its cycles are kept under."""
         return self._where
+
+    @property
+    def agents(self) -> tuple[AgentBase, ...]:
+        """Every agent in this record, including ones the flow spawned at runtime."""
+        with self._agents_lock:
+            return tuple(self._agents)
+
+    @property
+    def run_agents(self) -> tuple[AgentBase, ...]:
+        """Every agent owned by the whole run, including ones spawned in called flows."""
+        root = self._root
+        return root._run_inventory()  # noqa: SLF001 -- root inventory is an internal registry
+
+    @property
+    def root(self) -> Cycle:
+        """The root record shared by this cycle and any nested called flow."""
+        return self._root
+
+    def _run_inventory(self) -> tuple[AgentBase, ...]:
+        with self._run_agents_lock:
+            return tuple(self._run_agents)
+
+    def spawned(self, parent: AgentBase, agents: Sequence[AgentBase]) -> None:
+        """Adds agents made from ``parent`` after the flow's runtime fan-out is known.
+
+        The whole group is admitted before any event is written, so a duplicate name cannot
+        leave half a requested fan-out attached to the run.
+        """
+        made = tuple(agents)
+        if not made:
+            return
+        records = _drove(made)
+        root = self._root
+        with root._run_agents_lock:  # noqa: SLF001 -- root owns the run inventory
+            occupied = {agent.id for agent in root._run_agents}  # noqa: SLF001
+            names = [agent.id for agent in made]
+            collision = next((name for name in names if name in occupied), None)
+            if collision is not None:
+                raise ValueError(f"agent name {collision!r} is already in this run")
+            if len(set(names)) != len(names):
+                raise ValueError("spawned agent names must be unique")
+            root._run_agents.extend(made)  # noqa: SLF001
+            with self._agents_lock:
+                self._agents.extend(made)
+                self._spawned.extend(made)
+                for agent in made:
+                    agent.cycle = self
+
+        # Whoever is driving the run learns about these before spawn() hands them to the
+        # flow, so a stop or a UI watcher cannot race their first turn.
+        if root.joined is not None:
+            root.joined(made)
+        for record in records:
+            self.write("spawned", parent=parent.id, agent=record)
+            if self is not root:
+                root.write(
+                    "spawned",
+                    parent=parent.id,
+                    agent=record,
+                    flow=self._flow,
+                    cycle=self._journal,
+                )
+
+    @property
+    def joined(self) -> Callable[[tuple[AgentBase, ...]], None] | None:
+        """The callback that observes agents joining the root run, if one was supplied."""
+        return self._joined if self is self._root else self._root.joined
 
     def _profiling(self) -> Profiler | None:
         """The sampler this run is profiled by, started, or None where there is none.
@@ -732,9 +820,23 @@ class Cycle:
           why: The exception itself, unread.
           traceback: Where it was raised, unread.
         """
-        self._close(kind)
-        for agent in self._agents:
-            agent.cycle = None
+        try:
+            self._close(kind)
+        finally:
+            self._finish_spawned()
+            for agent in self.agents:
+                if agent.cycle is self:
+                    agent.cycle = None
+
+    def _finish_spawned(self) -> None:
+        """Stops and detaches the runtime agents this record created."""
+        with self._agents_lock:
+            spawned = tuple(self._spawned)
+        for agent in spawned:
+            with contextlib.suppress(Exception):
+                agent.stop()
+            if agent.cycle is self:
+                agent.cycle = None
 
     def _close(self, kind: type[BaseException] | None) -> None:
         """Writes down that what this is a record of has ended, and how it ended.
@@ -763,7 +865,7 @@ class Cycle:
         # way made of it: the process goes out from under that turn, and from inside one that
         # reads as a turn that could not finish.
         stopped = kind is not None and (
-            issubclass(kind, Stopped) or any(agent.stopped for agent in self._agents)
+            issubclass(kind, Stopped) or any(agent.stopped for agent in self.agents)
         )
         self.write(
             "ended",
@@ -893,7 +995,14 @@ class Sub(Cycle):
           resumable: Whether it says it can be picked up again.
         """
         self._under = under
-        self._begin(under.path, record, under.workspace, flow, agents)
+        self._begin(
+            under.path,
+            record,
+            under.workspace,
+            flow,
+            agents,
+            under=under,
+        )
         self.write(
             "began",
             flow=flow,
@@ -912,7 +1021,10 @@ class Sub(Cycle):
         Args:
           kind: What was raised out of the called flow, if anything.
         """
-        self._close(kind)
+        try:
+            self._close(kind)
+        finally:
+            self._finish_spawned()
         self._under.write("returned", flow=self._flow, cycle=self._journal)
 
 
@@ -1087,7 +1199,9 @@ def read(cycle: Path) -> Ran | None:
         return None
     ended = next((one for one in reversed(events) if one.get("event") == "ended"), None)
     agents: list[Drove] = []
-    for one in began.get("agents") or ():
+    declared: list[object] = list(cast("list[object]", began.get("agents") or []))
+    declared.extend(one.get("agent") for one in events if one.get("event") == "spawned")
+    for one in declared:
         if not isinstance(one, dict):
             continue
         said = cast("dict[str, Any]", one)
