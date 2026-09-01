@@ -929,8 +929,8 @@ A flow is Python, and reading one means running it — so listing what a flowver
 entry point of every flow in its `flows/`. Adding one is trusting that repository with this
 machine, exactly as installing a package is.
 
-[`hmz flowverses`](/reference/cli#hmz-flowverses) is the same, said as arguments, for a machine
-being set up or a script: `list`, `show`, `add`, `fetch`, `remove`.
+[`Hmz().verses`](/reference/sdk#flowverses) is the same store, reached without opening
+anything, for a machine being set up or a script: `all`, `holds`, `add`, `fetch`, `remove`.
 
 ```sh
 hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
@@ -1209,8 +1209,8 @@ as a stop — a model can think for minutes.
 
 ## Checking a flow
 
-Two readings, before anything runs it — what [`hmz check`](/reference/cli#hmz-check) runs
-from a command line, reachable as a library for a test or a loop that writes flows.
+Two readings, before anything runs it. [`Hmz().flows.check`](/reference/sdk#flows) is both of
+them in their order; these are the layers under it, for a test or a loop that writes flows.
 
 `checked` is the static one: pure `ast` over every file the flow's directory holds (what is
 under its `skills/` excepted), executing nothing, so it is safe to point at a flow nobody has
@@ -1408,11 +1408,10 @@ Hmz().flows.foretell("official/review")   # writes the prophecy beside the flow
 Hmz().flows.prophecy("official/review")   # reads what the source compiles to
 ```
 
-or [`hmz check --ship`](/reference/cli#hmz-check) from a command line. The flow's own Python
-still has to be there: a prophecy names the functions its nodes are. The shipped-file reader
-rebuilds only the seven allowlisted tuple types a prophecy uses and validates the resulting
-shape. Any other class or malformed shape is refused; loading the flow's Python remains the
-separate trust boundary described in [Security](/user/security).
+The flow's own Python still has to be there: a prophecy names the functions its nodes are. The
+shipped-file reader rebuilds only the seven allowlisted tuple types a prophecy uses and
+validates the resulting shape. Any other class or malformed shape is refused; loading the
+flow's Python remains the separate trust boundary described in [Security](/user/security).
 
 ## Testing a flow
 

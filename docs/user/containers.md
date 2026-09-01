@@ -55,14 +55,22 @@ builder fixes what it reports, and everything they produce lands in your workspa
 ## The whole run in one container
 
 That puts **one agent** in a container. When the answer is *all of them*, say it once from
-outside, with no flow to edit:
+outside, with no flow to edit — which is a thing to say from Python, there being no line
+that says it:
 
-```sh
-hmz exec -f ralph_loop --container python:3.12 -a claude/claude-opus-5:max "get the suite green"
+```python
+from hmz.sdk import Hmz
+
+hmz = Hmz()
+path, agents, task, config, _ = hmz.read(
+    ["-f", "ralph_loop", "-a", "claude/claude-opus-5:max", "get the suite green"]
+)
+hmz.run(path, agents, task, config, container="python:3.12").run()
 ```
 
-One container is started for the run, **every** agent's turns land in it, and it goes when the
-run ends. One rather than one apiece is the point: the agents are working on one thing, so what
+`read` is the `hmz exec` line itself, so the flow and the agents are written the way they
+are written everywhere else; `container` is the one thing that is not on it. One container
+is started for the run, **every** agent's turns land in it, and it goes when the run ends. One rather than one apiece is the point: the agents are working on one thing, so what
 one of them writes is what the next one reads.
 
 The project directory is mounted at the path it already has, so the flow's own `open()` reads
@@ -180,11 +188,8 @@ login. Everything the agent *does* happens in the container.
 
 The work therefore happens in a **mirror** rather than in this directory, and the backend logs
 the agent's turns under a path this project has never heard of. It makes no difference: the run
-wrote down the ids of the sessions it opened, and that is what its trace is gathered by.
-
-```sh
-hmz trace collect
-```
+wrote down the ids of the sessions it opened, and that is what its trace is gathered by —
+`/epics`, enter on the run, then **collect a trace**.
 
 The run itself is still written down here. An [epic](/user/tracing#what-a-run-writes-down)
 belongs to the directory the flow ran in, and is a directory of its own with a `sessions/` in
@@ -202,8 +207,9 @@ tester-codex@local-0a1b2c3d-1a2b-3c4d-5e6f-708192a3b4c5
 ```
 
 The id is the end of the name, and a leading part of it is enough to name that session to
-[`hmz trace collect`](/user/tracing) — the tester's is the one that worked in the container.
-`/epics` finds the same directory at the prompt: enter on the run, then **where it is**.
+[`Hmz().epics.trace(sessions=…)`](/user/tracing) — the tester's is the one that worked in
+the container. `/epics` finds the same directory at the prompt: enter on the run, then
+**where it is**.
 
 ## Isolation here is about environment, not permission
 

@@ -42,8 +42,8 @@ as a path — `flows/mine` and `flows/mine.py` both. See
 ### `the official flowverse has not been fetched yet`
 
 The name is right; the download has not happened. `/flow` fetches whatever has never been
-fetched as it opens. Press `r` on it in `/flowverses` to fetch it again, or run `hmz flowverses
-fetch official`.
+fetched as it opens. Press `r` on it in [`/flowverses`](/weaver/flowverses) to fetch it again —
+or, from a script with no terminal to press it at, `Hmz().verses.fetch("official")`.
 
 ### `nothing in it is marked @flow(), and it holds …`
 
@@ -88,22 +88,31 @@ if TYPE_CHECKING:                     # ← this is the problem
 Import it at runtime instead. The count has to be readable where the flow runs, not only where
 pyright looks.
 
-### `bad agent 'claude:high': expected CLI[@PROVIDER]/MODEL:EFFORT or cli=CLI,…`
+### `bad agent 'claude:high': expected [NAME=]CLI[@PROVIDER]/MODEL:EFFORT`
 
-An `-a` is missing a part. All three are required:
+An `-a` is missing a part. The CLI, the model and the effort are all three required:
 
 ```sh
 -a claude/claude-opus-4-8:high
--a cli=claude,model=claude-opus-4-8,effort=high
 ```
 
 The CLI is read from the front and the effort from after the **last** colon. A model with
 slashes in it, such as `kimi/kimi-code/k3:high`, is fine.
 
-### `bad agent '…': foo is not cli, model, effort, service_tier, provider or config.KEY`
+### `bad agent 'cli=claude': cli= is gone`
 
-The written-out form has a key that is not one of the five every backend takes — `cli`,
-`model`, `effort`, `service_tier` and `provider` — or a `config.KEY` Codex override.
+The written-out `cli=…,model=…,effort=…` form no longer exists, and neither do `provider=`,
+`service_tier=` or `config.KEY=`. `=` on the line means something else now — it names which of
+the flow's agents this one is:
+
+```sh
+-a claude@deepseek/claude-opus-4-8:high        # the account is @, not provider=
+-a reviewer=codex/gpt-5.6-sol:max              # = names the place it fills
+```
+
+A latency tier and a backend-native override are still an agent's to carry. They are set where
+the agent is made — from the [SDK](/reference/sdk), or by the flow that declares it — rather
+than on the line that names one.
 
 ### `bad agent '…': permission is the flow's to say`
 
@@ -152,19 +161,20 @@ next account of that backend. Sign the one it left back in:
 
 ```sh
 claude auth login
-hmz providers
 ```
+
+Or, for an account humanize keeps rather than the one this machine is signed into, open
+[`/providers`](/reference/tui#the-accounts-themselves), put the cursor on it and press enter:
+*sign in again* runs that backend's own way in under this account's paths.
 
 ### `(retired: the model is gone or was never this account's; another place is what answers it)`
 
 The CLI or its service says there is no such model. No account of that backend answers it, they
 are all offered the same catalogue, so the turn goes straight to the next
 [place](/user/fallback). Ask the backend what it actually runs, and give the agent one of
-those:
-
-```sh
-hmz check
-```
+those: in the agent's own setup sheet, open the `model` row and press **r**, which asks that
+CLI again as that account and keeps what it said. From a script,
+`Hmz().accounts.ask(cli, provider)` is the same question.
 
 ### `(missing: npm i -g @anthropic-ai/claude-code)`
 
@@ -345,17 +355,17 @@ Nothing matched. In order of likelihood:
    many sessions each run opened, and `--epic` names another.
 3. **You are tracing the wrong directory.** Runs are kept per workspace. Without a
    `<workspace>`, the last run of *this* one is what is traced.
-4. **Nothing here was ever run by a flow.** Then there is no run to trace. What you want is
-   `hmz trace collect --all` or `--session <id>`.
-5. **The time window excludes it.** Drop `--start`/`--end`.
+4. **Nothing here was ever run by a flow.** Then there is no run to trace, and `/epics` has
+   nothing to offer. A trace of loose sessions is `Hmz().epics.trace()`, or
+   `Hmz().epics.trace(sessions=["<id>"])` for named ones — there is no way in that asks for one.
+5. **The time window excludes it.** Drop the `start` and `end` you passed.
 
 ### Two agents show up as one
 
-They ran at the same configuration, and nothing said they were two. `hmz trace collect` reads
-that off the run it is a trace of. That run is the last [epic](/reference/tracing#epics) of
-the workspace unless `--epic` names another. So a trace asked for by `--session` or `--all` is
-of no run and has nothing to read it off. If you drive agents by hand, pass `agents={a.id:
-a.opened for a in …}`. See [what counts as one
+They ran at the same configuration, and nothing said they were two. A trace reads that off
+the run it is a trace of, which is the [epic](/reference/tracing#epics) `/epics` gathered it
+from. So a trace asked for by `Hmz().epics.trace(sessions=…)` is of no run and has nothing to
+read it off. If you drive agents by hand, pass `agents={a.id: a.opened for a in …}`. See [what counts as one
 agent](/reference/tracing#what-counts-as-one-agent).
 
 ## Remote execution

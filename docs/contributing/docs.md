@@ -201,13 +201,14 @@ Concretely:
 - The prompt is VHS's own `>`. No user, no host, no path in it.
 - Every tape starts `cd /work/demo`, and the only homes that appear are the container's
   `/root/.humanize` and `/root/.claude`.
-- No provider is ever signed in: `hmz providers add` is only ever recorded with `--no-login`, an
-  account made in the interface is only ever made by a way that runs nothing, and the values are
-  obviously invalid — `gateway.example.invalid`, `not-a-real-token`, `not-a-real-key`.
+- No provider is ever signed in: the account `stage.py` writes down is a gateway nobody can
+  reach, and an account made on camera is made at `/providers` by a way in that runs nothing —
+  `key`, which asks for a name and a secret and writes them down. The values are obviously
+  invalid — `gateway.example.invalid`, `not-a-real-token`, `not-a-real-key`.
 - No turn is ever run. `/opt/standin/claude` and `/opt/standin/codex` exist so that humanize
   offers those backends; both exit 1 if anything actually calls them.
-- What the [`collect`](/user/tracing) demo reads, and the runs `/epics` lists, are what
-  `stage.py` invented.
+- The runs `/epics` lists, and the transcripts the [trace](/user/tracing) collected from one is
+  drawn out of, are what `stage.py` invented.
 
 If you add a tape, look at the rendered GIF before committing it. Frame by frame is worth it:
 

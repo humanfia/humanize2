@@ -97,8 +97,8 @@ run.wait(timeout=60)
 
 ## Flowverses
 
-`hmz.verses` — the same store [`hmz flowverses`](/reference/cli#hmz-flowverses) and `/flowverses`
-walk.
+`hmz.verses` — the same store [`/flowverses`](/reference/tui#where-flows-come-from) walks, and
+the one `/flow` steps between with its arrows.
 
 | | |
 | --- | --- |
@@ -176,6 +176,7 @@ happened.
 | `state(epic, flow="")` | What a [resumable](/user/resuming) flow left behind in one run. |
 | `traced(epic, *, output=None, start=None, end=None)` | Gathers one run into a [trace](/reference/tracing) of that run — its own sessions, by the ids it wrote down, beside the programs it profiled — and answers with where it went and what is in it. It goes beside the run unless an output is named. |
 | `trace(*, sessions=None, agents=None, output=None, start=None, end=None, profile=None)` | The same collector, asked for whatever sessions you name — which is how a session no run ever drove is read back. |
+| `bundled(epic, *, output=None, transcript=None)` | Packages one whole run up as one archive to send somewhere — its own records, every session log the backends wrote for it with the links followed, and a manifest — and answers with where it went and what went in. Credentials are struck out of every byte. See [Exporting a run](/user/export). |
 
 ## Session
 

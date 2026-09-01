@@ -31,30 +31,41 @@ failed turn is taken again first. `d` twice takes a step away.
 
 Nothing lands until the menu is saved on the way out, as on every menu.
 
-## On the command line
+## From Python
 
-```sh
-hmz fallback add claude/claude-opus-5 codex/gpt-5.6-sol
-hmz fallback retry claude/claude-opus-5 3 --policy exponential --timeout 90
-hmz fallback list
-hmz fallback show claude/claude-opus-5
-hmz fallback remove claude/claude-opus-5
+The steps are `Hmz().fallbacks`, which is the object the page itself is drawing — so a step
+written from a script is a step the next run walks, and a step written at the prompt is one a
+script reads back:
+
+```python
+from hmz.sdk import Hmz
+
+falls = Hmz().fallbacks
+
+falls.points("claude/claude-opus-5", "codex/gpt-5.6-sol")
+falls.retrying("claude/claude-opus-5", 3, "exponential", 90)
+falls.all()
+falls.clear("claude/claude-opus-5")
 ```
 
-An account is part of which place this is, after an `@`:
+An account is part of which place this is, after an `@`. `claude@work/claude-opus-5` and
+`claude@key/claude-opus-5` are two places rather than one written twice, the account being one
+of the three things a turn can fail for having named:
 
-```sh
-hmz fallback add claude@work/claude-opus-5 codex@key/gpt-5.6-sol
+```python
+falls.points("claude@work/claude-opus-5", "codex@key/gpt-5.6-sol")
 ```
 
-`show` prints the whole walk rather than the one step, since the walk is what a failed turn
+`chain` answers the whole walk rather than the one step, since the walk is what a failed turn
 actually does:
 
+```python
+falls.chain("claude@work/claude-opus-5")
+# ['claude@work/claude-opus-5', 'codex@key/gpt-5.6-sol', 'dsh/deepseek-v4-flash']
 ```
-1. claude@work/claude-opus-5   [3 more tries, exponential]
-2. codex@key/gpt-5.6-sol
-3. dsh/deepseek-v4-flash
-```
+
+What is written against one place on its own is `tried`, and the waits there are to choose from
+are `policies`. All of them are [SDK › Fallbacks](/reference/sdk#fallbacks).
 
 ## Trying again
 
@@ -65,11 +76,25 @@ with. One row says both, both being answers to the one thing that went wrong.
 | | |
 | --- | --- |
 | `tries` | how many goes beyond the first; `0` is a failed turn that is a failed turn |
-| `policy` | how long to wait between them — `none`, `constant`, `linear`, `exponential`, `exponential-jitter`, `fibonacci` |
+| `policy` | how long to wait between them — the ladder below |
 | `timeout` | the longest the trying again may go on for, or `0` for as long as the tries take |
 
-`exponential-jitter` is what to reach for when several agents are failing at once: full jitter
-is what keeps a flow's agents from all coming back on the same second.
+Nothing is retried unless you say so: a prompt the model refused is the same refusal every
+time, and only you know which of your places fails the other way. The waits themselves are the
+ones everybody uses, the first being one second and no single wait longer than a minute however
+far the backoff has climbed:
+
+| Policy | The waits before the 2nd, 3rd, 4th… try |
+| --- | --- |
+| `none` | none at all |
+| `constant` | 1s, 1s, 1s |
+| `linear` | 1s, 2s, 3s |
+| `exponential` | 1s, 2s, 4s, 8s |
+| `exponential-jitter` | anywhere up to the exponential wait — the default, and what to reach for when several agents are failing at once: full jitter is what keeps a flow's agents from all coming back on the same second |
+| `fibonacci` | 1s, 1s, 2s, 3s, 5s |
+
+The time the retrying is given is checked **before** a wait rather than after it, so a turn is
+never started knowing the time it was given is already spent.
 
 ## What a turn actually does
 
@@ -164,4 +189,5 @@ CLIs held open for a failure that never came.
 
 - [Providers](/user/providers) — the accounts an agent runs as, and the chain between them
 - [Unattended runs](/user/unattended) — where having somewhere to fall back to earns its keep
-- [TUI › `/fallback`](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken)
+- [TUI › `/fallback`](/reference/tui#where-a-turn-goes-when-it-cannot-be-taken) — the page itself
+- [SDK › Fallbacks](/reference/sdk#fallbacks) — the same steps as one object

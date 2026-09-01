@@ -6074,9 +6074,9 @@ def collected(ran: Ran) -> tuple[Path, str]:
 
     Beside the run rather than in this directory: an epic is what a run was, and the trace of
     that run belongs with the sessions it points at and the state it left. A trace of what a
-    directory holds whoever opened it is `hmz trace collect --all`, and a trace to attach to
-    an issue is `--output`: both are a command line, there being no run here to hang either
-    on.
+    directory holds whoever opened it is :meth:`hmz.sdk.epics.Epics.trace` with no sessions
+    named, and a trace written somewhere else is its `output`: both are Python, there being no
+    run here to hang either on.
 
     Args:
       ran: The run.

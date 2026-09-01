@@ -23,13 +23,14 @@ turns swarm mode on for a model that has one.
 
 ## Set the effort
 
-`backend/model:effort` is the short spelling. The written-out form of `-a` takes the same
-thing, and so does a flow's Python config:
+`backend/model:effort` is how an agent carries one on a command line — the effort last, after
+the last colon, however many slashes the model's own name has in it. A flow's Python config
+takes the same word:
 
 ::: code-group
 
 ```sh [command line]
-hmz exec -f ralph_loop -a cli=kimi,model=kimi-code/k3,effort=swarmmax "fix the build"
+hmz exec -f ralph_loop -a kimi/kimi-code/k3:swarmmax "fix the build"
 ```
 
 ```python [Python]

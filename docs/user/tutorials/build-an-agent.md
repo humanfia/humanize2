@@ -299,12 +299,13 @@ environment gate the builder implemented. That is the two planning phases earnin
 ## Step 6 — read the whole thing back
 
 ```sh
-hmz trace collect
+hmz
 ```
 
 Three runs happened here, one per phase, and each is its own **epic** — a directory under
-`~/.humanize/epics/`. `hmz trace collect` collects the last one; `/epics` in the interface
-lists all of them and collects whichever you pick.
+`~/.humanize/epics/`. `/epics` lists all three, newest first, and **enter** on one offers
+*collect a trace* — that run's sessions and no other's, written into `traces/` inside it. So
+the three phases are three traces, each gathered from the run it is of.
 
 The `rlcr` trace is the interesting one. The builder is a single long track, and the reviewer
 is a row of short ones — and the gaps between them are where the hook fired.

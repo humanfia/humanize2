@@ -146,9 +146,19 @@ how often it re-reads files it has already read.
 and press **←/→**. A Ralph loop of `low` turns is a different animal from one of `max` turns.
 See [Efforts](/user/efforts).
 
-**Make it read-only.** Start it from the command line with
-`-a cli=claude,model=…,effort=high,permission=read-only`. Now it can look at the repository and
-change nothing, which is how you use a loop to *review* rather than to build.
+**Make it read-only.** What an agent is allowed to do is the flow's to say, declared beside the
+agent it drives — so this one is a fork rather than something you type. Press **f** on
+`ralph_loop` in `/flow`, which copies the whole flow into `.humanize/flows/ralph_loop/`, and
+write what its one place is allowed beside the type:
+
+```python
+# .humanize/flows/ralph_loop/__init__.py — the annotation on run's agents
+agents: tuple[Annotated[Agent, AgentDefaults(permission="read-only")]]
+```
+
+`local/ralph_loop` now looks at the repository and changes nothing, whichever CLI fills the
+place, which is how you use a loop to *review* rather than to build. See
+[Permissions](/user/permissions).
 
 ## See also
 

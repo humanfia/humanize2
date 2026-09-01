@@ -27,7 +27,8 @@ WORK = pathlib.Path("/work/demo")
 HOME = pathlib.Path("/root/.humanize")
 
 #: Claude Code's home, inside this container. The trajectories below are written under it so
-#: that `hmz trace collect` has something real to read -- real in shape, invented in content.
+#: that a trace collected from one of the runs below has something real to read -- real in
+#: shape, invented in content.
 CLAUDE = pathlib.Path("/root/.claude")
 
 #: The moment the invented work happened, so a rendered GIF does not change every day.
