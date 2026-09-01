@@ -131,6 +131,11 @@ def test_a_terminal_going_away_is_not_the_run_going_away(held: daemon.Daemon) ->
 
 def test_what_is_running_is_answered_without_attaching(held: daemon.Daemon) -> None:
     """A line asking is a line somebody typed instead of opening the interface."""
+    # What a run says about itself it says once it has opened, which it does in its own
+    # process and so in its own time: `start` comes back when the socket is bound, and the
+    # status written down beside a socket nobody has answered on yet has only what the
+    # daemon knows.
+    assert _until(lambda: "kind" in held.status())
     said = held.status()
 
     assert said["pid"] == held.pid
