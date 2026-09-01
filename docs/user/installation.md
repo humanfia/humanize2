@@ -10,7 +10,7 @@
 
 Nothing else, and no tutorial needs more. Two features do: [a container of the agent's
 own](/user/containers) wants `docker`, and [remote execution](/user/remote-execution) wants
-Linux on x86-64 here plus `python3` on the far machine.
+Linux on x86-64 or aarch64 here plus `python3` on the far machine.
 
 ## Install humanize
 

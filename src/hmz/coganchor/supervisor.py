@@ -364,6 +364,11 @@ class Supervisor:
 
         The kernel overwrites the return register when a syscall is skipped, so
         the value can only be planted at the syscall-exit stop.
+
+        Minus one is how every Linux architecture is told to skip one -- it is
+        aarch64's ``NO_SYSCALL`` as much as it is a number x86-64 has no entry
+        for -- but *where* the number is written differs, which
+        :func:`hmz.coganchor.linux.ptrace.setregs` settles.
         """
         registers.syscall_number = -1
         tracee.pending_errno = action.errno
@@ -489,6 +494,11 @@ class Supervisor:
         A process stopped by ptrace never dequeues ordinary signals, so an
         agent's ``SIGTERM`` would otherwise be invisible.  Reading the pending
         mask lets the remote command see it instead.
+
+        ``SigPnd``/``ShdPnd`` are written by ``fs/proc/array.c``, which no
+        architecture overrides, and the signal numbers they are a mask of are
+        the generic ones -- so, like the ``__WALL`` the loop waits with, this is
+        the same on every architecture an agent can be supervised on.
         """
         for tracee in list(self._tracees.values()):
             if tracee.proxy is None:

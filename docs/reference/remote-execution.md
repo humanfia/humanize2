@@ -183,8 +183,8 @@ status = connect(["claude", "--print"], config)   # the agent's own exit status
 
 ## Requirements
 
-**Running an agent** needs Linux on x86-64 and a recent Python. Any other architecture is
-refused at start-up.
+**Running an agent** needs Linux on x86-64 or aarch64 and a recent Python. Any other
+architecture is refused at start-up, and told where it can run instead.
 
 **Serving** needs only a POSIX system with a Python of the same vintage — no root, no compiler,
 no kernel module, nothing installed.

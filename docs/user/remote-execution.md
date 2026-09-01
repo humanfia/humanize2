@@ -233,8 +233,8 @@ is refused outright. Prefer `ssh://` or `docker://`, which need no port at all. 
 
 ## Requirements
 
-Linux on x86-64 **here**. A POSIX system with a recent `python3` **there**. No root, no
-compiler, no kernel module, nothing installed on the far end.
+Linux on x86-64 or aarch64 **here**. A POSIX system with a recent `python3` **there**. No
+root, no compiler, no kernel module, nothing installed on the far end.
 
 ## See also
 

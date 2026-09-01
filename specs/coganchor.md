@@ -91,11 +91,11 @@ Each of these is deliberate, and each looks like a defect if you meet it cold.
 
 ## Requirements
 
-Running an agent needs Linux on x86-64 and a recent Python; any other
-architecture is refused at start-up. Serving needs only a POSIX system with a
-Python of the same vintage — no root, no compiler, no kernel module, nothing
-installed. The same program serves both ends, and the two refuse to run against
-each other if their versions disagree.
+Running an agent needs Linux on x86-64 or aarch64 and a recent Python; any
+other architecture is refused at start-up, and told where it can run instead.
+Serving needs only a POSIX system with a Python of the same vintage — no root,
+no compiler, no kernel module, nothing installed. The same program serves both
+ends, and the two refuse to run against each other if their versions disagree.
 
 ## Limits
 
