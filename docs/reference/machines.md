@@ -285,8 +285,15 @@ And the anchor answers the other half of the question — not where the work lan
 turn reaches it, which is a fact about the road rather than about the machine:
 
 ```python
-AnchorConfig(target="ssh://build-box").capabilities  # {"anchor:supervised"}
+AnchorConfig(target="ssh://build-box").capabilities               # {"anchor:supervised"}
+AnchorConfig(target="ssh://build-box", native=True).capabilities  # {"anchor:native-cli"}
 ```
+
+The same machine reached two ways is two different sets of things a turn may be asked to do.
+`anchor:supervised` runs the agent here and answers everything it does from the target;
+`anchor:native-cli` runs the CLI the target already has and carries its streams. The second
+needs that CLI installed there and sends the account across to it; the first needs neither.
+Read [Remote execution](/reference/remote-execution).
 
 ## Choosing between them
 

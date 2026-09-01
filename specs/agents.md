@@ -294,7 +294,21 @@ class AgentConfig:
   other is which of the flow's own callbacks it is offering, which is `hmz.agents.tools`.
 - An anchored turn MUST be run by spawning `AnchorConfig.command(argv)`, never by calling
   coganchor in this process: a turn is pumped from threads of its own, which a supervisor that
-  forks the agent and takes the process's signal handling cannot be given.
+  forks the agent and takes the process's signal handling cannot be given. This holds however
+  the anchor reaches the target, including where it drives the CLI already installed there and
+  there is no supervisor at all: what is spawned is then a relay rather than a tracer, but a
+  relay that owns this process's standard input and its signal handling is no more lendable
+  than a tracer is, and one line that renders every anchored turn is what keeps a setting from
+  applying to some of them.
+- An anchored turn whose CLI runs on the target MUST be given there what a supervised one is
+  given here, and MUST be given it by the anchor rather than by the backend: the account's
+  variables, the account's credential files, and the skills the flow carries. Which of those
+  a turn needs is read off `hmz.backends` and the provider, in `AgentBase.spawned`, so that a
+  backend added later is anchored by having its facts written down rather than by being taught
+  about anchors. The one thing that MUST NOT cross is the flow's own callbacks: the bridge
+  carrying them is a program on this machine speaking to a socket in this process, so a turn
+  offering them to a CLI on another machine MUST be refused where it is spawned rather than
+  taken without them.
 
 ## `hooks.py`
 

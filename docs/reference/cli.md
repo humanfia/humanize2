@@ -245,16 +245,25 @@ Everything after the agent's name is the agent's own.
 | `--net-allow HOST[:PORT]` | — | With `--net remote`, keep connections to this host local. Repeatable. |
 | `--token TOKEN` | `$HUMANIZE_TOKEN` | Shared secret a `tcp://` target expects. |
 | `--force` | off | Use the mirror directory even if it already holds unrelated files. |
+| `--native` | off | Run the CLI already installed **on the target** instead of supervising one here. No mirror, nothing traced: this process starts it there and carries its three streams, its signals and its exit status. The flags above that describe a mirror say nothing under it. |
+| `--hush NAME` | — | With `--native`, run the CLI on the target without this variable, whoever left it there. The other half of `--private`: a key in the target's own shell profile outranks the account the turn was given, and merely not sending one does not remove it. Repeatable. |
+| `--project NAME=DIR` | — | With `--native`, put this directory of credentials on the target for the length of the turn and set `NAME` to where it landed. Written where only the target's user may read it, and removed when the turn is over. Repeatable. |
+| `--carry DIR=PATH` | — | With `--native`, put this directory into the target's copy of the workspace at `PATH` for the length of the turn — which is how a flow's own [skills](/reference/flows#the-skills-a-flow-brings) get there. Nothing already at `PATH` is written over. Repeatable. |
+| `--installs LINE` | — | With `--native`, the line that installs this CLI, said where the target has nothing to run. |
 | `--check` | off | Connect, report what was found, and exit without running anything. |
 | `--log-level {debug,info,warning,error}` | `$HUMANIZE_LOG`, else `warning` | Logging verbosity. The log goes to stderr. |
 
-Settings no session could run under — a target nobody can read, a `--net` that is neither —
-exit 2 the way argparse's own rejections do.
+Settings no session could run under — a target nobody can read, a `--net` that is neither, a
+credential bound for something that is not a variable — exit 2 the way argparse's own
+rejections do. A `--native` session whose CLI the target has not got exits **127**, the status
+every shell uses for a command it could not find, so that whatever spawned it reads it as a CLI
+that is not installed.
 
 ```sh
 hmz anchor --target ssh://build-box claude
 hmz anchor --target ssh://gpu-01 codex exec "run the test suite"
 hmz anchor --target docker://build-container --workspace /srv/project claude
+hmz anchor --native --target docker://build-container --remote-path /srv/project claude
 hmz anchor --check --target ssh://build-box
 ```
 
