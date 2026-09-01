@@ -709,6 +709,14 @@ PROFILES = (
         # `--fork-session`, which is `--resume` told to mint an id rather than reuse the
         # one it was handed: the earlier turns come with it and the next one is its own.
         forks=True,
+        # Claude Code ships as one Bun standalone executable -- the whole CLI, minified and
+        # packed behind a `---- Bun! ----` trailer -- so the file the launcher resolves to is
+        # itself the bundle a patch reaches. Fingerprinted by the version it inlines, which is
+        # release-specific by design: the day a release changes it is the day `patching`
+        # reaches nothing here and the run falls back to the hook layer instead. `*`, because
+        # the file is named for its version -- `versions/2.1.269` -- and the one that is the
+        # resolved program is the one taken.
+        bundles=(Bundled(path="*", says='VERSION:"2.1.269"'),),
         aliases=("claude", "claude-code"),
         home_var="CLAUDE_CONFIG_DIR",
         home_dir=".claude",
@@ -1354,6 +1362,12 @@ PROFILES = (
         searches=True,
         # `run --fork`, which forks the session it was given before carrying on in it.
         forks=True,
+        # opencode is a Bun standalone executable too, and reached the same way -- the
+        # `opencode.exe` the launcher resolves to is the bundle. Fingerprinted by the version
+        # it inlines, which sits in one module of its own here rather than the entry, so the
+        # line picks that module out on its own. Its modules carry no precompiled bytecode, so
+        # a source edit is what runs without anything more.
+        bundles=(Bundled(path="opencode.exe", says='var n="1.18.30"'),),
         aliases=("opencode",),
         # No home variable of its own: it keeps its data where every other program does, in a
         # directory of its own under the one `XDG_DATA_HOME` names.
