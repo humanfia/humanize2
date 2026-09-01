@@ -179,7 +179,6 @@ def test_the_help_lists_every_command(
     assert all(command in shown for command in cli.COMMANDS)
     # And what `hmz` itself takes, which is the other half of the same line: one help says
     # both what may be opened and what may be run, because both of them are `hmz`.
-    assert "--no-daemon" in shown
     # The line that opens the interface says nothing about what it opens on, so there is
     # nothing here to say it with: what to run is chosen at the prompt.
     assert not any(flag in shown for flag in ("--flow", "--agent", "--config"))

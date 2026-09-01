@@ -41,15 +41,24 @@ def test_with_no_terminal_the_interface_opens_here(workspace: Path) -> None:
     assert daemon.running() is None
 
 
-def test_a_line_that_says_not_to_hold_it_opens_here(
-    workspace: Path, terminal: None
+def test_a_line_that_says_not_to_hold_it_is_one_to_correct(
+    workspace: Path, terminal: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`--no-daemon`, for a machine that would rather the run went with the terminal."""
-    with unittest.mock.patch("hmz.tui.Humanize.run") as opened:
-        assert cli.main(["--no-daemon"]) == 0
+    """Holding the run is not a preference: it is what makes closing the terminal survivable.
 
-    assert opened.called
-    assert daemon.running() is None
+    Whether a run can be held at all is still read off the terminal and off the machine's own
+    setting -- but neither is a thing to ask for on the line, so a line that asks is a line
+    with a flag in it that no longer exists.
+    """
+    with (
+        unittest.mock.patch("hmz.tui.Humanize.run") as opened,
+        pytest.raises(SystemExit) as stopped,
+    ):
+        cli.main(["--no-daemon"])
+
+    assert stopped.value.code == 2
+    assert not opened.called
+    assert "--no-daemon" in capsys.readouterr().err
 
 
 def test_the_environment_says_the_same_thing(
