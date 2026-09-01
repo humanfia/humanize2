@@ -253,8 +253,8 @@ What a flow drives, written as interfaces and nothing else.
   they answer MUST be stated once, where a type checker reads it, so that a driver which stops
   answering reads as a driver to correct rather than as a flow that fails on its first turn.
 - A flow MUST declare the places it drives with these, and what it writes beside one -- a
-  moment, a `Goal`, a `Remote`, an `Isolated`, an `AgentDefaults` -- MUST go on meaning what it
-  means. What is annotated is which interface, not which class.
+  moment, a `Goal`, a `Remote`, an `Isolated`, an `AgentDefaults`, a `Needs` -- MUST go on
+  meaning what it means. What is annotated is which interface, not which class.
 - What one turn of a conversation may spend before it is cut off MUST be sayable here, as a
   value rather than as arguments: a flow that wants a shorter round says what it may cost and
   when a cap takes hold, and a dimension added to the answer MUST NOT be a change to every
@@ -349,6 +349,7 @@ class Place(NamedTuple):
     permission: str = "bypass"
     goals: bool = True
     web_search: bool = True
+    needs: Needs | None = None
 
 
 class Running(NamedTuple):
@@ -409,7 +410,19 @@ def set_up(
 ) -> BaseModel: ...
 
 
-def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None: ...
+def serves(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None: ...
+
+
+def comes_to(backend: str) -> frozenset[str]: ...
+
+
+def lands(
+    flow: str | os.PathLike[str],
+    agent: Agent,
+    place: Place,
+    *,
+    container: str = "",
+) -> None: ...
 
 
 def runs_at(
@@ -444,6 +457,41 @@ run another. `hmz.runner` asks this and then opens an epic around the answer.
 - Where an agent works MUST be the flow's to say rather than a setting anybody may reach for,
   and MUST be settled here: a place that says nothing runs on this machine and MUST refuse an
   agent pointed anywhere else.
+- A flow built on something only some backends serve, or on work that has to happen somewhere
+  in particular, MUST be able to say so where it declares the place -- `Needs` -- and MUST be
+  refused an agent or a machine that does not answer, before the first turn. It is the same
+  bar a moment and a `Goal` are held to and for the same reason: a flow that finds out from
+  the call which reached for the thing finds out hours into a loop, from inside a turn rather
+  than from the line that chose the agent.
+- What it asks for MUST be asked for by name, and the names MUST be the ones everything else
+  here already goes under -- `checking.py`'s catalogue -- so that what a flow may ask for and
+  what an installation serves are one vocabulary rather than two that drift. A name nothing
+  serves MUST be a flow to correct rather than a second vocabulary quietly growing.
+- What the backend has to serve MUST be read off the driver class and off the facts written
+  down about the CLI, and MUST NOT need an agent to have opened anything: the answer has to be
+  there before a session, a container or a turn has cost anything.
+- What the machine has to come to MUST be read off that machine's settings rather than off a
+  machine -- `MachineConfig.capabilities` -- for the same reason: a place that will not do MUST
+  be refusable before an image has been pulled or a connection made. A capability only a live
+  handshake can answer MUST NOT be asked here, and MUST NOT be asked twice: a machine that
+  turns out not to be what its settings promised already fails as it starts. What no setting
+  answers for MUST NOT be offered as something to ask for, a requirement nothing can ever
+  satisfy being a run that never starts rather than a flow that is careful.
+- An agent pointed nowhere works on this machine, which comes to nothing at all, so a place
+  that needs anything of where it works MUST be refused one. A place the flow itself put in a
+  container MUST be checked against the container it named, and MUST be checked before the
+  agent is put in it: a refusal leaves whoever was driving that agent driving what they had,
+  and one that had already moved it would hand back an agent pointed somewhere.
+- A whole run put in a container from outside MUST be counted as where that run's work lands,
+  even though nothing is pointed at it until the run starts. Otherwise a place needing
+  somewhere remote would be refused at the top of a run that is about to put every agent of
+  it somewhere remote, and allowed inside that same run where one flow called another.
+- The check MUST be the same one wherever an agent is handed to a flow -- at the top of a run
+  and where one flow calls another -- so that a flow which passes as it is started cannot fail
+  in the middle of the run that started it.
+- Whatever is *choosing* an agent MUST be able to ask the same question before there is one,
+  by backend rather than by agent, so that a CLI which could not fill a place is not offered
+  for it and then refused where the run is set up.
 - What an agent may do, whether it has goals and whether it may search the web MUST be read
   off the place the same way, out of the `AgentDefaults` a flow wrote beside it, and MUST be
   settled onto the agent here -- `runs_at` -- before its first turn and over whatever it was
