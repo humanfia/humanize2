@@ -17,8 +17,10 @@ import pytest
 
 from hmz import cli
 
-#: Every command, and what reaching it may load besides `cli` itself: the layers its work is
-#: really done in, and nothing of any other command's.
+#: Every command a line reaches, and what reaching it may load besides `cli` itself: the
+#: layers its work is really done in, and nothing of any other command's. `anchor` is in it
+#: for being the one humanize spawns that a whole layer is behind: the target half of a
+#: session is this package with coganchor and nothing else on it.
 COMMANDS = [
     # And the two leaves that say whether humanize reports its own failures and where the
     # answer is kept: a command that cannot report a crash is a crash nobody hears about.
@@ -31,11 +33,7 @@ COMMANDS = [
         "exec",
         {"sdk", "runner", "flows", "backends", "telemetry", "settings", "kept"},
     ),
-    ("trace", set[str]()),
-    ("export", set[str]()),
     ("anchor", {"coganchor"}),
-    ("flowverses", set[str]()),
-    ("check", set[str]()),
 ]
 
 
@@ -43,7 +41,7 @@ COMMANDS = [
 def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
     command: str, layers: set[str]
 ) -> None:
-    """`hmz exec` must not pay for a date parser, nor `hmz anchor` for any of it."""
+    """`hmz exec` must not pay for the interface, nor `hmz anchor` for any of it."""
     probe = (
         "import contextlib, io, sys\n"
         "from hmz import cli\n"
@@ -63,35 +61,53 @@ def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
     assert reached <= layers | {"cli"}
 
 
-@pytest.mark.parametrize(("command", "layers"), COMMANDS, ids=lambda value: value)
-def test_a_command_is_given_the_rest_of_the_line_untouched(
-    command: str, layers: set[str]
-) -> None:
+def test_a_command_is_given_the_rest_of_the_line_untouched() -> None:
     """Including the arguments a top-level parser would have eaten, such as `--help`."""
     carry_out = unittest.mock.Mock(return_value=0)
-    with unittest.mock.patch.dict(cli.COMMANDS, {command: (carry_out, "")}):
-        assert cli.main([command, "--help", "-x", "task"]) == 0
+    with unittest.mock.patch.dict(cli.COMMANDS, {"exec": (carry_out, "")}):
+        assert cli.main(["exec", "--help", "-x", "task"]) == 0
     assert carry_out.call_args.args == (["--help", "-x", "task"],)
+
+
+def test_what_is_spawned_is_given_the_rest_of_the_line_untouched() -> None:
+    """It is routed as every other command is; being listed is the whole of the difference."""
+    carry_out = unittest.mock.Mock(return_value=0)
+    with unittest.mock.patch.dict(cli._SPAWNED, {"anchor": carry_out}):
+        assert cli.main(["anchor", "--help", "-x", "claude"]) == 0
+    assert carry_out.call_args.args == (["--help", "-x", "claude"],)
 
 
 def test_the_status_a_command_exits_with_is_the_one_that_is_returned() -> None:
     def refused(_argv: list[str]) -> int:
         return 130
 
-    with unittest.mock.patch.dict(cli.COMMANDS, {"anchor": (refused, "")}):
+    with unittest.mock.patch.dict(cli._SPAWNED, {"anchor": refused}):
         assert cli.main(["anchor", "claude"]) == 130
 
 
-@pytest.mark.parametrize("argv", [["fly"], ["--target", "ssh://build-box"]])
-def test_a_line_that_names_something_that_is_not_a_command_is_a_usage_error(
+@pytest.mark.parametrize("argv", [["--target", "ssh://build-box"], ["-f", "chat"]])
+def test_a_line_of_flags_the_interface_does_not_take_is_a_usage_error(
     argv: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A name no command answers to, and a flag the interface does not take."""
+    """`-f` and `-a` among them: what to run is chosen at the prompt, not said here."""
     with pytest.raises(SystemExit) as stopped:
         cli.main(argv)
 
     assert stopped.value.code == 2
     assert "hmz" in capsys.readouterr().err
+
+
+def test_a_line_that_names_something_that_is_not_a_command_is_a_usage_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """And says which there are, which is now the one there is."""
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["fly"])
+
+    assert stopped.value.code == 2
+    said = capsys.readouterr().err
+    assert "hmz" in said
+    assert "exec" in said
 
 
 def test_a_line_naming_no_command_opens_the_interface() -> None:
@@ -101,6 +117,15 @@ def test_a_line_naming_no_command_opens_the_interface() -> None:
 
     assert opened.called
     assert "tui" not in cli.COMMANDS
+
+
+def test_the_interface_is_opened_on_nothing_the_line_said() -> None:
+    """What to run is chosen at the prompt, and read back from what was chosen there."""
+    with unittest.mock.patch("hmz.tui.Humanize") as opened:
+        assert cli.main([]) == 0
+
+    assert opened.call_args.args == ()
+    assert opened.call_args.kwargs == {}
 
 
 @pytest.mark.parametrize(
@@ -141,56 +166,41 @@ def test_an_explicit_textual_keyboard_choice_is_kept() -> None:
     assert terminal["TEXTUAL_DISABLE_KITTY_KEY"] == "0"
 
 
-def test_a_line_of_flags_and_no_command_opens_the_interface_set_up() -> None:
-    """`hmz -f <flow>`: a run that is always the same run is one line rather than three walks."""
-    with unittest.mock.patch("hmz.tui.Humanize.run") as opened:
-        assert cli.main(["-f", "chat"]) == 0
-
-    assert opened.called
-
-
-def test_a_line_that_says_what_the_flow_says_does_not_open_the_interface(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """A rung is the flow's, so a line that carries one is a line to correct before anything."""
-    spec = "cli=codex,model=m,effort=high,permission=read-only"
-    with (
-        unittest.mock.patch("hmz.tui.Humanize.run") as opened,
-        pytest.raises(SystemExit) as stopped,
-    ):
-        cli.main(["-f", "chat", "-a", spec])
-
-    assert stopped.value.code == 2
-    assert not opened.called
-    error = capsys.readouterr().err
-    assert f"bad agent {spec!r}" in error
-    assert "is the flow's to say, written beside the agent" in error
-
-
 @pytest.mark.parametrize("argv", [["--help"], ["-h"]])
 def test_the_help_lists_every_command(
     argv: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Asked for on its own, which is what somebody typing it wants: what there is to run.
-
-    Rather than what the interface takes, which is what the same flags after `-f` are about.
-    """
+    """Asked for on its own, which is what somebody typing it wants: what there is to run."""
     with pytest.raises(SystemExit) as stopped:
         cli.main(argv)
 
     assert stopped.value.code == 0
     shown = capsys.readouterr().out
-    assert all(command in shown for command, _ in COMMANDS)
+    assert all(command in shown for command in cli.COMMANDS)
     # And what `hmz` itself takes, which is the other half of the same line: one help says
     # both what may be opened and what may be run, because both of them are `hmz`.
-    assert all(flag in shown for flag in ("--flow", "--agent", "--config"))
+    assert "--no-daemon" in shown
+    # The line that opens the interface says nothing about what it opens on, so there is
+    # nothing here to say it with: what to run is chosen at the prompt.
+    assert not any(flag in shown for flag in ("--flow", "--agent", "--config"))
     # And nothing humanize spawns for itself: a listing offering the supervisor a turn is
     # run under would be offering a way to run something that is not humanize.
-    assert "cred" not in shown
+    assert not any(spawned in shown for spawned in cli._SPAWNED)
 
 
-def test_what_humanize_spawns_for_itself_is_carried_out_but_not_listed() -> None:
+@pytest.mark.parametrize("spawned", ["anchor", "cred", "tools"])
+def test_what_humanize_spawns_for_itself_is_carried_out_but_not_listed(
+    spawned: str,
+) -> None:
     """A turn taken as an account is spawned as one of these; nobody types one."""
-    assert "cred" not in cli.COMMANDS
+    assert spawned not in cli.COMMANDS
     # Still a line that runs: it is a command line because a process is started by one.
+    with pytest.raises(SystemExit) as stopped:
+        cli.main([spawned, "--help"])
+
+    assert stopped.value.code == 0
+
+
+def test_what_is_spawned_carries_out_what_it_was_given() -> None:
+    """The supervisor a turn under an account runs in, reached the way humanize reaches it."""
     assert cli.main(["cred", "--map=/house/x=/store/y", "--", "true"]) in (0, 1)

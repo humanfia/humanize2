@@ -815,17 +815,30 @@ never have reason to name this module.
 hmz [--no-daemon] [<command> [<args>...]]
 ```
 
+- There MUST be one command anybody is offered -- `hmz exec`, which runs a flow in a
+  directory -- and everything else humanize keeps MUST be reached at the prompt or through
+  `sdk` rather than from a line of its own. What accounts there are, where flows come from,
+  where a turn goes when it cannot be taken and what a run left behind are each a sheet at
+  that prompt, and each would be a noun to learn here as well: a listing of them is a second
+  interface, and the interface is the one with the sheets in it. A line is what a script, a
+  CI job and a machine nobody is sitting at have instead of a prompt, and running a flow is
+  what those ask for; whatever else one of them needs -- reading a flow for what will not
+  run, gathering a trace, packaging a run up -- MUST be asked of `sdk`, which is the same
+  object this line holds.
 - A line naming no command at all MUST open the terminal interface, which is every command at
   one prompt. There MUST be no command that opens it too: one way in is one way in. A line
   naming something that is not a command MUST be a usage error listing the commands there
   are. Everything after the command name MUST reach that command untouched, `--help`
   included, so that each answers for its own arguments.
+- The line that opens the interface MUST say nothing about what to run. Which flow, what
+  drives it and what it is set up with MUST be chosen at the prompt, and what was chosen there
+  MUST be what the next line opens on -- so a run that is always the same run is set up once
+  rather than spelled out again by every line that reads it, and a run already being held here
+  is read as it is rather than told something it would have to refuse.
 - The interface MUST be opened on a run held apart from the terminal wherever there is a
   terminal to hand over to, so that closing the terminal is not what ends a day's work: a
   line naming no command MUST read whichever run is already being held in this directory, and
-  MUST start one where none is. A line that also says what to run MUST be a line to correct
-  where one is already being held -- a run that is set up is set up, and two answers to how it
-  is set up is one of them silently losing.
+  MUST start one where none is.
 - With no terminal on both ends -- output going to a file, a suite driving the interface
   itself -- it MUST be opened in this process exactly as it always was, and `--no-daemon` MUST
   say so outright. An environment variable MUST say the same thing for a whole machine without
@@ -942,236 +955,25 @@ Args:
   words themselves, what the turn cost, and when. It MUST NOT write anything a terminal needed
   and a program does not.
 
-## `hmz trace`
+## `hmz anchor`
 
 ```shell
-hmz trace collect [<workspace>] [--epic <epic> | --session <session>[,<session>]... | --all] [--output <output>] [--start <start>] [--end <end>] [--json]
+hmz anchor [<options>] <agent> [<args>...]
+hmz anchor serve --export <virtual>[:<real>] (--stdio | --listen [<host>:]<port>)
 ```
 
-Collects and aggregates what a run left behind -- the agents' own trajectories, and the
-programs they ran where the run was profiled -- into a Chrome JSON trace for visualization.
+Runs an agent here whose work lands on another machine, and -- under `serve` -- is the half
+that lands it. What each of the two takes is `coganchor`'s and is specified there.
 
-- It MUST be a command with what there is to do to a trace under it rather than a verb at the
-  top level: a `collect` says what happens to the thing without ever saying what the thing is.
-- A line naming no command under it MUST say which there are rather than doing one of them.
-- A trace of a run MUST hold the sessions that run opened and no others, asked for by the ids
-  the run wrote down rather than by the directory it ran in: a directory is run in over and
-  over, and a trace filed inside one run holding the work of the others is a trace of nothing
-  anybody asked about. By id and not by directory, so that a flow that worked in a machine's
-  mirror is in its own trace as well. A run that opened nothing MUST be a trace of nothing.
-- What a directory holds whoever opened it MUST also be collectable, since a session no flow
-  ever drove is still a session to read back, and it MUST be asked for outright -- `--all`,
-  or the sessions named. It is not a trace of any run and MUST NOT be written inside one, and
-  a line naming a run as well MUST be a line to correct rather than one of the two silently
-  winning. It MUST be here and not in the interface: `/epics` is a list of runs, and a trace
-  of what is not one has nothing there to be reached from.
-
-Args:
-
-- `<workspace>`: The path to the workspace directory to generate traces for. If not provided, the current working directory is used, unless sessions are named.
-- `--epic <epic>`: Which run to trace, by the name of its directory or a leading part of it. If not provided, the last run of the workspace. That run says which sessions the trace holds and which agent opened each of them, its profile is drawn beside them, and its directory is where the trace lands. A name no run of it answers to MUST be a line to correct.
-- `--session <session>[,<session>]...`: Sessions to trace instead of a run, comma separated and repeatable. A session is named by its whole id, by the key the trace shows it under, or by a leading part of either, and the sub-agents it started are collected with it. Named sessions are collected wherever they were recorded, and are cut down to the workspace when one is provided.
-- `--all`: Every session of the workspace instead of a run, whichever run opened them and whether any did.
-- `--output <output>`: The path to the output file where the aggregated trace will be saved. Its directory is created if it does not exist. If not provided, the trace is saved as `traces/<datetime>.trace.json` inside the run it is a trace of -- where `<datetime>` is the UTC moment it was collected, so that collecting twice keeps both -- and, for a trace that is of no one run, in the directory that workspace's runs are kept in. A trace of a run belongs with the run: the sessions it points at and the state it left are already there, and a trace written into whatever directory somebody was standing in is one they have to keep track of themselves. A file named outright still wins, a trace being also a thing to attach to an issue.
-- `--start <start>`: The start time for filtering the session logs, in any wording dateparser understands. If not provided, up to earliest logs are included.
-- `--end <end>`: The end time for filtering the session logs, in any wording dateparser understands. If not provided, up to latest logs are included.
-- `--json`: Say the same thing as one JSON object for a program to read. A job that collects a trace and then wants to know where it went is a job that would otherwise be parsing English.
-
-Prints the output path, which run it is a trace of, and the number of sessions and slices it
-holds -- and the number of programs, for a run that was profiled.
-
-Environment Variables:
-
-- `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `KIMI_CODE_HOME`: The path to agent home directories for discovering session logs. If not set, use the default paths of each agent. A home directory that does not exist is skipped.
-
-## `hmz export`
-
-```shell
-hmz export [<epic>] [-o|--output <output>]
-```
-
-Packages one whole run up as one archive: what it did, what every session of every agent it
-drove was logged as, and what this machine was running -- with every credential taken out.
-
-- It MUST be one command and one thing done. `hmz trace` has what there is to do to a trace
-  under it because there is more than one; there is one thing to do to a bundle, which is
-  make it, and a verb under `export` would be a word to type for no reason.
-- What it writes MUST be the run with every link followed. An epic points at each backend's
-  own log rather than copying it, which is right where the run happened and worth nothing
-  anywhere else -- so a bundle that carried the links would be an archive with nothing in it.
-- It MUST refuse a directory that holds no run and a name no run of this directory answers to,
-  rather than exporting whichever run happens to sort last: a bundle attached to the wrong
-  report is worse than no bundle.
-- It MUST print where the archive landed, how much of the run is in it and how big it came
-  out. What somebody reads off that line is whether they can attach it to something.
-- A session the bundle holds no log for MUST be counted in that line as well as said in the
-  manifest: a CLI that keeps its sessions to itself is a thin bundle for a reason, and a
-  reader should not have to open one to find out which reason.
-
-Args:
-
-- `<epic>`: Which run, by the name of its directory, by a leading part of that name, or by the
-  path to it. If not provided, the last run of this directory. A path as well as a name
-  because a run of another workspace has no name here to answer to, and its directory is the
-  whole of what somebody has to point at it with.
-- `-o`, `--output <output>`: Where to write it -- a file, or a directory to write it into
-  under its own name. If not provided, `.humanize/<run>.epic.tar.gz` in this directory. A
-  bundle exists in order to be sent, so it lands where somebody is standing rather than in
-  humanize's own home the way a trace of a run does; a file named outright still wins, since a
-  bundle is also a thing to attach to an issue.
-
-Prints the output path, which run it is of, how many sessions and how many logs it holds, how
-many of those sessions logged nothing, and how big the archive came out.
-
-## `hmz flowverses`
-
-```shell
-hmz flowverses [list [-q] [--json] | show <name> [--json] | add <url> [<name>] | fetch <name> | remove <name>]
-```
-
-Where flows come from: what places there are, what one of them holds, and the three things
-that can happen to a flowverse -- added, fetched again, taken away.
-
-- It MUST be the same store the interface's own `/flowverses` keeps, for the reason
-  `hmz providers` is the same store as `/providers`: one place a thing is kept is one place it
-  is kept, whichever way somebody reached it. What it added MUST be findable by `-f` at once.
-- A flow MUST be listed under the name it is offered by, which is the one `-f` takes, and that
-  name MUST be asked of `hmz.flows.offers` rather than worked out here. A name built from a
-  filename is a name `-f` would refuse: a file may hold several flows, and the file beside it
-  may hold none at all.
-- Saying which places there are MUST NOT read a flow; saying what one of them holds MUST. What
-  a file holds is not a fact its name carries, so the second question has no cheap answer -- but
-  it MUST be asked only of the flowverse named, and MUST NOT be asked by a line that only
-  listed them or only fetched one. A repository that has just been cloned off the internet MUST
-  NOT be imported unasked: fetching one is not the same as saying to run it this second.
-- One that has not been fetched MUST say so where it would have said what it holds, rather
-  than saying it holds nothing.
-- Nothing MUST print a secret. Where a flowverse came from MUST be printed with whatever was
-  signed into the URL taken out: a private one is added as `https://x-access-token:$TOKEN@...`,
-  git keeps that verbatim, and this line is printed every time the flowverses are listed -- so
-  a token printed once is a token in the log of every job that ran it. `--json` MUST be held to
-  the same rule, and MUST say where one came from the same way.
-- `--json` MUST say what a listing says as one object a place, and what `show` says as one
-  object -- the place, and the name and description of every flow it offers.
-- Where one came from MUST be answered from which flowverse it is rather than from whether its
-  URL is empty. An empty URL means both "the package's own" and "a directory whose origin could
-  not be read", and answering the second with the first puts humanize's name on somebody else's
-  flows.
-- A line that could not be carried out -- a name none answers to, a name already taken, one of
-  the two that are always there being removed or added over, a fetch git refused, a directory
-  that will not go -- MUST say so where it can be read and exit non-zero, and MUST leave the
-  list as it was. None of those MUST reach whoever typed the line as a traceback.
-
-## `hmz check`
-
-```shell
-hmz check [--static] [--strict] [--json] [--prophecy | --ship] <flow> [<flow>...]
-```
-
-Reads a flow for what will not run, before anything runs it.
-
-- The two readings MUST run in their order: the static one over every file the flow holds,
-  which MUST NOT import or execute anything of it -- the flow most worth checking is one
-  nobody has read -- and then the flow loaded and its live config model read. The second MUST
-  run only in a subprocess with a clock held over it, MUST NOT run where the first found an
-  error, and `--static` MUST leave it out altogether: a flow that cannot run is not one to
-  run to find out more about.
-- Every finding MUST print one a line -- the file, the line, the severity, the code and what
-  is wrong -- with a count under them, and `--json` MUST say the same as one JSON object a
-  line for a script to read. That shape -- one object a line, and nothing else in the stream --
-  is what every other `--json` here MUST be: this was the first of them, and one shape is one
-  shape whichever command a script is reading. Everything wrong MUST be said at once rather
-  than first-failure first: a checker is asked so that one reading answers for the whole flow.
-- It MUST exit 0 for flows with nothing blocking -- warnings print and pass -- 1 where any
-  error was found, or any warning under `--strict`, and 2 for a line to correct or a name no
-  flow answers to, refused as argparse refuses one.
-- What an atlas compiles to MUST be sayable from here, since the line that checks a flow is
-  the line that has just read it: `--prophecy` MUST print the canonical prophecy in place of
-  the findings, and `--ship` MUST write it into the flow's own directory for every run of it
-  from then on to walk. The two MUST NOT be given together, and a name that is not an atlas
-  that compiles MUST be said and MUST exit non-zero.
-
-## `hmz providers`
-
-```shell
-hmz providers [list [<cli>] [--json] | ways <cli> [--json] | add <cli>/<name> [-w <way>] [-s VAR=VALUE]... [--no-login] | login <cli>/<name> [-s VAR=VALUE]... | show <cli>/[<name>] [--json] | falls-back <cli>/[<name>] [<name>] | remove <cli>/<name>]
-```
-
-The accounts an agent may be run as: what there is, how a backend can be signed into, and the
-three things that can happen to one -- made, signed in again, taken away.
-
-- `<cli>/` -- a backend and no name at all -- MUST be the account this machine is already
-  signed into, for the two lines that say something about an account rather than making one:
-  it is an account of every backend and one nobody made, so it is a thing to show and to point
-  somewhere, and not one to add, sign in or take away.
-- How often a failed turn is taken again MUST NOT be said here. It is a thing about the place a
-  turn runs at -- the CLI, the account and the model -- rather than about the credentials it
-  runs with, so `hmz fallback retry` is where it is said.
-- An account written down before that moved MUST say so wherever it is read, and MUST name the
-  line to type instead, carrying everything that was written down into it. A setting that
-  stopped being read without a word is one somebody goes on believing in, and nothing could
-  carry these over by itself: an account is a CLI and a name, a place is a CLI, a name and a
-  model, and the model is the part that would have to be invented. The account this machine is
-  signed into MUST be listed where it is holding one, or the notice would be about a row that
-  is not there.
-- It MUST be the same store the interface's own `/providers` walks: one place a thing is kept
-  is one place it is kept, whichever way somebody reached it.
-- Whatever a way asks that the line did not answer MUST be asked at the terminal, and a secret
-  MUST NOT be echoed. A line run where nobody is at a terminal MUST answer everything itself:
-  a question with no answer and no default MUST be reported rather than waited on.
-- Nothing MUST print a secret. What one holds MUST be shown as the names of the variables it
-  sets and never their values, and `--json` MUST be held to exactly that: a program reading an
-  account MUST be handed the names too, since a value written for a machine is a value in the
-  same log.
-- The three lines that only say what there is -- what accounts there are, how a backend can be
-  signed into, and what one account holds -- MUST take `--json`. The ones that make, sign in or
-  take away MUST NOT: those ask at the terminal, and a line nobody is at is a line that has to
-  say everything itself.
-- An account that has just been made or signed in again MUST have its CLI asked what it runs
-  as that account, and what it said MUST be reported. A CLI that would not answer MUST NOT
-  make the line fail: the account was made, which is what the line was for. `--no-login` MUST
-  ask nothing either -- a line that says not to run the backend does not run it.
-
-## `hmz fallback`
-
-```shell
-hmz fallback [list [-q] [--json] | show <cli>[@<account>]/<model>:<effort> [--json] | add <cli>[@<account>]/<model>:<effort> <cli>[@<account>]/<model>:<effort> | remove <cli>[@<account>]/<model>:<effort>]
-```
-
-Where a turn goes when the agent taking it cannot take it at all.
-
-- It MUST be a command of its own rather than a line of `hmz providers`: an account's chain is
-  a thing about an account, and this is about neither of the two agents it names.
-- An agent MUST be named exactly as `-a` names one, so that a fallback is written the way the
-  thing it is about is written.
-- `show` MUST print the whole walk rather than the one step, since the walk is what a failed
-  turn does, and MUST say so where an agent falls back nowhere. `--json` MUST say one object a
-  place of that walk, in the order it is walked, so that a program reading it reads the same
-  order a turn takes it in.
-- It MUST be the same store the interface's own `/fallback` walks.
-
-## `hmz daemon`
-
-```shell
-hmz daemon [list [-q] [--json] | status [<workspace>] [--json] | start [-f <flow>] [-a <agent>...] | attach [<workspace>] | stop [<workspace>] [--kill]]
-```
-
-The runs being held apart from a terminal: which there are, what one of them is doing, and the
-two ways one ends.
-
-- It MUST be about runs that are already being held rather than a second way of opening the
-  interface. `hmz` is how one is opened and read; this is what is left to say about one from
-  outside it -- which is why `attach` is here as the long way round of what `hmz` already
-  does, and `start` is here for a machine being set up rather than sat at.
-- What is running in one MUST be readable without attaching to it. A line asking is a line
-  somebody typed instead of opening the interface, and answering it by opening the interface
-  would be answering a different question. It MUST also be readable by something that is not a
-  person: `--json` on the two lines that only say what there is, since a monitor asking which
-  runs are up is exactly the caller that cannot attach.
-- Stopping MUST mean what closing the interface means -- the flow stopped, the interface
-  closed -- and MUST wait for it to go. Ending the process holding it MUST be asked for
-  outright, and MUST be what is left when the first will not work.
-- A directory nothing is being held in MUST say so and exit non-zero, rather than starting one.
+- It MUST be a command of its own because a turn whose work lands elsewhere is a process of
+  its own -- one holding a session to a target, with the agent under it -- and it MUST NOT be
+  one of the commands a listing shows nor be documented as a way in. humanize spawns it for
+  every such turn, the agent's own configuration rendering the line, and the zipapp
+  bootstrapped onto a target runs `hmz anchor serve` to answer one. Neither is a line anybody
+  types.
+- Reaching it MUST load `coganchor` and nothing else of humanize, since `serve` is what runs
+  on a target where it is the only layer there is and the architecture is whatever the target
+  happens to be.
 
 ## `hmz cred`
 

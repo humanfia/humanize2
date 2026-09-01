@@ -5,6 +5,10 @@ it and worth nothing anywhere else: a directory of symlinks into somebody's home
 with nothing in it. So a bundle is the run with every link followed -- and with every
 credential taken out, since the one thing a person sending their own run must not also send is
 the key it ran on.
+
+`hmz.exporting` itself, and no command line: there is none any more. `/export` in the
+interface is what asks for a bundle now, and this is the layer under it, held to what a bundle
+holds and what it must never carry rather than to how a line said so.
 """
 
 from __future__ import annotations
@@ -585,74 +589,3 @@ def test_a_value_is_struck_wherever_it_appears() -> None:
 )
 def test_how_big_it_came_out(count: int, said: str) -> None:
     assert sized(count) == said
-
-
-def test_the_command_line_exports_the_last_run_of_this_directory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """`hmz export` with nothing said is the run that has just happened."""
-    from hmz import cli
-
-    monkeypatch.chdir(tmp_path)
-    written(tmp_path, "flow", ONE)
-    _claude(tmp_path, monkeypatch)
-    Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
-    (epic,) = epics()
-
-    assert cli.main(["export"]) == 0
-
-    at = tmp_path / ".humanize" / f"{epic.name}.epic.tar.gz"
-    assert at.is_file()
-    said = capsys.readouterr().out
-    assert str(at) in said
-    assert "1 session" in said
-    assert "1 log" in said
-
-
-def test_the_command_line_takes_a_run_by_name_and_a_file_to_write(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """A run to attach to an issue is a run named outright, written where it was asked for."""
-    from hmz import cli
-
-    monkeypatch.chdir(tmp_path)
-    written(tmp_path, "flow", ONE)
-    _claude(tmp_path, monkeypatch)
-    Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
-    (epic,) = epics()
-
-    assert cli.main(["export", epic.name[:8], "-o", str(tmp_path / "sent.tgz")]) == 0
-
-    assert (tmp_path / "sent.tgz").is_file()
-    assert str(tmp_path / "sent.tgz") in capsys.readouterr().out
-
-
-def test_a_name_no_run_answers_to_is_a_line_to_correct(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Rather than an archive of whichever run happened to sort last."""
-    from hmz import cli
-
-    monkeypatch.chdir(tmp_path)
-    written(tmp_path, "flow", ONE)
-    _claude(tmp_path, monkeypatch)
-    Runner(tmp_path / "flow", [ClaudeAgent(CONFIG, name="builder")]).run("go")
-
-    with pytest.raises(SystemExit) as stopped:
-        cli.main(["export", "nothing-is-called-this"])
-
-    assert stopped.value.code == 2
-
-
-def test_a_directory_nothing_has_been_run_in_is_a_line_to_correct(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """There is no run here to package up, which is a thing to say rather than to guess at."""
-    from hmz import cli
-
-    monkeypatch.chdir(tmp_path)
-
-    with pytest.raises(SystemExit) as stopped:
-        cli.main(["export"])
-
-    assert stopped.value.code == 2
