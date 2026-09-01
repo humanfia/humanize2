@@ -36,6 +36,7 @@ from websockets.sync.client import ClientConnection, connect
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Question, Usage, say
+from .preload import preloaded
 from .watchdog import Watchdog
 
 if TYPE_CHECKING:
@@ -1062,6 +1063,25 @@ class KimiCodeCLIAgent(AgentBase):
         #: starts another rather than going on submitting turns as somebody else.
         self._server_as = ""
         self._serving = threading.Lock()
+
+    def environment(self) -> Mapping[str, str]:
+        """What this agent's daemon is started with, plus the preload where one is wanted.
+
+        On the agent rather than on a session because the daemon is the agent's: one process
+        holds every conversation with it, so there is one runtime to load anything into and it
+        is started once, with this. :mod:`hmz.agents.preload` is what decides whether one is
+        wanted -- Kimi Code is a Node program, so what a turn of it runs, reads, writes and
+        opens can be read from inside the process taking it.
+
+        Started once is also the whole of the catch: the question is asked where the daemon is
+        started, so a hook hung after that gets nothing from this backend for as long as the
+        agent lives. A backend that is a process a turn asks it again every turn.
+
+        Returns:
+          The provider's own variables, and the preload beside them for an agent something is
+          listening to.
+        """
+        return preloaded(self, super().environment())
 
     @property
     def server(self) -> _AppServer:

@@ -18,6 +18,9 @@
 ├── mimo.py
 ├── opencode.py
 ├── pi.py
+├── preload/
+│   ├── __init__.py
+│   └── runtime.cjs
 ├── skills.py
 ├── tools.py
 └── watchdog.py
@@ -1068,6 +1071,70 @@ other direction from driving one, and the thing that lets an agent call a flow.
   quietly never offering it, and MUST say beforehand which it is on the class.
 - Nothing of the person at this machine's own configuration MUST be written to do it. Their own
   tool servers are theirs, and what this flow offers MUST go away with this flow.
+
+## `preload/`
+
+```python
+def runtime() -> str: ...
+
+
+def preloaded(agent: AgentBase, added: Mapping[str, str]) -> dict[str, str]: ...
+
+
+def reported(line: str) -> tuple[str, str] | None: ...
+
+
+class Watch:
+    def __init__(self, hooks: Hooks) -> None: ...
+
+    def address(self) -> str: ...
+
+    def tells(self, line: str) -> None: ...
+
+    def close(self) -> None: ...
+```
+
+What a turn did, read from inside the runtime the CLI is running on: a file of humanize's own
+loaded before the CLI's own entry point, patching the calls a turn makes -- the processes it
+spawns, the files it reads and writes, the connections it opens.
+
+- Which CLIs take a preload and through which variable MUST be read off `hmz.backends` rather
+  than written here a second time, and a CLI shipped with its runtime compiled in MUST take
+  none: there is nothing to load a file into.
+- The file MUST be shipped with the package and MUST be found through the package rather than
+  by a path relative to a module's own file, so that it is the same answer wherever humanize
+  was installed from.
+- The preload MUST fail open. It runs inside somebody else's program, so anything that goes
+  wrong in it MUST leave the CLI running exactly as it would have run: a report that cannot be
+  written is dropped, a socket that will not take one is put down, and nothing it observes is
+  worth a turn that does not run.
+- It MUST NOT hold the turn up. Nothing in it may wait: a reader that has fallen behind MUST
+  make a report be dropped rather than make the process wait, and the connection it reports on
+  MUST NOT be what keeps a process alive past its work. A report MUST be written when it is
+  made rather than when the runtime next has nothing to do, since a CLI that takes its turn and
+  exits would otherwise exit with everything it saw unsaid.
+- What is watched MUST be the CLI rather than the process it started in, and rather than
+  everything under the turn. A process running the same program MUST go on reporting -- a CLI
+  that re-execs itself onto its own bundle is one process of two and the turn is in the second
+  -- and the program MUST be told by what it belongs to rather than by where it is, since a CLI
+  re-execs itself to wherever its own updater put its newest copy. Any other program MUST report
+  nothing and MUST hand nothing on to what it runs in turn: the agent running it was already
+  reported by the spawn that ran it, and its own reads are not the agent's work.
+- What a CLI reads and writes of its own install MUST NOT be reported. A bundle loading itself
+  is thousands of calls and not one of them is the turn doing anything.
+- What is observed MUST reach the same moments everything else does, as `PreToolUse` named for
+  what the runtime did rather than for any tool the CLI has -- so that a hook hung on one of the
+  CLI's tools never sees one, and a flow wanting only these asks for them by that name. It MUST
+  be told rather than asked: the call has already been made by the time it is reported, so a
+  verdict MUST NOT be acted on here, and a flow that means to refuse a tool hangs its hook where
+  the CLI asks first.
+- Nothing MUST be started unless something is listening. An agent with nothing hung on that
+  moment MUST have no socket, no thread and no patched runtime. Nothing MUST be set for a turn
+  that lands on another machine either, a path named here naming nothing there.
+- The socket MUST be somewhere only this user may reach: what is said on it is every file the
+  agent touched, and one anybody could connect to is a way to watch somebody else's work.
+- What a runtime says MUST be read rather than trusted. It is another program's output, and a
+  line that cannot be read MUST be dropped rather than raised.
 
 ## `board.py`
 
