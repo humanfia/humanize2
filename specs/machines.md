@@ -21,6 +21,11 @@ classes.
 ```python
 @dataclass(frozen=True, kw_only=True)
 class MachineConfig(ABC):
+    @property
+    def capabilities(self) -> frozenset[str]:
+        """What a machine of these settings comes to, before one is brought up."""
+        return frozenset()
+
     @abstractmethod
     def create(self) -> MachineBase:
         raise NotImplementedError
@@ -28,6 +33,13 @@ class MachineConfig(ABC):
 
 class MachineBase(ABC):
     def __init__(self, config: MachineConfig): ...
+
+    @property
+    def capabilities(self) -> frozenset[str]:
+        """The settings' answer, and whatever the machine itself has said since."""
+
+    def observe(self, anchor: AnchorConfig) -> frozenset[str]:
+        """Reads from the handshake what only the machine can say, and holds it."""
 
     @abstractmethod
     def start(self) -> AnchorConfig:
@@ -57,6 +69,31 @@ class MachineBase(ABC):
   whatever it created if it cannot.
 - `stop` MUST leave the workspace behind, and MUST do nothing at all for a machine that was
   already running: one nobody here brought up is not one anybody here may take down.
+- What a place comes to MUST be said in capability names, and the setting MUST be what says
+  them: a flow's requirement has to be refusable before the first turn, and a name that could
+  only be answered by a machine that is already up would be one no flow could act on in time.
+  Asking a setting what it comes to MUST therefore bring nothing up and reach nothing.
+- The names MUST come from one shared vocabulary rather than each machine inventing its own.
+  Of a place: `remote` for work that lands through an anchor rather than as an ordinary
+  process here -- which a target standing in for a machine answers to as much as a real one
+  does, the road being the same -- `isolated` for a place whose tools are not this machine's,
+  `managed` for one that was started for the agent, and `linux` or `darwin` for the platform
+  it runs. How a turn *reaches* a place is a second axis and MUST NOT be said here: it is a
+  fact about the anchor rather than about the machine, and belongs to whatever the anchor
+  answers under `anchor:` and the name of the way.
+- `managed` MUST mean the machine was brought up for the agent and goes down with it, which is
+  the same line `stop` is drawn on: a machine nobody here brought up MUST NOT be `managed`,
+  since it is not one anybody here may take down.
+- A capability no setting can promise -- the platform a machine that was already running turns
+  out to be -- MUST be read from the handshake rather than declared, and MUST be answered by
+  the machine rather than by the setting. The two MUST NOT be conflated: what was declared is
+  refusable before anything starts, and what was observed is not known until something has
+  connected.
+- A machine whose setting promised a platform MUST put that promise to the machine itself as
+  it starts, and MUST fail to start where the handshake contradicts it. The failure MUST name
+  the capability it could not serve: a place refused for being the wrong one is no use to
+  whoever has to go and find another. A setting that promised no platform has nothing to put,
+  which is why a machine that was already running is the one kind that need not ask.
 
 ## `anchored.py` / `docker.py` / ... - Concrete Machines
 
@@ -69,12 +106,17 @@ class Dummy(MachineBase): ...
 ```
 
 - A machine that is already running MUST be named by the anchor that reaches it, and MUST
-  bring up nothing.
+  bring up nothing. It MUST come to `remote` and nothing else: nobody here brought it up, so
+  it is not `managed`; what a target does with the commands it is sent is the target's own
+  business, so it is not `isolated`; and its platform is the one thing about somebody else's
+  machine that cannot be known until it has been reached.
 - A machine started for the agent MUST be given the project directory itself rather than a
   copy of it, so the work outlives the machine, and a container MUST run as the calling user,
   so the workspace stays that user's. What is isolated MUST be the tools a command finds and
   not the work: the agent goes on running here, with its own credentials and its own
-  trajectory, and only what it does reaches the container.
+  trajectory, and only what it does reaches the container. A container started for the agent
+  MUST come to `remote`, `isolated`, `managed` and `linux` -- the last being a claim the
+  container itself can contradict, and so one `start` MUST put to it.
 
 ## `mapped.py`
 
