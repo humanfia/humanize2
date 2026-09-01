@@ -27,7 +27,7 @@
 
 Expose `AgentConfig`, `AgentBase`, `Event`, `Question`, `Saying`, `Stopped`, `Failed`,
 `Unrecoverable`, `Usage`, `SessionBase`, `CommandSessionBase`, `StreamSessionBase`, `Tool`,
-`Toolbox`, `Board`, `Item`, and all agent and session classes.
+`Toolbox`, `Gate`, `Board`, `Item`, and all agent and session classes.
 
 ## `event.py`
 
@@ -299,7 +299,8 @@ class AgentConfig:
 ## `hooks.py`
 
 `Moment`, `Occasion`, `Verdict`, `Hook`, `Hooks` and `Unhooked`: the points of a turn something
-may be hung on, what it is told when one arrives, and what it may say back.
+may be hung on, what it is told when one arrives, and what it may say back. And `Gate`, which
+is where a backend's own hook table reaches them.
 
 - A hook MUST be a callable of the flow's own, hung on a live agent and taken down again while
   it runs -- the same table these CLIs take as shell commands, held here instead so that it is
@@ -314,6 +315,51 @@ may be hung on, what it is told when one arrives, and what it may say back.
 - A hook that raises MUST have said nothing, as a watcher that raises has: a flow MUST NOT fail
   because something hung off it did. `Stopped` is the one thing it MUST raise out of the turn,
   since a run ended by hand has to read as ended by hand.
+
+### The moment a backend waits on
+
+`PRE_TOOL_USE` read off the stream a turn is read from is a moment that has already happened:
+a CLI says what it reached for and then reaches for it, so a hook refusing one there is
+watching a tool run rather than stopping it. The CLI's own hook table is the one place it
+stops and waits to be told, and `Gate` is what stands in that place.
+
+- A backend that takes a hook table meant for one run MUST have `PRE_TOOL_USE` fired from that
+  table rather than off its stream, and MUST act on a refusal by not running the tool. Which
+  backends those are MUST be `Profile.hooks` in `hmz.backends`, read from there rather than
+  declared on the driver a second time, and MUST be what puts `anchor:hooked` in `tags()`.
+- The moment MUST fire exactly once per tool call. A session MUST NOT also say it off the
+  stream where a gate is serving it: one tool call putting the same hook twice is a flow whose
+  hook counted two of everything.
+- Nothing of the person's own configuration MUST be read, written or replaced to do it. The
+  table MUST reach the CLI by a seam scoped to the run -- a flag carrying the whole of a
+  settings file, a `-c` override, a settings file of ours the run alone is pointed at -- and a
+  flow that ends MUST leave that machine as it found it. A switch of the CLI's own that would
+  turn the whole table off MAY be said off at that same layer, since a gate that quietly does
+  nothing is worse than one that was never installed.
+- The table MUST be installed whether or not anything is hung on the moment. A hook goes up and
+  comes down while the agent runs, so a table that depended on what was hung when the CLI
+  started would be one that had to restart the CLI; what is hung MUST be asked at the moment it
+  fires, which is the only moment the answer is true.
+- The relay MUST be `hmz hook`, and the callback MUST run in the process the flow is in, for
+  the reason `hmz tools` exists: a hook that ran anywhere else would be a subprocess and not a
+  callable of the flow's. The socket MUST be in a directory this user alone may enter.
+- A CLI whose table will not run until it has been trusted, where that trust is a thing
+  written into the person's own configuration, MUST NOT be given one. Codex is that CLI: it
+  takes `hooks.pre_tool_use` through the same `-c` its other settings go through, but a hook
+  there is untrusted until a hash of it is written into their `config.toml`, and the one flag
+  that lifts that is on `codex exec` and not on `codex app-server` -- the transport every turn
+  here is driven over. It keeps `PERMISSION_REQUEST`, which is a real gate over that same app
+  server. Kimi Code is the same shape for a simpler reason: its table is a file under its home
+  and there is no variable or flag that points one run at another.
+- An anchored turn MUST NOT be given a table. Its CLI runs on another machine, where the relay
+  is not and the socket is not, so the moment MUST go on being read off the stream there --
+  watching a tool rather than gating it, which is what it was everywhere before this.
+- A gate MUST NOT be what keeps an agent alive: an agent nobody holds any more is one whose
+  socket, its thread and its directory go with it.
+- `PERMISSION_REQUEST` MUST be left as it is on the three backends that have it. The two are
+  different moments and both MUST fire: the table gets the first word, because the CLI runs its
+  hooks before it decides whether the tool is permitted, so a refusal there means the
+  permission is never asked. A flow hanging on one MUST NOT have to know about the other.
 
 ## `skills.py`
 

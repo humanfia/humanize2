@@ -1547,6 +1547,16 @@ class CodexAgent(AgentBase):
                 "-c",
                 f"mcp_servers.humanize.args={json.dumps(held[1:])}",
             ]
+        # And no hook table, which is the one thing this same `-c` will not carry. Codex has
+        # one -- `hooks.pre_tool_use` takes a matcher and a command, and a table given here is
+        # a source it knows by name -- but a hook is not run until it has been trusted, and
+        # trust is a hash written into `hooks.state` in the user's own `config.toml`. The two
+        # ways past it are a review screen in the TUI, where nobody is sitting, and
+        # `--dangerously-bypass-hook-trust`, which `codex exec` takes and `codex app-server`
+        # -- the one transport every turn here is driven over -- does not. So the only route
+        # left is writing that hash into their config.toml, which is the thing this layer
+        # exists not to do. Codex keeps the gate it already has: `PERMISSION_REQUEST` comes
+        # over this same app server, and a hook hung there refuses a tool and is waited on.
         return argv
 
     def stop(self) -> None:

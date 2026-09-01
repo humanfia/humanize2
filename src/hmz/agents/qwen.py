@@ -35,6 +35,7 @@ from ._inputs import snapshot
 from .base import AgentBase, CommandSessionBase, SessionBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Usage
+from .hooks import WAITING, Gate
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -43,7 +44,10 @@ if TYPE_CHECKING:
 
 #: What the CLI is installed as, and the variable that points one run at a settings file of
 #: ours. The system layer rather than the user's own: it is read for this process only, and
-#: what it says outranks the file the person who started the flow has configured.
+#: what it says outranks the file the person who started the flow has configured. The same
+#: variable `hmz.backends` names as this CLI's hook seam, since a settings file for one run is
+#: one thing whether what is in it is an effort or a table of moments; the suite holds the two
+#: spellings together rather than leaving them free to drift apart.
 _COMMAND = "qwen"
 _SETTINGS = "QWEN_CODE_SYSTEM_SETTINGS_PATH"
 
@@ -105,46 +109,110 @@ _REFUSED = re.compile(r"^\[API Error:(?P<said>.*)\]$", re.DOTALL)
 #: it cost rather than shown twice.
 _SAYS = {"text": "text", "thinking": "reasoning"}
 
-#: Where the settings files that say how hard to think are kept, one per effort there is.
-#: One directory for the process rather than one per session: a flow that opens a session a
-#: turn would otherwise leave a directory behind for every turn it ran, and what is in these
-#: files is the effort and nothing else -- so two sessions at one effort are one file.
+#: How many milliseconds a second is, for the one field of Qwen Code's that is counted in
+#: them: it took the `timeout` of Claude Code's hook table and not the unit under it.
+_A_SECOND = 1000
+
+#: Where the settings files that say how hard to think are kept, one per effort there is, for
+#: the turns that have no gate to put beside them. One directory for the process rather than
+#: one per session: a flow that opens a session a turn would otherwise leave a directory behind
+#: for every turn it ran, and what is in these files is the effort and nothing else -- so two
+#: sessions at one effort are one file.
 _EFFORTS: dict[str, Path] = {}
 _EFFORT_LOCK = threading.Lock()
 
 
-def _thinking(effort: str) -> Path:
+def _thinking(effort: str, gate: Gate | None = None) -> Path:
     """The settings file a turn at one effort is run against, written once.
 
     Qwen Code has no flag for how hard to think: it is a setting of its own `settings.json`,
     so a run is pointed at a file of ours instead of having it written into the user's. The
-    system layer, which is the one that outranks what they have configured.
+    system layer, which is the one that outranks what they have configured -- and the layer
+    whose hooks Qwen Code runs whether or not this directory is one it trusts, since folder
+    trust is about what a *workspace* brought rather than what the run was started with.
 
     What a turn defaults to is written beside it, because that is where Qwen Code looks for
     the defaults layer -- under the settings file it was pointed at, which is this directory.
 
     Args:
       effort: How hard the turn is to think, as Qwen Code words it.
+      gate: Where this agent's moments are served, whose directory the file then goes in, or
+        None for a turn with nowhere to serve them -- an anchored one, whose CLI runs where
+        the socket is not.
 
     Returns:
       The file's path.
     """
     with _EFFORT_LOCK:
-        held = _EFFORTS.get(effort)
-        if held is None:
-            # Concurrent first turns must agree on the path as well as its contents: a
-            # changed path would make the next turn restart an otherwise unchanged CLI.
-            where = Path(tempfile.mkdtemp(prefix="hmz-qwen-"))
-            held = where / "settings.json"
-            held.write_text(
-                json.dumps({**_VERSION, "model": {"reasoningEffort": effort}}),
-                encoding="utf-8",
-            )
-            (where / _DEFAULTS_FILE).write_text(
-                json.dumps({**_VERSION, **_HEADLESS}), encoding="utf-8"
-            )
-            _EFFORTS[effort] = held
+        if gate is not None:
+            # Under the gate's own directory, so that the file goes when the agent does: what
+            # is in it names that agent's socket, so it is no more reusable than the socket
+            # is, and a table kept in a dictionary here would be an entry per agent for as
+            # long as this process ran. The path is the gate and the effort, so it is the same
+            # path every time -- a settings file that moved would restart an unchanged CLI.
+            held = _writing(Path(gate.address()).parent / effort, effort, gate)
+        else:
+            held = _EFFORTS.get(effort)
+            if held is None:
+                # Concurrent first turns must agree on the path as well as its contents: a
+                # changed path would make the next turn restart an otherwise unchanged CLI.
+                held = _writing(
+                    Path(tempfile.mkdtemp(prefix="hmz-qwen-")), effort, None
+                )
+                _EFFORTS[effort] = held
         return held
+
+
+def _writing(where: Path, effort: str, gate: Gate | None) -> Path:
+    """Writes the two files a turn is run against, and says where the first of them is.
+
+    Written again whenever it is asked for rather than remembered, since a gate's directory is
+    only ever asked about for the one agent whose it is and the answer is the same bytes every
+    time -- so there is nothing to keep and nothing to grow.
+
+    Args:
+      where: The directory to put them in, made if it is not there.
+      effort: How hard the turn is to think, as Qwen Code words it.
+      gate: Where this agent's moments are served, or None for a turn with nowhere to serve
+        them.
+
+    Returns:
+      The settings file's path.
+    """
+    where.mkdir(parents=True, exist_ok=True)
+    said: dict[str, Any] = {**_VERSION, "model": {"reasoningEffort": effort}}
+    if gate is not None:
+        # Milliseconds, which is the unit Qwen Code reads this number in -- the same spelling
+        # Claude Code gave the field, and not the same unit behind it. And the switch that
+        # turns every hook off with them: it is one setting for the whole of the table, so a
+        # person who has it on has a flow whose gate quietly does nothing. Said at the system
+        # layer, which is this run's alone -- what they configured is untouched, and is theirs
+        # again the moment the run ends.
+        said |= {
+            "hooks": gate.table(WAITING * _A_SECOND),
+            "disableAllHooks": False,
+        }
+    held = where / "settings.json"
+    _wholly(held, json.dumps(said))
+    _wholly(where / _DEFAULTS_FILE, json.dumps({**_VERSION, **_HEADLESS}))
+    return held
+
+
+def _wholly(where: Path, said: str) -> None:
+    """Puts a file in place whole, or leaves the one that is there.
+
+    Beside and then over, because a second session of the same agent writing the same bytes to
+    the same path is a file that is briefly nothing -- and a Qwen Code starting just then reads
+    a settings file with no effort in it and runs at the CLI's own. Which is the failure the
+    CLI's own rewrites are already guarded against here, arriving from our side instead.
+
+    Args:
+      where: Where the file goes.
+      said: What is to be in it.
+    """
+    beside = where.with_name(f"{where.name}.{os.getpid()}.{threading.get_ident()}")
+    beside.write_text(said, encoding="utf-8")
+    beside.replace(where)
 
 
 class QwenCodeSession(StreamSessionBase):
@@ -398,11 +466,21 @@ class QwenCodeSession(StreamSessionBase):
         change what the person who started the flow has configured. The system layer, because
         that is the one that outranks what they have configured.
 
+        The hook table goes in the same file, for the same reason and by the same route: a
+        `PreToolUse` read off the stream this session reads arrives after Qwen Code has
+        announced the tool and is about to run it, and Qwen Code's own table is the one place
+        it stops and waits to be told. Not for an anchored turn, whose `qwen` runs on another
+        machine and could not reach the socket the relay carries the moment to.
+
         And where the CLI's compiled bundle is kept between processes, unless whoever started
         the flow has said where themselves: a session a turn is a Node process a turn, and
         eight of them starting at once compile the same bundle eight times.
         """
-        held = {**super()._environment(), _SETTINGS: str(_thinking(self.effort))}
+        gate = self._agent.hooks.gate() if self._agent.anchor is None else None
+        held = {
+            **super()._environment(),
+            _SETTINGS: str(_thinking(self.effort, gate)),
+        }
         # Whoever said where, said it: the provider's own variables are in `held` and the
         # flow's are in this process's environment, and either outranks a cache of ours.
         # And not for an anchored turn: it runs on another machine, where a path named from

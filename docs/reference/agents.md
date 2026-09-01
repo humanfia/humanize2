@@ -795,7 +795,7 @@ on the **agent**, so one covers every session it holds, and hanging one mid-run 
 | --- | --- | --- |
 | `SESSION_START` | a session is about to take its first turn | — |
 | `USER_PROMPT_SUBMIT` | a prompt is about to go to the agent | `refused` skips the turn; `adds` goes into the prompt |
-| `PRE_TOOL_USE` | the agent has reached for a tool | — |
+| `PRE_TOOL_USE` | the agent has reached for a tool | `refused` stops the tool on a backend that [takes a hook table for one run](#refusing-a-tool); elsewhere, — |
 | `SUBAGENT_START` | the agent has started an agent of its own | — |
 | `SUBAGENT_STOP` | one of those has come back | — |
 | `PERMISSION_REQUEST` | the backend is asking whether a tool may run | `refused` denies it, with `because` as the reason |
@@ -853,10 +853,48 @@ where the hook is hung, rather than by quietly never firing.
 
 Claude Code, Codex and ZCode ask before they use a tool — Claude over the same stream the turn
 is read from, Codex and ZCode each through the app server it is driven over — and wait for
-the answer, so those are the three backends here where a refusal reaches the agent. It
-also wants the [`auto` rung](#what-an-agent-may-do), which is the one setting under which any
-of them asks at all. The rest are driven unattended, which is what a flow watching its agent
-rather than gating it means.
+the answer, so those are the three backends here where a `PERMISSION_REQUEST` refusal reaches
+the agent. It also wants the [`auto` rung](#what-an-agent-may-do), which is the one setting
+under which any of them asks at all. The rest are driven unattended, which is what a flow
+watching its agent rather than gating it means.
+
+### Refusing a tool
+
+`PRE_TOOL_USE` is in every backend's `moments`, and what a refusal *does* there is not the same
+everywhere. A CLI says what it reached for and then reaches for it, so a refusal read off the
+stream a turn is read from would be describing a tool that had already run.
+
+On the backends whose CLI takes a hook table meant for a single run — the ones
+[`anchor:hooked`](#what-each-backend-can-do) names — humanize puts the moment in that table
+instead, pointed at `hmz hook`, a relay that carries the call to a socket this process is
+serving and the verdict back again. The CLI stops and waits for it, and a refusal means the
+tool does not run:
+
+```python
+def no_shell(occasion: Occasion) -> Verdict | None:
+    if occasion.tool == "Bash":
+        return Verdict(refused=True, because="this flow does not shell out")
+    return None
+
+with agent.hooks.on(Moment.PRE_TOOL_USE, no_shell):
+    agent(task)
+```
+
+The seam is the CLI's own and is scoped to the run: `--settings` carries the whole of a
+settings file as a literal on Claude Code's command line, and Qwen Code is pointed at a
+settings file of ours through the variable it already reads its effort from. Nothing of the
+person's own configuration is read, written or replaced, and the table is installed whether or
+not anything is hung on the moment — a hook goes up and comes down while the agent runs, so
+what is hung is asked when the moment fires rather than when the CLI started.
+
+`PRE_TOOL_USE` and `PERMISSION_REQUEST` are two moments and both fire. The table gets the first
+word, a CLI running its hooks before it decides whether a tool is permitted, so a refusal at
+`PRE_TOOL_USE` means the permission is never asked.
+
+An [anchored](#where-the-turns-land) turn is given no table: its CLI runs on another machine,
+where neither the relay nor the socket is. There, and on a backend with no such seam, the
+moment is read off the stream as it always was — which is a flow watching a tool rather than
+stopping one.
 
 Claude Code, Codex and Cursor each say on the stream a turn is read from when they start an
 agent of their own and when that one comes back, so those are the three where a fleet is
@@ -1363,6 +1401,7 @@ never `0.0`, for a model nobody lists, so a flow steering by money can tell *not
 | [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | no | yes |
 | [`SubagentStart`/`SubagentStop`](#not-every-backend-runs-every-moment) | no | yes | yes | yes | no | no | no | no | no | no | no |
 | [Callbacks as tools](#callbacks-of-the-flow-s-own) | no | `--mcp-config` | `-c mcp_servers…` | no | no | no | no | no | no | no | no |
+| [A refusable `PreToolUse`](#refusing-a-tool) — `anchor:hooked` | no | `--settings` | no | no | no | no | no | no | `QWEN_CODE_SYSTEM_SETTINGS_PATH` | no | no |
 | A turn held to a shape | `--json-schema` | `--json-schema` | `outputSchema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt |
 | Sub-agents in a trace | no | yes | yes | no | no | no | yes | no | no | no | no |
 

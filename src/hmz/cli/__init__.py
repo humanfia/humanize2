@@ -14,8 +14,8 @@ on that: `hmz exec` must not pay for the terminal interface it is not opening, a
 only layer present and the architecture is whatever the target happens to be.
 
 A command whose line takes a parser of its own has a module of its own here, so that reaching
-one of them costs nothing for the others -- which is what `anchor.py`, `cred.py` and
-`tools.py`, the three humanize spawns for itself, are. `exec` has none: the line it takes is
+one of them costs nothing for the others -- which is what `anchor.py`, `cred.py`, `hook.py` and
+`tools.py`, the four humanize spawns for itself, are. `exec` has none: the line it takes is
 read by :func:`hmz.runner.flow_and_agents`, since the terminal interface starts a flow from
 that same line.
 
@@ -178,6 +178,20 @@ def _tools(argv: list[str]) -> int:
     from .tools import tools
 
     return tools(argv)
+
+
+def _hook(argv: list[str]) -> int:
+    """Carries one call of a coding agent's own hook table to the flow whose moment it is.
+
+    Args:
+      argv: What followed the command name.
+
+    Returns:
+      Zero, whatever the flow said and whether or not it was there to say it.
+    """
+    from .hook import hook
+
+    return hook(argv)
 
 
 def _line() -> ArgumentParser:
@@ -367,12 +381,14 @@ COMMANDS = {
 #: its own -- it forks the program and takes the signal handling with it, which a flow pumping
 #: turns from threads of its own has none to lend. A flow's own callbacks are the same shape
 #: the other way round: a CLI takes a tool by starting a program, so there is a program, and it
-#: does nothing but carry the protocol back to the process the callbacks are in. An anchored
-#: turn is the third: `AnchorConfig.command()` renders one for every turn whose work lands on
-#: another machine, and the zipapp bootstrapped onto a target answers it by running
-#: `hmz anchor serve`. All three are a command line because there is no other way to start a
-#: process, and none of them is a line anybody types.
-_SPAWNED = {"anchor": _anchor, "cred": _cred, "tools": _tools}
+#: does nothing but carry the protocol back to the process the callbacks are in. A moment of a
+#: flow's is that same shape once more: a CLI takes a hook by starting a program and waiting
+#: for what it says, which is the one place a `PreToolUse` can be refused rather than watched.
+#: An anchored turn is the fourth: `AnchorConfig.command()` renders one for every turn whose
+#: work lands on another machine, and the zipapp bootstrapped onto a target answers it by
+#: running `hmz anchor serve`. All four are a command line because there is no other way to
+#: start a process, and none of them is a line anybody types.
+_SPAWNED = {"anchor": _anchor, "cred": _cred, "hook": _hook, "tools": _tools}
 
 
 def main(argv: list[str] | None = None) -> int:
