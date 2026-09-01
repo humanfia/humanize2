@@ -122,6 +122,43 @@ def parser() -> ArgumentParser:
         help="use the mirror directory even if it already holds unrelated files",
     )
     built.add_argument(
+        "--native",
+        action="store_true",
+        help="run the CLI already installed on the target rather than supervising one "
+        "here: no mirror, nothing traced, and this process carries its streams",
+    )
+    built.add_argument(
+        "--hush",
+        metavar="NAME",
+        action="append",
+        default=[],
+        help="with --native, run the CLI on the target without this variable, whoever "
+        "left it there: a key in its shell profile would outrank the account it was given",
+    )
+    built.add_argument(
+        "--project",
+        metavar="NAME=DIR",
+        action="append",
+        default=[],
+        help="with --native, put this directory of credentials on the target for the life "
+        "of the session and set NAME to where it landed; removed when the turn is over",
+    )
+    built.add_argument(
+        "--carry",
+        metavar="DIR=PATH",
+        action="append",
+        default=[],
+        help="with --native, put this directory into the target's copy of the workspace at "
+        "PATH for the length of the turn -- which is how a flow's own skills get there",
+    )
+    built.add_argument(
+        "--installs",
+        metavar="LINE",
+        default="",
+        help="with --native, the line that installs this CLI, said where the target has "
+        "nothing to run",
+    )
+    built.add_argument(
         "--check",
         action="store_true",
         help="connect to the target, report what was found, and exit",
@@ -171,6 +208,11 @@ def settings(args: Namespace) -> AnchorConfig:
         net_allow=tuple(args.net_allow),
         token=args.token,
         force=args.force,
+        native=args.native,
+        hushes=tuple(args.hush),
+        projects=tuple(_pair(said) for said in args.project),
+        carries=tuple(_pair(said) for said in args.carry),
+        installs=args.installs,
     )
 
 
@@ -196,6 +238,9 @@ def render(config: AnchorConfig, argv: Sequence[str]) -> list[str]:
         ("--remote-path", config.remote_path),
         ("--shadow", config.shadow),
         ("--token", config.token),
+        # Written only where there is one, unlike the two above: it defaults to "" rather
+        # than to None, and an empty line would read as a CLI nothing installs.
+        ("--installs", config.installs or None),
     ):
         if value is not None:
             options.append(f"{flag}={value}")
@@ -203,12 +248,20 @@ def render(config: AnchorConfig, argv: Sequence[str]) -> list[str]:
         ("--local-path", config.local_paths),
         ("--local-exec", config.local_execs),
         ("--net-allow", config.net_allow),
+        ("--hush", config.hushes),
     ):
         options += [f"{flag}={value}" for value in values]
-    options += [f"--redirect={named}={instead}" for named, instead in config.redirects]
+    for flag, pairs in (
+        ("--redirect", config.redirects),
+        ("--project", config.projects),
+        ("--carry", config.carries),
+    ):
+        options += [f"{flag}={one}={other}" for one, other in pairs]
     options += [f"--private={name}" for name in config.private]
     if config.force:
         options.append("--force")
+    if config.native:
+        options.append("--native")
     return [sys.executable, "-m", "hmz", "anchor", *options, *argv]
 
 
