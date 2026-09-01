@@ -13,7 +13,7 @@ import json
 import os
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from hmz import home
 
@@ -104,6 +104,11 @@ class PiSession(StreamSessionBase):
     turns of one conversation are commands written to a pi that is already there, and so is
     anything said to it while a turn is running.
     """
+
+    #: `pi --mode rpc` takes a prompt as a command on the stdin of the process holding the
+    #: session, so one written while a turn is running is spliced into that turn -- and the
+    #: user message pi answers with is the model having it.
+    steers: ClassVar[bool] = True
 
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None

@@ -60,6 +60,10 @@ loses what was put in and leaves the rest for the next turn to take as its own.
 | **ZCode** | Nothing: a second prompt is refused while one is running. |
 | **opencode**, **mimocode**, and every other backend given a turn's whole prompt up front | Nothing: there is nothing there to hear it. |
 
+Which of the two a backend is is written on it rather than found out: `session.steers` says so
+before a word is put in, so a flow that means to steer picks an agent that can be rather than
+catching the refusal from a turn it is already an hour into.
+
 ## The anchored exception
 
 An [anchored](/features/anchor) Claude ends its process with each turn, so what the agent wrote
