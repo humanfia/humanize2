@@ -66,6 +66,13 @@ Inside the workspace it sees the target: the same file names, contents, sizes, m
 timestamps, at the same paths. A failure answers with the target's own error, not a local
 approximation of it.
 
+Where the target spells a path more than one way, every spelling reaches the same file. A Mac
+reaches `/tmp`, `/var` and `/etc` through `/private`, and ignores case unless it was formatted
+not to, so a path a command there hands back — `pwd` in a temporary directory answers
+`/private/var/folders/...` — is understood as the workspace path it names. A path outside the
+workspace is left exactly as the agent named it: it belongs to this machine, and one that is
+not here is reported missing rather than claimed for the target.
+
 Every program it spawns behaves like an ordinary local child — the same descriptors, the same
 output, the same exit status — and its parent is released as soon as it starts, so commands run
 concurrently and a long-lived one can be talked to while it runs.

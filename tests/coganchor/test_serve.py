@@ -66,6 +66,62 @@ def test_longest_export_wins() -> None:
     assert table.resolve("/project/src/a.py") == "/srv/real/src/a.py"
 
 
+def test_an_export_is_reached_by_either_name_a_mac_has_for_it() -> None:
+    """`/tmp` is a symlink into `/private/tmp` there, so a request may arrive as either."""
+    table = ExportTable.parse(["/tmp/work:/srv/real"])
+    assert table.resolve("/private/tmp/work/src/a.py") == "/srv/real/src/a.py"
+    assert table.resolve("/private/tmp/work") == "/srv/real"
+
+    aliased = ExportTable.parse(["/private/tmp/work:/srv/real"])
+    assert aliased.resolve("/tmp/work/src/a.py") == "/srv/real/src/a.py"
+
+
+def test_case_is_folded_only_where_the_filesystem_ignores_it() -> None:
+    """The end holding the files is the end that says how it compares two names."""
+    insensitive = ExportTable.parse(["/Project:/srv/real"], insensitive=True)
+    assert insensitive.resolve("/project/src/a.py") == "/srv/real/src/a.py"
+    # What lies below keeps its own case, or the request would name another file.
+    assert insensitive.resolve("/project/src/A.py") == "/srv/real/src/A.py"
+
+    sensitive = ExportTable.parse(["/Project:/srv/real"], insensitive=False)
+    with pytest.raises(PermissionError):
+        sensitive.resolve("/project/src/a.py")
+
+
+def test_folding_widens_nothing_a_neighbour_could_walk_through() -> None:
+    """A name that is not the export's is refused however either end spells it."""
+    table = ExportTable.parse(["/tmp/work:/srv/real"], insensitive=True)
+    for escape in (
+        "/private/tmp/workshop/x",
+        "/private/tmp/work/../../etc/passwd",
+        "/private/opt/work/x",
+        "/tmp/private/work/x",
+    ):
+        with pytest.raises(PermissionError):
+            table.resolve(escape)
+
+
+def test_an_argument_naming_an_export_in_another_case_is_rewritten_on_a_mac() -> None:
+    table = ExportTable.parse(["/Project:/srv/real"], insensitive=True)
+    assert table.rewrite("cat /project/f") == "cat /srv/real/f"
+    assert ExportTable.parse(["/Project:/srv/real"], insensitive=False).rewrite(
+        "cat /project/f"
+    ) == ("cat /project/f")
+
+
+def test_an_argument_naming_an_export_by_its_other_name_is_rewritten() -> None:
+    table = ExportTable.parse(["/tmp/work:/srv/real"])
+    assert table.rewrite("cat /private/tmp/work/f") == "cat /srv/real/f"
+    assert table.rewrite("cat /tmp/work/f") == "cat /srv/real/f"
+
+
+def test_the_deepest_export_wins_however_it_was_written() -> None:
+    """`/private/tmp/x` is no deeper than `/tmp/x`, so it must not outrank what is."""
+    table = ExportTable.parse(["/private/tmp/w:/srv/real", "/tmp/w/data:/mnt/data"])
+    assert table.resolve("/tmp/w/data/set.csv") == "/mnt/data/set.csv"
+    assert table.resolve("/private/tmp/w/src/a.py") == "/srv/real/src/a.py"
+
+
 # --------------------------------------------------------------------- fsops
 
 

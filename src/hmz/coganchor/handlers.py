@@ -202,31 +202,51 @@ class SyscallDispatcher:
     # ---------------------------------------------------------- answered paths
 
     def _answer(self, tracee: Tracee, registers: Registers) -> Action | None:
-        """Point a syscall's paths at whatever this session answers them with.
+        """Point a syscall's paths at what this machine will really touch.
 
-        Before the handler below reads them, so that everything after this sees
-        the file the syscall will really touch: what a path is answered with is
-        local state, kept out of the layouts, so the shadow tree never hears of
-        it and the target is never told.
+        Two things are put right here, before the handler below reads them, so that
+        everything after this sees the file the syscall will act on.
 
-        Returns ``None`` when there was nothing to answer, which is the usual
-        case, and the failure to give the syscall when a path was answered but
-        the answer could not be planted.  Never the original path: an agent that
-        read the credentials of whoever is at this machine would be a turn taken
-        as the wrong account, which is worse than a turn that did not run.
+        What a path is *answered with* is local state, kept out of the layouts, so the
+        shadow tree never hears of it and the target is never told.  What a path is
+        *spelled as* is the target's habit leaking into a name this machine has to
+        resolve: an agent told the target's own spelling of a directory -- a Mac's
+        ``/private/var/...``, or any case at all on a filesystem that ignores case --
+        would otherwise run the syscall against a name only the target has, and be told
+        a file is missing that the mirror is holding open for it.
+
+        The two part company when the write cannot be made.  A path answered with another
+        must be planted or the syscall failed: reading the credentials of whoever is at
+        this machine would be a turn taken as the wrong account, which is worse than a
+        turn that did not run.  A spelling is left alone instead and the syscall runs
+        against the name the tracee gave, which fails ``ENOENT`` exactly as it does today
+        -- the handler below will have mirrored the settled path by then, so the work is
+        wasted, but nothing is written anywhere the agent did not ask for.
+
+        Returns ``None`` when there was nothing to put right, which is the usual case, and
+        the failure to give the syscall when an answer could not be planted.
         """
         router = self._sup.router
-        if not router.redirects:
-            # A session that answers nothing reads no path out of a tracee twice.
+        arguments = _REDIRECTABLE.get(registers.syscall_number, ())
+        if not arguments or (not router.redirects and not router.settles):
+            # A session that answers nothing, against a target that spells everything one
+            # way, reads no path out of a tracee twice.  Asked in that order so that a
+            # syscall naming no path at all costs one lookup and nothing else.
             return None
         taken = 0  # what the paths already planted used, so two do not overwrite one
-        for descriptor, argument in _REDIRECTABLE.get(registers.syscall_number, ()):
+        for descriptor, argument in arguments:
             dirfd = AT_FDCWD if descriptor is None else registers.signed_arg(descriptor)
-            named = self._path(tracee.pid, dirfd, registers.arg(argument))
-            instead = router.swap(named) if named is not None else None
-            if instead is None:
+            named = self._raw(tracee.pid, dirfd, registers.arg(argument))
+            if named is None:
+                continue
+            settled = router.canonical(named)
+            answered = router.swap(settled)
+            instead = settled if answered is None else answered
+            if instead == named:
                 continue
             if _confined(tracee.pid, registers):
+                if answered is None:
+                    continue
                 log.warning(
                     "pid %d: openat2 insisted on a resolution %s cannot be given; failing it",
                     tracee.pid,
@@ -235,6 +255,8 @@ class SyscallDispatcher:
                 return fails(errno.EIO)
             room = _plant(tracee.pid, registers, taken, argument, instead)
             if room is None:
+                if answered is None:
+                    continue
                 log.warning(
                     "pid %d: %s could not be given %s; failing it",
                     tracee.pid,
@@ -547,6 +569,23 @@ class SyscallDispatcher:
         return self._sup.router.to_virtual(local_path)
 
     def _path(self, pid: int, dirfd: int, address: int) -> str | None:
+        """The path a syscall argument names, as *this machine* spells it.
+
+        Every path a handler acts on passes through here, because this is where one is read
+        out of the tracee and so the last point before it becomes a directory in the mirror.
+        A target that spells the same directory two ways -- a Mac reaches ``/var`` through
+        ``/private/var``, and does not tell ``A`` from ``a`` -- hands the agent names this
+        machine would take for somewhere else, and the mirror is built at whatever name gets
+        this far.  Settling it here means the mirror is built at the one path the layouts
+        name; settling it where paths are *compared* instead would leave the other spelling
+        to be created, which is a tree under ``/private`` on a machine that allows it and a
+        refusal on one that does not.
+        """
+        raw = self._raw(pid, dirfd, address)
+        return None if raw is None else self._sup.router.canonical(raw)
+
+    def _raw(self, pid: int, dirfd: int, address: int) -> str | None:
+        """The same path as the tracee itself spelled it, which is what the syscall runs."""
         raw = procfs.read_cstring(pid, address)
         if raw is None:
             return None
@@ -562,11 +601,13 @@ class SyscallDispatcher:
             return None
         return os.path.normpath(os.path.join(base, raw))
 
-    @staticmethod
-    def _absolute(pid: int, program: str) -> str:
-        if program.startswith("/"):
-            return os.path.normpath(program)
-        return os.path.normpath(os.path.join(procfs.working_directory(pid), program))
+    def _absolute(self, pid: int, program: str) -> str:
+        joined = (
+            program
+            if program.startswith("/")
+            else os.path.join(procfs.working_directory(pid), program)
+        )
+        return self._sup.router.canonical(os.path.normpath(joined))
 
     @staticmethod
     def _read_times(
