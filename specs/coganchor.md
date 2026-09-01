@@ -94,8 +94,12 @@ Each of these is deliberate, and each looks like a defect if you meet it cold.
 Running an agent needs Linux on x86-64 and a recent Python; any other
 architecture is refused at start-up. Serving needs only a POSIX system with a
 Python of the same vintage — no root, no compiler, no kernel module, nothing
-installed. The same program serves both ends, and the two refuse to run against
-each other if their versions disagree.
+installed. A macOS target serves as readily as a Linux one, on either
+architecture: macOS ships no `python3` on the `PATH` a remote command is given,
+so the interpreter is looked for where a Mac keeps one — Homebrew's, or the
+framework the installer from python.org writes — and a target holding none is
+told what was looked for. The same program serves both ends, and the two refuse
+to run against each other if their versions disagree.
 
 ## Limits
 

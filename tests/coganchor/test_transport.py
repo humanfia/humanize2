@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -10,7 +11,15 @@ from pathlib import Path
 
 import pytest
 
-from hmz.coganchor.transport import Target, build_bundle
+from hmz.coganchor.transport import (
+    MINIMUM_PYTHON,
+    PYTHON_CANDIDATES,
+    REMOTE_CACHE,
+    Target,
+    _ssh_serve_line,
+    build_bundle,
+    python_command,
+)
 from tests.coganchor.conftest import REPO_ROOT, Anchorage
 
 
@@ -106,6 +115,83 @@ def test_bundle_reports_failure_in_its_exit_status(tmp_path: Path) -> None:
     )
     assert result.returncode == 2, "the bundle swallowed a start-up failure"
     assert "malformed listen address" in result.stderr
+
+
+def test_a_target_keeping_its_python_off_the_path_is_found_it_anyway(
+    tmp_path: Path,
+) -> None:
+    """An interpreter that is not on the ``PATH`` is still an interpreter.
+
+    macOS ships no ``python3`` on the ``PATH`` a remote command is given, so looking there
+    and stopping is a target that fails for want of something it has. Driven with an empty
+    ``PATH`` for real, which is the same target as a Mac's: the bare names answer to nothing
+    and only the places one is kept are left.
+    """
+    kept = [
+        candidate
+        for candidate in PYTHON_CANDIDATES
+        if candidate.startswith("/") and os.access(candidate, os.X_OK)
+    ]
+    if not kept:
+        pytest.skip(
+            "this machine keeps no interpreter at any of the absolute candidates"
+        )
+    empty = tmp_path / "empty"
+    empty.mkdir()
+
+    said = "import sys; print(sys.version_info[0], sys.version_info[1])"
+    result = subprocess.run(
+        python_command(["-c", said]),
+        capture_output=True,
+        text=True,
+        env={"PATH": str(empty)},
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    found = tuple(int(part) for part in result.stdout.split())
+    assert found >= MINIMUM_PYTHON, "an interpreter too old for the bundle was taken"
+
+
+def test_a_target_with_no_python_at_all_says_what_it_looked_for(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The answer is to install one of them, so the list is the message."""
+    monkeypatch.setattr(
+        "hmz.coganchor.transport.PYTHON_CANDIDATES", ("python3-not-here", "/no/python3")
+    )
+
+    result = subprocess.run(
+        python_command(["-c", "pass"]), capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode != 0
+    assert "python3-not-here" in result.stderr
+    assert "/no/python3" in result.stderr
+
+
+def test_the_line_ssh_carries_is_read_by_the_shell_there_before_anything_runs() -> None:
+    """So what it must not take apart, and what it must, are both in it.
+
+    The line that finds the interpreter is a script and travels quoted; the cache path
+    travels bare, because the ``~`` in it is that shell's to expand and a quoted one names a
+    directory called ``~`` under wherever the session began; and an export holding a space is
+    one word on arrival.
+    """
+    bundle = f"{REMOTE_CACHE}/humanize-0123456789abcdef.pyz"
+
+    line = _ssh_serve_line(bundle, ["/a b:/c d"])
+
+    words = shlex.split(line)
+    assert words[:3] == ["exec", "/bin/sh", "-c"]
+    assert "for py in" in words[3], (
+        "the line that finds the interpreter arrived in pieces"
+    )
+    assert words[4:7] == ["humanize", bundle, "anchor"]
+    assert words[-2:] == ["--export", "/a b:/c d"]
+    assert f" {bundle} " in line, (
+        "a quoted ~ is a directory of that name, not the home one"
+    )
 
 
 def _bare() -> dict[str, str]:

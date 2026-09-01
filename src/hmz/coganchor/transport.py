@@ -37,12 +37,33 @@ from pathlib import Path
 from hmz import coganchor
 from hmz.coganchor.proto import Channel
 
-__all__ = ["Target", "Transport", "build_bundle", "connect"]
+__all__ = ["Target", "Transport", "build_bundle", "connect", "python_command"]
 
 log = logging.getLogger(__name__)
 
 #: Where the bootstrapped copy is cached on the target machine.
 REMOTE_CACHE = "~/.cache/humanize"
+
+#: Where a target may keep a Python, in the order they are tried.  ``python3`` first, which
+#: answers on every Linux and on a Mac somebody has set up; then the versioned names, which is
+#: what a Homebrew or a python.org install answers to when the bare one was never linked; then
+#: the paths those two install at, for a target whose ``PATH`` is the short one a non-login
+#: shell gets.  ``/usr/bin/python3`` last: on macOS it is the Command Line Tools shim, which is
+#: either an interpreter too old for this or a prompt to install Xcode, and on Linux it is the
+#: one ``PATH`` has already found.
+PYTHON_CANDIDATES = (
+    "python3",
+    "python3.14",
+    "python3.13",
+    "python3.12",
+    "/opt/homebrew/bin/python3",
+    "/usr/local/bin/python3",
+    "/Library/Frameworks/Python.framework/Versions/Current/bin/python3",
+    "/usr/bin/python3",
+)
+
+#: The oldest Python the bundle runs on, which is this project's own floor.
+MINIMUM_PYTHON = (3, 12)
 
 #: Installing that copy, for a target reached by piping it there. Written under a name of its
 #: own and moved into place, so a session finds the whole archive or none of it, and a copy
@@ -54,6 +75,43 @@ _INSTALL = (
 )
 
 _SSH_OPTIONS = ("-T", "-o", "BatchMode=no", "-o", "ServerAliveInterval=30")
+
+#: Finding one, in POSIX sh, because this runs on the target before anything of humanize
+#: exists there.  Each candidate is *run* rather than merely looked for: macOS's
+#: ``/usr/bin/python3`` is a shim that is there whether or not an interpreter is behind it,
+#: and answers with a prompt to install Xcode when none is.  What it is asked is its version,
+#: so a target whose only Python is older than the bundle needs is passed over here rather
+#: than failing on a syntax error a frame later.  A target with none at all is told what was
+#: looked for, since what to do about it is to install one of them.
+_FIND_PYTHON = (
+    "for py in {candidates}; do "
+    'command -v "$py" >/dev/null 2>&1 || continue; '
+    '"$py" -c "import sys; sys.exit(sys.version_info < {minimum})" >/dev/null 2>&1 '
+    "|| continue; "
+    'exec "$py" "$@"; '
+    "done; "
+    'echo "humanize: no python {version} or newer on this machine; '
+    'looked for: {candidates}" >&2; '
+    "exit 127"
+)
+
+
+def python_command(args: list[str]) -> list[str]:
+    """The command that runs ``args`` under the target's Python, wherever it keeps one.
+
+    Argv, so that a path holding a space or a quote reaches the target as it is.  Called with
+    nothing it is the part that does the finding, which is what whoever has to hand a target
+    one string instead -- ``ssh`` does -- quotes before writing its own arguments after it.
+    """
+    script = _FIND_PYTHON.format(
+        candidates=" ".join(PYTHON_CANDIDATES),
+        minimum=f"({MINIMUM_PYTHON[0]}, {MINIMUM_PYTHON[1]})",
+        version=".".join(str(part) for part in MINIMUM_PYTHON),
+    )
+    # ``/bin/sh`` by its path rather than its name, since the ``PATH`` this is reaching past
+    # is the same one that would have to hold a shell.  ``$0`` is what sh prefixes its own
+    # complaints with, so it is named for whose command this is.
+    return ["/bin/sh", "-c", script, "humanize", *args]
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,18 +227,7 @@ def _connect_ssh(target: Target, exports: list[str], token: str | None) -> Trans
             f"{result.stderr.decode(errors='replace').strip()}"
         )
 
-    remote_command = " ".join(
-        [
-            "exec",
-            "python3",
-            remote_file,
-            "anchor",
-            "serve",
-            "--stdio",
-            *_export_args(exports, quote=True),
-        ]
-    )
-    return _spawn([*ssh, remote_command], token)
+    return _spawn([*ssh, _ssh_serve_line(remote_file, exports)], token)
 
 
 def _connect_docker(target: Target, exports: list[str]) -> Transport:
@@ -207,20 +254,55 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
         raise ConnectionError(
             f"could not install humanize in {target.host}: "
             f"{result.stderr.decode(errors='replace').strip()}"
+            f"{_docker_said(target.host)}"
         )
 
     # Unquoted, unlike ssh: docker is handed the command as argv and passes it on, so an export
     # holding a space or a quote needs nothing done to it to survive the trip.
-    command = [
-        *exec_in,
-        "python3",
-        remote_file,
-        "anchor",
-        "serve",
-        "--stdio",
-        *_export_args(exports),
-    ]
-    return _spawn(command, None)
+    serve = [remote_file, "anchor", "serve", "--stdio", *_export_args(exports)]
+    return _spawn([*exec_in, *python_command(serve)], None)
+
+
+def _docker_said(container: str) -> str:
+    """The tail of what the container printed, for an error that does not say enough.
+
+    A container whose own process could not start is one docker then reports as merely not
+    running; why it could not -- that there is no Python it can use, and where it was looked
+    for -- was said on the way out and is in the log and nowhere else.
+    """
+    said = subprocess.run(
+        ["docker", "logs", "--tail", "3", container], capture_output=True, check=False
+    )
+    if said.returncode != 0:
+        # There is no container to have said anything, or no daemon to ask -- which is what
+        # the error being written already says, and saying it twice says less.
+        return ""
+    # Both streams: what a container printed on its way out is on the one it chose.
+    tail = (said.stdout + said.stderr).decode(errors="replace").strip()
+    return f"; the container said: {tail}" if tail else ""
+
+
+def _ssh_serve_line(remote_file: str, exports: list[str]) -> str:
+    """The one string ssh carries, read by the login shell on the far side before it runs.
+
+    Three things have to survive that reading.  The line that finds the interpreter is a
+    shell script and is quoted whole, so the login shell hands it on rather than acts on it.
+    The cache path is left bare, because the ``~`` in it is that shell's to expand -- quoted,
+    it names a directory called ``~`` under wherever the session began -- which is the same
+    expansion the upload was written against.  And an export is quoted as it is built, since
+    a workspace path may hold a space.
+    """
+    return " ".join(
+        [
+            "exec",
+            *(shlex.quote(word) for word in python_command([])),
+            remote_file,
+            "anchor",
+            "serve",
+            "--stdio",
+            *_export_args(exports, quote=True),
+        ]
+    )
 
 
 def _spawn(command: list[str], token: str | None) -> Transport:
