@@ -120,10 +120,10 @@ Each of these is a decision, and each looks like a defect if you meet it cold.
 
 ## What it needs installed
 
-Running an agent under it needs Linux on x86-64 and a recent Python. **Serving needs only a
-POSIX system and a Python of the same vintage** — no root, no compiler, no kernel module,
-nothing installed. The same program is both ends, and the two refuse to run against each other
-if their versions disagree.
+Running an agent under it needs Linux on x86-64 or aarch64 and a recent Python. **Serving
+needs only a POSIX system and a Python of the same vintage** — no root, no compiler, no kernel
+module, nothing installed. The same program is both ends, and the two refuse to run against
+each other if their versions disagree.
 
 ## Where the detail is
 

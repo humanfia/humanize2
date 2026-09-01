@@ -81,7 +81,7 @@ coganchor/
 ├── anchor.py     AnchorConfig, connect, check — the front door
 ├── argv.py       the `hmz anchor` line, all three directions: parse, settle, render
 ├── proto.py      the wire, shared by both halves
-├── linux/        ptrace, seccomp, procfs, syscall numbers (x86-64)
+├── linux/        ptrace, seccomp, procfs, syscall numbers (x86-64, aarch64)
 ├── serve/        the target half — imports nothing but proto
 └── supervisor.py handlers.py policy.py shadow.py standin.py execproxy.py netproxy.py
                   remote.py transport.py statepaths.py — the half beside the agent
@@ -150,7 +150,8 @@ checked at all.
 
 That last one is why `coganchor/serve/` may import nothing but `proto`. The serving half runs on
 the target, which may be any architecture, while `coganchor/linux/` picks a register map at
-import time and refuses anything but x86-64.
+import time and refuses any architecture it has not got one for — which is x86-64 and aarch64,
+and nothing else.
 
 The same discipline is why **every command imports what it needs when it is the one asked for,
 and no earlier** — `hmz exec` must not pay for a date parser it will not use. Ruff's
@@ -257,5 +258,5 @@ Run them through `uv run`, not `uvx`: the lockfile pins the versions the hooks a
 - Google-style docstrings, and type annotations everywhere.
 
 CI runs all of it over every file, and the tests on each Python the package claims, on both
-Linux and macOS. The tests that run an agent under an anchor need Linux on x86-64 and skip
-aloud anywhere else; the serving half, and everything above it, is held to both.
+Linux and macOS. The tests that run an agent under an anchor need Linux on x86-64 or aarch64
+and skip aloud anywhere else; the serving half, and everything above it, is held to both.

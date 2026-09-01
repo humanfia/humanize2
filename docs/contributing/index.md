@@ -32,9 +32,10 @@ Installing the hooks once means every commit is checked before it is made.
 Both of the first two have to pass. CI runs them over every file, on each Python the package
 claims and on both Linux and macOS, and never runs the third. What a machine cannot do it says
 so and skips: running an agent under an anchor is a seccomp filter and a ptrace supervisor, so
-those tests are Linux on x86-64's, and everything above them is held to both systems. `ruff` and `pyright` come from this project's own environment
-rather than one pre-commit builds, so bump them with `uv lock --upgrade-package ruff` rather
-than by editing a second pin.
+those tests are Linux on x86-64's and aarch64's, and everything above them is held to both
+systems. `ruff` and `pyright` come from this project's own environment rather than one
+pre-commit builds, so bump them with `uv lock --upgrade-package ruff` rather than by editing a
+second pin.
 
 ## What the code is held to
 

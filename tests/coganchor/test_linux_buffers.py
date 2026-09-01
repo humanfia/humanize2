@@ -6,6 +6,7 @@ import ctypes
 import errno
 import gc
 import os
+import platform
 import signal
 import subprocess
 import sys
@@ -25,6 +26,11 @@ from hmz.coganchor.linux import procfs, ptrace
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+#: `write(2)`, which the supervisor's own table has no entry for -- it is a hot syscall and
+#: deliberately never trapped -- so the two architectures the bindings have a register map for
+#: are named here instead.
+WRITE = {"x86_64": 1, "aarch64": 64}[platform.machine()]
 
 
 @pytest.fixture
@@ -120,7 +126,7 @@ os.write(1, payload)
             assert os.WIFSTOPPED(status)
             assert os.WSTOPSIG(status) == signal.SIGTRAP | ptrace.SYSCALL_STOP_SIG
             registers = ptrace.getregs(child.pid)
-            if registers.syscall_number == 1:  # x86-64 write(2).
+            if registers.syscall_number == WRITE:
                 break
         else:
             pytest.fail("the tracee never reached its write syscall")

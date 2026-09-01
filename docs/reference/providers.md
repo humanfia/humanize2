@@ -476,7 +476,8 @@ Which file a path is answered with depends on what the call is about to do with 
 
 ## Requirements and limits
 
-- **Linux on x86-64**, as running an agent under an anchor needs. There is nothing to install.
+- **Linux on x86-64 or aarch64**, as running an agent under an anchor needs. There is nothing
+  to install.
 - **A turn that is also [anchored](/reference/machines) is supervised once, not twice.** A process has
   one tracer, so the anchor is told which paths to answer and answers them itself.
 - **Only the paths listed [above](#where-the-credentials-are-kept) are answered.** A CLI that
