@@ -1674,6 +1674,45 @@ shape of work — see [Flows › Where each agent works](/reference/flows#where-
 `machine` here is what fills a place the flow declared `Remote`; a place it declared `Isolated`
 is settled by the flow itself and takes no `machine` from anyone.
 
+## Reaching into a bundled CLI
+
+Two of these agents — Claude Code and opencode — ship as a single [Bun](https://bun.sh)
+standalone executable: the whole CLI, its JavaScript minified and packed into one file behind a
+`---- Bun! ----` trailer, runtime and all. Where a shallower way in cannot reach a thing they
+do, `hmz.agents.patching` reaches it by rewriting that bundle — and, because doing so is brittle
+by construction, is careful about it. This is the deepest of the ways humanize reaches a CLI's
+own commands, named `anchor:patched` in the [catalogue](/reference/flows#the-catalogue), and it
+reaches these two backends and no other: the agents shipped as native binaries carry no bundle
+to patch, and the plain Node scripts are reached from their runtime instead.
+
+```python
+from pathlib import Path
+
+from hmz.agents.patching import Patch, patched
+from hmz.backends import named, program
+
+claude, where = named("claude"), program("claude")
+copy = None
+if claude is not None and where is not None:
+    copy = patched(claude, Path(where),
+                   [Patch(find=b"...", into=b"...")])   # same length on both sides, or None
+```
+
+What the layer promises:
+
+- **Never the installed binary.** A patch is applied to a copy humanize makes in a directory of
+  its own, run for one session and removed after — dropping the handle removes it too.
+- **Fingerprint before touching anything.** The copy is checked against what
+  [`backends`](#what-each-backend-can-do) wrote down under `Profile.bundles`: a line the bundle
+  must contain — its inlined version — and an optional digest. The fingerprint is release-specific
+  by design, so a new release of the CLI is one this reaches nothing in.
+- **Fall back on any mismatch or failure.** An unknown version, a digest that changed, a site
+  that has moved, a copy that will not start: every one returns `None` and is logged, and the run
+  reaches the CLI a shallower way. A patch that did not apply is never a run that did not happen.
+- **Same length in place.** The file records where everything in it is, so every rewrite is the
+  same length as what it replaces and nothing moves; the one book-keeping left is clearing the
+  patched module's precompiled bytecode, so the rewritten source is what runs.
+
 ## Which account it runs as
 
 A config's `provider` names one of the [providers](/reference/providers) made for its CLI. `""` — the

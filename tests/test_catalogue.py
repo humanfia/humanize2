@@ -180,12 +180,23 @@ def test_the_names_a_backend_serves_are_derived_from_its_own_facts() -> None:
     }
 
 
-def test_no_backend_has_been_given_a_layer_that_is_not_written_yet() -> None:
-    """The schema the anchors are read out of is laid down empty, and is still empty."""
+def test_only_the_bun_bundles_carry_a_patch_layer_and_the_rest_are_still_empty() -> (
+    None
+):
+    """The patched layer reaches the two single-file Bun executables and no other backend yet.
+
+    The hook and preload layers are still laid down empty -- their units have not landed -- so
+    what a run reaches into is exactly the bundles fingerprinted here: Claude Code and opencode,
+    the two CLIs shipped as one Bun file, and nothing that is a native binary or a plain script.
+    """
+    with_bundles = {one.name for one in PROFILES if one.bundles}
+    assert with_bundles == {"claude", "opencode"}
     for one in PROFILES:
         assert one.hooks is None, one.name
         assert not one.preloads, one.name
-        assert not one.bundles, one.name
+        if one.bundles:
+            # Every bundle written down fingerprints on a line rather than a path alone.
+            assert all(bundle.says for bundle in one.bundles), one.name
 
 
 def test_the_catalogue_names_where_an_agents_turns_may_land() -> None:
@@ -200,8 +211,11 @@ def test_the_catalogue_names_where_an_agents_turns_may_land() -> None:
 def test_an_anchor_nothing_serves_is_left_out_rather_than_read_as_everybodys() -> None:
     told = {one.name: one for one in catalogue() if one.name.startswith("anchor:")}
     # An empty backend set means every backend here, so a way in that has not been built
-    # must not be listed at all. These two are: every backend is a command line spawned
-    # here, and what a spawned turn runs is what an anchor traces.
-    assert set(told) == {"anchor:native-cli", "anchor:supervised"}
-    for one in told.values():
-        assert one.backends == frozenset()
+    # must not be listed at all. The two universal ones always are: every backend is a command
+    # line spawned here, and what a spawned turn runs is what an anchor traces. The patched
+    # layer is served by the two Bun bundles and so is listed against exactly those; the hook
+    # and preload layers are not built yet and are absent.
+    assert set(told) == {"anchor:native-cli", "anchor:supervised", "anchor:patched"}
+    assert told["anchor:native-cli"].backends == frozenset()
+    assert told["anchor:supervised"].backends == frozenset()
+    assert told["anchor:patched"].backends == frozenset({"claude", "opencode"})
