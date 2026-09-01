@@ -309,10 +309,10 @@ class Needs:
         settings, :attr:`~hmz.machines.MachineConfig.capabilities`, so that a place which
         will not do is refused before an image has been pulled; a place asked for nothing in
         particular may be filled by an agent that was pointed nowhere, whose machine comes to
-        nothing at all. Only what a setting promises is asked here, which is why the
-        `anchor:` names -- how a turn's own commands are reached, a fact about the road
-        rather than about the machine -- are not among them yet: no machine's settings answer
-        for one, and asking for what nothing can answer is asking for a run that never starts.
+        nothing at all. The `anchor:` names belong here too -- how a turn's own commands are
+        reached is a fact about the road rather than about the machine, but it is the machine
+        that was pointed down one, so a flow needing the CLI the target already has asks for
+        it the same way it asks for `remote`.
 
     Raises:
       TypeError: If `where` was written as one name rather than as a sequence of them.

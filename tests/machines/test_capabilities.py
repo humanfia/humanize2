@@ -77,7 +77,9 @@ def test_a_setting_says_what_its_place_comes_to_without_starting_anything() -> N
     """
     anchored = AnchoredConfig(anchor=AnchorConfig(target="ssh://build-box"))
 
-    assert anchored.capabilities == frozenset({"remote"})
+    # `remote` because the work lands through an anchor, and the road that anchor names with
+    # it: a flow asking for the CLI the target already has is asking about this machine.
+    assert anchored.capabilities == frozenset({"remote", "anchor:supervised"})
     assert DockerConfig(image=IMAGE).capabilities == frozenset(
         {"isolated", "linux", "managed", "remote"}
     )
@@ -118,12 +120,13 @@ def test_the_platform_a_machine_runs_is_read_from_the_handshake_rather_than_decl
 ) -> None:
     """The half no setting can promise: somebody else's machine is whatever it turns out to be."""
     machine = AnchoredConfig(anchor=_anchor(tmp_path / "target")).create()
-    assert machine.capabilities == frozenset({"remote"})  # nothing has been asked yet
+    settled = frozenset({"remote", "anchor:supervised"})
+    assert machine.capabilities == settled  # nothing has been asked yet
 
     observed = machine.observe(machine.start())
 
-    assert observed == frozenset({"remote", HERE})
-    assert machine.capabilities == frozenset({"remote", HERE})
+    assert observed == settled | {HERE}
+    assert machine.capabilities == settled | {HERE}
 
 
 def test_a_machine_that_cannot_serve_what_was_asked_of_it_is_refused_as_it_starts(
