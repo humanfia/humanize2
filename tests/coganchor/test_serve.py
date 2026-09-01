@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import os
+import pty
 import signal
 import socket
 import threading
@@ -23,7 +24,7 @@ from hmz.coganchor.remote import RemoteClient
 from hmz.coganchor.serve import fsops
 from hmz.coganchor.serve.exports import Export, ExportTable
 from hmz.coganchor.serve.server import Server
-from hmz.coganchor.serve.sessions import compose_env
+from hmz.coganchor.serve.sessions import _read_stream, compose_env
 from tests.coganchor.conftest import VIRTUAL_EXPORT
 
 if TYPE_CHECKING:
@@ -187,6 +188,29 @@ def test_host_specific_variables_do_not_leak() -> None:
     assert "LD_PRELOAD" not in env
 
 
+def test_what_a_mac_says_about_itself_does_not_leak_either() -> None:
+    """What a macOS client's own login session put in its environment stays on that machine.
+
+    ``DYLD_INSERT_LIBRARIES`` is that machine's ``LD_PRELOAD`` and would name a library of
+    the client's; the rest name the launchd session it logged in on. Asserted against this
+    machine's own environment rather than against absence, because a macOS target has its own
+    copies of these and is entitled to keep them.
+    """
+    clients = {
+        "DYLD_INSERT_LIBRARIES": "/machine-a/evil.dylib",
+        "DYLD_LIBRARY_PATH": "/machine-a/lib",
+        "SECURITYSESSIONID": "186a6",
+        "__CF_USER_TEXT_ENCODING": "0x1F5:0x0:0x0",
+        "Apple_PubSub_Socket_Render": "/private/tmp/com.apple.launchd.0/Render",
+        "XPC_SERVICE_NAME": "0",
+    }
+    env = compose_env(clients | {"MY_TOKEN": "abc"}, "/work", tty=False)
+
+    for name in clients:
+        assert env.get(name) == os.environ.get(name), f"{name} came from the client"
+    assert env["MY_TOKEN"] == "abc", "and everything else still crosses"
+
+
 # ---------------------------------------------------------------------- server
 
 
@@ -257,6 +281,54 @@ def test_a_request_missing_what_it_needs_is_a_bad_request_rather_than_a_dead_lin
 
     assert raised.value.errno == errno.EINVAL
     assert link.client.call(Op.STAT, path=VIRTUAL_EXPORT)["kind"] == "dir"
+
+
+def test_the_end_of_a_stream_reads_the_same_whichever_way_the_kernel_says_it() -> None:
+    """A spent descriptor answers with no bytes, whichever way its kernel says so.
+
+    A pty master whose child is gone raises ``EIO`` on Linux and ends the file on macOS,
+    whose ``kqueue`` reports it readable and has no other way to say it. Both are the end of
+    the output, and the second is stood in for here by a socket, which says it that way on
+    either machine -- so a run on Linux covers the answer a Mac would give.
+    """
+    master, slave = pty.openpty()
+    os.close(slave)
+    try:
+        assert _read_stream(master) == b""
+    finally:
+        os.close(master)
+
+    left, right = socket.socketpair()
+    with left, right:
+        right.close()
+        assert _read_stream(left.fileno()) == b""
+
+
+@pytest.mark.timeout(60)
+def test_a_command_given_a_tty_runs_and_ends_on_it(link: Link) -> None:
+    """Which is how an agent started from a terminal spawns everything it spawns.
+
+    The session ends when the pty says the child is gone, and that is the only thing that
+    ever says so: there is no second descriptor to read the exit off.
+    """
+    ended = threading.Event()
+    said: list[bytes] = []
+
+    def over(_result: dict[str, Any] | None, _error: object) -> None:
+        ended.set()
+
+    link.client.start_exec(
+        ["sh", "-c", "echo from-the-tty"],
+        cwd=VIRTUAL_EXPORT,
+        env={},
+        on_output=lambda _stream, data: said.append(data),
+        on_exit=over,
+        tty=True,
+        winsize=(24, 80),
+    )
+
+    assert ended.wait(timeout=30)
+    assert b"from-the-tty" in b"".join(said)
 
 
 @pytest.mark.timeout(60)

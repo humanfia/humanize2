@@ -20,12 +20,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from hmz.coganchor import AnchorConfig
+from hmz.coganchor.transport import python_command
 
 from .base import MachineBase, MachineConfig
 
 #: What the container does while the turns come and go: nothing, in the interpreter coganchor's
-#: target half needs, so an image without one fails as it starts rather than a turn later.
-_IDLE = ("python3", "-c", "import time; time.sleep(2**31)")
+#: target half needs, looked for the way that half looks for it -- the same machine and the
+#: same Python, so an image keeping one off `PATH` is served rather than refused. An image
+#: holding none at all is a container that stops as it starts, and so is a flow that fails
+#: where it is set up rather than a turn later.
+_IDLE = tuple(python_command(["-c", "import time; time.sleep(2**31)"]))
 
 #: Marks a container as one of ours, and whose, for whoever has to clean up after a flow that
 #: was killed before it could. Named for the project rather than for this layer, since it is
@@ -90,11 +94,15 @@ class Docker(MachineBase):
         Raises:
           FileNotFoundError: If there is no workspace directory to give the container, or no
             `docker` to give it to.
-          RuntimeError: If the container cannot be started -- an image with no `python3` in it
-            is refused here. What docker said is attached. Or if what came up is not the
-            machine these settings promised, which names the capability it could not serve.
+          RuntimeError: If the container cannot be started -- an image with no shell in it,
+            or none holding a Python new enough, is refused here. What docker said is
+            attached. Or if what came up is not the machine these settings promised, which
+            names the capability it could not serve.
           OSError: If the container cannot serve the workspace it was mounted, which is a turn
-            that would fail on its first file, reported before the first turn instead.
+            that would fail on its first file, reported before the first turn instead. An
+            image holding no Python the target half can use is refused here too: the idle
+            process is what looks for one, so an image without one holds no container to
+            serve from by the time this asks.
         """
         # `abspath` rather than `Path.resolve`: what is mounted is the directory named, and
         # a workspace reached through a symlink is not a request to mount what it points at.
