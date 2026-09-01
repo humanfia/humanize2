@@ -232,6 +232,52 @@ said.ok, said.status, said.output
 Every path may be given as the machine names it or relative to the workspace. The connection is
 the one an anchored turn opens, made when the flow first asks and held for the rest of the run.
 
+## What a place comes to
+
+Each setting says what a machine of it would come to, in capability names — and says it
+**without starting anything**, so a requirement can be refused before the first turn rather
+than after an image has been pulled:
+
+```python
+AnchoredConfig(anchor=…).capabilities          # {"remote"}
+DockerConfig(image="python:3.12").capabilities # {"remote", "isolated", "managed", "linux"}
+```
+
+| Name | Means |
+| --- | --- |
+| `remote` | The work lands through an anchor rather than as an ordinary process here. A `local:` target answers to it too — it stands in for a machine of its own, and a turn reaches it down the same road. |
+| `isolated` | The tools a command finds there are the image's, not this machine's. |
+| `managed` | Started for the agent, and taken down with it. A machine that was already running is never `managed` — nobody here brought it up, so nobody here may take it down. |
+| `linux` / `darwin` | The platform it runs. |
+
+One of those is not the setting's to promise. The platform of a machine that was **already
+running** is whatever it turns out to be, and nothing knows it until something has connected —
+so it is read from the handshake instead, and the *machine* is where the two answers meet:
+
+```python
+machine = AnchoredConfig(anchor=anchor).create()
+machine.capabilities              # {"remote"} -- nothing has been asked yet
+machine.observe(machine.start())  # {"remote", "linux"} -- and the machine said the second
+```
+
+`observe` asks what `hmz.coganchor.check` asks — the handshake, and then the workspace — so it
+raises `OSError` for a machine that cannot be reached *or* has not got the directory the anchor
+names, which is the same bar `start` is held to.
+
+A machine whose handshake contradicts what its setting promised **fails to start**, naming the
+capability it could not serve:
+
+```text
+the machine at docker://humanize-4f2a cannot serve linux: it says it is darwin
+```
+
+And the anchor answers the other half of the question — not where the work lands but how a
+turn reaches it, which is a fact about the road rather than about the machine:
+
+```python
+AnchorConfig(target="ssh://build-box").capabilities  # {"anchor:supervised"}
+```
+
 ## Choosing between them
 
 | You want | Use |
@@ -263,6 +309,10 @@ from hmz.machines import MachineBase, MachineConfig
 class PodmanConfig(MachineConfig):
     image: str = "python:3.12"
 
+    @property
+    def capabilities(self) -> frozenset[str]:
+        return frozenset({"remote", "isolated", "managed", "linux"})
+
     def create(self) -> "Podman":
         return Podman(self)
 
@@ -270,7 +320,13 @@ class Podman(MachineBase):
     _config: PodmanConfig
 
     def start(self) -> AnchorConfig:
-        ...  # bring it up, and answer with the anchor that reaches it
+        anchor = ...  # bring it up, and answer with the anchor that reaches it
+        try:
+            self.observe(anchor)  # have it confirm the platform declared above
+        except BaseException:
+            self.stop()  # a refusal must not strand what start() just brought up
+            raise
+        return anchor
 
     def stop(self) -> None:
         ...  # take down what start() brought up; leave the workspace behind
@@ -280,7 +336,9 @@ They are two classes because one config drives as many agents as it is given to,
 them gets a machine of its own. `start` must take down whatever it created if it cannot finish;
 `stop` is called once per machine that was started and never for one that was not, so it only
 has to answer for what `start` got as far as creating. `stop` has a do-nothing default, which is
-what `AnchoredConfig` uses.
+what `AnchoredConfig` uses. `capabilities` has a default too — the empty set, so a machine that
+says nothing comes to nothing rather than to everything it never denied — and `observe` is on
+`MachineBase` for every machine that has an anchor to ask.
 
 The contract is `specs/machines.md`.
 
@@ -288,8 +346,9 @@ The contract is `specs/machines.md`.
 
 ```python
 from hmz.machines import (
-    MachineConfig,   # the setting: .create() -> MachineBase
-    MachineBase,     # the machine: .start() -> AnchorConfig, .stop() -> None
+    MachineConfig,   # the setting: .capabilities, .create() -> MachineBase
+    MachineBase,     # the machine: .start() -> AnchorConfig, .stop() -> None,
+                     #              .capabilities, .observe(anchor)
     AnchoredConfig,  # a machine that is already running
     Anchored,
     DockerConfig,    # a container started for the agent

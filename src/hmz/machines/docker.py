@@ -19,7 +19,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from hmz.coganchor import AnchorConfig, check
+from hmz.coganchor import AnchorConfig
 
 from .base import MachineBase, MachineConfig
 
@@ -46,6 +46,20 @@ class DockerConfig(MachineConfig):
 
     image: str = "python:3.12"
     workspace: str | None = None
+
+    @property
+    def capabilities(self) -> frozenset[str]:
+        """`remote`, `isolated`, `managed` and `linux`.
+
+        `isolated` because the tools a command finds there are the image's rather than this
+        machine's, which is the whole of what a container is reached for. `managed` because
+        the container is started for the agent and goes down with it -- which is what tells a
+        machine anybody here may take down from one nobody here may. And `linux` because a
+        container of an image is a Linux userland whatever the daemon happens to be running
+        on, which is the one of the four the machine itself can contradict: :meth:`Docker.start`
+        asks it, and refuses a container that says otherwise.
+        """
+        return frozenset({"isolated", "linux", "managed", "remote"})
 
     def create(self) -> Docker:
         """Builds the backend, without starting a container yet."""
@@ -77,7 +91,8 @@ class Docker(MachineBase):
           FileNotFoundError: If there is no workspace directory to give the container, or no
             `docker` to give it to.
           RuntimeError: If the container cannot be started -- an image with no `python3` in it
-            is refused here. What docker said is attached.
+            is refused here. What docker said is attached. Or if what came up is not the
+            machine these settings promised, which names the capability it could not serve.
           OSError: If the container cannot serve the workspace it was mounted, which is a turn
             that would fail on its first file, reported before the first turn instead.
         """
@@ -140,7 +155,10 @@ class Docker(MachineBase):
                 workspace=workspace,
                 shadow=str(Path(self._mirror.name) / "shadow"),
             )
-            check(anchor)  # raises unless it is the workspace we mounted that it serves
+            # Raises unless it is the workspace we mounted that it serves, and unless the
+            # container is the machine this config promised -- one handshake answering both,
+            # since what a target says of itself comes back with the workspace either way.
+            self.observe(anchor)
         except BaseException:
             self.stop()
             raise

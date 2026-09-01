@@ -91,6 +91,27 @@ class AnchorConfig:
                     f"unsupported redirect {'='.join(pair)!r}; expected two absolute paths"
                 )
 
+    @property
+    def capabilities(self) -> frozenset[str]:
+        """What reaching a turn through this anchor comes to.
+
+        The other half of what a place answers for. A machine's own settings say *where* the
+        work lands -- somewhere else, somewhere isolated, somewhere started for the agent --
+        and this says *how* a turn gets there, which is a fact about the anchor rather than
+        about the machine: the same machine reached two ways is two different sets of things
+        a turn may be asked to do.
+
+        Today there is one way and :func:`connect` is it, so `anchor:supervised` is the whole
+        answer: the agent runs here under coganchor's supervisor, and every file it opens and
+        every command it spawns is answered from the target. Further ways name themselves
+        here as they arrive, each under `anchor:` and its own name, so that a flow needing one
+        asks for it by name instead of inferring it from a target.
+
+        Returns:
+          The names reaching this anchor answers to.
+        """
+        return frozenset({"anchor:supervised"})
+
     def command(
         self,
         argv: Sequence[str],
