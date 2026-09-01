@@ -303,8 +303,9 @@ def read_agent(spec: str) -> tuple[str, backends.Profile, str, str, str]:
     """Reads and validates one command-line agent specification.
 
     The grammar itself is `hmz.backends.read`, an agent being a backend before it is anything
-    else. This is where the command line and the terminal interface both reach it, so that
-    one agent is read one way wherever it was written.
+    else. This is the name the line's own reading of one goes by, kept because that is what
+    the spec calls it -- and holding nothing of its own, since everything it used to check
+    moved into the grammar when the written-out spelling went.
 
     Args:
       spec: One agent, as `-a` spells one. An `-a` naming several is split into them first.

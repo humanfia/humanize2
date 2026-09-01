@@ -170,13 +170,16 @@ def test_the_names_a_backend_serves_are_derived_from_its_own_facts() -> None:
         preloads="NODE_OPTIONS",
         bundles=(Bundled(path="dist/*/cli.js", says="spawnSync("),),
     )
+    # `bundles` is set on this profile and names nothing: what a fingerprint says is that a
+    # patch could be found in what the CLI shipped, which the bytes on this machine decide
+    # rather than the table -- so it is read back where a turn takes that road, not promised
+    # here where a flow could ask for it and be given nothing.
     assert full.tags() == {
         "swarm",
         "search",
         "fork",
         "anchor:hooked",
         "anchor:preloaded",
-        "anchor:patched",
     }
 
 
@@ -216,19 +219,19 @@ def test_an_anchor_nothing_serves_is_left_out_rather_than_read_as_everybodys() -
     # An empty backend set means every backend here, so a way in that has not been built
     # must not be listed at all, and one only some of them serve must be listed with exactly
     # those. The two universal ones always are: every backend is a command line spawned here,
-    # and what a spawned turn runs is what an anchor traces. The other three are served by the
-    # CLIs whose profile says so, and are listed against exactly those.
+    # and what a spawned turn runs is what an anchor traces. The other two are served by the
+    # CLIs whose profile says so, and are listed against exactly those. There is no
+    # `anchor:patched`: nothing takes a turn down that road yet, and a name here would be one
+    # a flow could ask for and pass.
     assert set(told) == {
         "anchor:native-cli",
         "anchor:supervised",
         "anchor:hooked",
-        "anchor:patched",
         "anchor:preloaded",
     }
     assert told["anchor:native-cli"].backends == frozenset()
     assert told["anchor:supervised"].backends == frozenset()
     assert told["anchor:hooked"].backends == frozenset({"claude", "qwen"})
-    assert told["anchor:patched"].backends == frozenset({"claude", "opencode"})
     assert told["anchor:preloaded"].backends == frozenset(
         {"kimi", "mimo", "pi", "qwen"}
     )

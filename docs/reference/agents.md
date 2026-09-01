@@ -1791,9 +1791,15 @@ standalone executable: the whole CLI, its JavaScript minified and packed into on
 `---- Bun! ----` trailer, runtime and all. Where a shallower way in cannot reach a thing they
 do, `hmz.agents.patching` reaches it by rewriting that bundle — and, because doing so is brittle
 by construction, is careful about it. This is the deepest of the ways humanize reaches a CLI's
-own commands, named `anchor:patched` in the [catalogue](/reference/flows#the-catalogue), and it
-reaches these two backends and no other: the agents shipped as native binaries carry no bundle
-to patch, and the plain Node scripts are reached from their runtime instead.
+own commands, and it reaches these two backends and no other: the agents shipped as native
+binaries carry no bundle to patch, and the plain Node scripts are reached from their runtime
+instead.
+
+It is a mechanism rather than a road a turn takes, and the catalogue names no capability for
+it. Whether a patch can be found is decided by the bytes installed on this machine rather than
+by the fingerprint written down, so it is read back where it is used — the way a machine's
+platform is read off the handshake rather than promised by its settings — and a flow cannot
+ask for it until a turn actually goes that way.
 
 ```python
 from pathlib import Path

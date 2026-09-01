@@ -62,8 +62,15 @@ class DockerConfig(MachineConfig):
         container of an image is a Linux userland whatever the daemon happens to be running
         on, which is the one of the four the machine itself can contradict: :meth:`Docker.start`
         asks it, and refuses a container that says otherwise.
+
+        And the road, for the reason an anchored place says it: a container is reached by an
+        anchor like any other target, and this is the one place in humanize certain of which
+        anchor it will be -- :meth:`Docker.start` builds a supervised one every time.
         """
-        return frozenset({"isolated", "linux", "managed", "remote"})
+        return (
+            frozenset({"isolated", "linux", "managed", "remote"})
+            | AnchorConfig().capabilities
+        )
 
     def create(self) -> Docker:
         """Builds the backend, without starting a container yet."""

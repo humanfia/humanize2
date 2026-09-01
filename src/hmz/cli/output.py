@@ -35,7 +35,6 @@ from typing import TYPE_CHECKING, Any, Self
 from . import many
 
 if TYPE_CHECKING:
-    from argparse import ArgumentParser
     from collections.abc import Callable, Iterable
     from types import TracebackType
     from typing import IO
@@ -46,36 +45,7 @@ if TYPE_CHECKING:
     from hmz.agents import AgentBase, Event
     from hmz.agents.base import SessionBase
 
-__all__ = ["Out", "Shown", "asked_as_json", "colours", "reads_json", "terminal"]
-
-
-def reads_json(parser: ArgumentParser, about: str) -> None:
-    """Offers `--json` on one command, spelled the way every command spells it.
-
-    Here rather than at each of them because it is one flag: how it is written and what it is
-    read back under are facts about humanize's command line rather than about whichever
-    command is offering it, and a copy of them beside every subcommand that offers one is a
-    place apiece for one of them to drift.
-
-    Args:
-      parser: The command, or the subcommand, that offers it.
-      about: What that command answers with when it is on, in its own words -- one object a
-        line for a listing, one whole object for a question with one answer.
-    """
-    parser.add_argument("--json", action="store_true", dest="as_json", help=about)
-
-
-def asked_as_json(args: object) -> bool:
-    """Whether the line asked for objects, for a command whose subcommands need not offer it.
-
-    Args:
-      args: What argparse read the line into.
-
-    Returns:
-      Whether a program is reading, and False for a subcommand that does not offer the flag
-      at all -- one that answers with nothing to read.
-    """
-    return bool(getattr(args, "as_json", False))
+__all__ = ["Out", "Shown", "colours", "terminal"]
 
 
 #: The bullet a thing an agent said is set on, and the star a turn is closed with. The same
