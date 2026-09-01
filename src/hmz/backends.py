@@ -717,6 +717,10 @@ PROFILES = (
         # the file is named for its version -- `versions/2.1.269` -- and the one that is the
         # resolved program is the one taken.
         bundles=(Bundled(path="*", says='VERSION:"2.1.269"'),),
+        # `--settings` takes the whole of a settings file as a JSON literal on the command
+        # line, hooks and all, for the length of one run -- which is the table this flow's
+        # own moments are put in without a line of anybody's `settings.json` being written.
+        hooks=Hooked(seam="flag", name="--settings"),
         aliases=("claude", "claude-code"),
         home_var="CLAUDE_CONFIG_DIR",
         home_dir=".claude",
@@ -1297,6 +1301,10 @@ PROFILES = (
         searches=True,
         # `--fork-session`, which it takes alongside `--resume` and nowhere else.
         forks=True,
+        # The same variable its effort is already said through: the system settings layer,
+        # read for one process and outranking what the person who started the flow has
+        # configured. Its `hooks` block is the one Claude Code wrote, spelled the same way.
+        hooks=Hooked(seam="env", name="QWEN_CODE_SYSTEM_SETTINGS_PATH"),
         aliases=("qwen", "qwen-code"),
         home_var="QWEN_HOME",
         home_dir=".qwen",

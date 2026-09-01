@@ -180,23 +180,23 @@ def test_the_names_a_backend_serves_are_derived_from_its_own_facts() -> None:
     }
 
 
-def test_only_the_layers_nobody_has_written_yet_are_still_empty() -> None:
-    """Two layers have landed and one has not, and each says which backends it reaches.
+def test_each_layer_names_exactly_the_backends_it_reaches() -> None:
+    """All three layers are built now, and each says which CLIs it reaches and no more.
 
-    The patched layer reaches the two CLIs shipped as one Bun file; the preload layer reaches
-    the four whose CLI is a plain Node script. The hook layer's unit has not landed, so it is
-    still written down nowhere -- which is the thing worth asserting, since a layer half
-    filled in would read as a backend that quietly gained one.
+    The hooked layer names the CLIs that take a hook table meant for a single run rather than
+    every CLI that happens to have hooks at all; the preload layer, the four whose CLI is a
+    plain Node script; the patched layer, the two shipped as one Bun file. A layer half filled
+    in would read as a backend that had quietly gained one, which is what this refuses.
     """
-    assert {one.name for one in PROFILES if one.bundles} == {"claude", "opencode"}
+    assert {one.name for one in PROFILES if one.hooks is not None} == {"claude", "qwen"}
     assert {one.name for one in PROFILES if one.preloads} == {
         "kimi",
         "mimo",
         "pi",
         "qwen",
     }
+    assert {one.name for one in PROFILES if one.bundles} == {"claude", "opencode"}
     for one in PROFILES:
-        assert one.hooks is None, one.name
         if one.bundles:
             # Every bundle written down fingerprints on a line rather than a path alone.
             assert all(bundle.says for bundle in one.bundles), one.name
@@ -216,17 +216,18 @@ def test_an_anchor_nothing_serves_is_left_out_rather_than_read_as_everybodys() -
     # An empty backend set means every backend here, so a way in that has not been built
     # must not be listed at all, and one only some of them serve must be listed with exactly
     # those. The two universal ones always are: every backend is a command line spawned here,
-    # and what a spawned turn runs is what an anchor traces. The patched layer is served by
-    # the two Bun bundles and the preload layer by the four Node scripts, so each is listed
-    # against exactly those; the hook layer is not built yet and is absent.
+    # and what a spawned turn runs is what an anchor traces. The other three are served by the
+    # CLIs whose profile says so, and are listed against exactly those.
     assert set(told) == {
         "anchor:native-cli",
         "anchor:supervised",
+        "anchor:hooked",
         "anchor:patched",
         "anchor:preloaded",
     }
     assert told["anchor:native-cli"].backends == frozenset()
     assert told["anchor:supervised"].backends == frozenset()
+    assert told["anchor:hooked"].backends == frozenset({"claude", "qwen"})
     assert told["anchor:patched"].backends == frozenset({"claude", "opencode"})
     assert told["anchor:preloaded"].backends == frozenset(
         {"kimi", "mimo", "pi", "qwen"}
