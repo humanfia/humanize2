@@ -222,9 +222,3 @@ __marimo__/
 
 
 .humanize/
-*.trace.json
-
-# The concurrency benchmark: a harness, its fixtures, and megabytes of retained
-# per-turn evidence. Kept on disk where it is run, out of the history where it would
-# outweigh the source it measures.
-bench/
