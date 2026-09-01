@@ -201,7 +201,7 @@ def test_an_exec_line_leaves_goals_to_the_flow(tmp_path: Path) -> None:
     """The line names a CLI, a model and an effort; the flow says what the work is."""
     where = _written(tmp_path, GOALS_OFF, "goals_off")
 
-    _, agents, _, _, _, _ = flow_and_agents(
+    _, agents, _, _, _ = flow_and_agents(
         ["-f", where, "-a", "claude/m:low", "the task"]
     )
     assert agents[0].config.goals is True

@@ -105,7 +105,7 @@ def _exec(argv: list[str]) -> int:
     # If it has been answered yes, and never otherwise: a run with nobody at a terminal is a
     # run with nobody to ask, and silence is not an answer.
     hmz.reports()
-    path, agents, task, config, container, as_json = hmz.read(argv)
+    path, agents, task, config, as_json = hmz.read(argv)
     with Out(as_json=as_json) as out, Shown(out) as shown:
         # The agents the line named, and not whatever else the flow turns out to drive: a
         # flow whose other side is the person drives one more, and with nobody at a prompt
@@ -113,7 +113,7 @@ def _exec(argv: list[str]) -> int:
         # only thing on the terminal that is about humanize rather than about the run.
         shown.watches(agents)
         try:
-            running = hmz.run(path, agents, task, config, container=container)
+            running = hmz.run(path, agents, task, config)
         except NotAFlow as error:
             # A flow that is not there, or one that takes other agents than these, is a
             # command line that was wrong before anything ran, so it exits as argparse's own
@@ -295,10 +295,10 @@ def _line() -> ArgumentParser:
         action="append",
         default=[],
         dest="agents",
-        metavar="CLI/MODEL:EFFORT",
-        help="what one of that flow's agents runs, repeated once for each it drives, in the "
-        "order it takes them; the written-out form may include service_tier=SERVICE_TIER; "
-        "needs -f",
+        metavar="SPEC[,SPEC...]",
+        help="what that flow's agents run, as CLI[@PROVIDER]/MODEL:EFFORT -- several to one "
+        "option, separated by commas, and the option repeated as often as suits, in the "
+        "order the flow takes them; needs -f",
     )
     parser.add_argument(
         "-c",
@@ -376,7 +376,8 @@ def runs_of(parser: ArgumentParser, flow: str, agents: Sequence[str]) -> list[Ru
     Args:
       parser: The line, for reporting one to correct.
       flow: The flow they are to drive, or "" for a line that named none.
-      agents: What each of them runs, as `-a` spells one.
+      agents: What they run, as `-a` spells them -- one option apiece or several to an
+        option, separated by commas.
 
     Returns:
       One apiece, in the order the flow takes them, and nothing at all for a line that named
@@ -395,23 +396,35 @@ def runs_of(parser: ArgumentParser, flow: str, agents: Sequence[str]) -> list[Ru
     if not flow:
         parser.error("-a says what runs the flow, so it needs -f")
     hmz = Hmz()
+    # One `-a` may name several, as it may on `hmz exec`: one grammar reads one agent, and a
+    # line that had to be broken up differently depending on which way in it was typed on
+    # would be two grammars for one option.
+    given = [spec for said in agents for spec in said.split(",")]
     # Read for nothing but the refusal: what an agent is travels in the spec and is read
     # again where the agent is made, and a line that says what the flow says is a line to
     # correct here rather than one the run finds out about.
-    for spec in agents:
+    for spec in given:
         try:
-            read_agent(spec)
+            place, *_ = read_agent(spec)
         except ValueError as bad:
             parser.error(f"bad agent {spec!r}: {bad}")
+        if place:
+            # `hmz exec` is where an agent names the place it fills. Here the flow is opened
+            # rather than run, and which place each agent fills is the interface's own to
+            # show and to change, so a name on this line is one nothing would read again.
+            parser.error(
+                f"bad agent {spec!r}: {place}= is for `hmz exec`; the interface takes them "
+                "in the order the flow does, and says which is which itself"
+            )
     try:
         places = hmz.flows.places(flow)
     except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
         parser.error(str(why))
-    if len(places) != len(agents):
-        parser.error(f"{flow} drives {len(places)} agents, {len(agents)} given")
+    if len(places) != len(given):
+        parser.error(f"{flow} drives {len(places)} agents, {len(given)} given")
     # Nothing is said here about goals, the rung or the web: the flow says all three, and
     # `Runner` settles them onto the agents before the first turn.
-    return [Runs(spec) for spec in agents]
+    return [Runs(spec) for spec in given]
 
 
 def opens(
