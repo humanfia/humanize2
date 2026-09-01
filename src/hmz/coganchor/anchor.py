@@ -274,6 +274,11 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
 
     link = transport.connect(target, [export], config.token)
     client = RemoteClient(link.channel)
+    # How the target spells a path is the target's to say -- a Mac reaches `/tmp` through
+    # `/private/tmp` and does not tell `A` from `a` -- and it says so at the handshake, which
+    # happens once the agent is forked and stopped, after these settings are read. So the
+    # router is given the question rather than the answer, and asks when a path needs routing.
+    router.platform = lambda: str(client.info.get("platform", ""))
     netproxy = NetProxy(client, config.net_allow) if config.net == "remote" else None
     # The mirror fills itself in as the agent looks at things, and the one directory it
     # cannot be asked about first is the one the agent is started in: the `chdir` happens in

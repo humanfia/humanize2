@@ -23,6 +23,13 @@ Inside the workspace it sees the target: the same file names, contents, sizes,
 modes and timestamps, at the same paths. A failure answers with the target's
 own error, not a local approximation of it.
 
+Where the target spells a path more than one way, every spelling of it reaches
+the same file. A Mac reaches `/tmp`, `/var` and `/etc` through `/private`, and
+ignores case unless it was formatted not to, so the paths a command there hands
+back are not always the paths the workspace was named with. A path outside the
+workspace is untouched by this: it belongs to this machine, and is answered as
+this machine answers it.
+
 Except where a path is answered with another: a credential the agent names is
 the one it is given instead, and a syscall that cannot be given it fails rather
 than reading the one it named.

@@ -43,6 +43,7 @@ from dataclasses import dataclass, field
 from typing import IO, Any, cast
 
 __all__ = [
+    "CASE_INSENSITIVE",
     "CHUNK_SIZE",
     "PLATFORMS",
     "PROTOCOL_VERSION",
@@ -54,7 +55,10 @@ __all__ = [
     "RemoteOSError",
     "Stream",
     "hello_capabilities",
+    "path_key",
+    "path_within",
     "rewrite_path_prefix",
+    "spelled_twice",
 ]
 
 PROTOCOL_VERSION = 1
@@ -117,6 +121,13 @@ class Op(enum.Enum):
 #: so on the wire all the same; it is simply not one of the names anything here asks after,
 #: and inventing one for it would be answering a question nobody can check.
 PLATFORMS = frozenset({"darwin", "linux"})
+
+#: The platforms whose filesystem does not tell ``A`` from ``a``.  APFS is formatted that way
+#: unless somebody asked for the other, so a Mac is one of them and a Linux machine is not.
+#: A volume formatted against its platform's habit is not named here and cannot be: the only
+#: way to know how a filesystem compares two names is to ask that filesystem, one round trip
+#: per path, and the habit holds on every volume nobody went out of their way to change.
+CASE_INSENSITIVE = frozenset({"darwin"})
 
 
 def hello_capabilities(said: dict[str, Any]) -> frozenset[str]:
@@ -329,24 +340,154 @@ class Channel:
         return chunks[0] if len(chunks) == 1 else b"".join(chunks)
 
 
+#: The directories a Mac keeps under ``/private`` and reaches through a symlink at the root.
+#: Nothing else there is aliased, so nothing else is folded: ``/private`` is an ordinary
+#: directory name on a machine that is not a Mac, and a path that merely begins with it must
+#: come back the way it went in.
+_ALIASED = ("etc", "tmp", "var")
+
+#: The same three under the name a Mac keeps them at.
+_ALIASES = tuple(f"/private/{name}" for name in _ALIASED)
+
+_PRIVATE = re.compile(rf"^/private(?=/(?:{'|'.join(_ALIASED)})(?:/|$))")
+
+
+def path_key(path: str, *, fold_case: bool = False) -> str:
+    """The one spelling of a path that two machines can be held to.
+
+    Two things make the same directory reach the two halves of a session under two names, and
+    both of them are a Mac's.  ``/etc``, ``/tmp`` and ``/var`` are symlinks into ``/private``
+    there, so one end normalising a path and the other resolving it legitimately disagree --
+    that one is folded here for everybody, because the machine that produced the other
+    spelling is the one this end cannot see.  And APFS ignores case unless it was formatted
+    not to, so ``/Users/me`` and ``/users/me`` are one directory and not one string; that one
+    is ``fold_case``, and it is the caller's to decide, because only the end holding the
+    filesystem knows how it compares.  Which is why this stays pure: the rule is shared, the
+    platform it is applied for is not.
+
+    A folded *case* is a key to compare and never a path to act on -- opening or creating it
+    would name something else on a filesystem that does tell ``A`` from ``a``.  Left uncased
+    the result is still a real path, the same directory under its other name, which is what
+    lets the supervising half fold a path as it reads it out of a traced process and mirror
+    the folded one.
+
+    The alias is matched as a Mac writes it, in lower case, and as whole segments:
+    ``/PRIVATE/tmp`` and ``/private/various`` are left alone.  Missing the first of those is
+    a miss rather than a mistake -- nothing on a Mac produces that spelling, and a path left
+    alone is answered by the machine that holds it.
+
+    Args:
+      path: An absolute path, as either machine spells it.
+      fold_case: Whether the filesystem holding it ignores case.
+
+    Returns:
+      The spelling to compare against another produced the same way.
+    """
+    folded = _PRIVATE.sub("", path)
+    return folded.casefold() if fold_case else folded
+
+
+def path_spellings(path: str) -> tuple[str, ...]:
+    """Every name this exact directory answers to, the one it was given first.
+
+    One name for nearly everywhere, and two for the three a Mac aliases -- ``/tmp`` and
+    ``/private/tmp`` are one directory written twice.  A caller translating *text* needs
+    both, because an argument is matched by its characters and the agent may have been
+    handed either.
+    """
+    folded = path_key(path)
+    if folded != path:  # Given the long way round; the short one is the other name.
+        return (path, folded)
+    aliased = f"/private{path}"
+    if path_key(aliased) != aliased:
+        return (path, aliased)
+    return (path,)
+
+
+def spelled_twice(path: str) -> bool:
+    """Whether this directory *or anything under it* can be reached under a second name.
+
+    Asked of a root rather than of a path, which is why it looks downwards as well: a
+    mirror at ``/`` holds ``/private/tmp/x`` and ``/tmp/x`` both, and a session told it had
+    nothing to settle would settle neither.  False for an ordinary root, which is what lets
+    such a session skip the work of settling spellings at all.
+
+    Case is not asked about here: that is a property of the filesystem rather than of any
+    one path on it, and the end holding it answers for it.
+    """
+    root = path.rstrip("/")
+    return len(path_spellings(root)) > 1 or any(
+        alias.startswith(f"{root}/") for alias in _ALIASES
+    )
+
+
+def path_within(path: str, root: str, *, fold_case: bool = False) -> str | None:
+    """The part of ``path`` that lies below ``root``, or ``None`` if it does not.
+
+    The comparison both halves route by, in one place so that they route alike.  An empty
+    string means the two name the same directory, which a caller joining the answer onto
+    somewhere else must tell apart from ``None``.
+
+    The piece returned is cut from ``path`` and not from its key, so it comes back spelled as
+    whoever named it spelled it: a suffix is a name on a filesystem, and handing back a
+    case-folded one would be handing back a file nobody asked for.  Cutting it means the two
+    are measured before they are folded, so a root whose case-folding is a different length
+    from itself -- ``ß`` folds to ``ss`` -- does not match.  That is a refusal rather than a
+    wrong answer, and the alternative is guessing where the fold put the boundary.
+
+    Args:
+      path: The path being placed.
+      root: The directory it may lie in.
+      fold_case: Whether the filesystem holding them ignores case.
+
+    Returns:
+      The path relative to ``root``, or ``None`` when it is somewhere else entirely.
+    """
+    below = path_key(path)
+    above = path_key(root).rstrip("/")
+    if not above:  # The root holds everything there is.
+        return below.lstrip("/")
+    head, tail = below[: len(above)], below[len(above) :]
+    if _cased(head, fold=fold_case) != _cased(above, fold=fold_case):
+        return None
+    if not tail:
+        return ""
+    return tail.lstrip("/") if tail.startswith("/") else None
+
+
+def _cased(text: str, *, fold: bool) -> str:
+    return text.casefold() if fold else text
+
+
 #: Characters that can precede or follow a path inside a command line.
 _BOUNDARY = r"\s'\"=:,;()\[\]<>|&"
 
 
 @functools.lru_cache(maxsize=64)
-def _prefix_pattern(prefix: str) -> re.Pattern[str]:
+def _prefix_pattern(prefix: str, *, insensitive: bool) -> re.Pattern[str]:
     return re.compile(
-        rf"(?:^|(?<=[{_BOUNDARY}])){re.escape(prefix)}(?=[/{_BOUNDARY}]|$)"
+        rf"(?:^|(?<=[{_BOUNDARY}])){re.escape(prefix)}(?=[/{_BOUNDARY}]|$)",
+        re.IGNORECASE if insensitive else re.NOFLAG,
     )
 
 
-def rewrite_path_prefix(text: str, prefix: str, replacement: str) -> str:
+def rewrite_path_prefix(
+    text: str, prefix: str, replacement: str, *, insensitive: bool = False
+) -> str:
     """Replace ``prefix`` with ``replacement`` where it names a path.
 
     Both machines must agree on this translation, so it lives beside the
     protocol.  Matches are anchored to token boundaries: ``/w`` is rewritten in
     ``cat /w/f`` but not in ``echo hello/world`` or ``--flag=/wide``.
+
+    ``insensitive`` is for a target whose filesystem ignores case, where an argument naming
+    the directory in some other case names the same directory and has to be translated all
+    the same.  It is off by default, because on a filesystem that does distinguish them a
+    prefix in the wrong case names somewhere else and rewriting it would send a command to a
+    directory nobody asked for.
     """
-    if prefix == replacement or prefix not in text:
+    if prefix == replacement or (not insensitive and prefix not in text):
         return text
-    return _prefix_pattern(prefix).sub(replacement.replace("\\", "\\\\"), text)
+    return _prefix_pattern(prefix, insensitive=insensitive).sub(
+        replacement.replace("\\", "\\\\"), text
+    )
