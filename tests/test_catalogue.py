@@ -181,10 +181,14 @@ def test_the_names_a_backend_serves_are_derived_from_its_own_facts() -> None:
 
 
 def test_no_backend_has_been_given_a_layer_that_is_not_written_yet() -> None:
-    """The schema the anchors are read out of is laid down empty, and is still empty."""
+    """The layers with nothing behind them yet are still empty; the preload is not one.
+
+    Which CLIs take a preload is `hmz.agents.preload`'s to have filled in, and is checked
+    where that layer is -- here, what is checked is that the two nobody has written are
+    still written down nowhere.
+    """
     for one in PROFILES:
         assert one.hooks is None, one.name
-        assert not one.preloads, one.name
         assert not one.bundles, one.name
 
 
@@ -200,8 +204,16 @@ def test_the_catalogue_names_where_an_agents_turns_may_land() -> None:
 def test_an_anchor_nothing_serves_is_left_out_rather_than_read_as_everybodys() -> None:
     told = {one.name: one for one in catalogue() if one.name.startswith("anchor:")}
     # An empty backend set means every backend here, so a way in that has not been built
-    # must not be listed at all. These two are: every backend is a command line spawned
-    # here, and what a spawned turn runs is what an anchor traces.
-    assert set(told) == {"anchor:native-cli", "anchor:supervised"}
-    for one in told.values():
-        assert one.backends == frozenset()
+    # must not be listed at all, and one only some of them serve must be listed with exactly
+    # those. These two are everybody's: every backend is a command line spawned here, and
+    # what a spawned turn runs is what an anchor traces.
+    assert told["anchor:native-cli"].backends == frozenset()
+    assert told["anchor:supervised"].backends == frozenset()
+    assert told["anchor:preloaded"].backends == frozenset(
+        {"kimi", "mimo", "pi", "qwen"}
+    )
+    assert set(told) == {
+        "anchor:native-cli",
+        "anchor:supervised",
+        "anchor:preloaded",
+    }

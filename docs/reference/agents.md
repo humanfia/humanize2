@@ -870,6 +870,73 @@ A flow says which moments it needs where it declares the agents it drives, and i
 its first turn if it was given one that cannot run them — see
 [Flows](/reference/flows#asking-for-an-agent-that-can-do-something).
 
+### What the runtime says the turn did
+
+Four of these CLIs are Node programs — `kimi`, `qwen`, `mimo` and `pi` — and Node reads
+`NODE_OPTIONS` before it reads the program. So humanize can be inside the process before the CLI
+has run a line, and from in there the calls a turn actually makes are functions to patch. Hang a
+hook on `PRE_TOOL_USE` and those backends report what their runtime did, as more occasions on the
+same moment:
+
+```python
+def watched(occasion: Occasion) -> None:
+    if occasion.tool == "spawn":
+        print("the turn ran:", occasion.about)
+
+agent.hooks.on(Moment.PRE_TOOL_USE, watched, tool="spawn")
+```
+
+`occasion.tool` is what the runtime did rather than a tool the CLI has — `spawn`, `read`,
+`write`, `connect`, and `quiet` for a process that has said all it is going to — and
+`occasion.about` is the command line, the path or the `host:port`. A hook hung on one of the
+CLI's own tools never sees them, and `tool="spawn"` is how to ask for only these.
+
+They are **told rather than asked**. This layer is behind the call it is reporting, so a refusal
+would be refusing something that has already happened, and nothing acts on the verdict. A flow
+that means to *stop* an agent doing something hangs its hook where the CLI asks first —
+[`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment).
+
+Nothing is switched on unless a hook is hung: an agent nobody is listening to has no socket, no
+thread and no patched runtime, and its turns are the turns they always were. Nothing is switched
+on for a turn that [lands on another machine](#where-the-turns-land) either — the file and the
+socket are paths on this one.
+
+**Hang the hook before the agent's first turn.** The question is asked where the CLI's process is
+started, so `qwen`, `pi` and `mimo` pick a hook hung later up on their next turn — but `kimi`
+runs one daemon for every session of an agent, started once, so a hook hung after that daemon is
+up gets nothing from it for as long as the agent lives.
+
+Two things to know before hanging an unfiltered hook on one of these four. There is **a lot** of
+it — a turn reads a couple of thousand files — so a hook that means to watch the CLI's own tools
+should say which tool it wants. And these occasions arrive **on a thread of their own**, the one
+reading the socket, while the turn's own occasions arrive on the turn's thread: a hook that
+writes to something the flow also touches answers for that itself, as a
+[watcher](#watching-a-turn-as-it-happens) does.
+
+What is watched is the **CLI**, not the process it started in and not everything under the turn.
+A Node program the agent itself runs — a package manager, a language server, a script it wrote —
+reports nothing: the agent running it was already reported by the `spawn` that ran it. But a CLI
+that re-execs *itself* is still the CLI, which is what qwen does, so the layer follows it there.
+
+| | `kimi` | `qwen` | `pi` | `mimo` |
+| --- | --- | --- | --- | --- |
+| What is watched | the daemon every session of the agent runs in | the launcher, and the bundle it re-execs itself as | the process the session is held open in | its launcher only — what that starts is a native binary, which reads none of this |
+
+The rest of the backends ship with a runtime compiled in — `claude` and `opencode` are Bun
+executables, `codex` and `grok` are native, `agy` is a compiled Deno — and there is nothing to
+load a file into. `backends.named(<backend>).preloads` is the variable each takes one through,
+and `anchor:preloaded` is the name a flow asks for the capability under.
+
+What the CLI reads and writes of its *own* install is not reported either — a bundle loading
+itself is not a turn doing anything — and neither is a call made on a file descriptor rather
+than a path, there being nothing in one that says which file it is.
+
+The preload never holds a turn up and never ends one. It fails open: a report that cannot be
+written is dropped, a socket that will not take one is put down, and anything that goes wrong
+inside it leaves the CLI running exactly as it would have run. A process that has said a hundred
+thousand things goes quiet, and says `quiet` once where it stopped; reports dropped because this
+process was reading too slowly are counted and said the same way, so a gap reads as a gap.
+
 ## Questions
 
 An agent may stop mid-turn to ask its user something. Set `ask` and it reaches you:
@@ -1363,6 +1430,7 @@ never `0.0`, for a model nobody lists, so a flow steering by money can tell *not
 | [`PERMISSION_REQUEST`](#not-every-backend-runs-every-moment) | no | yes | yes | no | no | no | no | no | no | no | yes |
 | [`SubagentStart`/`SubagentStop`](#not-every-backend-runs-every-moment) | no | yes | yes | yes | no | no | no | no | no | no | no |
 | [Callbacks as tools](#callbacks-of-the-flow-s-own) | no | `--mcp-config` | `-c mcp_servers…` | no | no | no | no | no | no | no | no |
+| [What its runtime says the turn did](#what-the-runtime-says-the-turn-did) | no | no | no | no | no | no | yes | yes | yes | `mimo` only, and only its launcher | no |
 | A turn held to a shape | `--json-schema` | `--json-schema` | `outputSchema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt | `--json-schema` | in the prompt | in the prompt |
 | Sub-agents in a trace | no | yes | yes | no | no | no | yes | no | no | no | no |
 

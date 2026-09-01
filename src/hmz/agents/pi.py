@@ -20,6 +20,7 @@ from hmz import home
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Question, Usage
+from .preload import preloaded
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
@@ -176,20 +177,23 @@ class PiSession(StreamSessionBase):
         return argv
 
     def _environment(self) -> Mapping[str, str]:
-        """What a turn is run with: what the provider sets, and where node may cache pi.
+        """What a turn is run with: the provider's, where node may cache pi, and the preload.
 
         Returns:
           Those variables. `NODE_COMPILE_CACHE` is left exactly as it was found where
           somebody has set one already -- whether the provider names it or this process was
           started with it, theirs is the cache they meant -- and is not set at all for a turn
           that lands somewhere else, since the path would name a directory on this machine
-          rather than on the one the turn runs on.
+          rather than on the one the turn runs on. The preload is there for an agent something
+          is listening to and absent otherwise, which :mod:`hmz.agents.preload` decides: pi
+          runs on Node, so what a turn of it runs, reads, writes and opens can be read from
+          inside the process taking it.
         """
-        added = super()._environment()
+        added = dict(super()._environment())
         chosen = added.get(_COMPILED) or os.environ.get(_COMPILED)
-        if chosen or self._agent.anchor is not None:
-            return added
-        return {**added, _COMPILED: str(home().joinpath(*_CACHE))}
+        if not chosen and self._agent.anchor is None:
+            added[_COMPILED] = str(home().joinpath(*_CACHE))
+        return preloaded(self._agent, added)
 
     def _write(self, text: str, ticket: str = "") -> str:
         """Renders one thing to say as the `prompt` command pi reads it as.
