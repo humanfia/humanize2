@@ -5,6 +5,12 @@ them reading somebody else's, and one written to run its tests in a container of
 image is not one to be pointed at a colleague's laptop instead. So a place says what it is --
 nothing, `Remote`, or an `Isolated` naming an image -- and everything else is refused before the
 first turn rather than discovered by a turn that landed somewhere surprising.
+
+What a flow needs *of* that place is said the same way and checked here too: `Needs(where=...)`
+names what the machine has to come to, and it is asked of the machine's settings rather than of
+a machine, so that a place which will not do is refused before an image has been pulled. What
+only a live handshake can answer is not asked here -- a machine that turns out not to be what
+its settings promised fails as it starts, and this file does not bring one up.
 """
 
 from __future__ import annotations
@@ -13,7 +19,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig, Isolated, Remote, anchored
+from hmz.agents import AgentConfig, Isolated, Needs, Remote, anchored
 from hmz.flows import NotAFlow, wanted
 from hmz.machines import DockerConfig
 from hmz.runner import Runner
@@ -38,6 +44,103 @@ class Agents(NamedTuple):
     builder: Annotated[AgentBase, Remote]
     tester: Annotated[AgentBase, Isolated("python:3.12")]
     reviewer: AgentBase
+
+
+@flow
+def run(agents: Agents, task: str) -> None:
+    pass
+'''
+
+#: A flow whose one agent may be sent away, and has to be: the work is not this machine's.
+ELSEWHERE = '''
+from typing import Annotated, NamedTuple
+
+from hmz.agents import AgentBase, Needs, Remote
+from hmz.flows import flow
+
+
+class Agents(NamedTuple):
+    """The one it drives, and what where it works has to come to."""
+
+    builder: Annotated[AgentBase, Remote, Needs(where=("remote",))]
+
+
+@flow
+def run(agents: Agents, task: str) -> None:
+    pass
+'''
+
+#: One whose work has to happen on a Linux machine nobody here has to have configured.
+CONTAINED = '''
+from typing import Annotated, NamedTuple
+
+from hmz.agents import AgentBase, Isolated, Needs
+from hmz.flows import flow
+
+
+class Agents(NamedTuple):
+    """The one it drives, in a container of the flow's own naming."""
+
+    tester: Annotated[
+        AgentBase, Isolated("python:3.12"), Needs(where=("isolated", "linux"))
+    ]
+
+
+@flow
+def run(agents: Agents, task: str) -> None:
+    pass
+'''
+
+#: One that needs a machine somebody here brought up, which an anchor onto one is not.
+MANAGED = '''
+from typing import Annotated, NamedTuple
+
+from hmz.agents import AgentBase, Needs, Remote
+from hmz.flows import flow
+
+
+class Agents(NamedTuple):
+    """The one it drives, somewhere this run may take down again."""
+
+    builder: Annotated[AgentBase, Remote, Needs(where=("managed",))]
+
+
+@flow
+def run(agents: Agents, task: str) -> None:
+    pass
+'''
+
+#: One whose container could never come to what it asks of it, which is a flow to correct.
+IMPOSSIBLE = '''
+from typing import Annotated, NamedTuple
+
+from hmz.agents import AgentBase, Isolated, Needs
+from hmz.flows import flow
+
+
+class Agents(NamedTuple):
+    """The one it drives, in a container that is asked to be a Mac."""
+
+    tester: Annotated[AgentBase, Isolated("python:3.12"), Needs(where=("darwin",))]
+
+
+@flow
+def run(agents: Agents, task: str) -> None:
+    pass
+'''
+
+#: One driven by an agent nobody points anywhere, whose work still has to land elsewhere.
+ANYWHERE_ELSE = '''
+from typing import Annotated, NamedTuple
+
+from hmz.agents import AgentBase, Needs, Remote
+from hmz.flows import flow
+
+
+class Agents(NamedTuple):
+    """The one it drives, somewhere that is not this machine."""
+
+    builder: Annotated[AgentBase, Remote, Needs(where=("remote",))]
 
 
 @flow
@@ -149,3 +252,93 @@ def test_what_a_flow_says_is_read_where_the_agents_are_chosen(tmp_path: Path) ->
     places = wanted(_flow(tmp_path, PLAIN))
 
     assert [place.where for place in places] == [None]
+
+
+def test_a_place_that_needs_a_machine_is_refused_an_agent_pointed_nowhere(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """This machine comes to nothing at all, so anything asked of where the work lands fails."""
+    monkeypatch.chdir(tmp_path)
+    flow = _flow(tmp_path, ELSEWHERE)
+
+    with pytest.raises(NotAFlow, match="comes to remote, which this machine does not"):
+        Runner(flow, [ShellAgent(CONFIG)])
+
+
+def test_a_place_that_needs_a_machine_takes_one_that_comes_to_what_it_asked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The other half: the settings already say `remote`, and nothing had to be reached."""
+    monkeypatch.chdir(tmp_path)
+    flow = _flow(tmp_path, ELSEWHERE)
+    builder = ShellAgent(
+        AgentConfig(model="m", effort="high", machine=anchored("ssh://elsewhere"))
+    )
+
+    Runner(flow, [builder])  # which is the whole assertion: it is not refused
+
+
+def test_a_place_is_refused_a_machine_whose_settings_do_not_promise_what_it_needs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nobody here started the machine an anchor names, so nobody here may take it down."""
+    monkeypatch.chdir(tmp_path)
+    flow = _flow(tmp_path, MANAGED)
+    builder = ShellAgent(
+        AgentConfig(model="m", effort="high", machine=anchored("ssh://elsewhere"))
+    )
+
+    with pytest.raises(
+        NotAFlow, match="comes to managed, which the machine it works on does not"
+    ):
+        Runner(flow, [builder])
+
+
+def test_the_container_a_flow_named_comes_to_what_that_flow_needs_of_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Settled and then checked, so a place the flow put in a container is checked in one."""
+    monkeypatch.chdir(tmp_path)
+    flow = _flow(tmp_path, CONTAINED)
+    tester = ShellAgent(CONFIG)
+
+    Runner(flow, [tester])
+
+    assert isinstance(tester.config.machine, DockerConfig)
+
+
+def test_what_a_place_needs_of_where_it_works_is_read_where_the_agents_are_chosen(
+    tmp_path: Path,
+) -> None:
+    """So that whoever is choosing them can be asked for a machine that would do."""
+    places = wanted(_flow(tmp_path, ELSEWHERE))
+
+    assert places[0].needs == Needs(where=("remote",))
+
+
+def test_a_place_refused_for_where_it_works_is_not_moved_there_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A refused call must hand its agents back as it found them, containers included."""
+    monkeypatch.chdir(tmp_path)
+    flow = _flow(tmp_path, IMPOSSIBLE)
+    tester = ShellAgent(CONFIG)
+
+    with pytest.raises(NotAFlow, match="comes to darwin"):
+        Runner(flow, [tester])
+
+    assert tester.config.machine is None
+
+
+def test_a_run_put_in_a_container_from_outside_is_where_that_run_works(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nothing is pointed at it until the run starts, so it is named rather than read."""
+    monkeypatch.chdir(tmp_path)
+    flow = _flow(tmp_path, ANYWHERE_ELSE)
+
+    Runner(flow, [ShellAgent(CONFIG)], container="python:3.12")
+
+    # And without one it is refused, which is the half that says the container did the work.
+    with pytest.raises(NotAFlow, match="comes to remote, which this machine does not"):
+        Runner(flow, [ShellAgent(CONFIG)])

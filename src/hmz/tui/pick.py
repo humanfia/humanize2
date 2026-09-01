@@ -4596,7 +4596,9 @@ class Clis(Picks):
 
     Not always all of them: a flow that hangs a hook on a moment only some backends run said
     so where it declared the place, and a CLI that does not run that moment is one choosing
-    would make the flow refuse to start.
+    would make the flow refuse to start. The same goes for whatever else that place says
+    filling it takes -- a turn it can talk to while it runs, a turn held to a shape -- which
+    is asked here of the backend the way a run of the flow asks it of the agent.
     """
 
     asked = "Select which coding agent takes its turns"
@@ -4630,16 +4632,28 @@ class Clis(Picks):
 
     def rows(self) -> list[tuple[str, str, str]]:
         """Every CLI that could take this one's turns, and what each of them runs."""
+        from hmz.flows.driving import comes_to
+
         needs: frozenset[Moment] = (
             self._place.moments if self._place is not None else frozenset()
         )
         pursuing = self._place is not None and self._place.goal
+        # And whatever else the flow said filling this place takes, asked the way a run of
+        # that flow asks it: a CLI offered here and then refused where the run is set up
+        # would be a question put to somebody who cannot answer it right.
+        serving: frozenset[str] = (
+            self._place.needs.of_agent
+            if self._place is not None and self._place.needs is not None
+            else frozenset()
+        )
         listed: list[tuple[str, str, str]] = []
         for backend in sorted(self._agents):
             drives = _drives(backend)
             if drives is None or not needs <= drives.moments:
                 continue
             if pursuing and not drives.pursues:
+                continue
+            if serving and not serving <= comes_to(backend):
                 continue
             listed.append(
                 (
