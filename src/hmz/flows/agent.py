@@ -68,6 +68,12 @@ class Session(Protocol):
     #: to catch the refusal.
     takes_tools: ClassVar[bool]
 
+    #: Whether a turn of this backend can be talked to while it is running, which is what
+    #: :meth:`interject` reaches for. A fact of the backend, said the same way, so a flow that
+    #: means to steer a turn asks before it does rather than catching the refusal from a
+    #: backend that took the whole prompt up front.
+    steers: ClassVar[bool]
+
     @property
     def forks(self) -> bool:
         """Whether this backend can carry this conversation into a second one.

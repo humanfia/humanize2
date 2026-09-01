@@ -24,7 +24,7 @@ import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -36,6 +36,8 @@ __all__ = [
     "SIGNS",
     "UNKNOWN",
     "Asked",
+    "Bundled",
+    "Hooked",
     "Model",
     "Profile",
     "Sign",
@@ -242,6 +244,55 @@ SIGNS: tuple[Sign, ...] = (
 
 
 @dataclass(frozen=True, slots=True)
+class Hooked:
+    """How one CLI takes a table of hooks written for a single run of it.
+
+    A hook table under the CLI's own home is everybody's: it fires for the turns a person takes
+    at their own prompt as well as for a flow's, and a flow that wrote one there would be a
+    flow that changed that machine. What is wanted is a table this run is told about and
+    nothing else reads, which these CLIs offer in three different shapes -- so which shape it
+    is, and what it is called, is written down here beside everything else that is true of a
+    backend.
+
+    Attributes:
+      seam: Which way the CLI is told: `flag` for a table named on its command line, `env` for
+        one named by a variable of its own, `config` for one set as a key of the settings a
+        turn is started with. The three are the whole of it, so a fourth is a typo rather than
+        a seam and is refused where a type checker reads this.
+      name: What that flag, variable or key is called, exactly as the CLI spells it.
+    """
+
+    seam: Literal["flag", "env", "config"]
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class Bundled:
+    """One file inside a CLI's own install, and what says it is the file that was meant.
+
+    A CLI shipped as a bundle is one file with the whole of it inside, minified and rewritten
+    by whatever built it, so nothing about it is stable between releases: what was patched this
+    morning is a different file tonight, under the same path. A fingerprint is what makes
+    reaching into one safe -- a file that does not answer to this is one nobody here has seen,
+    and is left alone rather than patched on the strength of its name.
+
+    Attributes:
+      path: Where the file is, relative to the directory the CLI is installed in, as a glob:
+        a bundle is versioned by the directory over it far more often than by its own name.
+      says: A line the file contains that says it is the one meant -- the call being reached
+        for, spelled as the bundler left it. Said rather than defaulted, since a bundle named
+        by its path alone is the thing this exists to prevent.
+      digest: The SHA-256 of that file whole, as it was last seen, and "" for a bundle
+        recognized by what it contains rather than by being exactly one release -- which is
+        most of them, a release a week being a digest a week.
+    """
+
+    path: str
+    says: str
+    digest: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class Model:
     """One model a backend runs, and the efforts it runs at.
 
@@ -357,6 +408,21 @@ class Profile:
         resume the id it minted, whose sessions refuse to be cloned rather than handing back
         a second handle on the one conversation -- two flows each continuing what they take
         to be their own is the failure nothing downstream could explain.
+      hooks: How this CLI takes a hook table meant for one run of it, or None for one that
+        takes none -- which is either a CLI with no hooks of its own or one whose only hooks
+        are the table under its home, where a run's own would be everybody's. What is written
+        here is the seam and its name; what goes through it is the layer that uses it.
+      preloads: The environment variable this CLI's own runtime takes a preload through, for
+        reaching what a turn does from inside the process rather than from outside it --
+        `NODE_OPTIONS` for the several of these that are Node programs. Empty for a CLI
+        shipped as a binary with no runtime to load anything into, and for one whose runtime
+        ignores the variable when it re-execs itself. What is put in it is the layer's; that
+        there is somewhere to put it is the fact.
+      bundles: The files inside this CLI's install that a layer reaching into it patches, each
+        with what says it is the one meant. Empty for a CLI nothing here patches, which is
+        every one of them until a layer says otherwise: a bundle is rewritten release by
+        release, so reaching into one without a fingerprint is patching whatever happens to be
+        at that path today.
       creds: What a login to this backend leaves behind: the paths it reads its credentials
         back out of and writes its refreshed ones to. One under this backend's home per entry,
         one under the user's own home where the entry starts with `~/` -- which is where some
@@ -417,6 +483,9 @@ class Profile:
     resumes: bool = True
     shares: bool = False
     forks: bool = False
+    hooks: Hooked | None = None
+    preloads: str = ""
+    bundles: tuple[Bundled, ...] = ()
     creds: tuple[str, ...] = ()
     ways: tuple[Way, ...] = ()
     ambient: tuple[str, ...] = ()
@@ -436,6 +505,37 @@ class Profile:
           The command, as `PATH` would name it.
         """
         return self.command or self.name
+
+    def tags(self) -> frozenset[str]:
+        """What this backend serves, by the names a flow and a compiler ask for it under.
+
+        Derived rather than stored: every one of these is already written down above as the
+        fact it is, and a second field carrying the same fact under the vocabulary's spelling
+        is a second place for it to be wrong. So the fact stays written once, here, and the
+        word for it is read off the fact -- which is what keeps this module the only place any
+        of it is said.
+
+        Only what is true of the CLI. Whether a turn can be held to a shape, given a tool,
+        talked to mid-flight or run under the backend's own goal feature is true of the driver
+        that speaks to it rather than of the CLI itself, so those are declared on the driver
+        classes and read off them, and are not here.
+
+        Returns:
+          The names, out of the agent vocabulary -- `swarm`, `search`, `fork`, `resume` -- and
+          out of the anchors, for a CLI that can be reached through one: `anchor:hooked` for
+          one that takes a hook table of its own, `anchor:preloaded` for one whose runtime
+          takes a preload, `anchor:patched` for one with a bundle to patch.
+        """
+        held = {
+            "swarm": self.swarms,
+            "search": self.searches,
+            "fork": self.forks,
+            "resume": self.resumes,
+            "anchor:hooked": self.hooks is not None,
+            "anchor:preloaded": bool(self.preloads),
+            "anchor:patched": bool(self.bundles),
+        }
+        return frozenset(name for name, serves in held.items() if serves)
 
     def directory(self, environment: Mapping[str, str] | None = None) -> Path:
         """Where this backend keeps its state and its logs, wherever it has been moved to.

@@ -1129,6 +1129,10 @@ class CodexSession(SessionBase):
     #: reach this turn without a line being written into anybody's `config.toml`.
     takes_tools: ClassVar[bool] = True
 
+    #: The thread is still there and still running, so a word put in is steered into the turn
+    #: under way rather than answered as the next one -- which is what an app server buys.
+    steers: ClassVar[bool] = True
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:

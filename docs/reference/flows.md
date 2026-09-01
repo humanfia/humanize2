@@ -1290,8 +1290,11 @@ catalogue()   # one Capability per thing a flow may build on, with the backends 
 briefed()     # the same, rendered as one page to steer by
 ```
 
-Read off the live interface at call time — the moments off the enum, the backend sets off
-the driver classes' own declarations — so what it promises is what this installation serves.
+Read off the live interface at call time — the moments off the enum, and the backend sets off
+the driver classes' own declarations and the facts written down about each CLI — so what it
+promises is what this installation serves. It covers what a flow may ask of an agent, where
+its turns may land, and how a turn's own commands are reached there; a capability nothing here
+serves yet is left out rather than listed with nobody against it.
 
 ## An atlas
 

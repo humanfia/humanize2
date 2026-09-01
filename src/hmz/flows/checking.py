@@ -2074,6 +2074,107 @@ class Capability(NamedTuple):
     said: str
 
 
+#: Where an agent's turns may land, and what a flow writes to say so. Facts of this
+#: installation rather than of any one backend -- what a machine is is the same question
+#: whichever CLI is being driven there -- so every one of these is served for every backend,
+#: and what needs saying is said where the place is declared rather than where the agent is
+#: chosen.
+_PLACES = {
+    "remote": "an agent whose turns land on another machine -- Annotated[Agent, Remote] -- "
+    "and only a place that says so may be given one at all; the agent goes on running here, "
+    "and what moves is the project it reads and the commands it runs",
+    "isolated": "an agent that works in a container of its own -- "
+    "Annotated[Agent, Isolated('python:3.12')] -- which the flow names and nobody may "
+    "configure: what is isolated is the tools a command finds and not the work",
+    "managed": "the machine brought up for the agent and taken down after it, as against an "
+    "anchor onto one that was already running -- which is never stopped here, a machine "
+    "nobody here started being nobody here's to end",
+    "linux": "an agent's turns landing on a Linux machine, which is what a container started "
+    "here is and where a turn's commands are reached by tracing them",
+    "darwin": "an agent's turns landing on a macOS machine, which is one that is already up "
+    "and reached by an anchor onto it: nothing here starts one",
+}
+
+#: The anchors nothing has to be written down for, each true of every CLI here: every one of
+#: them is a command line humanize spawns, and what a spawned turn runs is what a supervisor
+#: traces. The rest are read off the backends' own facts, under the same name.
+_REACHED = ("anchor:native-cli", "anchor:supervised")
+
+#: How a turn's own commands are reached, which is what an anchor is made of, by the name a
+#: flow and a compiler ask for each under -- and what the ask looks like.
+_ANCHORS = {
+    "anchor:native-cli": "a turn taken as the CLI's own command line, spawned here and read "
+    "off its streams, which is every turn that is anchored nowhere",
+    "anchor:supervised": "a turn whose commands are reached by tracing the process it runs "
+    "them in, which is how an anchored turn's work lands on the machine the flow chose",
+    "anchor:hooked": "a turn reached through the CLI's own hooks, written for this run and "
+    "read by no other -- backends.named(<backend>).hooks says through which seam it is told",
+    "anchor:preloaded": "a turn reached from inside the process, by what its runtime is told "
+    "to load before it starts -- backends.named(<backend>).preloads names the variable that "
+    "carries it",
+    "anchor:patched": "a turn reached by patching what the CLI ships, held to the "
+    "fingerprints backends.named(<backend>).bundles carries -- a file that does not answer "
+    "to one is left alone",
+}
+
+
+def _tagged(tag: str, agents: Mapping[str, type]) -> frozenset[str]:
+    """Which of these backends the facts written down about them say serve one capability.
+
+    Args:
+      tag: The capability name, as :meth:`hmz.backends.Profile.tags` spells it.
+      agents: The backends there are, by name.
+
+    Returns:
+      The names that serve it. A driven backend with no profile at all serves none of them:
+      what is not written down is not a fact about that CLI.
+    """
+    from hmz.backends import named
+
+    return frozenset(
+        name
+        for name in agents
+        if (profile := named(name)) is not None and tag in profile.tags()
+    )
+
+
+def _places() -> list[Capability]:
+    """Where an agent's turns may land, as a flow says it.
+
+    Returns:
+      One capability apiece, each served for every backend: a machine is the same question
+      whichever CLI is being driven on it.
+    """
+    return [Capability(name, frozenset(), said) for name, said in _PLACES.items()]
+
+
+def _anchors(agents: Mapping[str, type]) -> list[Capability]:
+    """How a turn's own commands are reached here, read off what serves each way.
+
+    An anchor nothing here serves yet is left out rather than listed with nobody against it:
+    an empty backend set means every backend in this catalogue, so a way in that has not been
+    built would read as one every backend already offers.
+
+    Args:
+      agents: The backends there are, by name.
+
+    Returns:
+      One capability per way something here is reached through, with the backends it reaches
+      -- or none at all against a way every one of them serves.
+    """
+    held: list[Capability] = []
+    for name, said in _ANCHORS.items():
+        reaching = frozenset(agents) if name in _REACHED else _tagged(name, agents)
+        if not reaching:
+            continue
+        held.append(
+            Capability(
+                name, frozenset() if reaching == frozenset(agents) else reaching, said
+            )
+        )
+    return held
+
+
 def catalogue() -> tuple[Capability, ...]:
     """Everything a flow may build on here, read off the installed interface at call time.
 
@@ -2086,7 +2187,9 @@ def catalogue() -> tuple[Capability, ...]:
     Returns:
       One capability apiece: the primitives every backend serves, then what only some do
       -- each moment outside `EVERYWHERE`, the shape a turn can be held to, the tools a
-      flow may offer, and the goal feature.
+      flow may offer, a turn that can be steered while it runs, the goal feature and the
+      fork -- and then where an agent's turns may land and how a turn's own commands are
+      reached there.
     """
     import inspect
     import sys as running
@@ -2212,7 +2315,7 @@ def catalogue() -> tuple[Capability, ...]:
         )
     held.append(
         Capability(
-            "shapes",
+            "shape",
             frozenset(
                 name for name, one in sessions.items() if getattr(one, "shapes", False)
             ),
@@ -2233,6 +2336,18 @@ def catalogue() -> tuple[Capability, ...]:
             "type(session).takes_tools says so beforehand",
         )
     )
+    held.append(
+        Capability(
+            "steer",
+            frozenset(
+                name for name, one in sessions.items() if getattr(one, "steers", False)
+            ),
+            "a word put into the turn already running -- session.interject(said) -- which "
+            "the agent takes into that turn rather than answering as the next one; "
+            "type(session).steers says so beforehand, and a backend not among these "
+            "refuses rather than queueing it behind",
+        )
+    )
     pursuing = frozenset(name for name, cls in agents.items() if cls.pursues)
     held.append(
         Capability(
@@ -2250,6 +2365,17 @@ def catalogue() -> tuple[Capability, ...]:
             "and is refused an agent whose backend has none before the first turn",
         )
     )
+    held.append(
+        Capability(
+            "fork",
+            _tagged("fork", agents),
+            "one conversation carried into a second going its own way -- "
+            "child = session.fork() -- which costs nothing until the child is used, and "
+            "which session.forks says of a backend beforehand",
+        )
+    )
+    held.extend(_places())
+    held.extend(_anchors(agents))
     return tuple(held)
 
 
