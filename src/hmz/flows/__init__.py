@@ -75,6 +75,7 @@ from .driving import (
     carries,
     configures,
     container,
+    declared,
     drives,
     load,
     resumes,
@@ -105,6 +106,7 @@ if TYPE_CHECKING:
         WINDOW,
         AgentConfig,
         AgentDefaults,
+        Allowance,
         Board,
         Budget,
         Event,
@@ -162,6 +164,7 @@ __all__ = [
     "Agent",
     "AgentConfig",
     "AgentDefaults",
+    "Allowance",
     "Board",
     "Budget",
     "Capability",
@@ -218,6 +221,7 @@ __all__ = [
     "checked",
     "configures",
     "container",
+    "declared",
     "digest",
     "drives",
     "entry",
@@ -285,6 +289,7 @@ _ELSEWHERE = {
     "AgentConfig": "hmz.coganchor.agents",
     "Board": "hmz.coganchor.agents",
     "AgentDefaults": "hmz.coganchor.agents",
+    "Allowance": "hmz.coganchor.agents",
     "Budget": "hmz.coganchor.agents",
     "EVERYWHERE": "hmz.coganchor.agents",
     "Event": "hmz.coganchor.agents",
@@ -387,6 +392,13 @@ class Flow:
         nothing is run from the top every time, which is what every flow was before this.
       selectable: Whether people are offered this flow in lists and the flow picker. An
         internal composition may set this false while remaining callable by name.
+      budget: What the flow says a run of it may spend, or None for a flow with no opinion --
+        which is every flow written before there was such a thing, and which runs under
+        whatever this workspace was set up with. Three states rather than two, and the third
+        is the whole of the exemption from being asked about an unbounded run: an
+        `Allowance()` written out is a flow saying in its own file that it is *meant* to run
+        under nothing, which is what `chat` is. A flow never holds itself to it -- the run
+        does, whatever the flow said -- so this is a default and not an implementation.
     """
 
     name: str = ""
@@ -394,6 +406,7 @@ class Flow:
     skills: tuple[str, ...] = ()
     resumable: bool = False
     selectable: bool = True
+    budget: Allowance | None = None
 
 
 #: Where a decorated function keeps what it said about itself. On the function rather than in
@@ -414,6 +427,7 @@ def flow[**P, T](
     skills: Iterable[str] = (),
     resumable: bool = False,
     selectable: bool = True,
+    budget: Allowance | None = None,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 
@@ -426,6 +440,7 @@ def flow[**P, T](
     skills: Iterable[str] = (),
     resumable: bool = False,
     selectable: bool = True,
+    budget: Allowance | None = None,
 ) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]:
     """Marks a function as a flow. Nothing else is one.
 
@@ -469,6 +484,17 @@ def flow[**P, T](
         def engine(agents: tuple[Agent], task: str) -> None:
             ...
 
+    And a flow may say what a run of it is worth, which whoever runs it can then override::
+
+        @flow(budget=Allowance(hours=6, tokens=10.0, dollars=50))
+
+    Saying nothing is a flow with no opinion, and it runs under whatever the workspace was
+    set up with. Saying `Allowance()` is a flow claiming it is meant to run under nothing at
+    all -- which `chat` is, being a conversation that ends when the person stops typing --
+    and is what exempts it from being asked to confirm an unbounded run. A flow does not hold
+    itself to any of this: what holds a run to it is every session of every agent in it, so
+    this is a default the run reads and never a thing the flow implements.
+
     Args:
       call: The function, when the decorator is written with no arguments at all.
       name: What to call this one among the flows its directory holds, or "" for the one it
@@ -480,6 +506,8 @@ def flow[**P, T](
         write the next run's into.
       selectable: Whether to offer it in flow lists and the flow picker. False keeps an
         internal composition callable by name without presenting it as a flow to start.
+      budget: What a run of it may spend by default, None for a flow with no opinion, and
+        `Allowance()` for one that means to run under nothing at all.
 
     Returns:
       The function, unchanged but for what it now says about itself: a flow is called the way
@@ -497,6 +525,7 @@ def flow[**P, T](
                 skills=tuple(skills),
                 resumable=resumable,
                 selectable=selectable,
+                budget=budget,
             ),
         )
         return said

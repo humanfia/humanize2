@@ -5,6 +5,7 @@
 ```
 .
 ├── __init__.py
+├── allowance.py
 ├── base.py
 ├── board.py
 ├── claude.py
@@ -28,10 +29,10 @@
 
 ## `__init__.py`
 
-Expose `KINDS`, `AgentConfig`, `AgentBase`, `Event`, `Question`, `Saying`, `Stopped`,
-`Failed`, `Unrecoverable`, `Usage`, `SessionBase`, `CommandSessionBase`,
-`StreamSessionBase`, `Tool`, `Toolbox`, `Gate`, `Board`, `Item`, and all agent and session
-classes.
+Expose `KINDS`, `AgentConfig`, `AgentBase`, `Allowance`, `Ledger`, `Reading`, `Event`,
+`Question`, `Saying`, `Stopped`, `Failed`, `Unrecoverable`, `Usage`, `SessionBase`,
+`CommandSessionBase`, `StreamSessionBase`, `Tool`, `Toolbox`, `Gate`, `Board`, `Item`, and
+all agent and session classes.
 
 ## `event.py`
 
@@ -351,6 +352,133 @@ class AgentConfig:
   is a program on this machine speaking to a socket in this process, so a turn offering them to a
   CLI on another machine MUST be refused where it is spawned rather than taken without them.
 
+## `allowance.py`
+
+```python
+MILLION: float
+KEY: str
+FIELDS: tuple[str, ...]
+DEFAULT: Allowance
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Allowance:
+    hours: float = 0.0
+    tokens: float = 0.0
+    dollars: float = 0.0
+
+    @property
+    def bounded(self) -> bool: ...
+    def over(
+        self, *, seconds: float = 0.0, output: float = 0.0, dollars: float | None = None
+    ) -> str: ...
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Reading:
+    seconds: float
+    output: float
+    dollars: float | None
+    floor: bool
+    blind: frozenset[str]
+
+
+class Ledger:
+    def __init__(self, allowance: Allowance, agents: Iterable[AgentBase] = ()) -> None: ...
+    @property
+    def allowance(self) -> Allowance: ...
+    @property
+    def began(self) -> float: ...
+    @property
+    def spent(self) -> bool: ...
+    def enrol(self, agent: AgentBase) -> None: ...
+    def agents(self) -> tuple[AgentBase, ...]: ...
+    def reads(self) -> Reading: ...
+    def over(self) -> str: ...
+    def stops(self) -> None: ...
+
+
+def written(said: object, where_: str = "") -> Allowance: ...
+
+
+def allowed(
+    given: Allowance | Mapping[str, object] | None, declared: Allowance | None
+) -> Allowance: ...
+
+
+def unwatched(effective: Allowance, declared: Allowance | None) -> bool: ...
+
+
+def unreadable(blind: Iterable[str]) -> str: ...
+```
+
+What a whole run may spend, and the reckoning that holds it to it. `Budget` shortens one
+turn; this ends a run, and they are deliberately two types rather than fields on one.
+
+- `Allowance` MUST be what a whole **run** may spend, and MUST NOT be what one turn may. The
+  confusion between the two is a factor of a million -- `Budget(output=2)` is two output
+  tokens and `Allowance(tokens=2)` is two million -- so the two MUST NOT share a field name,
+  and a dimension of one MUST NOT be spelled the way the other's is.
+- It MUST have three dimensions and no fewer, each a non-negative float. Time MUST be in
+  hours and MUST be wall clock, since it is the only one that moves whether or not anything
+  is being spent and so the only one that stops a run whose every turn is failing. Tokens
+  MUST be in **millions** and MUST be output alone, that being what the work is and what
+  every backend which counts anything counts. Money MUST be US dollars. A dimension added
+  later MUST be a field here and a line in `over`, and MUST NOT be a signature change
+  wherever a run is started.
+- `0` MUST mean no cap on that dimension, and an allowance with nothing named in it MUST be a
+  run under none. `bounded` MUST say which of the two it is, so that a run which cannot reach
+  the end of it reads no meter at all.
+- A dimension less than nothing MUST be refused where the allowance is written rather than
+  where it would have taken hold: a negative cap reads as spent from the first reading, which
+  is a run that stops before it starts and says it ran out.
+- `over` MUST be the one place a reading is compared with a cap, and MUST answer with why the
+  run is over it in words a person reads -- or "" while it is inside every dimension.
+- Money MUST be `None` where nothing in the run can be priced, and MUST NOT be `0.00`: a
+  model nobody lists is a run whose bill cannot be read, and a `$0.00` against one would say
+  the run had been free. A cap MUST NOT be reached by a `None`, since stopping a run on one
+  would be stopping it for a figure that was never measured.
+- A reckoning over a run that is partly priced MUST say that its bill is a floor. A column
+  quietly short of one agent's money is worse than one marked as short of it.
+- A dimension the run's agents cannot read at all MUST be said rather than left to silently
+  never bite: a fifty-dollar cap on a model nobody prices is a run with no cap on it, and it
+  reads exactly like a cap that has not been reached yet. Only a dimension that was actually
+  set MUST be named -- an unset one was never going to bite.
+- What each agent spent MUST be read off that agent's own meter and each agent MUST be
+  counted once. A run behind a gateway can be reported under two spellings of one model, so
+  anything adding up by model name can double it.
+- The person at the prompt MUST be outside the whole of it: what they spend MUST NOT be
+  counted, and stopping the run MUST NOT stop them. They run no model, so there is no token,
+  no dollar and no minute of an allowance that is theirs -- and a run that stopped them would
+  be a run with nobody left to tell that it had stopped, since a flow that is a conversation
+  says so by speaking to them. Counting them would also mark every dimension of a run of
+  theirs unreadable, a person reporting no tokens and being on no price list. Which agent that
+  is MUST be said on the class rather than worked out from a name.
+- A clone and a stand-in MUST spend the run's allowance. Tracing is about identity, so two
+  agents are two lines; an allowance is about the run's money, and a flow that does all its
+  work through clones would otherwise read as having spent nothing at all. Agents MUST be
+  held weakly, so that a flow opening ten thousand clones and dropping them is a reckoning of
+  what they spent rather than ten thousand agents nobody can collect.
+- Once a run has been found to be over its allowance it MUST stay over it: an allowance only
+  ever runs out, and a second reading that came back short would be a run unstopping itself.
+- Stopping the run MUST stop every agent of it, at once and once only. The allowance is the
+  run's, so the moment one reading says it is full it is full for every session at once, and
+  there MUST NOT be a set of blocked sessions collected before the run can stop -- a turn
+  running elsewhere on the run's money is a turn to end and not one to wait for. The flag
+  saying it has been done MUST be set before anything is stopped, since stopping an agent
+  closes its sessions and a session closing reads the ledger.
+- A run's allowance written down MUST be a mapping of the dimensions and MUST NOT be a bare
+  number. One number could be any of the three, and a run held to the wrong one stops a
+  thousand times too early or never; a bare one MUST therefore be refused with all three
+  meanings said, rather than taken for one of them.
+- Which of what was asked for, what the flow declared and nothing at all applies MUST be
+  ranked in one place, so that a run started from a command line, from the interface and from
+  another flow land on one answer. Whoever started the run MUST win over the flow's own
+  default.
+- Whether a run has nothing at all to stop it MUST be asked in one place too, and MUST take
+  the flow's declaration into account rather than the flow's name: a flow that wrote
+  `Allowance()` in its own file has said an unbounded run is what it is for.
+
 ## `hooks.py`
 
 `Moment`, `Occasion`, `Verdict`, `Hook`, `Hooks` and `Unhooked`: the points of a turn something
@@ -645,6 +773,11 @@ class AgentBase(ABC):
   been. Two agents, which is what they are. It MUST be named as any agent is -- the name given,
   else one nothing else answers to -- and MUST be refused a config its backend cannot express,
   where every other agent is refused one.
+- The run's allowance MUST be the one exception to that, and the clone MUST spend out of it.
+  Tracing is about identity, so two agents are two lines in a trace; an allowance is about the
+  run's money, and a clone spends the run's. A flow that does all its work through clones --
+  which is how a flow that recurses is written -- would otherwise read as having spent nothing
+  at all, and run under an allowance that could never bite.
 - A backend made from something other than a config MUST say how one of it is made rather than
   answer `clone` differently: the person at the prompt is made from nothing at all, and `clone`
   MUST be one thing wherever it is called.
@@ -893,6 +1026,38 @@ class SessionBase(ABC):
   halfway through would cut a turn off for tokens it was allowed when it wrote them.
 - A budget's cut-off MUST win over a hook that would have sent the agent on. A spent budget
   is not a question, and `Stop` refusing is what a turn goes round again on.
+- Every session of every backend MUST be held to the run's allowance, and no driver MUST have
+  to cooperate or be able to opt out. The check MUST therefore be `SessionBase`'s own rather
+  than a moment a flow hangs a hook on: a hook is the flow's seam, so an allowance a person
+  set would be defeatable by a flow hanging one; `SESSION_END` never fires for a session a
+  loop drops between rounds, which is the commonest shape a long run has; and their verdict
+  is thrown away today, so making them refusable would change a published contract.
+- It MUST be read at both edges of a turn and again as a session closes. Read only as a turn
+  opens, a run would take one whole turn more than it was allowed, which for a model thinking
+  at length is the expensive one; and a session that takes its last turn and is dropped never
+  reaches another edge, so a run whose last conversation closes on the end of its allowance
+  would be written down as having finished what it set out to do.
+- A turn asked for under a spent allowance MUST raise `Stopped`, and MUST NOT wait and MUST
+  NOT answer with nothing. An allowance only ever runs out -- time and tokens rise and never
+  fall -- so nothing that waits here is ever released; and a flow cannot tell "" from a round
+  that failed, so a loop counting stalls would take three empty rounds to notice and one
+  looping on a verdict would spin for as long as it was left. `Stopped` and not a failure,
+  because a flow that catches a failed turn goes round again, which would be the run taking
+  every round it has left for nothing.
+- It MUST be read ahead of the check on whether the agent was stopped, not behind it. A run
+  out of money stops its own agents, so every turn after the first one to notice would
+  otherwise be refused with `was stopped` -- which is true and says nothing about why, and
+  which of the three ran out is what a person needs off the first line of a stopped run.
+- The turn that spends the last of it MUST still answer with what it said. A turn cut off has
+  still done what it did -- its edits are on disk and its conversation is open -- so it is a
+  round that ended rather than a round that failed; read as a failure it would be taken again,
+  on an allowance that is already spent.
+- The person at the prompt MUST be outside all of it. They run no model and spend nothing, so
+  holding them to an allowance stops nothing and costs the run the one agent that could be
+  told it had stopped -- a flow that asks its user a question would otherwise deadlock at the
+  end of the money.
+- An agent driven by hand MUST be held to nothing: that is not a run of anything, and so is
+  nobody's budget.
 - A budget MUST be over a turn and not over a goal, and `interrupt` MUST NOT claim to reach
   one. A goal is the backend's own loop, started by the backend and followed rather than
   held, so there is no turn here to cut off and nothing that could honestly be measured

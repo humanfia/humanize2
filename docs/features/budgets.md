@@ -8,6 +8,19 @@ A turn can be given a **budget** — how many output tokens it may come out with
 run for — and when the budget is spent, the turn stops. Not the next turn: this one, the one
 that is running now.
 
+::: tip Two caps, and they are not the same cap
+This page is the **per-turn** one. It shortens an answer, it can be reached a thousand times in
+an afternoon, and its tokens are counted one by one.
+
+What a whole **run** may spend is the [allowance](/features/allowances): hours on the clock,
+*millions* of output tokens, dollars. It ends the run rather than an answer, and every flow has
+one whether or not it says so.
+
+The two are deliberately two types with two vocabularies, because the confusion between them is
+a factor of a million: `Budget(output=2)` is two output tokens and `Allowance(tokens=2)` is two
+million.
+:::
+
 Without it there is nothing to do about a turn that has gone wrong. Stopping an agent prevents
 its *next* turn, and a session that is one run of a command line per turn has nothing
 listening: an agent six minutes into an answer nobody wants goes on writing it for as long as
@@ -139,5 +152,5 @@ cut-off also wins over a hook that would have sent the agent on — a spent budg
 question.
 
 See [What it has cost, and how fast](/reference/agents#what-it-has-cost-and-how-fast) for the
-readings a budget is held to, and [Stopping](/user/stopping) for ending a run rather than a
-turn.
+readings a budget is held to, [Every run has an allowance](/features/allowances) for the cap on
+the run rather than on the turn, and [Stopping](/user/stopping) for ending a run by hand.

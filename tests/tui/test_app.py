@@ -27,6 +27,7 @@ from hmz.tui import Humanize
 from hmz.tui.app import _BY_NAME, _COMMANDS, _SAID, Editor, _where
 from hmz.tui.pick import (
     _ADD,
+    _BUDGET,
     _SAVE,
     Accounts,
     Agent,
@@ -38,6 +39,7 @@ from hmz.tui.pick import (
     Flows,
     Monitoring,
     Signing,
+    Unbounded,
     Ways,
 )
 from tests.stubs import events as recorded
@@ -262,6 +264,12 @@ async def _leaves(app: Humanize, driver: Pilot[None], *answer: str) -> None:
         await driver.pause()
     if isinstance(app.screen, Confirms):
         await driver.press(*answer)
+        await driver.pause()
+    # And, where saving is what was answered and the run it saves has nothing at all to stop
+    # it, the second question about that -- which every flow in this suite is asked, none of
+    # them declaring a budget and none of these tests setting one.
+    if isinstance(app.screen, Unbounded):
+        await driver.press("enter")
     await until(lambda: app.screen is not was, driver)
 
 
@@ -1187,7 +1195,7 @@ async def test_a_flow_is_opened_to_reach_its_agents_and_esc_comes_back() -> None
             await driver.press("enter")
             await until(lambda: sheet._inside, driver)
             # What the flow drives, and the row the lot is saved from.
-            assert rows(app) == ["0", _SAVE]
+            assert rows(app) == ["0", _BUDGET, _SAVE]
             assert "chat" in str(sheet.query_one("#asked", Label).content)
             assert "esc back to the flows" in str(
                 sheet.query_one("#keys", Label).content

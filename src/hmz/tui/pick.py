@@ -51,6 +51,7 @@ from typing import (
     get_origin,
 )
 
+from pydantic import BaseModel, Field
 from rich.markup import escape
 from textual import events, on, work
 from textual.await_complete import AwaitComplete
@@ -61,6 +62,7 @@ from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
 from hmz.coganchor.agents import ANYONE, FLOW, SWARM, USER, anchored, driver
+from hmz.coganchor.agents.allowance import Allowance, allowed, unwatched
 from hmz.coganchor.prices import money
 from hmz.runtime import telemetry
 from hmz.runtime.kept import Runs
@@ -73,7 +75,6 @@ from .selecting import Choices
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Mapping, Sequence
 
-    from pydantic import BaseModel
     from pydantic.fields import FieldInfo
     from textual.app import App, ComposeResult
 
@@ -228,6 +229,11 @@ _APART_MARK = "\x1e"
 _SAVE = f"{_APART_MARK}save"
 _ADD = f"{_APART_MARK}add"
 
+#: And what the row that sets what a run may spend answers with. Set apart for the reason
+#: saving is: the rows of the flow menu's second page are the agents it drives, and what the
+#: run is allowed to cost is not one of them.
+_BUDGET = f"{_APART_MARK}budget"
+
 #: What the row that takes a sheet's subject away answers with, on each of the submenus that
 #: has one. Where every row of a list opens onto what it is, taking one away belongs in there
 #: with everything else about it rather than on a key of the list -- so three sheets grew the
@@ -237,13 +243,18 @@ _TAKES_AWAY = f"{_APART_MARK}take-away"
 #: All three together, for the sheets that keep which row the cursor was on: a row set apart
 #: is not one of the things being kept track of, and one taken for one would move the cursor
 #: off it the moment it was walked to.
-_APART = frozenset({_SAVE, _ADD, _TAKES_AWAY})
+_APART = frozenset({_SAVE, _ADD, _TAKES_AWAY, _BUDGET})
 
 #: And what each of them is called, which is both the word on the row and what the row of
 #: keys says enter does while the cursor is on it: they are not answers to the question the
 #: list is asking, so what enter means on them is not what it means on the rows above them,
 #: and a row of keys saying `enter choose` over a row that saves is about some other row.
-_ON_APART = {_SAVE: "save", _ADD: "add", _TAKES_AWAY: "take it away"}
+_ON_APART = {
+    _SAVE: "save",
+    _ADD: "add",
+    _TAKES_AWAY: "take it away",
+    _BUDGET: "set",
+}
 
 #: How wide the column of names is before the line about each one starts. A model id
 #: may hold slashes of its own -- Kimi Code's and opencode's are `provider/id` -- and is
@@ -1155,11 +1166,16 @@ class Chosen(NamedTuple):
       agents: What each of its agents is, in the order the flow takes them.
       config: What the flow itself is set up with, or None for a flow that takes no setting
         up and one that was left as it comes.
+      budget: What a run of it may spend, or None to run under whatever the flow itself
+        says -- which is what a flow nobody has set one for here does. Beside the config
+        rather than inside it, because it is a setting of the run: the flow declares at most
+        a default and never holds itself to one.
     """
 
     flow: str
     agents: tuple[Runs, ...]
     config: BaseModel | None = None
+    budget: Allowance | None = None
 
 
 def opens_on(
@@ -1250,6 +1266,76 @@ def config_of(flow: str, kept: dict[str, Any]) -> BaseModel | None:
     try:
         return model.model_validate(kept)
     except Exception:  # noqa: BLE001 -- what was kept no longer fits the flow
+        return None
+
+
+def dimensions(said: Allowance) -> dict[str, float]:
+    """An allowance as the three fields a sheet asks for and a settings file writes down."""
+    return {"hours": said.hours, "tokens": said.tokens, "dollars": said.dollars}
+
+
+def _spending(held: Allowance | None, declared: Allowance | None) -> str:
+    """What a run of this flow may spend, said the way a row about it says it.
+
+    Said on the row rather than only inside the sheet it opens, because an allowance nobody
+    can see without opening something is one nobody checks: the row is where a person finds
+    out that the run they are about to start has no cap on it.
+
+    Args:
+      held: What was set here, or None for a flow nobody has set one for.
+      declared: What the flow itself says, or None for a flow with no opinion.
+
+    Returns:
+      The caps, shortest first, or a line saying there are none.
+    """
+    said = held if held is not None else declared
+    if said is None or not said.bounded:
+        return "nothing stops this run"
+    caps = [
+        f"{said.hours:g}h" if said.hours else "",
+        f"{said.tokens:g}M out" if said.tokens else "",
+        money(said.dollars) if said.dollars else "",
+    ]
+    whose = "" if held is not None else ", as the flow has it"
+    return f"stops at {', '.join(one for one in caps if one)}{whose}"
+
+
+def budget_of(flow: str) -> Allowance | None:
+    """What a run of one flow here was last set to be allowed to spend.
+
+    Args:
+      flow: The flow.
+
+    Returns:
+      The allowance, or None for a flow nobody has set one for here -- which is a run under
+      whatever the flow itself declares. What was written down is read back rather than
+      trusted, so a settings file somebody edited by hand into something that is not an
+      allowance is one the flow's own default is used instead of.
+    """
+    from hmz.coganchor.agents.allowance import written
+
+    kept = _hmz().settings.budget(flow)
+    if not kept:
+        return None
+    try:
+        return written(kept)
+    except ValueError:
+        return None
+
+
+def declared_by(flow: str) -> Allowance | None:
+    """What the flow itself says a run of it is worth, if it says anything.
+
+    Args:
+      flow: The flow, by name or as a path.
+
+    Returns:
+      What it declared, `Allowance()` for a flow that says it is meant to run under nothing
+      at all, and None for a flow with no opinion -- which is the one the menu asks about.
+    """
+    try:
+        return _hmz().flows.declared(flow)
+    except Exception:  # noqa: BLE001 -- a flow that will not load is still not a crash
         return None
 
 
@@ -1370,6 +1456,7 @@ class Flows(Drafts[Chosen]):
         agents: dict[str, tuple[Model, ...]],
         kept: dict[str, Any],
         *,
+        budget: Allowance | None = None,
         unavailable: frozenset[str] = frozenset(),
         running: bool = False,
         inside: bool = False,
@@ -1381,6 +1468,8 @@ class Flows(Drafts[Chosen]):
           runs: What each of its agents is, in the order the flow takes them.
           config: What the flow itself is set up with, for one that takes setting up.
           agents: The backends offered here, and what each of them says it runs.
+          budget: What a run of it may spend here, or None for a flow nobody has set one
+            for -- which runs under whatever the flow itself says.
           kept: What each flow was last set up with here, by flow -- read when the draft flow
             changes, so that turning to a flow this workspace has run finds it as it was left.
           unavailable: The optional backends among them that still need installing.
@@ -1404,6 +1493,7 @@ class Flows(Drafts[Chosen]):
                 else list(runs)
             )
             self._config = config
+            self._budget = budget
         else:
             # A flow the interface is not set up on, opened straight into: what it was last
             # set up with here is what it opens holding, exactly as turning to it would be.
@@ -1411,6 +1501,11 @@ class Flows(Drafts[Chosen]):
                 settled(self._remembered(flow), self._places, self._agents)
             )
             self._config = config_of(flow, self._held(flow).get("config") or {})
+            self._budget = budget_of(flow)
+        #: What the flow itself says a run of it is worth, read once per flow rather than on
+        #: every redraw: reading it means running the flow's own file, and the agents page is
+        #: drawn again on every keystroke.
+        self._declared = declared_by(self._flow)
         #: Every flow there is, read once: this is redrawn on every keystroke, and reading it
         #: means running each flow file to see what it holds. Cleared when a flowverse is
         #: fetched or taken away, which is when the list is something else.
@@ -1822,7 +1917,8 @@ class Flows(Drafts[Chosen]):
         lines = reads(named, self._runs)
         # The save row is past the end of the numbering, so what is numbered is the agents.
         self._counting = len(str(max(len(self._places), 1)))
-        at = min(listing.highlighted or 0, len(self._places))
+        # One row past the agents for what a run may spend, and one past that for saving.
+        at = min(listing.highlighted or 0, len(self._places) + 1)
         rows = [
             Option(
                 self._row(
@@ -1839,7 +1935,17 @@ class Flows(Drafts[Chosen]):
             for seen in range(len(self._places))
         ]
         rows.append(
-            self._saves("the flow and its agents", here=at == len(self._places))
+            Option(
+                self._apart(
+                    "budget",
+                    _spending(self._budget, self._declared),
+                    here=at == len(self._places),
+                ),
+                id=f"={_BUDGET}",
+            )
+        )
+        rows.append(
+            self._saves("the flow and its agents", here=at == len(self._places) + 1)
         )
         listing.set_options(rows)
         listing.highlighted = at
@@ -1851,9 +1957,11 @@ class Flows(Drafts[Chosen]):
         # Esc is out of the menu only where there is no list of flows to step back to,
         # which is while a flow is running: the row says what the key does here.
         back = Key("esc", "close" if self._only else "back to the flows")
-        if at == len(self._places):
+        if at == len(self._places) + 1:
             self._footed(Key("enter", "save"), back)
         else:
+            # What enter says is read off the row it is on -- `open` over an agent and `set`
+            # over the budget, which `Sheet._footed` rewrites from the row set apart.
             self._footed(Key("enter", "open"), Key(_CHORD, "save"), back)
 
     def _noagents(self) -> str:
@@ -1890,6 +1998,38 @@ class Flows(Drafts[Chosen]):
             # And walking out of it leaves the flow set up as the draft has it, which is
             # still a flow to go on and answer the agents of.
         self._walks(inside=True)
+
+    @work
+    async def _budgets(self) -> None:
+        """Asks what a run of this flow may spend, from the row on the agents page.
+
+        A row reached rather than a sheet the walk goes through, because every flow has an
+        allowance and most runs want the one they already have: a page that had to be pressed
+        past on the way to the agents would be a question asked of somebody who has answered
+        it. It is on the agents page rather than among the flow's own settings because it is a
+        setting of the run: the flow's model would refuse the fields, and a budget read back
+        as one of the flow's settings is the one mistake this must not make.
+        """
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        spends = await showing.push_screen_wait(
+            Configures(
+                self._flow,
+                Budgeted,
+                Budgeted.model_validate(dimensions(self._budget))
+                if self._budget is not None
+                else None,
+                asked=f"What a run of {self._flow} may spend",
+                about="Nothing is capped unless it is named, and 0 is no cap at all. "
+                "Whichever of them is reached first stops the run.",
+            )
+        )
+        if isinstance(spends, Budgeted):
+            self._budget = Allowance(**spends.model_dump())
+            self.changed()
+        self._fill()
 
     def action_fork(self) -> None:
         """Copies the flow under the cursor into this project's own, to be changed.
@@ -1978,6 +2118,9 @@ class Flows(Drafts[Chosen]):
         if held == _SAVE:
             self.applied()
             return
+        if held == _BUDGET:
+            self._budgets()
+            return
         try:
             at = int(held)
         except ValueError:
@@ -2004,6 +2147,8 @@ class Flows(Drafts[Chosen]):
                 settled(self._remembered(name), places, self._agents)
             )
             self._config = config_of(name, self._held(name).get("config") or {})
+            self._budget = budget_of(name)
+            self._declared = declared_by(name)
             self.changed()
         # On to what the flow itself takes, where it takes anything, and then to what will
         # drive it: three things about one flow, asked in the order they depend on nothing.
@@ -2071,7 +2216,27 @@ class Flows(Drafts[Chosen]):
             self._said = f"{escape(', '.join(missing))} has no model yet"
             self._fill()
             return
-        self.dismiss(Chosen(self._flow, tuple(self._runs), self._config))
+        # The one exit that makes an answer, so the one place to ask about a run nothing
+        # will stop: the save row and the question on the way out both come through here,
+        # and a check written at each of them is a check one of them would lose.
+        if unwatched(allowed(self._budget, self._declared), self._declared):
+            self._means_it()
+            return
+        self.dismiss(Chosen(self._flow, tuple(self._runs), self._config, self._budget))
+
+    @work
+    async def _means_it(self) -> None:
+        """Asks whether a run nothing will stop is what was meant, and saves if it is."""
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        if await showing.push_screen_wait(Unbounded()) != _KEEP:
+            telemetry.snag("unbounded-refused", flow=self._flow)
+            # Back to the menu holding everything it was holding, which is where a budget is
+            # set: the answer was "go and set one", and there is nothing else to do about it.
+            return
+        self.dismiss(Chosen(self._flow, tuple(self._runs), self._config, self._budget))
 
 
 def _added(url: str, name: str) -> str:
@@ -3151,6 +3316,35 @@ _ON = "on"
 _OFF = "off"
 
 
+class Budgeted(BaseModel):
+    """What a run of a flow may spend, as the menu asks it.
+
+    A model rather than three rows written by hand, so that the budget is asked with the same
+    sheet a flow's own settings are asked with: one place that knows how a number is typed,
+    stepped and read back, and three descriptions that say what each dimension means. What
+    comes out of it is fed to `Allowance`, which is where zero meaning "no limit" and a
+    negative meaning "correct this" are settled.
+
+    Not `hmz.coganchor.agents.Budget`, which is a cap on one turn. This is the run.
+    """
+
+    hours: float = Field(
+        default=0.0,
+        ge=0,
+        description="hours on the clock the whole run may take, 0 for as long as it takes",
+    )
+    tokens: float = Field(
+        default=0.0,
+        ge=0,
+        description="millions of output tokens it may come to, 0 for as many as it takes",
+    )
+    dollars: float = Field(
+        default=0.0,
+        ge=0,
+        description="US dollars it may cost, 0 for whatever it costs",
+    )
+
+
 def _shown(value: object) -> str:
     """One setting's value, as a line about it says it.
 
@@ -3264,7 +3458,13 @@ class Configures(Sheet["BaseModel"]):
     ]
 
     def __init__(
-        self, flow: str, model: type[BaseModel], now: BaseModel | None
+        self,
+        flow: str,
+        model: type[BaseModel],
+        now: BaseModel | None,
+        *,
+        asked: str = "",
+        about: str = "",
     ) -> None:
         """Initializes the setting up.
 
@@ -3272,9 +3472,15 @@ class Configures(Sheet["BaseModel"]):
           flow: The flow these settings are for.
           model: What it says it can be set up with.
           now: How it is set up already, or None to start from the model's own defaults.
+          asked: What to call the sheet, or "" for setting the flow up. Given by the one
+            other thing asked this way -- what a run of the flow may spend, which is a
+            question about the run rather than about the flow and has to say so.
+          about: The line under it, or "" for the one setting a flow up carries.
         """
         super().__init__()
         self._flow = flow
+        self._asked = asked
+        self._about = about
         self._model = model
         self._fields = list(model.model_fields.items())
         self._counting = len(str(len(self._fields)))
@@ -3296,9 +3502,10 @@ class Configures(Sheet["BaseModel"]):
 
     def _ask(self) -> None:
         """Says what is being set up, and what the keys do while it is."""
-        self.query_one("#asked", Label).update(f"Set up {self._flow}")
+        self.query_one("#asked", Label).update(self._asked or f"Set up {self._flow}")
         self.query_one("#about", Label).update(
-            "How this flow runs, which it says for itself. What is refused here is the "
+            self._about
+            or "How this flow runs, which it says for itself. What is refused here is the "
             "flow's own refusal rather than this list's."
         )
         self._fill()
@@ -4429,6 +4636,48 @@ class Confirms(Popup):
         other sheet leaves on it, and one that said `cancel` over a menu holding changes would
         read as the one thing it is not.
         """
+        super()._fill()
+        self._footed(Key("enter", "choose"), Key("esc", "back"))
+
+
+class Unbounded(Popup):
+    """Whether a run nothing at all will stop is what was meant, asked as the menu is saved.
+
+    Three caps and none of them set is a flow that will go until somebody notices -- for days,
+    and for whatever days of a model cost. That is a fair thing to ask for and a poor thing to
+    arrive at by not answering three questions, and the two look identical afterwards. So it
+    is asked once, here, where it can still be changed.
+
+    Not asked of a flow that said so itself. A flow writing `@flow(budget=Allowance())` has
+    claimed in its own file that it is meant to run under nothing -- `chat` is a conversation
+    that ends when the person stops typing -- and a question asked every time somebody picks
+    one of those is a question nobody reads by the third time.
+
+    The question and not a receipt: what is kept is written to a file that may not be
+    writable, and a box saying the run was saved would be claiming something this cannot
+    know.
+    """
+
+    #: The same box, said again for this class: every rule in this file selects by the name
+    #: of the sheet it is about, so a box drawn for another one is a rule of its own.
+    CSS = f"Unbounded {{ align: center middle; background: transparent; }}\n{_POPUP}"
+
+    asked = "Nothing will stop this run."
+
+    about = (
+        "No hours, no output tokens and no dollars are capped, so it runs until it is "
+        "stopped by hand."
+    )
+
+    def rows(self) -> list[tuple[str, str, str]]:
+        """The two answers: mean it, or go back and cap something."""
+        return [
+            (_KEEP, "that is what I meant", ""),
+            (_DROP, "go back and set one", ""),
+        ]
+
+    def _fill(self) -> None:
+        """Puts the two answers up, and says that esc is the second of them."""
         super()._fill()
         self._footed(Key("enter", "choose"), Key("esc", "back"))
 

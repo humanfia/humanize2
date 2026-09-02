@@ -300,6 +300,11 @@ class HumanAgent(AgentBase):
     #: refused them would be an interface refusing what was typed at it.
     moments: ClassVar[frozenset[Moment]] = frozenset()
 
+    #: Nothing. A person runs no model, so there is no token, no dollar and no minute of a
+    #: run's allowance that is theirs -- and a run that stopped them would be a run with
+    #: nobody left to tell that it had stopped.
+    spends: ClassVar[bool] = False
+
     def __init__(self, *, name: str = "human") -> None:
         """Initializes the person as an agent.
 

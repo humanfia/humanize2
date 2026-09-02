@@ -167,10 +167,11 @@ def test_a_config_is_read_off_a_yaml_file_as_it_is_written(tmp_path: Path) -> No
     said = tmp_path / "setup.yaml"
     said.write_text("rounds: 7\nmode: slow\n")
 
-    assert set_up_from(said) == {"rounds": 7, "mode": "slow"}
-    # An empty file is a flow left as it comes, which is what writing nothing means.
+    assert set_up_from(said) == ({"rounds": 7, "mode": "slow"}, None)
+    # An empty file is a flow left as it comes, which is what writing nothing means -- and
+    # `None` is what that is said with, since a flow taking no config takes no empty one.
     (tmp_path / "empty.yaml").write_text("")
-    assert set_up_from(tmp_path / "empty.yaml") == {}
+    assert set_up_from(tmp_path / "empty.yaml") == (None, None)
 
 
 @pytest.mark.parametrize(
@@ -198,20 +199,24 @@ def test_the_exec_line_reads_the_config_it_names(tmp_path: Path) -> None:
     """`hmz exec -c` is the whole of it: the file, unchecked, for the flow to check."""
     (tmp_path / "setup.yaml").write_text("rounds: 7\n")
 
-    _, agents, task, held, _ = flow_and_agents(
+    _, agents, task, held, budget, _ = flow_and_agents(
         ["-f", "flow", "-c", str(tmp_path / "setup.yaml"), "-a", "claude/m:high", "go"]
     )
 
     assert held == {"rounds": 7}
+    assert budget is None  # a file that says nothing about one leaves the flow's own
     assert len(agents) == 1
     assert task == "go"
 
 
 def test_the_exec_line_without_a_config_says_nothing_about_one(tmp_path: Path) -> None:
     """Which is every line written before there was such a thing, and is a flow as it comes."""
-    _, _, _, held, _ = flow_and_agents(["-f", "flow", "-a", "claude/m:high", "go"])
+    _, _, _, held, budget, _ = flow_and_agents(
+        ["-f", "flow", "-a", "claude/m:high", "go"]
+    )
 
     assert held is None
+    assert budget is None
 
 
 def test_a_flow_that_takes_nothing_refuses_being_set_up(tmp_path: Path) -> None:

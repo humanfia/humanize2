@@ -1150,12 +1150,35 @@ Nothing in the interface knows what any of the settings mean. The types say how 
 and the flow's own model says which combinations it will not take — so a flow that refuses
 `gen_idea` without `gen_plan` refuses it here, in its own words, rather than an hour in.
 
+### What a run of it may spend
+
+A **budget** row sits on the page a flow's agents are on, under them and above the row the menu
+is saved from. Enter on it opens the same three-column sheet the flow's own settings are asked
+on, over `hours`, `tokens` — millions of output tokens — and `dollars`. Each is `0` for no cap
+on that one, and whichever is reached first stops the run.
+
+A row rather than a page of the walk, because every flow has an
+[allowance](/features/allowances) and most runs want the one they already have: a page that had
+to be pressed past on the way to the agents is a question asked of somebody who has answered
+it. It is not among the flow's own settings, because it is a setting of the *run* — the flow
+declares at most a default and never holds itself to one — and the flow's own model would
+refuse the fields.
+
+The row says what the run is held to without being opened: `stops at 6h, 10M out`, or `nothing
+stops this run`. An allowance nobody can see without opening something is one nobody checks.
+
+Saving a menu whose run nothing at all will stop asks once whether that is what was meant.
+Three dimensions and none of them set is a run that goes until somebody notices, for whatever
+days of a model cost; that is a fair thing to ask for and a poor thing to arrive at by not
+answering three questions. A flow that said in its own file that it is meant to run
+unbounded — `@flow(budget=Allowance())`, which `chat` writes — is not asked.
+
 ## What it remembers
 
 Opening the interface again in the same project finds it set up the way you left it: the flow
 that was last run there, for each flow that workspace has run, what each of its agents was
 running, where its turns landed and which account it ran as —
-and how the flow itself was set up.
+how the flow itself was set up, and what a run of it may spend.
 
 Kept per flow — by the name humanize's own flows have, and by the path yours have, so a flow of
 yours cannot inherit the agents or the settings of the one it shares a name with. Per flow

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
+    from hmz.coganchor.agents.allowance import Allowance
     from hmz.flows import Finding, Flowverse, Offer, Place, Prophecy, Running
 
 __all__ = ["Flows", "Flowverses"]
@@ -333,6 +334,17 @@ class Flows:
 
         return configures(named)
 
+    def declared(self, named: str | os.PathLike[str]) -> Allowance | None:
+        """What a flow says a run of it may spend by default, or None for one with no opinion.
+
+        `Allowance()` is neither: it is a flow saying in its own file that it is meant to run
+        under nothing at all, which is what keeps a conversation from being asked to confirm
+        an unbounded run every time it is picked.
+        """
+        from hmz.flows.driving import declared
+
+        return declared(named)
+
     def resumes(self, named: str | os.PathLike[str]) -> bool:
         """Whether a flow says it can be picked up where the last run of it left off."""
         from hmz.flows import resumes
@@ -374,17 +386,23 @@ class Flows:
 
         return running()
 
-    def set_up_from(self, said: str | os.PathLike[str]) -> dict[str, Any]:
-        """Reads what a flow is to be set up with out of a YAML file of it.
+    def set_up_from(
+        self, said: str | os.PathLike[str]
+    ) -> tuple[dict[str, Any] | None, Allowance | None]:
+        """Reads what a flow is to be set up with, and what a run of it may spend, out of YAML.
 
         Args:
           said: The path to the file.
 
         Returns:
-          What it holds, field by field, and nothing at all for a file that is empty.
+          What it holds field by field with the run's own `budget:` taken out of it -- that
+          one being a setting of the run rather than of the flow -- or None where it left
+          nothing for the flow at all. And the allowance that key said, or None where the
+          file said nothing about one.
 
         Raises:
-          ValueError: If the file cannot be read, or holds something that is not a mapping.
+          ValueError: If the file cannot be read, holds something that is not a mapping, or
+            says a budget that cannot be read as one.
         """
         from hmz.runtime.runner import set_up_from
 

@@ -4,9 +4,9 @@
 running can show -- the annotation built at runtime, the config model declared in a helper,
 the loop that looks bounded and is not. This is that second reading. The flow is loaded and
 driven for real, in a subprocess of its own, by agents that are stubs: every turn lands at
-once, answers deterministically, and costs what the scenario says a turn costs -- so a loop
-held to a budget walks to the end of it in milliseconds, and what is being proved is the
-flow's own shape rather than any model's mood.
+once, answers deterministically, and costs what the scenario says a turn costs -- so a flow
+that declared an allowance of its own walks to the end of it in milliseconds, and what is
+being proved is the flow's own shape rather than any model's mood.
 
 The scenarios are the questions worth asking of a loop. `NEVER_DONE` is the reviewer that
 never says the work is done: a flow with a bound of its own still ends, and one without is
@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from hmz.coganchor.agents import AgentBase, Event
+    from hmz.coganchor.agents.allowance import Allowance, Ledger
 
     from .driving import Place
 
@@ -72,9 +73,16 @@ class Scenario(NamedTuple):
         is what a failed turn answers.
       answer: What a plain turn answers, and what every string field of a shaped one says.
       climb: What each turn adds to what the agent has spent, in output tokens, so that a
-        loop held to a budget walks to the end of it in a handful of turns.
+        flow declaring an allowance of its own walks to the end of it in a handful of
+        turns rather than in the hundred thousand a real run would take.
       turns: How many turns the flow may take before it is read as one that does not stop.
-      seconds: How long the scenario's process may live before the clock kills it.
+      tick: How much wall clock each turn is worth inside the proof, in seconds. A proof
+        sleeps for free and a stub answers at once, so real time never moves in one -- and a
+        flow declaring an allowance in hours would be driven to the turn cap and reported as
+        one that does not stop, which is a false failure about the very shape the checker now
+        blesses. A minute a turn walks six declared hours in a few hundred.
+      seconds: How long the scenario's process may live before the clock kills it. Real
+        seconds, this one, being the parent's patience rather than the proof's own clock.
     """
 
     name: str
@@ -82,12 +90,16 @@ class Scenario(NamedTuple):
     answer: str
     climb: float = 100_000.0
     turns: int = 200
+    tick: float = 60.0
     seconds: float = 60.0
 
 
-#: The reviewer that never says the work is done. A flow with a bound of its own -- a
-#: budget, a cap on the rounds -- still ends here, and one that waits forever on a verdict
-#: is caught by the turn cap: the executable proof that a run of it can end.
+#: The reviewer that never says the work is done. A flow with a bound of its own -- a cap on
+#: the rounds, a clock, an allowance it declared -- still ends here, and one that waits
+#: forever on a verdict is caught by the turn cap: the executable proof that a run of it can
+#: end. What a real run has underneath all of them is the allowance somebody set when they
+#: started it, which is not a thing a proof of the flow can stand on: the flow is on trial,
+#: and a run stopped for running out of money did not end because of anything the flow did.
 NEVER_DONE = Scenario("never-done", verdict=False, answer="did some of it")
 
 #: The shortest road through: every verdict is yes, so what is proved is that the flow can
@@ -307,6 +319,64 @@ async def _rested_for(seconds: float, result: Any = None) -> Any:
     return result
 
 
+def _allowed(
+    driven: list[AgentBase],
+    declared: Allowance | None,
+    scenario: Scenario,
+    steps: _Steps,
+) -> Ledger | None:
+    """Holds the stubs to the allowance the flow itself declared, and to no other.
+
+    The flow's own or none at all. A real run is held to whatever the person starting it
+    set, and a proof that stood on one of those would be proving something about a number
+    somebody typed rather than about the flow -- a loop that never ends would pass, having
+    been stopped by money. What the flow declared is the flow's, so it is on trial with the
+    rest of it: a flow saying `@flow(budget=Allowance(tokens=10))` is a flow claiming that
+    ten million output tokens is where a run of it ends, and this is that claim being tried.
+
+    Two of the three dimensions need the proof's world to move for them. Tokens move already:
+    a stub turn spends `climb` of them. The clock does not -- a proof sleeps for free and a
+    stub answers at once -- so it is driven off the turn count instead, `tick` seconds a turn,
+    which is what lets a flow declaring six hours be walked to the end of them. Money cannot
+    be moved at all: a stub runs a model nobody prices, so a dollars cap reads as blind and is
+    dropped rather than left to never bite. A flow whose only claim is a dollars one is
+    therefore proved by the turn cap, exactly as one that claimed nothing is.
+
+    Args:
+      driven: The stubs, which is every agent the flow declared.
+      declared: What the flow said, or None for a flow with no opinion -- which is left with
+        no allowance at all, so that the turn cap is what ends it exactly as before.
+      scenario: The world, for how much clock a turn is worth in it.
+      steps: The shared turn count, which is what the clock is read off.
+
+    Returns:
+      The reckoning the stubs are held to, or None where there is nothing to hold them to --
+      which is what says whether a `Stopped` was this allowance being reached.
+    """
+    import time
+
+    from hmz.coganchor.agents.allowance import Allowance as Said
+    from hmz.coganchor.agents.allowance import Ledger as Reckoning
+
+    if declared is None:
+        return None
+    # Money dropped: nothing in a proof is priced, so a cap on it could only ever read as
+    # blind, and a claim that cannot be tried must not be reported as one that failed.
+    held = Said(hours=declared.hours, tokens=declared.tokens)
+    if not held.bounded:
+        return None
+    began = time.monotonic()
+    # Patched over the whole child rather than handed to the ledger: it is the child's own
+    # process, thrown away with the proof, and the ledger reads the clock the same way every
+    # other reader of it does. A turn is worth `tick` of it, so the clock moves when the flow
+    # does and stands still while it is not taking turns -- which is what a proof measures.
+    time.monotonic = lambda: began + steps.taken * scenario.tick
+    ledger = Reckoning(held, driven)
+    for agent in driven:
+        agent.allowance = ledger
+    return ledger
+
+
 class _Enough(BaseException):
     """The turn cap, raised past everything a flow catches: a proof is over when it is.
 
@@ -373,16 +443,33 @@ def _driven(flow: str, spec: dict[str, Any]) -> dict[str, Any]:
             return answered
     if scenario is None:
         return answered
+    from hmz.coganchor.agents import Stopped
+
     steps = _Steps(scenario.turns)
     settings = () if setting is None else (given,)
     held: tuple[dict[str, Any], ...] = ({},) if mark.resumable else ()
+    driven = _crewed(places, scenario, steps)
+    ledger = _allowed(driven, mark.budget, scenario, steps)
     try:
-        out = run(make(_crewed(places, scenario, steps)), _TASK, *settings, *held)
+        out = run(make(driven), _TASK, *settings, *held)
         if inspect.isawaitable(out):
             import asyncio
 
             asyncio.run(_awaited(out))
         finished, turns, said = True, steps.taken, ""
+    except Stopped as stopped:
+        # The flow's own declared allowance, run out. It ended, and it ended the way its
+        # author said it should -- a loop that goes until what it asked for is gone is a loop
+        # with a bound, and this is that bound being reached rather than a crash.
+        #
+        # Asked of the ledger rather than taken from the exception's type: a flow that stops
+        # its own agent and then takes a turn raises this same `Stopped`, and a flow whose
+        # loop ends because it stopped itself by mistake is not a flow that finished.
+        if ledger is not None and ledger.spent:
+            finished, turns, said = True, steps.taken, ""
+        else:
+            finished, turns = False, steps.taken
+            said = f"stopped without having run out of what it declared -- {stopped}"
     except _Enough:
         finished, turns = False, scenario.turns
         said = (

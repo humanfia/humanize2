@@ -26,32 +26,35 @@ made an hour ago because nothing in the tree records that it was a decision. Wri
 decisions into the repository, and the loop reads them back.
 [`stateful_ralph`](/flows/stateful-ralph) is the same loop with the opposite trade.
 
-## What it takes
+## What ends it
 
-```yaml
-budget: 25    # millions of output tokens; 0 goes on until it is stopped
-```
+The run's [allowance](/features/allowances) — hours on the clock, millions of output tokens,
+dollars — which is humanize's rather than this flow's: it is held to at the edges of every turn
+of every session, so a round taken once it is spent raises rather than answering and the loop
+needs no exit of its own. The flow itself takes no settings at all.
 
-**10 million by default**, [counted across every run of it here](/flows/). Pass it with `-c
-budget.yaml`, or `/config` at the prompt; see [Settings of its own](/weaver/flow-settings).
+**Ten million output tokens by default**, which is what the flow declares a run of it is worth.
+`-c budget.yaml` with a `budget:` mapping in it says otherwise, and so does the **budget** row
+on the page `/flow` puts a flow's agents on.
 
 ## What it keeps
 
-`rounds` and `output`. A loop left going for days will be stopped — esc, a machine that goes
-down, a turn that takes the process with it — so running it again goes on from the round it
-reached rather than back at one.
+`rounds`. A loop left going for days will be stopped — esc, a machine that goes down, a turn
+that takes the process with it — so running it again goes on from the round it reached rather
+than back at one.
 
-A loop that has spent its budget is **over**, and what is over is not picked up: it clears what
-it kept, so the next run here opens at round one on a budget of its own rather than stopping
-before it has taken a turn. See [Picking a run up](/user/resuming).
+A run stopped by its allowance is one to **pick up**, not one that is over. The allowance is
+that run's and the next run gets one of its own, so what was kept is left exactly where it is
+rather than cleared. See [Picking a run up](/user/resuming).
 
 ## What else ends it
 
 **Three rounds in a row that answered with nothing.** A round whose turn failed answers with
 nothing and spends nothing, so a loop whose account was refused — or whose model that account
-may not run — would sit under a budget that never moves, going round on the same failure for as
-long as it was left. What it kept is left alone rather than cleared: a loop that stalled is one
-to fix and carry on from, not one that is over.
+may not run — would sit under a token allowance that never moves, going round on the same
+failure for as long as it was left. Hours are the dimension that moves for it anyway; three
+stalled rounds end it sooner. What it kept is left alone here too: a loop that stalled is one to
+fix and carry on from, not one that is over.
 
 ## See also
 

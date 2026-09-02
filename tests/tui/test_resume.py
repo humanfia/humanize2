@@ -246,8 +246,9 @@ async def test_a_run_that_emptied_what_it_wrote_is_not_carried_on(
 ) -> None:
     """A flow that cleared its state said the next run here starts clean.
 
-    Which is the opposite of what handing it that state back would say -- and a budget spent
-    is exactly that: over, and not a thing to pick up.
+    Which is the opposite of what handing it that state back would say. A run stopped for
+    having spent its allowance is not that: it was stopped rather than finished, so it leaves
+    what it kept and picking it up is the point of having kept it.
     """
     _ran("empties", "go")
 

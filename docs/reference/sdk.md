@@ -90,10 +90,10 @@ holding.
 from hmz.sdk import Hmz
 
 hmz = Hmz()
-flow, agents, task, config, container = hmz.read(
+flow, agents, task, config, budget, as_json = hmz.read(
     ["-f", "ralph_loop", "-a", "claude/claude-opus-5:high", "fix the build"]
 )
-run = hmz.run(flow, agents, task, config, container=container)
+run = hmz.run(flow, agents, task, config, budget=budget, container="python:3.12")
 run.start()
 ...
 run.stop()
@@ -229,8 +229,8 @@ def opens(session):
     # Runs in the held process, and returns when the run is over. `session` is what lets go
     # of the terminals reading it; a run nobody is drawing for never needs it.
     hmz = Hmz()
-    flow, agents, task, config, _ = hmz.read(LINE)
-    hmz.run(flow, agents, task, config).run()
+    flow, agents, task, config, budget, _ = hmz.read(LINE)
+    hmz.run(flow, agents, task, config, budget=budget).run()
 
 
 held = Daemons().hold(opens)

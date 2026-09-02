@@ -59,6 +59,11 @@ To end one turn without ending the run, a flow has
 [`session.interrupt`](/features/budgets#cutting-one-off-by-hand), and a turn can be given a
 [budget](/features/budgets) that cuts it off on its own.
 
+To have a run stop itself rather than wait for a key, give it an
+[allowance](/features/allowances): hours on the clock, millions of output tokens, dollars.
+Every run has one, and a run that reached the end of it is stopped exactly as this key stops
+one — turns left where they got to, state kept, and the run worth picking up.
+
 ## After a stop
 
 A stop is what makes a run worth picking up. Where the flow says it [can be picked

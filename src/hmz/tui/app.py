@@ -88,7 +88,9 @@ from .pick import (
     Providers,
     Reports,
     Runs,
+    budget_of,
     config_of,
+    dimensions,
     model_of,
     opens_on,
     places_of,
@@ -917,6 +919,10 @@ class Humanize(App[None]):
         self._config = config or config_of(
             self._flow_named, self.settings.config(self._flow_named)
         )
+        #: What a run of it here may spend, or None for a flow nobody has set one for --
+        #: which is a run under whatever the flow itself declares. Beside the config and not
+        #: inside it: it is a setting of the run rather than one of the flow's own.
+        self._budget = budget_of(self._flow_named)
         #: What has been typed here before, which the arrows walk. Read now rather than each
         #: time it is asked for: a run started here writes this project's own history into
         #: being, and what is being walked must not change under whoever is walking it.
@@ -2524,6 +2530,7 @@ class Humanize(App[None]):
                 self._config if holding else None,
                 agents,
                 self.settings.flows(),
+                budget=self._budget if holding else None,
                 unavailable=frozenset(unavailable),
                 running=running,
                 # A flow that was named has been chosen, so what is left to answer is what
@@ -2596,7 +2603,9 @@ class Humanize(App[None]):
             # A flow that will not load says nothing about what it drives, so nothing here can
             # tell whether it is set up. Running it is where that is said, exactly as it is
             # for the flow already in force.
-            return Chosen(flow, tuple(self.settings.agents(flow)))
+            return Chosen(
+                flow, tuple(self.settings.agents(flow)), budget=budget_of(flow)
+            )
         held = self.settings.flows().get(flow)
         kept = cast("dict[str, Any]", held) if isinstance(held, dict) else {}
         agents = kept.get("agents")
@@ -2624,7 +2633,11 @@ class Humanize(App[None]):
         # Through the same settling every other way into the models goes through, or a flow
         # that has since declared it needs the backend's own goals at a place would run here
         # with them off and be refused before its first turn.
-        return Chosen(flow, tuple(settled(runs, places)), config)
+        # What a run of it may spend, among the rest of what was remembered: this is the
+        # path a flow runs by without the menu ever opening, and one that dropped the
+        # allowance would start an unbounded run out of a workspace whose settings say six
+        # hours -- with nothing asked, the question living on the menu that did not open.
+        return Chosen(flow, tuple(settled(runs, places)), config, budget_of(flow))
 
     def _took_flow(self, chosen: Chosen, *, running: bool, starting: str = "") -> None:
         """Applies what the flow menu was saved with, and writes it down.
@@ -2638,10 +2651,11 @@ class Humanize(App[None]):
             told -- which is what every other way of choosing a flow leaves it doing.
         """
         places = places_of(chosen.flow)
-        same = (chosen.flow, list(chosen.agents), chosen.config) == (
+        same = (chosen.flow, list(chosen.agents), chosen.config, chosen.budget) == (
             self._flow_named,
             self._models,
             self._config,
+            self._budget,
         )
         if not running and not same:
             # A flow is chosen in order to be run, so whatever is running stops: the interface
@@ -2652,6 +2666,7 @@ class Humanize(App[None]):
         self._flow_named, self._models = chosen.flow, list(chosen.agents)
         self._wanted = places if places is not None else self._places_of(chosen.flow)
         self._config = chosen.config
+        self._budget = chosen.budget
         self.settings.remember(
             chosen.flow,
             self._named_by,
@@ -2659,6 +2674,13 @@ class Humanize(App[None]):
             chosen.config.model_dump(mode="json")
             if chosen.config is not None
             else None,
+            # An allowance that caps nothing is written down as nothing rather than as three
+            # zeros, which is how the menu says a flow is back to running under whatever the
+            # flow itself declares. Three zeros kept would override the flow's own default for
+            # good, and there would be no way left to say `as the flow has it`.
+            dimensions(chosen.budget)
+            if chosen.budget is not None and chosen.budget.bounded
+            else {},
         )
         if running:
             self._reconfigured()
@@ -2979,6 +3001,7 @@ class Humanize(App[None]):
         ]
         self._wanted = self._places_of(ran.flow)
         self._config = config_of(ran.flow, self.settings.config(ran.flow))
+        self._budget = budget_of(ran.flow)
         named = [part for runs in self._models for part in ("-a", runs.spec)]
         self.show(
             f"[dim]carrying on from {escape(ran.name)}: {escape(ran.flow)} on what that "
@@ -3205,7 +3228,7 @@ class Humanize(App[None]):
         try:
             # `--json` says how a run is written for whoever is at a command line, and there
             # is nobody at one here: the interface draws the same events itself.
-            path, chosen, task, _, _ = self.hmz.read(argv)
+            path, chosen, task, _, _, _ = self.hmz.read(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
         try:
@@ -3220,7 +3243,9 @@ class Humanize(App[None]):
             # through this interface like everything else. How the flow itself is set up
             # goes with them: it is a setting of the flow rather than of any agent, so it
             # is not on the line that says what each of them runs.
-            runner = self.hmz.runner(path, chosen, self._config, resume=resume)
+            runner = self.hmz.runner(
+                path, chosen, self._config, resume=resume, budget=self._budget
+            )
         except Exception as why:  # noqa: BLE001 -- a flow that will not load is a line to fix
             self.show(f"hmz: {why}", "red")
             return

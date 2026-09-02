@@ -58,6 +58,21 @@ CASES = [
     pytest.param(
         DOC
         + """
+from pathlib import Path
+
+from hmz.flows import Agent, flow
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    while True:
+        Path("beat").write_text(task)
+""",
+        {"dead-loop"},
+        id="dead-loop",
+    ),
+    pytest.param(
+        DOC
+        + """
 from hmz.flows import Agent, flow
 
 @flow
@@ -66,8 +81,8 @@ def run(agents: tuple[Agent], task: str) -> None:
     while True:
         agent(task, suppress=True)
 """,
-        {"dead-loop"},
-        id="dead-loop",
+        {"unbounded-loop"},
+        id="dead-loop-edge-a-turn-inside-runs-out-of-the-allowance",
     ),
     pytest.param(
         DOC
@@ -887,7 +902,7 @@ def test_a_single_file_flow_is_read_as_one(tmp_path: Path) -> None:
             '''
         )
     )
-    assert [one.code for one in checked(at)] == ["dead-loop"]
+    assert [one.code for one in checked(at)] == ["unbounded-loop"]
 
 
 def test_what_is_under_skills_is_not_read(tmp_path: Path) -> None:
@@ -964,7 +979,21 @@ def test_everything_offered_is_reachable() -> None:
 #: Every warning a flow humanize ships or the official flowverse holds is allowed to keep.
 #: rlar's loop is ended by its reviewer alone, which is the flow's own documented shape --
 #: and exactly the shape the checker exists to point at, so the warning stands.
-ALLOWED_WARNINGS = {"rlar": {"unbounded-loop"}}
+ALLOWED_WARNINGS = {
+    "rlar": {"unbounded-loop"},
+    # Four loops whose only end is the run's allowance being spent. That is legal -- a turn
+    # taken once it is spent raises -- and it is still worth saying, because such a loop stops
+    # rather than finishes and how long it takes is a number somebody else set.
+    "continue_loop": {"unbounded-loop"},
+    "fixed_juice_ralph": {"unbounded-loop"},
+    "flame_chase": {"unbounded-loop"},
+    "goal": {"unbounded-loop"},
+    # And two that do decide to stop -- three rounds answering with nothing -- and keep what
+    # they kept when they do, on purpose: a loop that stalled is one to fix and carry on from.
+    # Which is the judgement `state-kept` exists to make somebody state, and they state it.
+    "ralph_loop": {"state-kept"},
+    "stateful_ralph": {"state-kept"},
+}
 
 
 def _swept() -> list[object]:

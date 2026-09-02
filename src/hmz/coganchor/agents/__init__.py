@@ -8,6 +8,15 @@ from .agy import (
     AntigravityCLIAgentConfig,
     AntigravityCLISession,
 )
+from .allowance import (
+    DEFAULT,
+    MILLION,
+    Allowance,
+    Ledger,
+    Reading,
+    unreadable,
+    unwatched,
+)
 from .base import (
     WINDOW,
     AgentBase,
@@ -115,10 +124,12 @@ def driver(backend: str) -> tuple[type[AgentBase], type[AgentConfig]]:
 __all__ = [
     "ANYONE",
     "CUTOFFS",
+    "DEFAULT",
     "DRIVEN",
     "EVERYWHERE",
     "FLOW",
     "KINDS",
+    "MILLION",
     "OUTCOMES",
     "PERMISSIONS",
     "SERVICE_TIERS",
@@ -133,6 +144,7 @@ __all__ = [
     "AgentBase",
     "AgentConfig",
     "AgentDefaults",
+    "Allowance",
     "AntigravityCLIAgent",
     "AntigravityCLIAgentConfig",
     "AntigravityCLISession",
@@ -168,6 +180,7 @@ __all__ = [
     "KimiCodeCLIAgent",
     "KimiCodeCLIAgentConfig",
     "KimiCodeCLISession",
+    "Ledger",
     "Meter",
     "MimoCodeAgent",
     "MimoCodeAgentConfig",
@@ -185,6 +198,7 @@ __all__ = [
     "QwenCodeAgent",
     "QwenCodeAgentConfig",
     "QwenCodeSession",
+    "Reading",
     "Refused",
     "Remote",
     "Saying",
@@ -202,4 +216,6 @@ __all__ = [
     "ZcodeSession",
     "anchored",
     "isolated",
+    "unreadable",
+    "unwatched",
 ]

@@ -61,6 +61,7 @@ if TYPE_CHECKING:
         Needs,
         Remote,
     )
+    from hmz.coganchor.agents.allowance import Allowance
     from hmz.coganchor.agents.base import Journal
     from hmz.coganchor.agents.skills import Loaded
     from hmz.coganchor.machines import MachineBase, MachineConfig, Mapped
@@ -80,6 +81,7 @@ __all__ = [
     "configures",
     "contained",
     "container",
+    "declared",
     "declares",
     "drives",
     "entered",
@@ -499,6 +501,27 @@ def resumes(flow: str | os.PathLike[str]) -> bool:
       NotAFlow: If the file is not there, or is not a flow.
     """
     return declares(flow)[4].resumable
+
+
+def declared(flow: str | os.PathLike[str]) -> Allowance | None:
+    """What a flow says a run of it may spend by default, if it says anything.
+
+    A default and never an implementation: a flow does not hold itself to this, and whoever
+    starts a run of it overrides it. Asked by whatever is about to run one, so that a flow
+    rewritten since the last run of it is read as it is now.
+
+    Args:
+      flow: The Python file the flow is written in. It is run to be read.
+
+    Returns:
+      What `@flow(budget=...)` said -- `Allowance()` for a flow saying it is meant to run
+      under nothing at all, and None for one with no opinion, which is the difference
+      between a deliberate unbounded run and an accidental one.
+
+    Raises:
+      NotAFlow: If the file is not there, or is not a flow.
+    """
+    return declares(flow)[4].budget
 
 
 def _marked(run: Entry) -> Marked:

@@ -178,6 +178,57 @@ def test_a_flow_that_takes_no_setting_up_keeps_nothing(tmp_path: Path) -> None:
     Settings(tmp_path).remember("chat", ("",), [Runs("claude/m:high")])
 
     assert Settings(tmp_path).config("chat") == {}
+    assert Settings(tmp_path).budget("chat") == {}
+
+
+def test_what_a_run_of_a_flow_may_spend_is_kept_beside_how_it_was_set_up(
+    tmp_path: Path,
+) -> None:
+    """Beside the config and not inside it: it is a setting of the run, not of the flow."""
+    Settings(tmp_path).remember(
+        "ralph_loop",
+        ("",),
+        [Runs("claude/m:high")],
+        {"rounds": 12},
+        {"hours": 6.0, "tokens": 10.0, "dollars": 0.0},
+    )
+
+    again = Settings(tmp_path)
+    assert again.budget("ralph_loop") == {
+        "hours": 6.0,
+        "tokens": 10.0,
+        "dollars": 0.0,
+    }
+    assert again.config("ralph_loop") == {"rounds": 12}
+    held = yaml.safe_load((home() / "settings.yaml").read_text())
+    flows = held["workspaces"][str(tmp_path.resolve())]["flows"]
+    assert flows["ralph_loop"]["budget"]["hours"] == 6.0
+
+
+def test_choosing_the_agents_again_is_not_a_way_of_forgetting_the_budget(
+    tmp_path: Path,
+) -> None:
+    """The flow's whole entry is replaced, so what is not handed in has to be read back."""
+    Settings(tmp_path).remember(
+        "ralph_loop", ("",), [Runs("claude/m:high")], budget={"hours": 6.0}
+    )
+
+    Settings(tmp_path).remember("ralph_loop", ("",), [Runs("codex/n:low")])
+
+    assert Settings(tmp_path).budget("ralph_loop") == {"hours": 6.0}
+
+
+def test_a_budget_of_nothing_is_a_flow_back_under_what_it_says_for_itself(
+    tmp_path: Path,
+) -> None:
+    """Which is how the menu says a run is no longer held to what was set here."""
+    Settings(tmp_path).remember(
+        "ralph_loop", ("",), [Runs("claude/m:high")], budget={"hours": 6.0}
+    )
+
+    Settings(tmp_path).remember("ralph_loop", ("",), [Runs("claude/m:high")], budget={})
+
+    assert Settings(tmp_path).budget("ralph_loop") == {}
 
 
 def test_two_flows_of_one_name_are_two_entries(tmp_path: Path) -> None:

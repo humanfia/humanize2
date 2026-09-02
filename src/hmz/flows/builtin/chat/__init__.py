@@ -23,7 +23,7 @@ starting this again is another conversation rather than the last one carried on.
 
 from typing import NamedTuple
 
-from hmz.flows import Agent, Person, flow
+from hmz.flows import Agent, Allowance, Person, flow
 
 
 class Chat(NamedTuple):
@@ -33,7 +33,12 @@ class Chat(NamedTuple):
     human: Person
 
 
-@flow
+# An allowance of nothing, written out rather than left unsaid: a conversation ends when
+# the person stops typing, and there is no round of it they did not ask for. Written out is
+# also what says so -- a flow that says nothing about its budget is asked to confirm that an
+# unbounded run is what was meant, and a conversation is the one run where that question has
+# an obvious answer and would be asked every time.
+@flow(budget=Allowance())
 def run(agents: Chat, task: str) -> None:
     # One session, so the turns are a conversation rather than a series of first turns.
     conversation = agents.assistant.new()

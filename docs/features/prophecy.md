@@ -21,8 +21,8 @@ other piece of work belong in a node, where the whole language is available agai
 
 - A **mind** is one agent turn. It has one way out, because what a model happened to say is
   not yet a decision the graph can promise.
-- A **logic** node is Python that drives no agent. It may count, reshape an answer, enforce a
-  budget, and make the decision a branch reads.
+- A **logic** node is Python that drives no agent. It may count, reshape an answer, refuse to
+  go on where the tests did not run, and make the decision a branch reads.
 - A **supernode** is another atlas. From outside it is one node; inside it is another complete
   prophecy.
 

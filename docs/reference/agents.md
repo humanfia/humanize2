@@ -1505,6 +1505,61 @@ Neither call touches the network — they read what was already kept — and bot
 never `0.0`, for a model nobody lists, so a flow steering by money can tell *not priced* from
 *free*. See [Cost and rate](/user/tally).
 
+## What a whole run may spend
+
+A run can be given an **allowance** — hours on the clock, *millions* of output tokens, dollars
+— and when one of them is reached, every agent of the run is stopped. Not the turn: the run.
+
+```python
+from hmz.coganchor.agents import Allowance, Ledger
+
+allowance = Allowance(hours=6, tokens=10.0, dollars=50)
+ledger = Ledger(allowance, agents)
+for agent in agents:
+    agent.allowance = ledger
+```
+
+Whatever starts a flow does this; a flow never does. `Runner` builds the ledger and hangs it on
+every agent as the run starts, so `hmz exec`, the interface and a flow calling another all land
+on one reckoning.
+
+**Not `Budget`.** That one caps a *turn*, in raw output tokens and seconds, and shortens an
+answer. This one caps a run and ends it. The two are deliberately two types with two
+vocabularies, because the confusion between them is a factor of a million: `Budget(output=2)`
+is two output tokens and `Allowance(tokens=2)` is two million.
+
+Each dimension is a non-negative float and `0` is no cap on that one, so `Allowance()` is a run
+under nothing at all. Hours are wall clock and are the only dimension that moves whether or not
+anything is being spent — which is what stops a loop whose every turn is failing, since a turn
+that could not run spends nothing.
+
+It is held to at both edges of every turn and as every session closes, on `SessionBase` itself
+rather than on a moment a flow hangs a hook on: no driver cooperates and none can opt out. A
+turn asked for under a spent allowance raises `Stopped`; the turn that spends the last of it
+still answers with what it said, a turn cut off having still done what it did.
+
+| Reading | What it says |
+| --- | --- |
+| `ledger.reads().seconds` | How long the run has been going, on the clock |
+| `ledger.reads().output` | Output tokens every agent of it has come out with |
+| `ledger.reads().dollars` | What that came to, or `None` where nothing in the run is priced |
+| `ledger.reads().floor` | Whether the money is short of the truth, part of the run being unpriced |
+| `ledger.reads().blind` | Which caps that were set nothing in this run can read |
+| `ledger.over()` | Why the run is over its allowance, in words, or `""` |
+| `ledger.spent` | Whether it has already been found to be over it |
+
+Money is `None` and never `$0.00` for a model nobody lists, and a `None` never reaches the cap:
+stopping a run on one would be stopping it for a figure that was never measured. A cap on a
+dimension nothing in the run can read is named in `blind` rather than left to silently never
+bite.
+
+A clone and a stand-in spend the run's allowance, which is the one thing about a run that does
+cross a `clone()`. Tracing is about identity, so two agents are two lines; an allowance is about
+the run's money, and a flow that works only through clones would otherwise read as free.
+
+A flow says what a run of it is worth by default where it is marked — `@flow(budget=...)` — and
+whoever starts the run overrides it. See
+[Every run has an allowance](/features/allowances).
 ## What each backend can do
 
 | | `agy` | `claude` | `codex` | `cursor` | `dsh` | `grok` | `kimi` | `pi` | `qwen` | `opencode`, `mimo` | `zcode` |
