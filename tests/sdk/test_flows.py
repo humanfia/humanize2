@@ -308,7 +308,7 @@ def test_a_setup_file_that_is_empty_sets_nothing_up(tmp_path: Path) -> None:
     said = tmp_path / "setup.yml"
     said.write_text("", encoding="utf-8")
 
-    assert Hmz().flows.set_up_from(said) == ({}, None)
+    assert Hmz().flows.set_up_from(said) == (None, None)
 
 
 def test_a_setup_file_that_is_not_a_mapping_is_refused(tmp_path: Path) -> None:
