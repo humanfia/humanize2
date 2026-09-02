@@ -314,8 +314,9 @@ Ways {
 #rule { height: 1; color: $primary; }
 #asked { padding: 0 0 0 3; text-style: bold; color: $primary; }
 #about { padding: 0 3 1 3; color: $text-muted; width: 1fr; }
-/* The tabs, for the one sheet that has any. A sheet with none says nothing here, and a
-   label with nothing in it is a row nobody paid for. */
+/* The row above the list: the titles of a sheet that is several pages, and the places a
+   list of flows is one of. A sheet with neither says nothing here, and a label with nothing
+   in it is a row nobody paid for. */
 #tabs { padding: 0 0 1 3; width: 1fr; }
 OptionList { border: none; background: $background; scrollbar-size: 0 0; padding: 0; }
 /* The marker says where the cursor is, so the row is not filled as well. */
@@ -395,17 +396,24 @@ class Sheet[T](ModalScreen[T | None]):
     and where, and walking out without answering is None wherever it is asked.
 
     A sheet of several pages says so: the titles are across the top and tab and shift+tab turn
-    between them, which is the one pair of keys a terminal has for exactly that. Nothing here
-    is a chord -- a sheet asks one thing and its keys are its own, so a key that needed ctrl
-    held down would be a key somebody had to already know.
+    between them, which is the one pair of keys a terminal has for exactly that. Pages are what
+    two views of one question are, either of which may be read first: turning between them is
+    orientation. What is reached by picking something is not a page and is not a tab -- it is
+    opened with enter on the thing it is about and left on esc, because a tab between a list
+    and the thing picked out of it reads as a view that was there all along, which hides that
+    anything was picked at all.
+
+    Nothing here is a chord -- a sheet asks one thing and its keys are its own, so a key that
+    needed ctrl held down would be a key somebody had to already know.
     """
 
     CSS = _SHEET
     BINDINGS: ClassVar = [("escape", "back", "back")]
 
-    #: The pages this sheet is, in the order they are turned between, or nothing at all for a
-    #: sheet that is one page. A sheet with tabs shows their titles whether or not there are
-    #: two: a page nobody can see the name of is a page nobody knows they are on.
+    #: The parallel pages this sheet is, in the order they are turned between: nothing at all
+    #: for a sheet that is one page, and for one whose deeper view is opened rather than
+    #: turned to. A sheet with tabs shows their titles whether or not there are two: a page
+    #: nobody can see the name of is a page nobody knows they are on.
     TABS: ClassVar[tuple[str, ...]] = ()
 
     #: Which row the marker was last drawn against. Putting the rows up moves the cursor,
@@ -485,11 +493,7 @@ class Sheet[T](ModalScreen[T | None]):
         self._typed, self._searching = "", False
         self.query_one("#choices", OptionList).highlighted = 0
         self._drawn = 0
-        self._turned()
         self._fill()
-
-    def _turned(self) -> None:
-        """What a sheet does as a page opens, which is nothing unless it says otherwise."""
 
     def _tab_line(self) -> str:
         """The titles, with the one being read marked and the shut ones struck through."""
@@ -608,10 +612,11 @@ class Sheet[T](ModalScreen[T | None]):
         self._ask()
 
     def tabbed(self, said: str) -> None:
-        """Puts a row of tabs above the choices, or takes the row back where there are none.
+        """Puts the row above the choices up, or takes it back where there is nothing for it.
 
         Args:
-          said: The tabs, as markup, or "" for a sheet that is one list.
+          said: The titles of the pages, or whatever else a sheet says the list is one of, as
+            markup -- and "" for a sheet that is one list of one thing.
         """
         showing = self.query_one("#tabs", Label)
         showing.display = bool(said)
@@ -1009,61 +1014,61 @@ def _complete(runs: Runs) -> bool:
     return bool(cli and model)
 
 
-#: What separates the two halves of a row's id on the flows page: which place it came from,
+#: What separates the two halves of a row's id among the flows: which place it came from,
 #: and which flow it is. A byte no name has in it, since the second half may hold anything --
 #: a flow is offered under the place it came from, and holds a slash and may hold a colon.
 _HALVES = "\x1f"
 
-#: The pages the flow menu is, in the order they are turned between.
-_FLOW_PAGE, _AGENT_PAGE = 0, 1
+#: The row the flow menu is saved from, which is the last of its agents'.
 _SAVE = "save"
 
 
 class Flows(Drafts[Chosen]):
-    """Which flow runs and what each of its agents is: one menu, a page apiece.
+    """Which flow runs and what each of its agents is: one menu, walked into.
 
-    Two pages because they are two questions about one thing, and because they are not open
-    at the same moments. A flow is chosen in order to be started, so choosing one while one is
-    running is not a thing to offer at all -- that page is shut while a flow runs, and says so
-    rather than going away. What its agents are is the other way round: an agent that is
-    thinking too little, on the wrong account, or allowed too much is found out halfway
-    through a run, so that page is never shut.
+    The flows, and then the agents of the one that was opened. Not two pages turned between:
+    a flow is picked out of a list and what drives it is that flow's own, so a tab between
+    them would read as a second view that had been there all along -- and which flow's agents
+    were being set up would be a thing nobody could see they had chosen. Enter opens a flow
+    and esc comes back to the flows, which is what those two keys mean everywhere else here.
+
+    Choosing a flow is not offered at all while one is running: a flow is chosen in order to
+    be started, and there is one going. The menu opens inside the agents then, and esc leaves
+    rather than stepping back to a list that is not there. Its agents are the other way
+    round -- an agent that is thinking too little, on the wrong account, or allowed too much
+    is found out halfway through a run -- so they are reachable whatever is happening.
 
     The flows are read a place at a time -- every flowverse there is, fetched or not, and then
     this project's flows and yours -- with the left and right arrows stepping between the
     places and the list holding only the one being read. All of them run together under
     headings was one list nobody could see the end of, and one where walking to a flow meant
     walking past every flow that came before it. Stepping between the places is about which
-    list of flows is being read; what can happen to a flowverse is `/flowverses`, which is a
-    question about the places rather than about which flow to run.
+    list of flows is being read; what can happen to a flowverse is the menu `v` opens, which
+    is a question about the places rather than about which flow to run.
 
-    Choosing a flow asks what that flow itself takes, where it takes anything, and then turns
-    to what will drive it. A key that set the flow up was a key nobody pressed: a flow with
+    Choosing a flow asks what that flow itself takes, where it takes anything, and then opens
+    what will drive it. A key that set the flow up was a key nobody pressed: a flow with
     settings is chosen in order to be run with settings, and the moment it is chosen is the
     one moment somebody is thinking about that flow rather than about its agents.
 
-    Nothing is applied by turning a page. What the menu holds is a draft of the whole of it,
-    and it lands together from the save row or when saving is confirmed on the way out.
+    Nothing is applied by walking in or back out. What the menu holds is a draft of the whole
+    of it, and it lands together from the save row or when saving is confirmed on the way out.
     """
 
-    TABS: ClassVar = ("Flow", "Agents")
-    LETTERS: ClassVar = frozenset({"search", "fork"})
+    LETTERS: ClassVar = frozenset({"search", "fork", "verses"})
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
-        # The pages, on the one pair of keys a terminal has for exactly that. Priority, or
-        # the list under the cursor would take them as moving the focus about.
-        Binding("tab", "next_tab", "next page", priority=True),
-        Binding("shift+tab", "prev_tab", "previous page", priority=True),
-        # The places the flows come from, on the other pair: the list walks up and down, so
-        # across is what is left for stepping between the lists there are. Priority, or the
-        # list under the cursor would take them as moving between columns it has none of.
+        # The places the flows come from: the list walks up and down, so across is what is
+        # left for stepping between the lists there are. Priority, or the list under the
+        # cursor would take them as moving between columns it has none of.
         Binding("left", "before", "the place before", priority=True),
         Binding("right", "after", "the place after", priority=True),
         # Letters rather than chords, and priority so they are the keys rather than the
         # search: a search is asked for, and while one is running these fall through to it.
         Binding("s", "search", "search", priority=True),
         Binding("f", "fork", "copy it here to change", priority=True),
+        Binding("v", "verses", "where flows come from", priority=True),
     ]
 
     def __init__(
@@ -1076,7 +1081,7 @@ class Flows(Drafts[Chosen]):
         *,
         unavailable: frozenset[str] = frozenset(),
         running: bool = False,
-        opening: int = 0,
+        inside: bool = False,
     ) -> None:
         """Initializes the menu on what is set up now.
 
@@ -1088,14 +1093,14 @@ class Flows(Drafts[Chosen]):
           kept: What each flow was last set up with here, by flow -- read when the draft flow
             changes, so that turning to a flow this workspace has run finds it as it was left.
           unavailable: The optional backends among them that still need installing.
-          running: Whether a flow is running, which is what shuts the first page.
-          opening: Which page to open on, for whoever opened the menu to reach one of them
-            directly. A page that is shut is not opened on whatever is asked for.
+          running: Whether a flow is running, which is what takes the flows away.
+          inside: Whether to open inside the flow's agents rather than on the flows, for a
+            menu opened already naming one -- a flow that was named has been chosen, so what
+            is left to answer is what drives it.
         """
         super().__init__()
         self._agents = dict(agents)
         self._unavailable = unavailable
-        self._underway = running
         self._kept = kept
         # Said outright, both of them: the flow is read where it is set, so what it is has to
         # be settled without reading what reads it.
@@ -1124,7 +1129,7 @@ class Flows(Drafts[Chosen]):
         #: not a flow. Kept whole so that it still says which list it was a row of.
         self._was = ""
         #: Which place's flows are being read, the arrows stepping between them. "" until the
-        #: page is first drawn: which place the flow in force came from is a thing only the
+        #: flows are first drawn: which place the flow in force came from is a thing only the
         #: list of every flow there is can say, and reading that list is running every file.
         self._where = ""
         #: What became of the last fetch, said under the list.
@@ -1132,12 +1137,15 @@ class Flows(Drafts[Chosen]):
         #: What is being fetched now, so that a second fetch is not started over it and so
         #: that what is said under the list is what is being fetched. "" for none.
         self._fetching = ""
-        # The flows are shut while one is running, so the menu opens on the page that is not.
-        self._tab = _AGENT_PAGE if running else opening % len(self.TABS)
-
-    def turnable(self) -> tuple[bool, ...]:
-        """Which pages may be opened: the agents always, and the flows while none runs."""
-        return (not self._underway, True)
+        #: Whether the agents are the whole of this menu, there being no flows behind them
+        #: to step back to: while a flow runs choosing one is not offered, and a flow that was
+        #: named was chosen on the line that named it rather than picked out of a list. Esc
+        #: reads off this -- a step back to a list nobody walked through is a step somebody
+        #: did not take, and on a `$` that named a flow it would swallow the line typed with
+        #: it.
+        self._only = running or inside
+        #: Whether what is open is the agents of the flow rather than the flows.
+        self._inside = self._only
 
     def _follows(self, listing: OptionList) -> None:
         """Takes which row the cursor is on off the list, rather than off a row number.
@@ -1148,6 +1156,11 @@ class Flows(Drafts[Chosen]):
         which flow it is -- so that a row remembered under one place cannot be taken for a
         row of the next.
 
+        Only a row that says where it came from, which is what a row of flows is: the list is
+        read as the flows are drawn, and coming back out of a flow draws them while its agents
+        are still the rows -- so an id with no place in it is a row of some other list, and
+        taking it would lose where the cursor was before the walk in.
+
         Args:
           listing: The list.
         """
@@ -1155,15 +1168,15 @@ class Flows(Drafts[Chosen]):
         if at is None or not 0 <= at < listing.option_count:
             return
         named = str(listing.get_option_at_index(at).id or "")
-        if named:
+        if _HALVES in named:
             self._was = named
 
     def _fitted(self, runs: Sequence[Runs]) -> list[Runs]:
         """One row per agent the flow drives, whatever there was to fill it with.
 
         A place nothing was remembered for and nothing falls back on still has a row here:
-        this is the page it is set up on, and a place with no row is a place nobody can
-        answer. What such a row says is that it has not been answered yet.
+        this is where it is set up, and a place with no row is a place nobody can answer. What
+        such a row says is that it has not been answered yet.
 
         Args:
           runs: What there is, in the order the flow takes them.
@@ -1204,8 +1217,7 @@ class Flows(Drafts[Chosen]):
         ]
 
     def _ask(self) -> None:
-        """Says what the menu is, puts up the page it opened on, and catches up on fetches."""
-        self.query_one("#asked", Label).update("Flow")
+        """Puts up whichever of the two it opened on, and catches up on fetches."""
         self._fill()
         self.query_one("#choices", OptionList).focus()
         self._catches_up()
@@ -1225,43 +1237,68 @@ class Flows(Drafts[Chosen]):
         per opening, however it goes, so that a machine with no network says so once rather
         than hammering a server on every keystroke.
         """
-        verses = _hmz().verses
+        import asyncio
 
+        verses = _hmz().verses
         for one in verses.all():
             if not one.url or one.fetched:
                 continue
-            name = one.name
+            self._fetching, self._said = one.name, ""
+            self._fill()
+            try:
+                await asyncio.to_thread(verses.fetch, one.name)
+            except (OSError, ValueError) as why:
+                # Said under the list rather than raised at whoever opened the menu: the
+                # question the menu is asking is still worth answering.
+                self._said = escape(str(why))
+            else:
+                self._offers = None  # a place that has flows in it now
+            self._fetching = ""
+            self._fill()
 
-            def fetching(named: str = name) -> str:
-                verses.fetch(named)
-                return named
+    def _walks(self, *, inside: bool) -> None:
+        """Opens what drives the flow, or comes back out to the flows.
 
-            await self._fetches(name, fetching)
+        What was typed and where the cursor was are left behind either way: the two are
+        different lists, so a search that narrowed one to a row would narrow the other to
+        none -- which reads as a list with nothing in it rather than as a search still on.
 
-    def _turned(self) -> None:
-        """Puts the cursor back on the flow being read when the flows page opens again."""
-        self._said = ""
+        Args:
+          inside: Whether to end up on the agents.
+        """
+        self._inside = inside
+        self._typed, self._searching = "", False
+        self._arming, self._said = "", ""
+        self.query_one("#choices", OptionList).highlighted = 0
+        self._drawn = 0
+        self._fill()
 
     def _fill(self) -> None:
-        """Puts up whichever page is open, and the titles above it."""
+        """Puts up whichever is open: the flows, or the agents of the one walked into."""
+        if self._inside:
+            # Which flow these drive, said where the menu says what it is asking: a list of
+            # agents that did not name its flow would be a list nobody could see they had
+            # opened.
+            self.query_one("#asked", Label).update(escape(self._flow))
+            self.query_one("#about", Label).update(
+                "What each agent it drives is: the CLI that takes its turns, the account "
+                "they run as, and the model at an effort. Enter opens one, and save applies "
+                "the complete flow setup."
+            )
+            self.tabbed("")
+            self._agents_page()
+            return
+        self.query_one("#asked", Label).update("Flow")
         self.query_one("#about", Label).update(
             "Which flow the agents are driven through. The first thing you say once it is "
             "chosen is what it is to do. A flow anywhere else is a path you type."
-            if self._tab == _FLOW_PAGE
-            else f"What each agent {escape(self._flow)} drives is: the CLI that takes its "
-            "turns, the account they run as, and the model at an effort. Enter opens one, "
-            "and save applies the complete flow setup."
         )
-        if self._tab != _FLOW_PAGE:
-            self.tabbed(self._tab_line())
-            self._agents_page()
-            return
-        # The places under the pages, since that is what the list under them is one of: which
-        # is settled before either is drawn, so that the strip and the list agree.
+        # The places, since that is what the list under them is one of: settled before either
+        # is drawn, so that the strip and the list agree.
         wheres = self._stepping()
         if self._where not in wheres:
             self._where = self._opens(wheres)
-        self.tabbed(f"{self._tab_line()}\n{self._where_line(wheres)}")
+        self.tabbed(self._where_line(wheres))
         self._flows_page()
 
     def _all(self) -> list[Offer]:
@@ -1309,13 +1346,13 @@ class Flows(Drafts[Chosen]):
         return found or wheres
 
     def _opens(self, wheres: list[str]) -> str:
-        """Which place is read when the page is drawn without one already being read.
+        """Which place is read when the flows are drawn without one already being read.
 
         Args:
           wheres: The places there are to step between.
 
         Returns:
-          The one the flow in force came from, that being the flow this page is about, and
+          The one the flow in force came from, that being the flow the menu is about, and
           otherwise the first there is.
         """
         return next(
@@ -1365,7 +1402,7 @@ class Flows(Drafts[Chosen]):
         Args:
           by: One place on or back.
         """
-        if self._tab != _FLOW_PAGE:
+        if self._inside:
             return  # the agents of one flow come from nowhere but that flow
         wheres = self._stepping()
         if len(wheres) < 2:  # noqa: PLR2004 -- one place is nowhere to step to
@@ -1426,20 +1463,24 @@ class Flows(Drafts[Chosen]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            f"Enter to choose · f copies it here · Esc to close{self.searching()}"
+            "Enter opens what drives it · f copies it here · v the flowverses · "
+            f"Esc to close{self.searching()}"
         )
 
     def _empty(self, whose: str) -> str:
         """What a place with no flows in it says on the row where its flows would be."""
         verse = self._verse(whose)
         if verse is not None and not verse.fetched:
-            return "not fetched yet; /flowverses fetches it"
+            return "not fetched yet; v opens the flowverses, where r fetches it"
         return "nothing in it yet"
 
     def _nothing(self) -> str:
         """What to say under the flows: how a fetch went, or that a search found nothing."""
         if self._fetching:
-            return f"fetching {escape(self._fetching)}…"
+            said = f"fetching {escape(self._fetching)}…"
+            # And why a key was refused while it runs, where one was: a key that did nothing
+            # and said nothing is a key somebody presses again.
+            return f"{said}{_DOT}{self._said}" if self._said else said
         if self._said:
             return self._said
         if self._typed and not any(self.fits(one.name) for one in self._all()):
@@ -1488,10 +1529,13 @@ class Flows(Drafts[Chosen]):
         self.query_one("#tuning", Label).update(
             f"[$text-muted]{said}[/]" if said else ""
         )
+        # Esc is out of the menu only where there is no list of flows to step back to,
+        # which is while a flow is running: the row says what the key does here.
+        back = "Esc to close" if self._only else "Esc back to the flows"
         self.query_one("#keys", Label).update(
-            "Enter to save · Esc to close"
+            f"Enter to save · {back}"
             if at == len(self._places)
-            else "Enter to set one up · Esc to close"
+            else f"Enter to set one up · {back}"
         )
 
     def _noagents(self) -> str:
@@ -1527,8 +1571,7 @@ class Flows(Drafts[Chosen]):
                 self.changed()
             # And walking out of it leaves the flow set up as the draft has it, which is
             # still a flow to go on and answer the agents of.
-        self._said = ""
-        self._turn_page(1)
+        self._walks(inside=True)
 
     def action_fork(self) -> None:
         """Copies the flow under the cursor into this project's own, to be changed.
@@ -1543,7 +1586,7 @@ class Flows(Drafts[Chosen]):
         """
         from hmz.flows import LOCAL
 
-        if self._tab != _FLOW_PAGE:
+        if self._inside:
             return
         named = self._was.partition(_HALVES)[2]
         if not named:
@@ -1566,34 +1609,39 @@ class Flows(Drafts[Chosen]):
         )
         self._fill()
 
-    async def _fetches(self, named: str, doing: Callable[[], str]) -> None:
-        """Runs one git fetch off the event loop, and shows the list it left behind.
+    @work
+    async def action_verses(self) -> None:
+        """Opens where flows come from, which is a question about the places.
 
-        Off the loop because a clone is seconds of network: a menu that stopped redrawing
-        while it ran would be one that looked as though it had gone away. What is being read
-        is left where it is: this is the flowverse nobody has fetched being fetched because
-        its flows are wanted, rather than somebody asking to be taken to it.
+        A menu of its own rather than three more keys here, and reached from here rather than
+        from a command alone: adding a repository, fetching one again and taking one away are
+        done to the list of places rather than to the flow under the cursor. Its own menu for
+        a second reason as well -- each of those runs git as it is asked for, and something
+        that has already been cloned is not a draft this one could hold until it is saved.
 
-        Args:
-          named: What is being fetched, said under the list while it runs.
-          doing: What to do, answering with the flowverse it left behind.
+        What comes back is a different list of flows, so they are read again, and what
+        happened to the places is said under them.
         """
-        import asyncio
-
+        if self._inside:
+            return  # the agents of one flow come from nowhere but that flow
         if self._fetching:
-            return
-        self._fetching, self._said = named or "it", ""
-        self._fill()
-        try:
-            await asyncio.to_thread(doing)
-        except (OSError, ValueError) as why:
-            # Said under the list rather than raised at whoever opened the menu: the question
-            # this page is asking is still worth answering.
-            self._said = escape(str(why))
-            self._fetching = ""
+            # The menu fetches what has never been fetched as it opens, and the other menu
+            # fetches what it is asked to: two clones of one flowverse land in one directory,
+            # where the second finds the path taken and git's tidying up after itself takes
+            # the first one's work away with it.
+            self._said = "the places open once it is done"
             self._fill()
             return
-        self._fetching, self._offers = "", None
+        showing = cast(
+            "App[None]",
+            self.app,  # pyright: ignore[reportUnknownMemberType]
+        )
+        said = await showing.push_screen_wait(Flowverses())
+        self._offers = None
+        if said:
+            # What happened to the places, said under the flows. Only where something did:
+            # a walk in to look and out again must not wipe what the list was already saying.
+            self._said = said[-1]
         self._fill()
 
     @on(OptionList.OptionSelected)
@@ -1603,7 +1651,7 @@ class Flows(Drafts[Chosen]):
         Args:
           event: What was chosen.
         """
-        if self._tab == _FLOW_PAGE:
+        if not self._inside:
             _, _, name = str(event.option.id or "").partition(_HALVES)
             if name:
                 self._chose(name)
@@ -1671,12 +1719,25 @@ class Flows(Drafts[Chosen]):
         self.changed()
         self._fill()
 
+    def leaving(self) -> None:
+        """Comes back out to the flows, or asks about the draft once there is nowhere back.
+
+        Esc is one step back everywhere in this interface, and walking into a flow is a step:
+        leaving outright from the agents would throw away the walk in along with the menu.
+        There is no step back out of a menu that opened inside one -- while a flow runs, and
+        on a flow that was named rather than picked -- so esc there is esc on the menu.
+        """
+        if self._inside and not self._only:
+            self._walks(inside=False)
+            return
+        super().leaving()
+
     def applied(self) -> None:
         """Answers with the flow, its agents and how it is set up, all of it at once.
 
         Unless one of them has not been answered: a flow driven by an agent that names no
-        model is a flow that stops on its first turn, and the page it would be answered on is
-        the page to be looking at when that is said.
+        model is a flow that stops on its first turn, and where it would be answered is what
+        to be looking at when that is said.
         """
         missing = [
             called(self._places, at)
@@ -1684,8 +1745,11 @@ class Flows(Drafts[Chosen]):
             if not _complete(one)
         ]
         if missing:
-            self._tab = _AGENT_PAGE
             telemetry.snag("save-refused", missing=len(missing))
+            if not self._inside:
+                # Refused from the flows, on the way out: the agents are what is to be looked
+                # at, and the cursor was on a row of another list.
+                self._walks(inside=True)
             self._said = f"{escape(', '.join(missing))} has no model yet"
             self._fill()
             return
@@ -1800,14 +1864,17 @@ class Holds(Sheet[None]):
 class Flowverses(Sheet[list[str]]):
     """The places flows come from: what there is, what one holds, and what can happen to one.
 
-    Its own menu rather than keys on the one a flow is chosen at. Adding a repository,
-    fetching one again and taking one away are things done to the list of places rather than
-    to the flow under the cursor, and a sheet that asks `which flow` with three keys on it
-    about something else is a sheet asking two questions. `/flow` still steps between the
-    places with the arrows, that being about which list of flows is being read.
+    Walked to from the menu a flow is chosen at, on `v`, and opened by `/flowverses` -- which
+    is the way in while a flow is running, the flows not being offered then. Its own sheet
+    rather than a deeper view of that menu: adding a repository, fetching one again and taking
+    one away each run git as they are asked for, and something that has already been cloned is
+    not a draft the flow menu could hold until it is saved.
 
-    What happens here happens as it is asked for rather than being held until the menu is
-    saved: each of these runs git, and something that has already been cloned is not a draft.
+    Its own sheet rather than three more keys on the flows for the same reason it is a walk
+    away from them: what happens here happens to the list of places rather than to the flow
+    under the cursor, and a sheet that asks `which flow` with three keys on it about something
+    else is a sheet asking two questions. Stepping between the places stays with the flows,
+    that being about which list of flows is being read.
     """
 
     LETTERS: ClassVar = frozenset({"search", "adding", "refresh", "drop"})
@@ -1831,7 +1898,8 @@ class Flowverses(Sheet[list[str]]):
         self._said = ""
         #: What is being fetched now, so that a second fetch is not started over it.
         self._fetching = ""
-        #: What is worth saying in the transcript once this menu is done with.
+        #: What is worth saying again once this menu is done with, as the menu said it:
+        #: whoever opened it says it where they say things, which is not always a transcript.
         self._told: list[str] = []
 
     def _ask(self) -> None:
@@ -1981,7 +2049,7 @@ class Flowverses(Sheet[list[str]]):
             self._fill()
             return
         self._said = f"{escape(one.name)} is no longer here"
-        self._told.append(f"[dim]{escape(one.name)} is no longer here[/dim]")
+        self._told.append(self._said)
         self._was = ""
         self._read()
         self._fill()
@@ -2012,7 +2080,7 @@ class Flowverses(Sheet[list[str]]):
             return
         self._fetching = ""
         self._said = f"{escape(name)} is fetched"
-        self._told.append(f"[dim]{escape(name)} is fetched[/dim]")
+        self._told.append(self._said)
         self._read()
         self._was = name
         self._fill()
@@ -4948,7 +5016,6 @@ class Fallbacks(Drafts[list[str]]):
     said in `/providers` where the accounts are.
     """
 
-    TABS: ClassVar = ("Fallback",)
     LETTERS: ClassVar = frozenset({"search", "adding", "drop"})
 
     BINDINGS: ClassVar = [
@@ -5366,13 +5433,10 @@ class Providers(Drafts[list[str]]):
     never a value: this is drawn where somebody can read it.
     """
 
-    TABS: ClassVar = ("Providers",)
     LETTERS: ClassVar = frozenset({"search", "adding", "drop"})
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
-        Binding("tab", "next_tab", "next page", priority=True),
-        Binding("shift+tab", "prev_tab", "previous page", priority=True),
         Binding("s", "search", "search", priority=True),
         Binding("a", "adding", "make one", priority=True),
         Binding("d", "drop", "take one away", priority=True),

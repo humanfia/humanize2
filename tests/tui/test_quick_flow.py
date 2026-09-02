@@ -124,15 +124,17 @@ async def sends(app: Humanize, driver: Pilot[None], line: str) -> None:
 
 
 async def saves(app: Humanize, driver: Pilot[None]) -> None:
-    """Saves the flow menu from the row that says so, which is on its agents page.
+    """Saves the flow menu from the row that says so, which is the last of its agents'.
+
+    A menu opened on a flow that was named opens inside it, there being nothing left to
+    choose, so the row is already there to walk to.
 
     Args:
       app: The interface.
       driver: What is pumping it.
     """
     sheet = cast("Flows", app.screen)
-    await driver.press("tab")
-    await until(lambda: sheet._tab == 1, driver)
+    await until(lambda: sheet._inside, driver)
     await opens(app, driver, "save")
     await until(lambda: not isinstance(app.screen, Flows), driver)
 
