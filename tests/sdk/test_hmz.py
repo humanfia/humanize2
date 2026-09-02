@@ -55,10 +55,18 @@ def test_what_it_is_asked_for_is_what_it_loads() -> None:
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
     )
 
-    # The runtime, because that is where `Hmz` is written and this hands it through rather
-    # than keeping a copy -- and nothing under the runtime, which is the whole of the point.
-    reached = {name.split(".")[1] for name in result.stdout.split()}
-    assert reached == {"runtime", "sdk"}
+    # By the whole name of each and not by the directory it is in: what must not be loaded
+    # is now under the same directory as what must -- a tracer, an exporter and every layer
+    # they name all sit beside the module `Hmz` is written in, and a set of directories
+    # would say `runtime` either way.
+    assert set(result.stdout.split()) == {
+        # What was named, which hands through rather than keeping a copy of its own.
+        "hmz.sdk",
+        # The runtime's front door, which is where `Hmz` is written.
+        "hmz.runtime",
+        "hmz.runtime.doing",
+        "hmz.runtime.doing.core",
+    }
 
 
 def test_the_places_flows_come_from_are_the_four_that_are_always_there() -> None:

@@ -220,10 +220,15 @@ ways in hold: `status()`, `attach()`, `detach()`, `stop()`, `kill()`.
 ```python
 from hmz.sdk import Daemons, Hmz
 
+LINE = ["-f", "ralph_loop", "-a", "claude/claude-opus-5:high", "fix the build"]
+
 
 def opens(session):
-    # Runs in the held process, and returns when the run is over.
-    Hmz().run("ralph_loop", agents, "fix the build").run()
+    # Runs in the held process, and returns when the run is over. `session` is what lets go
+    # of the terminals reading it; a run nobody is drawing for never needs it.
+    hmz = Hmz()
+    flow, agents, task, config, _ = hmz.read(LINE)
+    hmz.run(flow, agents, task, config).run()
 
 
 held = Daemons().hold(opens)
