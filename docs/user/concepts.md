@@ -254,8 +254,9 @@ Gathering one reads the backends' own transcripts and names each session by the 
 opened it, using the epic. It writes a Chrome JSON trace into the epic of the run it is a trace
 of; load it in [ui.perfetto.dev](https://ui.perfetto.dev). Each agent is a process, each row of
 that agent's sessions is a track, and each slice is one thing the agent did. A run is gathered
-from [`/epics`](/reference/tui#the-runs-that-have-already-happened) — **enter** on the run, then
-*collect a trace* — and from Python as `Hmz().epics.traced(epic)`.
+from [`/epics`](/reference/tui#the-runs-that-have-already-happened) — **enter** goes into the
+run, and *export it* gathers the trace and packs it with the run — and from Python as
+`Hmz().epics.traced(epic)`.
 
 It works on sessions no flow ever drove, too: a trace of yesterday's Claude Code session is
 `Hmz().epics.trace()` away. See [Tracing](/reference/tracing).

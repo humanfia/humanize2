@@ -20,6 +20,7 @@ import tarfile
 from typing import TYPE_CHECKING
 
 import pytest
+from textual.widgets import Label
 
 from hmz.runtime.epic import epics
 from hmz.runtime.exporting import TRANSCRIPT
@@ -127,7 +128,7 @@ async def test_packaging_a_run_up_is_not_a_command_of_its_own() -> None:
 async def test_a_run_out_of_the_list_is_exported_from_the_menu_under_it(
     workspace: Path,
 ) -> None:
-    """Exporting an old run belongs beside gathering its trace: both are reading one back."""
+    """Exporting an old run is gathering its trace as well: both are reading one back."""
     _ran("do the thing")
 
     app = Humanize()
@@ -142,10 +143,19 @@ async def test_a_run_out_of_the_list_is_exported_from_the_menu_under_it(
         await onto(app, driver, "export")
         await driver.press("enter")
         await until(lambda: app.screen is sheet, driver)
-        await until(lambda: "epic.tar.gz" in _transcript(app), driver)
+        # Under the list while it is open: what was written reaches the transcript when the
+        # list is left, so waiting for it there with the list still up waits for nothing.
+        await until(
+            lambda: "epic.tar.gz" in str(sheet.query_one("#tuning", Label).content),
+            driver,
+        )
 
     (epic,) = epics(workspace)
     at = workspace / ".humanize" / f"{epic.name}.epic.tar.gz"
     assert at.is_file()
+    held = _held(at)
     # No transcript in this one: what is on the screen is not this run, which may be a week old.
-    assert TRANSCRIPT not in _held(at)
+    assert TRANSCRIPT not in held
+    # And the trace of the run rides along, gathering one having been the other half of the
+    # row this was: a bundle is read by somebody who was not there.
+    assert [one for one in held if one.startswith("traces/")], held

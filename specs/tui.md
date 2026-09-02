@@ -175,11 +175,10 @@ line, with what the flow is doing beside the transcript.
   somebody to run the suite.
 - `hmz internal anchor` MUST NOT be a command here: it is not a thing to do to a flow that is
   running, and a command that only ever means one thing is a command line. Gathering a trace
-  MUST NOT be one either -- it is a thing done to a run that has already happened, so it is
-  one of the things `/epics` offers about the run under the cursor rather than a command of
-  its own.
-- `/resume` MUST carry the last run in this directory on, as `/epics` carries the run under
-  its cursor on: that run's own flow, on that run's own agents, with what it was asked to do,
+  MUST NOT be one either -- it is a thing done to a run that has already happened, so it comes
+  of exporting a run gone into from `/epics` rather than being a command of its own.
+- `/resume` MUST carry the last run in this directory on, as `/epics` carries the run gone
+  into on: that run's own flow, on that run's own agents, with what it was asked to do,
   and on what it left behind. A command of its own unlike a trace, which is a thing done to a
   run that has already happened: a run picked up is a flow started, which is the one thing
   this prompt is for, and the last run is not something anybody has to find in a list. It
@@ -596,35 +595,59 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   it opened -- and marking the ones whose flow says they can be picked up again. A run is
   written down as it happens and nothing showed them, which made the record something only a
   command line could reach.
-- It MUST be read rather than chosen from: enter MUST open what there is to do with the run
-  under the cursor rather than doing any of it, since what there is depends on that run. A
-  flow that says it can be picked up MUST offer carrying on from where it stopped; every run,
+- It MUST be read rather than chosen from: enter MUST go into the run under the cursor rather
+  than doing anything to it, since what there is to do depends on that run. A flow that says
+  it can be picked up MUST offer carrying on from where it stopped, from in there; every run,
   whatever its flow says, MUST offer the things that can be done to a run that is over.
+- What is drawn on going into a run MUST say where that run is written down, since that is
+  where its sessions are linked and what anybody reading one back opens. It was a row of its
+  own that printed the path under the list, which is an errand to send somebody on for
+  something the sheet is already about.
 - Whether a run can be picked up MUST be asked of its flow rather than read off the run,
   wherever it is said -- the mark on the row and the row in the menu alike: a flow is a
   directory on disk, and one marked since that run is one whose older runs can be picked up
   now, while one that no longer says so MUST say why there is nothing to carry on from rather
   than offering it. What the run recorded is what it was, not what can be done with it.
-- A trace gathered here MUST be a trace of that run: the sessions it opened and no others,
-  asked for by the ids it wrote down rather than by the directory it ran in. A trace of what
-  a directory holds whoever opened it MUST NOT be offered here at all -- this is a list of
-  runs, and a trace that is of none of them has nothing here to hang on. There is no way in
-  that asks for one: :meth:`hmz.sdk.Hmz.epics.trace` with no sessions named gathers every
-  session of the workspace, and nothing typed and nothing drawn calls it that way.
-- A run MUST also be exportable from here, beside gathering its trace: both are reading one
-  back afterwards, and a report about something that went wrong last week is written about a
-  run out of this list rather than about the one on the screen. What is written MUST be what
-  `hmz.runtime.exporting` writes and MUST carry no transcript -- what is on the screen is not
-  that run, which may be a week old, and a screen of somebody else's run in it would be a
-  bundle saying something that is not true. Where the archive landed and how big it came out
-  MUST be said, and writing it MUST NOT hold the interface still: following a day's logs and
-  compressing them is seconds, and an interface that stopped redrawing for them would look as
-  though it had gone away.
+- A run MUST be exportable from in there, and exporting one MUST gather a trace of it and
+  carry that trace in the archive. They were two things to ask for, and one of them wrote a
+  file into the run that the other packed anyway: what is sent to somebody who was not there
+  has to be a thing they can read the run out of, and a bundle they must gather a timeline
+  from themselves is a bundle that stopped one step short. Both are reading a run back
+  afterwards, and a report about something that went wrong last week is written about a run
+  out of this list rather than about the one on the screen.
+- The trace MUST be a trace of that run: the sessions it opened and no others, asked for by
+  the ids it wrote down rather than by the directory it ran in. A trace of what a directory
+  holds whoever opened it MUST NOT be offered here at all -- this is a list of runs, and a
+  trace that is of none of them has nothing here to hang on. There is no way in that asks for
+  one: :meth:`hmz.sdk.Hmz.epics.trace` with no sessions named gathers every session of the
+  workspace, and nothing typed and nothing drawn calls it that way.
+- What is written MUST be everything the run wrote down and everything its sessions were
+  logged to, and MUST carry no transcript -- what is on the screen is not that run, which may
+  be a week old, and a screen of somebody else's run in the bundle would be a bundle saying
+  something that is not true. Where the archive landed and how big it came out MUST be said,
+  and writing it MUST NOT hold the interface still: following a day's logs and compressing
+  them is seconds, and an interface that stopped redrawing for them would look as though it
+  had gone away.
+- Exporting one run twice MUST leave one trace of it rather than a pile: the archive is named
+  for the run and replaces itself, a run that is over does not read any differently tomorrow,
+  and an epic that grew a trace every time somebody sent it would make every later archive
+  bigger than the one before. A trace gathered by hand is the other thing and keeps both.
 - Carrying a run on MUST run that run's own flow, on that run's own agents, with what it was
   asked to do -- what is being picked up is what ran, and an agent swapped under it would be
   a different run wearing its name. It MUST be a run of its own, saying which run it came
   from, since a closed epic is never reopened. While a flow is running it MUST be refused
   where it was asked for, `ctrl+c` twice being what stops one.
+- Carrying a run on from in there MUST be the same thing `/resume` is of the last run, with
+  the run already named: what picking a run up does, and what stands in the way of it, MUST be
+  settled in one place for both. So a run that left nothing behind MUST be turned down there
+  in the words it is turned down in at the prompt, rather than started from the top wearing a
+  line saying which run it came from -- which would be a record of something that did not
+  happen. Two ways to pick a run up that took one up or turned it down on different grounds
+  would be two answers to one question.
+- Whether a flow is running MUST be asked when a run is picked up rather than settled when the
+  list opened: what has already happened is worth reading while a flow works, so the list
+  outlives the run it was opened during, and one holding an answer from then would go on
+  refusing in the name of a flow that has since finished.
 - It MUST be readable while a flow runs: what has already happened does not change under one.
 
 ### The run, drawn

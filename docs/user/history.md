@@ -40,8 +40,9 @@ its own is in it either.
 
 ## What it is not
 
-- **Not a session log.** For what actually happened, [exporting a run](/user/export) packages
-  the whole of it up and [a trace](/user/tracing) draws it as one timeline.
+- **Not a session log.** For what actually happened, [exporting a run](/user/export) from
+  `/epics` packages the whole of it up, with [a trace](/user/tracing) inside that draws it as
+  one timeline.
 - **Not shared with the flow.** A flow gets the task it was started with. It cannot read the
   history.
 - **Not on the command line.** `hmz exec` takes its task as an argument. Your shell's own
