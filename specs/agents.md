@@ -1107,14 +1107,27 @@ class CommandSessionBase(SessionBase):
 def codename() -> str: ...
 ```
 
-- What an agent nobody named is called. It MUST be one rule and nothing else: a Greek word,
-  capitalised at the front and wherever the word breaks, and three digits -- `NeiKos496`. The
-  twelve the story spells out MUST be among what it answers with and MUST come up far oftener
-  than their share of the pool, a name being only a joke to somebody who recognises it.
-- A word MUST be buildable rather than only listed, since a list has a last word and there
-  MUST NOT be one: morphemes join at the capital, so `Meta` and `Kratos` are `MetaKratos` by
-  the same rule that spells `ApoRia`. There MUST be at least two morphemes a word may lead
-  with, the count being spelled in them.
+- What an agent nobody named is called. It MUST be two rules and no more, one for what the
+  story has already spelled and one for what it never did. A code drawn from the canon MUST be
+  a designation the story spells, copied verbatim in whatever shape the story spells it --
+  `NeiKos496`, `Golem99`, `ScreW`. A code that is generated MUST be a Greek word, capitalised
+  at the front and wherever the word breaks, and three digits -- `KykLos204`. The two differ
+  because one has a source and the other has none: giving `Ortho102` the inner capital the
+  heirs carry, or padding `Imora8` out to three digits, would hand out a name the story never
+  gave, and a name nobody can recognise is the whole of what a codename is for; while a
+  generated word has nothing to copy, so a rule is the only thing that keeps the supply
+  endless.
+- Every designation the story says out loud MUST be among what it answers with -- the current
+  heirs, the heirs of earlier recurrences, the signals logged before there were heirs at all,
+  and the outsiders who entered the experiment rather than being run by it -- and they MUST
+  come up far oftener than their share of the pool, a name being only a joke to somebody who
+  recognises it. A designation MUST NOT be invented for a bearer the story left without one.
+- A generated word MUST be buildable rather than only listed, since a list has a last word and
+  there MUST NOT be one: morphemes join at the capital, so `Meta` and `Kratos` are `MetaKratos`
+  by the same rule that spells `ApoRia`. There MUST be at least two morphemes a word may lead
+  with, the count being spelled in them. What the canon spells MUST NOT be fed back into this:
+  a stem the story issued whole, hung with three digits of the generator's own, is neither
+  rule and reads as a bug.
 - A code MUST NOT be handed out twice in one process. Two agents left unnamed are two agents,
   and a name is what a trace groups an agent's sessions under.
 - A process that has drawn every short code MUST be answered with a longer one built the same

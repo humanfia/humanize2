@@ -3092,8 +3092,9 @@ class AgentBase(ABC):
         Args:
           config: The model and effort every session of this agent runs at.
           name: What to call this agent, defaulting to one nothing else answers to -- a
-            Chrysos Heir's, out of :mod:`hmz.coganchor.agents.codenames`. Two agents sharing a name
-            are one agent to a trace, which is how the roles of a flow survive being restarted; two
+            designation out of Amphoreus, from :mod:`hmz.coganchor.agents.codenames`, which may be
+            a Chrysos Heir's or may be `Golem99`. Two agents sharing a name are one agent to a
+            trace, which is how the roles of a flow survive being restarted; two
             left unnamed are two, which is how one configuration driven twice -- an actor and the
             reviewer reading its work -- stays two.
         """
