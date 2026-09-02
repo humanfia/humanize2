@@ -1,10 +1,11 @@
 """A run being read from a terminal, as whatever is holding the run sees it.
 
-A protocol rather than the thing itself, so that the interface names no daemon: the point of
-it is that the interface can ask how many terminals are reading and let go of them without
-knowing what is holding the run. What is worth checking about such a protocol is the two
-halves of that promise -- that the thing a daemon really hands over satisfies it, and that
-something which only half does is not mistaken for one.
+A protocol rather than the thing itself, so that a run held apart from a terminal and a run in
+the process somebody typed `hmz` in are one interface: whatever is drawing asks how many
+terminals are reading and lets go of them without knowing which of the two it is in. What is
+worth checking about such a protocol is the two halves of that promise -- that the thing a
+daemon really hands over satisfies it, and that something which only half does is not mistaken
+for one.
 
 The socket is bound by a bare name from inside its own directory: a Unix socket address holds
 about a hundred bytes whole, 104 of them on macOS, and the directory pytest hands out is
@@ -46,7 +47,7 @@ def held(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Held]:
 def test_what_a_daemon_holds_a_run_in_is_what_the_interface_was_promised(
     held: Held,
 ) -> None:
-    """Which is the whole of the coupling: the interface names this and no daemon."""
+    """Which is the whole of the coupling: what is drawing names this and no `Held`."""
     assert isinstance(held, Session)
 
 

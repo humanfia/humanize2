@@ -392,7 +392,9 @@ Every way in — the command, and every sheet of the interface — is a shell ar
 can make yourself. The layer each lives in is named in
 [Architecture](/contributing/architecture).
 
-Every one of them is [`Hmz`](/reference/sdk), which is the same object the command line holds:
+Every one of them is [`Hmz`](/reference/sdk) — the object the command line itself holds, which
+it reaches as `from hmz.runtime import Hmz` and which `hmz.sdk` hands out to whoever is calling
+humanize from outside:
 
 ```python
 from hmz.sdk import Hmz
@@ -409,7 +411,7 @@ hmz.verses.add("humanfia/flowverse")
 - `hmz.accounts` — [Providers](/reference/providers)
 - `hmz.verses` — [Flowverses](/weaver/flowverses)
 
-The layers under it are reachable directly where that is what you want — the SDK composes them
+The layers under it are reachable directly where that is what you want — `Hmz` composes them
 and restates none of them:
 
 ```python

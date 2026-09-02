@@ -136,7 +136,7 @@ _THEIRS = "<not humanize>"
 _ABOUT: dict[str, Callable[[], object]] = {}
 _TELLING = threading.Lock()
 
-#: Whether the SDK has been started here, so that two entry points in one process -- the
+#: Whether reporting has been started here, so that two entry points in one process -- the
 #: interface, and a flow it runs -- start it once. A list rather than a name that is rebound,
 #: since what it holds is a thing that happens rather than a constant.
 _started: list[bool] = []

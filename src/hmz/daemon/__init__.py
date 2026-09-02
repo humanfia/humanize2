@@ -11,10 +11,16 @@ terminal reads it by connecting to a socket beside it. Letting go of a terminal 
 stopping the run: the flow goes on taking its turns, and the next terminal to arrive is drawn
 for from the top.
 
-Nothing here knows what a run is. What it holds is a callable that opens one and returns when
-it is over, which is what keeps the interface and this apart: the interface draws on a
-terminal, and whether that terminal is somebody's ssh session or one of these is not a thing
-it has to be told.
+How a run is opened is still none of this. What is held is a callable that opens one and
+returns when it is over, which is what keeps what draws and what holds apart: the interface
+draws on a terminal, and whether that terminal is somebody's ssh session or one of these is
+not a thing it has to be told.
+
+What the run *is* is this package's now. It is the process a run of this workspace happens in,
+so it is where the runtime is reached from: :class:`Hmz` is handed through from
+:mod:`hmz.runtime` under this name, and the interface it holds asks it for everything it does
+rather than draws. A name rather than a message, because the interface runs inside this
+process -- a round trip here would be a process asking itself.
 """
 
 from __future__ import annotations
@@ -32,12 +38,15 @@ from hmz.daemon import where
 from hmz.daemon.attach import attaches, reads, size
 from hmz.daemon.proto import CONTROL, Frames, asked, spoken
 from hmz.daemon.serve import Held, hosts, logged
+from hmz.daemon.session import Session
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-__all__ = ["Daemon", "Held", "daemons", "running", "start"]
+    from hmz.runtime import Hmz
+
+__all__ = ["Daemon", "Held", "Hmz", "Session", "daemons", "running", "start"]
 
 #: How long a daemon is given to bind its socket before whoever asked for one gives up. It is
 #: a fork and a bind; a second is already generous, and ten is a machine under load.
@@ -56,6 +65,30 @@ _TICK = 0.1
 #: is a connect to a file on this machine: either it is refused at once or it is taken, and a
 #: wedged one must not be what a listing of every run on the machine waits on.
 _ANSWERS_AT_ONCE = 1.0
+
+
+def __getattr__(name: str) -> object:
+    """Hands through the runtime this holds a run in, out of the layer it is written in.
+
+    Fetched when it is named rather than imported at the top, for the reason every layer here
+    is: what holds a run apart from a terminal is a process and a socket, and a line that only
+    asks which runs are being held must not pay for the flows, the drivers and the traces.
+
+    Args:
+      name: What was asked for.
+
+    Returns:
+      The same object :mod:`hmz.runtime` holds, so that there is one of each however it was
+      reached.
+
+    Raises:
+      AttributeError: If nothing here is called that, as for any other module.
+    """
+    if name != "Hmz":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from hmz.runtime import Hmz
+
+    return Hmz
 
 
 @dataclass(frozen=True, slots=True)

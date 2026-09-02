@@ -95,8 +95,7 @@ def _exec(argv: list[str]) -> int:
       Zero, once the flow has returned.
     """
     from hmz.flows import NotAFlow
-    from hmz.runtime import telemetry
-    from hmz.sdk import Hmz
+    from hmz.runtime import Hmz, telemetry
 
     from .output import Out, Shown
 
@@ -306,15 +305,15 @@ def apart(session: Held) -> None:
     # it has to be settled before the interface below is reached.
     _prepare_textual_terminal()
 
-    from hmz.sdk import Hmz
     from hmz.tui import Humanize
 
     app = Humanize(session=session)
     # Each of these is called from a thread of whatever is holding the run, so each hands the
-    # work to the interface's own thread and waits there rather than here.
+    # work to the interface's own thread and waits there rather than here. What is running
+    # here is not among them: the daemon is the process those flows are running in and asks
+    # the runtime itself, rather than being handed the answer by whatever it is holding.
     session.redrawn(lambda: app.call_from_thread(app.reattached))
     session.stopping(lambda: app.call_from_thread(app.action_quit))
-    session.says(lambda: {"flows": [one.flow for one in Hmz().flows.running()]})
     app.run()
 
 
