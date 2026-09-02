@@ -59,6 +59,7 @@ dev = [
     "pytest-timeout>=2.3",
     # Exercises dsh's dotenv-compatible native configuration without making the SDK
     # itself part of every development environment.
+    "pytest-xdist>=3.8.0",
     "python-dotenv>=1.2.3",
     "ruff>=0.16.5",
 ]
@@ -68,7 +69,14 @@ dev = [
 asyncio_mode = "auto"
 # A marker nobody registered is a typo, and a typo in `-m` selects nothing.
 # `-ra` names what was skipped, so a test that quietly stops running says so.
-addopts = ["--strict-markers", "--strict-config", "-ra"]
+# `-n auto` because nothing here is CPU-bound: every test drives a subprocess, a socket or a
+# pseudoterminal and spends its time waiting on one, so a machine's cores sit idle while the
+# suite takes a quarter of an hour. Run across them it is a minute and a half, which is the
+# difference between a gate somebody runs before pushing and one they learn to skip. Each
+# test already has a home, a workspace and a temporary directory of its own -- `tmp_path` and
+# the autouse fixtures in `tests/conftest.py` -- so there is no shared state for the workers
+# to race on. `auto` rather than a number: CI's runners are not this machine.
+addopts = ["--strict-markers", "--strict-config", "-ra", "-n", "auto"]
 # A ceiling on any one test that did not ask for its own. Everything here drives processes,
 # sockets and pseudoterminals, and every one of those has a way of waiting forever -- which
 # without this is a whole job sitting at the wall until CI kills it, saying nothing about
