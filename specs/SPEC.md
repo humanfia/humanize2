@@ -121,6 +121,8 @@ class Settings:
 
     def config(self, flow: str) -> dict[str, Any]: ...
 
+    def budget(self, flow: str) -> dict[str, Any]: ...
+
     def flows(self) -> dict[str, Any]: ...
 
     def remember(
@@ -129,6 +131,7 @@ class Settings:
         names: tuple[str, ...],
         models: Sequence[Runs],
         config: dict[str, Any] | None = None,
+        budget: dict[str, Any] | None = None,
     ) -> None: ...
 
     def answers(self, *, enable_sentry: bool) -> None: ...
@@ -152,6 +155,12 @@ not a workspace's.
   everything else MUST be whatever is on disk now.
 - A file that is missing, unreadable or not what this writes MUST read as nothing remembered
   rather than as a reason to stop.
+- What a run of a flow here may spend MUST be remembered beside how that flow was set up and
+  never inside it: the flow declares at most a default, and this is what the person running it
+  here decided a run of it is worth. Remembering either MUST be asymmetric in the same way --
+  what is not handed in MUST be read back rather than forgotten, since the flow's whole entry
+  is replaced -- so that choosing the agents again is not a way of forgetting either of them,
+  and an empty value MUST erase.
 
 ## `runtime/telemetry.py`
 
@@ -772,7 +781,19 @@ class Runner:
         config: BaseModel | dict[str, Any] | None = None,
         resume: str | os.PathLike[str] | None = None,
         container: str = "",
+        budget: Allowance | Mapping[str, Any] | None = None,
     ): ...
+
+    @property
+    def budget(self) -> Allowance:
+        """What this run will be held to, whoever or whatever settled it."""
+
+    @property
+    def unwatched(self) -> bool:
+        """Whether nothing will stop this run and nobody said that is the point."""
+
+    def unreadable(self) -> str:
+        """Which caps this run was given nothing in it can read, in words."""
 
     @property
     def agents(self) -> tuple[AgentBase, ...]:
@@ -792,12 +813,14 @@ def read_agent(spec: str) -> tuple[str, Profile, str, str, str]:
 
 def flow_and_agents(
     argv: list[str],
-) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, bool]:
+) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, Allowance | None, bool]:
     """Reads an `hmz exec` line into a flow, the agents, the task, and the flow's setup."""
 
 
-def set_up_from(said: str | os.PathLike[str]) -> dict[str, Any]:
-    """Reads what a flow is to be set up with out of a file of it."""
+def set_up_from(
+    said: str | os.PathLike[str],
+) -> tuple[dict[str, Any] | None, Allowance | None]:
+    """Reads what a flow is set up with, and what a run of it may spend, out of a file."""
 ```
 
 What starts a flow: the file it is in, the agents it takes, and the line naming both. What a
@@ -843,12 +866,24 @@ never have reason to name this module.
 - Whether a run here is profiled as well as traced MUST be read from this workspace's own
   settings rather than from the epic, which is the run written down rather than the settings
   under it.
+- Every run MUST be held to an allowance, whether or not the flow said anything about one,
+  and the reckoning MUST be made and hung on every agent where the run starts rather than
+  wherever a run is started from: a command line, the interface, the daemon and a flow calling
+  another are then one run held to one thing, and nothing that can start a flow has to remember
+  to hang one on. What the flow declared MUST be a default and MUST be overridable by whoever
+  started the run.
+- `-c` MUST take one reserved top-level key, which is the run's allowance rather than a
+  setting of the flow, and MUST lift it out before the flow's own model ever sees it: a model
+  refuses a field it never declared. A file left holding nothing for the flow after that MUST
+  read as a flow left as it comes rather than as a flow set up with nothing, since a flow that
+  takes no config takes no empty one either.
 - `flow_and_agents` MUST read the same `hmz exec` line the command takes, and MUST be here
   rather than in `cli`: the terminal interface starts a flow from that line and then keeps the
   agents, and a reader that lived in the command line would be one the interface reached up
   into. It MUST NOT load a flow to answer a `--help`, nor refuse a line for a flow it cannot
   read: what a place suggests about goals is a convenience, and reporting the flow is
-  `Runner`'s one job.
+  `Runner`'s one job. What the file says the run may spend MUST be handed back beside what it
+  says the flow is set up with, and MUST NOT be folded into it.
 - An `-a` naming several agents MUST be split into them before any one of them is read, so
   that a line naming three and mistyping one is answered about the one it got wrong rather than
   about all three. What each agent is MUST be read out of `backends`, an agent being a backend
@@ -995,7 +1030,9 @@ class Flows:
     def resumes(self, named: str | os.PathLike[str]) -> bool: ...
     def fork(self, named: str, into: str | os.PathLike[str] | None = None) -> str: ...
     def running(self) -> tuple[Running, ...]: ...
-    def set_up_from(self, said: str | os.PathLike[str]) -> dict[str, Any]: ...
+    def set_up_from(
+        self, said: str | os.PathLike[str]
+    ) -> tuple[dict[str, Any] | None, Allowance | None]: ...
 ```
 
 The flows there are, and the places they come from.
