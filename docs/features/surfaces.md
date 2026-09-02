@@ -17,15 +17,15 @@ job.
 ## A flow starts near you
 
 A flowverse is one place flows come from: a Git repository whose flows directory is the only
-part offered to humanize. The built-in flows are read from the package instead, and the project
-flow directory and the one in your home are places too — called local and user, even though
-nothing fetches either of them.
+part offered to humanize. `chat` is read from the package instead, and the project flow
+directory and the one in your home are places too — called local and user, even though nothing
+fetches either of them.
 
 That gives a name two different orders:
 
 | | |
 | --- | --- |
-| **The catalogue** | the flows humanize ships, then the official flowverse, then added flowverses, and finally the local places, wherever either has something to show |
+| **The catalogue** | humanize's own flows, then added flowverses, and finally the local places, wherever either has something to show |
 | **An unqualified name** | this project first, then your home, then everywhere else — what is nearest wins |
 | **A qualified name** | its flowverse outright, bypassing that precedence |
 

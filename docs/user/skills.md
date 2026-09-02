@@ -75,7 +75,7 @@ A flow is a directory. The `skills/` inside it is what that flow works by, in th
 every one of these CLIs already reads a skill in:
 
 ```
-official/rlar/
+rlar/
 ├── __init__.py
 └── skills/
     └── review-notes/

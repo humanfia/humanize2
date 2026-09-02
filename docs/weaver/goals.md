@@ -131,11 +131,11 @@ refusing can use it to decide when to stop.
 
 ## The flow that is this
 
-[`official/goal`](/flows/goal) is Ralph with the task set as the agent's own goal. The loop
+[`goal`](/flows/goal) is Ralph with the task set as the agent's own goal. The loop
 starts it over only when it stopped without having met it.
 
 ```sh
-hmz exec -f official/goal -a claude/claude-opus-5:max "$(cat TASK.md)"
+hmz exec -f goal -a claude/claude-opus-5:max "$(cat TASK.md)"
 ```
 
 ## See also

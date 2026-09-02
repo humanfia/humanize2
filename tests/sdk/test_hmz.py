@@ -69,23 +69,18 @@ def test_what_it_is_asked_for_is_what_it_loads() -> None:
     }
 
 
-def test_the_places_flows_come_from_are_the_four_that_are_always_there() -> None:
-    assert [one.name for one in Hmz().verses.all()] == [
-        "builtin",
-        "official",
-        "local",
-        "user",
-    ]
+def test_the_places_flows_come_from_are_the_three_that_are_always_there() -> None:
+    assert [one.name for one in Hmz().verses.all()] == ["official", "local", "user"]
 
 
 def test_where_a_place_came_from_is_asked_of_which_place_it_is() -> None:
-    """An empty URL means three different things, and one of them is humanize's own."""
+    """An empty URL means two different things, and neither is humanize's own."""
     verses = Hmz().verses
     by_name = {one.name: one for one in verses.all()}
 
-    assert verses.whence(by_name["builtin"]) == "the flows humanize ships"
     assert "your own flows" in verses.whence(by_name["local"])
-    # And humanize's own flowverse is where it is fetched from, whether or not it has been.
+    # And humanize's own flowverse is where it is fetched from, whether or not it has been --
+    # the handful it keeps in the package are under that name too, and came from there.
     assert verses.whence(by_name["official"]).startswith("https://")
 
 

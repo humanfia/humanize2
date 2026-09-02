@@ -71,7 +71,10 @@ and it goes *into* the running turn rather than starting a new one. `/` lists ev
 
 ### Or without the interface
 
-The same flow, the same agent, with the task on the line instead:
+The same flow, the same agent, with the task on the line instead. `ralph_loop` is one of
+humanize's own flows, which live in a [flowverse](/weaver/flowverses) fetched the first time
+the flow menu opens — so if you have come straight here, open `hmz` once first and press
+`/flow`.
 
 ::: code-group
 

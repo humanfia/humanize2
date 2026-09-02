@@ -74,24 +74,30 @@ hmz exec -f yours/review -a claude/claude-opus-4-8:high "the payments module"
 stand in for. That is the whole feature: flows in a repository are offered by name, on every
 machine you add the repository to.
 
-## The two that are always there
+## The one that is always there
 
-| | |
-| --- | --- |
-| `builtin` | the flows in the package: [`chat`, `ralph_loop`, `stateful_ralph`](/flows/) |
-| `official` | [humanfia/flowverse](https://github.com/humanfia/flowverse) — [everything else](/flows/) humanize offers |
-
-Neither can be taken away. Run one from `official` by giving `-f` the flowverse and the flow:
+`official` is humanize's own, and it is kept in two places: `chat` is in the package, because
+an interface that has never reached a network still has to have something to open talking to,
+and [everything else](/flows/) is in
+[humanfia/flowverse](https://github.com/humanfia/flowverse). Which of the two a flow is in is
+humanize's business rather than yours, so both are offered under the one name and every flow of
+humanize's is run by a bare one:
 
 ```sh
-hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
+hmz exec -f rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
 ```
 
-`official` is **listed before it has been fetched**, because what there is to run is not the
-same question as what has been downloaded. Opening `/flow` fetches whatever has never been
-fetched, so in practice it is there by the time you look — and a flow from a flowverse that has
-not been fetched says so, rather than saying there is no such file. The name is right; the
-download has not happened.
+`official/rlar` is the qualified spelling and still resolves — it is the one that pins a flow to
+the place it came from — but nothing needs it, and a flow that moves from the package into the
+flowverse goes on answering to the name it always had.
+
+It cannot be taken away, and it is **listed before it has been fetched**, because what there is
+to run is not the same question as what has been downloaded. Opening `/flow` fetches whatever
+has never been fetched, so in practice it is there by the time you look; from then on every
+start of the interface takes what each repository says now, in the background and without a
+word about it — except for a clone you have written into, which is left where it is, a fetch
+being what would take the edit back. A flow from a flowverse that has not been fetched says so, rather than saying
+there is no such file. The name is right; the download has not happened.
 
 ## Adding one
 
@@ -121,8 +127,7 @@ hmz exec -f yours/review -a claude/claude-opus-5:high "the payments module"
 - `add` names it after the repository when you do not, as `git clone` does.
 - `all` answers with the places themselves, in the order their flows are offered, so a script
   reads the names off the objects rather than off anything printed.
-- `holds` answers `official/humanize1:gen-plan`, not the `official/humanize1` its filename
-  would suggest. Working that out means **importing** the files, which is what `/flow` does for
+- `holds` answers `humanize1:gen-plan`, not the `humanize1` its filename would suggest. Working that out means **importing** the files, which is what `/flow` does for
   the same question.
 - `all`, `add` and `fetch` read nothing, so a repository you have just cloned is never run
   until you ask what is in it.
@@ -145,8 +150,8 @@ See [SDK reference](/reference/sdk#flowverses).
 What a flowverse holds is something you read rather than choose from: each flow's name, and the
 line it says about itself.
 
-![what builtin holds: chat, ralph_loop and stateful_ralph, each with the line its flow says
-about itself](/demo/flowverse-holds.png)
+![what a flowverse holds: a flow apiece, each with the line its own flow says about
+itself](/demo/flowverse-holds.png)
 
 One that has never been fetched has nothing to read yet. It says so, and says that **r**
 fetches it, rather than reading as a place with nothing in it. A fetch runs off the interface's
@@ -198,7 +203,7 @@ One list, so one rule for what a flow is called and one place a name is looked u
 | --- | --- |
 | `local` | `.humanize/flows/*` — this project's own |
 | `user` | `~/.humanize/flows/*` — yours, in every project |
-| — | the ones humanize ships, and every flowverse there is |
+| — | humanize's own, and every flowverse there is |
 
 Nearest wins. A flow of your own may stand in for one of humanize's by taking its name: a
 `.humanize/flows/chat/__init__.py` is what `-f chat` runs *in that project*.
@@ -207,8 +212,8 @@ What a flow is **called** is a separate question, and every place answers it the
 
 | | |
 | --- | --- |
-| `chat` | one humanize ships |
-| `official/rlar` | one a flowverse holds — the one spelling nothing can stand in for |
+| `chat` · `rlar` | humanize's own, wherever of its two places each is kept |
+| `yours/review` | one somebody else's flowverse holds — the one spelling nothing can stand in for |
 | `local/chat` | this project's own |
 | `user/chat` | yours, in every project |
 
@@ -227,7 +232,7 @@ another flow:
 ```python
 from hmz.flows import load
 
-plan = load("official/humanize1:gen-plan")
+plan = load("humanize1:gen-plan")
 plan(agents, f"plan this first: {task}")
 ```
 
@@ -256,8 +261,8 @@ Whoever adds your flowverse is trusting it with their machine. Earn it. Say in t
 - **Which backends it needs.** A flow that hangs a `PERMISSION_REQUEST` hook needs Claude Code
   or Codex; one built on `pursue` needs a backend with a goal feature.
 - **What it writes.** Files, branches, commits, pushes.
-- **The `hmz exec` line that starts it**, verbatim. Each flow humanize ships names its own in
-  its docstring; do the same.
+- **The `hmz exec` line that starts it**, verbatim. Each of humanize's own flows names its own
+  in its docstring; do the same.
 
 ::: danger Adding one is trusting that repository with this machine
 A flow is Python, and reading a flow means **running** it. Listing what a flowverse holds

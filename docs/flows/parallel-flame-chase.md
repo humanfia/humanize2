@@ -2,7 +2,7 @@
 pageClass: hmz-feature
 ---
 
-# official/parallel_flame_chase
+# parallel_flame_chase
 
 Seven agents, three lanes, one working directory. A coordinator plans them once and does not
 come back; six actors alternate in fresh sessions and coordinate through durable reports.
@@ -10,7 +10,7 @@ come back; six actors alternate in fresh sessions and coordinate through durable
 artifacts rather than writing to your tree.
 
 ```sh
-hmz exec -f official/parallel_flame_chase \
+hmz exec -f parallel_flame_chase \
     -a codex/gpt-5.6-sol:max \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max \
@@ -66,6 +66,6 @@ starts a fresh run.
 
 ## See also
 
-- [official/parallel_flame_chase_mission](/flows/parallel-flame-chase-mission) — the same lanes, audited
-- [official/flame_chase](/flows/flame-chase) — one lane of this, and the flow it is named after
+- [parallel_flame_chase_mission](/flows/parallel-flame-chase-mission) — the same lanes, audited
+- [flame_chase](/flows/flame-chase) — one lane of this, and the flow it is named after
 - [Worktrees](/weaver/worktrees) — humanize's own way of giving an agent a tree of its own

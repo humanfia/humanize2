@@ -54,6 +54,18 @@ line, with what the flow is doing beside the transcript.
   interface opens, in the background and one at a time: before that there is nothing to
   offer at any sheet and nothing to open talking to. It MUST NOT hold the prompt up, and a
   backend that will not answer MUST NOT be asked again on its own.
+- Every flowverse already fetched here MUST be fetched again as the interface opens, in the
+  background and one at a time: a flowverse is a copy of somebody else's repository, and one
+  only ever fetched again when somebody thinks to press a key is one that is months behind by
+  the time anybody notices. It MUST NOT hold the prompt up and MUST say nothing about how it
+  went, there already being a list of flows to show -- a machine with no network MUST be no
+  slower and no noisier for it. It MUST NOT fetch one that has never been fetched, that being
+  the flow menu's, which says how it went. It MUST NOT begin one under a flow that is running,
+  and MUST stop rather than go on to the next once one is, since fetching again takes what the
+  repository says now and that is a running flow's own source swapped out from beneath it. Nor
+  MUST it fetch one that has been written into: a weaver editing a flow in a flowverse of their
+  own would lose it to a download nobody asked for, and fetching it again by hand is still how
+  somebody says they meant that.
 - Choosing a flow MUST stop whatever is running, since a flow is chosen in order to be run.
   Looking at the flows and leaving without choosing MUST change nothing at all.
 - It MUST be drawn in the terminal's own colours, and MUST NOT ask the terminal what they

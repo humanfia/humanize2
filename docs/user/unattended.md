@@ -42,7 +42,7 @@ name every agent on the line or none of them, since an agent with no name fills 
 place, and that cannot be counted while the others are filled by name.
 
 ```console
-$ hmz exec -f official/rlar -a actor=claude/claude-opus-5:max -a codex/gpt-5.6-sol:high "fix the build"
+$ hmz exec -f rlar -a actor=claude/claude-opus-5:max -a codex/gpt-5.6-sol:high "fix the build"
 hmz exec: error: name every agent or none of them: an agent that names no place fills the flow's next one, which cannot be counted while the others are filled by name
 ```
 
@@ -138,8 +138,8 @@ stdout: whatever the flow prints goes to stderr, so one stray line cannot break 
 Run these on purpose. Each is refused before a single turn:
 
 ```console
-$ hmz exec -f official/rlar -a claude/claude-opus-5:max "fix the build"
-hmz exec: error: official/rlar: the flow drives 2 agents, 1 given
+$ hmz exec -f rlar -a claude/claude-opus-5:max "fix the build"
+hmz exec: error: rlar: the flow drives 2 agents, 1 given
 
 $ hmz exec -f ralph_loop -a claude:high "fix the build"
 hmz exec: error: bad agent 'claude:high': expected [NAME=]CLI[@PROVIDER]/MODEL:EFFORT
@@ -182,7 +182,7 @@ mode: slow
 ```
 
 ```sh
-hmz exec -f official/humanize1:rlcr -c setup.yaml \
+hmz exec -f humanize1:rlcr -c setup.yaml \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:xhigh "add undo"
 ```
 
@@ -202,7 +202,7 @@ settings](/weaver/flow-settings).
 You can script on these statuses:
 
 ```sh
-hmz exec -f official/goal -a claude/claude-opus-5:max "$(cat TASK.md)" || {
+hmz exec -f goal -a claude/claude-opus-5:max "$(cat TASK.md)" || {
     echo "the loop did not finish" >&2
     exit 1
 }

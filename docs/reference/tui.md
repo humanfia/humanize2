@@ -55,7 +55,7 @@ unpriced one marks its total `$1.34+`. See [Cost and rate](/user/tally).
 has been going. Between two turns it names the flow and how long the run has been going, since
 a flow that sleeps off a round, commits, and reads what the last turn wrote has not stopped. A
 flow that [called another flow](/reference/flows#a-flow-that-calls-another-flow) names both, innermost
-last: `chat ▸ official/rlar`. A
+last: `chat ▸ rlar`. A
 flow that has run out of things to do until you say something says `waiting for you`. With
 nothing running at all, it names the flow that is set up to run and the directory it would run
 in, with your home written as `~`.
@@ -569,11 +569,11 @@ made of several lists names them where the titles go, and `←` / `→` step bet
 ## Choosing a flow
 
 `/flow` puts up the flows of one place at a time, with `←` and `→` stepping between the
-places: every [flowverse](/reference/flows#flowverses) — `builtin`, which is the package's own,
-`official`, which is where the rest come from, whatever else has been added, and last `local`,
-this project's flows under `.humanize/flows`, and `user`, yours under `~/.humanize/flows`, each
-where there are any. The strip above the list is the places, with the one being read marked;
-the list is that place's flows and nothing else.
+places: every [flowverse](/reference/flows#flowverses) — `official`, which is `chat` from the
+package plus whatever else has been fetched or added, and last `local`, this project's flows
+under `.humanize/flows`, and `user`, yours under `~/.humanize/flows`, each where there are any.
+The strip above the list is the places, with the one being read marked; the list is that
+place's flows and nothing else.
 
 ```
   Flow
@@ -581,11 +581,11 @@ the list is that place's flows and nothing else.
   Which flow the agents are driven through. The first thing you say once it is chosen is what
   it is to do. A flow anywhere else is a path you type.
 
-  builtin · official · local   ←/→ to switch
+  official · local · user   ←/→ to switch
 
 ❯ 1. chat                    Chat — one agent, one session, and every line typed between…
-  2. ralph_loop              Ralph loop (flowbench: ralph_loop) — a fresh session every…
-  3. stateful_ralph          Stateful ralph (flowbench: stateful_ralph) — one session, re-…
+  2. continue_loop           Continue loop (flowbench: continue_loop) — send the task once,…
+  3. fixed_juice_ralph       Fixed-juice ralph (flowbench: fixed_juice_ralph) — a ralph loop…
 
   Enter opens what drives it · f copies it here · v the flowverses · Esc to close · s to search
 ```
@@ -606,6 +606,15 @@ loop — the menu keeps drawing while it clones — and what became of it is sai
 rather than thrown at you. A place with nothing in it says so where its flows would be, and
 one that has never been fetched says which key opens the menu that fetches it: adding a place,
 fetching one again and taking one away are [**v**](#where-flows-come-from).
+
+**Every later start fetches again what is already here**, in the background as the interface
+opens, one at a time and without a word about it: a flowverse is a copy of somebody else's
+repository, and one only ever fetched again when somebody thinks to press a key is one that is
+months behind by the time anybody notices. There is already a list of flows to show, so nothing
+waits on it and nothing is said about how it went — a machine with no network is no slower and
+no noisier for it. It leaves alone a clone you have written into, since a fetch resets one to
+what the repository says now, and it stops at a flow that starts running, for the same reason
+read the other way round.
 
 Enter on a flow opens it: what that flow was last set up with here is read back,
 [what the flow itself takes](#setting-a-flow-up) is asked where it takes anything, and what
@@ -637,15 +646,15 @@ they lie. Each is offered under the name it is listed under. A place that has ne
 fetched is listed all the same, with its URL and `not fetched yet` beside it: what there is to
 run is not the same question as what has been downloaded.
 
-![The /flowverses list: builtin, which holds the flows humanize ships, and official, a GitHub
-URL marked as not fetched yet](/demo/flowverses.png)
+![The /flowverses list: official, which holds `chat` from the package and, at its GitHub URL,
+the rest — marked as not fetched yet](/demo/flowverses.png)
 
 | Key | |
 | --- | --- |
 | **enter** | What that flowverse holds: one row per flow, with the line it says about itself. Reading them means importing them, so it is asked of the one you opened rather than of all of them at once. |
 | **a** | Add one: a URL or an `owner/repo`, and a name to keep it under. |
-| **r** | Fetch the one under the cursor again, or for the first time. `builtin` came with humanize, and `local` and `user` are directories of your own: all three say there is nothing to fetch. |
-| **d** **d** | Take an added one away, flows and all. `builtin`, `official`, `local` and `user` are always here, and say so. |
+| **r** | Fetch the one under the cursor again, or for the first time. `official` already holds `chat`, which came with humanize, and fetches the rest from its GitHub URL; `local` and `user` are directories of your own and say there is nothing to fetch. |
+| **d** **d** | Take an added one away, flows and all. `official`, `local` and `user` are always here, and say so. |
 
 Its own menu rather than three more keys on the flows, because they are about something else:
 adding a repository, fetching one again and taking one away are done to the list of places,

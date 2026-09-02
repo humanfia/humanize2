@@ -19,7 +19,7 @@ import pytest
 
 from hmz.cli import main
 from hmz.coganchor.agents import PERMISSIONS, AgentConfig
-from hmz.flows import ENTRY, NotAFlow
+from hmz.flows import BUILTIN_AT, ENTRY, NotAFlow
 from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, written
 
@@ -803,11 +803,12 @@ def test_a_flow_of_your_own_is_found_where_flows_live(
     assert ("user", "user/yours") in named
     # Both, under names of their own: one is not offered as if it were the other.
     assert ("local", "local/chat") in named
-    assert ("builtin", "chat") in named
+    assert ("official", "chat") in named
     # `-f` still takes a bare name, and the nearest flow answering to it is what runs.
     assert find("chat") == str((project / ".humanize/flows/chat" / ENTRY).resolve())
     assert find("yours") == str((home / ".humanize/flows/yours" / ENTRY).resolve())
-    assert find("ralph_loop").endswith(f"src/hmz/flows/builtin/ralph_loop/{ENTRY}")
+    # And a flow of humanize's own said outright is not one the project can stand in for.
+    assert find("official/chat") == str((BUILTIN_AT / "chat" / ENTRY).resolve())
     # And it takes what the list calls one, which says which place it came from and so is the
     # spelling nothing can stand in for.
     assert find("user/yours") == str((home / ".humanize/flows/yours" / ENTRY).resolve())

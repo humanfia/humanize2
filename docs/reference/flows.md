@@ -177,8 +177,8 @@ is the newer one.
 The count is checked before the first turn:
 
 ```console
-$ hmz exec -f official/rlar -a claude/claude-opus-4-8:high "fix the build"
-hmz exec: error: official/rlar: the flow drives 2 agents, 1 given
+$ hmz exec -f rlar -a claude/claude-opus-4-8:high "fix the build"
+hmz exec: error: rlar: the flow drives 2 agents, 1 given
 ```
 
 which is what keeps a two-agent flow started with one from failing on an unpacking hours into a
@@ -575,7 +575,7 @@ What the flow declared is readable without driving it:
 ```python
 from hmz.flows import wanted
 
-wanted("official/rlar")   # one Place per agent somebody has to choose:
+wanted("rlar")   # one Place per agent somebody has to choose:
                           # .name, .moments, .goal, .where, .needs,
                           # .permission, .goals, .web_search
 ```
@@ -700,8 +700,8 @@ def then_plan(agents: Planning, task: str, config: Plan | None = None) -> None:
 ```
 
 ```sh
-hmz exec -f official/humanize1:gen-idea -a claude/claude-opus-5:max "add undo to the editor"
-hmz exec -f official/humanize1:gen-plan -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max ""
+hmz exec -f humanize1:gen-idea -a claude/claude-opus-5:max "add undo to the editor"
+hmz exec -f humanize1:gen-plan -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max ""
 ```
 
 The name is what you write in the mark and nothing else — a name written down where a flow is
@@ -737,13 +737,13 @@ from hmz.flows import Agent, flow, load
 
 @flow
 def run(agents: tuple[Agent, Agent], task: str) -> None:
-    plan = load("official/humanize1:gen-plan")
+    plan = load("humanize1:gen-plan")
     plan(agents, f"plan this first: {task}")
     for _ in range(3):
         agents[0].new()(task)
 ```
 
-`load` takes what `-f` takes — `ralph_loop`, `official/rlar`, `humanize1:gen-plan`, a path of
+`load` takes what `-f` takes — `ralph_loop`, `rlar`, `humanize1:gen-plan`, a path of
 your own — so a flowverse is a library as well as a menu. A name nothing answers to is refused
 where you ask for it rather than an hour into your loop.
 
@@ -773,7 +773,7 @@ happened, and leaves the agents exactly as it found them.
 A wrapper flow may deliberately keep its own skills available inside the called flow:
 
 ```python
-load("official/rlar", inherit_skills=True)(agents, task)
+load("rlar", inherit_skills=True)(agents, task)
 ```
 
 The called flow's skills come first and win any same-name collision. Parent-only skills are
@@ -785,7 +785,7 @@ not implicitly given its caller's capabilities.
 as a third argument — an instance of that flow's model, or the fields to build one from:
 
 ```python
-load("official/rlar")(agents, task, {"rounds": 9})
+load("rlar")(agents, task, {"rounds": 9})
 ```
 
 They are read back through the flow's own model at the moment it is called, so a flow that
@@ -797,14 +797,14 @@ awaited by whoever called it:
 ```python
 @flow
 async def run(agents: tuple[Agent], task: str) -> None:
-    await load("official/rlar")(agents, task)
+    await load("rlar")(agents, task)
 ```
 
 **A call may say what the called flow drives one of its places at**, by the name that flow
 gives the place or the name of the agent filling it:
 
 ```python
-load("official/rlar")(agents, task, drives={"reviewer": replace(config, effort="max")})
+load("rlar")(agents, task, drives={"reviewer": replace(config, effort="max")})
 ```
 
 What fills the place is a clone at that config rather than the agent set up again — two efforts
@@ -864,14 +864,14 @@ you already have a copy of — in either shape, since a directory would otherwis
 single-file flow's name without touching the file it is in — rather than writing over it. A
 copy that fails partway leaves nothing behind, so the name is free to try again.
 
-What a flow is **called** is another question, and one rule answers it for every place: the
-ones humanize ships are called by a bare name, and every other by the place it came from,
-which is the one spelling nothing can stand in for. Your own two places are `local` and `user`:
+What a flow is **called** is another question, and one rule answers it for every place:
+humanize's own are called by a bare name, and every other by the place it came from, which is
+the one spelling nothing can stand in for. Your own two places are `local` and `user`:
 
 | | |
 | --- | --- |
-| `chat` | one humanize ships |
-| `official/rlar` | one the official flowverse holds |
+| `chat` · `rlar` | humanize's own, wherever of its two places each is kept |
+| `theirs/rlar` | one somebody else's flowverse holds |
 | `local/chat` | this project's own |
 | `user/chat` | yours, in every project |
 
@@ -979,17 +979,25 @@ brings. It is cloned into
 name. Nothing outside that directory is read, so the repository is free to have a README, a
 pyproject and a test suite of its own without any of it being taken for a flow.
 
-Four are always there:
+Three are always there:
 
 | | |
 | --- | --- |
-| `builtin` | the flows in the package, which are [the three below](#the-flows-humanize-ships) |
-| `official` | [humanfia/flowverse](https://github.com/humanfia/flowverse), which is everything else humanize offers |
+| `official` | humanize's own: [`chat`](#the-flow-in-the-package) in the package, and [humanfia/flowverse](https://github.com/humanfia/flowverse) for everything else |
 | `local` | `.humanize/flows` where humanize is being run — this project's own |
 | `user` | `~/.humanize/flows` — yours, in every project |
 
+`official` is two places read as one. `chat` is in the package because an interface that has
+never reached a network still has to have something to open talking to; everything else is in
+the repository, where it can change without a release. Which of the two a flow is kept in is
+humanize's business, so both are offered under the one name and every flow of humanize's is run
+by a bare one. The qualified spelling — `official/rlar` — still resolves and is still the one
+that pins a flow to the place it came from, but nothing needs it, and a flow moved from the
+package into the flowverse goes on answering to the name it always had.
+
 `official` is listed before it has been fetched — what there is to run is not the same question
-as what has been downloaded — and none of the four can be taken away.
+as what has been downloaded, and the `chat` it keeps in the package is offered either way — and
+none of the three can be taken away.
 
 The last two are places rather than repositories: nothing fetches them, and what is in one is
 whatever you put there. They are listed as flowverses all the same, so that one rule says what
@@ -1010,32 +1018,29 @@ machine, exactly as installing a package is.
 anything, for a machine being set up or a script: `all`, `holds`, `add`, `fetch`, `remove`.
 
 ```sh
-hmz exec -f official/rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
+hmz exec -f rlar -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
 ```
 
 A flow from a flowverse that has not been fetched says so rather than saying there is no such
 file: the name is right, the download has not happened.
 
 Editing a flowverse's own copy does not keep: it is somebody else's repository, and fetching it
-again takes what that repository says now. `f` on a flow copies it into `.humanize/flows/`,
+again takes what that repository says now — the interface will not do that behind you while the
+edit is there, but `r` and `Hmz().verses.fetch` both mean exactly that. `f` on a flow copies it into `.humanize/flows/`,
 where it is yours — and where the name then means your copy.
 
-## The flows humanize ships
+## The flow in the package
 
-Three, which are the shapes a flow takes. Each names the `hmz exec` line that starts it in its
-own docstring, and each has a [page of its own](/flows/) with its loop drawn on it.
+One, and it is the one an interface opens on. Everything else humanize offers is in the
+flowverse, fetched the first time somebody wants it — a flow is content, and content that can
+change without a release is content that keeps up; but a first run that had to clone before it
+could say hello would be a first run that fails without a network.
 
 | Flow | Agents | What it does |
 | --- | --- | --- |
 | `chat` | 1 + you | One agent, one session, and every line typed between turns is a turn of it. Talking to a coding agent with no loop around it. This is what the interface opens on. |
-| `ralph_loop` | 1 | A fresh session every turn, so nothing carries over: the agent starts from the task and the repository each time. |
-| `stateful_ralph` | 1 | One session, held for the whole run, re-sent the task every turn. |
 
-Both loops [can be picked up](#a-flow-that-can-be-picked-up), and what they keep is `rounds`
-and `output`: one left going for days is one that will be stopped, so running it again goes on
-from the round it reached rather than back at one. Nothing else carries — a session is opened
-rather than reopened, so `stateful_ralph` started again is a conversation of its own. `chat`
-keeps nothing: what was said is the conversation, and the backend logged it.
+`chat` keeps nothing: what was said is the conversation, and the backend logged it.
 
 ### What ends a loop
 
@@ -1061,35 +1066,35 @@ week of restarts is, so what is counted is every run of that flow in that worksp
 has spent its budget is **over**, and what is over is not picked up: it clears what it kept, so
 the next run there opens on a budget of its own and at round one.
 
-`chat` and `official/rlar` have no budget, because each already ends: a conversation ends when
-you stop typing, and `rlar` ends when its reviewer agrees the work is done. `humanize1:rlcr`
-ends on `--max` rounds. The loops that take one are `ralph_loop`, `stateful_ralph`,
-`official/continue_loop`, `official/flame_chase`, `official/goal` and
-`official/fixed_juice_ralph` — where `budget` is the same quantity `juice` is, read at the
-scale of the loop rather than of a turn.
+`chat` and `rlar` have no budget, because each already ends: a conversation ends when you stop
+typing, and `rlar` ends when its reviewer agrees the work is done. `humanize1:rlcr` ends on
+`--max` rounds. The loops that take one are `ralph_loop`, `stateful_ralph`, `continue_loop`,
+`flame_chase`, `goal` and `fixed_juice_ralph` — where `budget` is the same quantity `juice` is,
+read at the scale of the loop rather than of a turn.
 
-Their source is the best documentation of this API there is — `src/hmz/flows/builtin/` in
-a checkout, or wherever `pip` put it.
+Their source is the best documentation of this API there is —
+[humanfia/flowverse](https://github.com/humanfia/flowverse), or
+`~/.humanize/flowverses/official/flows/` once it has been fetched.
 
 ## The official flowverse
 
 Everything else humanize offers is in [humanfia/flowverse](https://github.com/humanfia/flowverse),
-which is [fetched](#flowverses) the first time somebody wants what is in it. Five of these are
-flowbench's loops, written against this API. [Flows](/flows/) is the same list with the shape of
-each one drawn.
+which is [fetched](#flowverses) the first time somebody wants what is in it and taken again, in
+the background, at every later start of the interface. Seven of these are flowbench's loops,
+written against this API. [Flows](/flows/) is the same list with the shape of each one drawn.
 
 | Flow | Agents | What it does |
 | --- | --- | --- |
-| `official/fixed_juice_ralph` | 1 | Ralph with a governor on it: it [moves the effort](/reference/agents#moving-the-effort-while-it-runs) a rung a round to hold the agent to `juice` output tokens per turn of the model. |
-| `official/continue_loop` | 1 | Sends the task once, then keeps nudging `continue`. Until a turn lands the task is sent again — `continue` on its own would open a session that never saw it. |
-| `official/goal` | 1 | Ralph, with the task set as the agent's [own goal](/reference/agents#goals). The loop only starts it over when it stopped without having met it. |
-| `official/flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. Its [budget](#what-ends-a-loop) is what the pair spend between them. |
-| `official/rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. The review *is* the actor's next prompt, word for word, and the reviewer is also the one that says the task is finished — which is what ends the run. |
-| `official/humanize1:gen-idea` | `drafter` | Opens a loose idea into a repo-grounded draft. |
-| `official/humanize1:gen-plan` | `planner`, `analyst` | Turns that draft into a plan both sides have converged on. |
-| `official/humanize1:rlcr` | `builder`, `reviewer` | Builds the plan under review until nothing is left to say. Run it in a git repository. |
-| `official/parallel_flame_chase` | 7 | A coordinator plans three isolated lanes and leaves; six actors alternate two to a lane and coordinate by durable report. Lane 1 alone writes the original source; lanes 2 and 3 work in snapshots and publish artifacts. |
-| `official/parallel_flame_chase_mission` | 7 | The same three lanes, with a fresh coordinator returning to adjudicate outcomes, deadlines, stalls and objective revisions, and to run periodic portfolio audits. |
+| `fixed_juice_ralph` | 1 | Ralph with a governor on it: it [moves the effort](/reference/agents#moving-the-effort-while-it-runs) a rung a round to hold the agent to `juice` output tokens per turn of the model. |
+| `continue_loop` | 1 | Sends the task once, then keeps nudging `continue`. Until a turn lands the task is sent again — `continue` on its own would open a session that never saw it. |
+| `goal` | 1 | Ralph, with the task set as the agent's [own goal](/reference/agents#goals). The loop only starts it over when it stopped without having met it. |
+| `flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. Its [budget](#what-ends-a-loop) is what the pair spend between them. |
+| `rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. The review *is* the actor's next prompt, word for word, and the reviewer is also the one that says the task is finished — which is what ends the run. |
+| `humanize1:gen-idea` | `drafter` | Opens a loose idea into a repo-grounded draft. |
+| `humanize1:gen-plan` | `planner`, `analyst` | Turns that draft into a plan both sides have converged on. |
+| `humanize1:rlcr` | `builder`, `reviewer` | Builds the plan under review until nothing is left to say. Run it in a git repository. |
+| `parallel_flame_chase` | 7 | A coordinator plans three isolated lanes and leaves; six actors alternate two to a lane and coordinate by durable report. Lane 1 alone writes the original source; lanes 2 and 3 work in snapshots and publish artifacts. |
+| `parallel_flame_chase_mission` | 7 | The same three lanes, with a fresh coordinator returning to adjudicate outcomes, deadlines, stalls and objective revisions, and to run periodic portfolio audits. |
 
 Every one of them but the two drafting phases [can be picked up](#a-flow-that-can-be-picked-up),
 each keeping the little it honestly can. The three Ralphs keep the round they reached, as
@@ -1257,7 +1262,7 @@ agents = [
     ClaudeCodeAgent(config, name="reviewer"),
 ]
 
-Runner("official/rlar", agents).run("fix the build")
+Runner("rlar", agents).run("fix the build")
 ```
 
 `Runner` takes the same flow names and paths `-f` does, checks the count the same way, and
@@ -1266,7 +1271,7 @@ do.
 
 ## Stopping
 
-A flow ends when `run` returns — most of the built-in ones never do, and are ended from
+A flow ends when `run` returns — most of humanize's own never do, and are ended from
 outside:
 
 - **ctrl+c** twice in the interface. (One press asks. A third does not wait for the flow to
@@ -1388,7 +1393,7 @@ from hmz.flows import Agent, atlas, canonical, digest, logic, mind, prophesied, 
 | `@atlas` | A flow whose body is a declaration. Takes everything `@flow` takes but `resumable`, which is always on. |
 | `@mind` | A node that is one turn, handed the agent its call site names. Exactly one way out. |
 | `@logic` | A node that is Python and drives nothing. May have several ways out. |
-| `sub("official/x")` | The atlas one supernode is, by the name `-f` takes. |
+| `sub("x")` | The atlas one supernode is, by the name `-f` takes. |
 
 `@mind` and `@logic` take `rerun=False` for a node a run picked up inside steps past rather
 than runs again; such a node answers with nothing.
@@ -1481,8 +1486,8 @@ what runs rather than the atlas compiled again:
 ```python
 from hmz.sdk import Hmz
 
-Hmz().flows.foretell("official/review")   # writes the prophecy beside the flow
-Hmz().flows.prophecy("official/review")   # reads what the source compiles to
+Hmz().flows.foretell("review")   # writes the prophecy beside the flow
+Hmz().flows.prophecy("review")   # reads what the source compiles to
 ```
 
 The flow's own Python still has to be there: a prophecy names the functions its nodes are. The

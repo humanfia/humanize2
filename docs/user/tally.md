@@ -264,7 +264,7 @@ if agent.juice(over=120) < target:
     agent.effort = harder(agent.effort)
 ```
 
-That is what [`official/fixed_juice_ralph`](/flows/fixed-juice-ralph) does, a rung a round, to
+That is what [`fixed_juice_ralph`](/flows/fixed-juice-ralph) does, a rung a round, to
 hold the agent to a target.
 
 A window with no turn in it reads as `0.0`. There is nothing to go on, and a flow tells that

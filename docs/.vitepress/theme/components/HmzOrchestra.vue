@@ -196,7 +196,7 @@ const caption = computed(() => {
         <i />
         {{ running ? 'running' : 'paused' }}
       </span>
-      <code class="flow">hmz exec -f official/flame_chase</code>
+      <code class="flow">hmz exec -f flame_chase</code>
       <div class="spacer" />
       <div class="counts" role="group" aria-label="how many agents">
         <button

@@ -1022,6 +1022,7 @@ class Humanize(App[None]):
         self.set_interval(_REFRESH, self._draw)
         self._asks_what_runs()
         self._asks_about_reports()
+        self._freshens_flows()
         # What a token costs in money, fetched here and nowhere else: this is the one part of
         # humanize that shows a bill, and it is asked for once on a thread of its own so that
         # nothing drawn afterwards ever waits on a network. What is already kept is served
@@ -1067,6 +1068,55 @@ class Humanize(App[None]):
                     goals=self._wanted[0].goals if self._wanted else True,
                 )
             self._draw()
+
+    @work
+    async def _freshens_flows(self) -> None:
+        """Takes what each flowverse already here says now, quietly, as the interface opens.
+
+        A flowverse is a copy of somebody else's repository, and one only ever fetched again
+        when somebody thinks to press a key is one that is months behind by the time anybody
+        notices. Every start is the moment to do it: it is the one moment nothing is running,
+        and it is often enough that the flows offered are the flows there are.
+
+        In the background and one at a time, the way the backends are asked what they run: a
+        fetch is a network round trip, and a prompt that waited on one would open late on a
+        slow connection and not at all on a machine with no network. Nothing is drawn about it
+        either -- whoever opened the interface asked for a prompt, not for a download -- so one
+        that failed goes to the log, and what is already here goes on being what is offered.
+
+        Only the ones already fetched. The first fetch belongs to the flow menu, which does it
+        as the menu opens and says how it went: humanize's own repository before anybody has
+        asked for it is a download to say something about rather than to do silently, and a
+        first one that failed here without a word would be an empty list with no explanation.
+
+        And not one somebody has written into. A fetch resets the clone to what the repository
+        says now, so a weaver editing a flow in a flowverse of their own would lose it to a
+        download nobody asked for -- `r` is still how somebody says they meant that.
+
+        Nor under a flow that is running, for the same reason read the other way round: the
+        clone reset under a running flow is its own source swapped out from beneath it, and
+        what it imports next and the skills it brings would be somebody else's edit halfway
+        through a run. Nothing is running when the interface opens, and this stops rather than
+        goes on to the next if something starts while it is still going. What is left is the
+        one fetch already in the air when a run starts, which is seconds at the opening of the
+        interface and the reason this is done then rather than on a timer.
+        """
+        import asyncio
+
+        verses = self.hmz.verses
+        for one in await asyncio.to_thread(verses.all):
+            if not one.url or not one.fetched:
+                continue
+            if self._agents or self._stopping:
+                return
+            if await asyncio.to_thread(verses.edited, one):
+                continue
+            try:
+                await asyncio.to_thread(verses.fetch, one.name)
+            except Exception as why:  # noqa: BLE001 -- a flowverse that would not fetch again
+                # Not raised at whoever opened the interface: nobody asked for this, and the
+                # flows that came down last time are still there to run.
+                self.log(f"{one.name} was not fetched again: {why}")
 
     def _welcome(self) -> None:
         """The box this opens with: what this is, and how to begin.

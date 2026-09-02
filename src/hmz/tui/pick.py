@@ -1236,6 +1236,10 @@ class Flows(Drafts[Chosen]):
         being read is left where it is, and a fetch that fails says so under the list. Once
         per opening, however it goes, so that a machine with no network says so once rather
         than hammering a server on every keystroke.
+
+        The first fetch only. Taking what one already here says now is the interface's, done
+        in the background as it opens and silently, since there is already a list to show and
+        nothing anybody is waiting for.
         """
         import asyncio
 
@@ -1853,11 +1857,17 @@ class Holds(Sheet[None]):
         self.query_one("#keys", Label).update(f"Esc to close{self.searching()}")
 
     def _nothing(self) -> str:
-        """Why there is nothing in it, which is not always the same reason."""
-        if not self._verse.fetched:
-            return "not fetched yet; r fetches it"
+        """Why there is nothing in it, which is not always the same reason.
+
+        What was typed comes first. `official` holds the flows in the package before it has
+        been fetched, so a search of it that found nothing is a list emptied by the search
+        rather than by the download -- and saying the download is why would send somebody to
+        fetch a flowverse that is already showing them what it has.
+        """
         if self._typed:
             return "no flow of that name in it"
+        if not self._verse.fetched:
+            return "not fetched yet; r fetches it"
         return "nothing in it: a flowverse keeps its flows in flows/"
 
 
@@ -2017,10 +2027,13 @@ class Flowverses(Sheet[list[str]]):
         if not one.url:
             from hmz.flows.verses import MINE
 
+            # The other way to have no URL is a directory under the flowverses home that is
+            # not a clone, which is what a clone killed partway leaves behind: there is
+            # nothing to fetch it from, and `d` is what it wants rather than `r`.
             said = (
                 f"is read from {MINE[one.name]}"
                 if one.name in MINE
-                else "came with humanize"
+                else "is not a clone of anything; d twice takes it away"
             )
             self._said = f"{escape(one.name)} {said}; there is nothing to fetch"
             self._fill()

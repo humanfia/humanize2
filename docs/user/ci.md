@@ -269,8 +269,9 @@ can be reviewed in a pull request, which is why it is the one CI reads.
 annotation: `Annotated[Agent, Goal]` or `Annotated[Agent, Moment.PERMISSION_REQUEST]`, and it
 is refused up front. See [Port a project](/user/tutorials/port-a-project).
 
-**A flowverse that has not been fetched.** `official/...` says so rather than saying there is
-no such file. Fetch it in the job, or vendor the flow into `.humanize/flows/`.
+**A flowverse that has not been fetched.** `-f` says so rather than saying there is no such
+file — for a name qualified by a place and for a bare one alike, humanize's own flows being
+bare. Fetch it in the job, or vendor the flow into `.humanize/flows/`.
 
 **Nothing in the working tree.** A loop that made no change should not open an empty pull
 request:
