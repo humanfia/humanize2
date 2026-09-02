@@ -144,14 +144,19 @@ def _thinking(effort: str, gate: Gate | None = None) -> Path:
     Returns:
       The file's path.
     """
+    # Asked once, and outside the lock: a gate that could not be served answers with "", and
+    # that turn wants the same file a turn with no gate at all wants rather than one written
+    # beside a socket that is not there -- `Path("").parent` being this directory, which is
+    # the project.
+    at = gate.address() if gate is not None else ""
     with _EFFORT_LOCK:
-        if gate is not None:
+        if gate is not None and at:
             # Under the gate's own directory, so that the file goes when the agent does: what
             # is in it names that agent's socket, so it is no more reusable than the socket
             # is, and a table kept in a dictionary here would be an entry per agent for as
             # long as this process ran. The path is the gate and the effort, so it is the same
             # path every time -- a settings file that moved would restart an unchanged CLI.
-            held = _writing(Path(gate.address()).parent / effort, effort, gate)
+            held = _writing(Path(at).parent / effort, effort, gate)
         else:
             held = _EFFORTS.get(effort)
             if held is None:
@@ -175,24 +180,22 @@ def _writing(where: Path, effort: str, gate: Gate | None) -> Path:
       where: The directory to put them in, made if it is not there.
       effort: How hard the turn is to think, as Qwen Code words it.
       gate: Where this agent's moments are served, or None for a turn with nowhere to serve
-        them.
+        them -- and one serving nothing writes no table either.
 
     Returns:
       The settings file's path.
     """
     where.mkdir(parents=True, exist_ok=True)
     said: dict[str, Any] = {**_VERSION, "model": {"reasoningEffort": effort}}
-    if gate is not None:
+    table = gate.table(WAITING * _A_SECOND) if gate is not None else {}
+    if table:
         # Milliseconds, which is the unit Qwen Code reads this number in -- the same spelling
         # Claude Code gave the field, and not the same unit behind it. And the switch that
         # turns every hook off with them: it is one setting for the whole of the table, so a
         # person who has it on has a flow whose gate quietly does nothing. Said at the system
         # layer, which is this run's alone -- what they configured is untouched, and is theirs
         # again the moment the run ends.
-        said |= {
-            "hooks": gate.table(WAITING * _A_SECOND),
-            "disableAllHooks": False,
-        }
+        said |= {"hooks": table, "disableAllHooks": False}
     held = where / "settings.json"
     _wholly(held, json.dumps(said))
     _wholly(where / _DEFAULTS_FILE, json.dumps({**_VERSION, **_HEADLESS}))

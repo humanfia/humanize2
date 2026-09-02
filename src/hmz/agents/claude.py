@@ -336,9 +336,14 @@ class ClaudeCodeSession(StreamSessionBase):
         settings: dict[str, Any] = {
             "fastMode": self._agent.config.service_tier == "fast"
         }
-        if self._agent.anchor is None:
-            # Seconds, which is the unit Claude Code reads this number in.
-            settings["hooks"] = self._agent.hooks.gate().table(WAITING)
+        # Seconds, which is the unit Claude Code reads this number in. Nothing at all for an
+        # anchored turn, and nothing for a gate that could not be served: either is a turn
+        # whose `PreToolUse` is read off the stream again rather than one pointed at a socket
+        # nothing is listening on.
+        if self._agent.anchor is None and (
+            table := self._agent.hooks.gate().table(WAITING)
+        ):
+            settings["hooks"] = table
         return settings
 
     def _write(self, text: str, ticket: str = "") -> str:

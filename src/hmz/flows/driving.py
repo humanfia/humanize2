@@ -68,6 +68,7 @@ if TYPE_CHECKING:
 
     from . import Flow as Marked
     from .agent import Agent, Driven
+    from .checking import Capability
 
 __all__ = [
     "Entry",
@@ -1735,7 +1736,9 @@ def serves(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
         )
 
 
-def comes_to(backend: str) -> frozenset[str]:
+def comes_to(
+    backend: str, *, catalogued: Sequence[Capability] | None = None
+) -> frozenset[str]:
     """What one backend serves, by the names a flow asks for it under.
 
     Read out of the one catalogue rather than off the driver classes again: what a flow may
@@ -1752,6 +1755,10 @@ def comes_to(backend: str) -> frozenset[str]:
 
     Args:
       backend: The coding agent, named as a command line names it.
+      catalogued: The catalogue to read, for a caller asking this of several backends at
+        once -- a picker listing every CLI a place could be filled by asks twelve times, and
+        the catalogue is read off the live interface with `inspect` each time it is built.
+        None reads it here, which is what one question wants.
 
     Returns:
       The names it serves. What every backend here serves is in it too: the catalogue names
@@ -1762,9 +1769,8 @@ def comes_to(backend: str) -> frozenset[str]:
 
     from .checking import catalogue
 
-    comes = {
-        one.name for one in catalogue() if not one.backends or backend in one.backends
-    }
+    held = catalogue() if catalogued is None else catalogued
+    comes = {one.name for one in held if not one.backends or backend in one.backends}
     profile = named(backend)
     return frozenset(comes if profile is None else comes | profile.tags())
 

@@ -310,10 +310,11 @@ class Hooks:
         about itself -- from the thread serving that question, which is the CLI's own turn
         waiting on the other end of a socket. Either way whatever called this waits here: a
         hook is a word in the turn rather than a note about it, and one that takes a while is
-        a turn that takes a while. One agent's are one at a time whichever way they arrive,
-        so a CLI reaching for three tools at once still puts them one after another. A hook
-        that raises has said nothing, in the way a watcher that raises has -- a flow must not
-        fail because something hung off it did.
+        a turn that takes a while. The ones that arrive through a gate are one at a time, so
+        a CLI reaching for three tools at once still puts them one after another; what a turn
+        fires off its own stream is not held behind those, being the same thread the turn is
+        on. A hook that raises has said nothing, in the way a watcher that raises has -- a
+        flow must not fail because something hung off it did.
 
         Args:
           occasion: What is happening.
@@ -383,10 +384,16 @@ class Hooks:
         Returns:
           True where a gate is serving it, which is what tells a session not to say the moment
           a second time off the stream it is reading: the CLI has already asked, and a turn
-          that fired the moment twice would be one whose hooks ran twice for one tool.
+          that fired the moment twice would be one whose hooks ran twice for one tool. False
+          for a gate that could not be served at all, whose turns go on reading the moment off
+          the stream rather than reading it nowhere.
         """
         with self._lock:
-            return self._gate is not None and moment in self._gate.moments
+            return (
+                self._gate is not None
+                and moment in self._gate.moments
+                and self._gate.serving
+            )
 
 
 #: How long a CLI is told to wait on one of these before giving up on it, in seconds. As
@@ -439,7 +446,8 @@ def answers(line: str, hooks: Hooks) -> str:
 
     Returns:
       The line to answer with. An empty object is a gate with nothing to say, which every one
-      of these CLIs reads as the tool going ahead exactly as it would have.
+      of these CLIs reads as the tool going ahead exactly as it would have -- a refusal and
+      whatever a hook added are what make it anything else.
     """
     try:
         held: object = json.loads(line)
@@ -475,19 +483,22 @@ def answers(line: str, hooks: Hooks) -> str:
         # there is nowhere here to raise it to. What the stop does to the run it does anyway;
         # what this end owes is that the tool it was reaching for does not run in the meantime.
         verdict = Verdict(refused=True, because=str(stopped))
-    if not verdict.refused:
+    said_back: dict[str, Any] = {"hookEventName": named}
+    if verdict.refused:
+        said_back |= {
+            "permissionDecision": "deny",
+            "permissionDecisionReason": verdict.because
+            or f"{occasion.tool} was refused",
+        }
+    if verdict.adds:
+        # What a hook adds is what the agent is told, at this moment as at every other: the
+        # gate is the only place `PreToolUse` is served on these backends, so a verdict that
+        # only adds would otherwise be a hook that said nothing at all. `additionalContext`
+        # is the key Claude Code gave it and the rest of these CLIs copied.
+        said_back["additionalContext"] = verdict.adds
+    if len(said_back) == 1:
         return _NOTHING
-    return json.dumps(
-        {
-            "hookSpecificOutput": {
-                "hookEventName": named,
-                "permissionDecision": "deny",
-                "permissionDecisionReason": verdict.because
-                or f"{occasion.tool} was refused",
-            }
-        },
-        separators=(",", ":"),
-    )
+    return json.dumps({"hookSpecificOutput": said_back}, separators=(",", ":"))
 
 
 def _accepts(
@@ -541,7 +552,11 @@ def _serves(
         always been one at a time, being a word in the turn. Per gate, so one agent's moments
         wait on each other and nobody else's do.
     """
-    with held, held.makefile("rwb") as stream:
+    # A relay that has gone is not a failure: its CLI may have been stopped by hand, or given
+    # up on a hook that took longer than it waits, either of which leaves this end writing an
+    # answer to a socket with nobody on it. Said nowhere rather than as a traceback out of a
+    # thread nothing is watching, which is what would land in the middle of a flow's output.
+    with contextlib.suppress(OSError, ValueError), held, held.makefile("rwb") as stream:
         for line in stream:
             hooks = whose()
             if hooks is None:
@@ -598,6 +613,10 @@ class Gate:
         self._sock: socket.socket | None = None
         self._closed = threading.Event()
         self._where: tempfile.TemporaryDirectory[str] | None = None
+        #: Whether making a socket was tried and could not be done, which is the one thing
+        #: that turns this gate off: a machine with none to spare is a turn whose moment is
+        #: read off the stream again rather than one pointed at a socket nobody is on.
+        self._refused = False
         #: Taken for the whole of one answer, so that a CLI reaching for several tools at once
         #: still puts them to a hook one at a time.
         self._one_at_a_time = threading.Lock()
@@ -619,18 +638,30 @@ class Gate:
             # A gate served again after it was closed is an agent still being driven: the
             # thread that looks would otherwise see the old answer and stop before it began.
             self._closed.clear()
-            self._where = tempfile.TemporaryDirectory(
-                prefix="humanize-hook-", ignore_cleanup_errors=True
-            )
-            # Inside a directory this user alone may enter: a socket is a way into this
-            # process, and one anybody could connect to is a way in for anybody.
-            where = Path(self._where.name)
-            where.chmod(0o700)
-            self._at = str(where / "hook.sock")
-            self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self._sock.bind(self._at)
-            self._sock.listen(8)
-            self._sock.settimeout(_LOOKING)
+            try:
+                self._where = tempfile.TemporaryDirectory(
+                    prefix="humanize-hook-", ignore_cleanup_errors=True
+                )
+                # Inside a directory this user alone may enter: a socket is a way into this
+                # process, and one anybody could connect to is a way in for anybody.
+                where = Path(self._where.name)
+                where.chmod(0o700)
+                self._at = str(where / "hook.sock")
+                self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self._sock.bind(self._at)
+                self._sock.listen(8)
+                self._sock.settimeout(_LOOKING)
+                self._refused = False
+            except OSError:
+                # A machine with no socket to spare, or a temporary directory whose name is
+                # longer than a Unix socket path may be. The same answer the preload layer
+                # gives: a turn whose `PreToolUse` is read off the stream rather than gated
+                # is weaker than one that is gated, and far better than a turn that will not
+                # run at all. `gated` then says False, so the moment is read off the stream.
+                self._closed.set()
+                self._shut()
+                self._refused = True
+                return ""
             # Given what it needs rather than the gate itself, and given the hooks weakly: a
             # thread holding its agent's hooks would be what kept the agent up, and an agent
             # nobody holds any more is one whose socket, its thread and its directory go the
@@ -665,10 +696,14 @@ class Gate:
 
         Returns:
           The mapping of event to what runs for it, in the shape Claude Code wrote and the
-          rest of these CLIs copied: one matcher standing for every tool, and one command.
+          rest of these CLIs copied: one matcher standing for every tool, and one command --
+          and nothing at all where the gate could not be served, a table naming a socket that
+          is not there being a hook that fails to start before every tool call.
         """
         import shlex
 
+        if not self.address():
+            return {}
         return {
             moment.value: [
                 {
@@ -685,12 +720,28 @@ class Gate:
             for moment in sorted(self.moments)
         }
 
+    @property
+    def serving(self) -> bool:
+        """Whether a CLI's own table may be pointed here at all.
+
+        True for a gate with a socket up and for one nothing has asked the address of yet,
+        which is a gate that will have one the moment a CLI is started. False only where
+        making one was tried and could not be done -- the one case a session has to go on
+        reading the moment off its own stream for, rather than reading it nowhere.
+        """
+        return not self._refused
+
     def close(self) -> None:
         """Stops serving, and takes the socket away. Doing it twice does it once."""
         self._closed.set()
         with self._lock:
-            sock, self._sock = self._sock, None
-            where, self._where = self._where, None
+            self._shut()
+
+    def _shut(self) -> None:
+        """Drops the socket and the directory holding it, with this gate's lock held."""
+        sock, self._sock = self._sock, None
+        where, self._where = self._where, None
+        self._at = ""
         if sock is not None:
             sock.close()
         if where is not None:

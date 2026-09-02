@@ -314,16 +314,34 @@ def located(profile: Profile, program: Path) -> Located | None:
       Where a patch would land, or None for a backend with no bundle written down, a file that is
       not a bundle, a fingerprint that does not match, or a site that has moved -- each logged.
     """
-    import hashlib
-    import mmap
-
     if not profile.bundles:
         return None
     found = _bundle(profile, program)
     if found is None:
         log.debug("no patchable bundle located for %s at %s", profile.name, program)
         return None
-    bundle, bundled = found
+    return _located(profile, *found)
+
+
+def _located(profile: Profile, bundle: Path, bundled: Bundled) -> Located | None:
+    """The same question, asked of a bundle somebody has already found.
+
+    Split out so that the whole path -- fingerprint, copy, rewrite -- globs the install once:
+    :func:`patched` needs the ``Bundled`` that named the file as well as the file, and calling
+    :func:`located` and then looking the bundle up a second time is two walks of a directory
+    that may hold a two-hundred-megabyte executable, and two answers that can disagree.
+
+    Args:
+      profile: The backend whose bundle this is, for what a refusal says.
+      bundle: The file :func:`_bundle` found.
+      bundled: The fingerprint whose glob found it.
+
+    Returns:
+      Where a patch would land, or None -- each reason logged, as :func:`located` says.
+    """
+    import hashlib
+    import mmap
+
     try:
         with (
             bundle.open("rb") as handle,
@@ -400,11 +418,14 @@ def patched(
 
     from hmz import home
 
-    where = located(profile, program)
     found = _bundle(profile, program)
-    if where is None or found is None:
+    if found is None:
+        log.debug("no patchable bundle located for %s at %s", profile.name, program)
         return None
     _, bundled = found
+    where = _located(profile, *found)
+    if where is None:
+        return None
     try:
         into = home() / "patched"
         into.mkdir(parents=True, exist_ok=True)
