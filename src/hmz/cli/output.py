@@ -491,12 +491,23 @@ class Shown:
         installed: `$0.00` beside a turn that cost something would be a claim about a bill,
         and a wrong one.
         """
+        from hmz.coganchor.agents import KINDS
         from hmz.coganchor.prices import cost, money
 
         if not event.spent:
             return
+        # In the one order every reader of these is shown them: what went in, what came out,
+        # then the cache kinds and the reasoning. A footer whose columns came out in whatever
+        # order the backend happened to write them is one nobody can read two turns of.
         counted = _DOT.join(
-            f"{kind} {_counted(tokens)}" for kind, tokens in event.spent.items()
+            f"{kind} {_counted(event.spent[kind])}"
+            for kind in sorted(
+                event.spent,
+                key=lambda kind: (
+                    KINDS.index(kind) if kind in KINDS else len(KINDS),
+                    kind,
+                ),
+            )
         )
         bill = cost(event.spent, agent.config.model)
         priced = f"{money(bill)}{_DOT}" if bill is not None else ""

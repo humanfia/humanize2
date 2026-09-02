@@ -69,6 +69,26 @@ _WEB_TOOLS = ("web_search", "web_fetch")
 #: again: it was shown when it started, and a row per status is a transcript of statuses.
 _SAYS = {"text": "text", "thought": "reasoning"}
 
+#: What each kind of token is called in the counts Grok Build states, and what each of them
+#: is here. Humanize's own names rather than the CLI's, as everywhere else a kind is
+#: counted: the prices are per kind, so a usage written down under a spelling nothing else
+#: knows is a lump nobody can put a figure on -- which is what these were until this table.
+#: The input count is the uncached part alone, which is why the two cache counts stand beside
+#: it rather than being folded into it, so the four added up are the whole of what crossed
+#: the wire.
+#:
+#: Its `reasoning_tokens` is deliberately not among them. It is counted *inside* the output
+#: rather than beside it -- a turn asked to think at length and answer in one word came back
+#: with `output_tokens: 1141` and `reasoning_tokens: 1140` -- so a kind of its own here would
+#: count those tokens twice and, the prices billing reasoning as output, charge for them
+#: twice as well.
+_KINDS = {
+    "input": "input_tokens",
+    "output": "output_tokens",
+    "cache_read": "cache_read_input_tokens",
+    "cache_write": "cache_creation_input_tokens",
+}
+
 #: `grok -p` writes the protocol's own `session/update` with `sessionUpdate` flattened onto
 #: `type` and the words moved onto `data`: the two transports are one stream said twice, which
 #: is why a turn reads the same on either and why `_TOLD` above is the protocol's own table.
@@ -658,15 +678,9 @@ class GrokBuildSession(StreamSessionBase):
         """
         return Usage(
             {
-                name: float(counted.get(name) or 0)
-                for name in (
-                    "input_tokens",
-                    "output_tokens",
-                    "cache_read_input_tokens",
-                    "cache_creation_input_tokens",
-                    "reasoning_tokens",
-                )
-                if counted.get(name)
+                kind: float(counted.get(named) or 0)
+                for kind, named in _KINDS.items()
+                if counted.get(named)
             }
         )
 
@@ -843,6 +857,10 @@ class GrokBuildAgentConfig(AgentConfig):
 
 class GrokBuildAgent(AgentBase):
     """Grok Build, driven through the protocol it serves, one process per conversation."""
+
+    #: What it counts, read off the same table its driver reads a usage with, so that what
+    #: a run is told this backend reports is what its driver actually parses.
+    counts: ClassVar[frozenset[str]] = frozenset(_KINDS)
 
     def new(self, cwd: str | os.PathLike[str] | None = None) -> GrokBuildSession:
         """Opens a new Grok Build session, in the directory it is given or in this one."""

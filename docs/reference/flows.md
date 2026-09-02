@@ -428,6 +428,7 @@ class Agents(NamedTuple):
 | `shape` | a turn *held* to a schema rather than asked to keep to one |
 | `tools` | the flow's own callbacks put in front of the agent, `session.offers([...])` |
 | `fork` | one conversation carried into a second going its own way |
+| `counts:<kind>` | the backend says what a turn spent on that kind of token — `input`, `output`, `cache_read`, `cache_write`, `reasoning` — so a loop bounded by one is not bounded by a nought |
 | `search` / `swarm` / `resume` | facts about the CLI itself, out of its own profile |
 | `moment:<name>` | a moment only some backends reach, written out rather than as the enum |
 

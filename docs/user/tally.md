@@ -11,12 +11,47 @@ The readout sits under the agent lines, above the editor:
 ```
               builder · claude/claude-opus-5:high · ● 2 · reading
               reviewer · codex/gpt-5.6-sol:high · ○ 3 · unread
-                    48.2k tokens · $1.34 · 91/s
+    input 12.4k · output 2.1k · cache_read 1.02M+ · cache_write 48.2k+
+                              $1.34 · 91 out/s
 ```
 
-It is **per model**, since two agents at one model are one bill, and it covers **a recent
-window only**, so a flow that has stopped reads as stopped. [`/monitor`](/user/monitor) is the
-fuller version, with the handover graph beside it.
+**Each kind of token is counted on its own**, never as one total over the lot of them. An
+input token, an output token, a cached read and a cached write are four different things
+bought at four different prices, and a single figure over all of them cannot tell a long
+conversation from a lot of work.
+
+The money is **per model**, since two agents at one model are one bill, and the rate covers **a
+recent window only**, so a flow that has stopped reads as stopped.
+[`/monitor`](/user/monitor) is the fuller version, with the handover graph beside it.
+
+## The `+` on a kind
+
+A `+` means *at least this much*. It is there when **some agent of the run drives a CLI that
+does not report that kind at all** — Codex says nothing about a cache write, so a run mixing
+Codex with Claude Code has a `cache_write` column made of Claude's writes alone. The union of
+two backends is still the right figure to show; what would be wrong is showing it as though it
+were the whole.
+
+With **one** agent running there is nothing for a figure to be short of, so nothing is marked
+and what you see is that backend's own reckoning — every kind it counts, whether or not
+anything has gone on it yet. A column that appeared the first time a cache was written to
+would be a readout that shuffles sideways while you are reading it.
+
+A `+` is also there when **something was counted without its kind being said** — a backend that
+reports a lump, a turn that spanned two models and named the kinds of neither. Those tokens
+went on some kind and there is nothing to say which, so every column is short by part of them.
+
+Which kinds each backend reports is a capability like any other: `counts:cache_read` and its
+four siblings say who serves each one, and `hmz.flows.briefed()` lists them.
+
+## What refreshes it, and when
+
+Every **five seconds**, and again the moment an agent does anything at all — a tool call, a
+word, an answer. Not only when a count arrives: a turn is minutes long and spends most of them
+between the moments it reports one, and a rate is tokens over *seconds on the clock*. A figure
+that moved only when a count landed would stand still through every tool call of a turn and
+then jump as the turn ended, which reads as a run that stalled and recovered rather than as one
+working.
 
 ## The money
 
@@ -32,8 +67,13 @@ humanize drives whatever CLI you have installed. So the unlisted model is the or
 not the broken one:
 
 ```
-   Tokens:   claude-opus-5              48.2k    $1.34     91/s
-             some-local-model            9.1k              12/s
+   Tokens:   claude-opus-5              48.2k    $1.34     91 out/s
+             some-local-model            9.1k              12 out/s
+   Kinds:    input                       1.2k
+             output                        980
+             cache_read                 46.0k+
+             cache_write                 9.1k+
+             + a floor: not every agent here reports that kind
 ```
 
 The blank is deliberate. `$0.00` beside a model nobody priced would be a claim about a bill,
@@ -130,8 +170,12 @@ spells another is two lines. Each line's money is that line's.
 
 `input` and `output` are the two that every backend counts, and they sit on the mapping as
 attributes. The rest differ from CLI to CLI: a cache read, a cache write, or the reasoning a
-backend counts beside the output rather than inside it. So **a kind that is not there is one
-that backend does not report**:
+backend counts beside the output rather than inside it. The five names are
+`hmz.coganchor.agents.KINDS`, and every driver reports under them — a kind is the same word
+whichever CLI counted it, because the prices are per kind and a usage written down under one
+CLI's own spelling is a lump nothing can price.
+
+So **a kind that is not there is one that backend does not report**:
 
 ```python
 spent = session.spent()
@@ -144,6 +188,36 @@ The kinds are also what a bill is made of. A reasoning count kept beside the out
 as output. A backend that says what a turn cost without saying which kinds it went on gets no
 bill at all — the tokens are counted and nothing is claimed about them.
 
+They add up to the whole of what crossed the wire, and never to more. A backend that counts its
+reasoning inside the output does not also carry it beside the output, and one that counts a
+cached read inside the input has the read taken back out: a token counted twice is a token
+billed twice.
+
+**Which kinds a backend reports is a fact about the backend, not about the turn**, and it is
+declared rather than guessed: a turn that spent nothing on a cache write is missing that kind
+exactly as a CLI that never counts one is. `AgentBase.counts` says it, the catalogue serves it
+as `counts:<kind>`, and a flow can be refused an agent whose backend never reports what it
+means to steer by:
+
+| Backend | Counts |
+| --- | --- |
+| Claude Code, Kimi Code, pi, DeepSeek Harness, Grok Build, Qwen Code | `input`, `output`, `cache_read`, `cache_write` |
+| opencode, mimocode | those four and `reasoning` |
+| Antigravity | `input`, `output`, `cache_read`, `reasoning` |
+| Codex, ZCode | `input`, `output` — each counts its cached reads inside the input |
+| Cursor | nothing: it reports a duration and no tokens |
+
+`reasoning` is only there for the backends that count it **beside** the output. Grok Build
+reports a `reasoning_tokens` and it is deliberately not among its kinds: one measured turn,
+asked to think at length and answer in one word, came back with `output_tokens: 1141` and
+`reasoning_tokens: 1140`, so counting it separately would count those tokens twice and — the
+prices billing reasoning as output — bill for them twice.
+
+The interface reads the CLIs' own logs as well as their drivers, and a kind either of them
+names counts as reported — Codex's server never names a cached read, and the rollout it writes
+does. Only once that log has actually been read here, though: an agent whose turns land on
+another machine writes its rollout there, and nothing on this one can show a kind out of it.
+
 The `result` event a turn ends on carries the same reckoning, beside the per-model `tokens` it
 already carried. `result.spent.total` is what `result.tokens` comes to.
 
@@ -152,6 +226,13 @@ already carried. `result.spent.total` is what `result.tokens` comes to.
 **A rate is tokens a second over seconds on the clock**, not seconds an agent was talking. A
 flow sleeps between rounds, commits and reads what the last turn wrote. That time is time the
 tokens were spent over, and it is the honest reading of what a run costs per hour.
+
+**The one the interface draws is output tokens a second, and says so.** The input of a turn is
+the conversation so far, sent again at every request and mostly served out of a cache: it grows
+with the length of the transcript rather than with the work, so a rate counting it says how
+long the conversation has got — and doubles the moment a backend starts reporting what it read
+back out of its cache. `session.rate()` itself is per kind, so a flow can read whichever it
+means.
 
 The window defaults to five minutes — `hmz.flows.WINDOW`, the same window the interface's
 readout uses. A run younger than the window is measured **over the run**, so a rate read a

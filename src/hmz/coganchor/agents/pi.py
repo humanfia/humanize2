@@ -443,6 +443,10 @@ class PiAgent(AgentBase):
     reaches for a tool, so there is no permission for a hook to be hung on.
     """
 
+    #: What it counts, read off the same table its driver reads a usage with. Its reasoning
+    #: is counted inside the output rather than beside it, so it is not a kind of its own.
+    counts: ClassVar[frozenset[str]] = frozenset(_KINDS)
+
     def new(self, cwd: str | os.PathLike[str] | None = None) -> PiSession:
         """Opens a new pi session, in the directory it is given or in this one."""
         return PiSession(self, cwd)

@@ -10,20 +10,47 @@ from __future__ import annotations
 import threading
 import time
 from collections import Counter, deque
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from hmz.coganchor import prices
+from hmz.coganchor.agents import KINDS
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable
 
-__all__ = ["Monitor", "Shape", "Spend", "Under", "lasting", "short", "thousands"]
+__all__ = [
+    "Counted",
+    "Monitor",
+    "Shape",
+    "Spend",
+    "Under",
+    "lasting",
+    "short",
+    "thousands",
+]
 
 #: How far back the rate is measured. Five minutes is long enough to carry across the gaps a
 #: flow leaves -- a turn that thinks, a round it sleeps off, a commit it makes -- and short
 #: enough that a run which has gone quiet reads as quiet.
 _WINDOW = 300.0
+
+#: How long what a run has spent may stand before it is worked out again, however quiet the
+#: run has been. It moves while nothing arrives: a rate is tokens over seconds on the clock,
+#: and the clock runs through the minutes a turn spends thinking. Worked out only when a
+#: count changed, the figure stood still through all of them and then jumped at the end of
+#: the turn, which reads as a run that stalled and recovered rather than as one working.
+#: Five seconds because that is as often as a running total is worth reading, and because
+#: putting a price on it reads a list off the disk -- which a screen drawn twice a second
+#: must not pay for twice a second.
+_FIGURED = 5.0
+
+#: Under how much of a token a difference is not a token. A turn spread over two models has
+#: its kinds divided between them by what each took, and a division leaves a remainder of a
+#: millionth of a token -- which, counted as spending nobody said the kind of, would mark
+#: every figure of an honest run as a floor. Nothing counts tokens in fractions.
+_DUST = 1.0
 
 #: Where a count stops fitting and starts being abbreviated.
 _THOUSAND = 1000
@@ -34,17 +61,18 @@ _MINUTE = 60.0
 _HOUR = 3600.0
 
 
-def thousands(count: int) -> str:
+def thousands(count: float) -> str:
     """Renders a token count short enough for a status line.
 
     Args:
-      count: How many tokens.
+      count: How many tokens. A float because a kind is counted as one -- what a backend
+        reports is what it reports -- and nothing here shows a fraction of a token.
 
     Returns:
       The count, abbreviated once it stops fitting.
     """
     if count < _THOUSAND:
-        return str(count)
+        return f"{count:.0f}"
     if count < _MILLION:
         return f"{count / _THOUSAND:.1f}k"
     return f"{count / _MILLION:.2f}M"
@@ -148,10 +176,20 @@ class Spend:
     Attributes:
       model: The model the tokens were spent on.
       tokens: Every token spent on it, in and out alike.
-      rate: Tokens a second over the last five minutes, or over the whole run while the run
-        is younger than that. Seconds on the clock, not seconds an agent was talking: a flow
-        sleeps between rounds, commits, reads what the last turn wrote, and that time is time
-        the tokens were spent over.
+      kinds: The same spending, by the kind each token went on, as the fullest source that
+        broke it down says. What a reader is shown: an input token, an output token and a
+        cached read are three different things bought at three different prices, and a lump
+        of them added together answers no question anybody has. The kind called `` is what a
+        source counted without saying what kind it was, which is the one part of a total that
+        cannot be priced -- and its being there at all is what makes every other figure a
+        floor. Empty for a model nobody broke down.
+      rate: Output tokens a second over the last five minutes, or over the whole run while the
+        run is younger than that. Output alone, because that is the work: the input of a turn
+        is the conversation so far, read again at every request and mostly out of a cache, so
+        a rate counting it says how long the transcript has got rather than how fast the model
+        is writing. Seconds on the clock, not seconds an agent was talking: a flow sleeps
+        between rounds, commits, reads what the last turn wrote, and that time is time the
+        tokens were spent over.
       dollars: What those tokens came to, or None where nobody prices this model or the
         source that counted them did not say which kind each was. None is not nothing spent:
         a reader MUST show the tokens alone rather than a bill of zero.
@@ -161,6 +199,26 @@ class Spend:
     tokens: int
     rate: float
     dollars: float | None = None
+    kinds: Mapping[str, float] = field(default_factory=dict[str, float])
+
+
+@dataclass(frozen=True, slots=True)
+class Counted:
+    """One kind of token a run has spent, over every model of it, as a reader is shown it.
+
+    Attributes:
+      kind: Which kind, out of :data:`hmz.coganchor.agents.KINDS`.
+      tokens: How many went on it, over every model anything was spent on.
+      whole: Whether that figure is the whole of what went on this kind. False where an agent
+        of the run drives a CLI that does not report this kind at all, and false where some of
+        what was spent was counted without saying which kind it went on -- either way the
+        figure is a floor, and one drawn as though it were the total would be a claim about
+        the run that nothing here can make.
+    """
+
+    kind: str
+    tokens: float
+    whole: bool
 
 
 @dataclass
@@ -207,11 +265,28 @@ class Monitor:
     kinds: dict[tuple[str, str], dict[str, float]] = field(
         default_factory=dict[tuple[str, str], dict[str, float]]
     )
-    #: Recent spending as (when, model, tokens), which is what the rate is measured over.
-    #: Bounded by the window rather than by the length of the run: a flow going for days
-    #: keeps five minutes of it.
-    recent: deque[tuple[float, str, int]] = field(
-        default_factory=deque[tuple[float, str, int]]
+    #: The breakdown each model's spending is read in: the fullest reckoning any one source
+    #: has given of it, which is what every per-kind figure and the money alike are worked out
+    #: from. One source rather than the best of each kind from all of them: two sources
+    #: counting the same tokens differ in which kinds they name, and a cached read taken from
+    #: one beside an input taken from another is the same tokens counted twice.
+    parts: dict[str, dict[str, float]] = field(
+        default_factory=dict[str, dict[str, float]]
+    )
+    #: Which kinds of token each agent's backend reports at all, said of the backend rather
+    #: than read off what a turn happened to spend -- a kind nothing went on this turn is
+    #: missing from that turn's reckoning exactly as a kind the CLI never counts is, and this
+    #: is what tells them apart. What makes a union over two backends honest: a figure drawn
+    #: beside a backend that never reports a kind is short by whatever that backend spent on
+    #: it, and says so rather than passing for the whole.
+    reports: dict[str, frozenset[str]] = field(
+        default_factory=dict[str, frozenset[str]]
+    )
+    #: Recent spending as (when, model, kinds risen), which is what the rate is measured over.
+    #: By kind, since the rate is output alone. Bounded by the window rather than by the
+    #: length of the run: a flow going for days keeps five minutes of it.
+    recent: deque[tuple[float, str, Mapping[str, float]]] = field(
+        default_factory=deque[tuple[float, str, Mapping[str, float]]]
     )
     #: The rate per model as it was last worked out, and what it was worked out from: the rate
     #: is worked out again when something it is made of moves, and not on any clock of its own.
@@ -219,6 +294,13 @@ class Monitor:
     #: And the money, worked out at the same moment and from the same tokens.
     money: dict[str, float | None] = field(default_factory=dict[str, float | None])
     figured: int | None = None
+    #: And when, so that figures which move on the clock alone -- a rate is tokens over
+    #: seconds, and the seconds pass whether or not a token does -- are worked out again
+    #: while a turn is still thinking rather than only once it has landed.
+    figured_at: float = 0.0
+    #: Set by anything an agent did that was not a token: a tool, a word, an answer. What has
+    #: been spent is then worked out again at the next draw rather than at the next count.
+    astir: bool = False
     #: How many times what has been spent has changed, which is what `figured` is against.
     changed: int = 0
     #: When the run began, which is when this was made: one of these is made for one flow.
@@ -340,7 +422,8 @@ class Monitor:
                 broken[kind] = broken.get(kind, 0.0) + spent
             # Whatever the kinds did not account for still cost something, and is put under
             # no kind at all rather than guessed at as one: what is priced is then a floor.
-            if (rest := tokens - sum((kinds or {}).values())) > 0:
+            # A whole token or nothing: see `_DUST`.
+            if (rest := tokens - sum((kinds or {}).values())) >= _DUST:
                 broken[""] = broken.get("", 0.0) + rest
             self._counted("told", model, running, now, broken or None)
 
@@ -400,13 +483,33 @@ class Monitor:
             else:
                 self.kinds[(source, model)] = broken
             self.changed += 1  # so that what it is worth is worked out again
+        # What every per-kind figure and the money are read off, kept here so that the rate --
+        # which is output alone -- has a rise per kind to be measured over. Clamped at
+        # nothing, because the fullest source may change from one reading to the next and a
+        # reckoning that went backwards is not tokens somebody got back.
+        fullest = self._fullest(model)
+        before = self.parts.get(model, {})
+        grown = {
+            kind: risen
+            for kind, tokens in (fullest or {}).items()
+            if (risen := tokens - before.get(kind, 0.0)) > 0
+        }
+        if fullest is None:
+            # Dropped rather than kept: a breakdown outliving the total it described would
+            # price a bigger total against a smaller reckoning of what went into it, and
+            # would draw kinds for a spend nobody has broken down since.
+            self.parts.pop(model, None)
+        elif fullest != before:
+            self.parts[model] = dict(fullest)
         # The most any source has seen, which is what has been spent: two sources counting
         # the same tokens are not two lots of tokens.
         seen = max(held for (_, named), held in self.totals.items() if named == model)
-        if (risen := seen - self.spent[model]) <= 0:
+        risen = seen - self.spent[model]
+        if risen <= 0 and not grown:
             return
-        self.spent[model] = seen
-        self.recent.append((time.monotonic() if now is None else now, model, risen))
+        if risen > 0:
+            self.spent[model] = seen
+        self.recent.append((time.monotonic() if now is None else now, model, grown))
         self.changed += 1
 
     def spending(self, now: float | None = None) -> list[Spend]:
@@ -430,40 +533,49 @@ class Monitor:
             while self.recent and self.recent[0][0] < moment - _WINDOW:
                 self.recent.popleft()
                 aged = True
-            if aged or self.figured != self.changed:
+            if (
+                aged
+                or self.astir
+                or self.figured != self.changed
+                or moment - self.figured_at >= _FIGURED
+            ):
                 # Seconds on the clock: the window holds the turns and the flow's own code
                 # alike, so what a flow spent between two turns -- sleeping off a round,
                 # committing, reading what the last turn wrote -- is time it is measured over.
                 # Under five minutes old, the run itself is the window it has had.
                 over = min(_WINDOW, moment - self.began)
-                lately: Counter[str] = Counter()
-                for _, model, tokens in self.recent:
-                    lately[model] += tokens
+                # Output alone. The input of a turn is the conversation so far, sent again at
+                # every request and mostly served out of a cache, so a rate counting it says
+                # how long the transcript has got rather than how fast the model is writing --
+                # and doubles the moment a backend starts reporting its cached reads.
+                lately: dict[str, float] = {}
+                for _, model, grown in self.recent:
+                    lately[model] = lately.get(model, 0.0) + grown.get("output", 0.0)
                 self.rates = {
-                    model: lately[model] / over if over > 0 else 0.0
+                    model: lately.get(model, 0.0) / over if over > 0 else 0.0
                     for model in self.spent
                 }
                 # Priced here rather than as it is drawn: the prices are read off the disk,
                 # and a screen redrawn twice a second must not pay for that twice a second.
                 self.money = {model: self._priced(model) for model in self.spent}
-                self.figured = self.changed
+                self.figured, self.astir, self.figured_at = (
+                    self.changed,
+                    False,
+                    moment,
+                )
             return [
                 Spend(
                     model=model,
                     tokens=tokens,
                     rate=self.rates.get(model, 0.0),
                     dollars=self.money.get(model),
+                    kinds=dict(self.parts.get(model, {})),
                 )
                 for model, tokens in self.spent.most_common()
             ]
 
     def _priced(self, model: str) -> float | None:
         """What has been spent on one model, in money. Held under the lock by its callers.
-
-        The kinds come from whichever source said the kind of the most tokens, and where two
-        said as much, from the one that has seen the most: two sources counting the same
-        tokens are one bill, so the fullest reckoning that can be priced is the one to price
-        -- and a total nobody broke down is no reckoning at all rather than the biggest one.
 
         Args:
           model: The model.
@@ -473,7 +585,31 @@ class Monitor:
           token was -- which a reader shows as tokens alone rather than as nothing spent.
           What comes back is a floor: tokens no source said the kind of are left out of it.
         """
-        fullest: Mapping[str, float] | None = None
+        broken = self.parts.get(model)
+        return prices.cost(broken, model) if broken else None
+
+    def _fullest(self, model: str) -> dict[str, float] | None:
+        """The reckoning of one model to read every figure off. Held under the caller's lock.
+
+        Whichever source said the kind of the most tokens, and where two said as much, the one
+        that has seen the most: two sources counting the same tokens are one bill, so the
+        fullest reckoning that can be priced is the one to price -- and a total nobody broke
+        down is no reckoning at all rather than the biggest one.
+
+        One source entire rather than the best figure for each kind out of all of them. Two
+        sources differ in which kinds they name as well as in how far they have read: a cached
+        read taken from the log beside an input taken from the backend's own report is the
+        same tokens counted twice, and a figure that overstates a bill is the one thing this
+        must never do.
+
+        Args:
+          model: The model.
+
+        Returns:
+          What that source says was spent on it, by kind, or None where no source broke it
+          down at all.
+        """
+        fullest: dict[str, float] | None = None
         best = (-1.0, -1.0)
         for (source, named), held in self.totals.items():
             if named != model:
@@ -488,7 +624,83 @@ class Monitor:
             told = sum(count for kind, count in broken.items() if kind)
             if (told, held) > best:
                 best, fullest = (told, held), broken
-        return prices.cost(fullest, model) if fullest else None
+        return dict(fullest) if fullest is not None else None
+
+    def reporting(self, agent: str, kinds: Iterable[str]) -> None:
+        """Notes which kinds of token one agent's backend reports at all.
+
+        Said of the backend rather than read off what a turn happened to spend: a kind nothing
+        went on this turn is missing from that turn's reckoning exactly as a kind the CLI never
+        counts is, and this is the only thing that tells the two apart afterwards.
+
+        Args:
+          agent: Whose backend it is.
+          kinds: What that backend counts, as `hmz.coganchor.agents.AgentBase.counts` says.
+        """
+        with self._lock:
+            self.reports[agent] = frozenset(kinds)
+
+    def stirring(self) -> None:
+        """Notes that an agent did something that was not a token: a tool, a word, an answer.
+
+        What a run has spent is then worked out again at the next draw rather than at the next
+        count. A turn spends most of its minutes between the moments it reports one, and a
+        figure that moved only on those stands still through every tool call and then jumps,
+        which reads as a run that stalled and recovered rather than as one working.
+        """
+        with self._lock:
+            self.astir = True
+
+    def reckoning(self, now: float | None = None) -> list[Counted]:
+        """What the run has spent kind by kind, and which of those figures are floors.
+
+        The union over every model rather than one agent's own, since a run driving two
+        backends is one bill and a kind only one of them counts is still a kind something was
+        spent on. Which is also why a kind is marked: drawn beside a backend that never
+        reports it, the union is short by whatever that backend spent on it, and a column
+        quietly short of one agent's tokens is worse than one marked as short of them.
+
+        With one agent it is that agent's own reckoning and nothing is marked. There is no
+        other backend for it to be short of, and a mark against every figure of a run that is
+        counting everything would be a warning nobody could act on.
+
+        Args:
+          now: The moment to read it at, defaulting to this one.
+
+        Returns:
+          One entry per kind: every kind an agent of the run reports, whether or not anything
+          has gone on it yet -- a column that appeared the first time a cache was written to
+          would be a readout that shuffles sideways while it is being read -- and every kind
+          anything was actually spent on, whoever reports it.
+        """
+        spending = self.spending(now)
+        counted: dict[str, float] = {}
+        # Whether any of what was spent was counted without saying what kind it went on: a
+        # backend that reports a lump, a turn that spanned two models and said the kinds of
+        # neither. It makes every figure here a floor, since the tokens it stands for went on
+        # some kind and there is nothing to say which.
+        unnamed = False
+        for spend in spending:
+            for kind, tokens in spend.kinds.items():
+                if kind:
+                    counted[kind] = counted.get(kind, 0.0) + tokens
+                elif tokens >= _DUST:
+                    unnamed = True
+            if spend.tokens - sum(spend.kinds.values()) >= _DUST:
+                unnamed = True
+        with self._lock:
+            told = list(self.reports.values())
+        # Nothing having said what it reports, there is nothing for a figure to be short of:
+        # what was counted is what was spent. This is a run watched before its agents were
+        # known, not a run of backends that report nothing.
+        every = told[0].intersection(*told[1:]) if told else frozenset(counted)
+        union = frozenset[str]().union(*told) if told else frozenset(counted)
+        held = [kind for kind in KINDS if kind in union or counted.get(kind)]
+        held += sorted(kind for kind in counted if kind not in KINDS)
+        return [
+            Counted(kind, counted.get(kind, 0.0), kind in every and not unnamed)
+            for kind in held
+        ]
 
     def now_working(self) -> list[str]:
         """Who has a turn open, taken whole so that a reader never sees it mid-change.

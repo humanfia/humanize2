@@ -15,7 +15,8 @@ agent — a transcript, a multi-line editor under it, and a status line under th
 ├──────────────────────────────────────────────────────────────────────┤
 │              builder · claude/claude-opus-4-8:high · ● 2 · reading   │  ← what each agent runs
 │              reviewer · codex/gpt-5.6-sol:high · ○ 3 · unread        │
-│                    48.2k tokens · $1.34 · 91/s                       │
+│   input 12.4k · output 2.1k · cache_read 1.02M+ · cache_write 48.2k+ │
+│                          $1.34 · 91 out/s                            │
 │ ❯ type here                                                          │  ← the editor
 ├──────────────────────────────────────────────────────────────────────┤
 │ ·|· builder… (73s · ctrl+c twice to stop)   esc status · tab agent  │  ← the status line
@@ -38,13 +39,17 @@ it runs as `cli/model:effort`, then the machine its turns land on where that is 
 [account](#which-cli-and-which-account) it runs as where that is not this machine's own, and
 finally what it is holding — `●` or `○` for whether it is working, how many conversations it
 has open, `reading` on the agent whose transcript is on the screen, and `unread` on one that
-has said something since you last looked at it. Under them, what the run has cost so far — in
-tokens, in money, and the rate it is costing it at — per model, since two agents at one model
-are one bill, and over a recent window only, so a flow that has stopped reads as stopped. The
-money comes from [OpenLLMPrices](https://openllmprices.com/), fetched once as the interface
-opens and kept under `~/.humanize/prices.json`; a model nobody lists shows its tokens with
-nothing beside them rather than `$0.00`, and a run mixing a priced model with an unpriced one
-marks its total `$1.34+`. See [Cost and rate](/user/tally).
+has said something since you last looked at it. Under them, what the run has cost so far — one
+figure per kind of token rather than one over the lot of them, then the money and the rate.
+A `+` on a kind means some agent of the run drives a CLI that does not report it at all, so
+that figure is a floor rather than the total; with one agent running nothing is marked. The rate is
+**output tokens** a second, over a recent window only, so a flow that has stopped reads as
+stopped — and the whole readout is worked out again every five seconds and whenever an agent
+does anything, rather than only when a count lands. The money is per model, since two agents at
+one model are one bill; it comes from [OpenLLMPrices](https://openllmprices.com/), fetched once
+as the interface opens and kept under `~/.humanize/prices.json`; a model nobody lists shows its
+tokens with nothing beside them rather than `$0.00`, and a run mixing a priced model with an
+unpriced one marks its total `$1.34+`. See [Cost and rate](/user/tally).
 
 **The status line, left:** what is running, if anything is — whose turn it is and how long it
 has been going. Between two turns it names the flow and how long the run has been going, since
@@ -341,8 +346,12 @@ neighbours as the arrows joining them:
 
    Flow:             chat
    Also:             builder → reporter · ×2
-   Tokens:           claude-opus-5                48.2k    $1.34    91/s
-                     some-local-model             9.1k              12/s
+   Tokens:           claude-opus-5                48.2k    $1.34  91 out/s
+                     some-local-model             9.1k            12 out/s
+   Kinds:            input                         1.2k
+                     output                          980
+                     cache_read                   46.0k
+                     cache_write                   9.1k
 ```
 
 **Each box says what its agent is on the left and what it is doing on the right.** What it runs
@@ -360,8 +369,13 @@ under the diagram as `Also` rather than drawn — a line crossing the page from 
 the fourth is a line nothing in a terminal draws readably.
 
 **`Tokens` is one row per model**, biggest spender first, with what it has cost in tokens, what
-that came to in money, and the rate. The blank in the money column is a model nobody prices —
-never a bill of `$0.00`, which would be a claim about what was spent. See [Cost and
+that came to in money, and the rate in output tokens a second. The blank in the money column is
+a model nobody prices — never a bill of `$0.00`, which would be a claim about what was spent.
+
+**`Kinds` is one row per kind of token**, over every model: a bill is made of the kinds
+whichever model bought them, so this is the run's rather than any one model's. A figure marked
+`+` is a floor — some agent here drives a CLI that does not report that kind, or something was
+counted without its kind being said — with a line under the block saying so. See [Cost and
 rate](/user/tally).
 
 **A box appears as its agent takes its first turn**, and not before. A flow may declare ten
@@ -407,8 +421,9 @@ what the run is running as, and the two are read from the bottom up — the last
 the running total end on the same row:
 
 ```
-❯ and fix the tests too                    assistant · claude-opus-5:high
-❯ then push                             12.3k tokens · $0.31 · 84/s
+                                           assistant · claude-opus-5:high
+❯ and fix the tests too            input 11.2k · output 1.1k · cache_read 0
+❯ then push                                           $0.31 · 84 out/s
 ────────────────────────────────────────────────────────────────────────
 ❯ █
 ```

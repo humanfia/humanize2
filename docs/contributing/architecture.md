@@ -219,6 +219,13 @@ of it can be gathered afterwards, and a branch in `tui/tally.py`'s `_spent` wher
 says what one request cost, which is what a tally moving during a turn is read out of. A
 backend that writes neither gets neither, and says so rather than being left out.
 
+Its usage goes under the names in `coganchor/agents/event.py`'s `KINDS` and no others — the
+prices are per kind, so a driver writing its CLI's own spelling down reports a lump nothing can
+price — and which of them it reports is declared on the agent class as `counts`, read off the
+same table the driver parses with rather than written down twice. A backend that reports
+nothing declares nothing; what draws a run then marks its figures as floors rather than leaving
+that backend out of them.
+
 And the documentation. Several pages count the backends and several tables name every one of
 them, so one added without them is a site that says there are fewer than there are.
 

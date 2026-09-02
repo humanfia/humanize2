@@ -1374,6 +1374,11 @@ class CodexAgent(AgentBase):
     #: codex keeps itself going toward an objective, which is what `pursue` reaches for.
     pursues: ClassVar[bool] = True
 
+    #: What it counts, read off the same table its driver reads a usage with. Two kinds
+    #: and no more: Codex counts its cached reads inside the input rather than beside it,
+    #: so there is no cache kind here to report.
+    counts: ClassVar[frozenset[str]] = frozenset(_KINDS)
+
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent whose app server is not running yet.
 

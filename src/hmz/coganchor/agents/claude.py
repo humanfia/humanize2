@@ -714,6 +714,10 @@ class ClaudeCodeAgent(AgentBase):
     #: Claude keeps itself going toward an objective, which is what `pursue` reaches for.
     pursues: ClassVar[bool] = True
 
+    #: What it counts, read off the same table its driver reads a usage with, so that
+    #: what a run is told this backend reports is what its driver actually parses.
+    counts: ClassVar[frozenset[str]] = frozenset(_KINDS)
+
     def new(self, cwd: str | os.PathLike[str] | None = None) -> ClaudeCodeSession:
         """Opens a new Claude Code session, in the directory it is given or in this one."""
         return ClaudeCodeSession(self, cwd)

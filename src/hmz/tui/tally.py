@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
     from .monitor import Monitor
 
-__all__ = ["Tally"]
+__all__ = ["Tally", "reported"]
 
 #: How often the logs are looked at. Often enough that a turn's spending shows while the turn
 #: is still running, and cheap because only what has been appended since is ever read.
@@ -67,6 +67,30 @@ _KINDS: dict[str, tuple[tuple[str, str], ...]] = {
         ("cache_write", "inputCacheCreation"),
     ),
 }
+
+
+def reported(backend: str) -> frozenset[str]:
+    """Which kinds of token this backend's own log says, out of the logs read here.
+
+    Beside what its driver reports rather than instead of it: the two are read from two
+    places and one may say what the other does not -- Codex's server counts its cached reads
+    inside the input and never names them, while the rollout it writes does name them. What
+    the interface can show of a backend is what either of them says, and a figure marked as
+    short of a kind it can in fact see would be a warning about nothing.
+
+    What this answers is what such a log holds, not that there is one to read. A rollout is
+    written wherever the turn ran, so an agent working on another machine leaves none here --
+    which is why what is said of an agent is said once one of its logs has actually been
+    opened, and not when the run started.
+
+    Args:
+      backend: Whose logs.
+
+    Returns:
+      The kinds, empty for a backend whose logs are not read here at all -- which is not
+      the same as one whose logs say nothing, and reads the same way: nothing claimed.
+    """
+    return frozenset(kind for kind, _ in _KINDS.get(backend, ()))
 
 
 def _kinds(backend: str, usage: dict[str, Any]) -> dict[str, float]:
@@ -191,6 +215,11 @@ class Tally:
         self._agents = list(agents)
         self._monitor = monitor
         self._read: dict[Path, _Reading] = {}
+        #: Which agents this has actually opened a log of, so that what the monitor is told a
+        #: backend reports is what the interface can in fact see. A rollout written on another
+        #: machine, or in a container, is one nothing here reads -- and a kind claimed off a
+        #: log nobody read would be a nought drawn as a fact.
+        self._reading: set[str] = set()
         self._stop = threading.Event()
 
     def watch(self) -> None:
@@ -229,10 +258,19 @@ class Tally:
             idents = {
                 session.named for session in agent.sessions if session.named is not None
             } | set(agent.opened)
+            opened = False
             for ident in sorted(idents):
                 for pattern in profile.logs:
                     for path in sorted(home.glob(pattern.format(ident=ident))):
-                        self._take(path, profile.name, agent.config.model)
+                        opened |= self._take(path, profile.name, agent.config.model)
+            if opened and agent.id not in self._reading:
+                # Said once a log has been read rather than when the run started: what this
+                # reads is beside what the driver says, and only a log that is actually being
+                # read is a kind the interface can show.
+                self._reading.add(agent.id)
+                self._monitor.reporting(
+                    agent.id, type(agent).counts | reported(profile.name)
+                )
         totals: dict[str, Counter[str]] = {}
         for reading in self._read.values():
             for model, broken in reading.spent.items():
@@ -246,13 +284,17 @@ class Tally:
                 "read", model, sum(broken.values()), kinds=kinds or None
             )
 
-    def _take(self, path: Path, backend: str, model: str) -> None:
+    def _take(self, path: Path, backend: str, model: str) -> bool:
         """Reads one log on from wherever this last left it.
 
         Args:
           path: The log.
           backend: Whose it is, which is how its rows are read.
           model: What to count a row against when the row does not say for itself.
+
+        Returns:
+          Whether the log was there to be read, which is what says this backend's own
+          reckoning is one the interface can show.
         """
         reading = self._read.setdefault(path, _Reading())
         try:
@@ -260,7 +302,7 @@ class Tally:
                 stream.seek(reading.at)
                 written = stream.read()
         except OSError:
-            return  # not there yet, or not ours to read
+            return False  # not there yet, or not ours to read
         # To the last full line: a row being written is a row to read next time round.
         written = written[: written.rfind(b"\n") + 1]
         reading.at += len(written)
@@ -279,3 +321,4 @@ class Tally:
                 # under no kind at all rather than guessed at as one.
                 if (rest := tokens - int(sum(broken.values()))) > 0:
                     counted[""] += rest
+        return True

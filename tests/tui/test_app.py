@@ -902,8 +902,12 @@ async def test_the_readout_says_what_a_run_cost_in_money_as_well_as_in_tokens(
 
         above = str(app.query_one("#above", Static).content)
 
-    assert "1.0k tokens" in above
+    # Kind by kind rather than as one total over them: an input token and an output token
+    # are two different things bought at two different prices.
+    assert "input 1.0k" in above
+    assert "output 40" in above
     assert "$0.0012" in above  # a thousand in at $1/M and forty out at $5/M
+    assert "out/s" in above  # and the rate is the output alone, which it says
 
 
 @pytest.mark.timeout(60)
@@ -935,10 +939,16 @@ async def test_a_turn_that_lands_carries_the_kinds_its_bill_is_made_of(
 
 
 @pytest.mark.timeout(60)
-async def test_a_turn_spread_over_two_models_is_counted_and_not_priced(
+async def test_a_turn_spread_over_two_models_keeps_the_kinds_it_was_made_of(
     priced: str,
 ) -> None:
-    """One turn's kinds do not divide between two models, and nobody said how they would."""
+    """A turn that reached for a cheaper model for a sub-turn says the kinds of the pair.
+
+    Nothing in it says which of the two a cached read was made against, so they are divided
+    by what each model took. Dropped instead -- which is what happened before -- the whole
+    turn counted as tokens of no kind at all: missing from every per-kind figure and priced
+    at nothing, which is a worse answer than an apportioned one.
+    """
     from hmz.coganchor.agents import Event, Usage
     from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
@@ -956,10 +966,16 @@ async def test_a_turn_spread_over_two_models_is_counted_and_not_priced(
             ),
         )
 
-        spending = app._monitor.spending()
+        spending = {one.model: one for one in app._monitor.spending()}
 
-    assert sum(one.tokens for one in spending) == 1040
-    assert all(one.dollars is None for one in spending)
+    assert sum(one.tokens for one in spending.values()) == 1040
+    # Each model's share of each kind, which comes to the turn's own reckoning again.
+    assert spending[priced].kinds["input"] == pytest.approx(1000 * 1000 / 1040)
+    assert spending["some-lite-model"].kinds["input"] == pytest.approx(1000 * 40 / 1040)
+    assert sum(one.kinds["output"] for one in spending.values()) == pytest.approx(40)
+    # And the one that is priced has a bill, where before neither of them had one.
+    assert spending[priced].dollars is not None
+    assert spending["some-lite-model"].dollars is None  # nobody lists it
 
 
 @pytest.mark.timeout(60)
@@ -982,6 +998,97 @@ async def test_the_tokens_group_on_the_monitor_carries_the_bill_beside_the_count
 
 
 @pytest.mark.timeout(60)
+async def test_the_remainder_of_dividing_a_turn_between_models_marks_nothing(
+    priced: str,
+) -> None:
+    """A millionth of a token is not spending nobody said the kind of.
+
+    Dividing a turn's kinds between the two models it named leaves a remainder in the last
+    bit of a float. Counted as tokens of no named kind, it would mark every figure of a run
+    that is counting everything as a floor -- a warning about arithmetic, on the commonest
+    turn Claude Code takes, since a turn that reached for a sub-agent names two models.
+    """
+    from hmz.coganchor.agents import Event, Usage
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model=priced, effort="high"))
+    app = Humanize()
+    async with app.run_test():
+        app._monitor.reporting(agent.id, {"input", "output", "cache_read"})
+        app._heard(
+            agent,
+            agent.new(),
+            Event(
+                kind="result",
+                text="done",
+                tokens={priced: 201_391, "some-lite-model": 1755},
+                spent=Usage(input=1663, output=410, cache_read=201_073),
+            ),
+        )
+
+        counted = app._monitor.reckoning()
+
+    assert [one.kind for one in counted] == ["input", "output", "cache_read"]
+    assert all(one.whole for one in counted), counted
+
+
+@pytest.mark.timeout(60)
+async def test_the_readout_marks_a_kind_one_of_the_backends_running_does_not_report(
+    priced: str,
+) -> None:
+    """The union over two backends is short by whatever the one that never counts it spent.
+
+    Claude Code says what a cache write cost; Codex counts its cached reads inside the input
+    and never names a write at all. So a run driving both has a `cache_write` column made of
+    Claude's writes alone, and drawn as though it were the total it would be a claim about
+    the run that nothing here can make.
+    """
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._monitor.reporting(
+            "builder", {"input", "output", "cache_read", "cache_write"}
+        )
+        app._monitor.reporting("reviewer", {"input", "output", "cache_read"})
+        app._monitor.spend(
+            "builder", 1200, model=priced, kinds={"input": 1000, "cache_write": 200}
+        )
+        app._monitor.spend("reviewer", 40, model=priced, kinds={"output": 40})
+        app._draw()
+        await driver.pause()
+
+        above = str(app.query_one("#above", Static).content)
+
+    (counted,) = [line for line in above.splitlines() if "input" in line]
+    assert "input 1.0k·" in counted.replace(" · ", "·")  # both count it: whole
+    assert "cache_write 200+" in counted  # one of them never does: a floor
+
+
+@pytest.mark.timeout(60)
+async def test_the_kinds_group_on_the_monitor_says_what_a_run_spent_its_tokens_on(
+    priced: str,
+) -> None:
+    """Under the models, since a cached read is the same thing whichever model made it."""
+    app = Humanize()
+    async with app.run_test() as driver:
+        app._monitor.reporting("actor", {"input", "output", "cache_read"})
+        app._monitor.reporting("other", {"input", "output"})
+        app._monitor.spend(
+            "actor",
+            1140,
+            model=priced,
+            kinds={"input": 1000, "cache_read": 100, "output": 40},
+        )
+        app.action_monitor()
+        await until(lambda: isinstance(app.screen, Monitoring), driver)
+
+        said = str(app.screen.query_one("#tuning", Label).content)
+
+    assert "Kinds" in said
+    assert "cache_read" in said
+    assert "a floor: not every agent here reports that kind" in said
+
+
+@pytest.mark.timeout(60)
 async def test_a_model_nobody_prices_is_a_token_count_with_no_dollars_beside_it() -> (
     None
 ):
@@ -998,9 +1105,10 @@ async def test_a_model_nobody_prices_is_a_token_count_with_no_dollars_beside_it(
 
         above = str(app.query_one("#above", Static).content)
 
-    (counted,) = [line for line in above.splitlines() if "tokens" in line]
-    assert "4.0k tokens" in counted
-    assert "$" not in counted.replace("$text-muted", "")  # a colour is not a currency
+    (counted,) = [line for line in above.splitlines() if "input" in line]
+    assert "input 3.0k" in counted
+    assert "output 1.0k" in counted
+    assert "$" not in above.replace("$text-muted", "")  # a colour is not a currency
 
 
 @pytest.mark.timeout(60)
