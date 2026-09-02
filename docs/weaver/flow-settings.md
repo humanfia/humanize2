@@ -80,6 +80,35 @@ At the prompt there is no file to pass: the same answers are typed on the sheet.
 [what it takes](/reference/tui#setting-a-flow-up) is the page before its agents — answered once
 and [remembered](/user/settings) for every run of it after.
 
+## One key of that file is not yours
+
+`budget:` is reserved. It is the run's [allowance](/features/allowances) — hours, millions of
+output tokens, dollars — rather than a setting of the flow, so it is lifted out of the file
+before your model ever sees it. Declare a field called `budget` and the two would be one name
+for two quantities, which is the one mistake this reserving prevents.
+
+```yaml
+# setup.yaml
+rounds: 9
+mode: slow
+budget:
+  hours: 6      # the run's, not the flow's
+```
+
+What a run of your flow is worth *by default* is said where the flow is marked:
+
+```python
+@flow(budget=Allowance(hours=6, tokens=10.0))
+def run(agents: tuple[Agent], task: str, config: Config | None = None) -> None:
+    ...
+```
+
+Saying nothing is a flow with no opinion, which runs under whatever the workspace was set up
+with. Saying `Allowance()` outright is a flow claiming it is *meant* to run under nothing at
+all, which is what exempts it from being asked to confirm that. Either way the flow does not
+hold itself to it — the run does, at every session edge — so this is a default and never an
+implementation.
+
 ## Fall back when `None` arrives
 
 `None` means **nobody set it up**. The flow gets it from `hmz exec` when you do not pass `-c`.
@@ -152,6 +181,8 @@ another model is refused before its first turn, as one handed the wrong number o
 
 - A sheet, with the right widget per type.
 - `-c setup.yaml` on `hmz exec`, and the same answers on the sheet at the prompt.
+- An [allowance](/features/allowances) on every run of it, whether or not you declare one, and
+  the budget row of the flow menu to set it from.
 - Validation, in your own words, at the moment somebody types it.
 - [Remembered per flow](/user/settings), so twenty settings are not twenty questions every
   morning.

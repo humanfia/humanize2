@@ -1045,32 +1045,42 @@ could say hello would be a first run that fails without a network.
 ### What ends a loop
 
 A loop with nothing to stop it runs until somebody stops it, which is a bill nobody agreed to
-and a week of rounds nobody read. So every loop here that has no stopping condition of its own
-takes a **budget**, in millions of output tokens:
+and a week of rounds nobody read. So **every run has an
+[allowance](/features/allowances)** — hours on the clock, millions of output tokens, dollars,
+each `0` for no cap on that one — and the first of them to be reached stops the run:
 
 ```sh
 hmz exec -f ralph_loop -c budget.yaml -a claude/claude-opus-5:high "$(cat TASK.md)"
 ```
 
 ```yaml
-budget: 25    # millions of output tokens; 0 goes on until it is stopped
+budget:
+  hours: 6
+  tokens: 25
+  dollars: 50
 ```
 
-**10 million by default.** Output rather than every kind, because output is what a model is
-asked to produce and the only kind a loop of its own accord grows: what goes in is the task and
-the repository, and a round that read more of them is not a round that did more.
+It is not a flow's to implement, and no flow here implements one. It is held to at the edges of
+every turn of every session of every agent of the run, whatever backend is behind it: a turn
+taken once it is spent raises `Stopped` rather than answering, and the run is written down as
+stopped. Which is why a loop needs no stopping condition of its own to be legal — and why a
+`budget:` that is a bare number is refused, since a quarter of a day, twenty-five million
+tokens and twenty-five dollars are not each other.
 
-The spend is kept in the state, as `output`, because the rounds are — a budget that started
-again at nothing every time the loop was picked up would be no budget at all for the loop a
-week of restarts is, so what is counted is every run of that flow in that workspace. A loop that
-has spent its budget is **over**, and what is over is not picked up: it clears what it kept, so
-the next run there opens on a budget of its own and at round one.
+A flow may say what a run of it is worth by default, with `@flow(budget=Allowance(...))`. The
+six loops of the official flowverse each declare ten million output tokens, which is what they
+have always come with; `chat` declares `Allowance()`, which is a flow saying it is meant to run
+under nothing at all. Whoever runs one overrides it, from `-c` or from the budget row of the
+flow menu.
 
-`chat` and `rlar` have no budget, because each already ends: a conversation ends when you stop
-typing, and `rlar` ends when its reviewer agrees the work is done. `humanize1:rlcr` ends on
-`--max` rounds. The loops that take one are `ralph_loop`, `stateful_ralph`, `continue_loop`,
-`flame_chase`, `goal` and `fixed_juice_ralph` — where `budget` is the same quantity `juice` is,
-read at the scale of the loop rather than of a turn.
+The allowance is **this run's**. It used to be the flow's, kept in the flow's state as `output`
+and accumulated across every run of it in a workspace — so forty restarts shared one budget,
+and now they get forty. Which means a run stopped by its allowance is a run to pick up rather
+than one that is over: it leaves what it kept, and running the flow again carries on under a
+fresh allowance.
+
+`rlar` still ends when its reviewer agrees the work is done, `humanize1:rlcr` on `--max`
+rounds, and `chat` when you stop typing. The allowance is underneath all of them.
 
 Their source is the best documentation of this API there is —
 [humanfia/flowverse](https://github.com/humanfia/flowverse), or
@@ -1088,7 +1098,7 @@ written against this API. [Flows](/flows/) is the same list with the shape of ea
 | `fixed_juice_ralph` | 1 | Ralph with a governor on it: it [moves the effort](/reference/agents#moving-the-effort-while-it-runs) a rung a round to hold the agent to `juice` output tokens per turn of the model. |
 | `continue_loop` | 1 | Sends the task once, then keeps nudging `continue`. Until a turn lands the task is sent again — `continue` on its own would open a session that never saw it. |
 | `goal` | 1 | Ralph, with the task set as the agent's [own goal](/reference/agents#goals). The loop only starts it over when it stopped without having met it. |
-| `flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. Its [budget](#what-ends-a-loop) is what the pair spend between them. |
+| `flame_chase` | 2 | Two agents take turns on the same task. Each reads the repository, not a history. The pair spend the run's [allowance](#what-ends-a-loop) between them, as every agent of a run does. |
 | `rlar` | `actor`, `reviewer` | The actor works in one session and must remember; a fresh reviewer reads its work and must not. The review *is* the actor's next prompt, word for word, and the reviewer is also the one that says the task is finished — which is what ends the run. |
 | `humanize1:gen-idea` | `drafter` | Opens a loose idea into a repo-grounded draft. |
 | `humanize1:gen-plan` | `planner`, `analyst` | Turns that draft into a plan both sides have converged on. |
@@ -1098,10 +1108,10 @@ written against this API. [Flows](/flows/) is the same list with the shape of ea
 
 Every one of them but the two drafting phases [can be picked up](#a-flow-that-can-be-picked-up),
 each keeping the little it honestly can. The three Ralphs keep the round they reached, as
-`rounds`, and what they have spent, as `output`, which is what their
-[budget](#what-ends-a-loop) is held against; `fixed_juice_ralph` keeps the rung its governor
-settled at as well, since a loop started again at the top of the ladder walks back down to it a
-paid turn at a time.
+`rounds`; `fixed_juice_ralph` keeps the rung its governor settled at as well, since a loop
+started again at the top of the ladder walks back down to it a paid turn at a time. What they
+have spent is not among it: the [allowance](#what-ends-a-loop) is the run's rather than the
+flow's, and a run picked up is one picked up under a fresh one.
 `flame_chase` keeps whose turn is next, two turns in a row being the one thing a pair taking
 turns must not do. `rlar` keeps the review the actor is owed, word for word, which is the one
 thing a restart would otherwise throw away — and keeps nothing at all where the reviewer agreed,

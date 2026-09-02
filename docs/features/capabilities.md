@@ -102,6 +102,8 @@ capabilities, identities, conversations, and ways of collaborating with a person
 - Steering delivers an acknowledged instruction into a supported turn that is already running.
 - A per-turn budget of output tokens or wall-clock seconds is held to off the live meter, and
   cuts the running turn off where its cut-off setting says.
+- A per-run allowance of hours, millions of output tokens and dollars is held to at every
+  session edge of every backend, and stops every agent of the run at once when it is spent.
 - The same interrupt primitive ends a turn by hand, reaching whichever process is holding it.
 - Goals continue across controlled turns, while cloning creates a separate conversation branch.
 - Side questions through /btw read a frozen conversation snapshot without changing the main
@@ -112,6 +114,7 @@ capabilities, identities, conversations, and ways of collaborating with a person
 
 **Learn:** [A line typed mid-turn](/features/steering),
 [A turn can be cut off](/features/budgets),
+[Every run has an allowance](/features/allowances),
 [It decides when it is done](/features/goals), [The moments of a turn](/features/hooks),
 [You, as one of the agents](/features/human) · **Use:** [Questions](/user/questions),
 [Side questions (/btw)](/user/btw), [Board](/user/board),

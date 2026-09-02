@@ -135,6 +135,12 @@ The loop never ends by itself; it is a `while True`. A stop raises `Stopped` ins
 code. `suppress=True` deliberately **does not** catch that — otherwise the loop would carry on
 past a stop and never end. See [Stopping](/user/stopping).
 
+It also stops without you. Every run has an [allowance](/features/allowances) — hours, millions
+of output tokens, dollars — and a turn taken once it is spent raises that same `Stopped`, which
+is what lets a loop like this one be written with no way out at all. `ralph_loop` ships
+declaring ten million output tokens; the **budget** row of `/flow`, or a `budget:` in the file
+`-c` names, is where you say otherwise.
+
 Stopping is not losing your place. `ralph_loop` [can be picked up](/user/resuming): start it
 here again and it goes on from the round it reached. That run is a run of its own, with its own
 sessions and its own record. `/epics` is where both of them are.

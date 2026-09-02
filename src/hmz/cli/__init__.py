@@ -111,6 +111,11 @@ def _exec(argv: list[str]) -> int:
     # run with nobody to ask, and silence is not an answer.
     hmz.reports()
     path, agents, task, config, budget, as_json = hmz.read(argv)
+    # Only now that the line is known to name a flow: `--help` has already exited inside the
+    # reading above, and a line that runs nothing must not pay for the drivers to be loaded
+    # so that this can learn the name of what a stopped run raises.
+    from hmz.coganchor.agents import Stopped
+
     with Out(as_json=as_json) as out, Shown(out) as shown:
         # The agents the line named, and not whatever else the flow turns out to drive: a
         # flow whose other side is the person drives one more, and with nobody at a prompt
@@ -143,6 +148,12 @@ def _exec(argv: list[str]) -> int:
         except (KeyboardInterrupt, SystemExit):
             # Somebody stopping a run is not a run that went wrong.
             raise
+        except Stopped as why:
+            # Nor is a run that spent what it was allowed. It is the ordinary end of a
+            # budgeted loop -- a flow with no exit of its own runs until its allowance is
+            # gone, which is what having one is for -- so it is said in a line rather than
+            # reported as a crash and printed as a traceback nobody has anything to do about.
+            out.aside(f"hmz exec: stopped -- {why}")
         except BaseException as why:
             # Reported and then raised on exactly as it was: what a flow does when it fails
             # is the flow's business and the person at the terminal's, and this is only

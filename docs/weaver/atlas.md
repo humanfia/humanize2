@@ -101,8 +101,8 @@ read what it answered with a logic node, and branch on that
 ```
 
 That is what `settled` is for above. In a real flow it would earn its keep — counting the
-rounds, holding the loop to a budget, deciding that three passes is enough however the
-reviewer feels about it.
+rounds, refusing to go on where the tests did not run, deciding that three passes is enough
+however the reviewer feels about it.
 
 ## The Python an atlas is written in
 

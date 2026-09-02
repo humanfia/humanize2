@@ -28,7 +28,9 @@ class Review(BaseModel):
 ```
 
 `notes` becomes the actor's next prompt verbatim. `done` is what ends the run — this is the one
-flow here whose stopping condition is a judgement rather than a budget.
+flow here that ends on a judgement rather than on running out. The run's
+[allowance](/features/allowances) is under it as it is under every flow, and it is the ceiling
+rather than the point: what ordinarily stops this one is the reviewer agreeing.
 
 The reviewer's prompt tells it to be skeptical, and to treat reward hacking — tests weakened or
 special-cased, work stubbed out or faked — as the thing it is most there to catch. How to read

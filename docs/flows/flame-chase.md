@@ -24,17 +24,21 @@ at.
 Give the two the same model and effort and they are still two agents, which is sometimes the
 point: a [trace](/features/tracing) reads the run as two sets of sessions rather than one.
 
-## What it takes
+## What ends it
 
-`budget`, millions of output tokens [counted across every run of it here](/flows/) — **10 by
-default**, `0` for no limit. The **two spend it between them** rather than apiece, because the
-loop is the pair: it spends what it spends whichever of them was writing.
+The flow takes no settings of its own. What ends a run of it is the run's
+[allowance](/features/allowances) — hours, millions of output tokens, dollars. The **two spend
+it between them** rather than apiece, and that is the ordinary case rather than this flow's own
+arithmetic: an allowance is the run's money, and every agent of a run spends out of the one
+reckoning whichever of them was writing. It declares **ten million output tokens** as what a run
+of it is worth by default; `-c budget.yaml` with a `budget:` mapping in it, or the **budget** row
+in `/flow`, says otherwise.
 
 ## What it keeps
 
-`turn`, `rounds` and `output`. The turn is the half that has to be kept: a run that always
-opened at the first agent would hand it the turn the other was owed — two turns in a row, the
-one thing a flow built on alternating must not do.
+`turn` and `rounds`. The turn is the half that has to be kept: a run that always opened at the
+first agent would hand it the turn the other was owed — two turns in a row, the one thing a flow
+built on alternating must not do.
 
 A round is a turn each, and the turn that *finishes* one counts it, so a round the first agent
 was cut off in is finished, and counted once, by the run that picks that turn up.
