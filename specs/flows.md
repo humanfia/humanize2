@@ -17,11 +17,11 @@
 └── verses.py
 ```
 
-What a flow is: what it drives, what it is called, where it is found, which of the ones it
-holds was asked for, what it brings with it, and what it takes for one flow to run another.
-Nothing here reads a command line and nothing here opens an epic: `hmz.runtime.runner` does both, and
-asks this what the flow it was named says about itself. A call asks the epic already open for
-a record to be written into, which is not a second epic: it is part of the one run.
+What a flow is: what it drives, what it is called, where it is found, which of the ones it holds was
+asked for, what it brings with it, and what it takes for one flow to run another. Nothing here reads
+a command line and nothing here opens an epic: `hmz.runtime.runner` does both, and asks this what
+the flow it was named says about itself. A call asks the epic already open for a record to be
+written into, which is not a second epic: it is part of the one run.
 
 This MUST be the whole of what a flow imports. A flow is content -- somebody else's
 repository, forked and edited -- and one that named `hmz.coganchor.agents` for the type of what it
@@ -247,11 +247,11 @@ What a flow drives, written as interfaces and nothing else.
   backend with no fork of its own MUST refuse it where it is asked rather than hand back a
   second handle on the one conversation, and MUST say beforehand whether it can, so that a
   flow may ask rather than catch.
-- The drivers MUST answer to it structurally, and `hmz.coganchor.agents` MUST NOT import it. The arrow
-  points one way -- a flow names what it drives, and a driver is written without ever naming a
-  flow -- and a driver that inherited from this would be the layer below reaching up. That
-  they answer MUST be stated once, where a type checker reads it, so that a driver which stops
-  answering reads as a driver to correct rather than as a flow that fails on its first turn.
+- The drivers MUST answer to it structurally, and `hmz.coganchor.agents` MUST NOT import it. The
+  arrow points one way -- a flow names what it drives, and a driver is written without ever naming a
+  flow -- and a driver that inherited from this would be the layer below reaching up. That they
+  answer MUST be stated once, where a type checker reads it, so that a driver which stops answering
+  reads as a driver to correct rather than as a flow that fails on its first turn.
 - A flow MUST declare the places it drives with these, and what it writes beside one -- a
   moment, a `Goal`, a `Remote`, an `Isolated`, an `AgentDefaults`, a `Needs` -- MUST go on
   meaning what it means. What is annotated is which interface, not which class.
@@ -514,12 +514,12 @@ run another. `hmz.runtime.runner` asks this and then opens an epic around the an
   declared `Isolated`, where an agent works being the flow's to say, and the person at the
   prompt, who takes no turn anywhere.
 - The flow's own reads, writes and commands MUST be able to reach it too. A container is handed
-  the project directory at the path it already has, so a file the flow opens is already the
-  file a turn opened; a command it runs is not, being run by this machine's shell against this
-  machine's tools, which is the thing a container was reached for to avoid. So the run's
-  container MUST be askable for, and MUST answer with the workspace as that machine has it --
-  `hmz.coganchor.machines.Mapped`. A run on this machine MUST answer with nothing, a flow there doing
-  what it always did.
+  the project directory at the path it already has, so a file the flow opens is already the file a
+  turn opened; a command it runs is not, being run by this machine's shell against this machine's
+  tools, which is the thing a container was reached for to avoid. So the run's container MUST be
+  askable for, and MUST answer with the workspace as that machine has it --
+  `hmz.coganchor.machines.Mapped`. A run on this machine MUST answer with nothing, a flow there
+  doing what it always did.
 - Everything here MUST read the flow as it is now, by running it. A flow rewritten between two
   readings -- by hand, or by an agent it is itself driving -- MUST be read as it is now, which
   is what makes a run that improves its own flow a run that then drives the improved one.

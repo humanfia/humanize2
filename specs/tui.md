@@ -867,8 +867,8 @@ What the editor offers to finish, which is the only way anything is chosen.
 Which agents are installed here, what each one runs, and where their turns could land.
 
 - Nothing MUST be asked of a backend here: starting one costs what it costs, and this is read
-  at a prompt. What each runs MUST be what `hmz.coganchor.models` last kept for it, and what only this
-  machine knows -- which containers are up, which hosts are in an ssh config -- MUST be read
+  at a prompt. What each runs MUST be what `hmz.coganchor.models` last kept for it, and what only
+  this machine knows -- which containers are up, which hosts are in an ssh config -- MUST be read
   off the disk it is written on.
 - A backend that is not installed here MUST NOT be offered, and neither MUST an effort a model
   does not take.

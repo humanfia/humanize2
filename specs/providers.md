@@ -102,10 +102,10 @@ def points(cli: str, name: str, at: str) -> bool: ...
   is a chain -- a subscription that runs out falling to a key, and a key that is refused
   falling to a gateway.
 - It MUST stay the account's, and MUST NOT be widened to cover the agent that has nowhere left
-  to run at all -- a model retired, a CLI that will not start, a rate limit on the whole
-  account rather than one request. None of those is answered by another account of that
-  backend, what answers them is another agent entirely, and that is `hmz.coganchor.fallbacks`. The two
-  answer two failures, and one of them keeps the conversation where the other cannot.
+  to run at all -- a model retired, a CLI that will not start, a rate limit on the whole account
+  rather than one request. None of those is answered by another account of that backend, what
+  answers them is another agent entirely, and that is `hmz.coganchor.fallbacks`. The two answer two
+  failures, and one of them keeps the conversation where the other cannot.
 - A chain MUST be walked inside the session that was running: the conversation is the
   backend's own and is named by an id, so it carries on under the next account rather than
   being handed back to the flow as a failure. An agent that has moved MUST stay moved -- the
@@ -120,8 +120,9 @@ def points(cli: str, name: str, at: str) -> bool: ...
   agent given no account, which is where its chain already starts.
 - How many times over a failed turn is taken again before the chain moves on MUST NOT be said
   here. That is a thing about the place a turn runs at -- the CLI, the account and the model --
-  rather than about the credentials it runs with, and `hmz.coganchor.fallbacks` is the one place both it
-  and where the turn goes next are written. Two places saying it would be two places to drift.
+  rather than about the credentials it runs with, and `hmz.coganchor.fallbacks` is the one place
+  both it and where the turn goes next are written. Two places saying it would be two places to
+  drift.
 
 ## `redirect.py` / `_trace.py` / `_staging.py`
 

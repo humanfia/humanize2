@@ -4,10 +4,10 @@ Driving a coding agent from Python. An agent is settings; a
 [session](/user/concepts#session) is memory. Which of the two a [flow](/reference/flows) holds decides what
 it remembers.
 
-Everything here is importable from `hmz.coganchor.agents`. This is the layer under a flow rather than the
-one a flow is written against: `AgentBase` and `SessionBase` answer to the `Agent` and `Session`
-interfaces [flows](/reference/flows#what-a-flow-drives) declares, and a flow imports those from
-`hmz.flows`. Reach for this page when you are building agents yourself — from a script, from a
+Everything here is importable from `hmz.coganchor.agents`. This is the layer under a flow rather
+than the one a flow is written against: `AgentBase` and `SessionBase` answer to the `Agent` and
+`Session` interfaces [flows](/reference/flows#what-a-flow-drives) declares, and a flow imports those
+from `hmz.flows`. Reach for this page when you are building agents yourself — from a script, from a
 test that stands in for one — rather than weaving a flow.
 
 ## Making one
@@ -71,14 +71,14 @@ accounts entirely, they are all offered the same catalogue. The whole table is i
 [falling back](/user/fallback#what-went-wrong). A failure nothing recognises is tried again
 exactly as a failed turn always was.
 
-**Some failures are taken once whatever the step says.** A backend that knows its own
-failure cannot come out differently says so by raising `hmz.coganchor.agents.Unrecoverable`, and that
-one is neither retried nor carried to the next account in the chain. A conversation longer
-than the model's context window is that long again on the next try; a backend that will not
-answer under the session id it was opened with will not answer under it a second later. An
-account set to retry would otherwise take those on its own schedule for as long as anybody
-left the flow running. It is a `subprocess.CalledProcessError` like every other failed turn,
-so a flow that catches turns catches it.
+**Some failures are taken once whatever the step says.** A backend that knows its own failure cannot
+come out differently says so by raising `hmz.coganchor.agents.Unrecoverable`, and that one is
+neither retried nor carried to the next account in the chain. A conversation longer than the model's
+context window is that long again on the next try; a backend that will not answer under the session
+id it was opened with will not answer under it a second later. An account set to retry would
+otherwise take those on its own schedule for as long as anybody left the flow running. It is a
+`subprocess.CalledProcessError` like every other failed turn, so a flow that catches turns catches
+it.
 
 **Then the chain moves on.** This half is said on the account rather than on the agent: it is
 the account that goes down, and each account names the one to carry on under when it has
@@ -1786,12 +1786,12 @@ is settled by the flow itself and takes no `machine` from anyone.
 
 ## Reaching into a bundled CLI
 
-Two of these agents — Claude Code and opencode — ship as a single [Bun](https://bun.sh)
-standalone executable: the whole CLI, its JavaScript minified and packed into one file behind a
-`---- Bun! ----` trailer, runtime and all. Where a shallower way in cannot reach a thing they
-do, `hmz.coganchor.agents.patching` reaches it by rewriting that bundle — and, because doing so is brittle
-by construction, is careful about it. This is the deepest of the ways humanize reaches a CLI's
-own commands, and it reaches these two backends and no other: the agents shipped as native
+Two of these agents — Claude Code and opencode — ship as a single [Bun](https://bun.sh) standalone
+executable: the whole CLI, its JavaScript minified and packed into one file behind a `---- Bun!
+----` trailer, runtime and all. Where a shallower way in cannot reach a thing they do,
+`hmz.coganchor.agents.patching` reaches it by rewriting that bundle — and, because doing so is
+brittle by construction, is careful about it. This is the deepest of the ways humanize reaches a
+CLI's own commands, and it reaches these two backends and no other: the agents shipped as native
 binaries carry no bundle to patch, and the plain Node scripts are reached from their runtime
 instead.
 

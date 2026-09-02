@@ -183,10 +183,10 @@ Two calls that ran at once are two of these, with `began` and `ended` that overl
 `record` apiece — which is what tells them from one another, the flow's name being the same
 name.
 
-It is still one run and still one directory: a called flow is part of the run that called it,
-not another run. `hmz.runtime.epic.sessions` reads every record, so every session of a run is one list
-however many flows it took, each saying which `flow` opened it and which `record` — which is
-to say which *call* of that flow — it was opened in.
+It is still one run and still one directory: a called flow is part of the run that called it, not
+another run. `hmz.runtime.epic.sessions` reads every record, so every session of a run is one list
+however many flows it took, each saying which `flow` opened it and which `record` — which is to say
+which *call* of that flow — it was opened in.
 
 A session the flow [branched](/weaver/branching) also says `parent`, the id of the conversation
 it was forked from. The backend's own log cannot: it shows a session that opened on an agent
