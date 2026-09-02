@@ -95,6 +95,6 @@ that machine, and `/dev/shm` is empty again after a reboot either way.
 
 ## Reporting something
 
-Open an issue at [humanfia/humanize2](https://github.com/humanfia/humanize2/issues). If it is a
+Open an issue at [humanfia/humanize](https://github.com/humanfia/humanize/issues). If it is a
 vulnerability rather than a bug, say so in the title. Leave the details out of the public
 thread.

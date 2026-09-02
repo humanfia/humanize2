@@ -569,7 +569,7 @@ def test_what_is_struck_out_of_everything_a_bundle_carries(
         '{"input_tokens": 4211, "output_tokens": 12}',
         "/v1/messages?max_tokens=4096&model=x",
         "/search?monkey=hello",
-        "https://github.com/humanfia/humanize2",
+        "https://github.com/humanfia/humanize",
         "ask-the-reviewer-about-it",
         "the password is wrong",
     ],

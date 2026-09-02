@@ -19,14 +19,14 @@ def test_two_checkouts_of_one_repository_are_two_daemons(
     tmp_path: pathlib.Path,
 ) -> None:
     """Named after the project and then after the whole path, so a name is not enough."""
-    one = tmp_path / "a" / "humanize2"
-    other = tmp_path / "b" / "humanize2"
+    one = tmp_path / "a" / "humanize"
+    other = tmp_path / "b" / "humanize"
     one.mkdir(parents=True)
     other.mkdir(parents=True)
 
     assert where.at(one) != where.at(other)
     # And still readable: which project it is is the front of the name.
-    assert where.at(one).name.startswith("humanize2-")
+    assert where.at(one).name.startswith("humanize-")
 
 
 def test_the_same_directory_is_the_same_daemon(tmp_path: pathlib.Path) -> None:

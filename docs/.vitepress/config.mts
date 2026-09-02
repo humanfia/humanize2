@@ -3,13 +3,13 @@ import { dirname, join } from 'node:path'
 
 import { defineConfig, type SiteConfig } from 'vitepress'
 
-// Deployed to https://docs.humanfia.ai/humanize2/ by .github/workflows/build-docs.yml.
+// Deployed to https://docs.humanfia.ai/humanize/ by .github/workflows/build-docs.yml.
 // The custom domain belongs to the organisation's own pages, so this repository is a project
 // page served under a subdirectory of it, and `base` is that subdirectory: without it every
 // stylesheet, script and link would ask for a path at the domain root, where nothing of this
 // site is. Internal links are still written from the site's own root -- VitePress prepends
 // the base to each of them -- so nothing in a page names the subdirectory.
-const BASE = '/humanize2/'
+const BASE = '/humanize/'
 
 // Where a page used to be, and where it is now. Guides used to be one flat section serving two
 // audiences at once; they are a User Guide and a Weaver Guide now, and the tutorials went with
@@ -110,7 +110,7 @@ export default defineConfig({
   head: [
     // Written out with the base in it: VitePress prepends the base to a theme's own
     // links and to what a page names, and hands `head` to the template as it is.
-    ['link', { rel: 'icon', href: '/humanize2/logo.svg' }],
+    ['link', { rel: 'icon', href: '/humanize/logo.svg' }],
     ['meta', { name: 'theme-color', content: '#2a6ea6' }],
   ],
 
@@ -407,10 +407,10 @@ export default defineConfig({
       ],
     },
 
-    socialLinks: [{ icon: 'github', link: 'https://github.com/humanfia/humanize2' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/humanfia/humanize' }],
 
     editLink: {
-      pattern: 'https://github.com/humanfia/humanize2/edit/main/docs/:path',
+      pattern: 'https://github.com/humanfia/humanize/edit/main/docs/:path',
       text: 'Edit this page on GitHub',
     },
 
@@ -425,7 +425,7 @@ export default defineConfig({
   },
 
   // One file per moved page, written after the build so no page has to pretend to be a
-  // redirect. `cleanUrls` means GitHub Pages answers /humanize2/guide/afk with guide/afk.html,
+  // redirect. `cleanUrls` means GitHub Pages answers /humanize/guide/afk with guide/afk.html,
   // so that is the name each one is written under, and a path that ended in a slash is the
   // index.html of its directory.
   async buildEnd(site: SiteConfig) {

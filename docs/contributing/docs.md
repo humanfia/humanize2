@@ -230,11 +230,11 @@ already in them, which run 8 to 20 seconds end to end.
 
 `.github/workflows/build-docs.yml` builds on every push and pull request that touches `docs/`, and
 deploys to GitHub Pages on a push to `main`. It is served at
-[docs.humanfia.ai/humanize2](https://docs.humanfia.ai/humanize2/). The custom domain is the
+[docs.humanfia.ai/humanize](https://docs.humanfia.ai/humanize/). The custom domain is the
 organisation's own pages site, so this repository is a project page under a subdirectory of it:
-the config sets **`base: '/humanize2/'`**, and this repository publishes no `CNAME` of its own —
+the config sets **`base: '/humanize/'`**, and this repository publishes no `CNAME` of its own —
 one here would move the whole site to a domain root that belongs to something else.
-`humanfia.github.io/humanize2` redirects here.
+`humanfia.github.io/humanize` redirects here.
 
 A `base` that does not match where the site is served is a page whose every stylesheet, script
 and link asks for a path that is not there, which is a site that looks like unstyled markdown.

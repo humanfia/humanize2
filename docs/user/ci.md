@@ -153,7 +153,7 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Install humanize
-        run: uv pip install --system git+https://github.com/humanfia/humanize2.git
+        run: uv pip install --system git+https://github.com/humanfia/humanize.git
 
       - name: Sign the CLI in as an account of its own
         env:

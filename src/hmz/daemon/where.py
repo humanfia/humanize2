@@ -58,7 +58,7 @@ LOCK = "daemon.lock"
 _PLAIN = re.compile(r"[^A-Za-z0-9]+")
 
 #: How much of the workspace's own name is kept in front of the digest of the whole path. A
-#: directory of these is read by people, and `humanize2-a1b2c3d4e5f6` says which project.
+#: directory of these is read by people, and `humanize-a1b2c3d4e5f6` says which project.
 _KEPT = 24
 
 #: The longest a socket may be reached by its whole path. What a Unix socket address holds is
