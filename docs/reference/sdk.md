@@ -1,9 +1,13 @@
 # SDK reference
 
-humanize as one object. `Hmz` is a workspace and everything humanize can be asked to do in it,
-and it is what the [command line](/reference/cli), the [daemon](/reference/daemon) and the
-[terminal interface](/reference/tui) all go through — so a thing that can be done one way can be
-done every way, and is refused the same way whichever way it was asked.
+How a tool that is not humanize reaches humanize. There are two ways to reach a run from
+outside, and `hmz.sdk` is where both are offered.
+
+**Straight at the runtime.** `Hmz` is a workspace and everything humanize can be asked to do in
+it — the same object the [command line](/reference/cli) holds, and the one the
+[terminal interface](/reference/tui) reaches through the [daemon](/reference/daemon) holding
+its run. A thing that can be done one way can be done every way, and is refused the same way
+whichever way it was asked.
 
 ```python
 from hmz.sdk import Hmz
@@ -11,6 +15,27 @@ from hmz.sdk import Hmz
 hmz = Hmz()
 hmz.run("chat", [], "say hello").run()
 ```
+
+**Over a daemon.** [`Daemons`](#daemons) is a run held where a terminal closing cannot end it:
+a process of its own, one per workspace, reached over the socket beside it. That is what a tool
+looking after a run somebody else started asks, and what holds a run of its own past its own
+exit.
+
+```python
+from hmz.sdk import Daemons
+
+held = Daemons().here()          # the run being held in this directory, or None
+if held is not None:
+    print(held.status())         # how many terminals are reading, and what is running
+    held.detach()                # let go of them; the run goes on
+```
+
+Nothing here does any of it. Every answer is written where it is carried out — `hmz.runtime`
+for what can be done in a workspace, `hmz.daemon` for a run held apart from a terminal — and
+this hands those through under one name, so that a tool and humanize itself are holding one
+object rather than two that agree for now. The [layers](/contributing/architecture) are
+reachable by their own names too, which is what a tool writing an interface or a command line
+of its own does.
 
 ## `Hmz`
 
@@ -179,14 +204,51 @@ happened.
 | `trace(*, sessions=None, agents=None, output=None, start=None, end=None, profile=None)` | The same collector, asked for whatever sessions you name — which is how a session no run ever drove is read back. |
 | `bundled(epic, *, output=None, transcript=None)` | Packages one whole run up as one archive to send somewhere — its own records, every session log the backends wrote for it with the links followed, and a manifest — and answers with where it went and what went in. Credentials are struck out of every byte. See [Exporting a run](/user/export). |
 
+## Daemons
+
+`hmz.daemon` — [a run held](/reference/daemon) where a terminal closing cannot end it, as a
+tool outside reaches one.
+
+| | |
+| --- | --- |
+| `here(workspace=None)` | The run being held in one workspace, or `None` where nothing is. |
+| `all()` | Every run being held on this machine, oldest first. |
+| `hold(opens, workspace=None, *, columns=0, rows=0)` | Puts a run where a terminal closing cannot end it, and comes back once it is listening. `opens` is called in the held process with the run being held, and returns when the run is over — so a tool that wants a flow held runs one there, and one that wants an interface of its own held draws one. |
+
+Each of these hands back a [`Daemon`](/reference/daemon#python), which is what humanize's own
+ways in hold: `status()`, `attach()`, `detach()`, `stop()`, `kill()`.
+
+```python
+from hmz.sdk import Daemons, Hmz
+
+LINE = ["-f", "ralph_loop", "-a", "claude/claude-opus-5:high", "fix the build"]
+
+
+def opens(session):
+    # Runs in the held process, and returns when the run is over. `session` is what lets go
+    # of the terminals reading it; a run nobody is drawing for never needs it.
+    hmz = Hmz()
+    flow, agents, task, config, _ = hmz.read(LINE)
+    hmz.run(flow, agents, task, config).run()
+
+
+held = Daemons().hold(opens)
+held.status()
+held.stop()
+```
+
 ## Session
 
-What is holding a run somewhere a terminal closing cannot reach, as the interface sees one — a
-`Protocol` rather than the thing itself, so that the interface names no daemon.
+What is holding a run somewhere a terminal closing cannot reach, as whatever is drawing sees
+one — a `Protocol` rather than the thing itself, so that a run held apart from a terminal and a
+run in the process somebody typed `hmz` in are one interface: one is handed one of these and
+the other is handed none.
 
 | | |
 | --- | --- |
 | `attached` | How many terminals are reading this run right now. |
 | `detach()` | Lets go of every terminal reading it, leaving the run running. Returns how many were let go of. |
 
-[`hmz.daemon.Held`](/reference/daemon) is what implements it.
+`Held` is what implements it, and is what a tool holding a run of its own is handed: it is
+[`Session`](#session) plus the hooks the process holding a run registers — `redrawn`,
+`stopping`, `says`. Both names are here, so an interface of your own is one import away.

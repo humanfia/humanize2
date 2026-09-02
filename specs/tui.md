@@ -279,9 +279,11 @@ line, with what the flow is doing beside the transcript.
   rather than the run, and `hmz` in this directory opens it again. It MUST be offered only
   where something outside this terminal is holding the run, since where nothing is, closing
   the terminal is what closes the run.
-- What is holding the run MUST be `hmz.sdk.Session` and no more of it: how many terminals are
-  reading, and how to let go of them. The interface MUST name no daemon -- it draws on a
-  terminal, and which terminal is not a thing it is told.
+- What is holding the run MUST be `hmz.daemon.Session` and no more of it: how many terminals
+  are reading, and how to let go of them. The interface names the daemon for the runtime it
+  reaches through it, and MUST NOT name what a held run really is: it draws on a terminal, and
+  whether there is anything on the other end of that terminal but a person is answered by
+  being handed one of these or none.
 - `reattached` MUST draw the whole screen again, for a terminal that has just begun reading a
   run that was already going. A terminal that has just arrived has none of what was drawn
   before it, so the interface MUST be stopped and started again on it rather than refreshed:
@@ -503,7 +505,7 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 - `/flowverses` MUST list every place there is, saying where each came from and which have
   not been fetched, and MUST be the four things there are to do with one: what it holds, one
   added, one fetched again, one taken away. It MUST be the same store `/flow` reads the flows
-  out of and the same one :attr:`hmz.sdk.Hmz.verses` walks -- one place a thing is kept is
+  out of and the same one :attr:`hmz.runtime.doing.core.Hmz.verses` walks -- one place a thing is kept is
   one place it is kept, whichever way somebody reached it.
 - Enter MUST say what one holds, which MUST be read only of the flowverse it was asked of: a
   flow is read by running it, so what a place holds is the one question about it with no cheap
@@ -513,7 +515,7 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   rather than raised at whoever opened it, and MUST NOT stop the interface redrawing while it
   runs.
 - Where a flowverse came from MUST be shown with whatever was signed into the URL taken out,
-  for the reason :attr:`hmz.sdk.Hmz.verses` gives it back that way: a private one is added as
+  for the reason :attr:`hmz.runtime.doing.core.Hmz.verses` gives it back that way: a private one is added as
   `https://x-access-token:$TOKEN@...`, git keeps that verbatim, and a token on a screen is a
   token in a photograph. It MUST be taken out in one place, which both ways of showing it ask.
 
@@ -619,8 +621,8 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   the ids it wrote down rather than by the directory it ran in. A trace of what a directory
   holds whoever opened it MUST NOT be offered here at all -- this is a list of runs, and a
   trace that is of none of them has nothing here to hang on. There is no way in that asks for
-  one: :meth:`hmz.sdk.Hmz.epics.trace` with no sessions named gathers every session of the
-  workspace, and nothing typed and nothing drawn calls it that way.
+  one: :meth:`hmz.runtime.doing.epics.Epics.trace` with no sessions named gathers every
+  session of the workspace, and nothing typed and nothing drawn calls it that way.
 - What is written MUST be everything the run wrote down and everything its sessions were
   logged to, and MUST carry no transcript -- what is on the screen is not that run, which may
   be a week old, and a screen of somebody else's run in the bundle would be a bundle saying

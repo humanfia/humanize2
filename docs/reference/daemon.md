@@ -14,6 +14,12 @@ take another, and its own pseudoterminal so there is a screen to draw on when no
 Nothing of the interface knows about any of it. It draws on a terminal, and whether that
 terminal is your ssh session or one of these is not something it is told.
 
+It is the other way round for everything the interface *does* rather than draws. A run of this
+directory happens in the held process, so that process is where humanize itself is reached
+from: `hmz.daemon` hands through [`Hmz`](/reference/sdk), and the interface asks it. A name
+rather than a message — the interface is already inside the process holding the run, and the
+socket is for the terminals outside it.
+
 ## From the prompt
 
 | | |
@@ -94,7 +100,7 @@ rather than one that says nothing is running.
 ## Python
 
 ```python
-from hmz.daemon import Daemon, daemons, running, start
+from hmz.daemon import Daemon, Hmz, Session, daemons, running, start
 ```
 
 | | |
@@ -109,22 +115,34 @@ from hmz.daemon import Daemon, daemons, running, start
 | --- | --- |
 | `alive` | Whether the process holding it is still there. |
 | `attach()` | Reads it from this terminal, until it ends or lets go. |
-| `status()` | What it says about itself: how many are reading, and what is running. |
+| `status()` | What it says about itself: how many terminals are reading, which flows are running, and what is written down beside its socket. |
 | `detach()` | Lets go of every terminal reading it. |
 | `stop(seconds=20.0)` | Asks the run to stop, as closing the interface does, and waits for it to go. |
 | `kill(seconds=20.0)` | Ends the process holding it, whatever it was doing. |
 
-`start` knows nothing about what a run is: it is handed something that opens one and returns
-when it is over. That is what keeps the interface and this apart, and what makes the interface
-running under a daemon identical to the interface running under none. What it hands back to the
-opener is a `Held`, which is [`hmz.sdk.Session`](/reference/sdk#session) plus the three hooks the
-process holding a run registers:
+`start` knows nothing about how a run is opened: it is handed something that opens one and
+returns when it is over. That is what keeps what draws and what holds apart, and what makes the
+interface running under a daemon identical to the interface running under none. What it hands
+back to the opener is a `Held`, which is [`Session`](#session) plus the three hooks the process
+holding a run registers:
 
 | | |
 | --- | --- |
 | `redrawn(hook)` | What to call when a terminal arrives, which is to draw the whole screen again. It is called on a thread of its own. |
 | `stopping(hook)` | What to call when somebody asks the run to stop from outside it. |
-| `says(hook)` | What to add to the answer when somebody asks what is running here. |
+| `says(hook)` | What to add to the answer when somebody asks what is running here. Which flows are running is not among the things it has to say: the daemon is the process they are running in and asks the runtime itself. |
+
+## Session
+
+What is holding a run, as whatever is drawing it sees one — a `Protocol` rather than `Held`
+itself, so that a run held apart from a terminal and a run in the process you typed `hmz` in
+are one interface: one is handed one of these and the other is handed none, and `/detach` says
+so rather than doing nothing.
+
+| | |
+| --- | --- |
+| `attached` | How many terminals are reading this run right now. |
+| `detach()` | Lets go of every terminal reading it, leaving the run running. Returns how many were let go of. |
 
 ## What a terminal is put back to
 

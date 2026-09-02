@@ -80,21 +80,21 @@ presented to a run is refused before its first turn.
 
 ## Shared core does not mean identical interfaces
 
-The SDK's workspace object is the composition point. It reaches the same settings, flows,
-agents, accounts and epics that the other surfaces show, and loads each only when it is asked
-for. Adding a flowverse through one surface and seeing it in another is not a sync operation —
-both are reading the same store.
+The runtime's workspace object — `Hmz`, which the SDK hands out under its own name — is the
+composition point. It reaches the same settings, flows, agents, accounts and epics that the
+other surfaces show, and loads each only when it is asked for. Adding a flowverse through one
+surface and seeing it in another is not a sync operation — both are reading the same store.
 
 | | | |
 | --- | --- | --- |
-| **Python** | composable | Holds the SDK Run — a loaded runner plus its task — with one lifecycle for running here, starting in the background, waiting, stopping and closing the agent conversations |
-| **The command line** | scriptable | The same Run, on the blocking path |
-| **The terminal interface** | conversational | Keeps that workspace object and runner in hand, so it can configure the flow, watch several conversations, accept questions and steer a turn while the run is live |
-| **The daemon** | continuity | Interprets no flows at all. It holds that same interface in a detached process and carries its screen through a pseudoterminal |
+| **Python** | composable | Holds the Run — a loaded runner plus its task — with one lifecycle for running here, starting in the background, waiting, stopping and closing the agent conversations. It is offered both ways: straight at the runtime, or held apart from any terminal by a daemon |
+| **The command line** | scriptable | The same Run, on the blocking path, reaching the runtime by name |
+| **The terminal interface** | conversational | Keeps that workspace object and runner in hand — reached through the daemon holding its run — so it can configure the flow, watch several conversations, accept questions and steer a turn while the run is live |
+| **The daemon** | continuity | Opens no flow itself: it is handed something that opens one. It holds that same interface in a detached process, carries its screen through a pseudoterminal, and answers what is running there out of the runtime |
 
-The interface sees only the SDK Session boundary — how many terminals are reading, and how to
-detach them without stopping the run — which keeps daemon machinery out of it while a closed
-terminal leaves the work going on the same host.
+What the interface sees of being held is the Session boundary — how many terminals are reading,
+and how to detach them without stopping the run — which keeps the pseudoterminal and the socket
+out of it while a closed terminal leaves the work going on the same host.
 
 So unified means common state, validation and runtime semantics where the surfaces overlap,
 rather than feature parity. Each stays small because none has to redefine what a flow, setup,

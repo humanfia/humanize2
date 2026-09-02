@@ -5,6 +5,11 @@ have already happened there, and the flow that is running there now. The things 
 workspace's -- the accounts agents run as, where flows come from -- are still reached from
 here, because there is one of each and one place to ask for it.
 
+The front door of :mod:`hmz.runtime` and reached by its name: a command line names the runtime
+and holds this, a daemon holding a run apart from a terminal holds it too and the interface it
+holds reaches it through that daemon, and :mod:`hmz.sdk` is the same object handed to whoever
+is calling humanize from outside. One list of what humanize can do rather than one per way in.
+
 Each of them is fetched when it is asked for and not before. A command line that only lists the
 places flows come from must not load the tracer, the sandbox and every coding agent driver
 there is to do it, and `hmz internal anchor` must not load any of this at all.
@@ -23,13 +28,13 @@ if TYPE_CHECKING:
 
     from hmz.coganchor.agents import AgentBase
     from hmz.coganchor.backends import Profile
+    from hmz.runtime.doing.accounts import Accounts
+    from hmz.runtime.doing.epics import Epics
+    from hmz.runtime.doing.fallbacks import Fallbacks
+    from hmz.runtime.doing.flows import Flows, Flowverses
+    from hmz.runtime.doing.running import Run
     from hmz.runtime.runner import Runner
     from hmz.runtime.settings import Settings
-    from hmz.sdk.accounts import Accounts
-    from hmz.sdk.epics import Epics
-    from hmz.sdk.fallbacks import Fallbacks
-    from hmz.sdk.flows import Flows, Flowverses
-    from hmz.sdk.running import Run
 
 __all__ = ["Hmz"]
 
@@ -80,7 +85,7 @@ class Hmz:
     def flows(self) -> Flows:
         """The flows there are to run, and the places they come from."""
         if self._flows is None:
-            from hmz.sdk.flows import Flows
+            from hmz.runtime.doing.flows import Flows
 
             self._flows = Flows()
         return self._flows
@@ -94,7 +99,7 @@ class Hmz:
     def accounts(self) -> Accounts:
         """The accounts an agent may be run as, and what each backend runs as one."""
         if self._accounts is None:
-            from hmz.sdk.accounts import Accounts
+            from hmz.runtime.doing.accounts import Accounts
 
             self._accounts = Accounts()
         return self._accounts
@@ -103,7 +108,7 @@ class Hmz:
     def fallbacks(self) -> Fallbacks:
         """Where a turn goes when the place taking it cannot take it at all."""
         if self._fallbacks is None:
-            from hmz.sdk.fallbacks import Fallbacks
+            from hmz.runtime.doing.fallbacks import Fallbacks
 
             self._fallbacks = Fallbacks()
         return self._fallbacks
@@ -112,7 +117,7 @@ class Hmz:
     def epics(self) -> Epics:
         """The runs of this workspace that have already happened."""
         if self._epics is None:
-            from hmz.sdk.epics import Epics
+            from hmz.runtime.doing.epics import Epics
 
             self._epics = Epics(self._workspace)
         return self._epics
@@ -208,7 +213,7 @@ class Hmz:
         Raises:
           NotAFlow: If the flow is not there, is not a flow, or takes other agents than these.
         """
-        from hmz.sdk.running import Run
+        from hmz.runtime.doing.running import Run
 
         return Run(self.runner(flow, agents, config, resume, container), task)
 
@@ -223,9 +228,9 @@ class Hmz:
             declares -- which is a line that was wrong before anything ran.
           SystemExit: If the line is not one argparse accepts.
         """
-        # What the line said about who is reading is the command line's to act on: the SDK
+        # What the line said about who is reading is the command line's to act on: this
         # answers with the run itself rather than with a rendering of it.
         flow, agents, task, config, _ = self.read(argv)
-        # Through a run, which is the one thing a flow being driven is: an SDK user who ran a
-        # line and one who built a run are then holding the same thing.
+        # Through a run, which is the one thing a flow being driven is: whoever ran a line
+        # through this and whoever built a run are then holding the same thing.
         self.run(flow, agents, task, config).run()

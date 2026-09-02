@@ -2,13 +2,14 @@
 
 The interface is opened on a terminal and the run it started outlives that terminal: a flow is
 a loop, a turn thinks for minutes, and a day's work must not end because somebody closed a
-laptop. What holds the run when no terminal is reading it is :mod:`hmz.daemon`, and this is
-the little of it the interface has to know about -- how many terminals are reading, and how to
-let go of them without stopping anything.
+laptop. What holds the run when no terminal is reading it is this package, and this is the
+little of it whatever is drawing has to know about -- how many terminals are reading, and how
+to let go of them without stopping anything.
 
-A protocol rather than the thing itself, so that the interface names no daemon: one running
-under a daemon is handed one of these, and one run in the process somebody typed `hmz` in is
-handed none and says so where the question is asked.
+A protocol rather than :class:`hmz.daemon.serve.Held` itself, so that a run held apart from a
+terminal and a run in the process somebody typed `hmz` in are the same interface drawing on
+the same terminal: one is handed one of these and the other is handed none, and what is
+drawing says so where the question is asked rather than being written twice.
 """
 
 from __future__ import annotations

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // The package, drawn from the table `tests/test_layering.py` enforces: every layer, and
 // everything it is allowed to name. It is a DAG -- everything points downward, nothing points
-// both ways -- and hovering a layer lights up exactly what it is built on.
+// both ways -- and hovering a layer lights up exactly what it is built on. `cli` is not in
+// that table, being what joins the rest; what it names is drawn here anyway, since a picture
+// with a way in missing from it is a picture of something else.
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { withBase } from 'vitepress'
 
@@ -18,41 +20,45 @@ const W = 132
 const H = 40
 
 const NODES: Node[] = [
-  { id: 'tui', dotted: 'hmz.tui', x: 140, y: 42, blurb: 'the terminal interface', href: '/reference/tui' },
-  { id: 'daemon', dotted: 'hmz.daemon', x: 450, y: 42, blurb: 'a run held where a terminal closing cannot end it', href: '/reference/daemon' },
+  { id: 'sdk', dotted: 'hmz.sdk', x: 140, y: 42, blurb: 'how a tool that is not humanize reaches humanize — named by nothing below it', href: '/reference/sdk' },
   { id: 'cli', dotted: 'hmz.cli', x: 760, y: 42, blurb: 'one command line, over layers that have none', href: '/reference/cli' },
-  { id: 'sdk', dotted: 'hmz.sdk', x: 300, y: 116, blurb: 'humanize as one object, for whoever is calling it from outside', href: '/reference/sdk' },
-  { id: 'runner', dotted: 'hmz.runtime.runner', x: 300, y: 190, blurb: 'finds a flow, checks it, names the agents, drives it', href: '/reference/flows' },
-  { id: 'flows', dotted: 'hmz.flows', x: 120, y: 264, blurb: 'what a flow is, where it is found, what it brings', href: '/reference/flows' },
-  { id: 'exporting', dotted: 'hmz.runtime.exporting', x: 470, y: 264, blurb: 'one whole run packaged up to send somewhere', href: '/user/export' },
-  { id: 'epic', dotted: 'hmz.runtime.epic', x: 470, y: 338, blurb: 'one run of one flow, written down as it happens', href: '/reference/tracing' },
-  { id: 'tracing', dotted: 'hmz.runtime.tracing', x: 470, y: 412, blurb: "the backends' own logs, read back as one Chrome trace", href: '/reference/tracing' },
-  { id: 'coganchor', dotted: 'hmz.coganchor', x: 300, y: 486, blurb: 'everything humanize knows about driving a coding agent CLI', href: '/reference/agents' },
-  { id: 'telemetry', dotted: 'hmz.runtime.telemetry', x: 300, y: 560, blurb: 'what humanize reports about itself, and whether it does at all', href: '/user/reporting' },
-  { id: 'settings', dotted: 'hmz.runtime.settings', x: 300, y: 634, blurb: 'what each workspace was set up to run', href: '/user/settings' },
-  { id: 'kept', dotted: 'hmz.runtime.kept', x: 300, y: 708, blurb: 'an agent written down: a shape and the two ways it goes', href: '/user/concepts' },
+  { id: 'tui', dotted: 'hmz.tui', x: 450, y: 116, blurb: 'the terminal interface', href: '/reference/tui' },
+  { id: 'daemon', dotted: 'hmz.daemon', x: 450, y: 190, blurb: 'a run held where a terminal closing cannot end it', href: '/reference/daemon' },
+  { id: 'doing', dotted: 'hmz.runtime.doing', x: 300, y: 264, blurb: 'a workspace and everything that can be done in it — hmz.runtime.Hmz', href: '/reference/sdk' },
+  { id: 'runner', dotted: 'hmz.runtime.runner', x: 300, y: 338, blurb: 'finds a flow, checks it, names the agents, drives it', href: '/reference/flows' },
+  { id: 'flows', dotted: 'hmz.flows', x: 120, y: 412, blurb: 'what a flow is, where it is found, what it brings', href: '/reference/flows' },
+  { id: 'exporting', dotted: 'hmz.runtime.exporting', x: 470, y: 412, blurb: 'one whole run packaged up to send somewhere', href: '/user/export' },
+  { id: 'epic', dotted: 'hmz.runtime.epic', x: 470, y: 486, blurb: 'one run of one flow, written down as it happens', href: '/reference/tracing' },
+  { id: 'tracing', dotted: 'hmz.runtime.tracing', x: 470, y: 560, blurb: "the backends' own logs, read back as one Chrome trace", href: '/reference/tracing' },
+  { id: 'coganchor', dotted: 'hmz.coganchor', x: 300, y: 634, blurb: 'everything humanize knows about driving a coding agent CLI', href: '/reference/agents' },
+  { id: 'telemetry', dotted: 'hmz.runtime.telemetry', x: 300, y: 708, blurb: 'what humanize reports about itself, and whether it does at all', href: '/user/reporting' },
+  { id: 'settings', dotted: 'hmz.runtime.settings', x: 300, y: 782, blurb: 'what each workspace was set up to run', href: '/user/settings' },
+  { id: 'kept', dotted: 'hmz.runtime.kept', x: 300, y: 856, blurb: 'an agent written down: a shape and the two ways it goes', href: '/user/concepts' },
 ]
 
 const EDGES: [string, string][] = [
-  ['tui', 'sdk'],
+  ['sdk', 'doing'],
+  ['sdk', 'daemon'],
+  ['tui', 'daemon'],
   ['tui', 'flows'],
   ['tui', 'exporting'],
   ['tui', 'epic'],
   ['tui', 'coganchor'],
   ['tui', 'telemetry'],
   ['tui', 'kept'],
-  ['cli', 'sdk'],
+  ['cli', 'tui'],
   ['cli', 'daemon'],
+  ['cli', 'doing'],
   ['cli', 'coganchor'],
-  ['sdk', 'runner'],
-  ['sdk', 'flows'],
-  ['sdk', 'exporting'],
-  ['sdk', 'epic'],
-  ['sdk', 'tracing'],
-  ['sdk', 'coganchor'],
-  ['sdk', 'settings'],
-  ['sdk', 'telemetry'],
-  ['sdk', 'kept'],
+  ['daemon', 'doing'],
+  ['doing', 'runner'],
+  ['doing', 'flows'],
+  ['doing', 'exporting'],
+  ['doing', 'epic'],
+  ['doing', 'tracing'],
+  ['doing', 'coganchor'],
+  ['doing', 'settings'],
+  ['doing', 'telemetry'],
   ['runner', 'flows'],
   ['runner', 'epic'],
   ['runner', 'coganchor'],
@@ -94,7 +100,7 @@ const beneath = computed(() => new Set(EDGES.filter(([f]) => f === active.value)
 const above = computed(() => new Set(EDGES.filter(([, t]) => t === active.value).map(([f]) => f)))
 
 let tour: ReturnType<typeof setInterval> | undefined
-const ORDER = ['coganchor', 'runner', 'sdk', 'tracing', 'tui', 'flows']
+const ORDER = ['coganchor', 'runner', 'doing', 'tracing', 'tui', 'flows']
 
 onMounted(() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -116,7 +122,7 @@ function hold(id: string) {
 
 <template>
   <div class="stack hmz-panel">
-    <svg viewBox="0 0 900 752" role="img" aria-label="the layers of humanize, and what each may name">
+    <svg viewBox="0 0 900 900" role="img" aria-label="the layers of humanize, and what each may name">
       <g class="wires">
         <path
           v-for="wire in wires"

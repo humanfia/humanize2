@@ -11,9 +11,10 @@ src/hmz/
 ├── __main__.py       python -m hmz
 ├── coganchor/        everything humanize knows about driving a coding agent CLI
 ├── flows/            what a flow is called, where it is found, and what it brings
-├── runtime/          what a run is: driving one, writing it down, reading it back
+├── runtime/          what a run is: driving one, writing it down, reading it back —
+│                     and doing/, which is the whole of that as one object
 ├── daemon/           a run held where a terminal closing cannot end it
-├── sdk/              humanize as one object, for whoever is calling it from outside
+├── sdk/              how a tool that is not humanize reaches humanize
 ├── tui/              the terminal interface
 └── cli/              the command line: one module per command that has a parser, and
                       output.py, which answers whether a person or a program is reading
@@ -42,9 +43,10 @@ for the anchor inside it, a program that ships to a target and could be lifted o
 | `runtime/epic.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Epic`, `epics`, `read`, `opened`, `state`, `resumed` |
 | `runtime/runner.py` | Handing a flow the agents it declared, naming them, and running it under an epic. Also reads the `hmz exec` line, which the interface starts a flow from too. What the flow says it drives is `flows/`'s to answer. | `Runner`, `flow_and_agents`, `read_agent`, `set_up_from` |
 | `runtime/tracing/` | Reading the backends' logs back — and, for a profiled run, sampling the programs its agents start — and rendering both as one Chrome trace. | `collect`, `profile.Profiler` |
-| `sdk/` | humanize as one object. A workspace, what is remembered about it, the flows there are, the agents and accounts they run as, the runs already made and the run being made now. It composes the layers and restates none of them, and it reaches each of them from inside the call that needs it — which is what lets a caller name it without paying for the tracer. | `Hmz`, `Run`, `Session` |
-| `tui/` | The terminal interface. | `Humanize` |
-| `daemon/` | A run held where a terminal closing cannot end it, and the terminals that come and go from it. A leaf: what it holds is a callable that opens a run and returns when it is over, so it knows nothing of what a run is. | `Daemon`, `Held`, `running`, `daemons`, `start` |
+| `runtime/doing/` | humanize as one object, and the front door `hmz.runtime` hands through. A workspace, what is remembered about it, the flows there are, the agents and accounts they run as, the runs already made and the run being made now. It composes the layers and restates none of them, and it reaches each of them from inside the call that needs it — which is what lets a caller name it without paying for the tracer. | `Hmz`, `Run` |
+| `tui/` | The terminal interface. It reaches the runtime through the daemon holding the run it is drawing. | `Humanize` |
+| `daemon/` | A run held where a terminal closing cannot end it, and the terminals that come and go from it. How a run is opened is still none of its business — it is handed a callable — but it is the process a run happens in, so it is where the runtime is reached from and what is running there is a question it answers itself. | `Daemon`, `Held`, `Session`, `Hmz`, `running`, `daemons`, `start` |
+| `sdk/` | How a tool that is not humanize reaches humanize: the runtime straight at it, and a run held apart from a terminal reached over its socket. It composes nothing and is named by no layer. | `Hmz`, `Daemons`, `Run`, `Session` |
 | `cli/` | The one command line, over layers that have none of their own. | `main`, `COMMANDS` |
 
 ### Inside the bigger ones
@@ -70,6 +72,8 @@ runtime/
 ├── settings.py   what each workspace was set up to run
 ├── kept.py       what an agent is, written down: a shape and the two ways it goes
 ├── telemetry.py  what humanize reports about itself, and whether it does at all
+├── doing/        core.py, and one module per store: the whole of the above as one
+│                 object, which is what `from hmz.runtime import Hmz` hands back
 └── tracing/      collector.py session.py chrome.py profile.py, and readers/ per format
 
 flows/
@@ -92,11 +96,15 @@ flows/
       ↑           │
     runner ── epic ── tracing ── exporting
       ↑
-     sdk        daemon   ← a leaf: it holds a callable, not a run
+    doing   ← the whole of the runtime as one object: hmz.runtime.Hmz
+      ↑
+    daemon  ← a run held where a terminal closing cannot end it
       ↑
      tui
       ↑
      cli   ← may name anything; it is what joins them
+
+    sdk → doing, daemon   ← the way in from outside. Nothing below names it.
 ```
 
 <HmzStack />
@@ -104,7 +112,20 @@ flows/
 It is a DAG with no exceptions. Nothing points both ways. The diagram above is the same table
 drawn: hover a layer and it lights up exactly what that layer is allowed to name.
 
-Three edges are worth explaining:
+The column in the middle is the one thing worth reading twice. `cli` names the runtime by its
+own name; `tui` names it through the `daemon` holding the run it is drawing, because a run of a
+workspace lives in a process of its own and the interface is what draws inside that process —
+so what holds the run is what the interface asks, and asking it is a name rather than a message
+on the socket. The socket carries the terminals outside; the interface is already in here.
+
+`sdk` sits off to the side because it is not a layer humanize is built out of. It is how a tool
+that is not humanize reaches humanize — the runtime straight at it, a held run over its
+socket — and it composes nothing, restates nothing, and is named by nothing below it. It used
+to be both that and the seam every way in had to pass through, which are two different jobs: a
+rule about how humanize is built wins every argument with a promise made to somebody else, so
+the promise was the one going unkept.
+
+Four edges are worth explaining:
 
 - **`coganchor → telemetry`**, which is the one thing the bottom layer names. A skill a flow
   brought that a session will not read is noticed there and nowhere else, and the reporter
@@ -115,7 +136,13 @@ Three edges are worth explaining:
   itself knows how to *drive* nothing; it needs the home directories and log globs, and
   nothing else.
 - **`cli` reaches `coganchor` directly**, for `hmz internal anchor`. That command is the only
-  line the target half is ever started by, and it must cost nothing else of humanize on the way.
+  line the target half is ever started by, and it must cost nothing else of humanize on the
+  way.
+- **`daemon → doing`**, which is the one edge out of what used to be a leaf. A daemon still
+  knows nothing about how a run is *opened* — it is handed a callable, which is what makes the
+  interface under one identical to the interface under none — but it is the process the run
+  happens in, so what is running there is a question it answers out of the runtime rather than
+  one it is handed the answer to by whatever it is holding.
 
 And one edge deliberately absent: **`coganchor` does not name `epic`.** A run is written out
 of the agents it drove, so naming the run from an agent would be a circle. What an agent needs
@@ -198,7 +225,7 @@ is a file the wheel ships: a SPEC is for whoever changes humanize, not for whoev
 | `specs/providers.md` | Which account an agent runs as, and how a turn is run under it |
 | `specs/coganchor.md` | What you are entitled to under an anchor, and what you deliberately are not |
 | `specs/tracing.md` | The collect API and how a trace is built |
-| `specs/sdk.md` | `Hmz` and everything it hands back |
+| `specs/sdk.md` | How a tool that is not humanize reaches humanize |
 | `specs/daemon.md` | Holding a run apart from a terminal, and the terminals that read one |
 | `specs/tui.md` | Every behaviour the interface must have |
 

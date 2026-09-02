@@ -18,6 +18,7 @@
 ├── daemon
 ├── flows
 ├── runtime
+│   ├── doing
 │   ├── epic.py
 │   ├── exporting.py
 │   ├── kept.py
@@ -43,7 +44,10 @@ second answer to a question this one already answers.
 
 `runtime` MUST be what a run is: finding the flow, handing it the agents it declared,
 driving it, writing it down as it happens, remembering what a workspace was set up with, and
-reading the whole of it back afterwards. It MUST drive no coding agent itself.
+reading the whole of it back afterwards. It MUST drive no coding agent itself. It MUST offer
+the whole of that as one object as well, written in `runtime/doing` and named by `runtime`
+itself: every way in asks the same questions of a workspace, and an answer written once per
+way in is not one answer.
 
 Each subdirectory is a library; one with a contract of its own has a SPEC named for it, and
 one no file is named for is bound by this one. The modules inside `coganchor` and `runtime`
@@ -53,12 +57,33 @@ it MUST reach a layer only from inside the command carried out in it, so that a 
 for no layer but its own -- and so that the same package serves as the target half of a
 session, where it is the only one installed.
 
-There are four ways in and one thing under them. `sdk` is humanize as one object, and `cli`,
-`daemon` and `tui` MUST each be a way of reaching it rather than a second copy of what it
-does: a command line reads a line and prints what came of it, a daemon holds a run where a
-terminal closing cannot end it, and the interface draws. What two of them would otherwise
-each have written MUST be written in `sdk` instead, so that a thing that can be done one way
-can be done every way and is refused the same way whichever way it was asked.
+There are three ways in, one way in from outside, and one thing under all of them. `runtime`
+MUST offer the whole of what humanize can be asked to do in a workspace as one object, and
+`cli`, `daemon` and `tui` MUST each be a way of reaching that object rather than a second copy
+of what it does: a command line reads a line and prints what came of it, a daemon holds a run
+where a terminal closing cannot end it, and the interface draws. What two of them would
+otherwise each have written MUST be written in `runtime` instead, so that a thing that can be
+done one way can be done every way and is refused the same way whichever way it was asked.
+
+`cli` MUST reach `runtime` by name. `tui` MUST reach it through `daemon`, and `daemon` MUST
+offer it: a run of a workspace is held in a process of its own and the interface draws inside
+that process, so what holds the run is what the interface asks. That MUST be a name and not a
+message -- a round trip from the interface to the daemon holding it is a process asking
+itself -- and what is running there MUST be a question the daemon answers rather than one it
+is handed the answer to by whatever it is holding.
+
+`sdk` MUST be the way in from outside, and MUST be named by no layer. It MUST offer both ways
+of reaching a run -- straight at the runtime, in the process that asked, and over a daemon --
+so that a tool which is not humanize has what humanize's own ways in have, including what it
+would need to write an interface or a command line of its own. It MUST compose nothing: what
+it hands through is written in `runtime` and in `daemon`, and restating any of it would be a
+second answer to a question that already has one.
+
+It was both of those at once, and was doing the second badly. A seam every way in has to pass
+through is a rule about how humanize is built; a seam somebody outside reaches in through is a
+promise to somebody else. Under one name the rule wins every argument -- everything named it,
+so nothing could be spelled for a stranger without the whole tree moving -- and the promise is
+what goes unmade.
 
 No two layers MUST name each other. A pair that does is two things put in one place, not one
 thing above another, and is what `tests/test_layering.py` refuses.
@@ -846,6 +871,293 @@ never have reason to name this module.
   the same mistake. What is done with it is the command line's -- there is nobody at one when
   the interface starts a flow from this same line, so the interface ignores it.
 
+## `runtime/doing/core.py`
+
+```python
+class Hmz:
+    def __init__(self, workspace: str | os.PathLike[str] | None = None): ...
+
+    @property
+    def workspace(self) -> Path: ...
+
+    @property
+    def home(self) -> Path: ...
+
+    @property
+    def settings(self) -> Settings: ...
+
+    @property
+    def flows(self) -> Flows: ...
+
+    @property
+    def verses(self) -> Flowverses: ...
+
+    @property
+    def accounts(self) -> Accounts: ...
+
+    @property
+    def fallbacks(self) -> Fallbacks: ...
+
+    @property
+    def epics(self) -> Epics: ...
+
+    def backends(self) -> tuple[Profile, ...]: ...
+
+    def reports(self) -> bool: ...
+
+    def read(
+        self, argv: list[str]
+    ) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, bool]: ...
+
+    def runner(
+        self,
+        flow: str | os.PathLike[str],
+        agents: Sequence[AgentBase],
+        config: BaseModel | dict[str, Any] | None = None,
+        resume: str | os.PathLike[str] | None = None,
+        container: str = "",
+    ) -> Runner: ...
+
+    def run(
+        self,
+        flow: str | os.PathLike[str],
+        agents: Sequence[AgentBase],
+        task: str,
+        config: BaseModel | dict[str, Any] | None = None,
+        resume: str | os.PathLike[str] | None = None,
+        container: str = "",
+    ) -> Run: ...
+
+    def exec(self, argv: list[str]) -> None: ...
+```
+
+humanize as one object: a workspace, and everything humanize can be asked to do in it.
+
+- There MUST be one of these and every way in MUST hold it. The command line names `runtime`
+  and holds this; the daemon holds it and offers it under its own name; the interface reaches
+  it through the daemon holding the run it is drawing; and `sdk` hands the same object to
+  whoever is calling humanize from outside -- so that what humanize can do is one list rather
+  than one per way in, and a thing that can be done from one of them can be done from all.
+- It MUST NOT be a layer of its own doing. What a flow is, what an agent is, what is written
+  down and what a run left behind are the layers beside and under this, and each MUST go on
+  being the one place its own rule is written: this composes them and MUST NOT restate any of
+  it. What it is composed of MUST be reached by name and never reached around: a way in that
+  went past this to a module it composes would be a second answer to a question this answers.
+- What two ways in would otherwise each have written MUST be written here instead -- refusing
+  a name already taken, where a flowverse came from, what an agent named on a command line is
+  -- so that a command line and a menu answer the same way. What only one of them does MUST
+  NOT be: asking somebody at a terminal is a command line's, and drawing is an interface's.
+- Nothing MUST be loaded until it is asked for. A line that lists the places flows come from
+  MUST NOT pay for the tracer, the sandbox and every coding agent driver there is, so every
+  layer MUST be reached from inside the call that needs it and never at the top of a module.
+  That MUST go for the modules beside it too: naming `runtime` is how every command begins, so
+  `Hmz` MUST cost the one module it is written in rather than all of them.
+- Running a line and building a run MUST be one thing. Whoever ran an `hmz exec` line through
+  this and whoever built a run out of its parts MUST be holding the same run afterwards.
+- It MUST name no way in. A DAG that pointed back at the command line, the daemon, the
+  interface or the SDK would be one of them holding another up, and `tests/test_layering.py`
+  refuses it.
+- A workspace MUST be kept exactly as it was given. One nobody named is one that follows a
+  flow which changes directory; one that was named is the directory it named, spelled the way
+  it was named -- since naming sessions without a workspace collects them wherever they were
+  recorded, and a workspace filled in here would narrow that.
+
+## `runtime/doing/flows.py`
+
+```python
+class Flowverses:
+    def all(self) -> list[Flowverse]: ...
+    def nearest(self) -> list[Flowverse]: ...
+    def find(self, name: str) -> Flowverse | None: ...
+    def add(self, url: str, name: str = "") -> Flowverse: ...
+    def fetch(self, name: str) -> Flowverse: ...
+    def remove(self, name: str) -> bool: ...
+    def holds(self, one: Flowverse) -> list[Offer]: ...
+    def where(self, name: str) -> Path: ...
+    def plain(self, url: str) -> str: ...
+    def whence(self, one: Flowverse, nowhere: str = "-") -> str: ...
+
+
+class Flows:
+    @property
+    def verses(self) -> Flowverses: ...
+    def all(self) -> list[Offer]: ...
+    def find(self, named: str) -> str: ...
+    def about(self, named: str) -> str: ...
+    def places(self, named: str | os.PathLike[str]) -> tuple[Place, ...]: ...
+    def check(
+        self, named: str | os.PathLike[str], *, static: bool = False
+    ) -> tuple[Finding, ...]: ...
+    def prophecy(self, named: str | os.PathLike[str]) -> Prophecy | None: ...
+    def foretell(self, named: str | os.PathLike[str]) -> str: ...
+    def configures(self, named: str | os.PathLike[str]) -> type[BaseModel] | None: ...
+    def resumes(self, named: str | os.PathLike[str]) -> bool: ...
+    def fork(self, named: str, into: str | os.PathLike[str] | None = None) -> str: ...
+    def running(self) -> tuple[Running, ...]: ...
+    def set_up_from(self, said: str | os.PathLike[str]) -> dict[str, Any]: ...
+```
+
+The flows there are, and the places they come from.
+
+- `check` MUST be the two readings of `hmz.flows` in their order -- the static one, then the
+  flow loaded in a subprocess -- and the second MUST NOT run where the first found an error,
+  nor say again what the first already said: one call is one answer, whichever way in asked.
+- `prophecy` MUST answer with what an atlas compiles to and with nothing for a flow that is
+  not one or does not compile, `check` being where the reasons are said. `foretell` MUST write
+  that prophecy into the flow's own directory, which is what every run of it walks from then
+  on, and MUST refuse a flow there is none for rather than writing something that is not one.
+- Where a flowverse came from MUST be answered here, and MUST be answered from which
+  flowverse it is rather than from whether its URL is empty. Whatever was signed into a URL
+  MUST be taken out of it in one place, which every way of showing one asks.
+- What to call a directory that is not a clone of anything is whoever is showing it to say:
+  a listing has a column and a sheet has a sentence.
+
+## `runtime/doing/accounts.py`
+
+```python
+class Accounts:
+    def all(self, cli: str = "") -> list[Provider]: ...
+    def ways(self, cli: str) -> tuple[Way, ...]: ...
+    def way(self, cli: str, name: str) -> Way | None: ...
+    def find(self, cli: str, name: str) -> Provider | None: ...
+    def where(self, cli: str, name: str) -> Path: ...
+    def local(self, cli: str) -> Path: ...
+    def write(
+        self,
+        cli: str,
+        name: str,
+        way: str = "",
+        env: Mapping[str, str] | None = None,
+        args: tuple[str, ...] = (),
+    ) -> Provider: ...
+    def make(
+        self, cli: str, name: str, way: Way, answers: Mapping[str, str] | None = None
+    ) -> Provider: ...
+    def sign_in(
+        self, provider: Provider, way: Way, answers: Mapping[str, str] | None = None
+    ) -> int: ...
+    def asks(self, way: Way, given: Mapping[str, str]) -> list[str]: ...
+    def serves(self, one: Provider) -> tuple[str, ...]: ...
+    def copies(self, one: Provider, cli: str, name: str = "") -> Provider: ...
+    def chain(self, one: Provider) -> list[Provider]: ...
+    def points(self, cli: str, name: str, at: str) -> bool: ...
+    def remove(self, cli: str, name: str) -> bool: ...
+    def env(self, said: str) -> dict[str, str]: ...
+    def environ(self, provider: Provider | None) -> dict[str, str]: ...
+    def models(self, cli: str, provider: str = "") -> tuple[Model, ...]: ...
+    def asked(self, cli: str, provider: str = "") -> str: ...
+    def ask(
+        self, cli: str, provider: str = "", seconds: float | None = None
+    ) -> tuple[Model, ...]: ...
+```
+
+The accounts an agent may be run as, and what each backend runs as one of them.
+
+- The accounts and the catalogue MUST be one object. Which models an account may name is that
+  account's rather than the CLI's, so whoever made an account is who asks.
+- Asking MUST be the layer's own asking, reached through this rather than reimplemented: a
+  suite that has taken the asking away MUST have taken it away here too.
+
+## `runtime/doing/fallbacks.py`
+
+```python
+class Fallbacks:
+    @property
+    def default(self) -> str: ...
+    def policies(self) -> tuple[Policy, ...]: ...
+    def named(self, policy: str) -> Policy | None: ...
+    def all(self) -> list[Falls]: ...
+    def reads(self, said: str) -> str: ...
+    def spec(self, backend: str, model: str, provider: str = "") -> str: ...
+    def tried(self, said: str) -> Falls: ...
+    def chain(self, said: str) -> list[str]: ...
+    def points(self, said: str, at: str) -> Falls: ...
+    def retrying(self, said: str, tries: int, policy: str, timeout: float) -> Falls: ...
+    def clear(self, said: str) -> bool: ...
+```
+
+Where a turn goes when the place taking it cannot take it at all.
+
+## `runtime/doing/epics.py`
+
+```python
+class Epics:
+    def __init__(self, workspace: str | os.PathLike[str] | None = None): ...
+    def under(self) -> Path: ...
+    def all(self) -> list[Path]: ...
+    def read(self, epic: Path) -> Ran | None: ...
+    def sessions(self, epic: Path) -> list[Session]: ...
+    def opened(self, epic: Path) -> dict[str, list[str]]: ...
+    def resumed(self, flow: str) -> Path | None: ...
+    def state(self, epic: Path, flow: str = "") -> dict[str, Any]: ...
+    def traced(
+        self,
+        epic: Path,
+        *,
+        output: str | os.PathLike[str] | None = None,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> tuple[Path, dict[str, Any]]: ...
+    def trace(
+        self,
+        *,
+        sessions: str | Iterable[str] | None = None,
+        agents: Mapping[str, Iterable[str]] | None = None,
+        output: str | os.PathLike[str] | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        profile: str | os.PathLike[str] | None = None,
+    ) -> dict[str, Any]: ...
+```
+
+The runs of one workspace that have already happened, and the traces gathered of them.
+
+- A trace of a run MUST be gathered here rather than by whoever asked for one. Two ways in ask
+  for the same trace -- a command line and the sheet the runs are read on -- and every part of
+  it is the same both times: the sessions asked for by the ids the run wrote down rather than
+  by the directory it ran in, which agent opened each, the profile beside them, and where it
+  goes, which is with the run.
+- A workspace nobody named MUST stay nobody's. Naming sessions without one collects them
+  wherever they were recorded, and a workspace filled in here would narrow that to whatever
+  directory somebody was standing in -- which is why a trace of a run is gathered with none.
+
+## `runtime/doing/running.py`
+
+```python
+class Run:
+    def __init__(self, runner: Runner, task: str): ...
+
+    @property
+    def agents(self) -> tuple[AgentBase, ...]: ...
+
+    @property
+    def running(self) -> bool: ...
+
+    @property
+    def raised(self) -> BaseException | None: ...
+
+    def run(self) -> None: ...
+    def start(self) -> None: ...
+    def wait(self, timeout: float | None = None) -> bool: ...
+    def stop(self) -> None: ...
+    def close(self) -> None: ...
+```
+
+One run of one flow, and the handful of things there are to do to one.
+
+- Making one MUST start nothing. `run` runs it here and returns when the flow does; `start`
+  runs it on a thread, so that whoever made one chooses which of the two they are holding.
+- A run in a container MUST be one at a time per process, and MUST say so: the container a
+  run works in is the process's rather than the run's, a flow that called another being one
+  run working in one place. Two started at once with an image between them would be two runs
+  reaching for one container.
+- `stop` MUST tell every agent to take no further turn, so that the turn running now is
+  closed out and the loop ends rather than handing on. `close` MUST NOT wait for that: it
+  closes every conversation still open, which is the backend's process going, and is the last
+  thing there is to do about a run.
+- What a run started on a thread raised MUST be kept rather than swallowed: a run that ended
+  because the flow failed is not a run that finished.
+
 ## Commands
 
 ```shell
@@ -860,8 +1172,8 @@ hmz [<command> [<args>...]]
   interface, and the interface is the one with the sheets in it. A line is what a script, a
   CI job and a machine nobody is sitting at have instead of a prompt, and running a flow is
   what those ask for; whatever else one of them needs -- reading a flow for what will not
-  run, gathering a trace, packaging a run up -- MUST be asked of `sdk`, which is the same
-  object this line holds.
+  run, gathering a trace, packaging a run up -- MUST be asked of `sdk`, which hands out the
+  same object this line holds.
 - What humanize spawns for itself MUST be reachable under one further command, `hmz internal`,
   and every command the line routes MUST be in the listing. There MUST be no name that is
   carried out but left out: a program whose help describes less than it runs is one nobody can
