@@ -29,7 +29,9 @@ def cred(argv: list[str]) -> int:
 
     parser = argparse.ArgumentParser(
         prog="hmz internal cred",
-        description="Run a coding agent whose credentials are kept somewhere else.",
+        description="Run a coding agent whose credentials are kept somewhere else. "
+        "humanize renders this line for every turn taken as an account; it is not one to "
+        "type by hand.",
     )
     parser.add_argument(
         "--map",

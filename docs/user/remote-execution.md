@@ -70,8 +70,8 @@ humanize ships the target half as a zipapp and caches it there by digest. It nee
 installation. The two halves refuse to run against each other if their versions disagree.
 
 ::: details It cannot connect
-Run `ssh build-box` yourself first. `hmz internal anchor` uses your own ssh config, agent and keys, and
-it adds nothing. Then check that there is a Python 3.12 or newer there; it need not be on the
+Run `ssh build-box` yourself first. `hmz internal anchor` uses your own ssh config, agent and
+keys, and it adds nothing. Then check that there is a Python 3.12 or newer there; it need not be on the
 `PATH`, since humanize looks where a Mac and a Homebrew keep one too. See
 [Troubleshooting](/user/troubleshooting#the-target-cannot-be-reached).
 :::
@@ -136,8 +136,8 @@ config = ClaudeCodeAgentConfig(
 )
 ```
 
-Every option of `hmz internal anchor` is a field of `AnchorConfig`, and every field is an option. A flow
-spawns what an operator would have typed. Settings no session could run under are refused where
+Every option of `hmz internal anchor` is a field of `AnchorConfig`, and every field is an
+option. A flow spawns what an operator would have typed. Settings no session could run under are refused where
 they are *written*, so a flow that misspells a target hears about it as it configures its
 agents rather than hours into the loop.
 
@@ -190,8 +190,8 @@ happens in the only names the far end has.
 /tmp/elsewhere is not inside /srv/project, which is the workspace this agent's turns land in
 ```
 
-The same paths are flags on `hmz internal anchor`. Where the project lives at a different path there,
-name both:
+The same paths are flags on `hmz internal anchor`. Where the project lives at a different path
+there, name both:
 
 ```sh
 hmz internal anchor --target ssh://build-box \

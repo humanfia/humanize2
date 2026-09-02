@@ -412,8 +412,8 @@ Both happen whichever way the provider was made, so an agent on a gateway never 
 your CLI is signed into either.
 
 The paths are answered by a seccomp-filtered ptrace supervisor — the technique
-[`hmz internal anchor`](/reference/remote-execution) runs a whole session under, here handling only the handful of
-syscalls that name one of those files. Everything else the agent does is untouched and runs at
+[`hmz internal anchor`](/reference/remote-execution) runs a whole session under, here handling
+only the handful of syscalls that name one of those files. Everything else the agent does is untouched and runs at
 native speed, and the agent is told none of it. That supervisor is a process humanize spawns
 for itself: a supervisor forks the program it watches, and a flow pumping turns from threads
 of its own has no signal handling to lend one.

@@ -189,8 +189,8 @@ config = ClaudeCodeAgentConfig(
 )
 ```
 
-Every option of `hmz internal anchor` is a field of `AnchorConfig` and every field is an option, so the
-two spellings mean exactly the same thing — a flow spawns what an operator would have typed.
+Every option of `hmz internal anchor` is a field of `AnchorConfig` and every field is an option,
+so the two spellings mean exactly the same thing — a flow spawns what an operator would have typed.
 Settings no session could run under are refused where they are *written* rather than where they
 are used, so a flow that misspells a target hears about it as it configures its agents, not
 hours into the loop.
@@ -290,8 +290,8 @@ Each of these is deliberate, and each looks like a defect if you meet it cold.
 
 ## Security
 
-**An `hmz internal anchor` port is equivalent to a shell on that machine.** Give `--token` a real secret,
-and prefer `ssh://` or `docker://`, which need no open port at all.
+**An `hmz internal anchor` port is equivalent to a shell on that machine.** Give `--token` a
+real secret, and prefer `ssh://` or `docker://`, which need no open port at all.
 
 The full statement, including what running any agent under humanize means, is in
 [Security](/user/security).
