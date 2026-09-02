@@ -121,6 +121,12 @@ class DshAgent(AgentBase):
     #: The official goal service keeps the session working until its objective is complete.
     pursues: ClassVar[bool] = True
 
+    #: What it counts. Its reasoning is already inside the output on the dsh contract, so
+    #: it is not a kind of its own here.
+    counts: ClassVar[frozenset[str]] = frozenset(
+        {"input", "output", "cache_read", "cache_write"}
+    )
+
     def __init__(self, config: DshAgentConfig, *, name: str | None = None) -> None:
         super().__init__(config, name=name)
 

@@ -23,8 +23,9 @@ dropped. A held line is pinned onto the editor rather than written into the tran
 behind the same `❯`:
 
 ```
-❯ and fix the tests too                    assistant · claude-opus-5:high
-❯ then push                                     12.3k tokens · 84/s
+                                           assistant · claude-opus-5:high
+❯ and fix the tests too            input 11.2k · output 1.1k · cache_read 0
+❯ then push                                                    84 out/s
 ────────────────────────────────────────────────────────────────────────
 ❯ █
 ```

@@ -3043,6 +3043,20 @@ class AgentBase(ABC):
     #: the first provider turn.
     service_tiers: ClassVar[tuple[str, ...]] = ("default",)
 
+    #: Which kinds of token this backend reports, out of :data:`hmz.coganchor.agents.KINDS`.
+    #: Declared here rather than worked out from what a turn happened to say: a kind nothing
+    #: was spent on this turn is missing from that turn's `Usage` exactly as a kind the CLI
+    #: never counts is, and a reader cannot tell the two apart afterwards. What a driver reads
+    #: out of its backend's own counters is what it says here, which is why each of them says
+    #: it off the same table it parses with.
+    #:
+    #: Empty for a CLI that reports nothing at all -- Cursor says a duration and no tokens, an
+    #: ACP peer says whatever its own protocol says, which is nothing agreed. A run that mixes
+    #: one of those with a CLI that counts everything MUST say that the figures it draws are a
+    #: floor rather than pass them off for the whole of what was spent: a column quietly short
+    #: of one agent's tokens is worse than a column marked as short of them.
+    counts: ClassVar[frozenset[str]] = frozenset()
+
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent that has opened nothing yet.
 

@@ -38,6 +38,19 @@ _TAKES = ("auto", "bypass")
 #: What a step says it is doing, as the one line a row of a transcript has room for.
 _THINKING = "THINKING"
 
+#: What each kind of token is called in the counts Antigravity states, and what each of
+#: them is here. Humanize's own names rather than the CLI's, as everywhere else a kind is
+#: counted: the prices are per kind, so a usage written down under a spelling nothing else
+#: knows is a lump nobody can put a figure on -- which is what these were until this table.
+#: The thinking is counted beside the output rather than inside it, as its model family
+#: counts it, so it is a kind of its own.
+_KINDS = {
+    "input": "input_tokens",
+    "output": "output_tokens",
+    "reasoning": "thinking_tokens",
+    "cache_read": "cache_read_tokens",
+}
+
 #: How a local command is written: one name, under a plugin's where it has one. A first word
 #: carrying a directory of its own is a path rather than a name, which is the whole of the
 #: difference the CLI itself can see -- so `/tmp` alone still reads as a command here, and
@@ -415,14 +428,9 @@ class AntigravityCLISession(StreamSessionBase):
         """
         return Usage(
             {
-                name: float(counted.get(name) or 0)
-                for name in (
-                    "input_tokens",
-                    "output_tokens",
-                    "thinking_tokens",
-                    "cache_read_tokens",
-                )
-                if counted.get(name)
+                kind: float(counted.get(named) or 0)
+                for kind, named in _KINDS.items()
+                if counted.get(named)
             }
         )
 
@@ -494,6 +502,10 @@ class AntigravityCLIAgentConfig(AgentConfig):
 
 class AntigravityCLIAgent(AgentBase):
     """Antigravity CLI, driven through its own persistent stream-json protocol."""
+
+    #: What it counts, read off the same table its driver reads a usage with, so that what
+    #: a run is told this backend reports is what its driver actually parses.
+    counts: ClassVar[frozenset[str]] = frozenset(_KINDS)
 
     def _serves(self, config: AgentConfig) -> None:
         """Refuses a rung this backend has no way of running at, wherever the config arrives.

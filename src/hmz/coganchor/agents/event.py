@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
 __all__ = [
+    "KINDS",
     "Event",
     "Failed",
     "Question",
@@ -26,6 +27,18 @@ __all__ = [
     "Usage",
     "say",
 ]
+
+#: Every kind of token humanize counts, in the order a reader is shown them: what went in,
+#: what came out, the two cache kinds, and the reasoning some backends count beside the output
+#: rather than inside it. One vocabulary rather than each CLI's own, so that a run driving two
+#: backends reads one word for one thing and the prices -- which are per kind -- can be put
+#: against any of them. A backend counts some of these and not others; what it counts is what
+#: it says, and a kind missing from a `Usage` is one it does not report rather than one it
+#: reports as nothing.
+#:
+#: The order is what everything that draws them draws them in. A run whose columns reordered
+#: themselves as a cache write first appeared would be a figure nobody could read at a glance.
+KINDS = ("input", "output", "cache_read", "cache_write", "reasoning")
 
 
 class Usage(Mapping[str, float]):

@@ -38,6 +38,12 @@ The three that state a whole turn's cost only at the end — Antigravity, Grok B
 Code — can only be held to a token budget at the end of a turn, which is the same thing their
 [rate](/reference/agents#what-it-has-cost-and-how-fast) already reads as.
 
+A token budget is **output tokens**, read off `session.spent().output`, so it depends on the
+backend counting them under that name. Every backend humanize drives does; which kinds each
+reports is declared as `counts` — see [Cost and rate](/user/tally) — and served by the
+catalogue as `counts:output`, so a flow can be refused an agent that would read nought and
+never be cut off at all.
+
 A cap on the clock has no such gap: it bites whether or not anything is arriving, which is what
 makes it the one that catches a turn that has gone quiet, and the one to reach for on a backend
 that does not count as it goes.

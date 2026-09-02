@@ -97,8 +97,9 @@ happened, and what each model has cost. On a one-agent flow the graph is dull. O
 Above the editor, continuously:
 
 ```
-   assistant · claude/claude-opus-4-8:high · ● 1
-                       48.2k tokens · 91/s
+        assistant · claude/claude-opus-4-8:high · ● 1
+   input 1.2k · output 980 · cache_read 46.0k · cache_write 9.1k
+                          $1.34 · 91 out/s
 ```
 
 `●` is an agent with a turn open, and `1` is how many conversations it has open **right now**.

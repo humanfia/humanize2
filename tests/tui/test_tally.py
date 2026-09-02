@@ -447,3 +447,51 @@ def test_a_prompt_that_was_wholly_cached_has_no_plain_input_rather_than_none_of_
     Tally([agent], monitor).read()
 
     assert monitor.kinds[("read", "gpt-5.6-sol")] == {"cache_read": 800, "output": 100}
+
+
+def test_a_backend_reports_what_its_log_says_once_that_log_has_been_read(
+    home: Path,
+) -> None:
+    """Not before: a rollout written on another machine is one nothing here reads.
+
+    Codex's own server counts its cached reads inside the input and never names one, while
+    the rollout it writes does name them. So what the interface can show of a Codex run is
+    wider than what its driver reports -- but only where the rollout is in fact on this
+    machine, and a kind claimed off a log nobody read would be a nought drawn as a fact.
+    """
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low"))
+    agent.new()._adopt("t1")
+    monitor = Monitor()
+    tally = Tally([agent], monitor)
+
+    tally.read()  # nothing written yet, so nothing claimed
+
+    assert monitor.reports == {}
+
+    _rows(
+        home
+        / "codex_home"
+        / "sessions"
+        / "2026"
+        / "08"
+        / "rollout-2026-08-06T07-14-14-t1.jsonl",
+        {
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {
+                    "last_token_usage": {
+                        "input_tokens": 900,
+                        "output_tokens": 40,
+                        "cached_input_tokens": 400,
+                        "total_tokens": 940,
+                    },
+                    "total_token_usage": {"total_tokens": 940},
+                },
+            },
+        },
+    )
+    tally.read()
+
+    # The driver's two, and the cached read only the rollout names.
+    assert monitor.reports[agent.id] == frozenset({"input", "output", "cache_read"})

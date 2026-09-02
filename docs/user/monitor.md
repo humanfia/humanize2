@@ -92,7 +92,8 @@ Only what the boxes cannot carry, so that the picture is what your eye lands on:
 | **Flow** | every flow running — the one that was started and whatever it called, innermost last |
 | **Set** | the flow's own settings, where any were changed from what it declares |
 | **Also** | the handovers no arrow could be drawn for |
-| **Tokens** | what each model has cost, and the rate it is costing it at |
+| **Tokens** | what each model has cost, and the output tokens a second it is coming out with |
+| **Kinds** | what the run spent on each kind of token, a `+` marking a figure some agent's CLI does not report and which is therefore a floor |
 
 Who is working, what each agent runs and how long it has been at it are on the boxes, and are
 not said twice.

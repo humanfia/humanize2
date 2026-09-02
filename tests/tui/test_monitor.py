@@ -101,7 +101,7 @@ def test_the_rate_is_the_last_five_minutes_of_the_clock() -> None:
     monitor = Monitor()
     monitor.began = 1000.0
     monitor.begins("actor", "opus")
-    monitor.spend("actor", 3000, now=1030.0)
+    monitor.spend("actor", 3000, now=1030.0, kinds={"output": 3000})
 
     (spending,) = monitor.spending(now=1060.0)
 
@@ -109,33 +109,79 @@ def test_the_rate_is_the_last_five_minutes_of_the_clock() -> None:
     assert spending.rate == 50.0  # over the minute the run has had, turn or no turn
 
 
-def test_the_rate_is_worked_out_again_when_what_it_is_made_of_moves() -> None:
-    """Adaptively rather than on a clock of its own.
+def test_the_rate_is_output_alone_and_not_every_token_that_crossed_the_wire() -> None:
+    """The input of a turn is the conversation so far, sent again at every request.
 
-    What moves it is tokens counted, or tokens ageing out of the window. A screen redrawn
-    twice a second against numbers that have not changed is a number nobody can read.
+    Mostly out of a cache, and growing with the transcript rather than with the work. A rate
+    counting it says how long the conversation has got, not how fast the model is writing --
+    and doubles the moment a backend starts reporting what it read back out of the cache.
     """
     monitor = Monitor()
     monitor.began = 1000.0
-    monitor.spend("actor", 3000, now=1030.0)
+    monitor.spend(
+        "actor",
+        102_000,
+        now=1030.0,
+        kinds={"input": 2000, "output": 1000, "cache_read": 99_000},
+    )
+
+    (spending,) = monitor.spending(now=1060.0)
+
+    assert spending.tokens == 102_000  # every token, for the count
+    assert spending.rate == pytest.approx(1000 / 60.0)  # the output alone, for the rate
+
+
+def test_the_rate_is_worked_out_again_when_what_it_is_made_of_moves() -> None:
+    """What moves it is tokens counted, or tokens ageing out of the window."""
+    monitor = Monitor()
+    monitor.began = 1000.0
+    monitor.spend("actor", 3000, now=1030.0, kinds={"output": 3000})
 
     (first,) = monitor.spending(now=1060.0)
 
     assert first.rate == 50.0
 
-    (again,) = monitor.spending(
-        now=1070.0
-    )  # nothing new counted, so nothing new worked out
-
-    assert again.rate == 50.0
-
     monitor.spend(
-        "actor", 3000, now=1071.0
-    )  # and something new counted is worked out at once
-    (moved,) = monitor.spending(now=1071.0)
+        "actor", 3000, now=1061.0, kinds={"output": 3000}
+    )  # something new counted is worked out at once
+    (moved,) = monitor.spending(now=1061.0)
 
     assert moved.tokens == 6000
-    assert moved.rate == 6000 / 71.0
+    assert moved.rate == 6000 / 61.0
+
+
+def test_what_has_been_spent_is_worked_out_again_on_the_clock_as_well() -> None:
+    """A rate is tokens over seconds, and the seconds pass whether or not a token does.
+
+    A turn spends most of its minutes between the counts it reports. Worked out only when one
+    arrives, the figure stands still through every tool call the turn makes and then jumps as
+    the turn lands, which reads as a run that stalled and recovered rather than as one working.
+    """
+    monitor = Monitor()
+    monitor.began = 1000.0
+    monitor.spend("actor", 3000, now=1030.0, kinds={"output": 3000})
+
+    assert monitor.spending(now=1060.0)[0].rate == 50.0
+
+    # A second later, with nothing at all having arrived: the run has had a second longer to
+    # have spent the same tokens over, so the rate has come down rather than standing still.
+    assert monitor.spending(now=1061.0)[0].rate == 50.0  # under five seconds, it stands
+    assert (
+        monitor.spending(now=1070.0)[0].rate == 3000 / 70.0
+    )  # and then it is read again
+
+
+def test_anything_the_agent_did_at_all_has_the_figures_read_again() -> None:
+    """A tool, a word, an answer: a turn is alive between the counts it reports."""
+    monitor = Monitor()
+    monitor.began = 1000.0
+    monitor.spend("actor", 3000, now=1030.0, kinds={"output": 3000})
+
+    assert monitor.spending(now=1060.0)[0].rate == 50.0
+
+    monitor.stirring()
+
+    assert monitor.spending(now=1061.0)[0].rate == 3000 / 61.0
 
 
 def test_two_sources_counting_the_same_tokens_are_not_two_lots_of_tokens() -> None:
@@ -167,8 +213,8 @@ def test_what_falls_out_of_the_window_stops_counting() -> None:
     """A flow that has gone quiet reads as quiet, which is what a window is for."""
     monitor = Monitor()
     monitor.began = 1000.0
-    monitor.spend("actor", 6000, now=1030.0)
-    monitor.spend("actor", 30000, now=4000.0)
+    monitor.spend("actor", 6000, now=1030.0, kinds={"output": 6000})
+    monitor.spend("actor", 30000, now=4000.0, kinds={"output": 30000})
 
     (windowed,) = monitor.spending(now=4090.0)
 
@@ -360,3 +406,115 @@ def test_a_breakdown_does_not_outlive_the_total_it_was_of(priced: str) -> None:
 
     assert spending.tokens == 9000
     assert spending.dollars is None  # rather than nine thousand priced as one thousand
+
+
+def test_the_breakdown_reaches_whatever_draws_it(priced: str) -> None:
+    """The kinds were parsed and then thrown away: only the money ever saw them.
+
+    An input token, an output token and a cached read are three different things bought at
+    three different prices, and one number over the lot of them answers no question anybody
+    has. So what a model has spent comes back as what it spent it *on*.
+    """
+    monitor = Monitor()
+    monitor.spend(
+        "actor",
+        1040,
+        model=priced,
+        kinds={"input": 900, "output": 40, "cache_read": 100},
+    )
+
+    (spending,) = monitor.spending()
+
+    assert spending.kinds == {"input": 900, "output": 40, "cache_read": 100}
+
+
+def test_one_agent_is_shown_its_own_kinds_and_nothing_is_marked() -> None:
+    """With one backend there is nothing for a figure to be short of."""
+    monitor = Monitor()
+    monitor.reporting("actor", {"input", "output", "cache_read", "cache_write"})
+    monitor.spend("actor", 1040, model="opus", kinds={"input": 1000, "output": 40})
+
+    counted = monitor.reckoning()
+
+    # Every kind that backend reports, in the one order they are ever drawn in -- a column
+    # appearing the first time a cache is written to would shuffle the readout sideways.
+    assert [one.kind for one in counted] == [
+        "input",
+        "output",
+        "cache_read",
+        "cache_write",
+    ]
+    assert [one.tokens for one in counted] == [1000, 40, 0, 0]
+    assert all(one.whole for one in counted)
+
+
+def test_a_kind_one_backend_does_not_report_is_marked_where_two_are_running() -> None:
+    """The union is short by whatever the backend that never counts it spent on it.
+
+    A run driving Claude beside Codex has a cache column made of Claude's reads alone, since
+    Codex counts its cached reads inside the input and never names them. Drawn as the total
+    it would be a claim about the run; drawn marked it is what it is, which is a floor.
+    """
+    monitor = Monitor()
+    monitor.reporting("writer", {"input", "output", "cache_read", "cache_write"})
+    monitor.reporting("reader", {"input", "output"})
+    monitor.spend(
+        "writer",
+        1100,
+        model="opus",
+        kinds={"input": 900, "output": 40, "cache_read": 160},
+    )
+    monitor.spend("reader", 500, model="gpt", kinds={"input": 400, "output": 100})
+
+    counted = {one.kind: one for one in monitor.reckoning()}
+
+    assert counted["input"].tokens == 1300
+    assert counted["input"].whole  # both of them count it
+    assert counted["output"].whole
+    assert counted["cache_read"].tokens == 160
+    assert not counted["cache_read"].whole  # one of them never says
+    assert not counted["cache_write"].whole
+
+
+def test_tokens_of_no_kind_at_all_make_every_figure_a_floor() -> None:
+    """A backend that reports a lump is a backend whose kinds nothing can say.
+
+    Its tokens went on some kind, and there is nothing to say which -- so every column is
+    short by some part of them, and says so rather than passing for the whole.
+    """
+    monitor = Monitor()
+    monitor.reporting("actor", {"input", "output"})
+    monitor.spend("actor", 1040, model="opus", kinds={"input": 1000, "output": 40})
+    monitor.spend(
+        "actor", 500, model="opus"
+    )  # and a turn that said only what it came to
+
+    counted = monitor.reckoning()
+
+    assert [one.kind for one in counted] == ["input", "output"]
+    assert not any(one.whole for one in counted)
+
+
+def test_a_kind_nobody_declared_but_something_spent_is_still_drawn() -> None:
+    """What was spent is what was spent, whoever said beforehand that they would count it."""
+    monitor = Monitor()
+    monitor.reporting("actor", {"input", "output"})
+    monitor.spend(
+        "actor",
+        1040,
+        model="opus",
+        kinds={"input": 900, "output": 40, "reasoning": 100},
+    )
+
+    counted = {one.kind: one for one in monitor.reckoning()}
+
+    assert counted["reasoning"].tokens == 100
+    assert not counted["reasoning"].whole
+
+
+def test_nothing_having_said_what_it_counts_marks_nothing() -> None:
+    """A run watched before its agents were known is not a run of backends counting nothing."""
+    monitor = Monitor()
+    monitor.spend("actor", 1040, model="opus", kinds={"input": 1000, "output": 40})
+
+    assert all(one.whole for one in monitor.reckoning())
