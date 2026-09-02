@@ -25,8 +25,9 @@ from __future__ import annotations
 import threading
 import time
 import weakref
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from hmz.coganchor import prices
 
@@ -35,7 +36,19 @@ if TYPE_CHECKING:
 
     from .base import AgentBase
 
-__all__ = ["DEFAULT", "MILLION", "Allowance", "Ledger", "Reading", "unwatched"]
+__all__ = [
+    "DEFAULT",
+    "FIELDS",
+    "KEY",
+    "MILLION",
+    "Allowance",
+    "Ledger",
+    "Reading",
+    "allowed",
+    "unreadable",
+    "unwatched",
+    "written",
+]
 
 #: What :attr:`Allowance.tokens` is counted in. Millions, because a run is a day of turns and
 #: a number with six zeros on it is one nobody can type without counting the zeros twice.
@@ -326,6 +339,107 @@ class Ledger:
 #: was such a thing, in the middle of its first run -- which is a cap nobody chose taking work
 #: away. What catches an unbounded run instead is being asked about it: :func:`unwatched`.
 DEFAULT = Allowance()
+
+#: What an allowance written down is filed under, in a YAML file of a flow's settings and in
+#: what a workspace remembers. One word, and it is the word the person set it under.
+KEY = "budget"
+
+#: The three fields, as a file spells them. Named here rather than read off the dataclass so
+#: that a file naming a fourth is refused with the three there are.
+FIELDS = ("hours", "tokens", "dollars")
+
+
+def written(said: object, where_: str = "") -> Allowance:
+    """Reads a run's allowance out of what a file or a settings entry says.
+
+    Refuses a bare number outright, and says both things it could have meant. Every flowverse
+    loop used to take `budget: 25` meaning twenty-five million output tokens for that flow,
+    and the same line now would have to mean one of three quantities. Read as any of them it
+    would be a run held to something nobody asked for, so it is refused and named.
+
+    Args:
+      said: What was written: an allowance already, or a mapping of the three fields.
+      where_: The file it was written in, for saying which one to correct.
+
+    Returns:
+      The allowance.
+
+    Raises:
+      ValueError: If it is not a mapping of the fields there are, or if any of them is not a
+        non-negative number.
+    """
+    if isinstance(said, Allowance):
+        return said
+    at = f"{where_}: " if where_ else ""
+    if not isinstance(said, Mapping):
+        # One number could be any of the three, and a run held to the wrong one stops a
+        # thousand times too early or never. So it is refused, with all three said.
+        raise ValueError(  # noqa: TRY004 -- a file to correct, not a caller's type error
+            f"{at}{KEY} is {', '.join(FIELDS)} rather than one number -- "
+            f"`{KEY}: {{tokens: 25}}` for 25 million output tokens, "
+            f"`{KEY}: {{hours: 25}}` for a day of it, `{KEY}: {{dollars: 25}}` for the money"
+        )
+    held = cast("Mapping[str, object]", said)
+    if unknown := [name for name in held if name not in FIELDS]:
+        raise ValueError(
+            f"{at}{KEY} takes {', '.join(FIELDS)}, not {', '.join(sorted(unknown))}"
+        )
+    read: dict[str, float] = {}
+    for name in FIELDS:
+        if (value := held.get(name)) is None:
+            continue
+        # `bool` first, because a `True` is an `int` in Python and `hours: true` is a file to
+        # correct rather than a run of one hour.
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(  # noqa: TRY004 -- a file to correct, not a caller's type error
+                f"{at}{KEY}.{name} is a number, not {value!r}"
+            )
+        read[name] = float(value)
+    try:
+        return Allowance(**read)
+    except ValueError as why:
+        raise ValueError(f"{at}{KEY}: {why}") from why
+
+
+def allowed(
+    given: Allowance | Mapping[str, object] | None, declared: Allowance | None
+) -> Allowance:
+    """What a run is actually held to, out of what was asked for and what the flow said.
+
+    The one place the three sources are ranked, so that a run started from a command line, a
+    run started from the menu and a run started from another flow all land on one answer:
+    whoever started it wins, else the flow's own default, else nothing at all.
+
+    Args:
+      given: What the line, the file or the menu said, or None for neither.
+      declared: What the flow said where it was marked, or None for a flow with no opinion.
+
+    Returns:
+      The allowance the run is held to.
+
+    Raises:
+      ValueError: If what was given cannot be read as one.
+    """
+    if given is not None:
+        return written(given)
+    return declared if declared is not None else DEFAULT
+
+
+def unreadable(blind: Iterable[str]) -> str:
+    """What to tell somebody about a cap nothing in their run can read.
+
+    Said rather than left silent, because a cap that will never bite reads exactly like a cap
+    that has not bitten yet: a person who set a fifty-dollar limit on a model nobody prices
+    has a run with no limit on it and no way of knowing.
+
+    Args:
+      blind: The dimensions nothing can read, as :attr:`Reading.blind` names them.
+
+    Returns:
+      One line about them, or "" where every cap that was set can be read.
+    """
+    said = [f"{name} ({_UNREADABLE[name]})" for name in FIELDS if name in set(blind)]
+    return f"nothing here can read {' or '.join(said)}" if said else ""
 
 
 def unwatched(effective: Allowance, declared: Allowance | None) -> bool:

@@ -110,7 +110,7 @@ def _exec(argv: list[str]) -> int:
     # If it has been answered yes, and never otherwise: a run with nobody at a terminal is a
     # run with nobody to ask, and silence is not an answer.
     hmz.reports()
-    path, agents, task, config, as_json = hmz.read(argv)
+    path, agents, task, config, budget, as_json = hmz.read(argv)
     with Out(as_json=as_json) as out, Shown(out) as shown:
         # The agents the line named, and not whatever else the flow turns out to drive: a
         # flow whose other side is the person drives one more, and with nobody at a prompt
@@ -118,7 +118,7 @@ def _exec(argv: list[str]) -> int:
         # only thing on the terminal that is about humanize rather than about the run.
         shown.watches(agents)
         try:
-            running = hmz.run(path, agents, task, config)
+            running = hmz.run(path, agents, task, config, budget=budget)
         except NotAFlow as error:
             # A flow that is not there, or one that takes other agents than these, is a
             # command line that was wrong before anything ran, so it exits as argparse's own
@@ -126,6 +126,18 @@ def _exec(argv: list[str]) -> int:
             # say so itself.
             print(f"hmz exec: error: {error}", file=sys.stderr)
             raise SystemExit(2) from error
+        # Said and then run, never asked. The interface asks somebody to confirm a run that
+        # nothing will stop; a command line has nobody to ask, and refusing here would break
+        # every unattended flow there has ever been for the sake of a question nobody is
+        # there to answer. So what it can do is say so plainly, on the stream that is not
+        # the answer.
+        if running.unwatched:
+            out.aside(
+                "hmz exec: nothing will stop this run -- no hours, no output tokens and no "
+                "dollars are capped. `-c` with a `budget:` is how one is set."
+            )
+        if blind := running.unreadable():
+            out.aside(f"hmz exec: {blind}, so that cap cannot stop this run")
         try:
             running.run()
         except (KeyboardInterrupt, SystemExit):

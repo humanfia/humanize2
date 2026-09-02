@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
+    from hmz.coganchor.agents.allowance import Allowance
     from hmz.flows import Finding, Flowverse, Offer, Place, Prophecy, Running
 
 __all__ = ["Flows", "Flowverses"]
@@ -374,17 +375,22 @@ class Flows:
 
         return running()
 
-    def set_up_from(self, said: str | os.PathLike[str]) -> dict[str, Any]:
-        """Reads what a flow is to be set up with out of a YAML file of it.
+    def set_up_from(
+        self, said: str | os.PathLike[str]
+    ) -> tuple[dict[str, Any], Allowance | None]:
+        """Reads what a flow is to be set up with, and what a run of it may spend, out of YAML.
 
         Args:
           said: The path to the file.
 
         Returns:
-          What it holds, field by field, and nothing at all for a file that is empty.
+          What it holds field by field with the run's own `budget:` taken out of it -- that
+          one being a setting of the run rather than of the flow -- and the allowance that
+          key said, or None where the file said nothing about one.
 
         Raises:
-          ValueError: If the file cannot be read, or holds something that is not a mapping.
+          ValueError: If the file cannot be read, holds something that is not a mapping, or
+            says a budget that cannot be read as one.
         """
         from hmz.runtime.runner import set_up_from
 

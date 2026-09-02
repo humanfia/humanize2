@@ -301,14 +301,14 @@ def test_what_a_flow_is_set_up_with_is_read_out_of_the_file_it_was_written_in(
     said = tmp_path / "setup.yml"
     said.write_text("rounds: 3\nname: mine\n", encoding="utf-8")
 
-    assert Hmz().flows.set_up_from(said) == {"rounds": 3, "name": "mine"}
+    assert Hmz().flows.set_up_from(said) == ({"rounds": 3, "name": "mine"}, None)
 
 
 def test_a_setup_file_that_is_empty_sets_nothing_up(tmp_path: Path) -> None:
     said = tmp_path / "setup.yml"
     said.write_text("", encoding="utf-8")
 
-    assert Hmz().flows.set_up_from(said) == {}
+    assert Hmz().flows.set_up_from(said) == ({}, None)
 
 
 def test_a_setup_file_that_is_not_a_mapping_is_refused(tmp_path: Path) -> None:

@@ -3205,7 +3205,7 @@ class Humanize(App[None]):
         try:
             # `--json` says how a run is written for whoever is at a command line, and there
             # is nobody at one here: the interface draws the same events itself.
-            path, chosen, task, _, _ = self.hmz.read(argv)
+            path, chosen, task, _, _, _ = self.hmz.read(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
         try:

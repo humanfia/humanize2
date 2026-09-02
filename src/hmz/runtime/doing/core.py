@@ -22,11 +22,12 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import os
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from pydantic import BaseModel
 
     from hmz.coganchor.agents import AgentBase
+    from hmz.coganchor.agents.allowance import Allowance
     from hmz.coganchor.backends import Profile
     from hmz.runtime.doing.accounts import Accounts
     from hmz.runtime.doing.epics import Epics
@@ -142,7 +143,9 @@ class Hmz:
 
     def read(
         self, argv: list[str]
-    ) -> tuple[str, list[AgentBase], str, dict[str, Any] | None, bool]:
+    ) -> tuple[
+        str, list[AgentBase], str, dict[str, Any] | None, Allowance | None, bool
+    ]:
         """Reads an `hmz exec` line into a flow, the agents, the task, and the flow's setup.
 
         Args:
@@ -150,8 +153,8 @@ class Hmz:
 
         Returns:
           The flow's path, the agents to drive it with in the order the flow takes them, the
-          task, what to set the flow up with, and whether the line asked for the run to be
-          written for a program rather than for a person.
+          task, what to set the flow up with, what the run may spend, and whether the line
+          asked for the run to be written for a program rather than for a person.
 
         Raises:
           SystemExit: If the line does not name a flow and an agent apiece, as argparse
@@ -168,6 +171,7 @@ class Hmz:
         config: BaseModel | dict[str, Any] | None = None,
         resume: str | os.PathLike[str] | None = None,
         container: str = "",
+        budget: Allowance | Mapping[str, Any] | None = None,
     ) -> Runner:
         """Loads a flow and hands it the agents it was written for.
 
@@ -177,6 +181,7 @@ class Hmz:
           config: What it was set up with, for a flow that says it can be.
           resume: The run to pick up from, for a flow that says it can be picked up.
           container: The image to run the whole of it in, or "" for this machine.
+          budget: What the run may spend, or None for whatever the flow says.
 
         Returns:
           The flow, loaded, with the agents it drives in hand.
@@ -186,7 +191,9 @@ class Hmz:
         """
         from hmz.runtime.runner import Runner
 
-        return Runner(flow, agents, config, resume=resume, container=container)
+        return Runner(
+            flow, agents, config, resume=resume, container=container, budget=budget
+        )
 
     def run(
         self,
@@ -196,6 +203,7 @@ class Hmz:
         config: BaseModel | dict[str, Any] | None = None,
         resume: str | os.PathLike[str] | None = None,
         container: str = "",
+        budget: Allowance | Mapping[str, Any] | None = None,
     ) -> Run:
         """A run of one flow, loaded and ready to be started.
 
@@ -206,6 +214,7 @@ class Hmz:
           config: What it was set up with, for a flow that says it can be.
           resume: The run to pick up from, for a flow that says it can be picked up.
           container: The image to run the whole of it in, or "" for this machine.
+          budget: What the run may spend, or None for whatever the flow says.
 
         Returns:
           The run. Nothing has started: `run()` runs it here, `start()` on a thread.
@@ -215,7 +224,7 @@ class Hmz:
         """
         from hmz.runtime.doing.running import Run
 
-        return Run(self.runner(flow, agents, config, resume, container), task)
+        return Run(self.runner(flow, agents, config, resume, container, budget), task)
 
     def exec(self, argv: list[str]) -> None:
         """Runs the flow one `hmz exec` line names, on the agents it names, to its return.
@@ -230,7 +239,7 @@ class Hmz:
         """
         # What the line said about who is reading is the command line's to act on: this
         # answers with the run itself rather than with a rendering of it.
-        flow, agents, task, config, _ = self.read(argv)
+        flow, agents, task, config, budget, _ = self.read(argv)
         # Through a run, which is the one thing a flow being driven is: whoever ran a line
         # through this and whoever built a run are then holding the same thing.
-        self.run(flow, agents, task, config).run()
+        self.run(flow, agents, task, config, budget=budget).run()
