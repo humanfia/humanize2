@@ -2424,7 +2424,7 @@ class Humanize(App[None]):
         self._draw()
 
     @work
-    async def action_flow(self, named: str = "", *, opening: int = 0) -> None:
+    async def action_flow(self, named: str = "") -> None:
         """Opens the flow menu: which flow runs, and what each of its agents is.
 
         One menu walked into rather than a sheet per question: the flows, and the agents of

@@ -337,7 +337,7 @@ async def test_the_places_are_walked_to_from_the_flows(theirs: Path) -> None:
 
         await driver.press("v")
         await until(lambda: isinstance(app.screen, Flowverses), driver)
-        assert rows(app) == ["builtin", OFFICIAL, "theirs", LOCAL, USER]
+        assert rows(app) == [OFFICIAL, "theirs", LOCAL, USER]
 
         await onto(app, driver, "theirs")
         await driver.press("d")
