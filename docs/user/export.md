@@ -1,6 +1,6 @@
-# Exporting a run — `/export`
+# Exporting a run
 
-`/export` packages the whole run up as one archive:
+An export packages one whole run up as one archive:
 
 ```
 .humanize/<run>.epic.tar.gz
@@ -14,7 +14,10 @@ carries what is behind it.
 
 ## Try it
 
-Run `/export`, then look at what it names:
+[`/epics`](/user/tracing#what-a-run-writes-down) lists every run of this directory, newest
+first. Enter on one opens what there is to do with it, and **export it** is there beside
+collecting its trace — a run is exported where the runs are, rather than by a command about
+whichever one your screen happens to be showing. Then look at what it names:
 
 ```sh
 tar tzf .humanize/20260809T014455.212Z-9f21ab.epic.tar.gz
@@ -32,7 +35,7 @@ Everything the run wrote down about itself, and everything its sessions were log
 | `profile.jsonl` | the programs it ran, for a [profiled](/user/tracing#profiling-a-run) run |
 | `traces/…` | every [trace](/user/tracing) gathered of it |
 | `sessions/<session>/…` | the backends' own logs, **as their contents** rather than as the links the run keeps — one directory per session, named for the agent, the CLI, the account and the id |
-| `transcript.md` | the screen, as the text it was written as rather than the rows it was drawn as — only for an export of the run that is on the screen |
+| `transcript.md` | a screen that went with the run, as the text it was written as rather than the rows it was drawn as — only where one was [handed in from Python](#from-python) |
 | `manifest.json` | what this was: see below |
 
 The manifest is what makes the rest readable by somebody who was not there — humanize's own
@@ -52,14 +55,11 @@ their own and write nothing humanize can read; a bundle that answered that with 
 directory would read exactly like a bundle that lost the logs. The manifest says which it is,
 against that session and against the backend.
 
-**The transcript is the whole screen**, everything drawn since the interface opened or since
-the last `/clear` — not the tail of it, so an export of a nine-hour run is the whole of it.
-Pressing **tab** steps between conversations and draws each into the same transcript, so it
-holds every conversation you have read rather than only the one showing now; see [Many
-conversations at once](/user/conversations). Whether tool calls and thinking are in it depends
-on what [`/details`](/user/details) is showing. And it goes in as it was written, not as it was
-wrapped: a line too long for your terminal is drawn over four rows and exported as the line, so
-a break in the file is a break that was really there.
+**No screen goes in by itself.** A run out of the list may be a week old, and what is on your
+screen now is not it — a bundle carrying somebody else's transcript would be a bundle saying
+something untrue. Something driving humanize from Python can hand one in, and then it goes in
+as it was written rather than as it was wrapped: a line too long for a terminal is drawn over
+four rows and written out as the line, so a break in the file is a break that was really there.
 
 ## What is never in it
 
@@ -97,16 +97,11 @@ It is your run. `tar xzf` it somewhere and read it — that is the point of it b
 of plain files rather than something only humanize opens.
 :::
 
-## A run that is not the one on the screen
+## Where it went
 
-[`/epics`](/user/tracing#what-a-run-writes-down) lists every run of this directory, newest
-first. Enter on one opens what there is to do with it, and **export it** is there beside
-collecting its trace. Use that for a run from last week: there is no transcript in it, because
-what is on your screen is not that run.
-
-`/export` and **export it** both say where the archive landed and how big it came out — under
-the list for a run picked out of it, and in the transcript either way, so a bundle made an hour
-ago is still found by reading back rather than by hunting through a directory:
+**export it** says where the archive landed and how big it came out — under the list, and again
+in the transcript, so a bundle made an hour ago is still found by reading back rather than by
+hunting through a directory:
 
 ```console
 /home/you/code/.humanize/20260809T014455.212Z-9f21ab.epic.tar.gz · 812 kB
@@ -115,7 +110,9 @@ ago is still found by reading back rather than by hunting through a directory:
 The archive is named for the run rather than for the moment you asked, so exporting the same
 run twice replaces the first — the second one is the first plus whatever has happened since.
 
-From Python it is the one call both of those come down to:
+## From Python
+
+It is one call, the same one the menu comes down to:
 
 ```python
 from hmz.sdk import Hmz
@@ -126,8 +123,7 @@ Hmz().epics.bundled(epic, output="/tmp/for-the-issue.tar.gz")
 `epic` is the run's own directory — what **where it is** says under the list, and what
 [`Hmz().epics.all()`](/reference/sdk#epics) hands back. An output that is a directory is written
 into under the run's own name, and no output at all is `.humanize/` beside wherever this is
-running. There is a `transcript=` as well, for the screen that went with the run, which only an
-export of the run you are watching has to give.
+running. There is a `transcript=` as well, for a screen of your own that went with the run.
 
 ## Copying instead
 
@@ -141,9 +137,9 @@ For a few lines, the mouse is faster and leaves no file:
 
 The status line says `copied` for a moment. That is the only sign there is.
 
-This copies what was written rather than what was drawn, exactly as the transcript in an export
-is. The box the interface opens with is a picture rather than a line. Dragging across it gives
-you its rows as they are drawn, borders and all.
+This copies what was written rather than what was drawn. The box the interface opens with is a
+picture rather than a line. Dragging across it gives you its rows as they are drawn, borders and
+all.
 
 **It works over ssh.** The interface has the mouse, so your terminal never sees the drag. What
 is selected goes out as OSC 52, the escape a terminal takes for its clipboard. It therefore
@@ -160,7 +156,7 @@ off.
 
 | | What it holds | Where |
 | --- | --- | --- |
-| `/export`, and **export it** on a run of `/epics` | the whole run: every record, every session log in full, the transcript, and a manifest | `.humanize/<run>.epic.tar.gz` |
+| **export it** on a run of `/epics` | the whole run: every record, every session log in full, and a manifest | `.humanize/<run>.epic.tar.gz` |
 | **collect a trace** on a run of `/epics` | every session of every agent as one [timeline](/user/tracing), with tool input and output | `traces/<datetime>.trace.json`, in the run's own epic |
 | the epic itself | the same records, with the session logs as links into the backends' own homes | `~/.humanize/epics/<workspace>/<run>/` |
 | the clipboard | whatever you dragged across | your machine's clipboard |

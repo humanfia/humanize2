@@ -141,7 +141,7 @@ rather than a run that stops.
 
 Being links, they are worth nothing on any machine but this one — so sending a run to somebody
 else means following them and carrying what is behind them, which is what
-[`/export`](/user/export) does.
+[exporting a run](/user/export) does.
 
 ![one run's sessions/ directory, its name saying agent, CLI and account, holding a symlink to
 Claude Code's own log](/demo/run-linked.png)

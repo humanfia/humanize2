@@ -145,8 +145,9 @@ class Epics:
           epic: The run, by the directory it is written in.
           output: Where to write it -- a file, or a directory to write it into under its own
             name -- or None for `.humanize/` beside wherever this is being run.
-          transcript: What was on the screen, for an export from the interface, or None from
-            a command line, where nothing was drawn.
+          transcript: A screen that went with this run, for a caller that has one, or None
+            -- which is what a run exported out of the list of them goes in as, that run not
+            being the one on the screen.
 
         Returns:
           Where it was written, and the manifest as it was written there -- which is what

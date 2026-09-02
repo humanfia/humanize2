@@ -346,9 +346,9 @@ async def test_a_line_that_named_a_run_is_said_back_rather_than_dropped(
 
 def test_the_command_is_offered_with_a_line_about_it() -> None:
     """Or it is a command only whoever wrote it knows is there."""
-    from hmz.tui.app import _OWN
-    from hmz.tui.complete import about, offered, takes
+    from hmz.tui.app import _BY_NAME, _COMMANDS
+    from hmz.tui.complete import offered
 
-    assert "/resume" in offered("/", _OWN)
-    assert about("resume")
-    assert takes("resume") == ""  # the last run is not something to name
+    assert "/resume" in offered("/", _COMMANDS)
+    assert _BY_NAME["resume"].about
+    assert _BY_NAME["resume"].takes == ""  # the last run is not something to name

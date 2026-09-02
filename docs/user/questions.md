@@ -40,6 +40,9 @@ on an answer that is not coming is a flow that has stopped, so this is the defau
 except an interface with `/afk` off. Asking starts **allowed**: an agent that really needs a
 person gets one unless it has been said that none is there.
 
+While it is on, the status line says `afk` in front of everything else on it — the whole point
+of the switch is that nothing stops to tell you, so the mode itself has to be visible.
+
 ## When the answer is not worth stopping for
 
 A question stops the turn until it is answered. For everything a run wants from you that is not

@@ -19,7 +19,6 @@ terminal is your ssh session or one of these is not something it is told.
 | | |
 | --- | --- |
 | `hmz` | Reads whichever run is being held in this directory, and starts one where none is. |
-| `/detach` | Lets go of this terminal and leaves the flow running. |
 | `/exit` | Asks what is to become of a flow that is running: stop it and leave, or leave it running and let go of this terminal. With nothing running it is a window being closed. |
 | `ctrl+c` twice | Stops the flow, as it always did. It is not what lets go of a terminal. |
 | `ctrl+q` | The same question `/exit` puts, rather than leaving outright. |
@@ -29,7 +28,7 @@ terminal is your ssh session or one of these is not something it is told.
 [`hmz`](/reference/cli#hmz) in a directory is the whole of it at a terminal: it reads whichever
 run is being held here, and starts one where none is. There is nothing else to type, because
 there is nothing else a person sitting at one of these wants — reading it is what they came for,
-and letting go of it is `/detach` once they are in.
+and letting go of it is one of the answers `/exit` puts once they are in.
 
 Everything else there is to ask of a held run — what is being held on this machine, what one of
 them is doing, letting go of every terminal on it, stopping it — is [asked in Python](#python).
@@ -66,8 +65,9 @@ a time.
   without. What is lost is being able to walk away from the run, which is not a reason to
   refuse to open.
 
-In that case `/detach` says so rather than doing nothing: closing the terminal is what closes
-the run, so there is nothing to let go of.
+In that case `/exit` does not offer leaving it running at all: closing the terminal is what
+closes the run, so the second answer is staying here instead. An answer that cannot be carried
+out is not one to offer.
 
 ## One per directory
 

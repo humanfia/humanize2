@@ -66,7 +66,7 @@ from hmz.runtime import telemetry
 from hmz.sdk import Hmz
 
 from .btw import AgentProgress, FlowSnapshot, Observation, compact, format_snapshot
-from .complete import about, hinted, offered, takes
+from .complete import Command, hinted, offered
 from .discover import installable, installed
 from .history import History
 from .monitor import Monitor, short, thousands
@@ -107,31 +107,6 @@ if TYPE_CHECKING:
     from hmz.coganchor.agents import AgentBase, Board, Event, Question, SessionBase
     from hmz.flows import Place
     from hmz.sdk import Session
-
-#: What the editor understands, named as opencode names them, one step along: what answers
-#: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
-#: runs on is an agent apiece rather than one model, so its `/models` is the page along from
-#: it. There is no command for an agent on its own: an agent belongs to the flow that drives
-#: it, and is set up on the page of `/flow` its agents are on. `hmz anchor` is not here
-#: either: it is not a thing to do to a flow that is running, and it is a command line of its
-#: own. What a run left behind is `/epics`, which is where the runs of this directory are.
-_OWN = (
-    "flow",
-    "btw",
-    "flowverses",
-    "providers",
-    "fallback",
-    "epics",
-    "resume",
-    "settings",
-    "monitor",
-    "clear",
-    "details",
-    "afk",
-    "export",
-    "detach",
-    "exit",
-)
 
 #: How often the right-hand column and the status line are redrawn, in seconds.
 _REFRESH = 0.5
@@ -432,7 +407,7 @@ class Editor(TextArea):
             # The list is filled from a message the application handles, so it can be a
             # keystroke behind the editor. An offer that no longer finishes what is typed is
             # not the one enter was pressed over, and the line goes as it stands instead.
-            if whole in offered(self.text, _OWN):
+            if whole in offered(self.text, _COMMANDS):
                 self.take(whole)
                 return
         said, self.text = self.text.strip(), ""
@@ -668,6 +643,11 @@ class Humanize(App[None]):
         the next terminal to open it is drawn for from the top. So it is asked rather than
         assumed, and it is asked only where there is something to ask about -- with nothing
         running, `/exit` is a window being closed.
+
+        The one way out, letting go of the terminal included. That was a command of its own
+        and is an answer here instead: both were about the same running flow, and a person
+        who has decided to leave should be asked what becomes of it once rather than having
+        to know which of two words asks.
         """
         if not self._agents:
             self.action_quit()
@@ -676,23 +656,20 @@ class Humanize(App[None]):
         if said == STOPS:
             self.action_quit()
         elif said == DETACHES:
-            self.action_detach()
+            self._detach()
 
-    def action_detach(self) -> None:
+    def _detach(self) -> None:
         """Lets go of the terminal reading this, leaving the flow running.
 
-        The other half of `/exit`: what is closed is the terminal rather than the run. What
-        was running goes on running, and `hmz` in this directory opens it again.
+        The answer to `/exit` that closes the terminal rather than the run: what was running
+        goes on running, and `hmz` in this directory opens it again. Only ever reached where
+        something outside this terminal is holding the run -- where nothing is, the question
+        offers staying here instead, an answer that cannot be carried out not being one.
         """
         session = self._session
-        if session is None:
-            self.show(
-                "hmz: this run is in the terminal it was opened in, so there is nothing to "
-                "let go of: closing the terminal closes the run",
-                "red",
-            )
-            return
-        if not session.attached:
+        if session is None or not session.attached:
+            # The reader went while the question was up, which is the run carrying on either
+            # way: what would have been let go of has let go of itself.
             self.show("hmz: nothing is reading this run to let go of", "red")
             return
         session.detach()
@@ -828,7 +805,8 @@ class Humanize(App[None]):
             Checked by whatever read the line: an interface is opened set up, not corrected.
           session: What is holding this run somewhere a terminal closing cannot reach, or
             None for one opened in the terminal it is drawn on -- where letting go of the
-            terminal and stopping the run are the same thing, and `/detach` says so.
+            terminal and stopping the run are the same thing, and `/exit` offers staying
+            here rather than an answer that cannot be carried out.
         """
         # `ansi_color` up front rather than left to the theme: Textual picks the filter it
         # runs every colour through inside `App.__init__`, before a theme set below could
@@ -1507,11 +1485,11 @@ class Humanize(App[None]):
         # typed is that answer, whatever it begins with, so a list that took the enter would
         # finish a flow's name over an answer nobody ever gave.
         answering = self._asking is not None and typed.startswith("$")
-        offers = offered(typed, _OWN) if at_end and not answering else []
+        offers = offered(typed, _COMMANDS) if at_end and not answering else []
         # Nothing left to finish, but a command still being written: its own line stays up,
         # since what it takes after its name is written there and is what is wanted just
         # then. Shown and not offered -- `offering` is what says a key is the list's.
-        hint = hinted(typed, _OWN) if at_end and not offers else ""
+        hint = hinted(typed, _COMMANDS) if at_end and not offers else ""
         listing = self.query_one("#offers", OptionList)
         listing.clear_options()
         listing.set_class(bool(offers), "offering")
@@ -1538,13 +1516,17 @@ class Humanize(App[None]):
           The row. The bare name is its id, since that is what replaces the text -- taking
           an offer must not type the arguments in as well.
         """
-        named = offer.removeprefix("/")
+        # A flow is the other thing offered here, and it says nothing about itself: only a
+        # `/` names a command, so a flow that happens to be called `monitor` is not one.
+        command = _BY_NAME.get(offer[1:]) if offer.startswith("/") else None
+        takes = command.takes if command else ""
+        about = command.about if command else ""
         # Escaped: what a command takes is written in brackets, and a bracket left as it is
         # would be read as markup and swallowed -- which is what `[path]` did. Padded first,
         # since the escaping adds characters that are not columns.
         return Option(
-            escape(f"{f'{offer} {takes(named)}'.rstrip():<19}")
-            + f"[dim]{escape(about(named))}[/dim]",
+            escape(f"{f'{offer} {takes}'.rstrip():<19}")
+            + f"[dim]{escape(about)}[/dim]",
             id=offer,
         )
 
@@ -1596,6 +1578,19 @@ class Humanize(App[None]):
                 f"[$secondary]◉[/] {escape(self._flowing())}"
                 f"[$text-muted]{_DOT}{escape(_where())}[/]"
             )
+        # The modes this is in, ahead of everything else on the line. Both change what the
+        # interface does without changing anything drawn on it, and a mode nobody can see
+        # they are in is one they find out about from what did not happen -- an agent that
+        # wanted a person and was told there is none. In front rather than beside, since
+        # that is the one place on this row that survives a narrow terminal: the keys are
+        # clipped from their end and the flow and the directory can fill a small screen on
+        # their own, so a marker anywhere else is one that is there until it is needed.
+        # `afk` in the colour of a warning, being the one that decides whether an agent may
+        # reach you at all.
+        if self._details:
+            left = f"[$text-muted]details[/]{_DOT}{left}"
+        if self._afk:
+            left = f"[$warning]afk[/]{_DOT}{left}"
         # For a moment after it happens, beside whatever else the line says: writing to a
         # clipboard is silent, and a person who has just dragged across half a screen is
         # owed the one word that says it went somewhere.
@@ -1725,7 +1720,7 @@ class Humanize(App[None]):
                 return lines
         return lines
 
-    def _switched(self, argv: list[str], *, now: bool) -> bool | None:
+    def _switched(self, argv: Sequence[str], *, now: bool) -> bool | None:
         """What a switch becomes: what was asked for, or the other of what it is.
 
         A toggle is what you reach for at a prompt and the wrong thing to write down: a line
@@ -1952,55 +1947,47 @@ class Humanize(App[None]):
         ) as error:  # an unbalanced quote is a line to correct, not a crash
             self.show(f"hmz: {error}", "red")
             return
-        if name == "exit":
-            self.action_exit()
-        elif name == "detach":
-            self.action_detach()
-        elif name == "clear":
-            self.action_clear()
-        elif name == "btw":
-            self.action_btw(" ".join(argv).strip())
-        elif name == "flow":
-            self.action_flow(argv[0] if argv else "")
-        elif name == "providers":
-            self.action_providers()
-        elif name == "fallback":
-            self.action_fallback()
-        elif name == "epics":
-            self.action_epics()
-        elif name == "resume":
-            self.action_resume(argv)
-        elif name == "flowverses":
-            self.action_flowverses()
-        elif name == "settings":
-            self.action_settings()
-        elif name == "monitor":
-            self.action_monitor()
-        elif name == "details":
-            if (switched := self._switched(argv, now=self._details)) is None:
-                return
-            self._details = switched
-            self.show(
-                "[dim]showing the working: every tool call, all of the thinking, and "
-                "whatever a backend prints on its way past[/dim]"
-                if self._details
-                else "[dim]showing what each turn said, and nothing of how it got "
-                "there[/dim]"
-            )
-        elif name == "afk":
-            if (switched := self._switched(argv, now=self._afk)) is None:
-                return
-            self._afk = switched
-            self.show(
-                "[dim]away: an agent that wants to ask is told nobody is here[/dim]"
-                if self._afk
-                else "[dim]here: an agent may stop and ask you[/dim]"
-            )
-        elif name == "export":
-            self._export()
-        else:
+        command = _BY_NAME.get(name)
+        if command is None:
             telemetry.snag("unknown-command", length=len(name))
             self.show(f"hmz: no such command: /{name}", "red")
+            return
+        command.does(self, argv)
+
+    def action_details(self, argv: Sequence[str] = ()) -> None:
+        """Turns the working on or off, and says which way it went.
+
+        Args:
+          argv: What was written after the name, which is `on`, `off`, or nothing at all.
+        """
+        if (switched := self._switched(argv, now=self._details)) is None:
+            return
+        self._details = switched
+        self.show(
+            "[dim]showing the working: every tool call, all of the thinking, and "
+            "whatever a backend prints on its way past[/dim]"
+            if self._details
+            else "[dim]showing what each turn said, and nothing of how it got there[/dim]"
+        )
+        self._draw()  # and the status line says which mode this is in from now on
+
+    def action_afk(self, argv: Sequence[str] = ()) -> None:
+        """Says whether anybody is here to be asked, and marks the status line with it.
+
+        Args:
+          argv: What was written after the name, which is `on`, `off`, or nothing at all.
+        """
+        if (switched := self._switched(argv, now=self._afk)) is None:
+            return
+        self._afk = switched
+        self.show(
+            "[dim]away: an agent that wants to ask is told nobody is here[/dim]"
+            if self._afk
+            else "[dim]here: an agent may stop and ask you[/dim]"
+        )
+        # Said once in the transcript and from now on in the status line: a line that has
+        # scrolled away is not how somebody finds out that an agent may not reach them.
+        self._draw()
 
     def action_btw(self, question: str = "") -> None:
         """Answers a side question from a frozen flow snapshot.
@@ -2358,64 +2345,6 @@ class Humanize(App[None]):
         if held:
             self.show(f"[dim]   never sent: {because}[/dim]")
         self._draw()
-
-    @work
-    async def _export(self) -> None:
-        """Packages the whole run up as one archive, transcript and all.
-
-        The screen alone was never the run. What an agent actually did is in the log its
-        backend wrote, which the run points at by a link -- and a link is worth nothing on
-        any machine but this one, so a bundle sent to whoever is being asked to fix something
-        follows every one of them and carries what is behind it. The transcript goes in
-        beside those, as the text it was written as rather than the rows it was drawn as:
-        lines broken where the terminal ran out of room are lines nothing reads back.
-
-        Off the event loop. Following a day's logs and compressing them is seconds, and an
-        interface that stopped redrawing for them would look as though it had gone away.
-        """
-        import asyncio
-
-        from hmz.runtime.exporting import sized
-
-        epic = self._epic()
-        if epic is None:
-            self.show(
-                "hmz: nothing has been run here yet, so there is nothing to export",
-                "red",
-            )
-            return
-        said = self.query_one("#transcript", Transcript).text
-        self.show(f"[dim]packaging {escape(epic.name)}…[/dim]")
-        try:
-            at, _ = await asyncio.to_thread(
-                self.hmz.epics.bundled, epic, transcript=said
-            )
-            size = await asyncio.to_thread(lambda: at.stat().st_size)
-        except (OSError, ValueError) as why:
-            self.show(f"hmz: {escape(str(why))}", "red")
-            return
-        self.show(f"[dim]{escape(str(at))} — {sized(size)}[/dim]")
-
-    def _epic(self) -> Path | None:
-        """The run this interface is showing, by the directory it is written in.
-
-        Asked of the agents rather than of the workspace: the run holds the epic it is
-        writing into, so a flow that is going is exported as itself rather than as whichever
-        directory happens to sort last. Once it has ended the agents still hold it, which is
-        what makes exporting a run that has just finished the same key as exporting one that
-        is still going.
-
-        Returns:
-          It, or the last run of this directory where no flow has been started here yet, or
-          None where nothing has ever been run here.
-        """
-        from hmz.runtime.epic import Epic
-
-        for agent in self._ran:
-            if isinstance(agent.epic, Epic):
-                return agent.epic.path
-        found = self.hmz.epics.all()
-        return found[-1] if found else None
 
     @work
     async def action_flow(self, named: str = "", *, opening: int = 0) -> None:
@@ -3795,3 +3724,93 @@ def _machine() -> dict[str, object]:
             {"name": one.name, "fetched": one.fetched} for one in held.verses.all()
         ],
     }
+
+
+#: What the editor understands, named as opencode names them, one step along: what answers
+#: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
+#: runs on is an agent apiece rather than one model, so its `/models` is the page along from
+#: it. There is no command for an agent on its own: an agent belongs to the flow that drives
+#: it, and is set up on the page of `/flow` its agents are on. `hmz anchor` is not here
+#: either: it is not a thing to do to a flow that is running, and it is a command line of its
+#: own. What a run left behind is `/epics`, which is where the runs of this directory are --
+#: and packaging one up to send is one of the things offered about the run under the cursor
+#: there, rather than a command of its own about whichever run this screen happens to show.
+#:
+#: One table, read by everything that has anything to do with a command: the list offers what
+#: is in it, the line under the editor says what each takes, and a line that was sent is
+#: carried out by the row it names. Adding one is one row here rather than an entry in three
+#: files that only a test kept in step.
+#:
+#: Written down here rather than beside the class, since a row names the method that carries
+#: it out and the class has to exist first.
+_COMMANDS: tuple[Command, ...] = (
+    Command(
+        "flow",
+        "Switch flow",
+        lambda app, argv: app.action_flow(argv[0] if argv else ""),
+        takes="[flow]",
+    ),
+    Command(
+        "btw",
+        "Ask a side question",
+        lambda app, argv: app.action_btw(" ".join(argv).strip()),
+        takes="<question>",
+    ),
+    Command(
+        "flowverses",
+        "Manage the places flows come from",
+        lambda app, _: app.action_flowverses(),
+    ),
+    Command(
+        "providers",
+        "Manage the accounts agents run as",
+        lambda app, _: app.action_providers(),
+    ),
+    Command(
+        "fallback",
+        "Where a turn goes when the place taking it cannot take it at all",
+        lambda app, _: app.action_fallback(),
+    ),
+    Command(
+        "epics",
+        "The runs of this directory, and what to do with one",
+        lambda app, _: app.action_epics(),
+    ),
+    Command(
+        "resume",
+        "Carry the last run here on from where it stopped",
+        lambda app, argv: app.action_resume(argv),
+    ),
+    Command(
+        "settings",
+        "What humanize remembers, here and everywhere",
+        lambda app, _: app.action_settings(),
+    ),
+    Command(
+        "monitor",
+        "Watch the run: the flow drawn, and the board",
+        lambda app, _: app.action_monitor(),
+    ),
+    Command("clear", "Clear the screen", lambda app, _: app.action_clear()),
+    Command(
+        "details",
+        "Toggle tool calls and thinking",
+        lambda app, argv: app.action_details(argv),
+        takes="[on|off]",
+    ),
+    Command(
+        "afk",
+        "Toggle whether an agent may ask you",
+        lambda app, argv: app.action_afk(argv),
+        takes="[on|off]",
+    ),
+    Command(
+        "exit",
+        "Leave; a flow that is running can be left running",
+        lambda app, _: app.action_exit(),
+    ),
+)
+
+#: The same rows by name, for the two readers that have a name in hand rather than a line to
+#: finish: the row drawn beside an offer, and the command a sent line turned out to be.
+_BY_NAME = {one.name: one for one in _COMMANDS}
