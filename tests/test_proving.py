@@ -237,6 +237,61 @@ def test_the_allowance_a_flow_declares_is_what_ends_its_proof(tmp_path: Path) ->
     assert proof.outcomes[0].turns == 3
 
 
+#: The same loop, declaring its allowance in hours rather than in tokens -- which is the shape
+#: a proof cannot measure unless its world has a clock that moves.
+HOURS = DECLARED.replace("Allowance(tokens=0.3)", "Allowance(hours=0.05)")
+
+
+def test_an_allowance_in_hours_is_walked_to_the_end_of_too(tmp_path: Path) -> None:
+    """A proof sleeps for free and a stub answers at once, so real time never moves in one.
+
+    Left at that, a flow claiming six hours over a loop with no exit would be driven to the
+    turn cap and reported as a flow that does not stop -- a false failure about exactly the
+    shape the checker blesses. So a turn is worth a slice of clock, and the claim can be tried.
+    """
+    at = written(tmp_path, "hours", textwrap.dedent(HOURS))
+
+    proof = proved(at, scenarios=(NEVER_DONE,))
+
+    assert proof.outcomes[0].finished
+    # 0.05 hours is three minutes, and a turn is worth the scenario's minute.
+    assert proof.outcomes[0].turns == 3
+
+
+def test_a_flow_that_stopped_itself_did_not_reach_what_it_declared(
+    tmp_path: Path,
+) -> None:
+    """`Stopped` is also what a flow that stops its own agent gets on its next turn.
+
+    Read as the allowance being reached, such a flow would be filed as one that ended the way
+    its author said it should -- when what happened is that it stopped itself by mistake.
+    """
+    at = written(
+        tmp_path,
+        "own",
+        textwrap.dedent(
+            '''
+            """A loop that stops its own agent and then asks it for another turn."""
+
+            from hmz.flows import Agent, Allowance, flow
+
+
+            @flow(budget=Allowance(tokens=100.0))
+            def run(agents: tuple[Agent], task: str) -> None:
+                (agent,) = agents
+                while True:
+                    agent(task)
+                    agent.stop()
+            '''
+        ),
+    )
+
+    proof = proved(at, scenarios=(NEVER_DONE,))
+
+    assert not proof.outcomes[0].finished
+    assert "without having run out of what it declared" in proof.outcomes[0].said
+
+
 def test_a_flow_that_declares_nothing_is_held_to_nothing_here(tmp_path: Path) -> None:
     """A proof of the flow does not stand on an allowance the flow never claimed.
 

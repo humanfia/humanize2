@@ -20,7 +20,14 @@ from hmz.coganchor.backends import Model
 from hmz.runtime.kept import Runs
 from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
-from hmz.tui.pick import _BUDGET, _SAVE, Configures, Flows, Unbounded
+from hmz.tui.pick import (
+    _BUDGET,
+    _SAVE,
+    Configures,
+    Flows,
+    Unbounded,
+    budget_of,
+)
 from tests.stubs import written
 
 from .test_app import onto, opens, rows, until
@@ -187,6 +194,62 @@ async def test_a_run_with_a_cap_on_it_is_not_asked_about(
         await until(lambda: app.screen is not sheet, driver)
 
         assert not isinstance(app.screen, Unbounded)
+
+
+@pytest.mark.timeout(60)
+async def test_a_flow_run_without_the_menu_is_still_held_to_what_was_set(
+    flows: Path, tmp_path: Path
+) -> None:
+    """`$flow <task>` runs a flow this workspace has set up without opening the menu.
+
+    Which is the whole point of that line -- and a path that dropped the allowance on the way
+    would start an unbounded run out of a workspace whose settings say six hours, with nothing
+    asked either, the question living on the menu that did not open.
+    """
+    Settings(tmp_path).remember(
+        "local/quiet", ("",), [Runs("claude/m:high")], budget={"hours": 6}
+    )
+    app = Humanize()
+    async with app.run_test():
+        held = app._remembered_for("local/quiet")
+
+        assert held is not None
+        assert held.budget == Allowance(hours=6)
+
+
+@pytest.mark.timeout(60)
+async def test_setting_every_dimension_back_to_nothing_forgets_it(
+    flows: Path, tmp_path: Path
+) -> None:
+    """Rather than writing three zeros down, which would override the flow for good.
+
+    A flow is back under what it says for itself by there being nothing remembered for it, so
+    an allowance that caps nothing has to be written down as nothing.
+    """
+    Settings(tmp_path).remember(
+        "local/quiet", ("",), [Runs("claude/m:high")], budget={"hours": 6}
+    )
+    app = Humanize()
+    async with app.run_test() as driver:
+        await _into(app, driver, "quiet")
+        assert "stops at 6h" in _said(app)
+
+        await opens(app, driver, _BUDGET)
+        await until(lambda: isinstance(app.screen, Configures), driver)
+        await driver.press("left")  # hours: 6 -> 5
+        for _ in range(5):
+            await driver.press("left")  # and down to nothing
+        await driver.pause()
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Flows), driver)
+        await onto(app, driver, _SAVE)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Unbounded), driver)
+        await driver.press("enter")
+        await until(lambda: not isinstance(app.screen, Flows), driver)
+
+    assert Settings(tmp_path).budget("local/quiet") == {}
+    assert budget_of("local/quiet") is None
 
 
 @pytest.mark.timeout(60)

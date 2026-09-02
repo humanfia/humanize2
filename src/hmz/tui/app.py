@@ -2603,7 +2603,9 @@ class Humanize(App[None]):
             # A flow that will not load says nothing about what it drives, so nothing here can
             # tell whether it is set up. Running it is where that is said, exactly as it is
             # for the flow already in force.
-            return Chosen(flow, tuple(self.settings.agents(flow)))
+            return Chosen(
+                flow, tuple(self.settings.agents(flow)), budget=budget_of(flow)
+            )
         held = self.settings.flows().get(flow)
         kept = cast("dict[str, Any]", held) if isinstance(held, dict) else {}
         agents = kept.get("agents")
@@ -2631,7 +2633,11 @@ class Humanize(App[None]):
         # Through the same settling every other way into the models goes through, or a flow
         # that has since declared it needs the backend's own goals at a place would run here
         # with them off and be refused before its first turn.
-        return Chosen(flow, tuple(settled(runs, places)), config)
+        # What a run of it may spend, among the rest of what was remembered: this is the
+        # path a flow runs by without the menu ever opening, and one that dropped the
+        # allowance would start an unbounded run out of a workspace whose settings say six
+        # hours -- with nothing asked, the question living on the menu that did not open.
+        return Chosen(flow, tuple(settled(runs, places)), config, budget_of(flow))
 
     def _took_flow(self, chosen: Chosen, *, running: bool, starting: str = "") -> None:
         """Applies what the flow menu was saved with, and writes it down.
@@ -2668,9 +2674,13 @@ class Humanize(App[None]):
             chosen.config.model_dump(mode="json")
             if chosen.config is not None
             else None,
-            # An allowance of nothing is written down as nothing, which is how the menu says
-            # a flow is back to running under whatever the flow itself declares.
-            dimensions(chosen.budget) if chosen.budget is not None else None,
+            # An allowance that caps nothing is written down as nothing rather than as three
+            # zeros, which is how the menu says a flow is back to running under whatever the
+            # flow itself declares. Three zeros kept would override the flow's own default for
+            # good, and there would be no way left to say `as the flow has it`.
+            dimensions(chosen.budget)
+            if chosen.budget is not None and chosen.budget.bounded
+            else {},
         )
         if running:
             self._reconfigured()

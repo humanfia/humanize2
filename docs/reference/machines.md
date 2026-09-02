@@ -203,10 +203,10 @@ a line:
 from hmz.sdk import Hmz
 
 hmz = Hmz()
-path, agents, task, config, _ = hmz.read(
+path, agents, task, config, budget, _ = hmz.read(
     ["-f", "ralph_loop", "-a", "claude/claude-opus-5:max", "get the suite green"]
 )
-hmz.run(path, agents, task, config, container="python:3.12").run()
+hmz.run(path, agents, task, config, budget=budget, container="python:3.12").run()
 ```
 
 One container is started as the run starts and taken down as it ends, and every agent is
