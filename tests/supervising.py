@@ -45,7 +45,7 @@ PATIENCE = 45
 def cred(
     argv: list[str], *, stdin: str = "", timeout: int = PATIENCE
 ) -> subprocess.CompletedProcess[str]:
-    """Runs `hmz cred` as a turn under a provider runs it: its own process, on its own.
+    """Runs `hmz internal cred` as a turn under a provider runs it: its own process, on its own.
 
     Args:
       argv: What follows the command name -- the swaps, `--`, and the program.
@@ -56,7 +56,7 @@ def cred(
       What the run came to, with its output read back.
     """
     return subprocess.run(
-        [sys.executable, "-m", "hmz", "cred", *argv],
+        [sys.executable, "-m", "hmz", "internal", "cred", *argv],
         input=stdin,
         capture_output=True,
         text=True,

@@ -869,7 +869,7 @@ stream a turn is read from would be describing a tool that had already run.
 
 On the backends whose CLI takes a hook table meant for a single run — the ones
 [`anchor:hooked`](#what-each-backend-can-do) names — humanize puts the moment in that table
-instead, pointed at `hmz hook`, a relay that carries the call to a socket this process is
+instead, pointed at `hmz internal hook`, a relay that carries the call to a socket this process is
 serving and the verdict back again. The CLI stops and waits for it, and a refusal means the
 tool does not run:
 
@@ -1752,7 +1752,7 @@ agent's: two conversations offering a tool of one name are offering one tool.
 
 The road between the two is the **Model Context Protocol**, that being the one way every one of
 these CLIs takes a tool it was not shipped with. What a backend is handed is a command to run —
-`hmz tools --at <socket>` — which relays its pipe back to the flow's process. Nothing is
+`hmz internal tools --at <socket>` — which relays its pipe back to the flow's process. Nothing is
 started until something is offered: an agent whose flow hands it no callbacks has no socket, no
 thread and no bridge.
 

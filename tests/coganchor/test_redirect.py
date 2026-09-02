@@ -50,7 +50,7 @@ def test_a_swap_a_turn_is_given_is_a_redirect_the_session_is_spawned_with(
     )
 
     assert f"--redirect={NAMED}={INSTEAD}" in rendered
-    assert settings(parser().parse_args(rendered[4:])) == AnchorConfig(
+    assert settings(parser().parse_args(rendered[5:])) == AnchorConfig(
         target="ssh://build-box", redirects=((NAMED, INSTEAD),)
     )
 
@@ -61,7 +61,7 @@ def test_a_turn_answers_what_the_settings_answer_as_well_as_its_own() -> None:
 
     rendered = config.command(["claude"], swaps=[(NAMED, INSTEAD)])
 
-    assert settings(parser().parse_args(rendered[4:])).redirects == (
+    assert settings(parser().parse_args(rendered[5:])).redirects == (
         ("/etc/machine-id", "/srv/borrowed-id"),
         (NAMED, INSTEAD),
     )
@@ -75,7 +75,7 @@ def test_a_turn_answers_what_the_settings_answer_as_well_as_its_own() -> None:
 def test_a_redirect_that_is_not_two_absolute_paths_is_refused(said: str) -> None:
     """Resolved against the turn's own directory, a relative answer is a different file."""
     with pytest.raises(SystemExit) as refused:
-        cli.main(["anchor", "--redirect", said, "claude"])
+        cli.main(["internal", "anchor", "--redirect", said, "claude"])
     assert refused.value.code == 2
 
 

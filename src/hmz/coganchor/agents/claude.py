@@ -317,7 +317,7 @@ class ClaudeCodeSession(StreamSessionBase):
         Claude has announced the tool and is about to run it: a flow refusing one would be
         describing what already happened. Claude's own table is the one place it stops and
         waits to be told, so that is where humanize puts the moment -- pointed at
-        `hmz hook --at <socket>`, which carries it back to the hooks hung on this agent.
+        `hmz internal hook --at <socket>`, which carries it back to the hooks hung on this agent.
 
         Said whether or not anything is hung on that moment, and not made conditional on it:
         a hook goes up and comes down while the agent runs, and a table that depended on what

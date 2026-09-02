@@ -167,7 +167,7 @@ list appears under the editor with a line about each.
 `/details` and `/afk` flip when given nothing, and take `on` or `off` when you want to say
 which.
 
-**`hmz anchor` is deliberately not here.** It is not a thing to do to a
+**`hmz internal anchor` is deliberately not here.** It is not a thing to do to a
 flow that is running, and a command that only ever means one thing is a command line.
 
 ### Starting a flow outright

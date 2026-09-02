@@ -53,7 +53,7 @@ def test_a_rendered_command_is_parsed_back_as_the_settings_it_came_from(
     monkeypatch.setattr("hmz.coganchor.anchor.connect", record)
     rendered = FULL.command(["claude", "--print"])
     # The interpreter running the flow, so the child is the one humanize is installed in.
-    assert rendered[:4] == [sys.executable, "-m", "hmz", "anchor"]
+    assert rendered[:5] == [sys.executable, "-m", "hmz", "internal", "anchor"]
 
     assert cli.main(rendered[3:]) == 0
 
@@ -67,11 +67,11 @@ def test_an_agent_argument_is_never_read_as_one_of_ours() -> None:
 
     rendered = AnchorConfig(target="ssh://build-box", force=True).command(argv)
 
-    assert parser().parse_args(rendered[4:]).command == argv
+    assert parser().parse_args(rendered[5:]).command == argv
 
 
 def test_a_default_anchor_says_only_where_the_work_lands() -> None:
-    assert AnchorConfig().command(["claude"])[4:] == [
+    assert AnchorConfig().command(["claude"])[5:] == [
         "--target=local",
         "--net=local",
         "claude",
@@ -134,7 +134,7 @@ def test_a_target_nobody_can_read_is_refused_the_way_argparse_refuses_an_argumen
     None
 ):
     with pytest.raises(SystemExit) as refused:
-        cli.main(["anchor", "--target", "rsync://build-box", "claude"])
+        cli.main(["internal", "anchor", "--target", "rsync://build-box", "claude"])
     assert refused.value.code == 2
 
 

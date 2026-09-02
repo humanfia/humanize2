@@ -112,7 +112,7 @@ if TYPE_CHECKING:
 #: here is a flow rather than an agent, so opencode's `/agents` is `/flow`, and what a flow
 #: runs on is an agent apiece rather than one model, so its `/models` is the page along from
 #: it. There is no command for an agent on its own: an agent belongs to the flow that drives
-#: it, and is set up on the page of `/flow` its agents are on. `hmz anchor` is not here
+#: it, and is set up on the page of `/flow` its agents are on. `hmz internal anchor` is not here
 #: either: it is not a thing to do to a flow that is running, and it is a command line of its
 #: own. What a run left behind is `/epics`, which is where the runs of this directory are.
 _OWN = (

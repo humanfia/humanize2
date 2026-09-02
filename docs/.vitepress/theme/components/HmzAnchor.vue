@@ -148,7 +148,7 @@ const lit = (where: Where) => (call.value.where === where ? 'lit' : '')
       <text x="452" y="118" class="sub mid">ssh · docker · tcp · a pipe</text>
 
       <rect x="676" y="56" width="288" height="40" rx="9" class="box strong" />
-      <text x="820" y="81" class="title mid">hmz anchor serve</text>
+      <text x="820" y="81" class="title mid">hmz internal anchor serve</text>
 
       <g class="dest" :class="lit('files')">
         <rect x="676" y="112" width="288" height="46" rx="9" class="box" />

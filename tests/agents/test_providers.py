@@ -246,7 +246,7 @@ def test_what_a_provider_adds_to_the_command_line_is_added_to_the_backends(
 
     spawned = agent.spawned(["claude", "--print"])
 
-    assert spawned[:4] == [sys.executable, "-m", "hmz", "cred"]
+    assert spawned[:5] == [sys.executable, "-m", "hmz", "internal", "cred"]
     # The backend's own line, the provider's arguments at the end of it.
     assert spawned[spawned.index("--") + 1 :] == [
         "claude",
@@ -351,7 +351,7 @@ def test_a_provider_reaches_the_command_a_real_backend_builds(
 
     assert agent.environment() == {"ANTHROPIC_API_KEY": "not-real"}
     spawned = agent.spawned(["claude", "--print"])
-    assert spawned[:4] == [sys.executable, "-m", "hmz", "cred"]
+    assert spawned[:5] == [sys.executable, "-m", "hmz", "internal", "cred"]
     assert any(f"--map={home}/.claude/.credentials.json=" in one for one in spawned), (
         spawned
     )

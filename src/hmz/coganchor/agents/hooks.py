@@ -570,8 +570,9 @@ def _serves(
 class Gate:
     """One agent's moments, served where the CLI's own hook table can reach them.
 
-    A CLI takes a hook as a program to run, so there is a program -- `hmz hook --at <socket>`,
-    which does nothing but carry the one call back to this process. The socket is in a
+    A CLI takes a hook as a program to run, so there is a program --
+    `hmz internal hook --at <socket>`, which does nothing but carry the one call back to this
+    process. The socket is in a
     directory this user alone may enter, made in this process and taken away with it, and what
     answers is the flow's own :class:`Hooks`: the same callables a turn fires from its own
     thread, fired here from the CLI's instead. Which is the whole of the difference this
@@ -683,7 +684,7 @@ class Gate:
         """
         import sys
 
-        return [sys.executable, "-m", "hmz", "hook", "--at", self.address()]
+        return [sys.executable, "-m", "hmz", "internal", "hook", "--at", self.address()]
 
     def table(self, wait: int) -> dict[str, Any]:
         """These moments as the hook table a CLI's own settings hold.

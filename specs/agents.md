@@ -357,8 +357,8 @@ stops and waits to be told, and `Gate` is what stands in that place.
   comes down while the agent runs, so a table that depended on what was hung when the CLI
   started would be one that had to restart the CLI; what is hung MUST be asked at the moment it
   fires, which is the only moment the answer is true.
-- The relay MUST be `hmz hook`, and the callback MUST run in the process the flow is in, for
-  the reason `hmz tools` exists: a hook that ran anywhere else would be a subprocess and not a
+- The relay MUST be `hmz internal hook`, and the callback MUST run in the process the flow is
+  in, for the reason `hmz internal tools` exists: a hook that ran anywhere else would be a subprocess and not a
   callable of the flow's. The socket MUST be in a directory this user alone may enter.
 - A CLI whose table will not run until it has been trusted, where that trust is a thing
   written into the person's own configuration, MUST NOT be given one. Codex is that CLI: it

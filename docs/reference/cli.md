@@ -12,6 +12,11 @@ is not a command is a usage error listing the commands there are. Everything aft
 name reaches that command untouched — `--help` included — so each answers for its own
 arguments.
 
+There are two commands. `hmz exec` runs a flow, and is the one anybody types.
+[`hmz internal`](#hmz-internal) is the door onto the four lines humanize spawns for itself —
+listed rather than hidden, because a command nobody can discover is a command nobody can
+debug, and these are exactly what turns up in a process table when a run has gone wrong.
+
 `python -m hmz` is the same command line, which is how a turn spawns itself under an
 [anchor](/reference/remote-execution).
 
@@ -214,18 +219,41 @@ hmz exec -f official/humanize1:rlcr -c setup.yaml -a claude/claude-opus-5:max \
 
 Nobody is at a prompt, so an agent that stops to ask is told nobody answered and carries on.
 
-## `hmz anchor`
+## `hmz internal`
+
+```
+hmz internal COMMAND [ARGS...]
+```
+
+The four lines humanize starts processes with, under one name. Nobody types one of these: each
+exists because starting a process needs a command line, and each takes arguments humanize
+renders for it.
+
+They are listed and documented rather than hidden behind an undocumented name, because every
+one of them is what a person *finds* rather than what they run — the process under a turn in
+`ps`, the line in a backend's MCP configuration, the program a hook's error came from. A door
+marked `internal` tells you both what is there and that it is not for you; a listing that left
+them out would simply be untrue about what humanize runs.
+
+| Command | |
+| --- | --- |
+| [`hmz internal anchor`](#hmz-internal-anchor) | A turn whose work lands on another machine, and — under `serve` — the half that lands it. |
+| [`hmz internal cred`](#hmz-internal-cred) | A program run with its credentials answered out of an account's own directory. |
+| [`hmz internal hook`](#hmz-internal-hook) | One moment of a coding agent's hook table, carried to the flow whose moment it is. |
+| [`hmz internal tools`](#hmz-internal-tools) | A coding agent's tool calls, carried to the flow whose callbacks they are. |
+
+## `hmz internal anchor`
 
 Runs a coding agent on this machine whose work lands on another one. See
 [Remote execution](/reference/remote-execution).
 
-**Not one of the commands the listing shows.** humanize spawns it for every turn whose work
-lands on another machine, and the zipapp bootstrapped onto a target runs `hmz anchor serve` to
-answer one — the same reason `hmz tools` is a command line. It still runs when it is typed,
+**Not a command anybody types.** humanize spawns it for every turn whose work lands on another
+machine, and the zipapp bootstrapped onto a target runs `hmz internal anchor serve` to answer
+one — the same reason `hmz internal tools` is a command line. It still runs when it is typed,
 which is what `--check` is for.
 
 ```
-hmz anchor [options] AGENT [ARGS...]
+hmz internal anchor [options] AGENT [ARGS...]
 ```
 
 Everything after the agent's name is the agent's own.
@@ -260,20 +288,21 @@ every shell uses for a command it could not find, so that whatever spawned it re
 that is not installed.
 
 ```sh
-hmz anchor --target ssh://build-box claude
-hmz anchor --target ssh://gpu-01 codex exec "run the test suite"
-hmz anchor --target docker://build-container --workspace /srv/project claude
-hmz anchor --native --target docker://build-container --remote-path /srv/project claude
-hmz anchor --check --target ssh://build-box
+hmz internal anchor --target ssh://build-box claude
+hmz internal anchor --target ssh://gpu-01 codex exec "run the test suite"
+hmz internal anchor --target docker://build-container --workspace /srv/project claude
+hmz internal anchor --native --target docker://build-container --remote-path /srv/project claude
+hmz internal anchor --check --target ssh://build-box
 ```
 
-## `hmz anchor serve`
+## `hmz internal anchor serve`
 
-The other half of a session: replays on this machine what an `hmz anchor` elsewhere asks of it.
-Needs only a POSIX system and a recent `python3` — no root, no compiler, nothing installed.
+The other half of a session: replays on this machine what an `hmz internal anchor` elsewhere
+asks of it. Needs only a POSIX system and a recent `python3` — no root, no compiler, nothing
+installed.
 
 ```
-hmz anchor serve --export VIRTUAL[:REAL] (--stdio | --listen [HOST:]PORT) [--token TOKEN]
+hmz internal anchor serve --export VIRTUAL[:REAL] (--stdio | --listen [HOST:]PORT) [--token TOKEN]
 ```
 
 | Flag | |
@@ -282,7 +311,7 @@ hmz anchor serve --export VIRTUAL[:REAL] (--stdio | --listen [HOST:]PORT) [--tok
 | `--stdio` | Serve one session over stdin/stdout. This is what a bootstrapped target runs. |
 | `--listen [HOST:]PORT` | Serve TCP connections on this address. A bare port listens on `127.0.0.1`. |
 | `--token TOKEN` | Shared secret required from clients. Defaults to `$HUMANIZE_TOKEN`. |
-| `--log-level` | As for `hmz anchor`. |
+| `--log-level` | As for `hmz internal anchor`. |
 
 `--stdio` and `--listen` are mutually exclusive, and one is required.
 
@@ -290,13 +319,62 @@ hmz anchor serve --export VIRTUAL[:REAL] (--stdio | --listen [HOST:]PORT) [--tok
 to a shell on that machine — read [Security](/user/security).
 
 ```sh
-hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
+hmz internal anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 ```
 
-## `hmz tools`
+## `hmz internal cred`
 
 ```sh
-hmz tools --at <socket>
+hmz internal cred --map FROM=TO [--map ...] -- COMMAND [ARGS...]
+```
+
+Runs a program with some of its paths answered by others, and exits with its status. What a
+turn under a [provider](/reference/providers) is spawned as, and what a login run for one is
+spawned as: the program runs here, unchanged and on this terminal, and the handful of syscalls
+that name one of its credential files are handed a path inside that account's directory
+instead.
+
+**Not a command anybody types.** It is a command of its own rather than something the driver
+does in this process because the supervisor forks the program and takes the process's signal
+handling with it, which a flow pumping turns from threads of its own has none to lend.
+
+| Flag | |
+| --- | --- |
+| `--map FROM=TO` | **Required, repeatable.** Answer this path — the file it names, or everything under the directory it names — with that one. |
+| `--` | Ends the flags. Everything after it is the program and its own arguments. |
+
+A line with nothing to answer, or nothing to run, is a usage error. A run that could not be
+supervised exits 1 rather than running the program unsupervised: that would be a turn taken as
+whoever is at this machine, which is the wrong account rather than a failed turn.
+
+## `hmz internal hook`
+
+```sh
+hmz internal hook --at <socket>
+```
+
+Carries one call of a coding agent's own [hook table](/reference/agents#hooks) to the flow
+whose moment it is, and the verdict back again: it reads the call on its stdin, sends it to the
+flow's socket and writes the answer back out. It is what makes a refusal at `PreToolUse` stop
+the tool rather than describe one that has already run.
+
+**Not a command anybody types.** A CLI takes a hook by starting a program and waiting for what
+it says, so there is a program — humanize writes this line into the CLI's own hook table and
+spawns it once per moment.
+
+| Flag | |
+| --- | --- |
+| `--at PATH` | **Required.** The unix socket the flow is serving its moments on. |
+
+It exits 0 whatever the flow said, and never with the status these CLIs read as the hook
+itself having refused: a relay that could not reach anybody would otherwise be refusing on a
+flow's behalf without having asked it. A socket that is not there lets the tool through and
+says so on stderr, where the CLI shows it and carries on.
+
+## `hmz internal tools`
+
+```sh
+hmz internal tools --at <socket>
 ```
 
 Carries the tool protocol between a coding agent and the flow whose
@@ -304,22 +382,26 @@ Carries the tool protocol between a coding agent and the flow whose
 answers back out to its stdout, and does nothing else.
 
 **Not a command anybody types.** A CLI takes a tool by starting a program, so there is a
-program — the same reason `hmz cred` exists. humanize spawns it and tells the backend to run
-it; a socket that is not there exits 1, which the CLI reads as tools being unavailable rather
-than as a turn that failed.
+program — the same reason `hmz internal cred` exists. humanize spawns it and tells the backend
+to run it; a socket that is not there exits 1, which the CLI reads as tools being unavailable
+rather than as a turn that failed.
+
+| Flag | |
+| --- | --- |
+| `--at PATH` | **Required.** The unix socket the flow is serving its toolbox on. |
 
 ## Environment variables
 
 | Variable | Read by | |
 | --- | --- | --- |
 | `HUMANIZE_HOME` | everything | Where humanize keeps what outlives one run. Defaults to `~/.humanize`. |
-| `HUMANIZE_TARGET` | `hmz anchor` | Default for `--target`. |
-| `HUMANIZE_TOKEN` | `hmz anchor`, `hmz anchor serve` | Default for `--token`. |
-| `HUMANIZE_LOG` | `hmz anchor`, `hmz anchor serve` | Default for `--log-level`. |
+| `HUMANIZE_TARGET` | `hmz internal anchor` | Default for `--target`. |
+| `HUMANIZE_TOKEN` | `hmz internal anchor`, `hmz internal anchor serve` | Default for `--token`. |
+| `HUMANIZE_LOG` | `hmz internal anchor`, `hmz internal anchor serve` | Default for `--log-level`. |
 | `HUMANIZE_DAEMON` | `hmz` with no command | `off`, `0` or `no` opens the interface in this terminal rather than [holding the run apart from it](/reference/daemon). Anything else — including empty — is silence, and silence holds the run. |
 | `HUMANIZE_SENTRY` | everything | `on` or `off`, answering the [reporting](/user/reporting) question for one process without writing anything down. Nothing else is looked at while it is set. |
 | `HUMANIZE_WATCHDOG` | everything that runs a turn | How long a turn may say nothing before [the watchdog looks at it](/reference/agents#when-a-cli-stops-answering), in seconds, overriding each backend's own. `0` turns it off. |
-| `HUMANIZE_SHADOWS` | `hmz anchor`, a container or a machine an agent works on | Where the mirrors coganchor has been pointed at are recorded. Defaults to `~/.cache/humanize/shadows`. |
+| `HUMANIZE_SHADOWS` | `hmz internal anchor`, a container or a machine an agent works on | Where the mirrors coganchor has been pointed at are recorded. Defaults to `~/.cache/humanize/shadows`. |
 | `CLAUDE_CONFIG_DIR` | the traces `/epics` gathers, the TUI's cost readout | Claude Code's home. Defaults to `~/.claude`. |
 | `CODEX_HOME` | same | Codex's home. Defaults to `~/.codex`. |
 | `DSH_HOME` | same | DeepSeek Harness's home. Defaults to `~/.dsh`. |
@@ -384,7 +466,7 @@ into them.
 | `1` | It could not: the target could not be reached, the listener could not be started, a turn could not be supervised. |
 | `2` | The command line was wrong — argparse's own rejections, a flow that is not there or takes other agents, a malformed listen address, a non-loopback listener with no token. |
 | `130` | Interrupted. |
-| *the agent's own* | `hmz anchor` exits with the status of the program it ran, and `hmz cred` with that of the program it supervised. |
+| *the agent's own* | `hmz internal anchor` exits with the status of the program it ran, and `hmz internal cred` with that of the program it supervised. |
 
 ## Python entry points
 
@@ -415,8 +497,8 @@ and restates none of them:
 ```python
 from hmz.runtime.runner import Runner          # hmz exec
 from hmz.runtime.tracing import collect        # the trace /epics gathers
-from hmz.coganchor import connect      # hmz anchor
-from hmz.coganchor import check        # hmz anchor --check
+from hmz.coganchor import connect      # hmz internal anchor
+from hmz.coganchor import check        # hmz internal anchor --check
 from hmz.daemon import running, start  # the run hmz holds apart from the terminal
 ```
 

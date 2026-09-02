@@ -216,7 +216,7 @@ def test_a_relay_with_no_flow_behind_it_lets_the_tool_through(serving: Hooks) ->
 
 def test_a_relay_given_a_line_it_cannot_read_still_refuses_nothing() -> None:
     """Argparse exits two for a bad line, and two is the one status this must never use."""
-    argv = [sys.executable, "-m", "hmz", "hook", "--nonsense"]
+    argv = [sys.executable, "-m", "hmz", "internal", "hook", "--nonsense"]
     done = subprocess.run(argv, input=b"{}", capture_output=True, check=False)
 
     assert done.returncode == 1
@@ -224,7 +224,13 @@ def test_a_relay_given_a_line_it_cannot_read_still_refuses_nothing() -> None:
 
 def test_the_relay_is_the_python_running_this_flow(serving: Hooks) -> None:
     """The callback is in this process, so what carries a call to it has to start here."""
-    assert serving.gate().command()[:4] == [sys.executable, "-m", "hmz", "hook"]
+    assert serving.gate().command()[:5] == [
+        sys.executable,
+        "-m",
+        "hmz",
+        "internal",
+        "hook",
+    ]
 
 
 def test_the_gate_is_reached_only_by_whoever_is_running_the_flow(

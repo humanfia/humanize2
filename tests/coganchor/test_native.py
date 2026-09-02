@@ -105,7 +105,7 @@ def test_every_setting_a_native_turn_takes_survives_being_written_back_out() -> 
     assert rendered[-2:] == ["claude", "--print"]
     # Read back by the same parser the spawned process reads it with, which is the whole of
     # what makes this a bijection rather than two lists that happen to look alike.
-    written = line.settings(line.parser().parse_args(rendered[4:]))
+    written = line.settings(line.parser().parse_args(rendered[5:]))
     assert written == settings
 
 
@@ -419,7 +419,7 @@ def test_a_native_turn_is_spawned_as_the_anchor_line_and_looks_for_no_local_cli(
 
     rendered = agent.spawned(["claude", "--print"], "/work/sub")
 
-    assert rendered[1:4] == ["-m", "hmz", "anchor"]
+    assert rendered[1:5] == ["-m", "hmz", "internal", "anchor"]
     assert "--native" in rendered
     assert "--chdir=/work/sub" in rendered
     # The CLI is named as it was written. Where claude is installed is a fact about the

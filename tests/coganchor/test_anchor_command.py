@@ -1,4 +1,4 @@
-"""`hmz anchor` as a command line: what it refuses, and where it routes what it accepts.
+"""`hmz internal anchor` as a command line: what it refuses, and where it routes what it accepts.
 
 Both halves are here. `serve` is answered first and without loading the agent half at all,
 which is what lets one program serve a target of any architecture -- so everything below runs
@@ -93,7 +93,7 @@ def test_an_address_that_is_not_one_is_a_bad_argument(
 def test_listening_where_anything_can_reach_it_without_a_secret_is_refused(
     exported: str, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An `hmz anchor` port is equivalent to a shell on that machine."""
+    """An `hmz internal anchor` port is equivalent to a shell on that machine."""
     monkeypatch.delenv("HUMANIZE_TOKEN", raising=False)
 
     assert anchor(["serve", "--export", exported, f"--listen={EVERYWHERE}:8080"]) == 2

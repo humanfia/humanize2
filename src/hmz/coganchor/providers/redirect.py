@@ -139,7 +139,7 @@ def command(
     if not held:
         return list(argv)
     mapped = [f"--map={named}={instead}" for named, instead in held.pairs]
-    return [sys.executable, "-m", "hmz", "cred", *mapped, "--", *argv]
+    return [sys.executable, "-m", "hmz", "internal", "cred", *mapped, "--", *argv]
 
 
 def run(swaps: Swaps, argv: Sequence[str]) -> int:

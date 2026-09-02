@@ -277,7 +277,7 @@ def test_the_command_a_turn_is_spawned_as_names_every_path_it_is_answered_at() -
 
     spawned = provider.command(["claude", "--print"])
 
-    assert spawned[:4] == [sys.executable, "-m", "hmz", "cred"]
+    assert spawned[:5] == [sys.executable, "-m", "hmz", "internal", "cred"]
     assert spawned[spawned.index("--") + 1 :] == ["claude", "--print"]
     assert len([one for one in spawned if one.startswith("--map=")]) == len(
         provider.swaps()

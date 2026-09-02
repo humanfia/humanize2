@@ -62,7 +62,7 @@ def test_bundle_is_self_contained(tmp_path: Path) -> None:
     assert bundle.stat().st_size > 0
 
     result = subprocess.run(
-        [sys.executable, str(bundle), "anchor", "serve", "--help"],
+        [sys.executable, str(bundle), "internal", "anchor", "serve", "--help"],
         capture_output=True,
         text=True,
         # An empty PYTHONPATH proves nothing is being imported from this repo.
@@ -129,6 +129,7 @@ def test_bundle_reports_failure_in_its_exit_status(tmp_path: Path) -> None:
         [
             sys.executable,
             str(bundle),
+            "internal",
             "anchor",
             "serve",
             "--export",
@@ -214,7 +215,7 @@ def test_the_line_ssh_carries_is_read_by_the_shell_there_before_anything_runs() 
     assert "for py in" in words[3], (
         "the line that finds the interpreter arrived in pieces"
     )
-    assert words[4:7] == ["humanize", bundle, "anchor"]
+    assert words[4:8] == ["humanize", bundle, "internal", "anchor"]
     assert words[-2:] == ["--export", "/a b:/c d"]
     assert f" {bundle} " in line, (
         "a quoted ~ is a directory of that name, not the home one"
@@ -277,6 +278,7 @@ def test_ssh_transport_bootstraps_and_runs(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "hmz",
+            "internal",
             "anchor",
             "--target",
             "ssh://localhost",

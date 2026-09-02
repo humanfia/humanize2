@@ -11,7 +11,7 @@ Four ways in:
     machine like any other here; it needs no port, no secret and no cooperation
     beyond a ``python3``.
 ``tcp://host:port``
-    Attach to an ``hmz anchor serve --listen`` someone already started.
+    Attach to an ``hmz internal anchor serve --listen`` someone already started.
 ``local[:REAL]``
     Run ``serve`` as a child process on this machine.  Used for development and
     by the test suite, where ``REAL`` is the directory standing in for the
@@ -198,6 +198,7 @@ def _connect_local(target: Target, exports: list[str], token: str | None) -> Tra
         sys.executable,
         "-m",
         "hmz",
+        "internal",
         "anchor",
         "serve",
         "--stdio",
@@ -259,7 +260,14 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
 
     # Unquoted, unlike ssh: docker is handed the command as argv and passes it on, so an export
     # holding a space or a quote needs nothing done to it to survive the trip.
-    serve = [remote_file, "anchor", "serve", "--stdio", *_export_args(exports)]
+    serve = [
+        remote_file,
+        "internal",
+        "anchor",
+        "serve",
+        "--stdio",
+        *_export_args(exports),
+    ]
     return _spawn([*exec_in, *python_command(serve)], None)
 
 
@@ -297,6 +305,7 @@ def _ssh_serve_line(remote_file: str, exports: list[str]) -> str:
             "exec",
             *(shlex.quote(word) for word in python_command([])),
             remote_file,
+            "internal",
             "anchor",
             "serve",
             "--stdio",
@@ -390,8 +399,8 @@ def build_bundle(destination: Path | None = None) -> Path:
                 f'"""{".".join(parts[:depth])}, cut down to {parts[depth]}."""\n'
             )
         # The command line comes too, because it is the only one: what the target runs is the
-        # same ``hmz anchor`` a user would run there, and each of its commands names the layers
-        # it needs only from inside itself, none of which is this one.
+        # same ``hmz internal anchor`` a user would run there, and each of its commands names
+        # the layers it needs only from inside itself, none of which is this one.
         # Taken off disk rather than imported, so that the serving half still names nothing
         # above itself.
         package = Path(coganchor.__file__).parent.parent
