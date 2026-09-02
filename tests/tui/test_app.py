@@ -1494,6 +1494,44 @@ async def test_what_a_turn_did_on_the_way_is_shown_only_where_it_is_asked_for() 
         assert "thinking aloud" in shown
 
 
+@pytest.mark.timeout(60)
+async def test_what_humanize_is_doing_about_a_turn_is_not_hidden_with_the_working() -> (
+    None
+):
+    """A turn told to wait half a minute and a turn that has hung look the same from here.
+
+    The line saying which it is was said as a tool call, so asking not to see every file read
+    was asking not to be told a rate limit was being waited out either.
+    """
+    from hmz.coganchor.agents import Event
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"))
+        app._agents = [agent]
+        session = agent.new()
+
+        def turn() -> None:
+            app._heard(agent, session, Event(kind="begins", text=""))
+            app._heard(agent, session, Event(kind="tool", text="Read pyproject.toml"))
+            app._heard(
+                agent,
+                session,
+                Event(kind="notice", text="waiting 30s for a rate limit"),
+            )
+            app._heard(agent, session, Event(kind="ends", text=""))
+
+        assert not app._details
+        await asyncio.to_thread(turn)
+        await until(lambda: "Worked for" in _transcript(app), driver)
+
+        shown = _transcript(app)
+        assert "waiting 30s for a rate limit" in shown
+        # And still none of the working, which is the other half of the same switch.
+        assert "pyproject.toml" not in shown
+
+
 def test_a_backend_offers_what_it_last_said_it_runs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

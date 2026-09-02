@@ -20,15 +20,25 @@ from hmz import home
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
 from .event import Event, Question, Usage
+from .hooks import arriving
 from .preload import preloaded
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
 
 #: What each kind of thing pi says a turn did reads as. A message is a list of parts and pi
-#: says each of them twice -- once as it starts and once with the whole of it -- so only the
-#: ends are read: they are the only ones that carry any words.
+#: says each of them three times -- as it starts, once per fragment, and once with the whole
+#: of it -- and for words the end is the only one worth reading: a row per fragment is one
+#: paragraph broken into fifty answers of a word each.
 _PARTS = {"text_end": "text", "thinking_end": "reasoning", "toolcall_end": "tool"}
+
+#: The three pi says a tool call under, and all three are read. A call's end is the moment its
+#: arguments have all arrived, and its arguments are what it was called with -- so for a
+#: `write` that end is the whole of the file, and a row held for it is a minute in which the
+#: agent has reached for something and the turn has said nothing at all. pi hands over the
+#: fragments as they came, so the row goes out at the first one there is anything to say it
+#: about.
+_REACHING = ("toolcall_start", "toolcall_delta", "toolcall_end")
 
 #: The ways an extension may stop a turn to ask the person at the prompt something. The rest
 #: of what one may put on the screen -- a notice, a status, a widget -- is told rather than
@@ -134,6 +144,10 @@ class PiSession(StreamSessionBase):
         #: What the process now up was last told to think at, so that a flow moving the
         #: effort mid-session is told to pi rather than left on the flag it was started with.
         self._at: str | None = None
+        #: The calls this turn has already said, by pi's own id for each, so that the row goes
+        #: out at the first fragment of the arguments that says anything and not again at
+        #: every fragment after it.
+        self._reaching: set[str] = set()
 
     @property
     def named(self) -> str | None:
@@ -250,6 +264,7 @@ class PiSession(StreamSessionBase):
     def _restarted(self) -> None:
         """Forgets the turn the last process was in the middle of, which this one is not."""
         self._said, self._failed, self._spent, self._costing = "", None, 0, Usage()
+        self._reaching = set()
         self._at = self.effort
 
     def _read(self, line: str) -> Iterator[Event]:
@@ -309,31 +324,79 @@ class PiSession(StreamSessionBase):
                 pass
 
     def _part(self, event: dict[str, Any]) -> Iterator[Event]:
-        """Reads one part of a message pi has finished writing.
+        """Reads one part of a message pi is writing.
 
         Args:
           event: The `assistantMessageEvent`, as read.
 
         Yields:
-          What the agent said or reached for, and nothing for a part still being written.
+          What the agent said, once its part is written, and what it reached for, as soon as
+          there is enough of the call to say what it is about.
         """
-        kind = _PARTS.get(str(event.get("type") or ""))
-        if kind is None:
+        named = str(event.get("type") or "")
+        if named in _REACHING:
+            yield from self._reaches(event)
             return
-        if kind == "tool":
-            called: dict[str, Any] = event.get("toolCall") or {}
-            arguments: dict[str, Any] = called.get("arguments") or {}
-            # The name and what it was called on, which is what a tool call reads as:
-            # `bash echo hi`, `read src/x.py`. Only what will fit on a row.
-            yield Event(
-                kind="tool",
-                text=f"{called.get('name') or 'tool'} {_about(arguments)}".strip()[
-                    :120
-                ],
-            )
+        kind = _PARTS.get(named)
+        if kind is None:
             return
         if (words := str(event.get("content") or "")).strip():
             yield Event(kind=kind, text=words)
+
+    def _reaches(self, event: dict[str, Any]) -> Iterator[Event]:
+        """Says that the agent has reached for something, once, as early as it can be said.
+
+        pi carries the call itself on the event that ends it and the message so far on all
+        three, so the block this event is about says what the call is called before it says
+        what it was called on. The row goes out at the first fragment that finishes a value in
+        the arguments rather than at the end, because the end is where the arguments stop
+        arriving and the arguments are the file.
+
+        Read off `partialJson`, which is those fragments as they came, rather than off the
+        `arguments` pi parses them into: that parse repairs what is half-written, so a value
+        still arriving reads as a whole one and the row would say `write /tmp/se`.
+
+        Args:
+          event: The `assistantMessageEvent`, which is a `toolcall_start`, a `toolcall_delta`
+            or a `toolcall_end`.
+
+        Yields:
+          The call: `bash echo hi`, `write src/x.py`. Only what will fit on a row, and nothing
+          at all for a call already said or one whose arguments have said nothing yet.
+        """
+        ending = str(event.get("type")) == "toolcall_end"
+        called: dict[str, Any] = event.get("toolCall") or {}
+        if not called:
+            # Not the end, so the block being written is where the call is: pi numbers the
+            # parts of the message it hands over on every one of these.
+            message: dict[str, Any] = event.get("partial") or {}
+            parts = cast("list[Any]", message.get("content") or [])
+            at = int(cast("int", event.get("contentIndex") or 0))
+            if not 0 <= at < len(parts):
+                return
+            called = cast("dict[str, Any]", parts[at])
+        # A call pi gave no id is said where it always was, at the end: there is nothing to
+        # tell it from the next one, and folding every unnamed call onto one blank id would
+        # say the first and silently drop every call after it.
+        marked = str(called.get("id") or "")
+        if not marked:
+            if not ending:
+                return
+        elif marked in self._reaching:
+            return  # said already, as the model reached for it
+        words = (
+            _about(cast("dict[str, Any]", called.get("arguments") or {}))
+            if ending
+            else arriving(str(called.get("partialJson") or ""))
+        )
+        if not words and not ending:
+            return  # nothing among the arguments has finished arriving to say it about
+        if marked:
+            self._reaching.add(marked)
+        yield Event(
+            kind="tool",
+            text=f"{called.get('name') or 'tool'} {words}".strip()[:120],
+        )
 
     def _message(self, message: dict[str, Any]) -> None:
         """Takes what one request to the model came to, as it comes back.
@@ -384,6 +447,9 @@ class PiSession(StreamSessionBase):
         """
         said, failed, spent, turn = self._said, self._failed, self._spent, self._costing
         self._said, self._failed, self._spent, self._costing = "", None, 0, Usage()
+        # The turn is over, so what it reached for is nothing the next one has to know about:
+        # a session takes thousands of turns, and this would grow with all of them.
+        self._reaching = set()
         tokens = {self._agent.config.model: spent} if spent > 0 else {}
         if failed is not None and not said:
             return Event(kind="failed", text=failed, tokens=tokens, spent=turn)

@@ -147,6 +147,23 @@ class Saying:
   read off these is then wrong upwards, which is the one direction none of them may be wrong
   in. Leaving a kind unreported is always allowed and is what a driver MUST do where it cannot
   tell whether the count it is given overlaps another.
+- A tool call MUST be said as the agent reaches for it rather than once it has finished
+  reaching. The arguments of a call are what it was called with, and for a write they are the
+  file: a driver that waits for the whole of them says nothing at all for as long as the model
+  takes to write it, which on a slow model is minutes of a turn that reads as hung -- and the
+  silence lands exactly where the work is largest. Where a backend streams those arguments a
+  driver MUST say the call at the first fragment there is anything to say it about, MUST ask
+  its CLI for the fragments where that is a flag, and MUST say it exactly once however many
+  ways the backend then repeats the same call. A call whose arguments never read as words MUST
+  still be said, by name, when they stop arriving: a reach is a reach.
+
+- `notice` MUST be humanize rather than the agent: a turn waiting out a rate limit, carried to
+  another account, cut off, or taken away from a backend that had stopped saying anything.
+  These were said as tool calls, which made them the working -- and an interface that hides the
+  working hid the one line that tells a stall from a hang from the person sitting in front of
+  the silence. What the agent did MUST NOT be said as one, and what humanize did MUST NOT be
+  said as anything else.
+
 - These MUST NOT name the base classes. Every backend needs them and none of them needs the
   base classes to say one, so a reader of somebody else's stream format imports this alone.
 
@@ -374,13 +391,22 @@ stops and waits to be told, and `Gate` is what stands in that place.
   flow that ends MUST leave that machine as it found it. A switch of the CLI's own that would
   turn the whole table off MAY be said off at that same layer, since a gate that quietly does
   nothing is worse than one that was never installed.
-- The table MUST be installed whether or not anything is hung on the moment. A hook goes up and
-  comes down while the agent runs, so a table that depended on what was hung when the CLI
-  started would be one that had to restart the CLI; what is hung MUST be asked at the moment it
-  fires, which is the only moment the answer is true.
+- The table MUST be installed only where something is hung on the moment. A table is a program
+  the CLI starts and waits for before every tool it runs, one call after another, so a table
+  written for hooks that are not there is a relay spawned per file read and its own delay added
+  to each of them for nobody. A hook hung or taken down between two turns MUST be answered the
+  way a moved effort is -- the next turn starting a CLI told the new answer -- and one hung
+  while a turn is running MUST be read off that turn's own stream instead, watching the tool
+  rather than gating it. What is hung MUST still be asked at the moment it fires, which is the
+  only moment the answer is true.
+- `Hooks.gated` MUST answer False for a moment nothing is hung on, whatever gate an earlier
+  hook left serving. It is what a session reads to decide whether to say the moment off its
+  own stream, and a gate outliving the hook that asked for it would otherwise be a moment that
+  fires in neither place.
 - The relay MUST be `hmz internal hook`, and the callback MUST run in the process the flow is
   in, for the reason `hmz internal tools` exists: a hook that ran anywhere else would be a
-  subprocess and not a callable of the flow's. The socket MUST be in a directory this user alone may enter.
+  subprocess and not a callable of the flow's. The socket MUST be in a directory this user
+  alone may enter.
 - A CLI whose table will not run until it has been trusted, where that trust is a thing
   written into the person's own configuration, MUST NOT be given one. Codex is that CLI: it
   takes `hooks.pre_tool_use` through the same `-c` its other settings go through, but a hook
@@ -660,6 +686,13 @@ class AgentBase(ABC):
   be told None only for something the agent said rather than one of them -- a question put by a
   server that serves every session of it at once. An agent may be holding ten conversations, and
   a watcher that cannot tell them apart is one reading ten interleaved with nowhere to answer.
+- A watcher that raises MUST NOT take the turn down with it, and MUST NOT be swallowed in
+  silence either. One draw that failed is one thing the agent said that nobody will ever see,
+  and an interface whose rows all went that way reads as a turn sitting there doing nothing --
+  a hang to whoever is watching and no trace at all to whoever is asked about it afterwards. It
+  MUST be reported as a snag, once per kind per agent, since a watcher that fails on one event
+  fails on every one of them. The report MUST say which kind was lost and MUST NOT say what was
+  said: the failure is ours to hear about and the turn's words are not.
 - `opened` MUST report the backend's id for every session this agent has opened, oldest first,
   including the sessions nobody holds any more. It is what a flow hands a trace to say which
   trajectories were this agent's.

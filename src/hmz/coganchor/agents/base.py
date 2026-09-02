@@ -844,7 +844,7 @@ class SessionBase(ABC):
             # is prevented by stopping the agent, which is a different thing.
             return
         self._cut = why or "interrupted"
-        self._heard(Event(kind="tool", text=f"cutting the turn off: {self._cut}"))
+        self._heard(Event(kind="notice", text=f"cutting the turn off: {self._cut}"))
         self._cuts()
         if self._moved_to is not None:
             # And the conversation this one moved to, since the turn being cut off may be
@@ -976,7 +976,7 @@ class SessionBase(ABC):
             same budget again: a loop that took the turn over on a schedule would be cut off
             at the same word every round and never get anywhere.
         """
-        self._heard(Event(kind="tool", text=f"turn cut off: {why}"))
+        self._heard(Event(kind="notice", text=f"turn cut off: {why}"))
         budget = self._capped
         if self._over and budget is not None and budget.then == "fail":
             raise Unrecoverable(1, [self._agent.backend], said, f"turn cut off: {why}")
@@ -1271,7 +1271,7 @@ class SessionBase(ABC):
                             # gating. Where a gate is up the CLI asks first and waits, so the
                             # moment fires from there instead -- and firing it here as well
                             # would be one tool call putting the same hook twice.
-                            if not self._agent.hooks.gated(Moment.PRE_TOOL_USE):
+                            if not self._asking(Moment.PRE_TOOL_USE):
                                 named, _, about = event.text.partition(" ")
                                 self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
                         elif event.kind in ("subagent", "subagent-ends"):
@@ -1527,10 +1527,15 @@ class SessionBase(ABC):
         minute for a rate limit is exactly the turn somebody would otherwise watch do
         nothing at all.
 
+        Said as a `notice` rather than as a tool call, which is what it was until an
+        interface that hides the working hid this with it: what a turn is waiting for is not
+        how the turn is getting its work done, and somebody who asked not to see every file
+        read did not ask to be left watching a rate limit in silence.
+
         Args:
           text: The line, as :meth:`_recovering` and its like build one.
         """
-        self._heard(Event(kind="tool", text=text))
+        self._heard(Event(kind="notice", text=text))
         if not self._agent._watchers:
             say(text, sys.stderr)
 
@@ -1782,6 +1787,30 @@ class SessionBase(ABC):
         """
         self._agent._heard(event, self)
         return event
+
+    def _asking(self, moment: Moment) -> bool:
+        """Whether the CLI now running this conversation asks about a moment and waits.
+
+        Of the process rather than of the agent, which is the difference that matters: a table
+        is written when a CLI starts, a gate outlives the hook that first asked for one, and a
+        session whose CLI was started without a table would otherwise stop saying the moment
+        off its own stream while the CLI never asked about it either -- a hook that fires in
+        neither place. Sibling sessions of one agent are the same story: one of them holding a
+        table says nothing about the process the other is running.
+
+        The gate's own answer here, for the backends whose turns are read off a stream and
+        whose CLIs take no table at all -- which is every backend but two, and for those two
+        it is the floor rather than the answer: a driver that writes a table says on top of
+        this whether the process now up was given one.
+
+        Args:
+          moment: The moment.
+
+        Returns:
+          True where the moment is fired from the CLI's own table instead, which is what tells
+          this turn not to say it a second time off the stream it is reading.
+        """
+        return self._agent.hooks.gated(moment)
 
     def _fire(
         self,
@@ -3098,6 +3127,10 @@ class AgentBase(ABC):
         self._watchers: list[
             Callable[[AgentBase, SessionBase | None, Event], None]
         ] = []
+        #: The kinds of event a watcher has already failed on, so that one broken listener is
+        #: one report rather than one per thing the agent says. A watcher that raises on a
+        #: tool row raises on every tool row.
+        self._deafened: set[str] = set()
         #: What is hung on this agent's moments, which a flow adds to and takes from while
         #: the agent is running: the hooks are the flow's own callables rather than a table
         #: the backend read out of a settings file before anything started.
@@ -4008,6 +4041,15 @@ class AgentBase(ABC):
         since a turn saying something is a turn on some other thread than the one hanging a
         watcher on the agent.
 
+        Swallowed and reported, not swallowed alone. One draw that raised is one thing the
+        agent said that nobody will ever see, and an interface whose tool rows all went that
+        way reads as a turn sitting there doing nothing -- which is a hang to whoever is
+        watching it and leaves no trace at all to whoever is asked about it afterwards. Once
+        per kind per agent, since a watcher that fails on one event fails on every one of
+        them and a report per event would be the same fault a thousand times. What is said is
+        which kind was lost and what failed, never what was said: the failure is ours to hear
+        about and the turn's words are not.
+
         Args:
           event: What was said.
           session: Which conversation said it, or None for something the agent said rather
@@ -4018,8 +4060,25 @@ class AgentBase(ABC):
         with self._holding:
             watching = tuple(self._watchers)
         for listener in watching:
-            with contextlib.suppress(Exception):
+            try:
                 listener(self, session, event)
+            except Exception as why:  # noqa: BLE001 -- a watcher fails on its own account
+                with self._holding:
+                    if event.kind in self._deafened:
+                        continue
+                    self._deafened.add(event.kind)
+                # And the report is not a second thing that may take the turn down: this
+                # whole branch exists so that something looking at a flow cannot fail it, and
+                # a reporter that raised here would be the very failure it was reporting.
+                with contextlib.suppress(Exception):
+                    from hmz.runtime import telemetry
+
+                    telemetry.snag(
+                        "watcher-raised",
+                        backend=self.backend,
+                        kind=event.kind,
+                        why=type(why).__name__,
+                    )
 
     def asked(self, question: Question) -> str | None:
         """Puts something a turn stopped to ask to whoever is driving this agent.

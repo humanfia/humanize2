@@ -288,11 +288,16 @@ class Event:
       kind: What was said. `text` is the agent talking, `reasoning` is it thinking aloud,
         `tool` is it using one, and `result` is the answer the turn ends on -- exactly one
         of which closes a turn. `failed` closes it the other way, carrying what went wrong
-        in place of an answer. A watcher sees five more: `begins` and `ends`, which bracket
+        in place of an answer. A watcher sees six more: `begins` and `ends`, which bracket
         the turn itself, `asks`, which is the agent stopping to ask its user something,
         `took`, which is the agent saying that a word put into the turn is now in front of
-        it -- carrying that word, so that whoever said it knows which one landed -- and
-        `subagent` and `subagent-ends`, which bracket an agent this one started of its own.
+        it -- carrying that word, so that whoever said it knows which one landed --
+        `subagent` and `subagent-ends`, which bracket an agent this one started of its own,
+        and `notice`, which is humanize rather than the agent: a turn waiting out a rate
+        limit, carried to another account, cut off, or taken away from a backend that had
+        stopped saying anything. A `notice` is not the working, and must not be hidden with
+        it -- a turn told to wait half a minute and a turn that has hung look identical from
+        outside, and the one thing that tells them apart is the line saying which it is.
       text: The words themselves, ready to be shown. For a `subagent` it is what the agent
         under this one is called and what it was asked to do.
       whose: Which of a turn's several things this is about, where a turn has several going

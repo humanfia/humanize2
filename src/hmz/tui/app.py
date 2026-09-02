@@ -3280,6 +3280,7 @@ class Humanize(App[None]):
             "ends",
             "failed",
             "asks",
+            "notice",
             "tool",
             "text",
             "result",
@@ -3415,6 +3416,18 @@ class Humanize(App[None]):
                     f"{'started' if event.kind == 'subagent' else 'done'}[/]",
                     packs=True,
                 )
+        elif event.kind == "notice":
+            # Not the working, so `/details` does not hide it: this is humanize saying what it
+            # is doing about a turn -- waiting out a rate limit, carrying on as another
+            # account, cutting the turn off, taking it away from a backend that had stopped
+            # saying anything. Hidden with the tool rows it reads as a hang, which is the one
+            # thing the line exists to tell apart from a hang.
+            self._on_screen(
+                self._part,
+                whose,
+                f"[yellow]{_SAID}[/] [dim]{escape(event.text)}[/]",
+                packs=False,
+            )
         elif event.kind == "tool" and self._details:
             # The tool on the bullet, what it came back with under it -- Claude Code's shape.
             named, _, about = escape(event.text).partition(" ")
