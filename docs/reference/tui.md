@@ -629,14 +629,22 @@ rather than thrown at you. A place with nothing in it says so where its flows wo
 one that has never been fetched says which key opens the menu that fetches it: adding a place,
 fetching one again and taking one away are [**v**](#where-flows-come-from).
 
-**Every later start fetches again what is already here**, in the background as the interface
-opens, one at a time and without a word about it: a flowverse is a copy of somebody else's
-repository, and one only ever fetched again when somebody thinks to press a key is one that is
-months behind by the time anybody notices. There is already a list of flows to show, so nothing
-waits on it and nothing is said about how it went — a machine with no network is no slower and
-no noisier for it. It leaves alone a clone you have written into, since a fetch resets one to
-what the repository says now, and it stops at a flow that starts running, for the same reason
-read the other way round.
+**Every start fetches every flowverse**, in the background as the interface opens, one at a
+time and without a word about it — whether or not it has ever been fetched here. A flowverse is
+a copy of somebody else's repository, and one only ever fetched again when somebody thinks to
+press a key is one that is months behind by the time anybody notices; one that has never been
+fetched is the one whose flows you cannot run at all. There is already a list of flows to show,
+so nothing waits on it and nothing is said about how it went — a machine with no network is no
+slower and no noisier for it. It leaves alone a clone you have written into, since a fetch
+resets one to what the repository says now, and it stops at a flow that starts running, for the
+same reason read the other way round.
+
+**A fetch that lands makes whatever is drawn read the flows again.** A menu that lists flows
+reads them once and holds what it read, since reading a flow means running it — so a download
+landing underneath would leave the list from before it, and a flow that arrived in the fetch
+would be one the menu does not offer while a flow whose file changed would be one it will not
+load. Both used to come right only on a restart, which was the fetch working and nothing
+showing it.
 
 Enter on a flow opens it: what that flow was last set up with here is read back,
 [what the flow itself takes](#setting-a-flow-up) is asked where it takes anything, and what

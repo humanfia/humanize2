@@ -46,9 +46,11 @@ from typing import (
     ClassVar,
     Literal,
     NamedTuple,
+    Protocol,
     cast,
     get_args,
     get_origin,
+    runtime_checkable,
 )
 
 from pydantic import BaseModel, Field
@@ -1232,6 +1234,88 @@ def places_of(flow: str) -> tuple[Place, ...] | None:
         return None
 
 
+def why_not(flow: str) -> str:
+    """Why a flow will not load, in the words of whatever refused it.
+
+    "will not load" on its own is a dead end: the reasons are nothing alike -- a flowverse
+    that has not been fetched, a module the flow imports that is not installed, a syntax
+    error somebody just wrote, a file holding several flows and none of them named -- and
+    each is fixed somewhere else. So the reason is read off the exception rather than
+    swallowed, and shown where the flow is picked.
+
+    Read by loading the flow again, which only happens on the path where it has already
+    failed: the answer is worth one more read of a file that did not work.
+
+    Args:
+      flow: The flow, by the name it was offered under.
+
+    Returns:
+      The first line of what was raised, as the type and what it said -- or "" for a flow
+      that loads, this being asked only of one that did not.
+    """
+    try:
+        _hmz().flows.places(flow)
+    except Exception as why:  # noqa: BLE001 -- the reason is the answer here
+        said = str(why).strip().splitlines()
+        first = said[0].strip() if said else ""
+        # Its type where it said nothing of its own: `KeyError` alone is thin, and thinner
+        # still is a blank line after a colon.
+        return first or type(why).__name__
+    return ""
+
+
+def bad(said: str) -> str:
+    """One line about something that went wrong, in the colour wrong things are drawn in.
+
+    Written down once and reached for by everything that says one. The lines under a list are
+    otherwise all the same grey -- what was fetched, what stays, what goes, and what failed --
+    and a failure that reads like a description is a failure nobody sees. Red for what did not
+    work and yellow for what did but is worth knowing about, which is :func:`iffy`.
+
+    Args:
+      said: The line, already escaped.
+
+    Returns:
+      It, marked up, or "" for nothing to say -- an empty line is not a colour.
+    """
+    return f"[red]{said}[/red]" if said else ""
+
+
+def iffy(said: str) -> str:
+    """One line about something worth knowing, in the colour such things are drawn in.
+
+    Args:
+      said: The line, already escaped.
+
+    Returns:
+      It, marked up, or "" for nothing to say.
+    """
+    return f"[yellow]{said}[/yellow]" if said else ""
+
+
+def _wont_load(flow: str, also: str = "") -> str:
+    """What to say about a flow that will not load: which flow, why, and what follows.
+
+    In red, that being what it is: a flow that will not load is the one thing on this menu
+    that is wrong rather than merely unset, and a line about it in the same grey as the rest
+    is a line that reads as description.
+
+    Args:
+      flow: The flow, by the name it was offered under.
+      also: What follows from it here, where anything does.
+
+    Returns:
+      The line, ready to draw.
+    """
+    said = f"{escape(flow)} will not load"
+    why = why_not(flow)
+    if why:
+        said += f": {escape(why)}"
+    if also:
+        said += f"; {also}"
+    return bad(said)
+
+
 def model_of(flow: str) -> type[BaseModel] | None:
     """What a flow says it can be set up with, if it says anything.
 
@@ -1398,6 +1482,20 @@ def _complete(runs: Runs) -> bool:
 #: and which flow it is. A byte no name has in it, since the second half may hold anything --
 #: a flow is offered under the place it came from, and holds a slash and may hold a colon.
 _HALVES = "\x1f"
+
+
+@runtime_checkable
+class Lists(Protocol):
+    """A sheet holding a list of flows it read off the disk.
+
+    What they have in common is the one thing anything outside them needs: the list was read
+    once, reading it means running every flow in it, and a fetch landing underneath makes it
+    wrong. This is how such a sheet is told so, without whatever fetched having to know which
+    sheets there are or how either of them keeps its list.
+    """
+
+    def reread(self) -> None:
+        """Drops what was read off the disk and draws the list again."""
 
 
 class Flows(Drafts[Chosen]):
@@ -1671,11 +1769,25 @@ class Flows(Drafts[Chosen]):
             except (OSError, ValueError) as why:
                 # Said under the list rather than raised at whoever opened the menu: the
                 # question the menu is asking is still worth answering.
-                self._said = escape(str(why))
+                self._said = bad(escape(str(why)))
             else:
                 self._offers = None  # a place that has flows in it now
             self._fetching = ""
             self._fill()
+
+    def reread(self) -> None:
+        """Drops the flows read before a fetch landed, and draws the list again.
+
+        The places too, for the flow in force: its file may be one of the ones that just came
+        down, and the agents page is drawn off what was read from the old one. A flow that
+        would not load before the fetch is exactly the flow this is for.
+        """
+        self._offers = None
+        if self._flow:
+            self._places = places_of(self._flow) or ()
+            self._declared = declared_by(self._flow)
+            self._runs = self._fitted(settled(self._runs, self._places, self._agents))
+        self._fill()
 
     def _walks(self, *, inside: bool) -> None:
         """Opens what drives the flow, or comes back out to the flows.
@@ -1967,7 +2079,7 @@ class Flows(Drafts[Chosen]):
     def _noagents(self) -> str:
         """Why there is no agent to set up, which is not always the same reason."""
         if places_of(self._flow) is None:
-            return f"{escape(self._flow)} will not load; nothing here can be set up"
+            return _wont_load(self._flow, "nothing here can be set up")
         return f"{escape(self._flow)} drives no agents; it talks only to you"
 
     @work
@@ -2054,7 +2166,7 @@ class Flows(Drafts[Chosen]):
         try:
             at = _hmz().flows.fork(named)
         except (OSError, ValueError) as why:
-            self._said = escape(str(why))
+            self._said = bad(escape(str(why)))
             self._fill()
             return
         # The list is something else now: there is a flow of yours that was not there, and
@@ -2139,7 +2251,7 @@ class Flows(Drafts[Chosen]):
         if name != self._flow:
             places = places_of(name)
             if places is None:
-                self._said = f"{escape(name)} will not load"
+                self._said = _wont_load(name)
                 self._fill()
                 return
             self._flow, self._places = name, places
@@ -2213,7 +2325,7 @@ class Flows(Drafts[Chosen]):
                 # Refused from the flows, on the way out: the agents are what is to be looked
                 # at, and the cursor was on a row of another list.
                 self._walks(inside=True)
-            self._said = f"{escape(', '.join(missing))} has no model yet"
+            self._said = iffy(f"{escape(', '.join(missing))} has no model yet")
             self._fill()
             return
         # The one exit that makes an answer, so the one place to ask about a run nothing
@@ -2312,6 +2424,11 @@ class Holds(Sheet[str]):
             except OSError:
                 self._offers = []
         return self._offers
+
+    def reread(self) -> None:
+        """Drops what it read before a fetch landed, and puts the flows up again."""
+        self._offers = None
+        self._fill()
 
     def _takes(self) -> bool:
         """Whether this is one there is any taking away, which four of them are not."""
@@ -2608,7 +2725,7 @@ class Flowverses(Sheet[list[str]]):
                 if one.name in MINE
                 else "is not a clone of anything; d twice takes it away"
             )
-            self._said = f"{escape(one.name)} {said}; there is nothing to fetch"
+            self._said = bad(f"{escape(one.name)} {said}; there is nothing to fetch")
             self._fill()
             return
         name = one.name
@@ -2634,9 +2751,9 @@ class Flowverses(Sheet[list[str]]):
         try:
             _hmz().verses.remove(one.name)
         except (OSError, ValueError) as why:
-            self._said = escape(str(why))
+            self._said = bad(escape(str(why)))
             return
-        self._said = f"{escape(one.name)} is no longer here"
+        self._said = bad(f"{escape(one.name)} is no longer here")
         self._told.append(self._said)
         self._was = ""
         self._read()
@@ -5655,7 +5772,7 @@ class Accounts(Picks):
         finally:
             self.opened()
         if outcome.why:
-            self._said = escape(outcome.why)
+            self._said = bad(escape(outcome.why))
         if outcome.provider is None:
             self._rows = None  # it may have been made and then failed; look again
             self._fill()
@@ -5763,7 +5880,7 @@ class Catalogue(Picks):
         except Exception as why:  # noqa: BLE001 -- a CLI that would not answer, however
             # Said under the list rather than raised at whoever opened the sheet: a CLI that
             # is not signed in cannot say what it runs, and the question here still stands.
-            self._said = escape(str(why) or type(why).__name__)
+            self._said = bad(escape(str(why) or type(why).__name__))
             self._asking = False
             self._fill()
             return
@@ -5961,7 +6078,7 @@ class Fallbacks(Drafts[list[str]]):
           said: The place, as it is written down.
         """
         self._steps = [one for one in self._steps if one.spec != said]
-        self._said = f"{escape(said)} falls back nowhere when this menu is saved"
+        self._said = iffy(f"{escape(said)} falls back nowhere when this menu is saved")
         self.changed()
         self._fill()
 
@@ -6627,7 +6744,7 @@ class Providers(Drafts[list[str]]):
             return
         way = _hmz().accounts.way(one.cli, one.way)
         if way is None:
-            self._said = f"{escape(one.way)} is not a way in {escape(one.cli)} has"
+            self._said = bad(f"{escape(one.way)} is not a way in {escape(one.cli)} has")
             self._fill()
             return
         showing = cast(
@@ -6694,7 +6811,7 @@ class Providers(Drafts[list[str]]):
             self.opened()
         one = outcome.provider
         if one is None:  # a name or a directory that will not do
-            self._said = escape(outcome.why)
+            self._said = bad(escape(outcome.why))
             self._fill()
             return
         self._told.append(
@@ -6780,7 +6897,7 @@ class Providers(Drafts[list[str]]):
             with handed_over(showing):
                 status = accounts.sign_in(one, way, answers)
         except OSError as why:  # the backend's own command is not on this machine
-            self._said = escape(f"{way.argv[0]}: {why}")
+            self._said = bad(escape(f"{way.argv[0]}: {why}"))
             self._fill()
             return
         # Signed in again is possibly a different account, and certainly a fresh answer to
@@ -6817,7 +6934,7 @@ class Providers(Drafts[list[str]]):
         try:
             backends.remember(name, shlex.split(command))
         except (OSError, ValueError) as why:
-            self._said = escape(str(why))
+            self._said = bad(escape(str(why)))
             self._fill()
             return
         self._said = f"{escape(name)} is a backend from here on"
@@ -7266,7 +7383,7 @@ class Epics(Sheet[Doing]):
         try:
             at, size, held = await asyncio.to_thread(exported, ran)
         except (OSError, ValueError) as why:
-            self._said = escape(str(why))
+            self._said = bad(escape(str(why)))
             self._fill()
             return
         said = f"{escape(str(at))}{_DOT}{sized(size)}{_DOT}{escape(held)}"
@@ -8299,7 +8416,7 @@ class Monitoring(Sheet[str]):
         try:
             board.put(named, value, by=USER)
         except (PermissionError, ValueError) as why:
-            self._said = escape(str(why))
+            self._said = bad(escape(str(why)))
         else:
             self._said = f"{escape(named)} is on the board"
         self._ids = []  # the rows have moved, so they are put up again

@@ -267,15 +267,21 @@ async def test_what_was_never_fetched_is_fetched_as_the_menu_opens(
 
 @pytest.mark.timeout(60)
 @pytest.mark.usefixtures("freshening")
-async def test_what_is_already_here_is_fetched_again_as_the_interface_starts(
+async def test_every_flowverse_is_fetched_as_the_interface_starts(
     theirs: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A flowverse only ever fetched on a keypress is one that is months behind.
 
     Quietly: there is already a list of flows to show, nobody asked for a download, and the
     prompt is up before any of it starts.
+
+    The one nobody has fetched yet included. That is the one whose flows nobody can run at
+    all, so it is the one most worth getting -- and a first fetch that waited for somebody to
+    open the flow menu was a first fetch the menu then drew the list from before.
     """
-    store.add(str(theirs))
+    monkeypatch.setattr(store, "OFFICIAL_URL", str(theirs))
+    store.add(str(theirs), name="theirs")
     written(theirs / store.FLOWS, "second", FLOW)
     _git("add", "-A", at=theirs)
     _git("commit", "-m", "another flow", at=theirs)
@@ -286,11 +292,11 @@ async def test_what_is_already_here_is_fetched_again_as_the_interface_starts(
         assert added is not None
         await until(lambda: store.flows(added) == ["loop", "second"], driver)
 
-        # And not the one nobody has fetched: that first fetch is the flow menu's, which
-        # says how it went rather than doing it behind whoever opened the interface.
+        # And the one nobody had fetched, which is now here to be run.
+        await until(lambda: (store.named(OFFICIAL) or added).fetched, driver)
         one = store.named(OFFICIAL)
         assert one is not None
-        assert not one.fetched
+        assert one.fetched
 
 
 @pytest.mark.timeout(60)
@@ -502,3 +508,58 @@ async def test_copying_one_twice_says_the_copy_is_already_there(
         await onto(app, driver, "official\x1fchat")
         await driver.press("f")
         await until(lambda: "already a flow of your own" in _under(sheet), driver)
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.usefixtures("freshening")
+async def test_a_fetch_that_lands_makes_an_open_menu_read_the_flows_again(
+    theirs: Path,
+) -> None:
+    """The menu holds what it read, and a download landing under it makes that the old list.
+
+    Which is the whole of what the fetch is for: a flow that arrived in it is a flow nobody
+    can run until the list is read again, and a restart to pick up what is already on the disk
+    is the fetch having worked and nothing showing it.
+    """
+    store.add(str(theirs))
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+        await _steps(app, driver, "theirs")
+        await until(lambda: _rows(sheet) == ["theirs/loop"], driver)
+
+        # A second flow lands in the repository the menu is reading, and is fetched.
+        written(theirs / store.FLOWS, "second", FLOW)
+        _git("add", "-A", at=theirs)
+        _git("commit", "-m", "another flow", at=theirs)
+        added = store.named("theirs")
+        assert added is not None
+        await asyncio.to_thread(store.fetch, "theirs")
+        app._flows_changed()
+
+        # Without the interface having been closed and opened again.
+        await until(lambda: _rows(sheet) == ["theirs/loop", "theirs/second"], driver)
+
+
+@pytest.mark.timeout(60)
+async def test_a_flow_that_will_not_load_says_why_it_would_not(tmp_path: Path) -> None:
+    """A flow that will not load is a dead end until it says which reason it was.
+
+    They are nothing alike -- a flowverse not fetched, a module that is not installed, a
+    syntax error somebody just wrote -- and each is fixed somewhere else.
+    """
+    where = tmp_path / ".humanize" / "flows"
+    where.mkdir(parents=True)
+    written(where, "broken", "import a_module_that_is_not_installed_anywhere\n")
+    app = Humanize()
+    async with app.run_test() as driver:
+        sheet = await _open(app, driver)
+        await _steps(app, driver, "local")
+        await onto(app, driver, "local\x1flocal/broken")
+        await driver.press("enter")
+        await until(lambda: "will not load" in _under(sheet), driver)
+
+        said = _under(sheet)
+        assert "local/broken will not load" in said
+        # And what refused it, which is the half that says where to go and fix it.
+        assert "a_module_that_is_not_installed_anywhere" in said

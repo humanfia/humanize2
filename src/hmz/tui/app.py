@@ -1117,11 +1117,15 @@ class Humanize(App[None]):
 
         verses = self.hmz.verses
         for one in await asyncio.to_thread(verses.all):
-            if not one.url or not one.fetched:
+            # Whether or not it has ever been fetched. One that never has is the one whose
+            # flows nobody can run at all, so it is the one most worth getting: `official`
+            # on a machine that has just been installed holds nothing but the `chat` in the
+            # package until this lands.
+            if not one.url:
                 continue
             if self._agents or self._stopping:
                 return
-            if await asyncio.to_thread(verses.edited, one):
+            if one.fetched and await asyncio.to_thread(verses.edited, one):
                 continue
             try:
                 await asyncio.to_thread(verses.fetch, one.name)
@@ -1129,6 +1133,32 @@ class Humanize(App[None]):
                 # Not raised at whoever opened the interface: nobody asked for this, and the
                 # flows that came down last time are still there to run.
                 self.log(f"{one.name} was not fetched again: {why}")
+            else:
+                # What is on the disk is something else now, so what anything has read off it
+                # is out of date. A fetch that landed behind a menu already holding the list
+                # from before it is a flow that will not load until the interface is closed
+                # and opened again -- which is the fetch working and nobody being able to
+                # tell.
+                self._flows_changed()
+
+    def _flows_changed(self) -> None:
+        """Tells whatever is drawn that the flows on the disk are not the ones it read.
+
+        A sheet that lists flows reads them once and holds the list, reading one being running
+        it. That is right while nothing underneath changes and wrong the moment a fetch lands:
+        the held list is from before the download, so a flow that arrived in it is one the menu
+        does not offer and a flow whose file changed is one it will not load. Both look like a
+        fetch that did nothing, and both come right on a restart -- which is the interface
+        asking to be closed and opened to pick up what it already has.
+
+        Every sheet on the stack rather than the one on top: a fetch lands where it lands, and
+        the menu underneath is the one somebody comes back to.
+        """
+        from hmz.tui.pick import Lists
+
+        for screen in self.screen_stack:
+            if isinstance(screen, Lists):
+                screen.reread()
 
     def _welcome(self) -> None:
         """The box this opens with: what this is, and how to begin.
