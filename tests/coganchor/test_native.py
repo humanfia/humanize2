@@ -166,7 +166,11 @@ def test_a_projected_credential_is_readable_by_nobody_else_and_gone_afterwards(
         "-c",
         'printf "%s\\n" "$CLAUDE_CONFIG_DIR"; cat "$CLAUDE_CONFIG_DIR/auth.json"; '
         'cat "$CLAUDE_CONFIG_DIR/nested/more.json"; '
-        'stat -c %a "$CLAUDE_CONFIG_DIR" "$CLAUDE_CONFIG_DIR/auth.json"',
+        # GNU coreutils spells the mode `-c %a` and BSD's spells it `-f %Lp`; this runs on
+        # whatever the target has, so it asks one way and falls back to the other. Both
+        # print the low twelve bits in octal, one line per path.
+        'stat -c %a "$CLAUDE_CONFIG_DIR" "$CLAUDE_CONFIG_DIR/auth.json" 2>/dev/null '
+        '|| stat -f %Lp "$CLAUDE_CONFIG_DIR" "$CLAUDE_CONFIG_DIR/auth.json"',
         projects=(("CLAUDE_CONFIG_DIR", str(creds)),),
     )
 
