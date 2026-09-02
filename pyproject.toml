@@ -33,6 +33,7 @@ dependencies = [
     # ordinary dependency rather than an extra: an install that could be missing the half
     # that reports its own failures is an install whose failures are not reported.
     "sentry-sdk>=2.20",
+    "setproctitle>=1.3",
     "textual>=8.2.8",
 ]
 
