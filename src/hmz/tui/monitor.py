@@ -102,7 +102,7 @@ def short(agent: str) -> str:
     """An agent's name, cut down to what fits beside a transcript.
 
     Args:
-      agent: The agent id, which is a Chrysos Heir's codename unless it was named.
+      agent: The agent id, which is a codename out of Amphoreus unless it was named.
 
     Returns:
       Something recognisable and narrow.
