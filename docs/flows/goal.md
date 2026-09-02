@@ -30,12 +30,11 @@ than an hour in. [Which backends have one](/weaver/goals#which-backends-have-one
 
 ## What ends it
 
-The flow takes no settings of its own. What ends a run of it is the run's
-[allowance](/features/allowances) — hours, millions of output tokens, dollars — and it counts
-**every turn of the model the goal took**, not one per round: the backend started them, and the
-agent counted them all. The flow declares **ten million output tokens** as what a run of it is
-worth by default; `-c budget.yaml` with a `budget:` mapping in it, or the **budget** row in
-`/flow`, says otherwise.
+The run's [allowance](/features/allowances) — hours, millions of output tokens, dollars. It
+counts **every turn of the model the goal took**, not one per round: the backend started them,
+and the agent counted them all. The flow itself takes no settings; it declares **ten million
+output tokens** as what a run of it is worth by default, and `-c budget.yaml` with a `budget:`
+mapping in it, or the **budget** row in `/flow`, says otherwise.
 
 An allowance is read at the edges of the session a goal runs in rather than inside it, so a goal
 that burns for an hour inside one call is not cut off mid-call. It stops at the next round.

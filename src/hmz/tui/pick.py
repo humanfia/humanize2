@@ -1502,6 +1502,10 @@ class Flows(Drafts[Chosen]):
             )
             self._config = config_of(flow, self._held(flow).get("config") or {})
             self._budget = budget_of(flow)
+        #: What the flow itself says a run of it is worth, read once per flow rather than on
+        #: every redraw: reading it means running the flow's own file, and the agents page is
+        #: drawn again on every keystroke.
+        self._declared = declared_by(self._flow)
         #: Every flow there is, read once: this is redrawn on every keystroke, and reading it
         #: means running each flow file to see what it holds. Cleared when a flowverse is
         #: fetched or taken away, which is when the list is something else.
@@ -1934,7 +1938,7 @@ class Flows(Drafts[Chosen]):
             Option(
                 self._apart(
                     "budget",
-                    _spending(self._budget, declared_by(self._flow)),
+                    _spending(self._budget, self._declared),
                     here=at == len(self._places),
                 ),
                 id=f"={_BUDGET}",
@@ -2144,6 +2148,7 @@ class Flows(Drafts[Chosen]):
             )
             self._config = config_of(name, self._held(name).get("config") or {})
             self._budget = budget_of(name)
+            self._declared = declared_by(name)
             self.changed()
         # On to what the flow itself takes, where it takes anything, and then to what will
         # drive it: three things about one flow, asked in the order they depend on nothing.
@@ -2214,9 +2219,7 @@ class Flows(Drafts[Chosen]):
         # The one exit that makes an answer, so the one place to ask about a run nothing
         # will stop: the save row and the question on the way out both come through here,
         # and a check written at each of them is a check one of them would lose.
-        if unwatched(
-            allowed(self._budget, declared_by(self._flow)), declared_by(self._flow)
-        ):
+        if unwatched(allowed(self._budget, self._declared), self._declared):
             self._means_it()
             return
         self.dismiss(Chosen(self._flow, tuple(self._runs), self._config, self._budget))
