@@ -1735,7 +1735,7 @@ session("write the parser, and have your work reviewed before you stop")
 ```
 
 Which is what makes an agent able to **call a flow**: a callback whose body is
-`load("official/rlar")(agents, said.task)` is an agent that starts a loop of its own and waits
+`load("rlar")(agents, said.task)` is an agent that starts a loop of its own and waits
 for what it comes to, and nothing about that is written into any backend.
 
 | | |

@@ -37,7 +37,7 @@ for the anchor inside it, a program that ships to a target and could be lifted o
 | `coganchor/agents/` | The drivers: one per backend, plus the vocabulary a turn is described in (`Event`, `Question`, `Moment`). `AgentBase` and `SessionBase` answer to the interface `flows/` declares, structurally — this layer never names a flow. | everything in `__init__` |
 | `coganchor/machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
 | `coganchor/` (the anchor in it) | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. The half that ships to a target — and the only half that does. | `AnchorConfig`, `connect`, `check` |
-| `flows/` | What a flow is: the interface it drives, the mark, what it says it drives, the skills it brings, calling one from another, and where flowverses are fetched to. The one import a flow writes — what it needs from another layer is handed through from here. `builtin/` beside it is the three humanize ships. | `Agent`, `Session`, `Person`, `flow`, `load`, `drives`, `wanted`, `found`, `find`, `held`, `fork`, `flowverses` |
+| `flows/` | What a flow is: the interface it drives, the mark, what it says it drives, the skills it brings, calling one from another, and where flowverses are fetched to. The one import a flow writes — what it needs from another layer is handed through from here. `builtin/` beside it is the one humanize keeps in the package. | `Agent`, `Session`, `Person`, `flow`, `load`, `drives`, `wanted`, `found`, `find`, `held`, `fork`, `flowverses` |
 | `coganchor/fallbacks.py` | The layer between an agent and its accounts: where a turn goes when the place taking it cannot take it at all, and how many times over it is taken again first. A step is written between two places — `CLI[@ACCOUNT]/MODEL` — rather than on the account, which `providers` already answers for. Names `backends` and nothing else. | `Falls`, `falls`, `points`, `retrying`, `tried`, `clear`, `chain`, `spec`, `reads`, `waits`, `POLICIES` |
 | `runtime/epic.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Epic`, `epics`, `read`, `opened`, `state`, `resumed` |
 | `runtime/runner.py` | Handing a flow the agents it declared, naming them, and running it under an epic. Also reads the `hmz exec` line, which the interface starts a flow from too. What the flow says it drives is `flows/`'s to answer. | `Runner`, `flow_and_agents`, `read_agent`, `set_up_from` |
@@ -78,7 +78,7 @@ flows/
 ├── __init__.py   the mark, finding one by name, and the one import a flow writes
 ├── skills.py     the skills a flow brings, its own and the ones it named
 ├── verses.py     where flows come from when they come from somewhere else
-└── builtin/      what humanize ships
+└── builtin/      chat, the one flow humanize keeps in the package
 ```
 
 ## The dependency graph
@@ -230,9 +230,11 @@ the top of the module. Write through `cli/output.py` rather than through `print`
 command has a `--json` of its own: `Out.row` is one call for the line a person reads and the
 object a program reads, and holding one open is what keeps a stray print out of the stream.
 
-**A flow.** Just a directory: one in `flows/builtin/` for one humanize ships, one in a
-[flowverse](/reference/flows#flowverses)'s own `flows/` for one it offers, one in
-`.humanize/flows/` for one of your own. Its `__init__.py` is the flow, whatever it imports
+**A flow.** Just a directory: one in a [flowverse](/reference/flows#flowverses)'s own `flows/`
+for one it offers, one in `.humanize/flows/` for one of your own. humanize's own go in
+[humanfia/flowverse](https://github.com/humanfia/flowverse) rather than in `flows/builtin/`,
+which holds `chat` alone — that is what an interface with no network yet has to open talking to,
+and everything else is content that should be able to change without a release. Its `__init__.py` is the flow, whatever it imports
 lives beside it, and its `skills/` is what it brings. They are content and import nothing of
 humanize but `hmz.flows`, which is where everything a flow is written against is handed
 through from.

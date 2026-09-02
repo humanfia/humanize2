@@ -3,8 +3,9 @@
 // page at the site's root -- `HmzMap` on the features landing is the detailed one, and this
 // deliberately is not that.
 //
-// Everything drawn here is checked against the code: the flow names are `theme/flows.ts` and
-// `hmz/flows/builtin/`, and the backend row is the `PROFILES` tuple in `hmz/backends.py` --
+// Everything drawn here is checked against the code: the flow names are `theme/flows.ts`, which
+// is itself read off `hmz/flows/builtin/` and humanfia/flowverse -- the two places humanize's
+// own flows are kept -- and the backend row is the `PROFILES` tuple in `hmz/backends.py` --
 // eleven command lines, plus DeepSeek Harness, which is a Python SDK that ships inside
 // humanize rather than a CLI you install, and so is drawn apart from them.
 //
@@ -32,8 +33,8 @@ const BANDS: Band[] = [
       'chat',
       'ralph_loop',
       'stateful_ralph',
-      'official/rlar',
-      'official/flame_chase',
+      'rlar',
+      'flame_chase',
       'and yours',
     ],
     down: 'a flow, and one agent for every agent it drives',

@@ -2,14 +2,14 @@
 pageClass: hmz-feature
 ---
 
-# official/flame_chase
+# flame_chase
 
 Two agents take turns on the same task, in one working directory, each starting from the
 repository rather than from a history. Neither is told what the other said; the tree is the
 only account of the last turn there is.
 
 ```sh
-hmz exec -f official/flame_chase \
+hmz exec -f flame_chase \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max "$(cat TASK.md)"
 ```
 
@@ -41,6 +41,6 @@ was cut off in is finished, and counted once, by the run that picks that turn up
 
 ## See also
 
-- [official/rlar](/flows/rlar) — two agents, but one of them reviews rather than works
-- [official/parallel_flame_chase](/flows/parallel-flame-chase) — three of these at once, in isolation
+- [rlar](/flows/rlar) — two agents, but one of them reviews rather than works
+- [parallel_flame_chase](/flows/parallel-flame-chase) — three of these at once, in isolation
 - [Many backends, one agent](/features/backends) — what you can put on either side of it

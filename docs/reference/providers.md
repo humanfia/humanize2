@@ -20,7 +20,7 @@ two agents in turn; here both are Claude Code, one running Opus and one running 
 model:
 
 ```sh
-hmz exec -f official/flame_chase \
+hmz exec -f flame_chase \
     -a claude@anthropic/claude-opus-5:max \
     -a claude@deepseek/deepseek-chat:high "fix the build"
 ```
@@ -375,7 +375,7 @@ ClaudeCodeAgentConfig(model="claude-opus-5", effort="max", provider="deepseek")
 On a command line, after the CLI and an `@`:
 
 ```sh
-hmz exec -f official/flame_chase -a claude@deepseek/claude-opus-5:max "fix the build"
+hmz exec -f flame_chase -a claude@deepseek/claude-opus-5:max "fix the build"
 ```
 
 The account and never the model, whatever comes after the slash: a CLI is never spelled with an

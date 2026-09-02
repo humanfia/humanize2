@@ -22,10 +22,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Flows", "Flowverses"]
 
-#: What is printed where the other flowverses print where they were fetched from. The flows
-#: humanize ships are not fetched from anywhere: they are in the package.
-_PACKAGE = "the flows humanize ships"
-
 #: For a directory under the flowverses home that is not a clone of anything, or is one whose
 #: origin cannot be read. Its flows are still offered, so it is still listed -- but where it
 #: came from is a question it has no answer to, which is not the same as having come from here.
@@ -120,11 +116,30 @@ class Flowverses:
           one: The flowverse.
 
         Returns:
-          One offer per flow in it, and nothing at all for one that has not been fetched.
+          One offer per flow in it: just the ones in the package for humanize's own before it
+          has been fetched, and nothing at all for any other that has not been.
         """
         from hmz.flows import offers
 
         return offers(one)
+
+    def edited(self, one: Flowverse) -> bool:
+        """Whether one has anything written into it that fetching it again would undo.
+
+        Asked by whatever fetches without being asked to. A fetch resets the clone to what the
+        repository says now, which is a fair thing to do on a key somebody pressed and not a
+        fair thing to do behind them.
+
+        Args:
+          one: The flowverse.
+
+        Returns:
+          Whether there is anything of somebody's own in it, and False for one that is not a
+          clone at all -- there being no fetch to take anything away.
+        """
+        from hmz.flows import verses
+
+        return verses.edited(one.at)
 
     def where(self, name: str) -> Path:
         """The directory one place is kept in, whether or not anything has been fetched into it."""
@@ -142,9 +157,9 @@ class Flowverses:
         """Where a place came from, as it may be shown to somebody.
 
         Asked of which flowverse it is rather than of whether its URL is empty. An empty URL
-        means several different things -- the flows humanize ships, the two directories your
-        own live in, and a directory whose origin could not be read -- and answering all of
-        them with the first would put humanize's name on somebody else's flows.
+        means two different things -- the two directories your own flows live in, and a
+        directory whose origin could not be read -- and answering both with the first would
+        put your name on somebody else's flows.
 
         Args:
           one: The flowverse.
@@ -158,10 +173,8 @@ class Flowverses:
           line is printed every time the places are listed, and a token printed once is a
           token in the log of every job that ran it.
         """
-        from hmz.flows.verses import BUILTIN, MINE, plain
+        from hmz.flows.verses import MINE, plain
 
-        if one.name == BUILTIN:
-            return _PACKAGE
         if one.name in MINE:
             return f"your own flows in {MINE[one.name]}"
         return plain(one.url) if one.url else nowhere

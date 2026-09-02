@@ -1,7 +1,7 @@
 # Port a project
 
 **An hour, mostly waiting.** You will use
-[`official/rlar`](https://github.com/humanfia/flowverse) to move a module of a real C# project
+[`rlar`](https://github.com/humanfia/flowverse) to move a module of a real C# project
 to Python — one agent doing the work in a long conversation, a fresh reviewer reading what
 actually landed, and the loop ending when the reviewer says it is finished rather than when the
 worker says so.
@@ -138,7 +138,7 @@ saying it again in the task costs nothing.
 
 ```sh
 export DEEPSEEK_API_KEY=sk-…
-hmz exec -f official/rlar \
+hmz exec -f rlar \
     -a dsh/deepseek-v4-pro:high \
     -a dsh/deepseek-v4-pro:high \
     "$(cat TASK.md)"

@@ -1,7 +1,7 @@
 # Build a coding agent
 
 **An afternoon.** You will take one loose sentence — "a small terminal coding agent for
-`deepseek-v4-flash`" — through [`official/humanize1`](https://github.com/humanfia/flowverse)'s
+`deepseek-v4-flash`" — through [`humanize1`](https://github.com/humanfia/flowverse)'s
 three phases, and end with a repository that did not exist when you started.
 
 The three phases are three separate flows. That is the point of them: each is set up on its
@@ -50,7 +50,7 @@ and reads every review against what came after.
 
 ```sh
 export DEEPSEEK_API_KEY=sk-…
-hmz exec -f official/humanize1:gen-idea \
+hmz exec -f humanize1:gen-idea \
     -a dsh/deepseek-v4-pro:high \
     "A small terminal coding agent for deepseek-v4-flash. One Python package, one entry point, no framework. It talks to the DeepSeek API with the OpenAI-compatible chat completions endpoint, holds a message list, and offers the model three tools: read a file, write a file, run a shell command. It loops until the model answers without asking for a tool. It is meant for a fast, cheap model, so it must keep the context small and the tool schemas short."
 ```
@@ -109,7 +109,7 @@ than after the plan is written.
 ## Step 3 — argue it into a plan
 
 ```sh
-hmz exec -f official/humanize1:gen-plan \
+hmz exec -f humanize1:gen-plan \
     -a dsh/deepseek-v4-pro:high \
     -a dsh/deepseek-v4-pro:high \
     "A small terminal coding agent for deepseek-v4-flash. …"
@@ -160,7 +160,7 @@ and worse — the round trip is where the analyst finds the things the planner a
 ## Step 4 — build it under review
 
 ```sh
-hmz exec -f official/humanize1:rlcr \
+hmz exec -f humanize1:rlcr \
     -a claude/claude-opus-4-8:high \
     -a codex/gpt-5.6-sol:high \
     "build it"

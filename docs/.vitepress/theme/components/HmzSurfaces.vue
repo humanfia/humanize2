@@ -55,7 +55,6 @@ const lookup = computed<LookupRow[]>(() =>
           state: 'hit',
         },
         { key: 'user', name: 'your home', note: 'not reached', state: 'later' },
-        { key: 'builtin', name: 'built in', note: 'not reached', state: 'later' },
         {
           key: 'official',
           name: 'official',
@@ -67,7 +66,6 @@ const lookup = computed<LookupRow[]>(() =>
     : [
         { key: 'local', name: 'this project', note: 'no flow by this name', state: 'miss' },
         { key: 'user', name: 'your home', note: 'no flow by this name', state: 'miss' },
-        { key: 'builtin', name: 'built in', note: 'no flow by this name', state: 'miss' },
         {
           key: 'official',
           name: 'official',

@@ -284,7 +284,7 @@ scripted, embedded, or detached work.
 
 ### E1. Discovery, forking, and configuration
 
-- Built-in, fetched, project, and user flows sit in an explicit catalogue: qualified names
+- Fetched, project, and user flows sit in an explicit catalogue: qualified names
   select a source directly, unqualified names prefer the nearest local version.
 - Forking stages a complete copy and refuses to overwrite an existing local flow.
 - A flow's pydantic model drives setup fields, validation, defaults, and grouped presentation.

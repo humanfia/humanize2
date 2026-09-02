@@ -1,7 +1,7 @@
 # Beat a benchmark
 
 **An hour of your attention, several of the machine's.** You will point
-[`official/flame_chase`](https://github.com/humanfia/flowverse) at Anthropic's open performance
+[`flame_chase`](https://github.com/humanfia/flowverse) at Anthropic's open performance
 take-home and watch two agents take turns driving a kernel from 147,734 simulated cycles down
 past 1,790.
 
@@ -114,7 +114,7 @@ Three parts of that prompt are doing real work.
 ## Step 3 — start the loop
 
 ```sh
-hmz exec -f official/flame_chase \
+hmz exec -f flame_chase \
     -a claude/claude-opus-4-8:high \
     -a codex/gpt-5.6-sol:high \
     "$(cat TASK.md)"
@@ -123,7 +123,7 @@ hmz exec -f official/flame_chase \
 Two `-a` flags because `flame_chase` drives two agents, taken in the order you write them: the
 first turn goes to Claude Code, the second to Codex, and round it goes.
 
-The first time you name `official/…`, humanize fetches the [official
+The first time you name a flow only the official flowverse holds, humanize fetches the [official
 flowverse](/weaver/flowverses) — a git repository of flows — into `~/.humanize/flowverses/`.
 
 ::: warning `flame_chase` never stops itself

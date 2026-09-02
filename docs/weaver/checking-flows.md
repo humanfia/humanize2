@@ -11,7 +11,7 @@ the interface does not answer to.
 ```python
 from hmz.sdk import Hmz
 
-for one in Hmz().flows.check("official/rlar"):
+for one in Hmz().flows.check("rlar"):
     print(f"{one.where}:{one.line}: {one.severity}: {one.code}: {one.said}")
 ```
 
@@ -21,7 +21,7 @@ agent to say so, and an agent may never say it -- give the loop a bound of its o
 read off spent(), a cap on the rounds, a range
 ```
 
-A flow is named the way `-f` names one — `chat`, `official/rlar`, a path of your own — and
+A flow is named the way `-f` names one — `chat`, `rlar`, a path of your own — and
 everything wrong comes back at once, one finding per thing found rather than the first of them
 raised. The full table of codes is in the [reference](/reference/flows#checking-a-flow).
 

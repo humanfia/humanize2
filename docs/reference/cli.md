@@ -81,7 +81,7 @@ hmz exec -f|--flow <flow> -a|--agent <spec>[,<spec>...] [-a ...] [-c|--config <p
 At a terminal, the run is drawn as it happens:
 
 ```console
-$ hmz exec -f official/rlar -a claude/claude-opus-5:high -a codex/gpt-5.6-sol:high "fix the build"
+$ hmz exec -f rlar -a claude/claude-opus-5:high -a codex/gpt-5.6-sol:high "fix the build"
 ● builder is working
 ● Bash(pytest -q tests/)
 ● I fixed add() and the tests pass.
@@ -189,8 +189,8 @@ different number than were given, is a usage error — reported before the first
 partway into a loop with a turn's work already behind it:
 
 ```console
-$ hmz exec -f official/rlar -a claude/claude-opus-4-8:high "fix the build"
-hmz exec: error: official/rlar: the flow drives 2 agents, 1 given
+$ hmz exec -f rlar -a claude/claude-opus-4-8:high "fix the build"
+hmz exec: error: rlar: the flow drives 2 agents, 1 given
 ```
 
 Whatever else a flow does as it is imported is the flow's own, and fails as it would anywhere.
@@ -199,16 +199,16 @@ Whatever else a flow does as it is imported is the flow's own, and fails as it w
 
 ```sh
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
-hmz exec -f official/flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "fix the build"
-hmz exec -f official/rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
-hmz exec -f official/rlar -a claude/claude-opus-4-8:high,codex/gpt-5.6-sol:high "$(cat TASK.md)"
-hmz exec -f official/rlar -a actor=claude/claude-opus-4-8:high -a reviewer=codex/gpt-5.6-sol:high "$(cat TASK.md)"
-hmz exec -f official/flame_chase -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
+hmz exec -f flame_chase -a claude/claude-opus-4-8:max -a codex/gpt-5.6-sol:max "fix the build"
+hmz exec -f rlar -a claude/claude-opus-4-8:high -a claude/claude-opus-4-8:high "$(cat TASK.md)"
+hmz exec -f rlar -a claude/claude-opus-4-8:high,codex/gpt-5.6-sol:high "$(cat TASK.md)"
+hmz exec -f rlar -a actor=claude/claude-opus-4-8:high -a reviewer=codex/gpt-5.6-sol:high "$(cat TASK.md)"
+hmz exec -f flame_chase -a claude@anthropic/claude-opus-5:max -a claude@deepseek/deepseek-chat:high "fix the build"
 hmz exec -f ./flows/mine -a kimi/kimi-code/k3:swarmmax "port this to asyncio"
 hmz exec -f ralph_loop -a pi/openai-codex/gpt-5.5:high "$(cat TASK.md)"
 hmz exec -f ralph_loop -a opencode/opencode/big-pickle:high "$(cat TASK.md)"
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high -- "--force is not a flag here"
-hmz exec -f official/humanize1:rlcr -c setup.yaml -a claude/claude-opus-5:max \
+hmz exec -f humanize1:rlcr -c setup.yaml -a claude/claude-opus-5:max \
     -a codex/gpt-5.6-sol:xhigh "add undo"
 ```
 

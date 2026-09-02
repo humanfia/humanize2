@@ -36,6 +36,16 @@ if TYPE_CHECKING:
 #: nothing was remembered for and can therefore be saved.
 _INSTALLED = {"claude": (Model("m", ("high",)),)}
 
+#: A flow of one agent, for the workspace that has set none of them up yet.
+_ONE = """
+from hmz.flows import Agent, flow
+
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    agents[0].new()(task)
+"""
+
 #: A flow of two agents, for what happens to a workspace set up for one of them and then
 #: handed a flow that wants both.
 _PAIR = """
@@ -158,30 +168,31 @@ async def test_a_flow_never_set_up_here_opens_the_menu_and_runs_once_it_is_saved
     tmp_path: Path, backend: None, started: list[list[str]]
 ) -> None:
     """A flow with no agents chosen for it is a flow that stops on its first turn."""
+    written(tmp_path / ".humanize" / "flows", "loop", _ONE)
     app = Humanize()
     async with app.run_test() as driver:
-        await sends(app, driver, "$ralph_loop fix the build")
+        await sends(app, driver, "$local/loop fix the build")
         await until(lambda: isinstance(app.screen, Flows), driver)
         assert (
-            cast("Flows", app.screen)._flow == "ralph_loop"
+            cast("Flows", app.screen)._flow == "local/loop"
         )  # opened on the one named
         assert not started  # nothing runs while the menu is up
 
         await saves(app, driver)
         await until(lambda: bool(started), driver)
 
-        assert started == [["-f", "ralph_loop", "-a", "claude/m:high", "fix the build"]]
-        assert Settings(tmp_path).flow == "ralph_loop"  # and it is set up now
+        assert started == [["-f", "local/loop", "-a", "claude/m:high", "fix the build"]]
+        assert Settings(tmp_path).flow == "local/loop"  # and it is set up now
 
     # And so the same line a second time is the run, with no menu in the way.
     started.clear()
     again = Humanize()
     async with again.run_test() as driver:
-        await sends(again, driver, "$ralph_loop fix the build")
+        await sends(again, driver, "$local/loop fix the build")
         await until(lambda: bool(started), driver)
 
         assert not isinstance(again.screen, Flows)
-        assert started == [["-f", "ralph_loop", "-a", "claude/m:high", "fix the build"]]
+        assert started == [["-f", "local/loop", "-a", "claude/m:high", "fix the build"]]
 
 
 @pytest.mark.timeout(60)
@@ -224,9 +235,10 @@ async def test_walking_out_of_the_menu_starts_nothing_and_says_so(
     tmp_path: Path, backend: None, started: list[list[str]]
 ) -> None:
     """A line typed to start something must not vanish without a word about it."""
+    written(tmp_path / ".humanize" / "flows", "loop", _ONE)
     app = Humanize()
     async with app.run_test() as driver:
-        await sends(app, driver, "$ralph_loop fix the build")
+        await sends(app, driver, "$local/loop fix the build")
         await until(lambda: isinstance(app.screen, Flows), driver)
         await driver.press("escape")  # out again, having answered nothing
         await until(lambda: not isinstance(app.screen, Flows), driver)

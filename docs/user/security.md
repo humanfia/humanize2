@@ -41,9 +41,9 @@ in its `flows/`.
 So adding a flowverse trusts that git repository with this machine, exactly as installing a
 package does. Add the ones you would clone and run.
 
-`builtin` and `official` are the two that are always there. `official` is
-[humanfia/flowverse](https://github.com/humanfia/flowverse). humanize does not fetch it until
-something wants what is in it.
+`official` is always there — `chat` ships with the package, and the rest is
+[humanfia/flowverse](https://github.com/humanfia/flowverse). humanize does not fetch that
+repository until something wants what is in it.
 
 ## An `hmz anchor` port is equivalent to a shell on that machine
 

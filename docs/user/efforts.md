@@ -112,7 +112,7 @@ is what an effort moves.
 agent.juice(over=60)
 ```
 
-[`official/fixed_juice_ralph`](/flows/fixed-juice-ralph) governs on it — a Ralph loop that
+[`fixed_juice_ralph`](/flows/fixed-juice-ralph) governs on it — a Ralph loop that
 moves the effort a rung a round to hold the agent to a target.
 
 ## See also

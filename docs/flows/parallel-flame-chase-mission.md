@@ -2,16 +2,16 @@
 pageClass: hmz-feature
 ---
 
-# official/parallel_flame_chase_mission
+# parallel_flame_chase_mission
 
 The same three isolated lanes as
-[`official/parallel_flame_chase`](/flows/parallel-flame-chase), with a coordinator that comes
+[`parallel_flame_chase`](/flows/parallel-flame-chase), with a coordinator that comes
 back to adjudicate terminal outcomes, deadlines, stalls, failures, objective revisions,
 external review requests and periodic portfolio audits — and accepted private-lane artifacts
 enter lane 1's durable integration queue.
 
 ```sh
-hmz exec -f official/parallel_flame_chase_mission \
+hmz exec -f parallel_flame_chase_mission \
     -a codex/gpt-5.6-sol:max \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max \
     -a claude/claude-opus-5:max -a codex/gpt-5.6-sol:max \
@@ -58,6 +58,6 @@ keeps](/flows/parallel-flame-chase#what-it-keeps).
 
 ## See also
 
-- [official/parallel_flame_chase](/flows/parallel-flame-chase) — the same lanes, unaudited
+- [parallel_flame_chase](/flows/parallel-flame-chase) — the same lanes, unaudited
 - [Many turns at once](/features/concurrency) — why seven agents are not seven queues
 - [Hooks](/weaver/hooks) — the moments an interruption is allowed to land on
