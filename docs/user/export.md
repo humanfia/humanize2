@@ -100,34 +100,43 @@ of plain files rather than something only humanize opens.
 ## A run that is not the one on the screen
 
 [`/epics`](/user/tracing#what-a-run-writes-down) lists every run of this directory, newest
-first. Enter on one opens what there is to do with it, and **export it** is there beside
-collecting its trace. Use that for a run from last week: there is no transcript in it, because
-what is on your screen is not that run.
+first. Enter goes **into** the run under the cursor — which says where it is written down —
+and **export it** is there. Use that for a run from last week: there is no transcript in it,
+because what is on your screen is not that run.
+
+**It gathers the trace too.** Collecting a trace was a row beside this one, and what it wrote
+went into `traces/` — which an export carries anyway. So **export it** gathers a
+[trace](/user/tracing) of **that run's** sessions first and packs it, and the line it reports
+says what went in the trace as well as how big the archive came out:
+
+```console
+/home/you/code/.humanize/20260809T014455.212Z-9f21ab.epic.tar.gz · 812 kB · 3 sessions, 412 slices
+```
+
+Which is the point of a bundle: the person you send it to can open the timeline rather than
+having to gather one themselves.
 
 `/export` and **export it** both say where the archive landed and how big it came out — under
 the list for a run picked out of it, and in the transcript either way, so a bundle made an hour
-ago is still found by reading back rather than by hunting through a directory:
-
-```console
-/home/you/code/.humanize/20260809T014455.212Z-9f21ab.epic.tar.gz · 812 kB
-```
+ago is still found by reading back rather than by hunting through a directory.
 
 The archive is named for the run rather than for the moment you asked, so exporting the same
 run twice replaces the first — the second one is the first plus whatever has happened since.
 
-From Python it is the one call both of those come down to:
+From Python it is the calls both of those come down to:
 
 ```python
 from hmz.sdk import Hmz
 
+Hmz().epics.traced(epic)                                     # into the run's own traces/
 Hmz().epics.bundled(epic, output="/tmp/for-the-issue.tar.gz")
 ```
 
-`epic` is the run's own directory — what **where it is** says under the list, and what
-[`Hmz().epics.all()`](/reference/sdk#epics) hands back. An output that is a directory is written
-into under the run's own name, and no output at all is `.humanize/` beside wherever this is
-running. There is a `transcript=` as well, for the screen that went with the run, which only an
-export of the run you are watching has to give.
+`epic` is the run's own directory — the path drawn at the top once you are inside the run on
+`/epics`, and what [`Hmz().epics.all()`](/reference/sdk#epics) hands back. An output that is a
+directory is written into under the run's own name, and no output at all is `.humanize/` beside
+wherever this is running. There is a `transcript=` as well, for the screen that went with the
+run, which only an export of the run you are watching has to give.
 
 ## Copying instead
 
@@ -160,13 +169,14 @@ off.
 
 | | What it holds | Where |
 | --- | --- | --- |
-| `/export`, and **export it** on a run of `/epics` | the whole run: every record, every session log in full, the transcript, and a manifest | `.humanize/<run>.epic.tar.gz` |
-| **collect a trace** on a run of `/epics` | every session of every agent as one [timeline](/user/tracing), with tool input and output | `traces/<datetime>.trace.json`, in the run's own epic |
+| `/export`, and **export it** on a run of `/epics` | the whole run: every record, every session log in full, every [trace](/user/tracing) gathered of it, the transcript where there was one, and a manifest | `.humanize/<run>.epic.tar.gz` |
+| the trace **export it** gathers on its way in | every session of that run as one [timeline](/user/tracing), with tool input and output | `traces/export.trace.json`, in the run's own epic |
 | the epic itself | the same records, with the session logs as links into the backends' own homes | `~/.humanize/epics/<workspace>/<run>/` |
 | the clipboard | whatever you dragged across | your machine's clipboard |
 
 A trace is for reading a run yourself, on the machine it ran on. An export is for sending it
-to somebody who was not there — it holds the trace as well.
+to somebody who was not there — and a bundle carries whatever traces the run has, which is why
+**export it** gathers one first rather than leaving the two to be asked for separately.
 
 ## See also
 

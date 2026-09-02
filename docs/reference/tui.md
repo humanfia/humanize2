@@ -150,8 +150,8 @@ list appears under the editor with a line about each.
 | --- | --- | --- |
 | `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Its Agents page saves the complete setup; esc remains the way to save or discard on the way out. |
 | `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
-| `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), [export it](/user/export), say where it is written, and carry it on where its flow says it can be picked up. |
-| `/resume` | | Carries [the last run here](#carrying-the-last-one-on-outright) on: that run's own flow, on its own agents, with what it was asked to do, and on what it left behind. The same thing `/epics` offers of the run under its cursor, without the list — there is only ever one last run. Where there is nothing to carry on from it says which reason that is. |
+| `/epics` | | The runs of this directory, newest first: what each was and how it went. **Enter** goes into one, which says where it is written down and offers [exporting it](/user/export) — trace and all — and carrying it on where its flow says it can be picked up. |
+| `/resume` | | Carries [the last run here](#carrying-the-last-one-on-outright) on: that run's own flow, on its own agents, with what it was asked to do, and on what it left behind. The same thing `/epics` offers of the run you go into, without the list — there is only ever one last run. Where there is nothing to carry on from it says which reason that is. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, or pointed at what it falls back to. How often a failed turn is taken again is not here: that is said of a [place](#where-a-turn-goes-when-it-cannot-be-taken) rather than of an account. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
 | `/monitor` | | [The run, drawn](#watching-the-run): a box per agent that has worked, marked as it works and saying how long it has been at it, with the handovers between them as the arrows joining them, whatever each started of its own hanging under it, and [the board](/user/board) below. Enter reads an agent or changes a line. **esc** opens it. |
@@ -800,25 +800,32 @@ room the others need. Newest first, because what somebody who opens this came to
 the run that has just happened. **s** searches the flow, what it was asked to do, and the name
 the run is written under.
 
-The list is read rather than chosen from, so **enter** opens what there is to do with the run
-under the cursor:
+The list is read rather than chosen from, so **enter** goes *into* the run under the cursor.
+What opens says where that run is written down — sessions and all, which is what anybody
+reading one back opens — and under it what there is to do with it:
 
-![The menu under one run: carry on from here, collect a trace, export it, and where it is,
-each with a line saying what it does](/demo/epic-does.png)
+![Inside one run: its directory, how it went and how much it opened, over resume this run and
+export it](/demo/epic-does.png)
 
 | Row | What it does |
 | --- | --- |
-| **carry on from here** | Runs that run's own flow again, on what that run left behind — which a flow that says it [can be picked up](/reference/flows#a-flow-that-can-be-picked-up) is handed. |
-| **collect a trace** | Gathers **that run's** sessions — and the programs it ran, for a [profiled](/reference/tracing#profiling-a-run) run — into `traces/` inside the run itself, rather than into whatever directory you are standing in. That run's and no others: they are asked for by the ids it wrote down, so a directory run in fifty times has fifty traces and none of them holds another's work. Where it went and what is in it are said under the list, and again in the transcript. |
-| **export it** | Packages **that run** up as one archive to send to somebody else — its own records, every session log the backends wrote for it as their contents rather than as the links the run keeps, and a manifest. There is no transcript in this one: what is on your screen is not that run. Where it landed and how big it came out are said under the list, and again in the transcript. See [Exporting a run](/user/export). |
-| **where it is** | The directory the run is written in, sessions and all, said under the list. |
+| **resume this run** | Runs that run's own flow again, on what that run left behind — which a flow that says it [can be picked up](/reference/flows#a-flow-that-can-be-picked-up) is handed. It is [`/resume`](#carrying-the-last-one-on-outright) with the run already named, and a run that cannot be carried on is turned down here in the same words. |
+| **export it** | Packages **that run** up as one archive to send to somebody else — its own records, every session log the backends wrote for it as their contents rather than as the links the run keeps, a manifest, and a [trace](/user/tracing) of the run gathered on the way in. There is no transcript in this one: what is on your screen is not that run. Where it landed and how big it came out are said under the list, and again in the transcript. See [Exporting a run](/user/export). |
+
+**Exporting gathers the trace.** They were two rows, and one of them wrote a file into the run
+that the other packed anyway. So the archive holds `traces/export.trace.json` of **that
+run's** sessions — and the programs it ran, for a [profiled](/reference/tracing#profiling-a-run)
+run — which is what makes a bundle something the person you send it to can read the run out of.
+That run's sessions and no others: they are asked for by the ids it wrote down, so a directory
+run in fifty times has fifty traces and none of them holds another's work. The trace lands in
+the run's own `traces/` as well, rather than in whatever directory you are standing in.
 
 **Carrying on is offered where the flow says so now**, rather than where the run said so then.
-The mark on the row is what that run wrote down as it ran; opening the menu asks the flow
+The mark on the row is what that run wrote down as it ran; going into the run asks the flow
 itself, since a flow is a file that may have been rewritten since — and one that will not load
 at all is one there is nothing to carry on from. Where it is not offered the row is not there
-and the reason is said under the two that are. Collecting a trace is offered for every run,
-whatever its flow says: a run that cannot be continued is still a run to read.
+and the reason is said under the one that is. Exporting is offered for every run, whatever its
+flow says: a run that cannot be continued is still a run to read.
 
 What is carried on is the run rather than what the interface happens to be set up on — the
 flow, its agents and what they were asked to do all come off the record of that run, an agent
@@ -832,24 +839,27 @@ picked up is a flow started, and there is one going. It is said under the list r
 shutting the menu, since the question the menu is asking is still worth answering: `a flow is
 running; ctrl+c twice stops it before another can be picked up`.
 
-A directory nothing has ever been run in says so under the empty list. This row is the only
-way in that is typed; the same trace is [`Hmz().epics.traced(epic)`](/reference/sdk) from
-Python, which is what this row calls. A trace of what a directory holds whoever opened it —
-a session no flow ever drove — is `Hmz().epics.trace()` with no `sessions=`, and is not
-offered here at all: this is a list of runs, and a trace of none of them has nothing here to
-hang on.
+A directory nothing has ever been run in says so under the empty list. Exporting is the only
+way in that is typed; the same two calls are
+[`Hmz().epics.traced(epic)`](/reference/sdk) and
+[`Hmz().epics.bundled(epic)`](/reference/sdk) from Python, which is what the row makes. A trace
+of what a directory holds whoever opened it — a session no flow ever drove — is
+`Hmz().epics.trace()` with no `sessions=`, and is not offered here at all: this is a list of
+runs, and a trace of none of them has nothing here to hang on.
 
 ### Carrying the last one on outright
 
-`/resume` is that first row without the list: it carries **the last run in this directory** on,
-which is the one somebody who left a loop running overnight came back for. The flow, its agents
-and what they were asked to do come off that run exactly as they do from the menu, and the line
-it starts on says which run is being picked up — a person who has been away is owed which day's
-work this is.
+`/resume` is **resume this run** without the list: it carries **the last run in this
+directory** on, which is the one somebody who left a loop running overnight came back for. The
+flow, its agents and what they were asked to do come off that run exactly as they do from
+inside it, and the line it starts on says which run is being picked up — a person who has been
+away is owed which day's work this is.
 
 The last run and no other. A run carried on from the day before yesterday, because yesterday's
 died before it wrote anything down, is a day's work thrown away without anybody being told, so
-where the last run is not one to carry on the reason is said instead:
+where the last run is not one to carry on the reason is said instead. These are the same
+reasons in the same words for a run you walked into on `/epics` and took **resume this run**
+on — one question has one answer, whichever way you came to it:
 
 | | |
 | --- | --- |

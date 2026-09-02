@@ -13,16 +13,22 @@ sessions it opened:
 ![The /epics list: the runs of this directory, newest first, each saying which flow it was, what
 it was asked to do and how many sessions it opened](/demo/epics.png)
 
-Put the cursor on the run you have just finished, press **enter**, and choose **collect a
-trace**. What was gathered is said under the list:
+Put the cursor on the run you have just finished, press **enter** to go into it, and choose
+**export it**. Exporting gathers the trace on its way in, and what it wrote is said under the
+list:
 
 ```console
-~/.humanize/epics/-home-you-code-myproject/20260809T014455.212Z-9f21ab/traces/20260809T014455Z.trace.json · 3 sessions, 412 slices
+/home/you/code/.humanize/20260809T014455.212Z-9f21ab.epic.tar.gz · 812 kB · 3 sessions, 412 slices
 ```
 
-The file, then what went into it. It lands in `traces/` inside that run's own directory, next
-to the run's record and the links to its sessions, because a trace of a run is a thing to find
-again with the run rather than in whatever directory you happened to be standing in.
+The archive, how big it came out, then what went into the trace inside it. The trace also lands
+in `traces/` inside that run's own directory, next to the run's record and the links to its
+sessions, because a trace of a run is a thing to find again with the run rather than in
+whatever directory you happened to be standing in:
+
+```
+~/.humanize/epics/-home-you-code-myproject/20260809T014455.212Z-9f21ab/traces/export.trace.json
+```
 
 Now open it. Go to [ui.perfetto.dev](https://ui.perfetto.dev) and drag the file in. Nothing is
 uploaded; Perfetto opens it in the browser. `chrome://tracing` works too, as does anything that
@@ -88,12 +94,13 @@ Every run of a flow is one **epic**, which is a directory:
     state.json                      what a flow that can be picked up again left behind
     profile.jsonl                   the programs it ran, for a run that was profiled
     sessions/<session>/…            a link per file the backend logged that session to
-    traces/<datetime>.trace.json    what was gathered of it afterwards
+    traces/export.trace.json        the trace exporting the run gathers, replaced each time
+    traces/<datetime>.trace.json    one gathered by hand afterwards, which keeps every one
 ```
 
 Not all of it every time: `state.json` is there for a flow that [can be picked
 up](/reference/flows#a-flow-that-can-be-picked-up), `profile.jsonl` for a directory that asked
-to be [profiled](#profiling-a-run), `traces/` from the first time a trace is collected, and a
+to be [profiled](#profiling-a-run), `traces/` from the first time the run is exported, and a
 `epic.<flow>_<hex>.jsonl` for each flow the run [called](#what-a-called-flow-writes-down).
 
 Find the run that just finished and list it:
@@ -147,10 +154,11 @@ else means following them and carrying what is behind them, which is what
 Claude Code's own log](/demo/run-linked.png)
 
 `/epics` is the same list at the prompt: every run of this directory, newest first, with a mark
-on the ones whose flow says it can be picked up. Enter opens what there is to do with the run
-under the cursor — carry on from here, collect a trace, [export it](/user/export), where it is.
-Collecting a trace and exporting are offered for every run, whatever its flow says; the rest is
-[picking a run up](/user/resuming#carrying-an-older-one-on).
+on the ones whose flow says it can be picked up. Enter goes **into** the run under the cursor,
+which says where it is written down and offers two things: [export it](/user/export), which
+gathers a trace of that run and packs the whole of it up, and resuming it — which is
+[picking a run up](/user/resuming#carrying-an-older-one-on). Exporting is offered for every
+run, whatever its flow says.
 
 **It is not a transcript.** The backend's own log is the turn-by-turn record. An epic is the
 *shape* of the run: enough to gather a trace afterwards out of the ids alone. It covers one run
@@ -206,8 +214,8 @@ Which run is therefore a row to walk to rather than a name to spell out. `/epics
 newest first, and **s** searches what each run was asked to do — which is how last Tuesday's is
 found among fifty:
 
-![/epics, the menu that opens on a run, and the trace that menu gathers into that run's own
-directory](/demo/epics.gif)
+![/epics, the run one of its rows opens into, and the trace exporting gathers into that run's
+own directory](/demo/epics.gif)
 
 ::: details `0 sessions, 0 slices`
 Three usual reasons. You are in a different directory from the one the run happened in. The
@@ -238,11 +246,12 @@ and the sub-agents it started come with it. `start` and `end` take anything
 whether or not a file was written.
 
 A run you have already picked out of the list is the other call,
-[`traced`](/reference/sdk#epics) — the one **collect a trace** makes: that run's sessions by the
-ids it wrote down, the programs it ran if it was profiled, and an `output` for when you want it
-somewhere other than the run's own `traces/`, a trace being a thing to attach to an issue as
-well as to read. Left alone it is named after the UTC moment it was collected, so collecting
-twice keeps both.
+[`traced`](/reference/sdk#epics) — the one **export it** makes on its way in: that run's
+sessions by the ids it wrote down, the programs it ran if it was profiled, and an `output` for
+when you want it somewhere other than the run's own `traces/`, a trace being a thing to attach
+to an issue as well as to read. Left alone it is named after the UTC moment it was collected,
+so gathering one by hand twice keeps both; the one **export it** writes has a name of its own,
+`export.trace.json`, so exporting twice leaves one trace as it leaves one archive.
 
 ## Profiling a run
 
