@@ -3148,6 +3148,16 @@ class AgentBase(ABC):
     #: of one agent's tokens is worse than a column marked as short of them.
     counts: ClassVar[frozenset[str]] = frozenset()
 
+    #: Whether this agent spends anything a run's allowance is reckoned in. False for the
+    #: person at the prompt, who runs no model: they cost no tokens, no money and no clock of
+    #: anybody's, so an allowance neither counts them nor stops them.
+    #:
+    #: Which is not a nicety. A run that stopped its person would be a run with nobody left to
+    #: tell that it had stopped -- a flow that is a conversation would raise on the line where
+    #: it tried to say so, and one that asks a question before giving up would never ask it.
+    #: The one agent that cannot be the reason the money ran out is the one agent worth keeping.
+    spends: ClassVar[bool] = True
+
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
         """Initializes an agent that has opened nothing yet.
 

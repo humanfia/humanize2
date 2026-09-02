@@ -447,6 +447,13 @@ turn; this ends a run, and they are deliberately two types rather than fields on
 - What each agent spent MUST be read off that agent's own meter and each agent MUST be
   counted once. A run behind a gateway can be reported under two spellings of one model, so
   anything adding up by model name can double it.
+- The person at the prompt MUST be outside the whole of it: what they spend MUST NOT be
+  counted, and stopping the run MUST NOT stop them. They run no model, so there is no token,
+  no dollar and no minute of an allowance that is theirs -- and a run that stopped them would
+  be a run with nobody left to tell that it had stopped, since a flow that is a conversation
+  says so by speaking to them. Counting them would also mark every dimension of a run of
+  theirs unreadable, a person reporting no tokens and being on no price list. Which agent that
+  is MUST be said on the class rather than worked out from a name.
 - A clone and a stand-in MUST spend the run's allowance. Tracing is about identity, so two
   agents are two lines; an allowance is about the run's money, and a flow that does all its
   work through clones would otherwise read as having spent nothing at all. Agents MUST be

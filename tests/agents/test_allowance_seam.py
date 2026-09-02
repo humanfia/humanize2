@@ -170,21 +170,42 @@ def test_a_session_closing_on_the_end_of_it_is_read_as_spent() -> None:
     assert ledger.spent
 
 
-def test_the_person_answers_under_an_allowance_that_is_spent() -> None:
-    """Because a flow that asks its user a question would otherwise deadlock at the end of it.
+def test_the_person_is_not_stopped_when_the_run_runs_out() -> None:
+    """Because the run would then have nobody left to tell that it had stopped.
 
-    The person spends nothing -- they run no model -- so holding them to an allowance stops
-    nothing and costs the run the one agent that could be told it had stopped. Their turn is
-    outside the seam by construction: `HumanSession` answers without taking the turn every
-    other session takes.
+    A flow that is a conversation says so by speaking to the person, and a person who had
+    been stopped raises on that line instead of hearing it -- so a flow that asks a question
+    before giving up would never ask it. They spend nothing, being no model, so stopping them
+    saves nothing either.
+    """
+    working = _agent()
+    person = HumanAgent()
+    ledger = Ledger(Allowance(tokens=EACH / 1_000_000), [working, person])
+    working.allowance = person.allowance = ledger
+    working.new()("go")
+
+    assert ledger.spent  # the run is over its allowance, and every spender is stopped
+    assert working.stopped
+    assert not person.stopped
+    assert person.new()("the run stopped -- anything else?") == ""
+
+
+def test_what_the_person_spends_is_not_counted() -> None:
+    """There is nothing of an allowance that is theirs: no token, no dollar, no minute.
+
+    Counted, they would also mark every cap of a run of theirs unreadable, a person
+    reporting no tokens and being on no price list -- which would put a line on a run's
+    first turn saying a cap cannot bite when the cap is the only thing that can.
     """
     person = HumanAgent()
-    ledger = Ledger(Allowance(tokens=0.001), [person])
-    person.allowance = ledger
+    ledger = Ledger(Allowance(tokens=0.001, dollars=5), [person])
     person._meter.spend(Usage({"output": 10_000.0}))  # as though they had spent it
 
-    assert ledger.over()  # the run is over its allowance
-    assert person.new()("are you still there") == ""  # and they still answer
+    read = ledger.reads()
+
+    assert read.output == 0.0
+    assert read.blind == frozenset()
+    assert ledger.over() == ""
 
 
 def test_an_agent_nobody_gave_an_allowance_is_held_to_nothing() -> None:
