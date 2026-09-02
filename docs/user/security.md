@@ -45,7 +45,7 @@ package does. Add the ones you would clone and run.
 [humanfia/flowverse](https://github.com/humanfia/flowverse). humanize does not fetch it until
 something wants what is in it.
 
-## An `hmz anchor` port is equivalent to a shell on that machine
+## An `hmz internal anchor` port is equivalent to a shell on that machine
 
 [Remote execution](/user/remote-execution) has three transports. Two of them need no open port
 at all:
@@ -54,7 +54,7 @@ at all:
 | --- | --- |
 | `ssh://host` | bootstrapped over your own ssh. Nothing listens. |
 | `docker://container` | over `docker exec`. Nothing listens. |
-| `tcp://host:port` | an `hmz anchor serve` listening there. |
+| `tcp://host:port` | an `hmz internal anchor serve` listening there. |
 
 For the third, `--export` bounds which files a request may *name*. It does **not** confine the
 commands that request can run. Anyone who can reach the port can run anything on that machine
@@ -65,7 +65,7 @@ as the user serving it.
 - Prefer `ssh://` or `docker://`.
 
 ```sh
-hmz anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
+hmz internal anchor serve --listen 0.0.0.0:7777 --export /srv/project --token "$SECRET"
 ```
 
 ## What humanize does not hold

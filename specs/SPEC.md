@@ -862,6 +862,13 @@ hmz [<command> [<args>...]]
   what those ask for; whatever else one of them needs -- reading a flow for what will not
   run, gathering a trace, packaging a run up -- MUST be asked of `sdk`, which is the same
   object this line holds.
+- What humanize spawns for itself MUST be reachable under one further command, `hmz internal`,
+  and every command the line routes MUST be in the listing. There MUST be no name that is
+  carried out but left out: a program whose help describes less than it runs is one nobody can
+  debug from the outside, and each of these is exactly what a person sees in a process table
+  when a run has gone wrong. Gathering them under one name is what keeps the listing readable
+  -- one entry rather than four, saying what they are and that none of them is a line to type
+  -- and is why the answer is a door rather than either four more entries or a trapdoor.
 - A line naming no command at all MUST open the terminal interface, which is every command at
   one prompt. There MUST be no command that opens it too: one way in is one way in. A line
   naming something that is not a command MUST be a usage error listing the commands there
@@ -1006,57 +1013,92 @@ Args:
   words themselves, what the turn cost, and when. It MUST NOT write anything a terminal needed
   and a program does not.
 
-## `hmz anchor`
+## `hmz internal`
 
 ```shell
-hmz anchor [<options>] <agent> [<args>...]
-hmz anchor serve --export <virtual>[:<real>] (--stdio | --listen [<host>:]<port>)
+hmz internal <command> [<args>...]
+```
+
+The door onto what humanize spawns for itself. Behind it are the four lines humanize starts
+processes with -- the anchor, the supervisor a turn under an account runs in, and the two
+relays a coding agent reaches a flow's callbacks and hooks through -- and nothing else.
+
+- Every one of them MUST be under this one command rather than beside `hmz exec` at the top.
+  Four more entries in the top-level listing would read as four more things to do with
+  humanize, which is the opposite of what they are: they name no capability a person wants,
+  and a listing is read for what there is to do.
+- It MUST be one of the commands a listing shows, and what is under it MUST be documented. A
+  command nobody can discover is a command nobody can debug, and every one of these is what a
+  person finds in a process table, a `ps` line or a backend's error when a run has gone wrong
+  -- so hiding them costs exactly the people who most need them named. A listing that leaves
+  out half of what a program runs is worse than one with a door marked `internal` on it: the
+  first is untrue about the program, and the second is true and says where not to go.
+- None of them MUST be a line anybody types by hand. Being listed is documentation of what
+  humanize runs, not an invitation: each is a command line because starting a process needs
+  one, each takes arguments only humanize knows how to render, and the help of each MUST say
+  so.
+- Everything after the name of one of them MUST reach it untouched, `--help` included, for
+  the reason the top of the line works that way: each answers for its own arguments, and a
+  parser here that ate one would be a second spelling of every line humanize renders.
+- Reaching one of them MUST cost no module of any of the others, exactly as at the top of the
+  line: the door is a lookup and not a layer.
+
+## `hmz internal anchor`
+
+```shell
+hmz internal anchor [<options>] <agent> [<args>...]
+hmz internal anchor serve --export <virtual>[:<real>] (--stdio | --listen [<host>:]<port>)
 ```
 
 Runs an agent here whose work lands on another machine, and -- under `serve` -- is the half
 that lands it. What each of the two takes is `coganchor`'s and is specified there.
 
 - It MUST be a command of its own because a turn whose work lands elsewhere is a process of
-  its own -- one holding a session to a target, with the agent under it -- and it MUST NOT be
-  one of the commands a listing shows nor be documented as a way in. humanize spawns it for
-  every such turn, the agent's own configuration rendering the line, and the zipapp
-  bootstrapped onto a target runs `hmz anchor serve` to answer one. Neither is a line anybody
-  types.
+  its own -- one holding a session to a target, with the agent under it. humanize spawns it
+  for every such turn, the agent's own configuration rendering the line, and the zipapp
+  bootstrapped onto a target runs `hmz internal anchor serve` to answer one. Neither is a line
+  anybody types.
 - Reaching it MUST load `coganchor` and nothing else of humanize, since `serve` is what runs
   on a target where it is the only layer there is and the architecture is whatever the target
-  happens to be.
+  happens to be. That MUST hold through `internal` as well: the door is what the bundled
+  target half is reached through.
 
-## `hmz cred`
+## `hmz internal cred`
 
 ```shell
-hmz cred --map <from>=<to> [--map ...] -- <command> [<args>...]
+hmz internal cred --map <from>=<to> [--map ...] -- <command> [<args>...]
 ```
 
 Runs a program with some of its paths answered by others, and exits with its status. What a
 turn under a provider is spawned as, and what a login run for one is spawned as.
 
 - It MUST be a command of its own rather than something the driver does in this process, for
-  the reason `hmz anchor` is: the supervisor forks the program and takes the process's signal
-  handling with it, which a flow pumping turns from threads of its own cannot lend it.
-- It MUST NOT be one of the commands a listing shows, and MUST NOT be documented as a way in:
-  it is a command line because a process is started by one, not because it is a thing anybody
-  types. What it runs is whatever it is given, so a listing offering it would be offering a
-  way to run something that is not humanize.
+  the reason `hmz internal anchor` is: the supervisor forks the program and takes the
+  process's signal handling with it, which a flow pumping turns from threads of its own cannot
+  lend it.
+- It MUST be under `internal` rather than at the top of the listing: it is a command line
+  because a process is started by one, not because it is a thing anybody types, and what it
+  runs is whatever it is given -- an entry beside `hmz exec` would read as humanize offering
+  to run something that is not humanize. What it is MUST still be written down, there and in
+  the documentation: it is the process a turn under an account actually runs as, so it is the
+  name on the failure when an account's credentials were not where it looked.
 - A line naming nothing to answer MUST be a usage error: a run with nothing to redirect is a
   supervisor started for no reason.
 
-## `hmz tools`
+## `hmz internal tools`
 
 ```shell
-hmz tools --at <socket>
+hmz internal tools --at <socket>
 ```
 
 Carries the tool protocol between a coding agent and the flow whose callbacks it is: this
 process's standard input into the flow's socket, and the flow's answers back out again.
 
-- It MUST be a command of its own for the reason `hmz cred` is, the other way round: a CLI
-  takes a tool by starting a program, so there has to be a program. It MUST NOT be one of the
-  commands a listing shows and MUST NOT be documented as a way in.
+- It MUST be a command of its own for the reason `hmz internal cred` is, the other way round:
+  a CLI takes a tool by starting a program, so there has to be a program. It MUST be under
+  `internal` with the rest, listed and documented as what it is: the line a backend's own tool
+  configuration holds is this one, and somebody reading that configuration has to be able to
+  look it up.
 - It MUST do nothing but carry lines. The callback belongs in the process the flow is in, and
   anything answered here would be a tool the flow never wrote.
 - Both directions MUST be carried at once, and the end of either MUST end the other: a CLI that
@@ -1064,19 +1106,21 @@ process's standard input into the flow's socket, and the flow's answers back out
 - A socket that is not there MUST be a status rather than a crash: it is a flow that has ended,
   and a CLI reads it as its tools being unavailable rather than as a turn that failed.
 
-## `hmz hook`
+## `hmz internal hook`
 
 ```shell
-hmz hook --at <socket>
+hmz internal hook --at <socket>
 ```
 
 Carries one call of a coding agent's own hook table to the flow whose moment it is, and the
 verdict back again. It is what makes a refusal at `PreToolUse` stop the tool rather than
 describe one that has already run, and what it serves is specified in `agents.md`.
 
-- It MUST be a command of its own for the reason `hmz tools` is: a CLI takes a hook by starting
-  a program and waiting for what it says, so there has to be a program. It MUST NOT be one of
-  the commands a listing shows and MUST NOT be documented as a way in.
+- It MUST be a command of its own for the reason `hmz internal tools` is: a CLI takes a hook by
+  starting a program and waiting for what it says, so there has to be a program. It MUST be
+  under `internal` with the rest, listed and documented: it is the line written into a CLI's
+  own hook table, it is spawned once per tool call, and it is what shows up when a gate stops
+  answering -- all of which is unreadable if the command has no name anybody may look up.
 - It MUST do nothing but carry the one call. The hook belongs in the process the flow is in,
   and anything decided here would be a verdict the flow never gave.
 - It MUST exit zero whatever the flow said, and MUST NOT exit with the status these CLIs read

@@ -1,7 +1,7 @@
 """Running a program whose credentials are somewhere other than where it looks for them.
 
 Two halves, as the module has two. The table -- which path is answered by which -- is read
-here directly. The rest is the real thing: `hmz cred` spawned exactly as a turn spawns it,
+here directly. The rest is the real thing: `hmz internal cred` spawned exactly as a turn spawns it,
 with a program underneath that reads, writes, renames, lists a directory, forks, and dies of
 a signal, on files that are all under `tmp_path`. Nothing here stands in for the supervisor,
 because the supervisor is what there is to be wrong.
@@ -11,8 +11,9 @@ this process ptrace a child of its own. Whether it can is answered by running on
 by asking what the kernel is -- a container without `CAP_SYS_PTRACE` has every module and can
 supervise nothing -- and where it cannot, those tests say so and skip.
 
-Whether this machine can trace, and how `hmz cred` is spawned, are `tests/supervising.py`'s:
-three suites and a conftest ask, and a conftest cannot import a test module.
+Whether this machine can trace, and how `hmz internal cred` is spawned, are
+`tests/supervising.py`'s: three suites and a conftest ask, and a conftest cannot import a test
+module.
 """
 
 from __future__ import annotations
@@ -148,6 +149,7 @@ def test_the_command_names_every_swap_and_then_the_program() -> None:
         sys.executable,
         "-m",
         "hmz",
+        "internal",
         "cred",
         "--map=/house/.claude=/store/mine/home",  # longest first, as the table is
         "--map=/house/x=/store/y",
@@ -193,7 +195,7 @@ def test_a_line_that_could_not_be_run_is_a_line_to_correct(
     argv: list[str], says: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with pytest.raises(SystemExit) as stopped:
-        cli.main(["cred", *argv])
+        cli.main(["internal", "cred", *argv])
 
     assert stopped.value.code == 2
     assert says in capsys.readouterr().err
@@ -209,7 +211,7 @@ def test_a_run_that_cannot_be_supervised_does_not_run_unsupervised(
 
     monkeypatch.setattr("hmz.coganchor.providers.redirect.run", refuse)
 
-    assert cli.main(["cred", "--map=/house/x=/store/y", "--", "true"]) == 1
+    assert cli.main(["internal", "cred", "--map=/house/x=/store/y", "--", "true"]) == 1
     assert "no supervisor here" in capsys.readouterr().err
 
 
@@ -602,6 +604,7 @@ def test_two_runs_at_once_do_not_see_each_others_accounts(tmp_path: Path) -> Non
                     sys.executable,
                     "-m",
                     "hmz",
+                    "internal",
                     "cred",
                     f"--map={machine}={instead}",
                     "--",

@@ -137,7 +137,7 @@ The road is the **Model Context Protocol**, that being the one way every one of 
 takes a tool it was not shipped with. What the backend is handed is a command to run:
 
 ```
-hmz tools --at /tmp/humanize-tools-XXXX/tools.sock
+hmz internal tools --at /tmp/humanize-tools-XXXX/tools.sock
 ```
 
 which relays its pipe to a socket in the flow's process. So the function that runs is the one

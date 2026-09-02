@@ -173,10 +173,11 @@ line, with what the flow is doing beside the transcript.
   whatever dispatches a sent line -- three declarations kept in step by a test is a command
   that works and is offered to nobody, or is offered and does nothing, for as long as it takes
   somebody to run the suite.
-- `hmz anchor` MUST NOT be a command here: it is not a thing to do to a flow that is running,
-  and a command that only ever means one thing is a command line. Gathering a trace MUST NOT
-  be one either -- it is a thing done to a run that has already happened, so it is one of the
-  things `/epics` offers about the run under the cursor rather than a command of its own.
+- `hmz internal anchor` MUST NOT be a command here: it is not a thing to do to a flow that is
+  running, and a command that only ever means one thing is a command line. Gathering a trace
+  MUST NOT be one either -- it is a thing done to a run that has already happened, so it is
+  one of the things `/epics` offers about the run under the cursor rather than a command of
+  its own.
 - `/resume` MUST carry the last run in this directory on, as `/epics` carries the run under
   its cursor on: that run's own flow, on that run's own agents, with what it was asked to do,
   and on what it left behind. A command of its own unlike a trace, which is a thing done to a

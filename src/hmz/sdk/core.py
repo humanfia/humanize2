@@ -7,7 +7,7 @@ here, because there is one of each and one place to ask for it.
 
 Each of them is fetched when it is asked for and not before. A command line that only lists the
 places flows come from must not load the tracer, the sandbox and every coding agent driver
-there is to do it, and `hmz anchor` must not load any of this at all.
+there is to do it, and `hmz internal anchor` must not load any of this at all.
 """
 
 from __future__ import annotations

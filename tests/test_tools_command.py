@@ -1,4 +1,4 @@
-"""`hmz tools`: the pipe a coding agent speaks the tool protocol over, relayed to a flow.
+"""`hmz internal tools`: the pipe a coding agent speaks the tool protocol over, relayed to a flow.
 
 A callback of a flow's is a Python function in the flow's own process, and a CLI takes a tool
 by starting a program and talking to it over that program's stdin and stdout. This is that
@@ -176,7 +176,7 @@ def test_a_socket_that_is_not_there_is_a_flow_that_has_ended(
     assert tools(["--at", "nobody-is-serving-this.sock"]) == 1
 
     said = capsys.readouterr().err
-    assert "hmz tools" in said
+    assert "hmz internal tools" in said
     assert "nobody-is-serving-this.sock" in said
 
 
