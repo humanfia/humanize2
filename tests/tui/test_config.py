@@ -533,7 +533,7 @@ async def test_a_setting_that_is_written_carries_a_caret_under_the_cursor(
             await driver.pause()
             assert sheet._under == "named"
             assert "reverse" in _under(app)
-            assert "Type to set" in str(sheet.query_one("#keys", Label).content)
+            assert "type set" in str(sheet.query_one("#keys", Label).content)
 
             # And it stays where the next letter would land as the value grows.
             await driver.press(*"here")

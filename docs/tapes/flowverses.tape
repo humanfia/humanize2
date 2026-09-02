@@ -20,7 +20,7 @@ Set TypingSpeed 40ms
 Hide
 Type "cd /work/demo && clear" Enter
 Type "hmz" Enter
-Wait+Screen /Say what to do/
+Wait+Screen /ctrl\+c exit/
 Show
 
 Sleep 400ms
@@ -34,10 +34,10 @@ Sleep 400ms
 
 # Enter says what one holds -- which means reading its flows, so it is asked of the one
 # that was opened rather than of all of them. It is also where one is taken away, past the
-# flows: what a place is, is what is in it. Not on this one -- the cursor opens on `builtin`,
+# flows: what a place is, is what is in it. Not on this one -- the cursor opens on `official`,
 # which is always here -- so the sheet says why there instead.
 Enter
-Wait+Screen /What this flowverse holds/
+Wait+Screen /What it holds, read from/
 Sleep 1400ms
 Screenshot "/out/flowverse-holds.png"
 Sleep 400ms

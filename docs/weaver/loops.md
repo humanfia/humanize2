@@ -145,7 +145,8 @@ sessions and its own record. `/epics` is where both of them are.
 how often it re-reads files it has already read.
 
 **Move the effort.** Open the flow in `/flow`, choose the agent, find the `effort` row,
-and press **←/→**. A Ralph loop of `low` turns is a different animal from one of `max` turns.
+and press **←/→** or **space**. A Ralph loop of `low` turns is a different animal from one of
+`max` turns.
 See [Efforts](/user/efforts).
 
 **Make it read-only.** What an agent is allowed to do is the flow's to say, declared beside the

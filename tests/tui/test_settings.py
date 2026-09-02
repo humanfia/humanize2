@@ -326,7 +326,7 @@ async def test_the_settings_menu_is_two_pages_and_turns_the_reporting_off(
     """One page for what is true of this machine, one for what this directory is set up as."""
     from hmz.runtime.kept import Runs
     from hmz.tui import Humanize
-    from hmz.tui.pick import Adjusts
+    from hmz.tui.pick import _SAVE, Adjusts
 
     monkeypatch.chdir(tmp_path)
     Settings(tmp_path).answers(enable_sentry=True)
@@ -337,7 +337,11 @@ async def test_the_settings_menu_is_two_pages_and_turns_the_reporting_off(
         await driver.press("enter")
         await until(lambda: isinstance(app.screen, Adjusts), driver)
         listing = app.screen.query_one("#choices", OptionList)
-        assert [str(one.id) for one in listing.options] == ["=reports", "=sent"]
+        assert [str(one.id) for one in listing.options] == [
+            "=reports",
+            "=sent",
+            f"={_SAVE}",
+        ]
         assert "on " in str(listing.get_option_at_index(0).prompt)
 
         await driver.press("right")  # off
@@ -351,6 +355,7 @@ async def test_the_settings_menu_is_two_pages_and_turns_the_reporting_off(
             "=flow",
             "=profile",
             "=forget",
+            f"={_SAVE}",
         ]
         assert "chat" in str(listing.get_option_at_index(1).prompt)
 

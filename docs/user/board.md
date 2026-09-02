@@ -68,11 +68,13 @@ you have to go and open is a board nobody reads.
   Board · what you and the flow both write on
     ◈ todo          write the parser
     ◈ doing         write the parser · flow's
+
+      add           a line
 ```
 
 | key | |
 | --- | --- |
-| `a` | put a line up: type a name, enter, then what it says |
+| `a` | put a line up: type a name, enter, then what it says. The `add` row below the lines does the same |
 | enter | change the line under the cursor |
 | `d` twice | take it off the board |
 

@@ -18,8 +18,9 @@ The word belongs to each backend rather than to humanize, so the values differ.
 hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "fix the build"
 ```
 
-The `effort` row of the agent's sheet shows `high`. Press **←/→** to adjust it; the `swarm` row
-turns swarm mode on for a model that has one.
+The `effort` row of the agent's sheet shows `high`, with `↔` beside it for a row that is
+adjusted where it stands. Press **←/→** to step it, or **space** to take the next one round;
+the `swarm` row turns swarm mode on for a model that has one.
 
 ## Set the effort
 

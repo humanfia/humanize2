@@ -19,6 +19,8 @@ from hmz.coganchor import fallbacks
 from hmz.coganchor.backends import Model
 from hmz.tui import Humanize
 from hmz.tui.pick import (
+    _ADD,
+    _SAVE,
     _TAKES_AWAY,
     Accounts,
     Catalogue,
@@ -96,20 +98,22 @@ async def test_the_menu_is_the_steps_between_places() -> None:
             lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
         )
 
-        assert rows(app) == ["claude/claude-opus-5"]
+        assert rows(app) == ["claude/claude-opus-5", _ADD, _SAVE]
         listing = app.screen.query_one("#choices", OptionList)
         assert "falls back to codex/gpt-5.6-sol" in str(listing.options[0].prompt)
 
 
 @pytest.mark.timeout(60)
-async def test_an_empty_menu_says_which_key_writes_one_down() -> None:
-    """An empty list that explains nothing reads as a feature that does not work."""
+async def test_an_empty_menu_still_offers_the_row_that_writes_one_down() -> None:
+    """An empty list with nothing to do about it reads as a feature that does not work."""
     app = Humanize()
     async with app.run_test() as driver:
         await _opens(app, driver)
         await driver.pause()
 
-        assert "a says one does" in _under(app)
+        # The row that writes one down, which is where to start.
+        assert rows(app) == [_ADD, _SAVE]
+        assert "nothing falls back anywhere yet" in _under(app)
 
 
 @pytest.mark.timeout(90)
@@ -126,7 +130,7 @@ async def test_a_step_is_two_places_chosen_and_is_held_until_the_menu_is_saved()
         await until(lambda: isinstance(app.screen, Fallbacks), driver)
 
         # Said, and nothing on disk until the menu is saved.
-        assert rows(app) == ["claude/claude-opus-5"]
+        assert rows(app) == ["claude/claude-opus-5", _ADD, _SAVE]
         assert fallbacks.falls() == []
 
         await keeps(app, driver)
@@ -175,7 +179,7 @@ async def test_a_step_is_taken_away_from_inside_what_it_says() -> None:
         await until(lambda: isinstance(app.screen, Fallbacks), driver)
 
         # Gone from the list, and nothing on disk until the menu is saved.
-        assert rows(app) == []
+        assert rows(app) == [_ADD, _SAVE]
         assert "falls back nowhere when this menu is saved" in _under(app)
         assert fallbacks.falls()
 
@@ -227,7 +231,7 @@ async def test_the_key_that_used_to_take_a_step_away_takes_nothing_away() -> Non
         await driver.pause()
 
         assert "press d again" not in _under(app)
-        assert rows(app) == ["claude/claude-opus-5"]
+        assert rows(app) == ["claude/claude-opus-5", _ADD, _SAVE]
 
 
 @pytest.mark.timeout(90)

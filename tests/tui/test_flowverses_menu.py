@@ -23,7 +23,7 @@ from textual.widgets import Label, OptionList
 from hmz.flows import LOCAL, OFFICIAL, USER, flowverses
 from hmz.flows import verses as store
 from hmz.tui import Humanize
-from hmz.tui.pick import _TAKES_AWAY, Fetches, Flows, Flowverses, Holds
+from hmz.tui.pick import _ADD, _TAKES_AWAY, Fetches, Flows, Flowverses, Holds
 from tests.stubs import written
 
 from .test_app import onto, rows, until
@@ -90,7 +90,7 @@ async def test_every_place_flows_come_from_is_listed(theirs: Path) -> None:
     async with app.run_test() as driver:
         sheet = await _open(app, driver)
 
-        assert rows(app) == [OFFICIAL, "theirs", LOCAL, USER]
+        assert rows(app) == [OFFICIAL, "theirs", LOCAL, USER, _ADD]
         drawn = str(
             sheet.query_one("#choices", OptionList).get_option(f"={LOCAL}").prompt
         )
@@ -289,7 +289,7 @@ async def test_one_that_was_added_is_taken_away_from_inside_what_it_holds(
         await until(lambda: "no longer here" in _under(sheet), driver)
 
         assert [one.name for one in flowverses()] == [OFFICIAL, LOCAL, USER]
-        assert rows(app) == [OFFICIAL, LOCAL, USER]
+        assert rows(app) == [OFFICIAL, LOCAL, USER, _ADD]
         # And the marker is on a row that is still there, rather than on the hole one left.
         listing = sheet.query_one("#choices", OptionList)
         assert listing.highlighted == 0
@@ -339,7 +339,7 @@ async def test_none_of_the_ones_always_here_offer_to_be_taken_away(named: str) -
 
         await driver.press("escape")
         await until(lambda: isinstance(app.screen, Flowverses), driver)
-        assert rows(app) == [OFFICIAL, LOCAL, USER]
+        assert rows(app) == [OFFICIAL, LOCAL, USER, _ADD]
 
 
 @pytest.mark.timeout(60)
@@ -385,7 +385,7 @@ async def test_the_places_are_walked_to_from_the_flows(theirs: Path) -> None:
 
         await driver.press("v")
         await until(lambda: isinstance(app.screen, Flowverses), driver)
-        assert rows(app) == [OFFICIAL, "theirs", LOCAL, USER]
+        assert rows(app) == [OFFICIAL, "theirs", LOCAL, USER, _ADD]
 
         places = app.screen
         await onto(app, driver, "theirs")
