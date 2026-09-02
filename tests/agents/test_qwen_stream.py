@@ -14,10 +14,10 @@ import pytest
 from pydantic import BaseModel
 
 from hmz import home
-from hmz.agents import Failed, QwenCodeAgent, QwenCodeAgentConfig
-from hmz.agents import qwen as backend
-from hmz.agents.skills import Loaded
-from hmz.machines import AnchoredConfig
+from hmz.coganchor.agents import Failed, QwenCodeAgent, QwenCodeAgentConfig
+from hmz.coganchor.agents import qwen as backend
+from hmz.coganchor.agents.skills import Loaded
+from hmz.coganchor.machines import AnchoredConfig
 from tests.stubs import HereAnchor
 
 if TYPE_CHECKING:

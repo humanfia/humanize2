@@ -1,6 +1,6 @@
 """A flow that is running, and the handful of things there are to do to one.
 
-:class:`hmz.runner.Runner` is a flow loaded and handed its agents; running it is a call that
+:class:`hmz.runtime.runner.Runner` is a flow loaded and handed its agents; running it is a call that
 returns when the flow does, which for a loop meant to run for a week is not a call anything
 holding a terminal can make. This is that call put on a thread of its own, with the two things
 somebody watching a run asks for -- whether it is still going, and to stop it.
@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import threading
 
-    from hmz.agents import AgentBase
-    from hmz.runner import Runner
+    from hmz.coganchor.agents import AgentBase
+    from hmz.runtime.runner import Runner
 
 __all__ = ["Run"]
 

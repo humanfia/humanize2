@@ -1,8 +1,8 @@
 """Where a turn goes when the place taking it cannot take it, reached through the SDK.
 
-The store itself is `tests/test_fallback_command.py`'s and `hmz.fallbacks`'s. What is checked
-here is the other half of the promise the SDK makes: that a step written from here is the step
-a command line lists and the interface's own menu reads back, and that the three things which
+The store itself is `tests/test_fallback_command.py`'s and `hmz.coganchor.fallbacks`'s. What is
+checked here is the other half of the promise the SDK makes: that a step written from here is the
+step a command line lists and the interface's own menu reads back, and that the three things which
 can happen to one -- pointed somewhere, told how to try again, taken away -- are the same three
 whichever way in wrote them.
 """

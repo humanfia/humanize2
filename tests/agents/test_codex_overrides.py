@@ -18,7 +18,7 @@ from typing import Any, cast
 
 import pytest
 
-from hmz.agents import CodexAgent, CodexAgentConfig
+from hmz.coganchor.agents import CodexAgent, CodexAgentConfig
 
 pytestmark = pytest.mark.agent
 

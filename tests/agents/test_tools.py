@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import BaseModel, Field
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,
@@ -27,15 +27,15 @@ from hmz.agents import (
     Tool,
     Toolbox,
 )
-from hmz.agents import codex as appservers
-from hmz.agents.tools import PROTOCOL, serve
+from hmz.coganchor.agents import codex as appservers
+from hmz.coganchor.agents.tools import PROTOCOL, serve
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-    from hmz.agents import AgentConfig
+    from hmz.coganchor.agents import AgentConfig
 
 
 class Asked(BaseModel):
@@ -510,7 +510,7 @@ def test_swapping_one_callback_for_another_starts_a_codex_server_told_about_it(
 
 def test_a_backend_with_no_way_of_being_told_refuses_a_callback() -> None:
     """A tool the model never sees would be a flow that quietly does not do what it says."""
-    from hmz.agents import AgentConfig as Config
+    from hmz.coganchor.agents import AgentConfig as Config
 
     said: AgentConfig = Config(model="m", effort="high")
     session = ShellAgent(said).new()
@@ -578,7 +578,7 @@ def test_the_bridge_runs_here_for_an_agent_whose_turns_land_elsewhere() -> None:
     The socket is in this process, so a bridge started on the target would find no socket and
     no humanize -- and the flow would lose its callbacks without anything looking wrong.
     """
-    from hmz.machines import AnchoredConfig
+    from hmz.coganchor.machines import AnchoredConfig
     from tests.stubs import HereAnchor
 
     agent = ClaudeCodeAgent(

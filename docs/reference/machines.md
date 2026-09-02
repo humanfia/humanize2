@@ -10,9 +10,9 @@ it reads and the commands it runs.
 ## The three answers
 
 ```python
-from hmz.agents import ClaudeCodeAgentConfig
+from hmz.coganchor.agents import ClaudeCodeAgentConfig
 from hmz.coganchor import AnchorConfig
-from hmz.machines import AnchoredConfig, DockerConfig
+from hmz.coganchor.machines import AnchoredConfig, DockerConfig
 
 here    = ClaudeCodeAgentConfig(model=…, effort=…)
 there   = ClaudeCodeAgentConfig(model=…, effort=…, machine=AnchoredConfig(
@@ -82,11 +82,11 @@ prompt, not the command line. The flow names the image, and the rest follows fro
   [any of them does](#when-the-machine-comes-up-and-when-it-goes).
 
 Which is [a container of the agent's own](#a-container-of-the-agent-s-own), settled where the
-flow's declaration is read rather than where the agents are chosen. `hmz.agents.isolated`
+flow's declaration is read rather than where the agents are chosen. `hmz.coganchor.agents.isolated`
 is what it comes to, if the same thing is ever wanted by hand:
 
 ```python
-from hmz.agents import isolated
+from hmz.coganchor.agents import isolated
 
 isolated("python:3.12")              # DockerConfig(image="python:3.12", workspace=None)
 isolated("python:3.12", "/srv/one")  # the same, holding that directory instead
@@ -115,7 +115,7 @@ directory on this machine standing in for one.
 
 ```python
 from hmz.coganchor import AnchorConfig
-from hmz.machines import AnchoredConfig
+from hmz.coganchor.machines import AnchoredConfig
 
 machine = AnchoredConfig(
     anchor=AnchorConfig(target="ssh://build-box", workspace="/srv/project")
@@ -139,7 +139,7 @@ and running as you — so the work it leaves behind is yours, in your own worksp
 everything else is the image's.
 
 ```python
-from hmz.machines import DockerConfig
+from hmz.coganchor.machines import DockerConfig
 
 machine = DockerConfig(image="python:3.12", workspace="/path/to/project")
 ```
@@ -320,7 +320,7 @@ Two classes: the setting, and the machine it brings up.
 from dataclasses import dataclass
 
 from hmz.coganchor import AnchorConfig
-from hmz.machines import MachineBase, MachineConfig
+from hmz.coganchor.machines import MachineBase, MachineConfig
 
 @dataclass(frozen=True, kw_only=True)
 class PodmanConfig(MachineConfig):
@@ -362,7 +362,7 @@ The contract is `specs/machines.md`.
 ## API summary
 
 ```python
-from hmz.machines import (
+from hmz.coganchor.machines import (
     MachineConfig,   # the setting: .capabilities, .create() -> MachineBase
     MachineBase,     # the machine: .start() -> AnchorConfig, .stop() -> None,
                      #              .capabilities, .observe(anchor)
@@ -384,7 +384,7 @@ agent.anchor   # AnchorConfig | None -- where its turns land, bringing the machi
 And what a flow writes beside a place, with the two shorthands that build the settings above:
 
 ```python
-from hmz.agents import (
+from hmz.coganchor.agents import (
     Remote,     # this place may be pointed at a machine
     Isolated,   # this place is a container of the flow's own: Isolated("python:3.12")
     anchored,   # anchored("ssh://build-box") -> AnchoredConfig, from a target as it is written

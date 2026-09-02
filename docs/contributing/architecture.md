@@ -9,51 +9,40 @@ contributors; nothing here is needed to *use* humanize.
 src/hmz/
 ├── __init__.py       home() — where humanize keeps what outlives one run
 ├── __main__.py       python -m hmz
-├── backends.py       every fact about a coding agent CLI that is not code
-├── models.py         what each backend runs, asked of it and kept per account
-├── epic.py           what one run of one flow was, written down as it happens
-├── fallbacks.py      where a turn goes when the place taking it cannot take it at all
-├── kept.py           what an agent is, written down: a shape and the two ways it goes
-├── settings.py       what each workspace was set up to run
-├── telemetry.py      what humanize reports about itself, and whether it does at all
-├── runner.py         finding a flow, checking it, driving it, reading the `hmz exec` line
-├── sdk/              humanize as one object: Hmz, which every way in goes through
-├── cli/              the command line: one module per command that has a parser, and
-│                     output.py, which answers whether a person or a program is reading
+├── coganchor/        everything humanize knows about driving a coding agent CLI
+├── flows/            what a flow is called, where it is found, and what it brings
+├── runtime/          what a run is: driving one, writing it down, reading it back
 ├── daemon/           a run held where a terminal closing cannot end it
-├── agents/           the contract, and the driver for each backend
-├── flows/            what a flow is called, where it is found, what it brings, and the three it ships
-├── machines/         where an agent's turns land
-├── providers/        which account an agent runs as, kept apart from which CLI it is
-├── coganchor/        running an agent here whose work lands elsewhere
-├── tracing/          trajectories back out as a Chrome trace
-└── tui/              the terminal interface
+├── sdk/              humanize as one object, for whoever is calling it from outside
+├── tui/              the terminal interface
+└── cli/              the command line: one module per command that has a parser, and
+                      output.py, which answers whether a person or a program is reading
 ```
 
-Four ways in, and one thing under them. `sdk/` is humanize as one object; `cli/`, `daemon/` and
-`tui/` each reach it rather than keeping a second copy of what it does. What two of them would
-otherwise each have written is written in `sdk/` instead, so that anything doable one way is
-doable every way, and is refused the same way whichever way it was asked.
+Nothing sits at the top but `__init__.py` and `__main__.py`. A module belongs inside the
+directory whose question it answers, because a top level that is a list of files is one where
+nothing says which of them go together.
 
-Every name says what it holds, except `coganchor` — a program that ships to a target and could
-be lifted out whole, so it has a name of its own.
+`coganchor/` is the whole of the agent-CLI capability, so that everything above it schedules
+flows and drives nothing itself. Every name says what it holds, except that one — it is named
+for the anchor inside it, a program that ships to a target and could be lifted out whole.
 
 ## The layers
 
 | Layer | Is | Entry points |
 | --- | --- | --- |
-| `backends.py` | Names, aliases, efforts, home directories, log globs, credential paths, ways in and skill directories for all twelve backends. Facts, not code — standard library only, and no model id anywhere in it. | `PROFILES`, `named()`, `profiles()`, `read()`, `remember()` |
-| `providers/` | Which account an agent runs as, kept apart from which CLI it is: what one is, where its state lives, and the interception a turn is run under. | `Provider`, `add`, `remove`, `find`, `providers`, `chain`, `points`, `ready`, `filled`, `alone`, `copies`, `serves`, `ways`, `where`, `environ`, `env_of`, `ENV`, `LOCAL` |
-| `models.py` | What each backend runs, asked of that backend the way it offers being asked, and kept per account. Nothing here is a list: a CLI ships models without asking anybody. | `ask`, `offered`, `asked`, `where` |
-| `agents/` | The drivers: one per backend, plus the vocabulary a turn is described in (`Event`, `Question`, `Moment`). `AgentBase` and `SessionBase` answer to the interface `flows/` declares, structurally — this layer never names a flow. | everything in `__init__` |
-| `machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
-| `coganchor/` | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. | `AnchorConfig`, `connect`, `check` |
+| `coganchor/backends.py` | Names, aliases, efforts, home directories, log globs, credential paths, ways in and skill directories for all twelve backends. Facts, not code — standard library only, and no model id anywhere in it. | `PROFILES`, `named()`, `profiles()`, `read()`, `remember()` |
+| `coganchor/providers/` | Which account an agent runs as, kept apart from which CLI it is: what one is, where its state lives, and the interception a turn is run under. | `Provider`, `add`, `remove`, `find`, `providers`, `chain`, `points`, `ready`, `filled`, `alone`, `copies`, `serves`, `ways`, `where`, `environ`, `env_of`, `ENV`, `LOCAL` |
+| `coganchor/models.py` | What each backend runs, asked of that backend the way it offers being asked, and kept per account. Nothing here is a list: a CLI ships models without asking anybody. | `ask`, `offered`, `asked`, `where` |
+| `coganchor/agents/` | The drivers: one per backend, plus the vocabulary a turn is described in (`Event`, `Question`, `Moment`). `AgentBase` and `SessionBase` answer to the interface `flows/` declares, structurally — this layer never names a flow. | everything in `__init__` |
+| `coganchor/machines/` | The setting that says which machine, and the machine it brings up. | `MachineConfig`, `MachineBase`, `AnchoredConfig`, `DockerConfig` |
+| `coganchor/` (the anchor in it) | Syscall interposition: a seccomp-filtered ptrace supervisor here, a replaying server there, a wire protocol between. The half that ships to a target — and the only half that does. | `AnchorConfig`, `connect`, `check` |
 | `flows/` | What a flow is: the interface it drives, the mark, what it says it drives, the skills it brings, calling one from another, and where flowverses are fetched to. The one import a flow writes — what it needs from another layer is handed through from here. `builtin/` beside it is the three humanize ships. | `Agent`, `Session`, `Person`, `flow`, `load`, `drives`, `wanted`, `found`, `find`, `held`, `fork`, `flowverses` |
-| `fallbacks.py` | The layer between an agent and its accounts: where a turn goes when the place taking it cannot take it at all, and how many times over it is taken again first. A step is written between two places — `CLI[@ACCOUNT]/MODEL` — rather than on the account, which `providers` already answers for. Names `backends` and nothing else. | `Falls`, `falls`, `points`, `retrying`, `tried`, `clear`, `chain`, `spec`, `reads`, `waits`, `POLICIES` |
-| `epic.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Epic`, `epics`, `read`, `opened`, `state`, `resumed` |
-| `runner.py` | Handing a flow the agents it declared, naming them, and running it under an epic. Also reads the `hmz exec` line, which the interface starts a flow from too. What the flow says it drives is `flows/`'s to answer. | `Runner`, `flow_and_agents`, `read_agent`, `set_up_from` |
-| `tracing/` | Reading the backends' logs back — and, for a profiled run, sampling the programs its agents start — and rendering both as one Chrome trace. | `collect`, `profile.Profiler` |
-| `sdk/` | humanize as one object. A workspace, what is remembered about it, the flows there are, the agents and accounts they run as, the runs already made and the run being made now. It composes the layers and restates none of them, and it reaches each of them from inside the call that needs it — which is what lets `hmz exec` name it without paying for the tracer. | `Hmz`, `Run`, `Session` |
+| `coganchor/fallbacks.py` | The layer between an agent and its accounts: where a turn goes when the place taking it cannot take it at all, and how many times over it is taken again first. A step is written between two places — `CLI[@ACCOUNT]/MODEL` — rather than on the account, which `providers` already answers for. Names `backends` and nothing else. | `Falls`, `falls`, `points`, `retrying`, `tried`, `clear`, `chain`, `spec`, `reads`, `waits`, `POLICIES` |
+| `runtime/epic.py` | One run of one flow as a directory: the journal, the links to each session's log, and what a flow that can be picked up left behind. Written by `runner`, read by `tracing`, `cli` and `tui`. | `Epic`, `epics`, `read`, `opened`, `state`, `resumed` |
+| `runtime/runner.py` | Handing a flow the agents it declared, naming them, and running it under an epic. Also reads the `hmz exec` line, which the interface starts a flow from too. What the flow says it drives is `flows/`'s to answer. | `Runner`, `flow_and_agents`, `read_agent`, `set_up_from` |
+| `runtime/tracing/` | Reading the backends' logs back — and, for a profiled run, sampling the programs its agents start — and rendering both as one Chrome trace. | `collect`, `profile.Profiler` |
+| `sdk/` | humanize as one object. A workspace, what is remembered about it, the flows there are, the agents and accounts they run as, the runs already made and the run being made now. It composes the layers and restates none of them, and it reaches each of them from inside the call that needs it — which is what lets a caller name it without paying for the tracer. | `Hmz`, `Run`, `Session` |
 | `tui/` | The terminal interface. | `Humanize` |
 | `daemon/` | A run held where a terminal closing cannot end it, and the terminals that come and go from it. A leaf: what it holds is a callable that opens a run and returns when it is over, so it knows nothing of what a run is. | `Daemon`, `Held`, `running`, `daemons`, `start` |
 | `cli/` | The one command line, over layers that have none of their own. | `main`, `COMMANDS` |
@@ -61,13 +50,27 @@ be lifted out whole, so it has a name of its own.
 ### Inside the bigger ones
 
 ```
-agents/
-├── event.py      Event, Question, Stopped, say — values, no behaviour, imported by every driver
-├── hooks.py      Moment, Occasion, Verdict, Hooks — the same, for what a turn stops at
-├── base.py       AgentBase and SessionBase: two halves of one object, declared in one file
-├── config.py     AgentConfig, anchored
-└── claude.py agy.py codex.py dsh.py grok.py kimi.py pi.py qwen.py opencode.py mimo.py
-    zcode.py acp.py human.py
+coganchor/
+├── backends.py   every fact about a coding agent CLI that is not code
+├── models.py     what each backend runs, asked of it and kept per account
+├── fallbacks.py  where a turn goes when the place taking it cannot take it at all
+├── prices.py     what a token costs, off a list somebody else keeps
+├── agents/       event.py hooks.py config.py base.py, and one driver per backend
+├── providers/    which account an agent runs as, and the interception it runs under
+├── machines/     where an agent's turns land
+├── anchor.py argv.py proto.py transport.py remote.py supervisor.py handlers.py
+│   policy.py shadow.py standin.py execproxy.py netproxy.py statepaths.py
+├── linux/        ptrace, seccomp, procfs, syscall numbers (x86-64, aarch64)
+└── serve/        the target half — imports nothing but proto
+
+runtime/
+├── runner.py     finding a flow, checking it, driving it, reading the `hmz exec` line
+├── epic.py       what one run of one flow was, written down as it happens
+├── exporting.py  one whole run packaged up to send somewhere
+├── settings.py   what each workspace was set up to run
+├── kept.py       what an agent is, written down: a shape and the two ways it goes
+├── telemetry.py  what humanize reports about itself, and whether it does at all
+└── tracing/      collector.py session.py chrome.py profile.py, and readers/ per format
 
 flows/
 ├── agent.py      Agent, Session, Person — what a flow drives, as interfaces and nothing else
@@ -75,44 +78,25 @@ flows/
 ├── __init__.py   the mark, finding one by name, and the one import a flow writes
 ├── skills.py     the skills a flow brings, its own and the ones it named
 ├── verses.py     where flows come from when they come from somewhere else
-└── builtin/      the three humanize ships
-
-coganchor/
-├── anchor.py     AnchorConfig, connect, check — the front door
-├── argv.py       the `hmz anchor` line, all three directions: parse, settle, render
-├── proto.py      the wire, shared by both halves
-├── linux/        ptrace, seccomp, procfs, syscall numbers (x86-64, aarch64)
-├── serve/        the target half — imports nothing but proto
-└── supervisor.py handlers.py policy.py shadow.py standin.py execproxy.py netproxy.py
-                  remote.py transport.py statepaths.py — the half beside the agent
-
-tracing/
-├── collector.py  what to gather, and naming each session's agent
-├── session.py    the model every reader produces
-├── chrome.py     the Chrome trace rendering
-├── profile.py    the sampler a profiled run's programs are read off the process tree by
-└── readers/      claude.py codex.py dsh.py kimi.py — one log format apiece
+└── builtin/      what humanize ships
 ```
 
 ## The dependency graph
 
 ```
-coganchor        backends
-    │                │
-machines            │
-    │                │
- agents ────────────┤
-    │                │
-  epic   flows       │
-    └──┬───┘         │
-       │             │
-    runner ──────────┤
-       │             │
-      sdk ── tracing ┘
-       │
-      tui        daemon   ← a leaf: it holds a callable, not a run
-       │
-      cli   ← may name anything; it is what joins them
+                coganchor   ← everything about driving a coding agent CLI
+                  ↑    ↓
+                  │  telemetry → settings → kept
+                  │
+    flows ────────┤
+      ↑           │
+    runner ── epic ── tracing ── exporting
+      ↑
+     sdk        daemon   ← a leaf: it holds a callable, not a run
+      ↑
+     tui
+      ↑
+     cli   ← may name anything; it is what joins them
 ```
 
 <HmzStack />
@@ -120,25 +104,39 @@ machines            │
 It is a DAG with no exceptions. Nothing points both ways. The diagram above is the same table
 drawn: hover a layer and it lights up exactly what that layer is allowed to name.
 
-Two edges are worth explaining:
+Three edges are worth explaining:
 
-- **`agents → machines`** rather than the other way round, because an agent's config says which
-  machine, and a machine hands back an anchor without knowing what will run on it.
-- **`tracing → backends` only.** `tracing` does not know how to *drive* anything; it needs the
-  home directories and log globs, and nothing else.
+- **`coganchor → telemetry`**, which is the one thing the bottom layer names. A skill a flow
+  brought that a session will not read is noticed there and nowhere else, and the reporter
+  names nothing above itself — so this widens the graph without bending it. It is also why
+  `runtime/` is drawn open rather than closed: had `telemetry` been inside one box with
+  `runner`, that box and `coganchor` would point both ways.
+- **`epic → tracing`**, because a profiled run samples the programs its agents start. `tracing`
+  itself knows how to *drive* nothing; it needs the home directories and log globs, and
+  nothing else.
+- **`cli` reaches `coganchor` directly**, for `hmz anchor`. That command is the only line the
+  target half is ever started by, and it must cost nothing else of humanize on the way.
 
-And one edge deliberately absent: **`agents` does not name `epic`.** A run is written out of
-the agents it drove, so naming the run from an agent would be a circle. What an agent needs of
-one — somewhere to write down a session it opened — is a `Journal` protocol declared in
-`agents/base.py`, which `Epic` happens to satisfy.
+And one edge deliberately absent: **`coganchor` does not name `epic`.** A run is written out
+of the agents it drove, so naming the run from an agent would be a circle. What an agent needs
+of one — somewhere to write down a session it opened — is a `Journal` protocol declared in
+`coganchor/agents/base.py`, which `Epic` happens to satisfy.
+
+Inside `coganchor` the arrows are no longer in the table, because it is one layer: the drivers
+name the facts, the accounts and the machines freely, exactly as the insides of `flows/` and
+`tui/` do. The one line held inside it is `coganchor/serve/`, which may name the wire and
+nothing else — see below.
 
 ## Rules that are checked
 
-`tests/test_layering.py` holds the table and four tests. It is the only place these can be
+`tests/test_layering.py` holds the table and five tests. It is the only place these can be
 checked at all.
 
 1. **Every layer imports only what it may.** The table lists what each may name besides its own
-   subtree and `hmz` itself. Relative spellings are resolved, so
+   subtree and `hmz` itself. A package a submodule was taken out of does not count as named —
+   `from hmz.runtime import telemetry` names the reporter, not everything beside it — or one
+   entry would silently say a whole directory the import never touched. Relative spellings are
+   resolved, so
    `from ..supervisor import Supervisor` counts exactly as the absolute form would.
 2. **No two layers name each other.** A pair that points both ways is two things put in one
    place, not one above another.
@@ -148,7 +146,7 @@ checked at all.
    is built, `hmz anchor serve` is run out of it with an empty `PYTHONPATH`, and what it loaded
    is compared with the table.
 
-That last one is why `coganchor/serve/` may import nothing but `proto`. The serving half runs on
+That last one is why `coganchor/serve/` may import nothing but `proto` — not even the package it sits in, whose name would be leave to name every driver in it. It is also why the bundle carries the anchor half alone: `DRIVING` in `coganchor/transport.py` names what a target has no use for, and `test_the_bundle_carries_nothing_that_drives_an_agent` is what notices a new one. The serving half runs on
 the target, which may be any architecture, while `coganchor/linux/` picks a register map at
 import time and refuses any architecture it has not got one for — which is x86-64 and aarch64,
 and nothing else.
@@ -172,8 +170,8 @@ what a single class could not express.
 ## Naming
 
 Module names come from the product's own vocabulary — the same words `hmz` and this site use.
-[Agents](/reference/agents) documents `agents/`, [Tracing](/reference/tracing) documents
-`tracing/`, and so on.
+[Agents](/reference/agents) documents `coganchor/agents/`, [Tracing](/reference/tracing)
+documents `runtime/tracing/`, and so on.
 
 A name of its own is for something that could be its own repository: its own SPEC, its own wire
 protocol, its own architecture requirement, shippable on its own. Exactly one thing qualifies,
@@ -185,7 +183,7 @@ Under `specs/`, and normative. Where this documentation says what humanize *does
 what it *must* do, in MUST/MUST NOT terms, for whoever is changing it.
 
 One flat directory, and a package with a contract of its own has a file named for it:
-`specs/agents.md` is the contract for `agents/`. A package no file is named for is bound by the
+`specs/agents.md` is the contract for `coganchor/agents/`. A package no file is named for is bound by the
 nearest one above it that has a file, and `specs/SPEC.md` is the one for the tree itself.
 Together rather than beside the code, because a contract is read as a set — what one package may
 demand of another is a question about several of them at once — and because a file under `src/`
@@ -209,14 +207,14 @@ SPEC; propose the SPEC change separately.
 
 ## Adding things
 
-**A backend.** A `Profile` in `backends.py`, a driver in `agents/`, an entry in the `DRIVEN`
-table in `agents/__init__.py`, which `runner.py` and the interface both read, a way of asking
-it what it runs in `models.py`'s `_READING` table, and its state paths in
-`coganchor/statepaths.py`. Subclass `CommandSessionBase` if a turn is one run of a command
+**A backend.** A `Profile` in `coganchor/backends.py`, a driver in `coganchor/agents/`, an
+entry in the `DRIVEN` table in `coganchor/agents/__init__.py`, which `runtime/runner.py` and
+the interface both read, a way of asking it what it runs in `coganchor/models.py`'s `_READING`
+table, and its state paths in `coganchor/statepaths.py`. Subclass `CommandSessionBase` if a turn is one run of a command
 line, or `StreamSessionBase` if it is one long-lived process spoken to a line at a time —
 `specs/agents.md` says which and why.
 
-Then whatever its logs allow, and nothing more: a reader in `tracing/readers/` where a session
+Then whatever its logs allow, and nothing more: a reader in `runtime/tracing/readers/` where a session
 of it can be gathered afterwards, and a branch in `tui/tally.py`'s `_spent` where a row of them
 says what one request cost, which is what a tally moving during a turn is read out of. A
 backend that writes neither gets neither, and says so rather than being left out.
@@ -224,7 +222,7 @@ backend that writes neither gets neither, and says so rather than being left out
 And the documentation. Several pages count the backends and several tables name every one of
 them, so one added without them is a site that says there are fewer than there are.
 
-**A machine.** Two classes in `machines/`, per [Machines](/reference/machines#writing-a-machine-of-your-own).
+**A machine.** Two classes in `coganchor/machines/`, per [Machines](/reference/machines#writing-a-machine-of-your-own).
 
 **A command.** A module under `cli/` if it takes a parser of its own, a thin wrapper in
 `cli/__init__.py`, and an entry in `COMMANDS`. Import your layer *inside* the function, not at
@@ -236,7 +234,8 @@ object a program reads, and holding one open is what keeps a stray print out of 
 [flowverse](/reference/flows#flowverses)'s own `flows/` for one it offers, one in
 `.humanize/flows/` for one of your own. Its `__init__.py` is the flow, whatever it imports
 lives beside it, and its `skills/` is what it brings. They are content and import nothing of
-humanize but `hmz.agents` — and `hmz.flows.flow`, where one holds several.
+humanize but `hmz.flows`, which is where everything a flow is written against is handed
+through from.
 
 ## The checks
 

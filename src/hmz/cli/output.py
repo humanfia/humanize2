@@ -42,8 +42,8 @@ if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderResult
     from rich.live import Live
 
-    from hmz.agents import AgentBase, Event
-    from hmz.agents.base import SessionBase
+    from hmz.coganchor.agents import AgentBase, Event
+    from hmz.coganchor.agents.base import SessionBase
 
 __all__ = ["Out", "Shown", "colours", "terminal"]
 
@@ -491,7 +491,7 @@ class Shown:
         installed: `$0.00` beside a turn that cost something would be a claim about a bill,
         and a wrong one.
         """
-        from hmz.prices import cost, money
+        from hmz.coganchor.prices import cost, money
 
         if not event.spent:
             return

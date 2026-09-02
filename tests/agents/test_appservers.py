@@ -21,8 +21,8 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import BaseModel
 
-from hmz import backends
-from hmz.agents import (
+from hmz.coganchor import backends
+from hmz.coganchor.agents import (
     CodexAgent,
     CodexAgentConfig,
     Event,
@@ -30,8 +30,8 @@ from hmz.agents import (
     KimiCodeCLIAgentConfig,
     Tool,
 )
-from hmz.agents import codex as appservers
-from hmz.agents import kimi as kimicode
+from hmz.coganchor.agents import codex as appservers
+from hmz.coganchor.agents import kimi as kimicode
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -1447,7 +1447,7 @@ def test_codex_grants_what_a_turn_asks_to_be_allowed_to_do(codex: _FakeServer) -
 def test_a_hook_may_refuse_what_codex_asked_to_be_allowed_to_do(
     codex: _FakeServer,
 ) -> None:
-    from hmz.agents import Moment, Verdict
+    from hmz.coganchor.agents import Moment, Verdict
 
     agent = CodexAgent(
         CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="auto")
@@ -1470,7 +1470,7 @@ def test_codex_is_widened_by_handing_back_the_permissions_it_asked_for(
 
 
 def test_a_widening_a_hook_refuses_is_granted_nothing(codex: _FakeServer) -> None:
-    from hmz.agents import Moment, Verdict
+    from hmz.coganchor.agents import Moment, Verdict
 
     agent = CodexAgent(
         CodexAgentConfig(model="gpt-5.6-sol", effort="high", permission="auto")

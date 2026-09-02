@@ -1,11 +1,10 @@
 """The accounts an agent may be run as, and what each backend runs as one of them.
 
-One named set of credentials per account, kept apart from the CLI's own, and the catalogue of
-models that account may name -- which is a thing about the account rather than about the CLI,
-since which models a key is good for is the key's. The store is :mod:`hmz.providers` and the
-catalogue is :mod:`hmz.models`; both are reached from here, so that an account made from a
-command line is one the interface offers a moment later and one whose models have been asked
-for once.
+One named set of credentials per account, kept apart from the CLI's own, and the catalogue of models
+that account may name -- which is a thing about the account rather than about the CLI, since which
+models a key is good for is the key's. The store is :mod:`hmz.coganchor.providers` and the catalogue
+is :mod:`hmz.coganchor.models`; both are reached from here, so that an account made from a command
+line is one the interface offers a moment later and one whose models have been asked for once.
 """
 
 from __future__ import annotations
@@ -16,8 +15,8 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-    from hmz.backends import Model, Way
-    from hmz.providers import Provider
+    from hmz.coganchor.backends import Model, Way
+    from hmz.coganchor.providers import Provider
 
 __all__ = ["Accounts"]
 
@@ -34,19 +33,19 @@ class Accounts:
         Returns:
           One apiece, by backend and then by name.
         """
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.providers(cli)
 
     def ways(self, cli: str) -> tuple[Way, ...]:
         """How one backend can be signed into, in the order it offers them."""
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.ways(cli)
 
     def way(self, cli: str, name: str) -> Way | None:
         """The way in one backend offers under a name, or None for one it does not."""
-        from hmz.providers import login
+        from hmz.coganchor.providers import login
 
         return login.way_of(cli, name)
 
@@ -61,7 +60,7 @@ class Accounts:
         Returns:
           It, or None for a name that backend has no account under.
         """
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.find(cli, name)
 
@@ -79,13 +78,13 @@ class Accounts:
           ValueError: If the backend is not one humanize drives, or the name is not one an
             account may be kept under -- which is what asks it of a name before it is made.
         """
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.where(cli, name)
 
     def local(self, cli: str) -> Path:
         """Where the account this machine is already signed into keeps what is written of it."""
-        from hmz.providers import store
+        from hmz.coganchor.providers import store
 
         return store.alone(cli)
 
@@ -118,7 +117,7 @@ class Accounts:
           ValueError: If the backend or the name is not one that may be used.
           OSError: If the directory cannot be made or the file cannot be written.
         """
-        from hmz import providers
+        from hmz.coganchor import providers
 
         if way:
             return providers.add(cli, name, way, env, args)
@@ -147,7 +146,7 @@ class Accounts:
           ValueError: If the backend or the name is not one that may be used.
           OSError: If the directory cannot be made or the file cannot be written.
         """
-        from hmz.providers import login
+        from hmz.coganchor.providers import login
 
         return login.make(cli, name, way, answers)
 
@@ -164,19 +163,19 @@ class Accounts:
         Returns:
           What the backend's own command exited with, which is zero for a sign-in that worked.
         """
-        from hmz.providers import login
+        from hmz.coganchor.providers import login
 
         return login.sign_in(provider, way, answers)
 
     def asks(self, way: Way, given: Mapping[str, str]) -> list[str]:
         """What a way in still has to be told before it can be used."""
-        from hmz.providers import login
+        from hmz.coganchor.providers import login
 
         return login.asked(way, given)
 
     def serves(self, one: Provider) -> tuple[str, ...]:
         """The other backends this account's credentials could run, in the order they are listed."""
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.serves(one)
 
@@ -195,13 +194,13 @@ class Accounts:
           ValueError: If that backend could not be run as this account.
           OSError: If it cannot be written.
         """
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.copies(one, cli, name)
 
     def chain(self, one: Provider) -> list[Provider]:
         """Every account a turn under this one would carry on under, this one first."""
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.chain(one)
 
@@ -220,7 +219,7 @@ class Accounts:
           ValueError: If the account named is not one of that backend's, or is the account
             itself, or would make a chain that comes round on itself.
         """
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.points(cli, name, at)
 
@@ -238,19 +237,19 @@ class Accounts:
           ValueError: If it is the account this machine is already signed into, which
             humanize did not make and keeps no credentials for.
         """
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.remove(cli, name)
 
     def env(self, said: str) -> dict[str, str]:
         """Reads `NAME=VALUE` lines into what a turn under an account is run with."""
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.env_of(said)
 
     def environ(self, provider: Provider | None) -> dict[str, str]:
         """What a turn under this account is run with, and nothing for no account at all."""
-        from hmz import providers
+        from hmz.coganchor import providers
 
         return providers.environ(provider)
 
@@ -265,13 +264,13 @@ class Accounts:
           One model apiece, each with the efforts it takes, and nothing at all for a backend
           nobody has asked yet.
         """
-        from hmz import models
+        from hmz.coganchor import models
 
         return models.offered(cli, provider)
 
     def asked(self, cli: str, provider: str = "") -> str:
         """When one backend was last asked what it runs as one account, and "" for never."""
-        from hmz import models
+        from hmz.coganchor import models
 
         return models.asked(cli, provider)
 
@@ -289,7 +288,7 @@ class Accounts:
         Returns:
           What it said it runs, which is nothing at all for one that would not answer.
         """
-        from hmz import models
+        from hmz.coganchor import models
 
         if seconds is None:
             return models.ask(cli, provider)

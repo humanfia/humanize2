@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,

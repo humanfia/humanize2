@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.kept import Runs
+from hmz.runtime.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.pick import DETACHES, STAYS, STOPS, Leaves
 from tests.stubs import written
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 FLOW = """
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

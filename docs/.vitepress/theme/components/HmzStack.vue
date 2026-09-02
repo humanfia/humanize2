@@ -7,6 +7,7 @@ import { withBase } from 'vitepress'
 
 interface Node {
   id: string
+  dotted: string
   x: number
   y: number
   blurb: string
@@ -17,64 +18,58 @@ const W = 132
 const H = 40
 
 const NODES: Node[] = [
-  { id: 'tui', x: 190, y: 42, blurb: 'the terminal interface', href: '/reference/tui' },
-  { id: 'daemon', x: 450, y: 42, blurb: 'a run held where a terminal closing cannot end it', href: '/reference/daemon' },
-  { id: 'cli', x: 730, y: 42, blurb: 'one command line, over layers that have none', href: '/reference/cli' },
-  { id: 'sdk', x: 380, y: 116, blurb: 'humanize as one object, which every way in goes through', href: '/reference/sdk' },
-  { id: 'runner', x: 300, y: 190, blurb: 'finds a flow, checks it, names the agents, drives it', href: '/reference/flows' },
-  { id: 'epic', x: 452, y: 264, blurb: 'one run of one flow, written down as it happens', href: '/reference/tracing' },
-  { id: 'flows', x: 120, y: 338, blurb: 'what a flow is, where it is found, what it brings', href: '/reference/flows' },
-  { id: 'tracing', x: 770, y: 338, blurb: "the backends' own logs, read back as one Chrome trace", href: '/reference/tracing' },
-  { id: 'agents', x: 300, y: 412, blurb: 'the contract a flow is written against, and a driver per backend', href: '/reference/agents' },
-  { id: 'models', x: 770, y: 412, blurb: 'what each backend runs, asked of it the way it offers being asked', href: '/reference/providers' },
-  { id: 'machines', x: 120, y: 486, blurb: "where an agent's turns land: a container, a host, here", href: '/reference/machines' },
-  { id: 'providers', x: 560, y: 486, blurb: 'which account an agent runs as, kept apart from which CLI it is', href: '/reference/providers' },
-  { id: 'coganchor', x: 120, y: 560, blurb: 'syscall interposition: a supervisor here, a server there', href: '/reference/remote-execution' },
-  { id: 'backends', x: 660, y: 560, blurb: 'every fact about a coding agent CLI that is not code', href: '/user/concepts' },
+  { id: 'tui', dotted: 'hmz.tui', x: 140, y: 42, blurb: 'the terminal interface', href: '/reference/tui' },
+  { id: 'daemon', dotted: 'hmz.daemon', x: 450, y: 42, blurb: 'a run held where a terminal closing cannot end it', href: '/reference/daemon' },
+  { id: 'cli', dotted: 'hmz.cli', x: 760, y: 42, blurb: 'one command line, over layers that have none', href: '/reference/cli' },
+  { id: 'sdk', dotted: 'hmz.sdk', x: 300, y: 116, blurb: 'humanize as one object, for whoever is calling it from outside', href: '/reference/sdk' },
+  { id: 'runner', dotted: 'hmz.runtime.runner', x: 300, y: 190, blurb: 'finds a flow, checks it, names the agents, drives it', href: '/reference/flows' },
+  { id: 'flows', dotted: 'hmz.flows', x: 120, y: 264, blurb: 'what a flow is, where it is found, what it brings', href: '/reference/flows' },
+  { id: 'exporting', dotted: 'hmz.runtime.exporting', x: 470, y: 264, blurb: 'one whole run packaged up to send somewhere', href: '/user/export' },
+  { id: 'epic', dotted: 'hmz.runtime.epic', x: 470, y: 338, blurb: 'one run of one flow, written down as it happens', href: '/reference/tracing' },
+  { id: 'tracing', dotted: 'hmz.runtime.tracing', x: 470, y: 412, blurb: "the backends' own logs, read back as one Chrome trace", href: '/reference/tracing' },
+  { id: 'coganchor', dotted: 'hmz.coganchor', x: 300, y: 486, blurb: 'everything humanize knows about driving a coding agent CLI', href: '/reference/agents' },
+  { id: 'telemetry', dotted: 'hmz.runtime.telemetry', x: 300, y: 560, blurb: 'what humanize reports about itself, and whether it does at all', href: '/user/reporting' },
+  { id: 'settings', dotted: 'hmz.runtime.settings', x: 300, y: 634, blurb: 'what each workspace was set up to run', href: '/user/settings' },
+  { id: 'kept', dotted: 'hmz.runtime.kept', x: 300, y: 708, blurb: 'an agent written down: a shape and the two ways it goes', href: '/user/concepts' },
 ]
 
 const EDGES: [string, string][] = [
   ['tui', 'sdk'],
-  ['tui', 'runner'],
-  ['tui', 'epic'],
   ['tui', 'flows'],
-  ['tui', 'tracing'],
-  ['tui', 'agents'],
-  ['tui', 'models'],
-  ['tui', 'providers'],
-  ['tui', 'backends'],
+  ['tui', 'exporting'],
+  ['tui', 'epic'],
+  ['tui', 'coganchor'],
+  ['tui', 'telemetry'],
+  ['tui', 'kept'],
   ['cli', 'sdk'],
   ['cli', 'daemon'],
-  ['cli', 'runner'],
-  ['cli', 'tracing'],
-  ['cli', 'epic'],
-  ['cli', 'models'],
+  ['cli', 'coganchor'],
   ['sdk', 'runner'],
-  ['sdk', 'epic'],
   ['sdk', 'flows'],
+  ['sdk', 'exporting'],
+  ['sdk', 'epic'],
   ['sdk', 'tracing'],
-  ['sdk', 'agents'],
-  ['sdk', 'models'],
-  ['sdk', 'providers'],
-  ['sdk', 'backends'],
-  ['runner', 'epic'],
+  ['sdk', 'coganchor'],
+  ['sdk', 'settings'],
+  ['sdk', 'telemetry'],
+  ['sdk', 'kept'],
   ['runner', 'flows'],
-  ['runner', 'agents'],
-  ['runner', 'backends'],
-  ['epic', 'agents'],
+  ['runner', 'epic'],
+  ['runner', 'coganchor'],
+  ['runner', 'settings'],
+  ['runner', 'telemetry'],
+  ['flows', 'epic'],
+  ['flows', 'coganchor'],
+  ['flows', 'telemetry'],
+  ['exporting', 'epic'],
+  ['exporting', 'tracing'],
+  ['exporting', 'coganchor'],
   ['epic', 'tracing'],
-  ['flows', 'agents'],
-  ['flows', 'backends'],
-  ['tracing', 'backends'],
-  ['agents', 'machines'],
-  ['agents', 'providers'],
-  ['agents', 'backends'],
-  ['agents', 'coganchor'],
-  ['models', 'providers'],
-  ['models', 'backends'],
-  ['machines', 'coganchor'],
-  ['providers', 'backends'],
-  ['providers', 'coganchor'],
+  ['epic', 'coganchor'],
+  ['tracing', 'coganchor'],
+  ['coganchor', 'telemetry'],
+  ['telemetry', 'settings'],
+  ['settings', 'kept'],
 ]
 
 const at = Object.fromEntries(NODES.map((n) => [n.id, n])) as Record<string, Node>
@@ -92,14 +87,14 @@ const wires = EDGES.map(([from, to]) => {
   }
 })
 
-const active = ref('agents')
+const active = ref('coganchor')
 const touched = ref(false)
 const node = computed(() => at[active.value])
 const beneath = computed(() => new Set(EDGES.filter(([f]) => f === active.value).map(([, t]) => t)))
 const above = computed(() => new Set(EDGES.filter(([, t]) => t === active.value).map(([f]) => f)))
 
 let tour: ReturnType<typeof setInterval> | undefined
-const ORDER = ['agents', 'coganchor', 'sdk', 'tracing', 'tui', 'flows']
+const ORDER = ['coganchor', 'runner', 'sdk', 'tracing', 'tui', 'flows']
 
 onMounted(() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -121,7 +116,7 @@ function hold(id: string) {
 
 <template>
   <div class="stack hmz-panel">
-    <svg viewBox="0 0 900 604" role="img" aria-label="the layers of humanize, and what each may name">
+    <svg viewBox="0 0 900 752" role="img" aria-label="the layers of humanize, and what each may name">
       <g class="wires">
         <path
           v-for="wire in wires"
@@ -153,7 +148,7 @@ function hold(id: string) {
 
     <div class="read">
       <div class="who">
-        <code>hmz.{{ node.id }}</code>
+        <code>{{ node.dotted }}</code>
         <a :href="withBase(node.href)">read it →</a>
       </div>
       <p>{{ node.blurb }}</p>

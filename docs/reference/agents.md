@@ -4,7 +4,7 @@ Driving a coding agent from Python. An agent is settings; a
 [session](/user/concepts#session) is memory. Which of the two a [flow](/reference/flows) holds decides what
 it remembers.
 
-Everything here is importable from `hmz.agents`. This is the layer under a flow rather than the
+Everything here is importable from `hmz.coganchor.agents`. This is the layer under a flow rather than the
 one a flow is written against: `AgentBase` and `SessionBase` answer to the `Agent` and `Session`
 interfaces [flows](/reference/flows#what-a-flow-drives) declares, and a flow imports those from
 `hmz.flows`. Reach for this page when you are building agents yourself — from a script, from a
@@ -15,7 +15,7 @@ test that stands in for one — rather than weaving a flow.
 Each backend has an agent class and a config class, and they take the same calls:
 
 ```python
-from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.coganchor.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
 agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="claude-opus-4-8", effort="high"))
 ```
@@ -72,7 +72,7 @@ accounts entirely, they are all offered the same catalogue. The whole table is i
 exactly as a failed turn always was.
 
 **Some failures are taken once whatever the step says.** A backend that knows its own
-failure cannot come out differently says so by raising `hmz.agents.Unrecoverable`, and that
+failure cannot come out differently says so by raising `hmz.coganchor.agents.Unrecoverable`, and that
 one is neither retried nor carried to the next account in the chain. A conversation longer
 than the model's context window is that long again on the next try; a backend that will not
 answer under the session id it was opened with will not answer under it a second later. An
@@ -283,7 +283,7 @@ or make a `key` account from the `provider` row of an agent with **a** and give 
 construct it like any other agent:
 
 ```python
-from hmz.agents import DshAgent, DshAgentConfig
+from hmz.coganchor.agents import DshAgent, DshAgentConfig
 
 agent = DshAgent(DshAgentConfig(model="deepseek-v4-flash", effort="high"))
 ```
@@ -394,7 +394,7 @@ report standard service when credits are disabled or fast mode is cooling down. 
 usage records, rather than the request alone, are authoritative for the tier actually served.
 
 ```python
-from hmz.agents import CodexAgent, CodexAgentConfig
+from hmz.coganchor.agents import CodexAgent, CodexAgentConfig
 
 agent = CodexAgent(
     CodexAgentConfig(
@@ -772,7 +772,7 @@ these are the same idea held here instead — hung on a live agent, taken down a
 runs, and written in the language the flow is written in.
 
 ```python
-from hmz.agents import Moment, Occasion, Verdict
+from hmz.coganchor.agents import Moment, Occasion, Verdict
 
 def no_force_push(occasion: Occasion) -> Verdict | None:
     if "push --force" in occasion.about:
@@ -1050,7 +1050,7 @@ strings — including the ones a Ralph loop dropped a turn later. It is what a t
 say which trajectories were this agent's:
 
 ```python
-from hmz.tracing import collect
+from hmz.runtime.tracing import collect
 
 collect(agents={a.id: a.opened for a in (actor, reviewer)})
 ```
@@ -1092,7 +1092,7 @@ name the ones whose roles matter and let the rest be heirs.
 A flow that is a conversation rather than a loop has two sides, and the second is you.
 
 ```python
-from hmz.agents import HumanAgent
+from hmz.coganchor.agents import HumanAgent
 
 person = HumanAgent()                      # takes only an optional name=, defaulting to "human"
 person("Here is what I did. What next?")   # asks, and answers with what was typed
@@ -1224,7 +1224,7 @@ of its own. It is more work than any single-agent effort, which is why it sits a
 
 **Kimi Code's effort says how wide to run as well as how hard to think.** `max` is one agent;
 `swarmmax` is the same thinking at the width of a fleet of subagents. The prefix is exported as
-`hmz.agents.SWARM` for anything that has to take it apart.
+`hmz.coganchor.agents.SWARM` for anything that has to take it apart.
 
 **ZCode's ladder is two vocabularies in one**, because its models have two. The ones that take
 a thinking budget answer `max`, `high` and `low` — and `nothink` for the bottom of that one —
@@ -1290,7 +1290,7 @@ dict(spent)                                  # everything it does count
 
 **A rate is tokens a second over seconds on the clock**, not seconds an agent was talking: a
 flow sleeps between rounds, commits, reads what the last turn wrote, and that time is time the
-tokens were spent over. The window defaults to five minutes — `hmz.agents.WINDOW`, the
+tokens were spent over. The window defaults to five minutes — `hmz.coganchor.agents.WINDOW`, the
 same one the interface's readout is over — and a run younger than the window is measured over
 the run, so a rate read a minute in is what that minute came to rather than a fifth of it.
 
@@ -1354,7 +1354,7 @@ A turn can be given a **budget** — what it may write, how long it may run — 
 is spent the turn stops. Not the next turn: the one running now.
 
 ```python
-from hmz.agents import Budget
+from hmz.coganchor.agents import Budget
 
 session.budget = Budget(output=4_000, seconds=300, when="immediately", then="end")
 ```
@@ -1445,7 +1445,7 @@ started:
 `agent.stop()` reaches the same place, which is what makes it mean what it always said: on a
 command-per-turn backend it ends the turn under way rather than only preventing the next one.
 
-**What any of that came to in money** is `hmz.prices`, which prices a `Usage` kind by kind
+**What any of that came to in money** is `hmz.coganchor.prices`, which prices a `Usage` kind by kind
 against a list fetched from [OpenLLMPrices](https://openllmprices.com/) and kept under
 `~/.humanize/prices.json`:
 
@@ -1661,7 +1661,7 @@ every agent of that CLI carries, installed and switched off where that CLI keeps
 list is readable from Python, and that is all it is:
 
 ```python
-from hmz.agents.skills import skills
+from hmz.coganchor.agents.skills import skills
 
 skills("claude")   # what it would load here: yours, and this project's
 
@@ -1713,7 +1713,7 @@ the agent reads back.
 
 ```python
 from pydantic import BaseModel, Field
-from hmz.agents import Tool
+from hmz.coganchor.agents import Tool
 
 
 class Reviewing(BaseModel):
@@ -1769,7 +1769,7 @@ one of its tools wrongly.
 A config's `machine` says where an agent's work goes. `None` — the default — is this machine.
 
 ```python
-from hmz.machines import AnchoredConfig, DockerConfig
+from hmz.coganchor.machines import AnchoredConfig, DockerConfig
 
 ClaudeCodeAgentConfig(model=…, effort=…, machine=DockerConfig(image="python:3.12"))
 ```
@@ -1789,7 +1789,7 @@ is settled by the flow itself and takes no `machine` from anyone.
 Two of these agents — Claude Code and opencode — ship as a single [Bun](https://bun.sh)
 standalone executable: the whole CLI, its JavaScript minified and packed into one file behind a
 `---- Bun! ----` trailer, runtime and all. Where a shallower way in cannot reach a thing they
-do, `hmz.agents.patching` reaches it by rewriting that bundle — and, because doing so is brittle
+do, `hmz.coganchor.agents.patching` reaches it by rewriting that bundle — and, because doing so is brittle
 by construction, is careful about it. This is the deepest of the ways humanize reaches a CLI's
 own commands, and it reaches these two backends and no other: the agents shipped as native
 binaries carry no bundle to patch, and the plain Node scripts are reached from their runtime
@@ -1804,8 +1804,8 @@ ask for it until a turn actually goes that way.
 ```python
 from pathlib import Path
 
-from hmz.agents.patching import Patch, patched
-from hmz.backends import named, program
+from hmz.coganchor.agents.patching import Patch, patched
+from hmz.coganchor.backends import named, program
 
 claude, where = named("claude"), program("claude")
 copy = None

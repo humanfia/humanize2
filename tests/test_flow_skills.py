@@ -17,11 +17,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig
-from hmz.agents.skills import Loaded
+from hmz.coganchor.agents import AgentConfig
+from hmz.coganchor.agents.skills import Loaded
 from hmz.flows import NotAFlow
 from hmz.flows.skills import brought, cached
-from hmz.runner import Runner
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
@@ -75,7 +75,7 @@ class PiAgent(ShellAgent):
 #: line the test hands it, so a test can have it look at what was mounted beside it.
 DOES = '''"""Does the one thing it is told."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -88,7 +88,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 #: The same, holding one session across two turns, so that two of them are open at once.
 TWICE = '''"""Opens two sessions and does the thing in both."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -108,7 +108,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 #: `load` is for: the two of them are running at once, in one workspace.
 CALLING = '''"""Holds a session open, then calls another flow."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 from hmz.flows import load
 
@@ -403,7 +403,7 @@ def test_a_called_flows_skill_does_not_take_over_the_name_from_the_flow_that_cal
 #: whose agent was stopped and started again does.
 AGAIN = '''"""Closes a session and opens another."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -422,7 +422,7 @@ SLOWLY = '''"""Takes one long turn."""
 
 import threading
 
-from hmz.agents import AgentBase, Stopped
+from hmz.coganchor.agents import AgentBase, Stopped
 from hmz.flows import flow
 
 
@@ -518,7 +518,7 @@ def test_a_copy_that_stopped_partway_is_not_left_to_be_taken_for_the_projects_ow
     """Nothing would ever remove it: it is not in the table of what humanize planted."""
     import shutil
 
-    from hmz.agents.skills import Loaded, mount
+    from hmz.coganchor.agents.skills import Loaded, mount
 
     at = written(tmp_path, "mine", DOES, {"note-taking": skill("note-taking")})
 

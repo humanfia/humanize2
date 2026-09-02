@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from hmz.agents import Event, Saying
+from hmz.coganchor.agents import Event, Saying
 
 
 def _said(events: list[Event]) -> list[tuple[str, str]]:

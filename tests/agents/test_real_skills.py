@@ -1,16 +1,16 @@
 """What each CLI really reads, asked of the CLI itself rather than believed.
 
-Where a backend looks for skills is written down in `hmz.backends`, and a list written down is
-a list that drifts: a CLI adds a directory, or stops reading one, and nothing here would
-notice. What a person is shown would then be either short of what their agent carries or full
-of skills it has not got, and neither reads as wrong until a turn behaves as though a skill
-were missing.
+Where a backend looks for skills is written down in `hmz.coganchor.backends`, and a list written
+down is a list that drifts: a CLI adds a directory, or stops reading one, and nothing here would
+notice. What a person is shown would then be either short of what their agent carries or full of
+skills it has not got, and neither reads as wrong until a turn behaves as though a skill were
+missing.
 
-So this asks. Three of these CLIs can say what they found without a turn being taken --
-`grok inspect`, and `opencode`/`mimo debug skill` -- and each is asked in a home and a project
-of its own, with one skill planted in every directory `hmz.backends` claims it reads. What it
-answers must be exactly what humanize would list: nothing declared that the CLI ignores, and
-nothing read that humanize does not know about.
+So this asks. Three of these CLIs can say what they found without a turn being taken -- `grok
+inspect`, and `opencode`/`mimo debug skill` -- and each is asked in a home and a project of its own,
+with one skill planted in every directory `hmz.coganchor.backends` claims it reads. What it answers
+must be exactly what humanize would list: nothing declared that the CLI ignores, and nothing read
+that humanize does not know about.
 
 No model is asked anything and no tokens are spent, but a real binary is run, so these are
 opt-in with the rest of the tests that need one installed.
@@ -27,11 +27,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents.skills import skills
-from hmz.backends import named
+from hmz.coganchor.agents.skills import skills
+from hmz.coganchor.backends import named
 
 if TYPE_CHECKING:
-    from hmz.backends import Profile
+    from hmz.coganchor.backends import Profile
 
 SKILL = (
     "---\nname: {name}\ndescription: planted where {backend} is said to read one\n---\n"

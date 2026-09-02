@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig
+from hmz.coganchor.agents import AgentConfig
 from hmz.flows import (
     NotAFlow,
     about,
@@ -32,7 +32,7 @@ from hmz.flows import (
     loaded,
     resumes,
 )
-from hmz.runner import Runner
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
@@ -58,7 +58,7 @@ def _writes(said: str) -> str:
     return (
         '"""Says which reading of it ran."""\n\n'
         "from pathlib import Path\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -112,7 +112,7 @@ def test_a_flow_that_grows_a_setting_between_calls_is_set_up_by_the_model_it_has
         '"""Takes a setting, and writes down what it was set up with."""\n\n'
         "import json\n"
         "from pathlib import Path\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n"
         "from pydantic import BaseModel\n\n\n"
         "class Config(BaseModel):\n"
@@ -165,7 +165,7 @@ def test_a_flow_that_changes_how_many_agents_it_drives_is_held_to_the_count_it_h
         flows,
         "pair",
         '"""Two agents now."""\n\n'
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase, AgentBase], task: str) -> None:\n"
@@ -236,7 +236,7 @@ def test_a_flow_that_becomes_resumable_between_two_runs_is_handed_state_at_the_n
         '"""Counts its runs."""\n\n'
         "from pathlib import Path\n"
         "from typing import Any\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow(resumable=True)\n"
         "def run(\n"
@@ -264,7 +264,7 @@ def test_what_a_flow_says_about_itself_is_read_as_it_says_it_now(project: Path) 
         flows,
         "says",
         '"""It says something else now."""\n\n'
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -289,7 +289,7 @@ def test_a_module_beside_a_flow_rewritten_between_two_calls_is_read_again(
         "reads",
         '"""Writes down what the module beside it says."""\n\n'
         "from pathlib import Path\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n"
         "import beside\n\n\n"
         "@flow\n"
@@ -319,7 +319,7 @@ def test_a_module_beside_a_flow_is_forgotten_so_the_next_flow_reads_its_own(
             name,
             '"""Writes down what the module beside it says."""\n\n'
             "from pathlib import Path\n\n"
-            "from hmz.agents import AgentBase\n"
+            "from hmz.coganchor.agents import AgentBase\n"
             "from hmz.flows import flow\n\n"
             "import beside\n\n\n"
             "@flow\n"
@@ -345,7 +345,7 @@ def test_reading_a_flow_leaves_nothing_of_it_behind(project: Path) -> None:
         flows,
         "leaves",
         '"""Imports the module beside it."""\n\n'
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n"
         "import beside\n\n\n"
         "@flow\n"
@@ -380,7 +380,7 @@ def test_a_flow_rewritten_by_the_run_it_is_driving_is_the_one_that_runs_next(
         "improves",
         '"""Rewrites the flow it is about to call."""\n\n'
         "from pathlib import Path\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -424,7 +424,7 @@ def test_a_flow_that_writes_itself_a_skill_carries_it_at_the_next_call(
         "brings",
         '"""Writes down what it is carrying."""\n\n'
         "from pathlib import Path\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"

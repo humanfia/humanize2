@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends, models, providers
-from hmz.agents import (
+from hmz.coganchor import backends, models, providers
+from hmz.coganchor.agents import (
     SUBAGENTS,
     CursorAgent,
     CursorAgentConfig,
@@ -26,8 +26,8 @@ from hmz.agents import (
     Occasion,
     Verdict,
 )
-from hmz.agents.cursor import _local_runtime, parameterized
-from hmz.machines import AnchoredConfig, DockerConfig
+from hmz.coganchor.agents.cursor import _local_runtime, parameterized
+from hmz.coganchor.machines import AnchoredConfig, DockerConfig
 from tests.stubs import HereAnchor
 
 if TYPE_CHECKING:

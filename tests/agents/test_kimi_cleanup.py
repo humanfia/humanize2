@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import kimi as kimi_backend
+from hmz.coganchor.agents import kimi as kimi_backend
 
 if TYPE_CHECKING:
     from pathlib import Path

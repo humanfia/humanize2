@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CodexAgent,
@@ -28,7 +28,7 @@ from hmz.agents import (
     PiAgentConfig,
 )
 from hmz.flows import NotAFlow, wanted
-from hmz.runner import Runner, flow_and_agents
+from hmz.runtime.runner import Runner, flow_and_agents
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -38,7 +38,7 @@ PURSUING = '''"""A loop that hands the objective to the agent and lets it decide
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Goal
+from hmz.coganchor.agents import AgentBase, Goal
 from hmz.flows import flow
 
 
@@ -56,7 +56,7 @@ def run(agents: Agents, task: str) -> None:
 #: The same loop, said the ordinary way: turns, and nothing asked of the backend.
 PLAIN = '''"""A loop of plain turns, which any backend takes."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -72,7 +72,7 @@ GOALS_OFF = '''"""A loop that owns its continuations, and says so where it decla
 
 from typing import Annotated
 
-from hmz.agents import AgentBase, AgentDefaults
+from hmz.coganchor.agents import AgentBase, AgentDefaults
 from hmz.flows import flow
 
 
@@ -88,8 +88,8 @@ def run(
 #: Written both ways at once is a flow the checker has something to say about; read back, it
 #: is a place run under a goal.
 REQUIRED_WHILE_OFF = PURSUING.replace(
-    "from hmz.agents import AgentBase, Goal",
-    "from hmz.agents import AgentBase, AgentDefaults, Goal",
+    "from hmz.coganchor.agents import AgentBase, Goal",
+    "from hmz.coganchor.agents import AgentBase, AgentDefaults, Goal",
 ).replace(
     "Annotated[AgentBase, Goal]",
     "Annotated[AgentBase, Goal, AgentDefaults(goals=False)]",

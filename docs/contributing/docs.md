@@ -166,7 +166,7 @@ Four things they are all held to:
   `specs/coganchor.md` and `coganchor/linux/seccomp.py` route it; `HmzStack`'s edges are the
   `ALLOWED` table in `tests/test_layering.py`; every box in `theme/flows.ts` is a turn a flow
   really takes; `HmzBackends` is `hmz/backends.py` and which session base each agent class
-  derives from; `HmzAccounts`' waits are the formulas in `fallbacks.py`; every agent on
+  derives from; `HmzAccounts`' waits are the formulas in `coganchor/fallbacks.py`; every agent on
   `HmzOrchestra` is spelled the way `hmz exec -a` would take it. A diagram that drifts from
   those is a diagram that lies to a reader.
 - **A simulation is not dressed up as a recording.** `HmzOrchestra`, the feature diagrams and

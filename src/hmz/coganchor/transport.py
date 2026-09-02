@@ -345,16 +345,29 @@ def _export_args(exports: list[str], *, quote: bool = False) -> list[str]:
     return args
 
 
-def build_bundle(destination: Path | None = None) -> Path:
-    """Package coganchor, and the command line reaching it, as a zipapp for the target.
+#: What the target has no use for, left out of the bundle by name. This package is two
+#: things: the anchor -- the wire, the supervisor and the serving half, which is what a
+#: target runs -- and everything humanize knows about driving a coding agent CLI, which a
+#: target never does. The anchor half ships whole, ptrace layer and register maps included,
+#: because pruning *that* would be a list to keep in step and nothing is lost by carrying
+#: it: the target only ever runs ``anchor serve``, which reaches none of it. The driving
+#: half is a different answer -- it is megabytes of drivers, it reaches the network to read
+#: prices and catalogues, and no line the target runs can arrive at it. It is named here
+#: rather than inferred, and ``test_the_bundle_carries_nothing_that_drives_an_agent`` is
+#: what notices a new one.
+DRIVING = ("agents", "providers", "machines", "backends.py", "models.py", "fallbacks.py",
+           "prices.py")  # fmt: skip
 
-    The whole subpackage ships, tracer half included, because pruning it would
-    be a list to keep in step with the source tree.  Nothing is lost by that:
-    the target only ever runs ``anchor serve``, which :func:`hmz.cli.main` reaches
-    without importing the modules that need ptrace or an x86-64 register map --
-    nor any other subpackage, none of which is here -- so the bundle runs on a
-    target of any architecture.  It is pure stdlib, so a host needs nothing but
-    ``python3``.
+
+def build_bundle(destination: Path | None = None) -> Path:
+    """Package the anchor, and the command line reaching it, as a zipapp for the target.
+
+    The anchor half of this package ships whole -- see :data:`DRIVING` for what does not and
+    why.  Nothing is lost by carrying the tracer with it: the target only ever runs ``anchor
+    serve``, which :func:`hmz.cli.main` reaches without importing the modules that need
+    ptrace or an x86-64 register map -- nor any other subpackage, none of which is here -- so
+    the bundle runs on a target of any architecture.  It is pure stdlib, so a host needs
+    nothing but ``python3``.
     """
     if destination is None:
         destination = Path(tempfile.gettempdir()) / f"humanize-{os.getuid()}.pyz"
@@ -366,7 +379,7 @@ def build_bundle(destination: Path | None = None) -> Path:
         shutil.copytree(
             Path(coganchor.__file__).parent,
             root.joinpath(*parts),
-            ignore=shutil.ignore_patterns("__pycache__", "*.md"),
+            ignore=shutil.ignore_patterns("__pycache__", "*.md", *DRIVING),
         )
         for depth in range(1, len(parts)):
             # A namespace of its own rather than the installed ``hmz/__init__.py``: the

@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 #: A flow, as short as one can be: the file is what is being fetched, not what it does.
 FLOW = '''"""A flow of somebody else's."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

@@ -21,17 +21,17 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig, Hooks, Moment, Occasion
-from hmz.agents import preload as layer
-from hmz.agents.preload import RUNTIME, Watch, preloaded, reported, runtime
-from hmz.backends import named
+from hmz.coganchor.agents import AgentConfig, Hooks, Moment, Occasion
+from hmz.coganchor.agents import preload as layer
+from hmz.coganchor.agents.preload import RUNTIME, Watch, preloaded, reported, runtime
+from hmz.coganchor.backends import named
 from tests.stubs import HereAnchor, ShellAgent
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-    from hmz.agents import AgentBase
+    from hmz.coganchor.agents import AgentBase
 
 #: What the stand-in agents here are configured with, which nothing in this file reads.
 CONFIG = AgentConfig(model="m", effort="high")

@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig
-from hmz.runner import Runner
+from hmz.coganchor.agents import AgentConfig
+from hmz.runtime.runner import Runner
 from hmz.sdk import Hmz
 from hmz.sdk.epics import Epics
 from tests.stubs import ShellAgent, written
@@ -35,7 +35,7 @@ FLOW = '''"""Opens a session, and counts the runs of itself."""
 
 from typing import Any
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

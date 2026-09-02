@@ -17,12 +17,12 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from hmz.tracing.readers import codex
+from hmz.runtime.tracing.readers import codex
 
 if TYPE_CHECKING:
     import pathlib
 
-    from hmz.tracing.session import Action, Session
+    from hmz.runtime.tracing.session import Action, Session
 
 #: The thread every rollout below is written under.
 THREAD = "01998f1a-0000-7000-8000-00000000beef"

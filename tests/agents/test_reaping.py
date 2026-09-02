@@ -19,14 +19,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentBase, AgentConfig, StreamSessionBase
-from hmz.agents.watchdog import WATCHDOG
+from hmz.coganchor.agents import AgentBase, AgentConfig, StreamSessionBase
+from hmz.coganchor.agents.watchdog import WATCHDOG
 
 if TYPE_CHECKING:
     import os
     from collections.abc import Iterable
 
-    from hmz.agents import Event
+    from hmz.coganchor.agents import Event
 
 CONFIG = AgentConfig(model="m", effort="high")
 

@@ -396,9 +396,9 @@ def _agent(anchor: AnchorConfig) -> object:
     The real backend rather than a stand-in for it: what is being checked is the one line
     every backend funnels through, so a fake agent would be checking the fake.
     """
-    from hmz.agents.claude import ClaudeCodeAgent
-    from hmz.agents.config import AgentConfig
-    from hmz.machines import AnchoredConfig
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent
+    from hmz.coganchor.agents.config import AgentConfig
+    from hmz.coganchor.machines import AnchoredConfig
 
     return ClaudeCodeAgent(
         AgentConfig(
@@ -412,7 +412,7 @@ def _agent(anchor: AnchorConfig) -> object:
 def test_a_native_turn_is_spawned_as_the_anchor_line_and_looks_for_no_local_cli() -> (
     None
 ):
-    from hmz.agents.base import AgentBase
+    from hmz.coganchor.agents.base import AgentBase
 
     agent = _agent(AnchorConfig(target="docker://box", native=True))
     assert isinstance(agent, AgentBase)
@@ -429,7 +429,7 @@ def test_a_native_turn_is_spawned_as_the_anchor_line_and_looks_for_no_local_cli(
 
 
 def test_a_supervised_turn_is_told_none_of_what_only_a_native_one_needs() -> None:
-    from hmz.agents.base import AgentBase
+    from hmz.coganchor.agents.base import AgentBase
 
     agent = _agent(AnchorConfig(target="docker://box"))
     assert isinstance(agent, AgentBase)
@@ -443,8 +443,8 @@ def test_a_supervised_turn_is_told_none_of_what_only_a_native_one_needs() -> Non
 def test_the_skills_a_flow_carries_are_named_to_a_native_turn_by_where_they_go() -> (
     None
 ):
-    from hmz.agents.base import AgentBase
-    from hmz.agents.skills import Loaded
+    from hmz.coganchor.agents.base import AgentBase
+    from hmz.coganchor.agents.skills import Loaded
 
     agent = _agent(AnchorConfig(target="docker://box", native=True))
     assert isinstance(agent, AgentBase)
@@ -458,8 +458,8 @@ def test_the_skills_a_flow_carries_are_named_to_a_native_turn_by_where_they_go()
 def test_a_turn_offering_the_flows_callbacks_to_a_cli_on_another_machine_is_refused() -> (
     None
 ):
-    from hmz.agents.base import AgentBase
-    from hmz.agents.tools import Tool
+    from hmz.coganchor.agents.base import AgentBase
+    from hmz.coganchor.agents.tools import Tool
 
     agent = _agent(AnchorConfig(target="docker://box", native=True))
     assert isinstance(agent, AgentBase)
@@ -472,8 +472,8 @@ def test_a_turn_offering_the_flows_callbacks_to_a_cli_on_another_machine_is_refu
 
 
 def test_the_flows_callbacks_still_reach_a_native_turn_that_is_running_here() -> None:
-    from hmz.agents.base import AgentBase
-    from hmz.agents.tools import Tool
+    from hmz.coganchor.agents.base import AgentBase
+    from hmz.coganchor.agents.tools import Tool
 
     agent = _agent(AnchorConfig(target="local", native=True))
     assert isinstance(agent, AgentBase)
@@ -498,8 +498,8 @@ def _account(
       variables: Whether it also carries the account in the environment, which is what a
         gateway and a key do and what a subscription does not.
     """
-    from hmz import providers
-    from hmz.providers import store
+    from hmz.coganchor import providers
+    from hmz.coganchor.providers import store
 
     held = providers.Provider(
         cli=cli,
@@ -521,7 +521,7 @@ def _account(
 def test_the_files_an_account_keeps_are_named_to_a_native_turn_by_what_points_at_them(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from hmz.agents.base import AgentBase
+    from hmz.coganchor.agents.base import AgentBase
 
     # Where the CLI keeps its own state, which its own variable moves; the shared
     # configuration directory, which one other variable moves; and the user's own home, which
@@ -550,7 +550,7 @@ def test_the_files_an_account_keeps_are_named_to_a_native_turn_by_what_points_at
 def test_what_a_native_turn_is_run_without_is_what_its_account_would_be_outranked_by(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from hmz.agents.base import AgentBase
+    from hmz.coganchor.agents.base import AgentBase
 
     _account(monkeypatch, "claude", tmp_path)
     agent = _agent(AnchorConfig(target="docker://box", native=True))
@@ -569,7 +569,7 @@ def test_what_a_native_turn_is_run_without_is_what_its_account_would_be_outranke
 def test_an_account_kept_only_where_nothing_can_point_a_remote_cli_is_refused(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from hmz.agents.base import AgentBase
+    from hmz.coganchor.agents.base import AgentBase
 
     # The whole of this account is one file under the user's own home, which nothing but
     # `HOME` moves. A turn driven on the target would read the target's own copy instead,
@@ -587,7 +587,7 @@ def test_an_account_kept_only_where_nothing_can_point_a_remote_cli_is_refused(
 def test_an_account_its_variables_carry_is_not_refused_for_what_stays_behind(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from hmz.agents.base import AgentBase
+    from hmz.coganchor.agents.base import AgentBase
 
     (tmp_path / "user").mkdir()
     (tmp_path / "user" / ".claude.json").write_text("{}\n")
@@ -605,9 +605,9 @@ def test_an_account_its_variables_carry_is_not_refused_for_what_stays_behind(
 def test_an_account_under_a_directory_a_variable_only_half_names_is_not_projected(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from hmz.agents.config import AgentConfig
-    from hmz.agents.opencode import OpencodeAgent
-    from hmz.machines import AnchoredConfig
+    from hmz.coganchor.agents.config import AgentConfig
+    from hmz.coganchor.agents.opencode import OpencodeAgent
+    from hmz.coganchor.machines import AnchoredConfig
 
     # opencode keeps its state under a directory its variable names the *parent* of, so a
     # projection of it would land a level out of place and the CLI would read nothing.
@@ -629,7 +629,7 @@ def test_an_account_under_a_directory_a_variable_only_half_names_is_not_projecte
 
 
 def test_a_backend_that_reads_no_project_skills_carries_none_of_a_flows() -> None:
-    from hmz.agents.skills import Loaded, carried
+    from hmz.coganchor.agents.skills import Loaded, carried
 
     brought = [Loaded(name="review", at=Path("/here/review"))]
 

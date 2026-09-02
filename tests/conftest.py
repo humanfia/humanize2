@@ -11,17 +11,17 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-import hmz.models
+import hmz.coganchor.models
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-    from hmz.backends import Model
+    from hmz.coganchor.backends import Model
 
 #: Asking a backend what it runs, before the suite takes it away again. Held here so that a
 #: test which is about the asking can have it back.
-_ASKS = hmz.models.ask
+_ASKS = hmz.coganchor.models.ask
 
 
 @pytest.fixture(autouse=True)
@@ -93,7 +93,7 @@ def _asks_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     def refuse(cli: str, provider: str = "", seconds: float = 0.0) -> tuple[Model, ...]:
         raise AssertionError(f"the suite does not start {cli} to ask what it runs")
 
-    monkeypatch.setattr(hmz.models, "ask", refuse)
+    monkeypatch.setattr(hmz.coganchor.models, "ask", refuse)
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ def asking(_asks_nothing: None, monkeypatch: pytest.MonkeyPatch) -> None:
     Named after the fixture that took it away, so that it is put back after rather than
     before: two fixtures setting one attribute is the order they run in.
     """
-    monkeypatch.setattr(hmz.models, "ask", _ASKS)
+    monkeypatch.setattr(hmz.coganchor.models, "ask", _ASKS)
 
 
 @pytest.fixture
@@ -118,7 +118,7 @@ def priced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     """
     import json
 
-    from hmz import prices
+    from hmz.coganchor import prices
 
     source = tmp_path / "prices-source.json"
     source.write_text(

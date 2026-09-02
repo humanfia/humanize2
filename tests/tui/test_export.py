@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.epic import epics
-from hmz.exporting import MANIFEST, TRANSCRIPT
+from hmz.runtime.epic import epics
+from hmz.runtime.exporting import MANIFEST, TRANSCRIPT
 from hmz.tui import Humanize
 from hmz.tui.pick import Does, Epics
 from tests.stubs import written
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 #: A flow that opens one session and says one thing, so that there is a run to package up.
 PLAIN = '''"""Runs once, and says what it was told."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -80,8 +80,8 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _ran(task: str) -> None:
     """Runs the flow here the way a command line would, so there is an epic to export."""
-    from hmz.agents import driver
-    from hmz.runner import Runner
+    from hmz.coganchor.agents import driver
+    from hmz.runtime.runner import Runner
 
     agent, config = driver("claude")
     Runner("plain", [agent(config(model="m", effort="high"))]).run(task)

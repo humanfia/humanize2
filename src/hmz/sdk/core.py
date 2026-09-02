@@ -21,15 +21,15 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from hmz.agents import AgentBase
-    from hmz.backends import Profile
-    from hmz.runner import Runner
+    from hmz.coganchor.agents import AgentBase
+    from hmz.coganchor.backends import Profile
+    from hmz.runtime.runner import Runner
+    from hmz.runtime.settings import Settings
     from hmz.sdk.accounts import Accounts
     from hmz.sdk.epics import Epics
     from hmz.sdk.fallbacks import Fallbacks
     from hmz.sdk.flows import Flows, Flowverses
     from hmz.sdk.running import Run
-    from hmz.settings import Settings
 
 __all__ = ["Hmz"]
 
@@ -69,7 +69,7 @@ class Hmz:
     def settings(self) -> Settings:
         """What humanize remembers: what was set up to run here, and what is true everywhere."""
         if self._settings is None:
-            from hmz.settings import Settings
+            from hmz.runtime.settings import Settings
 
             self._settings = Settings(
                 Path(self._workspace) if self._workspace is not None else None
@@ -119,7 +119,7 @@ class Hmz:
 
     def backends(self) -> tuple[Profile, ...]:
         """Every coding agent CLI humanize drives, whether or not it is installed here."""
-        from hmz import backends
+        from hmz.coganchor import backends
 
         return backends.profiles()
 
@@ -131,7 +131,7 @@ class Hmz:
           on: a run with nobody at a terminal is a run with nobody to ask, and silence is not
           an answer.
         """
-        from hmz import telemetry
+        from hmz.runtime import telemetry
 
         return telemetry.start()
 
@@ -152,7 +152,7 @@ class Hmz:
           SystemExit: If the line does not name a flow and an agent apiece, as argparse
             rejects it.
         """
-        from hmz.runner import flow_and_agents
+        from hmz.runtime.runner import flow_and_agents
 
         return flow_and_agents(argv)
 
@@ -179,7 +179,7 @@ class Hmz:
         Raises:
           NotAFlow: If the flow is not there, is not a flow, or takes other agents than these.
         """
-        from hmz.runner import Runner
+        from hmz.runtime.runner import Runner
 
         return Runner(flow, agents, config, resume=resume, container=container)
 

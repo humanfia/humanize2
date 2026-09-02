@@ -18,10 +18,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import tracing
-from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 from hmz.coganchor import AnchorConfig
-from hmz.machines import AnchoredConfig
+from hmz.coganchor.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.coganchor.machines import AnchoredConfig
+from hmz.runtime import tracing
 from tests.coganchor.conftest import VIRTUAL_WORKSPACE
 from tests.stubs import written
 from tests.supervising import traced
@@ -202,9 +202,9 @@ def test_one_flow_runs_two_agents_of_one_cli_as_two_accounts(
     """
     import json as reading
 
-    from hmz import providers
-    from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
-    from hmz.runner import Runner
+    from hmz.coganchor import providers
+    from hmz.coganchor.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.runtime.runner import Runner
 
     binaries = tmp_path / "bin"
     binaries.mkdir()
@@ -231,7 +231,7 @@ def test_one_flow_runs_two_agents_of_one_cli_as_two_accounts(
 import json
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

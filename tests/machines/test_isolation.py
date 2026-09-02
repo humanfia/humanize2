@@ -16,10 +16,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig
 from hmz.coganchor import check
-from hmz.machines import AnchoredConfig, DockerConfig, MachineBase, MachineConfig
-from hmz.runner import Runner
+from hmz.coganchor.agents import AgentConfig
+from hmz.coganchor.machines import (
+    AnchoredConfig,
+    DockerConfig,
+    MachineBase,
+    MachineConfig,
+)
+from hmz.runtime.runner import Runner
 from tests.machines.conftest import IMAGE
 from tests.stubs import HereAnchor, ShellAgent, written
 
@@ -159,7 +164,7 @@ def test_a_turn_runs_in_the_container_and_leaves_its_work_in_the_workspace(
 ISOLATING = f'''
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Isolated
+from hmz.coganchor.agents import AgentBase, Isolated
 from hmz.flows import flow
 
 
@@ -364,7 +369,7 @@ def test_the_flow_reads_writes_and_runs_on_the_machine_the_run_lands_on(
     already has -- and a command is not, being run by this machine's shell against this
     machine's tools unless it is sent there.
     """
-    from hmz.machines import Mapped
+    from hmz.coganchor.machines import Mapped
 
     monkeypatch.chdir(tmp_path)
     (tmp_path / "here.txt").write_text("written here\n")

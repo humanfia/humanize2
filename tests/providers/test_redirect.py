@@ -28,7 +28,7 @@ from pathlib import Path
 import pytest
 
 from hmz import cli
-from hmz.providers import redirect
+from hmz.coganchor.providers import redirect
 from tests.supervising import MACHINE, PATIENCE, PROVIDER, cred, traced
 
 
@@ -207,7 +207,7 @@ def test_a_run_that_cannot_be_supervised_does_not_run_unsupervised(
     def refuse(*_: object) -> int:
         raise OSError("no supervisor here")
 
-    monkeypatch.setattr("hmz.providers.redirect.run", refuse)
+    monkeypatch.setattr("hmz.coganchor.providers.redirect.run", refuse)
 
     assert cli.main(["cred", "--map=/house/x=/store/y", "--", "true"]) == 1
     assert "no supervisor here" in capsys.readouterr().err

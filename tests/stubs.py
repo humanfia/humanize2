@@ -11,11 +11,11 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from hmz.agents import AgentBase, CommandSessionBase
 from hmz.coganchor import AnchorConfig
-from hmz.epic import JOURNAL
+from hmz.coganchor.agents import AgentBase, CommandSessionBase
 from hmz.flows import ENTRY
 from hmz.flows.skills import SKILLS
+from hmz.runtime.epic import JOURNAL
 
 if TYPE_CHECKING:
     import os

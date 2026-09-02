@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING
 import pytest
 from textual.widgets import OptionList, Static
 
-from hmz.agents import AgentConfig, Event
-from hmz.kept import Runs
+from hmz.coganchor.agents import AgentConfig, Event
+from hmz.runtime.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.app import _EVERY, _KEPT
 from hmz.tui.monitor import short
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from textual.pilot import Pilot
 
-    from hmz.agents import AgentBase
+    from hmz.coganchor.agents import AgentBase
 
 CONFIG = AgentConfig(model="m", effort="high")
 
@@ -62,7 +62,7 @@ for line in sys.stdin:
 HOLDING = """
 import asyncio
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

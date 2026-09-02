@@ -18,22 +18,37 @@ import pytest
 from hmz import cli
 
 #: Every command a line reaches, and what reaching it may load besides `cli` itself: the
-#: layers its work is really done in, and nothing of any other command's. `anchor` is in it
-#: for being the one humanize spawns that a whole layer is behind: the target half of a
-#: session is this package with coganchor and nothing else on it.
+#: modules its work is really done in, and nothing of any other command's. Written as dotted
+#: names rather than as the directory each is in, because a directory is now several answers:
+#: `runtime` holds both what drives a run and the tracer that reads one back afterwards, and
+#: a budget saying `runtime` would stop noticing `hmz exec` paying for the second. A name
+#: here covers the modules inside it. `anchor` is in the list for being the one humanize
+#: spawns that a whole layer is behind: the target half of a session is this package with the
+#: anchor and nothing else on it.
 COMMANDS = [
-    # And the two leaves that say whether humanize reports its own failures and where the
-    # answer is kept: a command that cannot report a crash is a crash nobody hears about.
-    # And what a flow is, which is where the refusal a line naming no flow is answered with
-    # is written. Naming it must not cost the drivers: what a flow imports from there that
-    # is written down elsewhere is fetched when a flow names it, not when the line is read.
-    # And the SDK, which is the one object every way in holds: it reaches a layer only from
-    # inside the call that needs it, so naming it costs nothing but itself.
+    # The two leaves that say whether humanize reports its own failures and where the answer
+    # is kept: a command that cannot report a crash is a crash nobody hears about. And what a
+    # flow is, which is where the refusal a line naming no flow is answered with is written.
+    # Naming it must not cost the drivers: what a flow imports from `coganchor` is fetched
+    # when a flow names it, not when the line is read -- which is why the facts about the
+    # CLIs are here and nothing else of that layer is. And the SDK, which is the one object
+    # every way in holds: it reaches a layer only from inside the call that needs it, so
+    # naming it costs nothing but itself.
     (
         "exec",
-        {"sdk", "runner", "flows", "backends", "telemetry", "settings", "kept"},
+        {
+            "hmz.coganchor",
+            "hmz.coganchor.backends",
+            "hmz.flows",
+            "hmz.runtime",
+            "hmz.runtime.kept",
+            "hmz.runtime.runner",
+            "hmz.runtime.settings",
+            "hmz.runtime.telemetry",
+            "hmz.sdk",
+        },
     ),
-    ("anchor", {"coganchor"}),
+    ("anchor", {"hmz.coganchor"}),
 ]
 
 
@@ -56,9 +71,14 @@ def test_a_command_reaches_only_the_layers_it_is_carried_out_in(
     result = subprocess.run(
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
     )
-    reached = {name.split(".")[1] for name in result.stdout.split()}
+    reached = set(result.stdout.split())
     assert reached, "the command imported nothing, so this checks nothing"
-    assert reached <= layers | {"cli"}
+    allowed = layers | {"hmz.cli"}
+    assert not {
+        name
+        for name in reached
+        if not any(name == one or name.startswith(f"{one}.") for one in allowed)
+    }
 
 
 def test_a_command_is_given_the_rest_of_the_line_untouched() -> None:

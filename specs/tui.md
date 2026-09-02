@@ -280,7 +280,7 @@ line, with what the flow is doing beside the transcript.
   run points at that log by a link rather than holding it. A bundle sent to whoever is being
   asked to fix something MUST therefore follow every one of those links and carry what is
   behind it, since a link is worth nothing on any machine but the one that made it. It is
-  `hmz.exporting`, which is also what a run exported from `/epics` and
+  `hmz.runtime.exporting`, which is also what a run exported from `/epics` and
   :meth:`hmz.sdk.Hmz.epics.bundled` ask: one archive, made one way, whichever way somebody
   reached it.
 - The transcript that goes in MUST be the text the transcript was written as rather than the
@@ -792,7 +792,7 @@ a flow being a Python file that may branch any way it likes.
   stopped rather than as whatever it once averaged.
 - A backend that says what a turn cost MUST be believed over what its agent was configured
   with: a turn that reached for a sub-agent spent it on that model.
-- What has been spent MUST be reported in money as well as in tokens, from `hmz.prices`. A
+- What has been spent MUST be reported in money as well as in tokens, from `hmz.coganchor.prices`. A
   token count says how much work was done and nothing at all about what it came to, and what
   a run costs while it is still running is the question this whole sheet is here to answer.
 - The money MUST be worked out from the kinds of token, and MUST be taken from whichever
@@ -804,7 +804,7 @@ a flow being a Python file that may branch any way it likes.
   bill, and against an unpriced model it is a false one.
 - It MUST be worked out when what it is made of moves, as the rate is, rather than as the
   screen is drawn: a screen redrawn twice a second must not read a file twice a second.
-- A backend that states in money what a turn cost MUST be believed over what `hmz.prices`
+- A backend that states in money what a turn cost MUST be believed over what `hmz.coganchor.prices`
   works out from the tokens, for the same reason a backend that says what a turn cost is
   believed over what its agent was configured with: the vendor's own accounting beats a
   reckoning made from somebody else's list price. Nothing here states one yet, so nothing is
@@ -845,7 +845,7 @@ What the editor offers to finish, which is the only way anything is chosen.
 Which agents are installed here, what each one runs, and where their turns could land.
 
 - Nothing MUST be asked of a backend here: starting one costs what it costs, and this is read
-  at a prompt. What each runs MUST be what `hmz.models` last kept for it, and what only this
+  at a prompt. What each runs MUST be what `hmz.coganchor.models` last kept for it, and what only this
   machine knows -- which containers are up, which hosts are in an ssh config -- MUST be read
   off the disk it is written on.
 - A backend that is not installed here MUST NOT be offered, and neither MUST an effort a model

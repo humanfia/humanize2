@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from hmz import backends, models, providers
-from hmz.backends import named
+from hmz.coganchor import backends, models, providers
+from hmz.coganchor.backends import named
 from tests.supervising import traced
 
 if TYPE_CHECKING:

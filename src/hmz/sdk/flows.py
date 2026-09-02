@@ -373,6 +373,6 @@ class Flows:
         Raises:
           ValueError: If the file cannot be read, or holds something that is not a mapping.
         """
-        from hmz.runner import set_up_from
+        from hmz.runtime.runner import set_up_from
 
         return set_up_from(said)

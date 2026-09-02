@@ -733,7 +733,7 @@ def _declares(read: _Read) -> Iterator[Finding]:
       goals at once -- the flow saying two things about one agent, of which only one can be
       done.
     """
-    from hmz.agents import PERMISSIONS
+    from hmz.coganchor.agents import PERMISSIONS
 
     for node in ast.walk(read.tree):
         if isinstance(node, ast.Call) and _tip(node.func) == "AgentDefaults":
@@ -1033,7 +1033,7 @@ def _hooks(read: _Read, declared: frozenset[str]) -> Iterator[Finding]:
             # Read off the live enum rather than copied out of it, so that a moment
             # humanize adds is a moment this rule already knows. Fetched here rather
             # than imported with the module: the vocabulary lives beside the drivers.
-            from hmz.agents import EVERYWHERE
+            from hmz.coganchor.agents import EVERYWHERE
 
             everywhere = frozenset(one.name for one in EVERYWHERE)
         if moment.attr in everywhere or moment.attr in declared:
@@ -2130,14 +2130,14 @@ def _tagged(tag: str, agents: Mapping[str, type]) -> frozenset[str]:
     """Which of these backends the facts written down about them say serve one capability.
 
     Args:
-      tag: The capability name, as :meth:`hmz.backends.Profile.tags` spells it.
+      tag: The capability name, as :meth:`hmz.coganchor.backends.Profile.tags` spells it.
       agents: The backends there are, by name.
 
     Returns:
       The names that serve it. A driven backend with no profile at all serves none of them:
       what is not written down is not a fact about that CLI.
     """
-    from hmz.backends import named
+    from hmz.coganchor.backends import named
 
     return frozenset(
         name
@@ -2202,7 +2202,7 @@ def catalogue() -> tuple[Capability, ...]:
     import inspect
     import sys as running
 
-    from hmz.agents import DRIVEN, EVERYWHERE, Moment
+    from hmz.coganchor.agents import DRIVEN, EVERYWHERE, Moment
 
     agents = {name: held[0] for name, held in DRIVEN.items()}
     sessions: dict[str, type] = {}

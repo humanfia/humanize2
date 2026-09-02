@@ -15,10 +15,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig, Stopped
-from hmz.epic import STATE, epics, read, resumed, state
+from hmz.coganchor.agents import AgentConfig, Stopped
 from hmz.flows import NotAFlow, resumes
-from hmz.runner import Runner
+from hmz.runtime.epic import STATE, epics, read, resumed, state
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, written
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ COUNTS = '''"""Counts the runs of itself."""
 
 from typing import Any
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -48,7 +48,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -134,7 +134,7 @@ def test_a_flow_that_says_nothing_is_run_from_the_top_every_time(
     flow = written(
         tmp_path,
         "plain",
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -159,7 +159,7 @@ def test_the_state_of_a_run_that_was_stopped_is_there_to_be_picked_up(
         "stops",
         '"""Writes, and then is stopped where it stands."""\n\n'
         "from typing import Any\n\n"
-        "from hmz.agents import AgentBase, Stopped\n"
+        "from hmz.coganchor.agents import AgentBase, Stopped\n"
         "from hmz.flows import flow\n\n\n"
         "@flow(resumable=True)\n"
         "def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:\n"
@@ -185,7 +185,7 @@ def test_something_written_inside_the_state_is_saved_when_the_run_ends(
         "appends",
         '"""Appends to a list it keeps."""\n\n'
         "from typing import Any\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow(resumable=True)\n"
         "def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:\n"
@@ -224,7 +224,7 @@ def test_a_called_flow_keeps_its_own_state_under_its_own_name(
         "outer",
         '"""Calls the one that counts, and counts itself."""\n\n'
         "from typing import Any\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n"
         "from hmz.flows import load\n\n\n"
         "@flow(resumable=True)\n"
@@ -264,7 +264,7 @@ def test_a_flow_that_says_it_resumes_and_takes_no_dict_says_so(
     flow = written(
         tmp_path,
         "short",
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow(resumable=True)\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -301,7 +301,7 @@ def test_a_flow_that_emptied_its_state_starts_the_next_run_clean(
         "clears",
         '"""Counts, and clears what it kept when it is told to stop counting."""\n\n'
         "from typing import Any\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow(resumable=True)\n"
         "def run(agents: tuple[AgentBase], task: str, state: dict[str, Any]) -> None:\n"

@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 import psutil
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     Budget,
     OpencodeAgent,
     OpencodeAgentConfig,

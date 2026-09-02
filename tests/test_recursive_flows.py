@@ -15,11 +15,11 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from hmz.agents import AgentConfig
-from hmz.agents.skills import Loaded
-from hmz.epic import epics, records, sessions, tree
+from hmz.coganchor.agents import AgentConfig
+from hmz.coganchor.agents.skills import Loaded
 from hmz.flows import NotAFlow, load, running
-from hmz.runner import Runner
+from hmz.runtime.epic import epics, records, sessions, tree
+from hmz.runtime.runner import Runner
 from tests.stubs import ShellAgent, events, written
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow, load, running
 
 
@@ -82,7 +82,7 @@ import asyncio
 import uuid
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 MINE = uuid.uuid4().hex
@@ -105,7 +105,7 @@ async def run(agents: tuple[AgentBase], task: str) -> None:
 #: The one somebody starts, which says how deep the whole thing goes.
 OUTER = '''"""Starts the recursion, five levels of it."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow, load
 
 
@@ -234,7 +234,7 @@ def test_a_recursion_stopped_partway_unwinds_every_level_of_itself(
         "cancels",
         '"""Goes deep and is taken down while it is down there."""\n\n'
         "import asyncio\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -255,7 +255,7 @@ def test_a_recursion_stopped_partway_unwinds_every_level_of_itself(
         '"""Calls itself down and then waits to be taken down."""\n\n'
         "import asyncio\n\n"
         "from pydantic import BaseModel\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "class Config(BaseModel):\n"
         '    """How much further."""\n\n'
@@ -287,7 +287,7 @@ def test_a_chain_of_flows_with_no_bottom_to_it_is_refused(flows: Path) -> None:
         flows / ".humanize/flows",
         "forever",
         '"""Calls itself, and nothing stops it."""\n\n'
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -307,7 +307,7 @@ def test_a_call_may_say_what_the_flow_it_calls_is_driven_at(flows: Path) -> None
         "says",
         '"""Says what it was handed."""\n\n'
         "from pathlib import Path\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -336,7 +336,7 @@ def test_a_call_that_says_what_it_drives_names_a_place_the_flow_has(
         "named",
         '"""One agent, and it says what it calls it."""\n\n'
         "from typing import NamedTuple\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "class One(NamedTuple):\n"
         '    """The one."""\n\n'
@@ -362,7 +362,7 @@ def test_two_calls_sharing_one_agent_leave_it_where_they_were_both_called_from(
         "shares",
         '"""Gathers two calls over one agent, and neither gets it."""\n\n'
         "import asyncio\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -394,7 +394,7 @@ def test_two_calls_sharing_an_agent_leave_it_in_the_record_of_the_flow_they_shar
         flows / ".humanize/flows",
         "top",
         '"""Calls the one that gathers, so that the fork is not the run itself."""\n\n'
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -405,7 +405,7 @@ def test_two_calls_sharing_an_agent_leave_it_in_the_record_of_the_flow_they_shar
         "shares",
         '"""Gathers two calls over the one agent it was handed."""\n\n'
         "import asyncio\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -436,7 +436,7 @@ def test_a_call_driving_agents_of_its_own_is_still_part_of_the_run(flows: Path) 
         "aims",
         '"""Calls one flow at another effort, straight from the run\'s own flow."""\n\n'
         "from dataclasses import replace\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -447,7 +447,7 @@ def test_a_call_driving_agents_of_its_own_is_still_part_of_the_run(flows: Path) 
         flows / ".humanize/flows",
         "opened",
         '"""Opens a session, so the record has something in it."""\n\n'
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -474,7 +474,7 @@ def test_a_flow_called_from_a_thread_with_no_branch_on_it_is_still_written_down(
         "elsewhere",
         '"""Calls a flow from a thread of its own, the way a tool callback would."""\n\n'
         "from concurrent.futures import ThreadPoolExecutor\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -485,7 +485,7 @@ def test_a_flow_called_from_a_thread_with_no_branch_on_it_is_still_written_down(
         flows / ".humanize/flows",
         "opened",
         '"""Opens a session, so the record has something in it."""\n\n'
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -509,7 +509,7 @@ def test_a_gathered_call_cancelled_before_it_starts_takes_nothing(flows: Path) -
         "drops",
         '"""Gathers two calls and takes them down before either got a step."""\n\n'
         "import asyncio\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -528,7 +528,7 @@ def test_a_gathered_call_cancelled_before_it_starts_takes_nothing(flows: Path) -
         "naps",
         '"""Waits, and is never let to."""\n\n'
         "import asyncio\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -553,7 +553,7 @@ def test_a_called_flow_hands_its_agents_back_however_two_calls_end(flows: Path) 
         "carries",
         '"""Gathers two calls that each bring skills of their own."""\n\n'
         "import asyncio\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow, load\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"
@@ -568,7 +568,7 @@ def test_a_called_flow_hands_its_agents_back_however_two_calls_end(flows: Path) 
         "brings",
         '"""Brings a skill of its own."""\n\n'
         "import asyncio\n\n"
-        "from hmz.agents import AgentBase\n"
+        "from hmz.coganchor.agents import AgentBase\n"
         "from hmz.flows import flow\n\n\n"
         "@flow\n"
         "async def run(agents: tuple[AgentBase], task: str) -> None:\n"

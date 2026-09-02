@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from hmz.agents import AgentBase, Event
+    from hmz.coganchor.agents import AgentBase, Event
 
     from .driving import Place
 
@@ -469,7 +469,7 @@ def _crewed(
     Returns:
       One agent per place, the person's included.
     """
-    from hmz.agents import (
+    from hmz.coganchor.agents import (
         AgentBase,
         AgentConfig,
         Event,
@@ -478,7 +478,7 @@ def _crewed(
         SessionBase,
         Usage,
     )
-    from hmz.agents.human import HumanSession
+    from hmz.coganchor.agents.human import HumanSession
 
     class StubSession(SessionBase):
         """A turn that lands at once and answers what the scenario says."""

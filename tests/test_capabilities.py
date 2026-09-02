@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     DshAgent,
@@ -26,20 +26,20 @@ from hmz.agents import (
     Needs,
 )
 from hmz.flows import NotAFlow, load, wanted
-from hmz.runner import Runner
+from hmz.runtime.runner import Runner
 from tests.stubs import written
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from hmz.backends import Model
+    from hmz.coganchor.backends import Model
 
 #: A flow that steers the turn it is driving, which only some backends can be asked to do.
 STEERS = '''"""One that talks to its agent mid-turn."""
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Needs
+from hmz.coganchor.agents import AgentBase, Needs
 from hmz.flows import flow
 
 
@@ -59,7 +59,7 @@ SEVERAL = '''"""One built on more than a flow usually is."""
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Needs
+from hmz.coganchor.agents import AgentBase, Needs
 from hmz.flows import flow
 
 
@@ -80,7 +80,7 @@ RESUMES = '''"""One that picks a conversation back up."""
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Needs
+from hmz.coganchor.agents import AgentBase, Needs
 from hmz.flows import flow
 
 
@@ -100,7 +100,7 @@ EVERYONE = '''"""One built on what nobody has to shop for."""
 
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Needs
+from hmz.coganchor.agents import AgentBase, Needs
 from hmz.flows import flow
 
 
@@ -118,7 +118,7 @@ def run(agents: Agents, task: str) -> None:
 #: A flow that asks for nothing in particular, which is most flows.
 PLAIN = '''"""One that any agent can drive."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -130,7 +130,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 #: One that calls the one that steers, handing it the agent it was given.
 CALLS = '''"""One that reaches for the flow that steers."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow, load
 
 

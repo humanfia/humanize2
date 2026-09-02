@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from hmz.agents.skills import Skill, skills
-from hmz.kept import Runs
-from hmz.settings import Settings
+from hmz.coganchor.agents.skills import Skill, skills
+from hmz.runtime.kept import Runs
+from hmz.runtime.settings import Settings
 
 SKILL = """---
 name: {name}
@@ -285,7 +285,7 @@ def test_a_workspace_writes_down_no_skills_of_its_own(tmp_path: Path) -> None:
 
 def test_a_file_that_still_says_skills_is_read_past(tmp_path: Path) -> None:
     """An agent written down when they were a setting is the agent it always was."""
-    from hmz.kept import read_back
+    from hmz.runtime.kept import read_back
 
     runs = read_back(
         {"cli": "claude", "model": "m", "effort": "high", "skills": ["writing"]}

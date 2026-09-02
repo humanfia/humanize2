@@ -13,12 +13,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import AgentConfig
-from hmz.epic import TRACES, epics, opened
-from hmz.runner import Runner
-from hmz.settings import Settings
-from hmz.tracing.collector import collect
-from hmz.tracing.profile import PROFILE, read
+from hmz.coganchor.agents import AgentConfig
+from hmz.runtime.epic import TRACES, epics, opened
+from hmz.runtime.runner import Runner
+from hmz.runtime.settings import Settings
+from hmz.runtime.tracing.collector import collect
+from hmz.runtime.tracing.profile import PROFILE, read
 from tests.sampling import sampled
 from tests.stubs import ShellAgent, written
 
@@ -30,15 +30,15 @@ CONFIG = AgentConfig(model="m", effort="high")
 #: What the turn runs: a shell running a sleep, which is two programs, and the profile has to
 #: hold both of them.
 #:
-#: A second rather than the tenth of one it takes to say what is being checked. What reads it
-#: is a sampler, taking one every :data:`hmz.tracing.profile.EVERY`, and a program that lives
-#: for a handful of those is one a loaded machine can miss altogether. Twenty samples is the
-#: difference between a test of the profiler and a test of the clock.
+# : A second rather than the tenth of one it takes to say what is being checked. What reads it : is
+# a sampler, taking one every :data:`hmz.runtime.tracing.profile.EVERY`, and a program that lives :
+# for a handful of those is one a loaded machine can miss altogether. Twenty samples is the :
+# difference between a test of the profiler and a test of the clock.
 SAID = "sleep 1; echo the-session"
 
 #: A flow whose agent runs a program, which is what a turn mostly is.
 FLOW = f"""
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

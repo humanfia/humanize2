@@ -19,13 +19,13 @@
 
 What a flow is: what it drives, what it is called, where it is found, which of the ones it
 holds was asked for, what it brings with it, and what it takes for one flow to run another.
-Nothing here reads a command line and nothing here opens an epic: `hmz.runner` does both, and
+Nothing here reads a command line and nothing here opens an epic: `hmz.runtime.runner` does both, and
 asks this what the flow it was named says about itself. A call asks the epic already open for
 a record to be written into, which is not a second epic: it is part of the one run.
 
 This MUST be the whole of what a flow imports. A flow is content -- somebody else's
-repository, forked and edited -- and one that named `hmz.agents` for the type of what it
-drives and `hmz.backends` for a fact about a CLI would be a flow that breaks whenever
+repository, forked and edited -- and one that named `hmz.coganchor.agents` for the type of what it
+drives and `hmz.coganchor.backends` for a fact about a CLI would be a flow that breaks whenever
 humanize moves either. So the one import a flow writes MUST be `hmz.flows`, and whatever a
 flow legitimately needs that is written down in another layer MUST be handed through from
 here rather than reached for. What is handed through MUST be fetched when a flow names it
@@ -247,7 +247,7 @@ What a flow drives, written as interfaces and nothing else.
   backend with no fork of its own MUST refuse it where it is asked rather than hand back a
   second handle on the one conversation, and MUST say beforehand whether it can, so that a
   flow may ask rather than catch.
-- The drivers MUST answer to it structurally, and `hmz.agents` MUST NOT import it. The arrow
+- The drivers MUST answer to it structurally, and `hmz.coganchor.agents` MUST NOT import it. The arrow
   points one way -- a flow names what it drives, and a driver is written without ever naming a
   flow -- and a driver that inherited from this would be the layer below reaching up. That
   they answer MUST be stated once, where a type checker reads it, so that a driver which stops
@@ -296,7 +296,7 @@ What a flow drives, written as interfaces and nothing else.
   may do, up to and including running another flow and waiting for it. A backend with no way of
   being given a tool it was not shipped with MUST refuse one where it is offered, and MUST say
   beforehand which it is, so that a flow may ask rather than catch. What that comes to is
-  `hmz.agents.tools`.
+  `hmz.coganchor.agents.tools`.
 - Which of a flow's skills one conversation carries MUST be the session's own to say, and
   MUST be sayable again while the conversation runs: an agent is what it was made as, and a
   conversation is a thing that gets somewhere -- one that has finished reading and started
@@ -313,7 +313,7 @@ What a flow drives, written as interfaces and nothing else.
   neither waits at. Saying something to them stops the turn until they answer, and that is
   right for a question and wrong for what there is to do next and how far through it is. Which
   lines are one side's alone MUST be sayable, and the other side MUST be refused where it
-  writes. What that comes to is `hmz.agents.board`.
+  writes. What that comes to is `hmz.coganchor.agents.board`.
 - What is true of a backend rather than of one agent -- which moments it runs, whether it has
   a goal feature, whether it can be held to a shape, whether a turn of it can be talked to
   while it runs -- MUST be declared on the class. It is read off the class where a flow is
@@ -437,7 +437,7 @@ def left(one: Running) -> None: ...
 ```
 
 What a flow says it drives, read off its own entry point, and what it takes for one flow to
-run another. `hmz.runner` asks this and then opens an epic around the answer.
+run another. `hmz.runtime.runner` asks this and then opens an epic around the answer.
 
 - A flow's entry point MUST take `(agents: tuple[...], task: str)`, and that tuple MUST be of
   a fixed length: how many agents the flow drives is the one thing about a flow that a command
@@ -518,7 +518,7 @@ run another. `hmz.runner` asks this and then opens an epic around the answer.
   file a turn opened; a command it runs is not, being run by this machine's shell against this
   machine's tools, which is the thing a container was reached for to avoid. So the run's
   container MUST be askable for, and MUST answer with the workspace as that machine has it --
-  `hmz.machines.Mapped`. A run on this machine MUST answer with nothing, a flow there doing
+  `hmz.coganchor.machines.Mapped`. A run on this machine MUST answer with nothing, a flow there doing
   what it always did.
 - Everything here MUST read the flow as it is now, by running it. A flow rewritten between two
   readings -- by hand, or by an agent it is itself driving -- MUST be read as it is now, which
@@ -672,7 +672,7 @@ own.
   says it: a rung no backend has a word for MUST be an error wherever it is written, and so
   MUST a place declared under a goal and without goals at once -- one flow saying two things
   about one agent, of which only one can be done. The rungs there are MUST be read off
-  `hmz.agents` rather than written down again.
+  `hmz.coganchor.agents` rather than written down again.
 
 ## `proving.py`
 
@@ -1159,7 +1159,7 @@ def fetched(url: str) -> Path: ...
 
 The skills a flow works by: the ones in its own `skills/`, and the ones it named that live
 somewhere else. Nothing here installs anything, and nothing here mounts anything -- what a
-session does with them is `hmz.agents.skills`.
+session does with them is `hmz.coganchor.agents.skills`.
 
 - A flow's own skills MUST be the `skills/` inside it, read as a directory apiece each holding
   a `SKILL.md`, which is the layout every one of these CLIs already reads a skill in. A flow

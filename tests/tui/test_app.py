@@ -19,10 +19,10 @@ import pytest
 from textual import events
 from textual.widgets import Label, OptionList, Static
 
-from hmz.agents import DshSession
-from hmz.backends import Model
-from hmz.epic import epics
-from hmz.kept import Runs
+from hmz.coganchor.agents import DshSession
+from hmz.coganchor.backends import Model
+from hmz.runtime.epic import epics
+from hmz.runtime.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.app import _OWN, _SAID, Editor, _where
 from hmz.tui.pick import (
@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 FLOW = """
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -65,7 +65,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 CATCHING = """
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -81,7 +81,7 @@ def run(agents: tuple[AgentBase], task: str) -> None:
 AWAITED = """
 from pathlib import Path
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -787,7 +787,7 @@ async def test_a_line_to_a_running_flow_is_never_turned_away(workspace: Path) ->
     whichever turn starts next. There is no third answer -- a flow that is not running is
     what makes the first thing you say the task.
     """
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     written(workspace, "flow", FLOW)
     app = Humanize()
@@ -842,7 +842,7 @@ async def test_a_flow_between_two_turns_is_a_flow_that_is_running() -> None:
     thing, naming the flow and how long the run has been going rather than falling back to
     saying where it is, as if nothing were happening.
     """
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -890,7 +890,7 @@ async def test_the_readout_says_what_a_run_cost_in_money_as_well_as_in_tokens(
     priced: str,
 ) -> None:
     """A token count says how much work was done and nothing about what it came to."""
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -911,8 +911,8 @@ async def test_a_turn_that_lands_carries_the_kinds_its_bill_is_made_of(
     priced: str,
 ) -> None:
     """The `result` says what it cost by model and by kind, and the money needs both."""
-    from hmz.agents import Event, Usage
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents import Event, Usage
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model=priced, effort="high"))
     app = Humanize()
@@ -939,8 +939,8 @@ async def test_a_turn_spread_over_two_models_is_counted_and_not_priced(
     priced: str,
 ) -> None:
     """One turn's kinds do not divide between two models, and nobody said how they would."""
-    from hmz.agents import Event, Usage
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents import Event, Usage
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model=priced, effort="high"))
     app = Humanize()
@@ -986,7 +986,7 @@ async def test_a_model_nobody_prices_is_a_token_count_with_no_dollars_beside_it(
     None
 ):
     """`$0.00` against an unlisted model would be a claim about a bill, and a wrong one."""
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -1006,8 +1006,8 @@ async def test_a_model_nobody_prices_is_a_token_count_with_no_dollars_beside_it(
 @pytest.mark.timeout(60)
 async def test_a_turn_that_has_gone_quiet_still_reads_as_one_that_is_running() -> None:
     """A model thinks for minutes without a word, and the clock is what says it is alive."""
-    from hmz.agents import Event
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents import Event
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="m", effort="high"), name="one")
     app = Humanize()
@@ -1168,7 +1168,7 @@ async def test_a_third_ctrl_c_does_not_wait_for_the_flow_to_unwind() -> None:
     going: what the flow gets back is a turn that failed, exactly as it would have had the
     agent fallen over by itself. It is the last thing a key can do about a run.
     """
-    from hmz.agents import AgentConfig, Event
+    from hmz.coganchor.agents import AgentConfig, Event
     from tests.stubs import ShellAgent, ShellSession
 
     closed: list[ShellSession] = []
@@ -1252,8 +1252,8 @@ async def test_details_covers_the_thinking_as_well_as_the_tools() -> None:
 @pytest.mark.timeout(60)
 async def test_what_a_turn_did_on_the_way_is_shown_only_where_it_is_asked_for() -> None:
     """The complaint this answers: a screen of tool rows, with the answer somewhere in it."""
-    from hmz.agents import Event
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents import Event
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -1295,10 +1295,10 @@ def test_a_backend_offers_what_it_last_said_it_runs(
 ) -> None:
     """Read off the disk rather than asked for: asking is a coding agent starting up.
 
-    What each backend runs is not written down anywhere -- `hmz.models` asks it and keeps the
-    answer -- so a prompt reads the answer and nothing else.
+    What each backend runs is not written down anywhere -- `hmz.coganchor.models` asks it and keeps
+    the answer -- so a prompt reads the answer and nothing else.
     """
-    from hmz import models
+    from hmz.coganchor import models
     from hmz.tui import discover
 
     kept = models.where("claude")
@@ -1527,7 +1527,7 @@ async def test_deepseek_chat_sends_hello_and_draws_the_sdk_reply(
 
     monkeypatch.setattr(DshSession, "_running", running)
     monkeypatch.setattr(
-        "hmz.agents.dsh.uuid.uuid4", lambda: SimpleNamespace(hex="chat")
+        "hmz.coganchor.agents.dsh.uuid.uuid4", lambda: SimpleNamespace(hex="chat")
     )
 
     app = Humanize(agents=[Runs("dsh/deepseek-v4-flash:high")])
@@ -1680,8 +1680,8 @@ async def test_a_turn_reads_the_way_claude_code_renders_one() -> None:
     Which is Claude Code's own shape, read off its own screen: no bars, no boxes, nothing
     indented -- every line starts where the terminal does.
     """
-    from hmz.agents import Event
-    from hmz.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents import Event
+    from hmz.coganchor.agents.claude import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     app = Humanize()
     async with app.run_test() as driver:
@@ -1856,7 +1856,7 @@ async def test_deepseek_is_selectable_from_agents(
         """
 from typing import Annotated, NamedTuple
 
-from hmz.agents import AgentBase, Goal
+from hmz.coganchor.agents import AgentBase, Goal
 from hmz.flows import flow
 
 
@@ -1920,7 +1920,7 @@ async def test_deepseek_has_only_api_key_login_after_switching_from_kimi(
     _installed: unittest.mock.MagicMock,  # noqa: PT019 -- patch hands it over
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from hmz import providers
+    from hmz.coganchor import providers
 
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     providers.add("kimi", "subscription", way="login")
@@ -2092,7 +2092,7 @@ async def test_a_search_is_asked_for_and_left_rather_than_being_what_typing_does
     _installed: unittest.mock.MagicMock,  # noqa: PT019  -- `mock.patch` hands it over
 ) -> None:
     """Every letter on these sheets is a key, so the letters only search once s says so."""
-    from hmz import providers
+    from hmz.coganchor import providers
 
     providers.add("claude", "deepseek", way="key", env={"ANTHROPIC_API_KEY": "k"})
     app = Humanize()
@@ -2452,7 +2452,7 @@ from typing import Literal, NamedTuple
 
 from pydantic import BaseModel, Field
 
-from hmz.agents import HumanAgent
+from hmz.coganchor.agents import HumanAgent
 from hmz.flows import flow
 
 

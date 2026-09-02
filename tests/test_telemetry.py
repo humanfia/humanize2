@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from hmz import telemetry
-from hmz.settings import Settings
+from hmz.runtime import telemetry
+from hmz.runtime.settings import Settings
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -72,7 +72,7 @@ def test_a_workspace_forgotten_is_forgotten_whichever_one_did_it(
     tmp_path: Path,
 ) -> None:
     """A merge cannot see an absence: only what this instance read when it opened tells it."""
-    from hmz.kept import Runs
+    from hmz.runtime.kept import Runs
 
     Settings(tmp_path / "one").remember("chat", ("a",), [Runs("claude/m:high")])
     Settings(tmp_path / "other").remember("rlar", ("a",), [Runs("codex/n:low")])
@@ -192,7 +192,7 @@ def test_no_frame_of_a_stack_carries_what_humanize_was_working_on() -> None:
                     "stacktrace": {
                         "frames": [
                             {
-                                "abs_path": "/homes/someone/humanize/src/hmz/runner.py",
+                                "abs_path": "/homes/someone/humanize/src/hmz/runtime/runner.py",
                                 "vars": {"task": "fix the build", "key": "sk-abc"},
                                 "context_line": "    run(agents, task)",
                                 "pre_context": ["    # the task"],
@@ -231,7 +231,7 @@ def test_a_frame_of_humanizes_own_is_named_by_where_it_is_in_humanize() -> None:
                             {
                                 "abs_path": telemetry.__file__,
                                 "filename": telemetry.__file__,
-                                "module": "hmz.telemetry",
+                                "module": "hmz.runtime.telemetry",
                                 "function": "start",
                                 "lineno": 12,
                             }
@@ -246,8 +246,8 @@ def test_a_frame_of_humanizes_own_is_named_by_where_it_is_in_humanize() -> None:
 
     assert held is not None
     (frame,) = held["exception"]["values"][0]["stacktrace"]["frames"]
-    assert frame["abs_path"] == "hmz/telemetry.py"
-    assert frame["filename"] == "hmz/telemetry.py"
+    assert frame["abs_path"] == "hmz/runtime/telemetry.py"
+    assert frame["filename"] == "hmz/runtime/telemetry.py"
     assert frame["function"] == "start"  # humanize's own names are humanize's to send
     assert frame["lineno"] == 12
 
@@ -328,7 +328,7 @@ def test_a_setting_written_elsewhere_survives_a_workspace_being_remembered(
     tmp_path: Path,
 ) -> None:
     """Two of these are alive at once wherever a menu writes one while the app writes flows."""
-    from hmz.kept import Runs
+    from hmz.runtime.kept import Runs
 
     one, other = Settings(tmp_path), Settings(tmp_path)
     one.answers(enable_sentry=True)
@@ -343,7 +343,7 @@ def test_a_workspace_may_be_forgotten_without_forgetting_anything_else(
     tmp_path: Path,
 ) -> None:
     """Which is what the second page of the settings menu is for."""
-    from hmz.kept import Runs
+    from hmz.runtime.kept import Runs
 
     Settings(tmp_path).answers(enable_sentry=False)
     kept = Settings(tmp_path)

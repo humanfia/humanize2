@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 #: A flow, as short as one can be: what is being fetched is the file, not what it does.
 FLOW = '''"""Somebody else's loop, fetched from somewhere else."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 

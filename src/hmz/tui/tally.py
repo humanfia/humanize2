@@ -19,13 +19,13 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
-from hmz import backends
+from hmz.coganchor import backends
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-    from hmz.agents import AgentBase
+    from hmz.coganchor.agents import AgentBase
 
     from .monitor import Monitor
 

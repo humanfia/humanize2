@@ -148,7 +148,7 @@ An agent stopped by hand makes the run `stopped` rather than `failed`, whatever 
 way made of it — so a run you ended is written down as one you ended.
 
 ```python
-from hmz.epic import epics, opened
+from hmz.runtime.epic import epics, opened
 
 for epic in epics():                   # this workspace, oldest first
     print(epic, opened(epic))          # {"actor": ["0a1b…", "5f6e…"], "reviewer": [...]}
@@ -170,10 +170,10 @@ inside a run that may still be `done`.
 
 **Records nest.** A call made from inside a called flow is written under *that* flow's record,
 so a recursion five levels deep with two branches at every level reads back as the tree it ran
-as rather than as thirty-one things one run did. `hmz.epic.tree` reads it that way:
+as rather than as thirty-one things one run did. `hmz.runtime.epic.tree` reads it that way:
 
 ```python
-from hmz.epic import tree
+from hmz.runtime.epic import tree
 
 for one in tree(epic):                 # the calls the run itself made
     print(one.flow, one.record, len(one.calls))   # and what each of those called in turn
@@ -184,7 +184,7 @@ Two calls that ran at once are two of these, with `began` and `ended` that overl
 name.
 
 It is still one run and still one directory: a called flow is part of the run that called it,
-not another run. `hmz.epic.sessions` reads every record, so every session of a run is one list
+not another run. `hmz.runtime.epic.sessions` reads every record, so every session of a run is one list
 however many flows it took, each saying which `flow` opened it and which `record` — which is
 to say which *call* of that flow — it was opened in.
 
@@ -304,7 +304,7 @@ An `output` wins over where a trace would otherwise land.
 asked for by id — and one call is underneath both of them:
 
 ```python
-from hmz.tracing import collect
+from hmz.runtime.tracing import collect
 
 document = collect(
     "~/code/myproject",             # or None, for sessions asked for by id alone

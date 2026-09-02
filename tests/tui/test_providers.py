@@ -16,10 +16,10 @@ import pytest
 from textual import events
 from textual.widgets import Label, OptionList, Static
 
-from hmz import providers
-from hmz.backends import Model
-from hmz.kept import Runs
-from hmz.settings import Settings
+from hmz.coganchor import providers
+from hmz.coganchor.backends import Model
+from hmz.runtime.kept import Runs
+from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.pick import (
     Account,
@@ -106,7 +106,7 @@ def _kept(cli: str, name: str = "") -> tuple[Model, ...]:
     Returns:
       What was written, which is the one model these walks choose between.
     """
-    from hmz import models
+    from hmz.coganchor import models
 
     at = models.where(cli, name)
     at.parent.mkdir(parents=True, exist_ok=True)
@@ -160,7 +160,7 @@ async def test_the_command_opens_the_sheet_of_accounts() -> None:
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.coganchor.providers.login.sign_in", return_value=0)
 async def test_an_account_made_on_the_sheet_lands_in_the_store(
     signed_in: unittest.mock.MagicMock,
 ) -> None:
@@ -238,7 +238,7 @@ async def test_deepseek_offers_only_api_key_login_from_providers() -> None:
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.coganchor.providers.login.sign_in", return_value=0)
 async def test_a_secret_is_never_drawn_back(signed_in: unittest.mock.MagicMock) -> None:
     """It is on its way into a credential store, and a screen is somewhere it is read off."""
     app = Humanize()
@@ -321,7 +321,7 @@ async def test_a_pasted_secret_is_stored_without_its_trailing_newline() -> None:
 
 @pytest.mark.timeout(60)
 @pytest.mark.parametrize("key", ["shift+enter", "ctrl+j"])
-@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.coganchor.providers.login.sign_in", return_value=0)
 async def test_variables_of_your_own_are_given_a_line_apiece(
     signed_in: unittest.mock.MagicMock,
     key: str,
@@ -427,7 +427,7 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
     is the account chosen: making one here is choosing it -- with the models that account
     runs already asked for, which is what makes the step after it answerable.
     """
-    import hmz.models
+    import hmz.coganchor.models
 
     asked: list[tuple[str, str]] = []
 
@@ -435,7 +435,7 @@ async def test_an_account_can_be_made_from_the_sheet_that_asks_for_one(
         asked.append((cli, provider))
         return _kept(cli, provider)
 
-    monkeypatch.setattr(hmz.models, "ask", note)
+    monkeypatch.setattr(hmz.coganchor.models, "ask", note)
     app = Humanize()
     async with app.run_test() as driver:
         await into_flows(app, driver)
@@ -609,7 +609,7 @@ async def test_walking_out_of_the_accounts_makes_nothing_and_loses_nothing() -> 
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.coganchor.providers.login.sign_in", return_value=0)
 async def test_an_account_is_signed_in_again_by_the_way_it_was_made_with(
     signed_in: unittest.mock.MagicMock,
 ) -> None:
@@ -635,7 +635,7 @@ async def test_an_account_is_signed_in_again_by_the_way_it_was_made_with(
 
 
 @pytest.mark.timeout(60)
-@unittest.mock.patch("hmz.providers.login.sign_in", return_value=0)
+@unittest.mock.patch("hmz.coganchor.providers.login.sign_in", return_value=0)
 async def test_signing_in_again_asks_only_what_is_not_written_down(
     signed_in: unittest.mock.MagicMock,
 ) -> None:
@@ -835,7 +835,7 @@ async def test_taking_an_account_away_says_what_went_with_it() -> None:
 
 def test_an_agent_is_made_as_the_account_it_was_given() -> None:
     """What the sheet answered is a setting of the agent, done to it before the flow starts."""
-    from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     _account()
     app = Humanize()
@@ -964,7 +964,7 @@ async def test_a_cli_of_your_own_is_written_down_where_the_cli_is_asked_for() ->
     A row of the list of backends rather than a key on the list of accounts: the question it
     answers is `which CLI`, and that is the sheet asking it.
     """
-    from hmz import backends
+    from hmz.coganchor import backends
     from hmz.tui.pick import Speaks
 
     app = Humanize()
@@ -1212,7 +1212,7 @@ def test_the_file_the_notice_reads_is_the_file_the_store_writes() -> None:
     It cannot be asked of the store: what is read is exactly the key the store stopped
     reading, so the store is the wrong thing to ask for the file it is kept in.
     """
-    from hmz.providers import store
+    from hmz.coganchor.providers import store
     from hmz.tui import pick
 
     assert pick._HELD == store._HELD

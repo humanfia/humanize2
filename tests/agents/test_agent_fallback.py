@@ -22,9 +22,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends, fallbacks, providers
-from hmz.agents import AgentConfig, ClaudeCodeAgent, ClaudeCodeAgentConfig, Tool
-from hmz.agents.skills import Loaded
+from hmz.coganchor import backends, fallbacks, providers
+from hmz.coganchor.agents import (
+    AgentConfig,
+    ClaudeCodeAgent,
+    ClaudeCodeAgentConfig,
+    Tool,
+)
+from hmz.coganchor.agents.skills import Loaded
 from tests.stubs import ShellAgent
 
 if TYPE_CHECKING:

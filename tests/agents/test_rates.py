@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     WINDOW,
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
@@ -271,7 +271,7 @@ def test_a_session_that_has_run_nothing_has_spent_nothing() -> None:
 @pytest.mark.timeout(600)
 def test_claude_says_what_it_spent_by_kind_for_real() -> None:
     """The kinds are read off two spellings of the same usage, so a real turn settles both."""
-    from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+    from hmz.coganchor.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
 
     session = ClaudeCodeAgent(
         ClaudeCodeAgentConfig(model="claude-haiku-4-5-20251001", effort="low")
@@ -293,7 +293,7 @@ def test_claude_says_what_it_spent_by_kind_for_real() -> None:
 @pytest.mark.agent
 @pytest.mark.timeout(600)
 def test_codex_says_what_it_spent_by_kind_for_real() -> None:
-    from hmz.agents import CodexAgent, CodexAgentConfig
+    from hmz.coganchor.agents import CodexAgent, CodexAgentConfig
 
     session = CodexAgent(CodexAgentConfig(model="gpt-5.5", effort="low")).new()
     (answered,) = [

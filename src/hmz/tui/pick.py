@@ -49,11 +49,11 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-from hmz import telemetry
-from hmz.agents import ANYONE, FLOW, SWARM, USER, anchored, driver
-from hmz.kept import Runs
-from hmz.prices import money
-from hmz.telemetry import KEPT, SAYS, SENT
+from hmz.coganchor.agents import ANYONE, FLOW, SWARM, USER, anchored, driver
+from hmz.coganchor.prices import money
+from hmz.runtime import telemetry
+from hmz.runtime.kept import Runs
+from hmz.runtime.telemetry import KEPT, SAYS, SENT
 
 from .discover import installed, machines, ready_to_open
 from .monitor import Shape, lasting, short, thousands
@@ -66,16 +66,16 @@ if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
     from textual.app import App, ComposeResult
 
-    from hmz.agents import AgentBase, Board, Moment
-    from hmz.backends import Model, Way
-    from hmz.epic import Ran
+    from hmz.coganchor.agents import AgentBase, Board, Moment
+    from hmz.coganchor.backends import Model, Way
 
     # Under another name, because `Falls` here is the sheet one account's chain is chosen on
     # and this is the step itself. Two things called the same thing in one file is one of
     # them being read as the other.
-    from hmz.fallbacks import Falls as Step
+    from hmz.coganchor.fallbacks import Falls as Step
+    from hmz.coganchor.providers import Provider
     from hmz.flows import Flowverse, Offer, Place
-    from hmz.providers import Provider
+    from hmz.runtime.epic import Ran
     from hmz.sdk import Hmz
 
     from .monitor import Monitor, Under
@@ -161,7 +161,7 @@ def pointed(place: Place) -> bool:
     Returns:
       True if there is a machine to be chosen for it, which is a step of its own.
     """
-    from hmz.agents import Remote
+    from hmz.coganchor.agents import Remote
 
     return place.where is Remote or isinstance(place.where, Remote)
 
@@ -176,7 +176,7 @@ def _settled(place: Place) -> str:
       The image, or "" for an agent that works here and one that is asked where it works --
       neither of which is something the flow settled.
     """
-    from hmz.agents import Isolated
+    from hmz.coganchor.agents import Isolated
 
     return place.where.image if isinstance(place.where, Isolated) else ""
 
@@ -1189,7 +1189,7 @@ class Flows(Drafts[Chosen]):
           One apiece, and nothing at all for a flow this workspace has never run -- which is
           a flow whose agents fall back on the one the interface opens talking to.
         """
-        from hmz.kept import read_back
+        from hmz.runtime.kept import read_back
 
         agents: dict[str, Any] = self._held(name).get("agents") or {}
         return [
@@ -4432,7 +4432,7 @@ class Agent(Drafts[Runs]):
 
     def _tellable(self) -> bool:
         """Whether the chosen CLI can be told whether its agents may search the web."""
-        from hmz.backends import named
+        from hmz.coganchor.backends import named
 
         profile = named(self._cli) if self._cli else None
         return profile is not None and profile.searches
@@ -5103,7 +5103,7 @@ class Fallbacks(Drafts[list[str]]):
 
     def _step(self, said: str) -> Step:
         """The step written against one place, or an empty one for a place with none."""
-        from hmz.fallbacks import Falls
+        from hmz.coganchor.fallbacks import Falls
 
         return next((one for one in self._steps if one.spec == said), Falls(said))
 
@@ -5251,7 +5251,7 @@ def _tries_moved(cli: str, name: str) -> str:
     """
     import json
 
-    from hmz.providers import LOCAL, alone, where
+    from hmz.coganchor.providers import LOCAL, alone, where
 
     try:
         at = alone(cli) if name == LOCAL else where(cli, name) / _HELD
@@ -5428,7 +5428,7 @@ class Providers(Drafts[list[str]]):
         Last in each CLI's group rather than first: what somebody came here to read is the
         accounts they made, and this is the one that was always there.
         """
-        from hmz.providers import LOCAL
+        from hmz.coganchor.providers import LOCAL
 
         hmz = _hmz()
         accounts = hmz.accounts
@@ -5835,7 +5835,7 @@ class Providers(Drafts[list[str]]):
         workspace and every other -- which is why it is not one of the things this menu holds
         until it is saved.
         """
-        from hmz import backends
+        from hmz.coganchor import backends
 
         showing = cast(
             "App[None]",
@@ -6269,7 +6269,7 @@ class Epics(Sheet[Doing]):
         """
         import asyncio
 
-        from hmz.exporting import sized
+        from hmz.runtime.exporting import sized
 
         self._said = f"packaging {escape(ran.name)}…"
         self._fill()

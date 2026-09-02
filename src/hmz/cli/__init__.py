@@ -15,7 +15,7 @@ only layer present and the architecture is whatever the target happens to be.
 A command whose line takes a parser of its own has a module of its own here, so that reaching
 one of them costs nothing for the others -- which is what `anchor.py`, `cred.py`, `hook.py` and
 `tools.py`, the four humanize spawns for itself, are. `exec` has none: the line it takes is
-read by :func:`hmz.runner.flow_and_agents`, since the terminal interface starts a flow from
+read by :func:`hmz.runtime.runner.flow_and_agents`, since the terminal interface starts a flow from
 that same line.
 
 :mod:`hmz.cli.output` is the one module every command may reach: who is reading -- somebody at
@@ -94,8 +94,8 @@ def _exec(argv: list[str]) -> int:
     Returns:
       Zero, once the flow has returned.
     """
-    from hmz import telemetry
     from hmz.flows import NotAFlow
+    from hmz.runtime import telemetry
     from hmz.sdk import Hmz
 
     from .output import Out, Shown

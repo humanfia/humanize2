@@ -11,7 +11,7 @@ import pytest
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.server import serve
 
-from hmz.agents import kimi
+from hmz.coganchor.agents import kimi
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator

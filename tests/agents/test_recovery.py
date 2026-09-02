@@ -20,8 +20,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends, fallbacks, providers
-from hmz.agents import AgentBase, AgentConfig, Event, Failed, Unrecoverable
+from hmz.coganchor import backends, fallbacks, providers
+from hmz.coganchor.agents import AgentBase, AgentConfig, Event, Failed, Unrecoverable
 from tests.stubs import ShellAgent, ShellSession
 from tests.stubs import ShellAgent as _Shell
 

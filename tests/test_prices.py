@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from hmz import prices
+from hmz.coganchor import prices
 
 if TYPE_CHECKING:
     from pathlib import Path

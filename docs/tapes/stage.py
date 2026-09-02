@@ -52,7 +52,7 @@ PROJECT = {
 #: A flow of the project's own, so `hmz exec` has one to name that is not humanize's.
 FLOW = '''"""Two passes: do the work, then read it back and fix what is wrong."""
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -74,7 +74,7 @@ it has already fixed -- outlives the run and is handed to the next one.
 
 from typing import Any
 
-from hmz.agents import AgentBase
+from hmz.coganchor.agents import AgentBase
 from hmz.flows import flow
 
 
@@ -315,12 +315,12 @@ def _runs() -> None:
     """Writes down two runs of this project, as the code that writes down a real run.
 
     Invented, like everything else here -- the moments included, so that a rendered GIF says
-    the same date tomorrow. What is not invented is the shape: this is `hmz.epic` writing
+    the same date tomorrow. What is not invented is the shape: this is `hmz.runtime.epic` writing
     its own record, linking each session to the transcript above and keeping what a flow that
     can be picked up left behind.
     """
     from hmz import epic as written_as
-    from hmz.agents import AgentConfig
+    from hmz.coganchor.agents import AgentConfig
 
     moments = iter(
         [_stamped(0), _stamped(LATER)]
@@ -366,7 +366,7 @@ def _profile(at: pathlib.Path) -> None:
     Args:
       at: The epic's own directory.
     """
-    from hmz.tracing.profile import PROFILE
+    from hmz.runtime.tracing.profile import PROFILE
 
     lines: list[str] = []
     for pid, (name, argv, began, ended) in enumerate(PROGRAMS, start=41_207):
@@ -399,7 +399,7 @@ def _account() -> None:
     signs in to anything, and what is drawn of an account is the names of the variables it
     sets rather than what they are set to.
     """
-    from hmz import providers
+    from hmz.coganchor import providers
 
     providers.add(
         "claude",
@@ -420,8 +420,8 @@ def _settings() -> None:
     away from answering it on camera. This machine has been asked and has said no, which is
     also the only answer a throwaway container should have.
     """
-    from hmz.kept import Runs
-    from hmz.settings import Settings
+    from hmz.runtime.kept import Runs
+    from hmz.runtime.settings import Settings
 
     Settings(WORK).answers(enable_sentry=False)
     Settings(WORK).profiles(on=True)

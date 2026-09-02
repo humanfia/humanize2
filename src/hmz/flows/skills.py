@@ -16,7 +16,7 @@ Without one, every skill that repository holds is brought. A repository is clone
 somebody else maintains is a skill that keeps up.
 
 Nothing here installs anything. What is fetched is put where humanize keeps it, and what a
-session does with it is :func:`hmz.agents.skills.mount`: put where that backend reads a
+session does with it is :func:`hmz.coganchor.agents.skills.mount`: put where that backend reads a
 project's own skills for as long as the session lives, and taken away again after. The skills
 the person at this machine installed are untouched, being theirs.
 """
@@ -30,7 +30,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 from hmz import home
-from hmz.agents.skills import CARD, SKILLS, Loaded
+from hmz.coganchor.agents.skills import CARD, SKILLS, Loaded
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

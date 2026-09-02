@@ -176,9 +176,9 @@ Give an agent's config an anchored [machine](/reference/machines) and its turns 
 other change to the [flow](/reference/flows):
 
 ```python
-from hmz.agents import ClaudeCodeAgentConfig
+from hmz.coganchor.agents import ClaudeCodeAgentConfig
 from hmz.coganchor import AnchorConfig
-from hmz.machines import AnchoredConfig
+from hmz.coganchor.machines import AnchoredConfig
 
 config = ClaudeCodeAgentConfig(
     model="claude-opus-4-8",

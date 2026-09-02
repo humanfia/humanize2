@@ -14,7 +14,7 @@
 
 `readers` holds one reader per backend, each turning that backend's own log format into the
 shared session model. A backend is driven one way and logs another, so a reader MUST NOT need
-anything of what drives it; where the logs are MUST be read from `hmz.backends` rather
+anything of what drives it; where the logs are MUST be read from `hmz.coganchor.backends` rather
 than written down again here.
 
 `profile.py` samples the programs a run starts while it runs, so that what a turn spent its

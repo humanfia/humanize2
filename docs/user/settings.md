@@ -22,7 +22,7 @@ once and true wherever humanize is run from.
 Read what this directory remembers from Python:
 
 ```python
-from hmz.settings import Settings
+from hmz.runtime.settings import Settings
 
 Settings().profiling            # whether a run in this directory is profiled
 Settings().profiles(on=True)    # written down for it, from now on

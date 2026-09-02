@@ -1,7 +1,8 @@
 """The accounts half of the SDK, which is the same store every other way in walks.
 
-`Accounts` is a facade: each method is one call into :mod:`hmz.providers` or
-:mod:`hmz.models`. What is worth checking about a facade is not the call -- that is one line
+`Accounts` is a facade: each method is one call into :mod:`hmz.coganchor.providers` or
+:mod:`hmz.coganchor.models`. What is worth checking about a facade is not the call -- that is one
+line
 -- but that it is wired to the right one, with the arguments in the right order, so that an
 account made from here is the account a command line lists a moment later and the account the
 interface offers. So these go through the SDK and read back through the store, and the two
@@ -18,11 +19,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import providers
+from hmz.coganchor import providers
 from hmz.sdk import Hmz
 
 if TYPE_CHECKING:
-    from hmz.backends import Model
+    from hmz.coganchor.backends import Model
 
 
 def test_an_account_written_from_here_is_one_the_store_reads_back() -> None:
@@ -93,7 +94,7 @@ def test_a_name_an_account_may_not_be_kept_under_is_refused() -> None:
 def test_the_account_this_machine_is_signed_into_is_where_the_backend_keeps_its_own() -> (
     None
 ):
-    from hmz.providers import store
+    from hmz.coganchor.providers import store
 
     assert Hmz().accounts.local("claude") == store.alone("claude")
 
@@ -286,7 +287,7 @@ def test_what_a_turn_runs_with_is_the_account_s_and_nothing_for_no_account() -> 
 def test_what_a_backend_runs_is_read_off_what_was_kept_and_nothing_before_it_was_asked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from hmz import models
+    from hmz.coganchor import models
 
     held = Hmz().accounts
 
@@ -310,7 +311,7 @@ def test_how_long_a_backend_is_given_to_answer_is_passed_on_only_when_it_is_said
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The default is that backend's own, which is a different call rather than a number."""
-    from hmz import models
+    from hmz.coganchor import models
 
     seen: list[tuple[str, str, float | None]] = []
 

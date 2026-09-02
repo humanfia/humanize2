@@ -10,7 +10,7 @@ import pytest
 import yaml
 from pydantic import BaseModel
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     DRIVEN,
     DshAgent,
     DshAgentConfig,
@@ -638,7 +638,7 @@ def test_dsh_rejects_credentials_readable_by_other_users(
 def test_only_a_key_provider_can_authenticate_dsh(
     way: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from hmz import providers
+    from hmz.coganchor import providers
 
     monkeypatch.delenv("DEEPSEEK_API_KEY")
     providers.add(
@@ -674,7 +674,7 @@ def test_shapes_are_asked_for_in_the_prompt() -> None:
 def test_provider_environment_reaches_the_sdk_runtime(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from hmz import providers
+    from hmz.coganchor import providers
 
     monkeypatch.delenv("DEEPSEEK_API_KEY")
     providers.add(
@@ -755,7 +755,7 @@ def test_a_turn_that_outgrew_the_model_is_taken_once_under_every_account(
     A place that says a turn at it is worth taking again would otherwise take this one again
     on every rung of its chain of accounts, each try failing on the same words.
     """
-    from hmz import fallbacks, providers
+    from hmz.coganchor import fallbacks, providers
 
     tried_again = providers.Provider("dsh", providers.LOCAL, way="", fallback="second")
     second = providers.Provider("dsh", "second", way="")
@@ -797,7 +797,9 @@ def test_the_runtime_composition_compacts_before_the_model_refuses_the_turn() ->
     conversation stops for good: the next turn is the same conversation and the same
     refusal, and nothing in the composition ever makes it shorter.
     """
-    cordis = dsh.importlib.resources.files("hmz.agents").joinpath("dsh.cordis.yml")
+    cordis = dsh.importlib.resources.files("hmz.coganchor.agents").joinpath(
+        "dsh.cordis.yml"
+    )
     composed = cordis.read_text()
 
     assert "@deepseek-ai/dsh-token-meter" in composed
@@ -814,7 +816,9 @@ def test_the_runtime_composition_is_the_bypass_rung_the_agent_promises() -> None
     another rung is what would introduce the fail-closed Bash, so the absences are the
     contract and are asserted as one.
     """
-    cordis = dsh.importlib.resources.files("hmz.agents").joinpath("dsh.cordis.yml")
+    cordis = dsh.importlib.resources.files("hmz.coganchor.agents").joinpath(
+        "dsh.cordis.yml"
+    )
     # The `!!js` tags are the runtime's to evaluate and have no constructor here; what is
     # being asserted is which plugins are mounted, so the tags come off and what was written
     # behind them stays the text it was written as.
@@ -851,7 +855,9 @@ def test_a_turn_already_running_cannot_be_talked_to() -> None:
 
 
 def test_the_runtime_composition_uses_only_plugins_bundled_with_the_sdk() -> None:
-    cordis = dsh.importlib.resources.files("hmz.agents").joinpath("dsh.cordis.yml")
+    cordis = dsh.importlib.resources.files("hmz.coganchor.agents").joinpath(
+        "dsh.cordis.yml"
+    )
     configured_plugins = cordis.read_text()
 
     assert "@deepseek-ai/dsh-settings-file" not in configured_plugins

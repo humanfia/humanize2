@@ -1,11 +1,11 @@
 """The runs of a workspace that have already happened, and what is gathered out of them.
 
-One run is one epic: a directory holding what happened, what each session was logged to, and
-what a flow that says it can be picked up left behind. What is written down as a run happens
-is :mod:`hmz.epic`; reading the backends' own logs back is :mod:`hmz.tracing`; packaging one
-whole run up to send somewhere is :mod:`hmz.exporting`. All three are asked here, so that
-whatever is listing the runs -- a command line, the interface's own `/epics` -- asks one
-object about the one workspace it is about.
+One run is one epic: a directory holding what happened, what each session was logged to, and what a
+flow that says it can be picked up left behind. What is written down as a run happens is
+:mod:`hmz.runtime.epic`; reading the backends' own logs back is :mod:`hmz.runtime.tracing`;
+packaging one whole run up to send somewhere is :mod:`hmz.runtime.exporting`. All three are asked
+here, so that whatever is listing the runs -- a command line, the interface's own `/epics` -- asks
+one object about the one workspace it is about.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
     from typing import Any
 
-    from hmz.epic import Ran, Session
+    from hmz.runtime.epic import Ran, Session
 
 __all__ = ["Epics"]
 
@@ -39,43 +39,43 @@ class Epics:
 
     def under(self) -> Path:
         """The directory this workspace's runs are kept in."""
-        from hmz.epic import under
+        from hmz.runtime.epic import under
 
         return under(self._workspace)
 
     def all(self) -> list[Path]:
         """Every run of this workspace, oldest first, which is the order they are named in."""
-        from hmz.epic import epics
+        from hmz.runtime.epic import epics
 
         return epics(self._workspace)
 
     def read(self, epic: Path) -> Ran | None:
         """What one run was: when, which flow, on what, how it went, and what it opened."""
-        from hmz.epic import read
+        from hmz.runtime.epic import read
 
         return read(epic)
 
     def sessions(self, epic: Path) -> list[Session]:
         """Every session one run opened, across each of the records it holds."""
-        from hmz.epic import sessions
+        from hmz.runtime.epic import sessions
 
         return sessions(epic)
 
     def opened(self, epic: Path) -> dict[str, list[str]]:
         """What each agent of one run opened, by the name the run knew that agent as."""
-        from hmz.epic import opened
+        from hmz.runtime.epic import opened
 
         return opened(epic)
 
     def resumed(self, flow: str) -> Path | None:
         """The last run of one flow here, which is what running a resumable flow picks up."""
-        from hmz.epic import resumed
+        from hmz.runtime.epic import resumed
 
         return resumed(flow, self._workspace)
 
     def state(self, epic: Path, flow: str = "") -> dict[str, Any]:
         """What a flow that says it can be picked up left behind in one run."""
-        from hmz.epic import state
+        from hmz.runtime.epic import state
 
         return state(epic, flow)
 
@@ -107,8 +107,8 @@ class Epics:
         """
         import datetime
 
-        from hmz.epic import TRACES
-        from hmz.tracing.profile import PROFILE
+        from hmz.runtime.epic import TRACES
+        from hmz.runtime.tracing.profile import PROFILE
 
         agents = self.opened(epic)
         where = Path(output) if output is not None else None
@@ -152,7 +152,7 @@ class Epics:
           Where it was written, and the manifest as it was written there -- which is what
           says what went in, rather than a second reading of the run afterwards.
         """
-        from hmz.exporting import bundle
+        from hmz.runtime.exporting import bundle
 
         return bundle(epic, output, transcript=transcript)
 
@@ -182,7 +182,7 @@ class Epics:
         Returns:
           The trace, as the object that was written.
         """
-        from hmz.tracing.collector import collect
+        from hmz.runtime.tracing.collector import collect
 
         return collect(
             self._workspace,

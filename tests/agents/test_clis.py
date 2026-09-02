@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     AntigravityCLIAgent,
     AntigravityCLIAgentConfig,
     GrokBuildAgent,
@@ -33,7 +33,7 @@ from hmz.agents import (
     QwenCodeAgentConfig,
     Unrecoverable,
 )
-from hmz.machines import AnchoredConfig
+from hmz.coganchor.machines import AnchoredConfig
 from tests.stubs import HereAnchor
 
 if TYPE_CHECKING:
@@ -649,7 +649,7 @@ def test_mimo_is_opencode_under_its_own_name(stubs: _Stubs) -> None:
 
 def test_the_new_backends_name_themselves_as_a_command_line_names_them() -> None:
     """`AgentBase.backend` is read off the class, so a mismatch is a backend nobody finds."""
-    from hmz import backends
+    from hmz.coganchor import backends
 
     for agent, config in (
         (PiAgent, PI),

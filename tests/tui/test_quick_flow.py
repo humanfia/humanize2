@@ -14,10 +14,10 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from textual.widgets import OptionList
 
-from hmz.agents import AgentConfig, Question
-from hmz.backends import Model
-from hmz.kept import Runs
-from hmz.settings import Settings
+from hmz.coganchor.agents import AgentConfig, Question
+from hmz.coganchor.backends import Model
+from hmz.runtime.kept import Runs
+from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
 from hmz.tui.app import _OWN, Editor
 from hmz.tui.complete import offered

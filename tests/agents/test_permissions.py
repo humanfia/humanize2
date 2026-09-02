@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     PERMISSIONS,
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
@@ -32,7 +32,7 @@ from hmz.agents import (
     Moment,
     Verdict,
 )
-from hmz.agents.codex import unattended
+from hmz.coganchor.agents.codex import unattended
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -332,7 +332,7 @@ def test_kimi_is_told_the_rung_as_a_mode_and_a_plan(
     permission: str, mode: str, planning: bool
 ) -> None:
     """`manual` is never used: it asks, and an unattended flow has nobody to answer."""
-    from hmz.agents.kimi import _PERMITTED
+    from hmz.coganchor.agents.kimi import _PERMITTED
 
     said = _PERMITTED[permission]
     assert said["permission_mode"] == mode
@@ -341,8 +341,8 @@ def test_kimi_is_told_the_rung_as_a_mode_and_a_plan(
 
 def test_every_backend_has_something_to_say_at_every_rung() -> None:
     """A rung a backend quietly ignored would be a setting that lies."""
-    from hmz.agents import codex as codex_module
-    from hmz.agents import kimi, opencode, zcode
+    from hmz.coganchor.agents import codex as codex_module
+    from hmz.coganchor.agents import kimi, opencode, zcode
 
     for rung in PERMISSIONS:
         assert rung in kimi._PERMITTED
@@ -356,7 +356,7 @@ _READING = '''"""A flow whose agent reviews and does not write."""
 
 from typing import Annotated
 
-from hmz.agents import AgentBase, AgentDefaults
+from hmz.coganchor.agents import AgentBase, AgentDefaults
 from hmz.flows import flow
 
 
@@ -370,7 +370,7 @@ def run(
 
 def test_the_flow_says_which_rung_its_agent_is_on(tmp_path: Path) -> None:
     """Settled onto the agent before its first turn, over whatever it was made with."""
-    from hmz.runner import Runner
+    from hmz.runtime.runner import Runner
 
     where = tmp_path / "reading.py"
     where.write_text(_READING)
@@ -556,6 +556,6 @@ def test_the_rung_below_each_rung_is_the_next_one_down(
     refused: str, instead: str
 ) -> None:
     """And below the bottom there is nothing: a machine that will not run one at all."""
-    from hmz.agents.codex import _tighter
+    from hmz.coganchor.agents.codex import _tighter
 
     assert _tighter(refused) == instead

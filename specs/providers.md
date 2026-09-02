@@ -63,7 +63,7 @@ def points(cli: str, name: str, at: str) -> bool: ...
   what can be run.
 - The directory MUST be this user's alone, every level of it, and the file it is written down
   in MUST be too: it holds real credentials.
-- What a provider answers MUST be only the paths `hmz.backends` names as that backend's
+- What a provider answers MUST be only the paths `hmz.coganchor.backends` names as that backend's
   credentials. The sessions, the settings and the skills MUST be the ones the CLI already has,
   so that a turn under a provider still traces, still counts and still loads what is installed.
 - `swaps` MUST also answer the same path with the links in it followed, where that is a
@@ -104,7 +104,7 @@ def points(cli: str, name: str, at: str) -> bool: ...
 - It MUST stay the account's, and MUST NOT be widened to cover the agent that has nowhere left
   to run at all -- a model retired, a CLI that will not start, a rate limit on the whole
   account rather than one request. None of those is answered by another account of that
-  backend, what answers them is another agent entirely, and that is `hmz.fallbacks`. The two
+  backend, what answers them is another agent entirely, and that is `hmz.coganchor.fallbacks`. The two
   answer two failures, and one of them keeps the conversation where the other cannot.
 - A chain MUST be walked inside the session that was running: the conversation is the
   backend's own and is named by an id, so it carries on under the next account rather than
@@ -120,7 +120,7 @@ def points(cli: str, name: str, at: str) -> bool: ...
   agent given no account, which is where its chain already starts.
 - How many times over a failed turn is taken again before the chain moves on MUST NOT be said
   here. That is a thing about the place a turn runs at -- the CLI, the account and the model --
-  rather than about the credentials it runs with, and `hmz.fallbacks` is the one place both it
+  rather than about the credentials it runs with, and `hmz.coganchor.fallbacks` is the one place both it
   and where the turn goes next are written. Two places saying it would be two places to drift.
 
 ## `redirect.py` / `_trace.py` / `_staging.py`

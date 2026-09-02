@@ -15,10 +15,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-import hmz.agents
+import hmz.coganchor.agents
 import hmz.flows
-from hmz.agents import HumanAgent
-from hmz.agents import Unrecoverable as AgentUnrecoverable
+from hmz.coganchor.agents import HumanAgent
+from hmz.coganchor.agents import Unrecoverable as AgentUnrecoverable
 from hmz.flows import BUILTIN_AT, Agent, Person, Session
 from hmz.flows import Unrecoverable as FlowUnrecoverable
 from hmz.flows.checking import surface
@@ -34,7 +34,7 @@ ONLY = "hmz.flows"
 
 #: What a flow names for the two things that reach back out of a turn: the callbacks it puts
 #: in front of an agent as tools, and the board it and the person both write on. Each is
-#: written in `hmz.agents`. `Tool` is in an import line in the guide that introduces it;
+#: written in `hmz.coganchor.agents`. `Tool` is in an import line in the guide that introduces it;
 #: `Board`, `Item` and `Refused` are the types and the exception a flow meets through
 #: `person.board`, which it has to be able to annotate and catch by name.
 REACHING = ("Board", "Item", "Refused", "Tool")
@@ -90,7 +90,7 @@ def test_what_reaches_back_out_of_a_turn_is_offered_by_name(name: str) -> None:
     and the same object, since the tool the flow builds is the tool a backend is handed.
     """
     assert name in hmz.flows.__all__
-    assert getattr(hmz.flows, name) is getattr(hmz.agents, name)
+    assert getattr(hmz.flows, name) is getattr(hmz.coganchor.agents, name)
 
 
 def test_everything_handed_through_is_offered() -> None:
@@ -120,7 +120,7 @@ def _answers(driver: object) -> set[str]:
 
 
 def test_the_drivers_answer_to_what_a_flow_drives() -> None:
-    """Structurally, since the arrow points one way: `hmz.agents` never names a flow.
+    """Structurally, since the arrow points one way: `hmz.coganchor.agents` never names a flow.
 
     Against a driver that was made rather than against the classes, and against the one driver
     that can be made without a coding agent behind it: the person is an `AgentBase` and their

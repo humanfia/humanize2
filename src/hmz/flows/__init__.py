@@ -37,7 +37,7 @@ of that is written in is humanize's business -- a flow that named them would be 
 breaks when one of them moves, and a flow is somebody else's repository. So :mod:`hmz.flows`
 gathers them: the interfaces in [agent.py](agent.py), the mark and the finding here, calling
 another flow in [driving.py](driving.py), and the vocabulary a turn is described in from
-:mod:`hmz.agents` -- the moments a hook hangs on, what a turn cost, what an agent is
+:mod:`hmz.coganchor.agents` -- the moments a hook hangs on, what a turn cost, what an agent is
 configured with -- passed straight through.
 """
 
@@ -97,8 +97,9 @@ from .verses import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from hmz import backends, home, models
-    from hmz.agents import (
+    from hmz import home
+    from hmz.coganchor import backends, models
+    from hmz.coganchor.agents import (
         EVERYWHERE,
         PERMISSIONS,
         SWARM,
@@ -129,7 +130,7 @@ if TYPE_CHECKING:
         Usage,
         Verdict,
     )
-    from hmz.backends import Model, Profile
+    from hmz.coganchor.backends import Model, Profile
 
     from .checking import Capability, Finding, briefed, catalogue, checked
     from .prophesying import Prophesied, is_atlas, prophesied
@@ -257,8 +258,10 @@ __all__ = [
 #: is, and what each of them runs. A loop that turns the effort down when a model starts
 #: writing less asks the second of them what rungs there are, which is a question about a
 #: backend rather than about any agent -- so it is handed through as it stands rather than
-#: flattened into a name apiece.
-_MODULES = ("backends", "models")
+#: flattened into a name apiece. Under the name the flow writes rather than the one the
+#: module is at: a flow says `flows.backends`, and where humanize keeps that is humanize's
+#: own to move.
+_MODULES = {"backends": "hmz.coganchor.backends", "models": "hmz.coganchor.models"}
 
 #: And the names a flow imports from here that are written down elsewhere: the vocabulary a
 #: turn is described in, where humanize keeps what outlives a run, and the two readings of a
@@ -280,37 +283,37 @@ _ELSEWHERE = {
     "is_atlas": "hmz.flows.prophesying",
     "prophesied": "hmz.flows.prophesying",
     "proved": "hmz.flows.proving",
-    "AgentConfig": "hmz.agents",
-    "Board": "hmz.agents",
-    "AgentDefaults": "hmz.agents",
-    "Budget": "hmz.agents",
-    "EVERYWHERE": "hmz.agents",
-    "Event": "hmz.agents",
-    "Failed": "hmz.agents",
-    "Goal": "hmz.agents",
-    "Hook": "hmz.agents",
-    "Hooks": "hmz.agents",
-    "HumanAgent": "hmz.agents",
-    "Hung": "hmz.agents",
-    "Isolated": "hmz.agents",
-    "Item": "hmz.agents",
-    "Model": "hmz.backends",
-    "Moment": "hmz.agents",
-    "Needs": "hmz.agents",
-    "Occasion": "hmz.agents",
-    "PERMISSIONS": "hmz.agents",
-    "Profile": "hmz.backends",
-    "Question": "hmz.agents",
-    "Refused": "hmz.agents",
-    "Remote": "hmz.agents",
-    "SWARM": "hmz.agents",
-    "Stopped": "hmz.agents",
-    "Tool": "hmz.agents",
-    "Unhooked": "hmz.agents",
-    "Unrecoverable": "hmz.agents",
-    "Usage": "hmz.agents",
-    "Verdict": "hmz.agents",
-    "WINDOW": "hmz.agents",
+    "AgentConfig": "hmz.coganchor.agents",
+    "Board": "hmz.coganchor.agents",
+    "AgentDefaults": "hmz.coganchor.agents",
+    "Budget": "hmz.coganchor.agents",
+    "EVERYWHERE": "hmz.coganchor.agents",
+    "Event": "hmz.coganchor.agents",
+    "Failed": "hmz.coganchor.agents",
+    "Goal": "hmz.coganchor.agents",
+    "Hook": "hmz.coganchor.agents",
+    "Hooks": "hmz.coganchor.agents",
+    "HumanAgent": "hmz.coganchor.agents",
+    "Hung": "hmz.coganchor.agents",
+    "Isolated": "hmz.coganchor.agents",
+    "Item": "hmz.coganchor.agents",
+    "Model": "hmz.coganchor.backends",
+    "Moment": "hmz.coganchor.agents",
+    "Needs": "hmz.coganchor.agents",
+    "Occasion": "hmz.coganchor.agents",
+    "PERMISSIONS": "hmz.coganchor.agents",
+    "Profile": "hmz.coganchor.backends",
+    "Question": "hmz.coganchor.agents",
+    "Refused": "hmz.coganchor.agents",
+    "Remote": "hmz.coganchor.agents",
+    "SWARM": "hmz.coganchor.agents",
+    "Stopped": "hmz.coganchor.agents",
+    "Tool": "hmz.coganchor.agents",
+    "Unhooked": "hmz.coganchor.agents",
+    "Unrecoverable": "hmz.coganchor.agents",
+    "Usage": "hmz.coganchor.agents",
+    "Verdict": "hmz.coganchor.agents",
+    "WINDOW": "hmz.coganchor.agents",
     "home": "hmz",
 }
 
@@ -335,8 +338,8 @@ def __getattr__(name: str) -> object:
     """
     from importlib import import_module
 
-    if name in _MODULES:
-        return import_module(f"hmz.{name}")
+    if (whole := _MODULES.get(name)) is not None:
+        return import_module(whole)
     where_ = _ELSEWHERE.get(name)
     if where_ is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

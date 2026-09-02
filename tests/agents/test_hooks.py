@@ -11,7 +11,7 @@ import subprocess
 
 import pytest
 
-from hmz.agents import (
+from hmz.coganchor.agents import (
     AgentConfig,
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
@@ -263,7 +263,7 @@ def test_claude_puts_a_permission_to_the_hook_and_takes_no_for_an_answer() -> No
 
 def test_an_agent_stopped_inside_a_hook_stops_the_flow() -> None:
     """The one thing a hook may raise: a run ended by hand is not a run that finished."""
-    from hmz.agents import Stopped
+    from hmz.coganchor.agents import Stopped
 
     agent = _agent()
     other = _agent()

@@ -498,7 +498,7 @@ dropped on the way over.
 [SDK › Accounts](/reference/sdk#accounts). The modules under it, for anything reaching past it:
 
 ```python
-from hmz.providers import (
+from hmz.coganchor.providers import (
     Provider,   # cli, name, way, env, args, made; .at, .swaps(), .command(argv)
     providers,  # every provider there is, or one backend's
     find,       # one of a backend, by name, or None
@@ -509,7 +509,7 @@ from hmz.providers import (
     environ,    # what a turn under one is run with
 )
 
-from hmz.providers.login import (
+from hmz.coganchor.providers.login import (
     way_of,     # the way one backend offers under a name
     asked,      # what a way still has to be told
     make,       # a provider out of what its way was answered with

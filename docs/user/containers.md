@@ -113,7 +113,7 @@ python:3.12`, with `the flow settled this` beside it — a row to read rather th
 yourself, or for a place the flow declared `Remote`:
 
 ```python
-from hmz.machines import DockerConfig
+from hmz.coganchor.machines import DockerConfig
 
 ClaudeCodeAgentConfig(model=…, effort=…, machine=DockerConfig(image="python:3.12"))
 ```
@@ -132,9 +132,9 @@ Where the flow says a place may be pointed anywhere (`Annotated[Agent, Remote]`)
 hand it a container instead:
 
 ```python
-from hmz.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
-from hmz.machines import DockerConfig
-from hmz.runner import Runner
+from hmz.coganchor.agents import ClaudeCodeAgent, ClaudeCodeAgentConfig
+from hmz.coganchor.machines import DockerConfig
+from hmz.runtime.runner import Runner
 
 config = ClaudeCodeAgentConfig(
     model="claude-opus-5",

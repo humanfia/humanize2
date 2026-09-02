@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends, providers
+from hmz.coganchor import backends, providers
 
 if TYPE_CHECKING:
     from pathlib import Path
