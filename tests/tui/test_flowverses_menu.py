@@ -387,9 +387,13 @@ async def test_the_places_are_walked_to_from_the_flows(theirs: Path) -> None:
         await until(lambda: isinstance(app.screen, Flowverses), driver)
         assert rows(app) == [OFFICIAL, "theirs", LOCAL, USER]
 
+        places = app.screen
         await onto(app, driver, "theirs")
-        await driver.press("d")
-        await driver.press("d")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Holds), driver)
+        await onto(app, driver, _TAKES_AWAY)
+        await driver.press("enter")
+        await until(lambda: app.screen is places, driver)
         await until(
             lambda: (
                 "no longer here" in str(app.screen.query_one("#tuning", Label).content)
