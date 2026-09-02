@@ -195,9 +195,37 @@ class Settings:
           What was set, field by field, and nothing at all for a flow this workspace has
           never set up.
         """
+        return self._kept(flow, "config")
+
+    def budget(self, flow: str) -> dict[str, Any]:
+        """What a run of one flow here was last said to be allowed to spend.
+
+        Beside what the flow was set up with rather than inside it, because it is not one of
+        the flow's settings: the flow said at most a default, and this is what the person
+        running it here decided a run of it is worth.
+
+        Args:
+          flow: The flow it was set for.
+
+        Returns:
+          The dimensions that were set, and nothing at all for a flow nobody has set one for
+          here -- which is a run under whatever the flow itself says.
+        """
+        return self._kept(flow, "budget")
+
+    def _kept(self, flow: str, under: str) -> dict[str, Any]:
+        """One of the things remembered about a flow here, as a mapping.
+
+        Args:
+          flow: The flow.
+          under: Which of them.
+
+        Returns:
+          What was written down, and nothing at all where it was not or is not a mapping.
+        """
         flows: dict[str, Any] = self._mine().get("flows") or {}
         kept: dict[str, Any] = flows.get(flow) or {}
-        held = kept.get("config")
+        held = kept.get(under)
         return cast("dict[str, Any]", held) if isinstance(held, dict) else {}
 
     def remember(
@@ -206,6 +234,7 @@ class Settings:
         names: tuple[str, ...],
         models: Sequence[Runs],
         config: dict[str, Any] | None = None,
+        budget: dict[str, Any] | None = None,
     ) -> None:
         """Writes down what this workspace is set up to run, so that it opens that way.
 
@@ -217,6 +246,11 @@ class Settings:
           config: What the flow itself was set up with, or None to leave whatever was kept
             for it as it was -- choosing the agents again is not a way of forgetting how the
             flow was set up.
+          budget: What a run of it here may spend, or None to leave whatever was kept as it
+            was. The same asymmetry as `config` and for the same reason: the flow's whole
+            entry is replaced below, so what is not handed in has to be read back or it is
+            forgotten. A value that is empty erases it, which is how the menu says a flow is
+            back to running under whatever the flow itself says.
         """
         agents: dict[str, dict[str, Any]] = {
             # By what the flow calls it, or by where it comes in the line when it has no name.
@@ -229,6 +263,9 @@ class Settings:
         held = config if config is not None else self.config(flow)
         if held:
             kept["config"] = held
+        spends = budget if budget is not None else self.budget(flow)
+        if spends:
+            kept["budget"] = spends
         mine.setdefault("flows", {})[flow] = kept
         self._write()
 

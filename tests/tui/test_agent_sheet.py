@@ -22,7 +22,17 @@ from hmz.coganchor.backends import Model
 from hmz.runtime.kept import Runs
 from hmz.runtime.settings import Settings
 from hmz.tui import Humanize
-from hmz.tui.pick import _SAVE, Agent, Anchors, Catalogue, Clis, Confirms, Flows
+from hmz.tui.pick import (
+    _BUDGET,
+    _SAVE,
+    Agent,
+    Anchors,
+    Catalogue,
+    Clis,
+    Confirms,
+    Flows,
+    Unbounded,
+)
 from tests.stubs import written
 
 from .test_app import drops, into_agent, keeps, onto, opens, rows, until
@@ -196,9 +206,9 @@ async def test_two_agents_are_two_rows_and_a_sheet_apiece(
         # what is left to answer is what drives it.
         await until(lambda: sheet._inside, driver)
         listing = sheet.query_one("#choices", OptionList)
-        await until(lambda: len(listing.options) == 3, driver)
+        await until(lambda: len(listing.options) == 4, driver)
 
-        assert rows(app) == ["0", "1", _SAVE]
+        assert rows(app) == ["0", "1", _BUDGET, _SAVE]
         assert "builder" in str(listing.get_option_at_index(0).prompt)
         assert "reviewer" in str(listing.get_option_at_index(1).prompt)
 
@@ -232,7 +242,7 @@ async def test_explicit_saves_accept_two_agents_then_apply_the_complete_flow(
 
         await opens(app, driver, _SAVE)
         await until(lambda: isinstance(app.screen, Flows), driver)
-        assert rows(app) == ["0", "1", _SAVE]
+        assert rows(app) == ["0", "1", _BUDGET, _SAVE]
 
         await onto(app, driver, "1")
         await driver.press("enter")
@@ -244,6 +254,10 @@ async def test_explicit_saves_accept_two_agents_then_apply_the_complete_flow(
         await until(lambda: isinstance(app.screen, Flows), driver)
 
         await onto(app, driver, _SAVE)
+        await driver.press("enter")
+        # Nobody set a budget and this flow declares none, so saving asks whether a run with
+        # nothing at all to stop it is what was meant. It is, here.
+        await until(lambda: isinstance(app.screen, Unbounded), driver)
         await driver.press("enter")
         await until(lambda: not isinstance(app.screen, Flows), driver)
 
