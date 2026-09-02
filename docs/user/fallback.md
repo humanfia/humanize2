@@ -146,9 +146,11 @@ answers it); trying again in 30s (1 of 1)
 claude is rate-limited (…); carrying on as work
 ```
 
-Whatever is watching the agent sees those as `tool` events; where nothing is watching, they go
-on stderr beside the progress the backend itself puts there. A turn told to wait half a minute
-is exactly the turn you would otherwise watch do nothing at all.
+Whatever is watching the agent sees those as `notice` events; where nothing is watching, they
+go on stderr beside the progress the backend itself puts there. A turn told to wait half a
+minute is exactly the turn you would otherwise watch do nothing at all — which is why they are
+their own kind rather than tool calls, and why [`/details`](/user/details) does not hide them
+with the working.
 
 A backend that already knows which kind it was says so itself and is believed. Nothing guesses
 at a message when the CLI has named the failure.

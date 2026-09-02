@@ -456,6 +456,11 @@ class Shown:
         elif event.kind == "tool":
             named, _, about = event.text.partition(" ")
             self._out.line((f"{_SAID} ", "green"), (named, ""), (f"({about})", "dim"))
+        elif event.kind == "notice":
+            # humanize saying what it is doing about the turn rather than the agent working:
+            # a rate limit being waited out, another account being carried on as, a turn being
+            # cut off. Said in its own colour so it does not read as a tool call.
+            self._out.line((f"{_SAID} ", "yellow"), (event.text, "dim"))
         elif event.kind in ("subagent", "subagent-ends"):
             named, _, about = event.text.partition(" ")
             done = "started" if event.kind == "subagent" else "done"

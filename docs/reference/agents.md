@@ -683,6 +683,7 @@ mapping of model to tokens spent.
 | `text` | The agent talking. |
 | `reasoning` | The agent thinking aloud. |
 | `tool` | The agent using one. |
+| `notice` | **humanize** rather than the agent: a rate limit being waited out, another account being carried on as, a turn being cut off, a wedged backend being taken away. |
 | `result` | The answer the turn ends on. **Exactly one closes a turn**, and it is what calling the session returns. |
 | `failed` | The turn closed the other way, carrying what went wrong in place of an answer. |
 | `took` | A word [put into the running turn](#talking-to-a-turn-already-running) is now in front of the model, and is what the event carries. |
@@ -693,6 +694,18 @@ over the utterance they came to — as the agent reaches for a tool, since what 
 reaching is what says why it reached, and again as the message ends. So a paragraph is one
 event, and a turn of ten tool calls is ten or so events rather than several thousand. If you
 want the tokens as they land, read them from the backend yourself; a flow reads what was said.
+
+A `tool` event is the other way round: it lands as the agent **reaches**, not once it has
+finished reaching. The arguments of a call stream in like anything else, and for a write they
+are the whole file — so a row that waited for them would be a row that appeared minutes after
+the agent started writing, with nothing said in between. Where a backend streams them the row
+goes out at the first fragment that says what the call is about, which is the path or the
+command, and the file follows behind it.
+
+A `notice` is the one kind that is not the agent at all. It is what humanize is doing about the
+turn, and it exists because a turn told to wait half a minute and a turn that has hung look
+identical from outside. The interface draws it whichever way [`/details`](/user/details) is
+set.
 
 A watcher sees three more that a stream does not: `begins` and `ends`, which bracket the turn,
 and `asks`, which is the agent stopping to ask its user something.
@@ -711,7 +724,9 @@ have nowhere to say the next thing back to. It is `None` only for something the 
 rather than one of them: a question put by a server that serves every session of it at once.
 
 A watcher that raises is the watcher's own problem: a flow must not fail because something
-looking at it did.
+looking at it did. It is reported as a snag rather than swallowed in silence — one draw that
+failed is one thing the agent said that nobody will ever see, and a run whose rows all went
+that way reads as a turn sitting there doing nothing.
 
 This is the only place a run is visible. A flow drives the sessions and answers to nobody, so
 the turns going past are all there is — which is what the interface's status column is built
@@ -886,9 +901,15 @@ with agent.hooks.on(Moment.PRE_TOOL_USE, no_shell):
 The seam is the CLI's own and is scoped to the run: `--settings` carries the whole of a
 settings file as a literal on Claude Code's command line, and Qwen Code is pointed at a
 settings file of ours through the variable it already reads its effort from. Nothing of the
-person's own configuration is read, written or replaced, and the table is installed whether or
-not anything is hung on the moment — a hook goes up and comes down while the agent runs, so
-what is hung is asked when the moment fires rather than when the CLI started.
+person's own configuration is read, written or replaced.
+
+The table is installed only while something is hung on the moment. It is a program the CLI
+starts and waits for before every tool it runs, one call after another, so a table written for
+hooks that are not there costs every file read its own delay for nobody. Hanging a hook or
+taking one down between two turns starts the next turn in a CLI told the new answer, exactly as
+moving the effort does; one hung while a turn is already running is read off that turn's own
+stream instead, which watches the tool rather than gating it. What is hung is still asked when
+the moment fires rather than when the CLI started.
 
 `PRE_TOOL_USE` and `PERMISSION_REQUEST` are two moments and both fire. The table gets the first
 word, a CLI running its hooks before it decides whether a tool is permitted, so a refusal at

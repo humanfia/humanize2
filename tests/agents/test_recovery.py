@@ -83,7 +83,7 @@ def _watched(agent: AgentBase) -> list[str]:
     agent.watch(
         lambda _agent, _session, event: (
             narrated.append(event.text)
-            if event.kind == "tool" and event.text.startswith(f"{agent.backend} ")
+            if event.kind == "notice" and event.text.startswith(f"{agent.backend} ")
             else None
         )
     )
