@@ -115,7 +115,7 @@ in silence.
 | `<run> cannot be read back` | Its record is not one: a run that died mid-line left a line rather than an epic. |
 | `<flow> does not say it can be picked up` | Asked of the flow as it stands today, not of what the run recorded. |
 | `<run> left nothing behind` | It stopped before it wrote down where it had got to, or it emptied what it wrote — which is the flow saying the next run starts clean. Say what to do and it starts from the top. |
-| `no picking a run up while a flow is running` | A run picked up is a flow started, and one is going. [ctrl+c twice](/user/stopping) stops it first. |
+| `no picking a run up while a flow is running` | A run picked up is a flow started, and one is going. [ctrl+c twice or `/stop`](/user/stopping) stops it first. |
 | `no picking a run up while the flow is still stopping` | ctrl+c twice was pressed and the flow has not gone yet — it is closing out the turn it was in, and still writing down where it got to. |
 
 `/resume` takes nothing after it: a line that names a run is said back rather than dropped.

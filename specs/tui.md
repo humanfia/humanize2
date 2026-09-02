@@ -271,6 +271,19 @@ line, with what the flow is doing beside the transcript.
 - With nothing running, two presses MUST leave. Twice for the reason stopping is asked twice,
   and never on one press: it is pressed while work is going on, and leaving is not what was
   meant by it. A press long enough after the last MUST be the first of its own gesture.
+- `/stop` MUST stop the flow the way the second press does, and MUST NOT ask twice. The key
+  is asked twice because a finger lands on it by mistake; a command is written out and sent,
+  and that typing is the deliberation the second press stands in for -- asking again for
+  something somebody spelled out is a question with one answer.
+- It MUST NOT count as a press, and MUST leave no half-made gesture behind it either: a press
+  made before it and a press made after it MUST NOT be two presses of one gesture. They are a
+  gesture a command interrupted, and counted as one they are the interface closing on the one
+  key after a line that said there was nothing to stop.
+- `/stop` MUST say so where there is nothing to stop, which the key never says: with nothing
+  running the key is the one that leaves, and what it says is about leaving. `/stop` has the
+  one thing to mean, and a command typed on purpose that answers with nothing reads as a
+  command that did not work. A flow already told to stop MUST be said to be stopping rather
+  than told again, the agents it is holding being what the third press reaches.
 - `esc` MUST NOT stop a flow. It is pressed to dismiss whatever is on the screen everywhere
   else in this interface, and a key pressed to dismiss things MUST NOT be the key that ends a
   day's work. It MUST be `/monitor` instead, which is where the run is watched and where the

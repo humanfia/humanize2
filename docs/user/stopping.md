@@ -10,13 +10,26 @@ Press **ctrl+c** twice in the interface while a flow is running. Twice, because 
 behind a key that is also pressed by mistake: the first press says `press ctrl+c again to stop
 the flow`, and the second one does it.
 
-## The three ways to stop
+Or type **`/stop`** and send it, which is the same stop asked once.
+
+## The four ways to stop
 
 | | |
 | --- | --- |
 | **ctrl+c** twice, in the interface | Stops the flow — the whole flow, not just the turn. Clears what is half-typed first, if anything is. |
+| **`/stop`**, at the prompt | The same, asked once. |
 | **ctrl+c**, on a `hmz exec` command line | The same. |
 | **`agent.stop()`**, from anywhere | The same, for that agent. |
+
+**`/stop` is not asked twice.** The key is, because a finger lands on it by mistake; nothing is
+typed by mistake, so writing the command out and sending it is the deliberation the second
+press stands in for. It says so where there is nothing to stop, which the key never does —
+with nothing running the key is the one that leaves, and what it says is about leaving.
+
+It also leaves no half-made gesture behind it. A ctrl+c pressed before a `/stop` and one
+pressed after it are not two presses of one gesture: the command came between them, so the
+press after it starts again from the beginning — the third press below while the flow is still
+unwinding, and otherwise the first of a fresh one.
 
 **A third press does not wait for it.** A flow told to stop unwinds in its own time — a loop
 sleeps off its round, a server is given its seconds — and the press after the one that stopped
@@ -59,6 +72,8 @@ got to as it goes, so `/resume` in that window is refused with `no picking a run
 flow is still stopping` — picked up from a state still moving under it, the next run would do a
 round the stopped one had already recorded. A flow that will not unwind at all is what the third
 press is for: it leaves nothing reading as a run in progress, and `/resume` is answerable again.
+A second `/stop` in that window is no help either — it says the flow is already stopping rather
+than telling it again, since the agents it is holding are what that press reaches.
 
 ## What stopping is not
 

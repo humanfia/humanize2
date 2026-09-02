@@ -219,7 +219,7 @@ command -v claude codex kimi pi opencode mimo zcode
 
 Or `no switching flow while a flow is running`. Choosing a flow means running it, which means
 stopping whatever was running — and humanize says so rather than doing it behind your back.
-Press ctrl+c twice first.
+Press ctrl+c twice first, or type [`/stop`](/user/stopping), which is the same stop asked once.
 
 ### `a flow is already running`
 
