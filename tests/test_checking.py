@@ -58,6 +58,21 @@ CASES = [
     pytest.param(
         DOC
         + """
+from pathlib import Path
+
+from hmz.flows import Agent, flow
+
+@flow
+def run(agents: tuple[Agent], task: str) -> None:
+    while True:
+        Path("beat").write_text(task)
+""",
+        {"dead-loop"},
+        id="dead-loop",
+    ),
+    pytest.param(
+        DOC
+        + """
 from hmz.flows import Agent, flow
 
 @flow
@@ -66,8 +81,8 @@ def run(agents: tuple[Agent], task: str) -> None:
     while True:
         agent(task, suppress=True)
 """,
-        {"dead-loop"},
-        id="dead-loop",
+        {"unbounded-loop"},
+        id="dead-loop-edge-a-turn-inside-runs-out-of-the-allowance",
     ),
     pytest.param(
         DOC
@@ -887,7 +902,7 @@ def test_a_single_file_flow_is_read_as_one(tmp_path: Path) -> None:
             '''
         )
     )
-    assert [one.code for one in checked(at)] == ["dead-loop"]
+    assert [one.code for one in checked(at)] == ["unbounded-loop"]
 
 
 def test_what_is_under_skills_is_not_read(tmp_path: Path) -> None:

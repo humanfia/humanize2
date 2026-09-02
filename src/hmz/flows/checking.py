@@ -1909,16 +1909,17 @@ def _loops(
       scope: What following them collected.
 
     Yields:
-      A `dead-loop` error for one nothing inside can end, a `sleeping-loop` error for one
-      that only sleeps -- alive from the outside and doing nothing -- and an
-      `unbounded-loop` warning for one whose every way out waits for an agent to say so,
-      in a function with no bound of its own.
+      A `dead-loop` error for one nothing inside can end and no turn is taken in, a
+      `sleeping-loop` error for one that only sleeps -- alive from the outside and doing
+      nothing -- and an `unbounded-loop` warning for one that ends only when the run's
+      allowance is spent or when an agent says so, in a function with no bound of its own.
     """
     for loop in _whiles(node.body):
         if not (isinstance(loop.test, ast.Constant) and loop.test.value):
             continue
         exits = _exits(loop.body, ())
-        if not exits:
+        turns = _turned(loop.body, scope)
+        if not exits and not turns:
             if _sleeps(loop.body):
                 code = "sleeping-loop"
                 said = (
@@ -1929,24 +1930,61 @@ def _loops(
             else:
                 code = "dead-loop"
                 said = (
-                    "this loop cannot end -- no break, no return, no raise inside "
-                    "it; a loop is legal when something inside it can end it"
+                    "this loop cannot end -- no break, no return, no raise inside it, "
+                    "and no turn of an agent to run out of the run's allowance; a loop "
+                    "is legal when something inside it can end it"
                 )
             yield Finding(code, "error", scope.read.where, loop.lineno, said)
             continue
         if scope.bounded:
             continue
         shaped = {name for name, answer in scope.answers.items() if answer.shaped}
-        if all(_by_verdict(one, shaped) for one in exits):
+        if not exits:
+            # A loop with no way out but the money running out. Legal, because the run's
+            # allowance ends it wherever it is -- and worth saying, because how long that
+            # takes is what somebody set in the menu rather than anything this flow decides.
+            yield Finding(
+                "unbounded-loop",
+                "warning",
+                scope.read.where,
+                loop.lineno,
+                "nothing inside this loop ends it, so it runs until the run's allowance "
+                "is spent -- which is a stop and not a finish; give it a bound of its own "
+                "if it is meant to end on having done something",
+            )
+        elif all(_by_verdict(one, shaped) for one in exits):
             yield Finding(
                 "unbounded-loop",
                 "warning",
                 scope.read.where,
                 loop.lineno,
                 "every way out of this loop waits for an agent to say so, and an agent "
-                "may never say it -- give the loop a bound of its own: a budget read "
-                "off spent(), a cap on the rounds, a range",
+                "may never say it -- it then runs to the end of the run's allowance; "
+                "give the loop a bound of its own if it should stop sooner: a cap on the "
+                "rounds, a range, a clock",
             )
+
+
+def _turned(body: list[ast.stmt], scope: _Scope) -> bool:
+    """Whether anything in one loop takes a turn of an agent.
+
+    Which is what makes a loop with no `break` in it legal: every session of every backend
+    is held to the run's allowance, and a turn taken under a spent one raises `Stopped`
+    rather than answering. So a loop of turns ends, wherever it is, and a flow that wrote a
+    budget check of its own to have an exit would be writing the one thing a flow must not.
+
+    Args:
+      body: The loop's statements.
+      scope: The function so far, which is what says which names are agents.
+
+    Returns:
+      Whether a turn is taken in it.
+    """
+    return any(
+        isinstance(held, ast.Call) and isinstance(_called(held, scope), _Answer)
+        for one in body
+        for held in ast.walk(one)
+    )
 
 
 def _whiles(body: list[ast.stmt]) -> Iterator[ast.While]:
@@ -2243,8 +2281,12 @@ def catalogue() -> tuple[Capability, ...]:
         Capability(
             "budgets",
             frozenset(),
-            "what a loop's bound reads -- agent.spent().output climbs as the run spends, "
-            "and session.rate() and session.juice() say how fast",
+            "what a run is held to, which is not the flow's to implement -- every run has "
+            "an allowance in hours, millions of output tokens and dollars, a turn taken "
+            "under a spent one raises Stopped, and a flow may declare its own default with "
+            "@flow(budget=Allowance(...)). What a flow may still read as it goes: "
+            "agent.spent().output climbs as the run spends, and session.rate() and "
+            "session.juice() say how fast",
         ),
         Capability(
             "hooks",
