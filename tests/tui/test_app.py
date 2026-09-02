@@ -26,6 +26,8 @@ from hmz.runtime.kept import Runs
 from hmz.tui import Humanize
 from hmz.tui.app import _BY_NAME, _COMMANDS, _SAID, Editor, _where
 from hmz.tui.pick import (
+    _ADD,
+    _SAVE,
     Accounts,
     Agent,
     Alike,
@@ -675,7 +677,7 @@ async def test_what_is_running_is_not_swapped_underneath_itself(
         assert sheet._inside  # it opens on the agents, the flows not being offered
         # And nothing draws the places, which are about which list of flows is being read.
         assert not str(sheet.query_one("#tabs", Label).content)
-        assert "Esc to close" in str(sheet.query_one("#keys", Label).content)
+        assert "esc close" in str(sheet.query_one("#keys", Label).content)
 
         await driver.press("escape")
         await until(lambda: not isinstance(app.screen, Flows), driver)
@@ -1175,9 +1177,7 @@ async def test_a_flow_is_opened_to_reach_its_agents_and_esc_comes_back() -> None
             await into_flows(app, driver)
             sheet = cast("Flows", app.screen)
             assert "chat" in rows(app)[0]  # the flows, one place at a time
-            assert "Enter opens what drives it" in str(
-                sheet.query_one("#keys", Label).content
-            )
+            assert "enter open" in str(sheet.query_one("#keys", Label).content)
 
             # Tab is not a key of this menu at all: it turns nothing, and nothing moves.
             await driver.press("tab")
@@ -1186,12 +1186,10 @@ async def test_a_flow_is_opened_to_reach_its_agents_and_esc_comes_back() -> None
 
             await driver.press("enter")
             await until(lambda: sheet._inside, driver)
-            assert rows(app) == [
-                "0",
-                "save",
-            ]  # what the flow drives, and saving the lot
+            # What the flow drives, and the row the lot is saved from.
+            assert rows(app) == ["0", _SAVE]
             assert "chat" in str(sheet.query_one("#asked", Label).content)
-            assert "Esc back to the flows" in str(
+            assert "esc back to the flows" in str(
                 sheet.query_one("#keys", Label).content
             )
 
@@ -1252,7 +1250,7 @@ async def test_two_views_of_one_question_are_still_turned_between() -> None:
         await until(lambda: isinstance(app.screen, Adjusts), driver)
         sheet = app.screen
         assert isinstance(sheet, Adjusts)
-        assert "tab/shift+tab to switch" in str(sheet.query_one("#tabs", Label).content)
+        assert "tab/shift+tab switch" in str(sheet.query_one("#tabs", Label).content)
 
         await driver.press("tab")
         await until(lambda: sheet._tab == 1, driver)
@@ -1978,7 +1976,7 @@ async def test_what_an_agent_runs_is_a_row_of_its_own_and_an_effort_the_arrows_m
         # Walked into the way it is walked into: a flow, then what each of its agents is.
         await into_flows(app, driver)
         await into_agent(app, driver)
-        assert rows(app) == ["cli", "provider", "model", "effort", "save"]
+        assert rows(app) == ["cli", "provider", "model", "effort", _SAVE]
 
         # The CLIs installed here, opened from the row that says which one it is.
         await opens(app, driver, "cli")
@@ -2126,7 +2124,7 @@ def run(agents: Agents, task: str) -> None:
         await opens(app, driver, "provider")
         await until(lambda: isinstance(app.screen, Accounts), driver)
         accounts = app.screen.query_one("#choices", OptionList)
-        assert rows(app) == [""]
+        assert rows(app) == ["", _ADD]
         assert "as local" in str(accounts.get_option_at_index(0).prompt)
         assert "saved by dsh" in str(accounts.get_option_at_index(0).prompt)
         await driver.press("enter")
@@ -2187,7 +2185,7 @@ async def test_deepseek_has_only_api_key_login_after_switching_from_kimi(
         await opens(app, driver, "provider")
         await until(lambda: isinstance(app.screen, Accounts), driver)
         listing = app.screen.query_one("#choices", OptionList)
-        assert rows(app) == [""]
+        assert rows(app) == ["", _ADD]
         assert "saved by dsh" in str(listing.get_option_at_index(0).prompt)
 
         await driver.press("a")
@@ -2346,14 +2344,14 @@ async def test_a_search_is_asked_for_and_left_rather_than_being_what_typing_does
         sheet = cast("Accounts", app.screen)
         listing = sheet.query_one("#choices", OptionList)
         await until(lambda: bool(listing.options), driver)
-        assert "s to search" in str(sheet.query_one("#keys", Label).content)
+        assert "s search" in str(sheet.query_one("#keys", Label).content)
 
         await driver.press("s")
         await driver.pause()
         assert sheet._searching
         await driver.press(*"deep")
         await driver.pause()
-        assert rows(app) == ["deepseek"]
+        assert rows(app) == ["deepseek", _ADD]
 
         # And esc comes out of the search rather than out of the sheet.
         await driver.press("escape")
@@ -2361,7 +2359,7 @@ async def test_a_search_is_asked_for_and_left_rather_than_being_what_typing_does
         assert not sheet._searching
         assert sheet._typed == ""
         assert app.screen is sheet
-        assert rows(app) == ["", "deepseek"]
+        assert rows(app) == ["", "deepseek", _ADD]
 
 
 @pytest.mark.timeout(60)

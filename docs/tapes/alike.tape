@@ -23,7 +23,7 @@ Show
 # nothing. The stills below are of each step all the same.
 Hide
 Type "hmz" Enter
-Wait+Screen /Say what to do/
+Wait+Screen /ctrl\+c exit/
 Type "/providers" Enter
 Wait+Screen /Providers/
 Type "a"

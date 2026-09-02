@@ -367,15 +367,52 @@ The sheets: which flow, how it is set up, what each of its agents is, the accoun
 as, and the run as it goes. Each MUST be drawn the way Claude
 Code draws its own `/model` -- a rule across the top, the question and a line about it, the
 choices numbered with a marker against the one under the cursor, and under them whatever is
-adjusted rather than chosen. The one that is not a question -- `/monitor`, which is the run
-drawn -- MUST keep that frame and drop the numbering: its rows are a picture rather than
-answers to pick between, and a numbered diagram would offer a choice nobody is making.
+adjusted rather than chosen. Whatever is to be done about the list rather than picked out of
+it -- saving what the menu holds, adding one more of what the list is of, being rid of what
+the sheet is about -- MUST be set below the choices and out of their numbering, so that
+nothing about it reads as one of the answers. The one that is not a question -- `/monitor`,
+which is the run drawn -- MUST keep that frame and drop the numbering: its rows are a picture
+rather than answers to pick between, and a numbered diagram would offer a choice nobody is
+making.
 
 ### The keys
 
-- No key here MUST be a chord. A sheet asks one thing and its keys are its own, so a key that
-  needed a modifier held down would be a key somebody had to already know about; what is
-  reached with one is either a letter or a key a terminal already has.
+- No key here MUST be a chord, with one exception. A sheet asks one thing and its keys are
+  its own, so a key that needed a modifier held down would be a key somebody had to already
+  know about; what is reached with one is either a letter or a key a terminal already has.
+- Saving a menu is that exception, and MUST be `shift+enter` *and* `ctrl+j`, both said. It is
+  worth a chord because there is no bare key left for it to be -- enter opens the row under
+  the cursor and every letter on these sheets is taken -- and because it is the shortcut to a
+  row rather than the only way through, so nobody has to know it to save anything. It MUST be
+  both spellings because only one of them always arrives: a terminal reports shift+enter as
+  itself only where it speaks a keyboard protocol that has a way to say so, and sends a bare
+  carriage return where it does not -- which is enter, and would take whatever the cursor was
+  on. `ctrl+j` is a line feed and reaches a terminal application from every terminal there is,
+  which is why the editor is bound to both as well.
+- The keys MUST be said in one place on a sheet -- the row under the list -- and MUST NOT be
+  said anywhere else on it. A key named in the line about the sheet and again at the bottom is
+  one key learned twice, and it is the line about the sheet that MUST give: what a sheet *is*
+  is what that line is for, and what its keys are is what the row of them is for. One spelling
+  and one separator across every sheet: a key said as `Enter` on one and `enter` on the next
+  reads as two keys.
+- What a sheet says MUST be as short as it can be said in. These are menus rather than pages:
+  a line nobody reads is a line between a reader and the one thing they came to the sheet to
+  do, and a sheet that says a thing twice has said it once too often.
+- While a search is running the row of keys MUST say what the keys do *then*, which is not
+  what they do the rest of the time: the letters have gone to the search, and esc is about to
+  come out of it rather than out of the sheet.
+- A row that is adjusted where it stands MUST be adjusted on space as well as on the arrows,
+  and MUST say on the row that it is one of those rows. A switch and a word look the same
+  until you try to type at one, and a key nobody knows is there is a key nobody presses.
+  Space MUST take the next value and MUST come round to the first again at the end of the
+  range, on every sheet alike: an arrow points somewhere and may stop where the values do, but
+  a key that means `the next one` and did nothing at the end would look broken to whoever had
+  walked to that end.
+- Where a list is added to, adding MUST be a row of it as well as a letter, set below the
+  choices the way saving is. A letter said only at the bottom of the screen is a letter
+  somebody has to read the bottom of the screen to find, and the line that used to teach it
+  was drawn under an empty list -- which is a key taught once and then taken away the moment
+  the list had anything in it.
 - Typing MUST NOT be what searches. Every letter on these sheets is a key of its own, so a
   search MUST be asked for -- on `s` -- and MUST be left on esc, which clears what was typed
   before it goes. While one is running the letters MUST reach it rather than the keys they
@@ -419,13 +456,20 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   a page or walking into what was picked MUST apply nothing: what is read deeper in is what the
   menu is holding, and a menu that applied each part as it was left would be one where walking
   out changed things nobody confirmed.
+- Saving MUST be a row of the menu, set below the choices rather than numbered among them.
+  Numbered, it reads as one more thing to pick, and a menu whose way out looks like one of its
+  answers is a menu nobody can see the way out of. Every menu that holds anything MUST have
+  one, and it MUST say what lands.
 - Esc on a menu holding changes MUST ask whether to save them, and esc on that question MUST
   be the way back to the menu. Esc on a menu holding none MUST just leave: a walk in to look
   and out again is not a question anybody wants asked of them.
 - That question MUST be drawn as a box in the middle of the screen, over the menu it is about
   rather than instead of it: a sheet is a question somebody walked to, and this is one that
   arrived. It MUST be the two answers there are -- save, or throw away -- and MUST NOT make a
-  row of going back, that being what esc already is on every sheet there is.
+  row of going back, that being what esc already is on every sheet there is. It MUST be under
+  five words, keys and all: it arrives over a menu somebody has just spent a minute in, either
+  answer is a word, and a paragraph there is a paragraph put in front of somebody at the one
+  moment they are not reading.
 - What runs an external command MUST NOT be held: making an account and signing one in own the
   terminal while they run, and something that has already happened is not a draft.
 
@@ -544,9 +588,9 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 - A CLI that has never said what it runs as the chosen account MUST say so where the list
   would be, and MUST say which key asks it: an empty list that explains nothing reads as a
   CLI with no models.
-- An account MUST be makeable from the row that asks for one. That row is where somebody finds
-  out they have none for that CLI, and sending them to another command to make one loses the
-  question they were answering.
+- An account MUST be makeable from the sheet that asks for one, on a key and on a row of it.
+  That sheet is where somebody finds out they have none for that CLI, and sending them to
+  another command to make one loses the question they were answering.
 
 ### Where flows come from
 
@@ -568,7 +612,8 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   hold anything.
 - Enter MUST say what one holds, which MUST be read only of the flowverse it was asked of: a
   flow is read by running it, so what a place holds is the one question about it with no cheap
-  answer. `a` MUST add one and `r` MUST fetch one again.
+  answer. `a` MUST add one, and adding one MUST be a row below the list as well; `r` MUST
+  fetch one again.
 - Taking one away MUST be a row of what it holds rather than a key of the list: what a
   flowverse is, is what is in it, so being rid of one is decided where that has just been
   read. It MUST NOT be one of the flows -- it is about the place rather than about anything in
@@ -588,7 +633,7 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 
 - The accounts menu MUST list every account there is under a heading per CLI, and MUST be read
   rather than chosen from: which account an agent runs as is asked where that agent is set up.
-  `a` MUST make one.
+  `a` MUST make one, and making one MUST be a row below the list as well.
 - What else can be done to one account -- correcting what it holds, signing it in again,
   saying which account it falls back to, taking it away -- MUST be a menu opened with enter on
   the account it is about, rather than a letter apiece on the list. Four questions about one
@@ -659,8 +704,8 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
 - The accounts page MUST be the same store `/providers` walks, and its keys MUST say so: an
   account is made and taken away there, and this page is where it is said what one falls back
   to. A key that did nothing MUST say why rather than do nothing.
-- An empty page MUST say which key writes one down. A list with nothing in it and nothing
-  under it reads as a feature that does not work.
+- A page with nothing on it MUST still offer the row that writes one down. A list with
+  nothing in it and nothing to do about that reads as a feature that does not work.
 
 ### The runs that have already happened
 
@@ -827,8 +872,9 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   say so and MUST NOT be opened for editing: a flow writing down how far through it is must not
   have that edited underneath it. Refusing MUST be said where the key was pressed rather than
   by doing nothing.
-- Putting a line up, changing one and taking one away MUST be a letter to add, enter to change
-  what is under the cursor, and the taking-away key pressed twice. This is the one place the
+- Putting a line up, changing one and taking one away MUST be a letter to add -- with a row
+  below the lines for it, as every list that is added to has -- enter to change what is under
+  the cursor, and the taking-away key pressed twice. This is the one place the
   taking-away key is still pressed: enter on a line of the board opens what that line says,
   which is words being typed rather than a menu with a row to spare, so there is nowhere to
   walk to and the key acts where it is pressed. It lands at once, with no save to change one's
@@ -862,6 +908,11 @@ answers to pick between, and a numbered diagram would offer a choice nobody is m
   where it is asked rather than somewhere to go and read.
 - The answer that helps MUST be the one it opens on. Walking away MUST leave it unanswered and
   MUST be asked again next time: silence is neither a yes nor a no.
+- It MUST be answered once however many times the key is pressed. A sheet is answered by
+  picking a row, and a row picked twice before the first press has been handled is two answers
+  to one question -- which on a first start, where this is the only thing over the interface,
+  takes the interface down with it. That holds of every sheet here; it is said here because
+  this is the one a person meets before they have been shown anything else.
 
 ## `monitor.py`
 

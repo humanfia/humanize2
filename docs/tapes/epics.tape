@@ -17,8 +17,7 @@ Set TypingSpeed 40ms
 Hide
 Type "cd /work/demo && clear" Enter
 Type "hmz" Enter
-# The keys under the prompt, which is the last thing drawn once the interface is up. The
-# other tapes still wait on a placeholder the editor no longer draws.
+# The keys under the prompt, which is the last thing drawn once the interface is up.
 Wait+Screen /ctrl\+c exit/
 Show
 

@@ -172,10 +172,11 @@ async def test_a_line_the_flow_keeps_to_itself_is_not_one_to_change_here() -> No
         person.board.put("progress", "two of five", whose="flow")
         await _opens(app, driver)
 
-        # Down to it, and enter: it says why rather than opening an editor.
+        # Down to it, and enter: it says why rather than opening an editor. The last row
+        # is the one that puts a line up, so the flow's own line is the one before it.
         while (
             app.screen.query_one("#choices", OptionList).highlighted
-            != len(_ids(app)) - 1
+            != len(_ids(app)) - 2
         ):
             await driver.press("down")
         await driver.press("enter")
