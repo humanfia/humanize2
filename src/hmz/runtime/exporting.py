@@ -87,9 +87,10 @@ BUNDLE = "{epic}.epic.tar.gz"
 #: What the archive says about itself.
 MANIFEST = "manifest.json"
 
-#: What the transcript goes in, for a bundle exported from the interface. There is none in
-#: one exported from a command line: nothing was drawn, and an empty file saying so would
-#: read as a run that said nothing.
+#: What a transcript goes in, for the caller that has one to hand in. There is none in a
+#: bundle asked for of a run out of `/epics` or from a command line: a run in that list may be
+#: a week old and what is on the screen now is not it, and an empty file saying so would read
+#: as a run that said nothing.
 TRANSCRIPT = "transcript.md"
 
 #: What stands where something was taken out. One word, so that a bundle can be read for what
@@ -214,8 +215,9 @@ def bundle(
         name, or None for `.humanize/` beside whatever directory this is being run in. A
         bundle is made to be sent, so it lands where somebody can find it rather than in
         humanize's own home the way a trace of a run does.
-      transcript: What was on the screen, as the interface wrote it rather than as it drew
-        it, or None for an export from a command line -- where nothing was drawn.
+      transcript: A screen that went with this run, as it was written rather than as it was
+        drawn, or None -- which is what everything humanize itself asks for a bundle with
+        hands in, the run being one read back rather than one being watched.
 
     Returns:
       Where it was written, and the manifest as it was written there -- so that whatever

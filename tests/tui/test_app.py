@@ -24,7 +24,7 @@ from hmz.coganchor.backends import Model
 from hmz.runtime.epic import epics
 from hmz.runtime.kept import Runs
 from hmz.tui import Humanize
-from hmz.tui.app import _OWN, _SAID, Editor, _where
+from hmz.tui.app import _BY_NAME, _COMMANDS, _SAID, Editor, _where
 from hmz.tui.pick import (
     Accounts,
     Agent,
@@ -391,7 +391,7 @@ def test_only_the_flows_there_are_to_run_are_offered() -> None:
     from hmz.flows import found
     from hmz.tui.complete import offered
 
-    assert offered("/flow ", _OWN) == [one.name for one in found()]
+    assert offered("/flow ", _COMMANDS) == [one.name for one in found()]
 
 
 @pytest.mark.timeout(60)
@@ -602,19 +602,28 @@ async def test_nothing_is_offered_for_what_is_not_a_command() -> None:
 async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None:
     """A command this interface grows must be offered without being listed twice.
 
+    One table holds the name, the line about it, what it takes and what carries it out, so
+    what is offered and what a sent line reaches are the same rows by construction -- they
+    were three lists kept in step by a test, which is a command that works and is offered to
+    nobody for as long as it takes somebody to run the suite.
+
     And none of the three the command line has that are not things to do to a flow that is
     running: `exec` is what the first thing you say already does, and `collect`, `anchor` and
     the wrapper a turn is spawned as are each about a run rather than inside one. What both
     sides do have is the store of accounts, which is one thing said in two places.
     """
-    from hmz.tui.complete import about, offered
+    from hmz.tui.complete import offered
 
-    offers = offered("/", _OWN)
+    offers = offered("/", _COMMANDS)
 
-    assert {f"/{name}" for name in _OWN if about(name)} == set(offers)
+    assert {f"/{one.name}" for one in _COMMANDS} == set(offers)
+    assert {one.name for one in _COMMANDS} == set(_BY_NAME)
     assert not {"/exec", "/collect", "/anchor", "/cred"} & set(offers)
+    # Neither of the two that went: letting go of the terminal is an answer to `/exit`, and
+    # packaging a run up is one of the things `/epics` offers about the run under its cursor.
+    assert not {"/detach", "/export"} & set(offers)
     # And a command typed in full has nothing left to be finished with, so enter sends it.
-    assert offered("/exit", _OWN) == []
+    assert offered("/exit", _COMMANDS) == []
 
 
 @pytest.mark.timeout(90)
@@ -2297,11 +2306,68 @@ async def test_a_switch_takes_on_and_off_as_well_as_being_flipped() -> None:
         assert "say on or off" in _transcript(app)
 
 
+@pytest.mark.timeout(60)
+async def test_the_status_line_says_which_modes_this_is_in() -> None:
+    """A mode that decides whether an agent may stop and ask you is one you must be able to see.
+
+    Both switches say which way they went once, in the transcript, and that line has scrolled
+    away by the time an agent wants a person -- and what happens then is a question nobody is
+    ever put. So the line that says what is going on says which mode this is in while it is
+    in it, and says nothing once it is not.
+    """
+    app = Humanize()
+    async with app.run_test() as driver:
+        status = str(app.query_one("#status", Static).content)
+        assert "afk" not in status  # nothing to say while an agent may ask
+
+        await driver.press(*"/afk")
+        await driver.press("enter")
+        await driver.pause()
+        assert "afk" in str(app.query_one("#status", Static).content)
+
+        await driver.press(*"/details on")
+        await driver.press("enter")
+        await driver.pause()
+        status = str(app.query_one("#status", Static).content)
+        assert "afk" in status
+        assert "details" in status
+
+        await driver.press(*"/afk off")
+        await driver.press("enter")
+        await driver.pause()
+        status = str(app.query_one("#status", Static).content)
+        assert "afk" not in status
+        assert "details" in status  # the other switch is left where it was
+
+
+@pytest.mark.timeout(60)
+async def test_the_marker_is_where_a_narrow_terminal_cannot_take_it_away() -> None:
+    """A marker that falls off a small screen is a marker nobody has.
+
+    The keys on the right are dropped one at a time to make room, and what is running and
+    where it is running can fill a narrow row on their own -- so the modes go in front of
+    both, which is the one place on this line that is always drawn.
+    """
+    from textual.content import Content
+
+    app = Humanize()
+    async with app.run_test(size=(40, 12)) as driver:
+        app._afk = True
+        app._draw()
+        await driver.pause()
+
+        # As drawn rather than as written: what takes up the columns of a row this narrow is
+        # the text, and the markup naming its colours is not part of it.
+        drawn = str(Content.from_markup(str(app.query_one("#status", Static).content)))
+
+        assert drawn.startswith("afk")  # ahead of the flow, the directory and the keys
+
+
 def test_the_commands_are_offered_in_alphabetical_order() -> None:
     """The one order a list of commands has that a reader can predict."""
     from hmz.tui.complete import offered
 
-    offers = offered("/", _OWN)
+    offers = offered("/", _COMMANDS)
 
     assert offers == sorted(offers)
     assert "/help" not in offers  # the bottom bar says what the keys are
@@ -2375,14 +2441,12 @@ async def test_two_things_said_get_two_answers_and_not_three(
 
 def test_the_offers_say_what_each_command_takes() -> None:
     """A switch takes `on` or `off` as well as being flipped, and only the list says so."""
-    from hmz.tui.complete import about, takes
+    for one in _COMMANDS:
+        assert one.about, one.name  # or it is offered with nothing said about it
 
-    for name in _OWN:
-        assert about(name), name  # or it would not be offered at all
-
-    assert takes("afk") == "[on|off]"
-    assert takes("details") == "[on|off]"
-    assert takes("exit") == ""  # a command that takes nothing says nothing
+    assert _BY_NAME["afk"].takes == "[on|off]"
+    assert _BY_NAME["details"].takes == "[on|off]"
+    assert _BY_NAME["exit"].takes == ""  # a command that takes nothing says nothing
 
 
 @pytest.mark.timeout(60)

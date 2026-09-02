@@ -55,6 +55,13 @@ flow that has run out of things to do until you say something says `waiting for 
 nothing running at all, it names the flow that is set up to run and the directory it would run
 in, with your home written as `~`.
 
+**The status line, in front of all of that:** which modes the interface is in — `afk` in the
+colour of a warning while an agent may not stop and ask you, `details` while the working is
+being shown. Each is switched by a line in the transcript that has scrolled away by the time it
+matters, and neither changes anything else that is drawn, so a mode you cannot see you are in is
+one you find out about from what did not happen. In front rather than beside, because that is
+the one part of this row a narrow terminal cannot take away.
+
 **The status line, right:** the keys that do something *right now*, and only those. A shortcut
 listed in a state it does nothing in is worse than one that is not listed at all, and there is
 nowhere else to look them up. What **ctrl+c** would do next is what it is called by there,
@@ -118,8 +125,7 @@ is written to silently.
 **What comes back is what was written, not what was drawn.** A line too long for your terminal is
 drawn over four rows, and copying it gives you the line: no break where the terminal ran out of
 room, and none of the spaces that padded each row out to the edge. A break in what you copy is a
-break that was really there. The same goes for the transcript `/export` puts in the archive it
-writes.
+break that was really there.
 
 The box the interface opens with is a picture rather than a line, so dragging across it gives you
 its rows as they are drawn, borders and all.
@@ -160,9 +166,7 @@ list appears under the editor with a line about each.
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
 | `/fallback` | | Where a turn goes when what was taking it cannot: an agent that has nowhere left to run, and an account that has gone down. See [below](#where-a-turn-goes-when-it-cannot-be-taken). |
 | `/clear` | | Clears the screen, and nothing else: the transcript being read, not the others, and nothing that is running. |
-| `/export` | | Packages the whole run up as `.humanize/<run>.epic.tar.gz`: its own records, every session log the backends wrote for it as their contents rather than as the links the run keeps, and the transcript beside them — as it was written rather than as it was wrapped, and every conversation that has been read rather than only the one showing now. Credentials are struck out of all of it. See [Exporting a run](/user/export). |
-| `/detach` | | [Lets go of this terminal](/reference/daemon) and leaves the flow running. The run carries on where nothing is reading it, and `hmz` in this directory opens it again from the top. Where nothing is holding the run — no terminal to hand over to, or a machine whose [`HUMANIZE_DAEMON`](/reference/cli#environment-variables) says not to — it says so rather than doing nothing. |
-| `/exit` | | Leaves. With a flow running it asks first what is to become of it: stop it and leave, or leave it running and let go of this terminal. With nothing running it is a window being closed, and asks nothing. |
+| `/exit` | | Leaves; a flow that is running can be left running. With one going it asks first what is to become of it: stop it and leave, or [let go of this terminal](/reference/daemon) and leave it running — the run carries on where nothing is reading it, and `hmz` in this directory opens it again from the top. That second answer is offered only where something outside this terminal is holding the run; where nothing is, closing the terminal is what closes the run, so the answer offered instead is staying here. With nothing running it is a window being closed, and asks nothing. |
 
 `/details` and `/afk` flip when given nothing, and take `on` or `off` when you want to say
 which.
@@ -217,8 +221,8 @@ answer** — the next line you type is that answer, whatever it begins with.
 
 Closing the interface and stopping the run are two things. The run is
 [held in a process of its own](/reference/daemon), so a flow that is running goes on running
-where nothing is reading it — which is what makes `/detach` a thing there is, and what makes
-`/exit` ask rather than assume:
+where nothing is reading it — which is why `/exit` asks rather than assumes, and why letting go
+of the terminal is one of the answers rather than a command of its own:
 
 ```
 A flow is running here.
@@ -472,7 +476,9 @@ status line says `enter answer` while that is so.
 
 `/afk` says you are not there. An agent that wants to ask is then told nobody answered and
 carries on, rather than waiting on a reply that is not coming. Asking starts **allowed**: an
-agent that really needs a person gets one unless it has been said that none is there.
+agent that really needs a person gets one unless it has been said that none is there. While it
+is on, the status line says `afk` in front of everything else on it: the one sign that a turn
+went unanswered must not be a flow that finished early.
 
 A question still up when the flow ends or is stopped ends with it, so stopping a flow is never
 blocked on one.
@@ -810,7 +816,7 @@ each with a line saying what it does](/demo/epic-does.png)
 | --- | --- |
 | **carry on from here** | Runs that run's own flow again, on what that run left behind — which a flow that says it [can be picked up](/reference/flows#a-flow-that-can-be-picked-up) is handed. |
 | **collect a trace** | Gathers **that run's** sessions — and the programs it ran, for a [profiled](/reference/tracing#profiling-a-run) run — into `traces/` inside the run itself, rather than into whatever directory you are standing in. That run's and no others: they are asked for by the ids it wrote down, so a directory run in fifty times has fifty traces and none of them holds another's work. Where it went and what is in it are said under the list, and again in the transcript. |
-| **export it** | Packages **that run** up as one archive to send to somebody else — its own records, every session log the backends wrote for it as their contents rather than as the links the run keeps, and a manifest. There is no transcript in this one: what is on your screen is not that run. Where it landed and how big it came out are said under the list, and again in the transcript. See [Exporting a run](/user/export). |
+| **export it** | Packages **that run** up as one archive to send to somebody else — its own records, every session log the backends wrote for it as their contents rather than as the links the run keeps, and a manifest. No transcript goes in: what is on your screen is not that run. Where it landed and how big it came out are said under the list, and again in the transcript. See [Exporting a run](/user/export). |
 | **where it is** | The directory the run is written in, sessions and all, said under the list. |
 
 **Carrying on is offered where the flow says so now**, rather than where the run said so then.
@@ -1080,7 +1086,7 @@ the terminal's colours; a name no theme answers to is ignored rather than refuse
   what the flow itself takes is not asked. What each agent is stays open: that is the half
   worth changing mid-run.
 - **Guess at a bad line.** A line it cannot carry out is shown and the interface stays up. Only
-  `/exit` closes it — and `/detach`, which closes this terminal and not the run.
+  `/exit` closes it, and one of its answers closes this terminal and not the run.
 - **Ask the flow anything.** What is drawn beside and under the transcript is kept from the
   turns going past. A flow is Python that may branch any way it likes, so that is the
   only place a run is ever visible.
