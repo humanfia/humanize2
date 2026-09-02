@@ -764,10 +764,17 @@ class Sheet[T](ModalScreen[T | None]):
     def _armed(self, what: str) -> bool:
         """Whether a key that has to be pressed twice has been pressed once already.
 
-        Taking something away is the one thing on these sheets that cannot be undone, so it is
-        asked for twice: the first press arms the row under the cursor and says so, and the
-        second takes it away. Moving the cursor puts it down again -- see :meth:`_moved` --
-        which is what makes a stray keypress harmless.
+        For a key that acts where it is pressed: the first press arms the row under the
+        cursor and says what the second one does, and the second one does it. Moving the
+        cursor puts it down again -- see :meth:`_moved` -- which is what makes a stray
+        keypress harmless.
+
+        Where a row opens onto what it is, taking it away is a row of that sheet instead of a
+        key of this one, and nothing here is armed: a row somebody walked to and chose has
+        already been chosen once, and asking a second time about a walk is asking twice about
+        a thing nobody pressed by accident. What is left is the board on `/monitor`, whose
+        rows are lines of text rather than menus and whose taking-away is on the spot and read
+        by a flow that may be looking at the board on its next line.
 
         Args:
           what: The row, by its id.
@@ -1715,13 +1722,25 @@ def _came_from(one: Flowverse) -> str:
     return _hmz().verses.whence(one, "not a clone of anything")
 
 
-class Holds(Sheet[None]):
-    """What one flowverse holds, which is read rather than chosen from.
+#: What the row that takes a sheet's subject away answers with, on each of the submenus that
+#: has one. Where every row of a list opens onto what it is, taking one away belongs in there
+#: with everything else about it rather than on a key of the list -- so three sheets grew the
+#: same row, and one spelling is one thing for the sheet that opened them to read back.
+_TAKES_AWAY = "take-away"
 
-    A reading and not a menu: which flow to run is asked on `/flow`, where the flows of every
-    place are walked. This is the other question -- what is in this one -- and it is the one
+
+class Holds(Sheet[str]):
+    """What one flowverse holds, and the one thing there is to do to the flowverse itself.
+
+    Mostly a reading: which flow to run is asked on `/flow`, where the flows of every place
+    are walked. This is the other question -- what is in this one -- and it is the one
     question about a flowverse that costs something to answer, since what a file holds is not
     a fact its name carries: reading a flow means running it.
+
+    Taking the flowverse away is the last row, past the flows and out of their numbering. It
+    is here because this is where a flowverse is opened, and what one *is* is what it holds:
+    somebody deciding to be rid of one has just read the thing they are deciding about, which
+    a key on the list of names could not have shown them.
     """
 
     LETTERS: ClassVar = frozenset({"search"})
@@ -1746,7 +1765,8 @@ class Holds(Sheet[None]):
         self.query_one("#asked", Label).update(self._verse.name)
         self.query_one("#about", Label).update(
             f"What this flowverse holds, read from {escape(_came_from(self._verse))}. "
-            "Which of them to run is asked on /flow, where every place's flows are."
+            "Which of them to run is asked on /flow, where every place's flows are. The last "
+            "row takes the flowverse away, flows and all."
         )
         self._fill()
         self.query_one("#choices", OptionList).focus()
@@ -1760,13 +1780,24 @@ class Holds(Sheet[None]):
                 self._offers = []
         return self._offers
 
+    def _takes(self) -> bool:
+        """Whether this is one there is any taking away, which four of them are not."""
+        return not self._verse.fixed
+
     def _fill(self) -> None:
-        """Puts the flows up, each with the line it says about itself."""
+        """Puts the flows up, each with the line it says about itself, and the way to be rid.
+
+        The row that takes the flowverse away is past the end of the flows and out of both
+        the numbering and whatever a search narrowed them to: it is about the place rather
+        than about anything in it, and a search for a flow that found nothing must still be a
+        sheet somebody can be rid of the place from.
+        """
         listing = self.query_one("#choices", OptionList)
         shown = [one for one in self._flows() if self.fits(one.name, one.about)]
         self._counting = len(str(max(len(shown), 1)))
-        at = min(listing.highlighted or 0, max(len(shown) - 1, 0))
-        listing.set_options(
+        away = self._takes()
+        at = min(listing.highlighted or 0, max(len(shown) - 1 + (1 if away else 0), 0))
+        rows = [
             Option(
                 self._row(
                     seen,
@@ -1778,45 +1809,93 @@ class Holds(Sheet[None]):
                 id=f"={one.name}",
             )
             for seen, one in enumerate(shown)
-        )
-        listing.highlighted = at if shown else None
+        ]
+        if away:
+            # A row of air above it, carried in the row itself rather than as a row of its
+            # own: a blank row is somewhere the cursor can land, and this one is the last
+            # thing in the list, where the arrows walk straight on to it.
+            label = f"take {self._verse.name} away"
+            here = at == len(shown)
+            mark = f"{_INDENT}[$primary]{_HERE}[/] " if here else f"{_INDENT}  "
+            rows.append(
+                Option(
+                    f"\n{mark}{' ' * (self._counting + 2)}"
+                    f"[$primary]{escape(label)}[/]"
+                    f"{' ' * max(1, _LABEL - len(label))}"
+                    "[$text-muted]flows and all, as soon as this is chosen[/]",
+                    id=_TAKES_AWAY,
+                )
+            )
+        listing.set_options(rows)
+        listing.highlighted = at if rows else None
         self._drawn = listing.highlighted
-        said = "" if shown else self._nothing()
+        said = self._nothing(shown)
         self.query_one("#tuning", Label).update(
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(f"Esc to close{self.searching()}")
 
-    def _nothing(self) -> str:
-        """Why there is nothing in it, which is not always the same reason."""
-        if not self._verse.fetched:
-            return "not fetched yet; r fetches it"
-        if self._typed:
-            return "no flow of that name in it"
-        return "nothing in it: a flowverse keeps its flows in flows/"
+    def _nothing(self, shown: Sequence[Offer]) -> str:
+        """What to say under the list, which is why it is empty and why it is here for good.
+
+        Args:
+          shown: The flows on the sheet, which is what there is to say nothing about.
+
+        Returns:
+          Why there is nothing in it, where there is nothing in it, and why there is no
+          taking away the four that are always here -- a row somebody went looking for and
+          did not find is a sheet that has not said anything.
+        """
+        said: list[str] = []
+        if not shown:
+            if not self._verse.fetched:
+                said.append("not fetched yet; r on the list before this fetches it")
+            elif self._typed:
+                said.append("no flow of that name in it")
+            else:
+                said.append("nothing in it: a flowverse keeps its flows in flows/")
+        if not self._takes():
+            said.append(
+                f"{escape(self._verse.name)} is always here; it is not one to take away"
+            )
+        return "\n".join(said)
+
+    @on(OptionList.OptionSelected)
+    def _took(self, event: OptionList.OptionSelected) -> None:
+        """Answers with the flowverse going, for the one row here that is not a reading.
+
+        Args:
+          event: What was chosen.
+        """
+        if str(event.option.id or "") == _TAKES_AWAY:
+            # Answered rather than done here: what happens to the list of places is the list
+            # of places', which is also where what became of it is said.
+            self.dismiss(_TAKES_AWAY)
 
 
 class Flowverses(Sheet[list[str]]):
     """The places flows come from: what there is, what one holds, and what can happen to one.
 
-    Its own menu rather than keys on the one a flow is chosen at. Adding a repository,
-    fetching one again and taking one away are things done to the list of places rather than
-    to the flow under the cursor, and a sheet that asks `which flow` with three keys on it
-    about something else is a sheet asking two questions. `/flow` still steps between the
-    places with the arrows, that being about which list of flows is being read.
+    Its own menu rather than keys on the one a flow is chosen at. Adding a repository and
+    fetching one again are things done to the list of places rather than to the flow under
+    the cursor, and a sheet that asks `which flow` with keys on it about something else is a
+    sheet asking two questions. `/flow` still steps between the places with the arrows, that
+    being about which list of flows is being read.
+
+    Taking one away is not a key here either: enter opens what a flowverse holds, and being
+    rid of one is said in there, among everything else about it.
 
     What happens here happens as it is asked for rather than being held until the menu is
     saved: each of these runs git, and something that has already been cloned is not a draft.
     """
 
-    LETTERS: ClassVar = frozenset({"search", "adding", "refresh", "drop"})
+    LETTERS: ClassVar = frozenset({"search", "adding", "refresh"})
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
         Binding("s", "search", "search", priority=True),
         Binding("a", "adding", "add one", priority=True),
         Binding("r", "refresh", "fetch it again", priority=True),
-        Binding("d", "drop", "take it away", priority=True),
     ]
 
     def __init__(self) -> None:
@@ -1839,7 +1918,8 @@ class Flowverses(Sheet[list[str]]):
         self.query_one("#about", Label).update(
             "Where flows come from: a git repository with a flows/ directory apiece, cloned "
             "under humanize's home, and the flows of your own read where they lie. Each is "
-            "offered under its name here. Enter says what one holds."
+            "offered under its name here. Enter says what one holds, and is where one is "
+            "taken away."
         )
         self._read()
         self._fill()
@@ -1889,7 +1969,7 @@ class Flowverses(Sheet[list[str]]):
         )
         self.query_one("#keys", Label).update(
             "Enter says what one holds · a adds one · r fetches one again · "
-            f"d twice takes one away · Esc to close{self.searching()}"
+            f"Esc to close{self.searching()}"
         )
 
     def _follows(self, listing: OptionList) -> None:
@@ -1923,7 +2003,9 @@ class Flowverses(Sheet[list[str]]):
             "App[None]",
             self.app,  # pyright: ignore[reportUnknownMemberType]
         )
-        await showing.push_screen_wait(Holds(one))
+        said = await showing.push_screen_wait(Holds(one))
+        if said == _TAKES_AWAY:
+            self._removes(one)
         self._fill()
 
     @work
@@ -1964,26 +2046,27 @@ class Flowverses(Sheet[list[str]]):
 
         await self._fetches(name, fetching)
 
-    def action_drop(self) -> None:
-        """Takes the flowverse under the cursor away, flows and all, once d is twice."""
-        one = self._under()
-        if one is None:
-            return
-        if not self._armed(one.name):
-            self._said = f"press d again to take {escape(one.name)} away, flows and all"
-            self._fill()
-            return
+    def _removes(self, one: Flowverse) -> None:
+        """Takes a flowverse away, flows and all, as what it holds was just asked for.
+
+        Nothing is asked again here: the row that answers with this said what it was going to
+        do, and it was chosen on the sheet that had just shown what is about to go. What
+        became of it is said under the list rather than raised at whoever opened the menu --
+        the question this page is asking still stands -- and the cursor is let go of, since a
+        marker left against a name nothing answers to is a list pointing at nothing.
+
+        Args:
+          one: The flowverse.
+        """
         try:
             _hmz().verses.remove(one.name)
         except (OSError, ValueError) as why:
             self._said = escape(str(why))
-            self._fill()
             return
         self._said = f"{escape(one.name)} is no longer here"
         self._told.append(f"[dim]{escape(one.name)} is no longer here[/dim]")
         self._was = ""
         self._read()
-        self._fill()
 
     async def _fetches(self, named: str, doing: Callable[[], str]) -> None:
         """Runs one git fetch off the event loop, and shows the list it left behind.
@@ -4889,11 +4972,12 @@ _GOES, _TAKEN_AGAIN = "goes", "tried"
 
 
 class Failing(Picks):
-    """What to say about one place: where its turns go, and how often they are taken again.
+    """What to say about one place: where its turns go, how often, and whether to say it.
 
-    Its own menu rather than a letter apiece on the list of steps. They are two questions
+    Its own menu rather than a letter apiece on the list of steps. They are three questions
     about the place under the cursor, and enter -- which every list already means -- is what
-    opens them.
+    opens them. Being rid of the step is one of them because it is the last thing to decide
+    once the other two have been read: what the step says is what says whether it is wanted.
     """
 
     def __init__(self, place: str, step: Step) -> None:
@@ -4909,11 +4993,12 @@ class Failing(Picks):
         self.about = (
             "What happens when a turn at this place cannot be taken. It is taken again as "
             "many times as this says, and then at whatever it falls back to -- in a session "
-            "of its own, no backend taking another backend's session id."
+            "of its own, no backend taking another backend's session id. The last row is "
+            "how to have nothing written down about it at all."
         )
 
     def rows(self) -> list[tuple[str, str, str]]:
-        """The two, each saying what it is now."""
+        """The three, each saying what it is now."""
         tries = (
             f"{self._step.tries} more tries, {self._step.policy}"
             if self._step.tries
@@ -4926,6 +5011,11 @@ class Failing(Picks):
                 self._step.to or "nowhere: a failed turn is a failed turn",
             ),
             (_TAKEN_AGAIN, "taken again", tries),
+            (
+                _TAKES_AWAY,
+                "take it away",
+                "this place says nothing, once the menu behind this is saved",
+            ),
         ]
 
 
@@ -4948,13 +5038,12 @@ class Fallbacks(Drafts[list[str]]):
     """
 
     TABS: ClassVar = ("Fallback",)
-    LETTERS: ClassVar = frozenset({"search", "adding", "drop"})
+    LETTERS: ClassVar = frozenset({"search", "adding"})
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
         Binding("s", "search", "search", priority=True),
         Binding("a", "adding", "add one", priority=True),
-        Binding("d", "drop", "take one away", priority=True),
     ]
 
     def __init__(self, agents: dict[str, tuple[Model, ...]]) -> None:
@@ -5014,8 +5103,7 @@ class Fallbacks(Drafts[list[str]]):
             f"[$text-muted]{self._said or self._nothing(rows)}[/]"
         )
         self.query_one("#keys", Label).update(
-            "Enter for what happens · a adds one · d twice takes one away · "
-            f"Esc to close{self.searching()}"
+            f"Enter for what happens · a adds one · Esc to close{self.searching()}"
         )
 
     @staticmethod
@@ -5039,17 +5127,18 @@ class Fallbacks(Drafts[list[str]]):
         """Says that one more place falls back to another, which is two places to choose."""
         self._adds()
 
-    def action_drop(self) -> None:
-        """Takes the step under the cursor away, once d has been pressed twice."""
-        named = self.under()
-        if not named:
-            return
-        if not self._armed(named):
-            self._said = f"press d again to take {escape(named)} away"
-            self._fill()
-            return
-        self._steps = [one for one in self._steps if one.spec != named]
-        self._said = f"{escape(named)} falls back nowhere when this menu is saved"
+    def _drops(self, said: str) -> None:
+        """Holds one place having nothing written about it, until the menu is saved.
+
+        Held rather than done, as everything on this menu is: the row goes from the list at
+        once so that what is read is what is held, and the cursor lands on the first of what
+        is left rather than on a place that is no longer one of the rows.
+
+        Args:
+          said: The place, as it is written down.
+        """
+        self._steps = [one for one in self._steps if one.spec != said]
+        self._said = f"{escape(said)} falls back nowhere when this menu is saved"
         self.changed()
         self._fill()
 
@@ -5090,6 +5179,9 @@ class Fallbacks(Drafts[list[str]]):
         chosen = await showing.push_screen_wait(Failing(said, step))
         if chosen is None:
             return  # walked out, which changes nothing
+        if chosen == _TAKES_AWAY:
+            self._drops(said)
+            return
         if chosen == _GOES:
             at = await self._chosen(f"What takes {said}'s turns")
             if at:
@@ -5222,7 +5314,8 @@ def _falling(step: Step) -> str:
 
 #: What can be done to one account, which is what enter opens rather than what a row of
 #: letter keys does. Each of these is a question about the account under the cursor, and a
-#: menu of four is a menu; four keys nobody can see are four keys nobody presses.
+#: menu of four is a menu; four keys nobody can see are four keys nobody presses. Being rid
+#: of one is the fourth and is spelled with the rest of them -- see :data:`_TAKES_AWAY`.
 _CORRECTS, _SIGNS_IN, _FALLS_BACK = "corrects", "signs-in", "falls"
 
 #: What one account is written down in, spelled here because what is read below is the key the
@@ -5270,39 +5363,49 @@ def _tries_moved(cli: str, name: str) -> str:
 
 
 class Account(Picks):
-    """What to do with one account: correct it, sign it in again, say where it falls back to.
+    """What to do with one account: correct it, sign it in, point it somewhere, be rid of it.
 
-    Its own menu rather than a letter apiece on the list of accounts. They are three questions
+    Its own menu rather than a letter apiece on the list of accounts. They are four questions
     about the account under the cursor, and a sheet whose keys are `l` and `f` is a sheet
     whose keys have to be learned from a line at the bottom of it -- while enter, which every
-    list already means, was doing one of the three.
+    list already means, was doing one of the four.
+
+    Taking it away is the last of them rather than a key on the list before this: the row
+    that does it is read beside what the account is and what it is holding, which is what
+    somebody deciding to be rid of it is deciding about.
 
     How many times over a failed turn is tried again is not among them. That is a thing about
     the place a turn runs at rather than about the credentials it runs with, and `/fallback`
     is the menu it is said on.
     """
 
-    def __init__(self, cli: str, name: str) -> None:
+    def __init__(self, cli: str, name: str, *, gone: bool = False) -> None:
         """Asks about one account.
 
         Args:
           cli: The backend it belongs to.
           name: What it is called, or "" for the account this machine is already signed into.
+          gone: Whether the menu behind this is already holding it to be taken away, which is
+            what makes the last row say the opposite. What is held may be taken back before
+            it is saved, and a row that offered again to take away what is already going
+            would be a row somebody pressed and got nothing from.
         """
         super().__init__()
         self._cli = cli
         self._name = name
+        self._gone = gone
         #: What this account still says about tries, read once here: the line under the list
         #: is drawn again on every keystroke, and the file cannot change while this is up.
         self._stale_tries = _tries_moved(cli, name)
         self.asked = f"{cli}/{name}" if name else f"{cli}, as this machine is signed in"
         self.about = (
-            "What to do with this account. Correcting it and saying where it falls back to "
-            "land when the accounts menu is saved; signing in happens as it is asked for."
+            "What to do with this account. Correcting it, saying where it falls back to and "
+            "taking it away land when the accounts menu is saved; signing in happens as it "
+            "is asked for."
         )
 
     def rows(self) -> list[tuple[str, str, str]]:
-        """The three, less the two there is nothing to do for this machine's own account."""
+        """The four, less the three there is nothing to do for this machine's own account."""
         held = [
             (
                 _FALLS_BACK,
@@ -5324,21 +5427,30 @@ class Account(Picks):
                 "run its own way in again; it owns the terminal while it does",
             ),
             *held,
+            (
+                _TAKES_AWAY,
+                "keep it after all" if self._gone else "take it away",
+                "it is held to go when the accounts menu is saved"
+                if self._gone
+                else "the account and its credentials, when that menu is saved",
+            ),
         ]
 
     def nothing(self) -> str:
-        """Why two of them are not here, and what this account holds that nothing reads.
+        """Why three of them are not here, and what this account holds that nothing reads.
 
         Returns:
           One line apiece, or "" for the account with neither to say -- which is any account
-          humanize made and nobody ever wrote tries on.
+          humanize made and nobody ever wrote tries on. Why three of the four rows are not
+          here is said rather than left to be noticed: a row somebody went looking for and
+          did not find is a menu that has not answered them.
         """
         said: list[str] = []
         if not self._name:
             said.append(
                 f"this is {escape(self._cli)} as this machine is already signed in: "
-                "humanize keeps no credentials for it, so there is nothing to correct or "
-                "sign in"
+                "humanize keeps no credentials for it, so there is nothing to correct, "
+                "sign in or take away"
             )
         if self._stale_tries:
             said.append(self._stale_tries)
@@ -5351,7 +5463,7 @@ class Providers(Drafts[list[str]]):
     Read rather than chosen from: which account an agent runs as is asked where that agent is
     set up, so nothing here is being picked for anything. What it is for is what can happen to
     one -- made, set up again, signed in again, marked as where a turn goes when another
-    account fails, taken away -- and all but the first two of those are one menu, opened with
+    account fails, taken away -- and all but the first of those are one menu, opened with
     enter on the account they are about. A row of letter keys was a row of keys somebody had
     to read off the bottom of the screen while enter, which every list already means, did one
     of the four.
@@ -5366,7 +5478,7 @@ class Providers(Drafts[list[str]]):
     """
 
     TABS: ClassVar = ("Providers",)
-    LETTERS: ClassVar = frozenset({"search", "adding", "drop"})
+    LETTERS: ClassVar = frozenset({"search", "adding"})
 
     BINDINGS: ClassVar = [
         ("escape", "back", "back"),
@@ -5374,7 +5486,6 @@ class Providers(Drafts[list[str]]):
         Binding("shift+tab", "prev_tab", "previous page", priority=True),
         Binding("s", "search", "search", priority=True),
         Binding("a", "adding", "make one", priority=True),
-        Binding("d", "drop", "take one away", priority=True),
     ]
 
     def __init__(self) -> None:
@@ -5515,8 +5626,7 @@ class Providers(Drafts[list[str]]):
             f"[$text-muted]{said}[/]" if said else ""
         )
         self.query_one("#keys", Label).update(
-            "Enter for what to do with one · a makes one · d twice takes one away · "
-            f"Esc to close{self.searching()}"
+            f"Enter for what to do with one · a makes one · Esc to close{self.searching()}"
         )
 
     def _follows(self, listing: OptionList) -> None:
@@ -5585,30 +5695,30 @@ class Providers(Drafts[list[str]]):
         self.changed()
         self._fill()
 
-    def action_drop(self) -> None:
-        """Marks the account under the cursor to be taken away, once d is pressed twice."""
-        one = self._under()
-        if one is None:
-            return
-        if not one.name:
-            self._said = self._machines(one.cli, "take away")
-            self._fill()
-            return
+    def _drops(self, one: Provider) -> None:
+        """Holds one account to be taken away when this menu is saved, or takes that back.
+
+        Held rather than done, as the rest of what this menu writes down is: credentials go
+        with it, and a menu that deleted as it was read would be one where walking out had
+        changed something nobody confirmed. The row stays where it is, saying what is going
+        to happen to it, so the cursor is left on the thing it was on.
+
+        Nothing is refused here. The account this machine is already signed into is not
+        offered the row that answers with this -- humanize did not make it and keeps no
+        credentials for it -- and :meth:`Account.nothing` is where that is said, which is
+        where somebody looking for the row would have been looking.
+
+        Args:
+          one: The account.
+        """
         named = self._named(one)
         if named in self._gone:
-            self._gone.discard(named)  # said twice is said and taken back
+            # Said and taken back, which is the other half of what that row offers.
+            self._gone.discard(named)
             self._said = f"{escape(named)} stays"
-            self.changed()
-            self._fill()
-            return
-        if not self._armed(named):
-            self._said = (
-                f"press d again to take {escape(named)} away, credentials and all"
-            )
-            self._fill()
-            return
-        self._gone.add(named)
-        self._said = f"{escape(named)} goes when this menu is saved"
+        else:
+            self._gone.add(named)
+            self._said = f"{escape(named)} goes when this menu is saved"
         self.changed()
         self._fill()
 
@@ -5635,7 +5745,9 @@ class Providers(Drafts[list[str]]):
             "App[None]",
             self.app,  # pyright: ignore[reportUnknownMemberType]
         )
-        said = await showing.push_screen_wait(Account(one.cli, one.name))
+        said = await showing.push_screen_wait(
+            Account(one.cli, one.name, gone=self._named(one) in self._gone)
+        )
         if said is None:
             return  # walked out of it, which does nothing to the account
         if said == _CORRECTS:
@@ -5644,6 +5756,8 @@ class Providers(Drafts[list[str]]):
             self.action_again(one)
         elif said == _FALLS_BACK:
             self.action_fallback(one)
+        elif said == _TAKES_AWAY:
+            self._drops(one)
 
     @work
     async def _corrects(self, one: Provider) -> None:
@@ -7204,7 +7318,15 @@ class Monitoring(Sheet[str]):
         self._writes("")
 
     def action_drop(self) -> None:
-        """Takes the line under the cursor off the board, once d has been pressed twice."""
+        """Takes the line under the cursor off the board, once d has been pressed twice.
+
+        The one taking-away still asked for on a key, because it is the one that is not a
+        walk into what the thing is: enter on a line of the board opens what that line says,
+        which is words being typed rather than a menu with room for a row about the line. So
+        the press stays, and it stays asked for twice -- it lands the moment it is pressed,
+        with no save to change one's mind before and a flow that may read the board on its
+        very next line.
+        """
         named = self.under()
         board = self._boarding()
         if board is None or not named.startswith(_ON_BOARD):

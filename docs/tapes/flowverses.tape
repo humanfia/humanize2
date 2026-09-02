@@ -30,7 +30,9 @@ Screenshot "/out/flowverses.png"
 Sleep 400ms
 
 # Enter says what one holds -- which means reading its flows, so it is asked of the one
-# that was opened rather than of all of them.
+# that was opened rather than of all of them. It is also where one is taken away, past the
+# flows: what a place is, is what is in it. Not on this one -- the cursor opens on `builtin`,
+# which is always here -- so the sheet says why there instead.
 Enter
 Wait+Screen /What this flowverse holds/
 Sleep 1400ms

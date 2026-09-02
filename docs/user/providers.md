@@ -213,15 +213,20 @@ it sets:
 | --- | --- |
 | **enter** | What there is to do with the account under the cursor |
 | **a** | Make one: which CLI, then how to sign in, then what that way asks |
-| **d** **d** | Take it away, credentials and all |
 
-**enter** opens a menu of three rather than one letter apiece on the list:
+**enter** opens a menu of four rather than one letter apiece on the list:
 
 | | | |
 | --- | --- | --- |
 | **correct what it holds** | the answers its way in was made with, asked again | held until saved |
 | **sign in again** | its own way in, run again; it owns the terminal while it does | at once |
 | **falls back to** | which account a turn carries on under when this one fails | held until saved |
+| **take it away** | the account and its credentials | held until saved |
+
+Taking it away is in here rather than on a key of the list: it is read beside what the account
+is and what it holds, which is what you are deciding about. One already marked to go says **keep
+it after all** on that same row — nothing has happened to it yet, so what was said may be taken
+back before the menu is saved.
 
 How many times over a failed turn is taken again is not one of them: that is a thing about the
 place a turn runs at rather than about the credentials it runs with, and
@@ -237,7 +242,7 @@ other menu.
 The account this machine is already signed into is `as local`, last under each CLI, and the one
 thing it is offered is where it falls back to. The line under that says why rather than leaving
 rows that do nothing: humanize did not make that account and keeps no credentials for it, so
-there is nothing to correct and nothing to sign in.
+there is nothing to correct, nothing to sign in and nothing to take away.
 
 **a** asks which CLI first, because a backend's ways in are its own and the second question is
 only answerable once the first has been. The last row of that list is not a backend at all: [a

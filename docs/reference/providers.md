@@ -211,14 +211,15 @@ make, sign in or take away.
 
 `/providers` is where all of this happens. **a** makes one — which CLI, then how to sign in,
 then what that way asks, three questions rather than one form because each is only answerable
-once the one before it has been. **d** twice takes one away, credentials and all. **enter**
-opens what else can be done to the one under the cursor:
+once the one before it has been. **enter** opens what else can be done to the one under the
+cursor:
 
 | | |
 | --- | --- |
 | **correct what it holds** | The answers its way in was made with, asked again. What it holds is replaced rather than merged and the credentials a login left in its directory are left alone: a key corrected is not a reason to sign in again. |
 | **sign in again** | The backend's own way in, run again under this account's paths — for a way that has a command of its own. For one that is only answers, correcting it is what there is. |
 | **falls back to** | Which account of that CLI a turn carries on under when this one fails, or nothing at all for an account that is the end of the line. |
+| **take it away** | The account and its credentials, when the accounts menu is saved. One already marked to go says **keep it after all** instead: nothing has happened to it yet. |
 
 How many times over a failed turn is taken again is not among them: that is a thing about the
 place a turn runs at rather than about the credentials it runs with, and
