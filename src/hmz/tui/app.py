@@ -139,6 +139,12 @@ _LINES = 2000
 #: a press minutes later is a first press rather than half of one nobody remembers making.
 _AGAIN = 3.0
 
+#: What a flow told to stop and not yet gone is doing, said wherever that state is the answer
+#: -- to `/stop`, and to everything `_mid_run` turns down. One state reads as one state only
+#: while it is said in one wording: two sentences for it are two states to whoever is at the
+#: prompt, and each of them one somebody has to work out for themselves.
+_UNWINDING = "it is closing out the turn it was in"
+
 #: The three steps one agent of a flow is configured in, in the order they are asked: which
 #: coding agent takes its turns and as whom, which model it runs and at what effort, and --
 #: only for a place the flow said may be pointed anywhere -- which machine its work lands on.
@@ -1900,9 +1906,7 @@ class Humanize(App[None]):
         # `ctrl+c twice` is not the answer here: it has already been pressed.
         if self._stopping:
             self.show(
-                f"hmz: {what} while the flow is still stopping: it is closing out the "
-                "turn it was in",
-                "red",
+                f"hmz: {what} while the flow is still stopping: {_UNWINDING}", "red"
             )
             return True
         return False
@@ -2356,15 +2360,54 @@ class Humanize(App[None]):
         self._welcome()  # a cleared screen is a screen just opened, and one opens with this
         self._draw()
 
+    def action_stop(self) -> None:
+        """Stops the flow on a line typed rather than a key pressed, and asks once for it.
+
+        The key asks twice because a day's work is behind a key that a finger also lands on
+        by mistake. Nothing is typed by mistake: writing `/stop` out and sending it is the
+        deliberation the second press stands in for, so asking again would be a question with
+        one answer.
+
+        A flow already told to stop is said to be stopping rather than told again: stopping
+        hands the agents it is holding on to the ones on their way out, and running it over an
+        empty list would hand nothing on and drop the ones already there -- which is the third
+        press losing its only way to the conversations still open under their turns.
+
+        Nothing running at all is said as well. The key never says that, because with nothing
+        running it is the key that leaves and what it says is about leaving; `/stop` has only
+        the one thing to mean, and a command typed on purpose that answers with nothing reads
+        as a command that did not work.
+
+        Whatever it found, the count of presses goes back to nothing, which is what the second
+        press does after it stops a flow. A `/stop` is not a press and must not be counted as
+        one -- but neither may it leave a press made before it standing, or the press made
+        after it would be the second of a gesture the command interrupted: with the flow by
+        then unwound, that is the interface closing on one key after a line that said there
+        was nothing to stop.
+        """
+        if self._agents:
+            self.action_stop_flow()
+        elif self._stopping:
+            self.show(f"hmz: the flow is already stopping: {_UNWINDING}", "red")
+        else:
+            self.show("hmz: no flow is running, so there is nothing to stop", "red")
+        self._presses = 0
+        self._draw()  # rather than at the next tick: it was just typed
+
     def action_stop_flow(self) -> None:
-        """Stops the whole flow, not just the turn -- which is the second ctrl+c.
+        """Stops the whole flow, not just the turn -- which is the second ctrl+c or `/stop`.
 
         Every agent is told to take no further turn, so the one running now is closed out and
         the loop driving it ends rather than handing on to the next agent. The agents are let
         go of here rather than when the flow's own thread notices, so that the next thing
         said starts something instead of being put to a flow that is on its way out -- and
         kept as the ones stopping, since a flow unwinds in its own time and the press after
-        this one is the one that does not wait for it. Silent when nothing is running.
+        this one is the one that does not wait for it.
+
+        Silent when nothing is running, every caller having its own answer for that: the key
+        is mid-gesture and the press after it says what it does, a flow chosen while none runs
+        has nothing to say about the one that was not there, and `/stop` looks before it calls
+        this and says for itself that there was nothing to stop.
         """
         for agent in self._agents:
             agent.stop()
@@ -3934,6 +3977,11 @@ _COMMANDS: tuple[Command, ...] = (
         "Toggle whether an agent may ask you",
         lambda app, argv: app.action_afk(argv),
         takes="[on|off]",
+    ),
+    Command(
+        "stop",
+        "Stop the flow; typed out, so not asked twice",
+        lambda app, _: app.action_stop(),
     ),
     Command(
         "exit",

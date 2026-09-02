@@ -215,8 +215,8 @@ process takes it too. The turn under way dies with it, what it was doing is left
 to, and the command exits `130`.
 
 The [epic](/user/tracing#what-a-run-writes-down) records that run as **`failed`**. `stopped`
-is for an agent [told to stop by hand](/user/stopping), with ctrl+c twice in the interface or
-`agent.stop()` from inside the flow. Nothing on a command line tells the two apart.
+is for an agent [told to stop by hand](/user/stopping), with ctrl+c twice or `/stop` in the
+interface, or `agent.stop()` from inside the flow. Nothing on a command line tells the two apart.
 
 Either way, a flow that says it [can be picked up](/user/resuming) carries on from what that
 run left behind: run the same line again, or type `/resume` in the interface, which takes the
