@@ -31,6 +31,7 @@ from hmz.tui.pick import (
     Alike,
     Catalogue,
     Clis,
+    Configures,
     Confirms,
     Flows,
     Monitoring,
@@ -196,10 +197,10 @@ async def onto(app: Humanize, driver: Pilot[None], held: str) -> None:
 
 
 async def into_agent(app: Humanize, driver: Pilot[None], at: int = 0) -> None:
-    """Turns the flow menu to its agents and opens one of them.
+    """Opens the flow the menu is on, and then one of the agents it drives.
 
     Which every test about what an agent is has to walk through: an agent of a flow is set up
-    from the flow that drives it, on the page of the menu that is about them.
+    from the flow that drives it, inside the flow it belongs to.
 
     Args:
       app: The interface.
@@ -208,9 +209,15 @@ async def into_agent(app: Humanize, driver: Pilot[None], at: int = 0) -> None:
     """
     await until(lambda: isinstance(app.screen, Flows), driver)
     sheet = cast("Flows", app.screen)
-    if sheet._tab != 1:
-        await driver.press("tab")
-        await until(lambda: sheet._tab == 1, driver)
+    if not sheet._inside:
+        await driver.press("enter")  # which opens what drives the flow under the cursor
+        # A flow that takes settings of its own puts them up on the way in, that being the
+        # moment it is chosen. Esc leaves them exactly as the draft has them, which is what a
+        # walk that is about the agents wants.
+        await until(lambda: sheet._inside or isinstance(app.screen, Configures), driver)
+        if isinstance(app.screen, Configures):
+            await driver.press("escape")
+        await until(lambda: sheet._inside, driver)
     await until(
         lambda: bool(app.screen.query_one("#choices", OptionList).options), driver
     )
@@ -232,6 +239,30 @@ async def opens(app: Humanize, driver: Pilot[None], held: str) -> None:
     await driver.pause()
 
 
+async def _leaves(app: Humanize, driver: Pilot[None], *answer: str) -> None:
+    """Leaves the sheet on top, answering whatever it asks about what it is holding.
+
+    Esc twice where the first press was a step back rather than the way out: the flow menu is
+    walked into, so esc on the agents of a flow comes back to the flows and the press that
+    leaves the menu is the one after it.
+
+    Args:
+      app: The interface.
+      driver: What is pumping it.
+      answer: What to press on the question about what it is holding, where it asks one.
+    """
+    was = app.screen
+    inside = was._inside if isinstance(was, Flows) else False
+    await driver.press("escape")
+    await driver.pause()
+    if inside and isinstance(app.screen, Flows) and not app.screen._inside:
+        await driver.press("escape")
+        await driver.pause()
+    if isinstance(app.screen, Confirms):
+        await driver.press(*answer)
+    await until(lambda: app.screen is not was, driver)
+
+
 async def keeps(app: Humanize, driver: Pilot[None]) -> None:
     """Leaves the sheet on top, saving what it is holding when it asks.
 
@@ -242,12 +273,7 @@ async def keeps(app: Humanize, driver: Pilot[None]) -> None:
       app: The interface.
       driver: What is pumping it.
     """
-    was = app.screen
-    await driver.press("escape")
-    await driver.pause()
-    if isinstance(app.screen, Confirms):
-        await driver.press("enter")
-    await until(lambda: app.screen is not was, driver)
+    await _leaves(app, driver, "enter")
 
 
 async def drops(app: Humanize, driver: Pilot[None]) -> None:
@@ -257,13 +283,7 @@ async def drops(app: Humanize, driver: Pilot[None]) -> None:
       app: The interface.
       driver: What is pumping it.
     """
-    was = app.screen
-    await driver.press("escape")
-    await driver.pause()
-    if isinstance(app.screen, Confirms):
-        await driver.press("down")
-        await driver.press("enter")
-    await until(lambda: app.screen is not was, driver)
+    await _leaves(app, driver, "down", "enter")
 
 
 @pytest.mark.timeout(60)
@@ -621,11 +641,11 @@ async def test_the_offer_is_taken_from_the_commands_there_actually_are() -> None
 async def test_what_is_running_is_not_swapped_underneath_itself(
     workspace: Path,
 ) -> None:
-    """A flow is chosen in order to be started, so that page is shut while one is running.
+    """A flow is chosen in order to be started, so the flows are not offered while one runs.
 
-    Shut rather than gone: it says what it is and that it cannot be opened, which is what the
-    strike through its title is. The page its agents are set up on is never shut -- an agent
-    thinking too little is found out halfway through a run.
+    The menu opens inside the agents of the flow that is going -- an agent thinking too little
+    is found out halfway through a run -- and esc there leaves, there being no list of flows
+    behind it to step back to.
     """
     written(workspace, "flow", FLOW)
     app = Humanize()
@@ -643,12 +663,10 @@ async def test_what_is_running_is_not_swapped_underneath_itself(
         await until(lambda: isinstance(app.screen, Flows), driver)
         sheet = cast("Flows", app.screen)
 
-        assert sheet.turnable() == (False, True)
-        assert sheet._tab == 1  # it opens on the page that is not shut
-        assert "[s]Flow[/s]" in str(sheet.query_one("#tabs", Label).content)
-        await driver.press("shift+tab")  # and there is nowhere to turn to
-        await driver.pause()
-        assert sheet._tab == 1
+        assert sheet._inside  # it opens on the agents, the flows not being offered
+        # And nothing draws the places, which are about which list of flows is being read.
+        assert not str(sheet.query_one("#tabs", Label).content)
+        assert "Esc to close" in str(sheet.query_one("#keys", Label).content)
 
         await driver.press("escape")
         await until(lambda: not isinstance(app.screen, Flows), driver)
@@ -1024,11 +1042,11 @@ async def test_a_turn_that_has_gone_quiet_still_reads_as_one_that_is_running() -
 
 
 @pytest.mark.timeout(60)
-async def test_the_flow_and_its_agents_are_two_pages_of_one_menu() -> None:
-    """Two questions about one thing, turned between rather than walked through.
+async def test_a_flow_is_opened_to_reach_its_agents_and_esc_comes_back() -> None:
+    """One menu walked into, which is what enter and esc mean everywhere else here.
 
-    Esc off the second is out of the menu rather than back into the first: turning between
-    them is what tab and shift+tab are for.
+    Not two pages: a flow is picked out of a list and its agents are that flow's, so tab is
+    not what steps between them -- it would read as a view that had been there all along.
     """
     app = Humanize()
     # Whatever this machine has installed, since the menu is only put up if there is one.
@@ -1039,23 +1057,92 @@ async def test_the_flow_and_its_agents_are_two_pages_of_one_menu() -> None:
         async with app.run_test() as driver:
             await into_flows(app, driver)
             sheet = cast("Flows", app.screen)
-            tabs = str(sheet.query_one("#tabs", Label).content)
-            assert "Flow" in tabs
-            assert "Agents" in tabs
-            assert "tab/shift+tab to switch" in tabs
+            assert "chat" in rows(app)[0]  # the flows, one place at a time
+            assert "Enter opens what drives it" in str(
+                sheet.query_one("#keys", Label).content
+            )
 
+            # Tab is not a key of this menu at all: it turns nothing, and nothing moves.
             await driver.press("tab")
-            await until(lambda: sheet._tab == 1, driver)
-            assert "[b $primary]Agents" in str(sheet.query_one("#tabs", Label).content)
+            await driver.pause()
+            assert not sheet._inside
 
-            await driver.press("shift+tab")
-            await until(lambda: sheet._tab == 0, driver)
-            assert "[b $primary]Flow" in str(sheet.query_one("#tabs", Label).content)
+            await driver.press("enter")
+            await until(lambda: sheet._inside, driver)
+            assert rows(app) == [
+                "0",
+                "save",
+            ]  # what the flow drives, and saving the lot
+            assert "chat" in str(sheet.query_one("#asked", Label).content)
+            assert "Esc back to the flows" in str(
+                sheet.query_one("#keys", Label).content
+            )
+
+            await driver.press("escape")
+            await until(lambda: not sheet._inside, driver)
+            assert app.screen is sheet  # one step back, and not out of the menu
+            assert "chat" in rows(app)[0]
 
             await driver.press("escape")
             await until(lambda: not isinstance(app.screen, Flows), driver)
 
             assert app._models == []
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.parametrize(
+    ("said", "sheet"),
+    [
+        pytest.param("/fallback", "Fallbacks", id="fallback"),
+        pytest.param("/providers", "Providers", id="providers"),
+    ],
+)
+async def test_a_menu_of_one_page_draws_no_strip_of_titles(
+    said: str, sheet: str
+) -> None:
+    """One title is nowhere to turn to, so the row it would take is a row nobody paid for.
+
+    The strip is for pages that are turned between: a terminal has only so many rows, and the
+    keys are what falls off the bottom of a short one.
+    """
+    import hmz.tui.pick as sheets
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*said)
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, getattr(sheets, sheet)), driver)
+
+        tabs = app.screen.query_one("#tabs", Label)
+
+        assert not str(tabs.content)
+        assert not tabs.display  # gone rather than blank: a blank row is still a row
+
+
+@pytest.mark.timeout(60)
+async def test_two_views_of_one_question_are_still_turned_between() -> None:
+    """What tab is for, which is why what is walked into does not take it.
+
+    `/settings` is two scopes of one question -- everywhere, and here -- and either may be
+    read first, so neither is reached by picking the other.
+    """
+    from hmz.tui.pick import Adjusts
+
+    app = Humanize()
+    async with app.run_test() as driver:
+        await driver.press(*"/settings")
+        await driver.press("enter")
+        await until(lambda: isinstance(app.screen, Adjusts), driver)
+        sheet = app.screen
+        assert isinstance(sheet, Adjusts)
+        assert "tab/shift+tab to switch" in str(sheet.query_one("#tabs", Label).content)
+
+        await driver.press("tab")
+        await until(lambda: sheet._tab == 1, driver)
+
+        assert "[b $primary]This directory" in str(
+            sheet.query_one("#tabs", Label).content
+        )
 
 
 #: A `claude` that stops to ask before it answers, as the real one does when it reaches for

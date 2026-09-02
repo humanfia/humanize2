@@ -94,8 +94,8 @@ What is sampled, what that costs while the flow runs, and what a trace then make
 ## Changing what it opens on
 
 It is changed where it was set in the first place. [`/flow`](/reference/tui#choosing-a-flow)
-chooses the flow; its **Agents** page says what each of that flow's agents runs, where its
-turns land and which account it runs as; and a flow with
+chooses the flow; opening that flow says what each of its agents runs, where its turns land
+and which account it runs as; and a flow with
 [settings of its own](/reference/tui#setting-a-flow-up) asks them as it is chosen. Saving that
 menu is what gets written down, so the next `hmz` in this directory opens on exactly what you
 left — and opening is all it does. The interface comes up ready and the first thing you say is

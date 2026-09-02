@@ -148,8 +148,8 @@ list appears under the editor with a line about each.
 
 | Command | Takes | What it does |
 | --- | --- | --- |
-| `/flow` | `[flow]` | The menu of two pages: [which flow runs](#choosing-a-flow) and [what each of its agents is](#what-each-agent-is). With a name or a path, opens already holding that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the agents page, which is never shut. Its Agents page saves the complete setup; esc remains the way to save or discard on the way out. |
-| `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
+| `/flow` | `[flow]` | The menu that is [which flow runs](#choosing-a-flow) and, inside the flow you open, [what each of its agents is](#what-each-agent-is). With a name or a path, opens already inside that one — and is refused outright while a flow is running, since that name would be choosing one. Without a name it opens on the flows, or inside the agents of the flow that is going. `save`, the last row inside a flow, saves the complete setup; esc is one step back, and then the way to save or discard on the way out. |
+| `/flowverses` | | [Where flows come from](/weaver/flowverses): what places there are, what one of them holds, and one added, fetched again or taken away. The same menu **v** opens on the flows; a command as well, because there are no flows to press it on while one is running. Not which flow to run — that is `/flow`, where the arrows step between the same places. |
 | `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), [export it](/user/export), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/resume` | | Carries [the last run here](#carrying-the-last-one-on-outright) on: that run's own flow, on its own agents, with what it was asked to do, and on what it left behind. The same thing `/epics` offers of the run under its cursor, without the list — there is only ever one last run. Where there is nothing to carry on from it says which reason that is. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, or pointed at what it falls back to. How often a failed turn is taken again is not here: that is said of a [place](#where-a-turn-goes-when-it-cannot-be-taken) rather than of an account. |
@@ -185,8 +185,8 @@ What happens next depends on whether this directory has run that flow before:
 
 | | |
 | --- | --- |
-| **Set up here already** | It runs, now. No menu: two pages of answers already given are not two pages to answer again. |
-| **Never set up here** | [`/flow`](#choosing-a-flow) opens with the cursor on that flow. The line you typed is held; the flow runs on it the moment the menu is saved. Walk out without saving and nothing starts, and it says so. |
+| **Set up here already** | It runs, now. No menu: a menu of answers already given is not a menu to answer again. |
+| **Never set up here** | [`/flow`](#choosing-a-flow) opens inside that flow, on what drives it. The line you typed is held; the flow runs on it the moment the menu is saved. Walk out without saving and nothing starts, and it says so. |
 | **No such flow** | A line to correct, the way `/nosuchcommand` is. The interface stays up. |
 
 **Set up here** means a remembered agent for every place the flow declares *now* — under the
@@ -209,7 +209,7 @@ the prompt rather than part of it. A `$` naming a flow and saying nothing after 
 `$ralph_loop` — chooses that flow and stops there: there is nothing to start it on.
 
 Two things it will not do. It is **refused while a flow is running**, and leaves that run
-exactly as it was: it is choosing a flow, and [the page that chooses one is shut while one
+exactly as it was: it is choosing a flow, and [there are no flows to choose from while one
 runs](#choosing-a-flow). And it is **not read as a flow while an agent is waiting on an
 answer** — the next line you type is that answer, whatever it begins with.
 
@@ -524,29 +524,35 @@ true of all of them:
   a modifier held down.
 - **Typing does not search.** Every letter is a key, so a search is asked for with **s** and
   left with **esc**, which clears what was typed. While one is running the letters go into it.
-- **Nothing lands until you save.** `/flow` has a `save` row on its Agents page for the
-  complete flow setup. Esc remains available on every menu: it asks in a box in the middle of
-  the screen, over the menu rather than instead of it, whether to save and close or discard
-  and close. Esc on the box is the way back to the menu. A menu you only looked at asks
+- **Nothing lands until you save.** `/flow` has a `save` row inside the flow it opened, for the
+  complete flow setup. Esc remains available on every menu: it asks in a box in the middle of the
+  screen, over the menu rather than instead of it, whether to save and close or discard and
+  close. Esc on the box is the way back to the menu. A menu you only looked at asks
   nothing.
 
 `/epics` and `/flowverses` are lists of the same kind, and the first two are true of them as
 well. The third is not: neither holds a draft of anything, so what is asked for there happens
 as it is asked for and esc asks nothing on the way out.
 
-A menu of several pages shows their titles across the top, and **tab** / **shift+tab** turn
-between them. A page that cannot be opened right now is still a title, struck through. A page
-made of several lists names them under the titles, and `←` / `→` step between those.
+Pages are parallel — two views of one question, either of which you might read first. A menu
+of several shows their titles across the top, and **tab** / **shift+tab** turn between them; a
+page that cannot be opened right now is still a title, struck through. A menu of one page draws
+no strip at all, one title being nowhere to turn to.
+
+What you reach by picking something is not a page. **Enter** opens it and **esc** comes back,
+which is one step rather than the way out of the menu — the same two keys they are everywhere
+else here. A tab between two views of one question is orientation; a tab between a list and the
+thing you picked out of it hides the fact that you picked anything, so it is not offered. A page
+made of several lists names them where the titles go, and `←` / `→` step between those.
 
 ## Choosing a flow
 
-`/flow` opens on two pages — **Flow** and **Agents** — and the first of them puts up the flows
-of one place at a time, with `←` and `→` stepping between the places: every
-[flowverse](/reference/flows#flowverses) — `builtin`, which is the package's own, `official`, which is
-where the rest come from, whatever else has been added, and last `local`, this project's flows
-under `.humanize/flows`, and `user`, yours under `~/.humanize/flows`, each where there are any.
-The strip above the list is the places, with the one being read marked; the list is that
-place's flows and nothing else.
+`/flow` puts up the flows of one place at a time, with `←` and `→` stepping between the
+places: every [flowverse](/reference/flows#flowverses) — `builtin`, which is the package's own,
+`official`, which is where the rest come from, whatever else has been added, and last `local`,
+this project's flows under `.humanize/flows`, and `user`, yours under `~/.humanize/flows`, each
+where there are any. The strip above the list is the places, with the one being read marked;
+the list is that place's flows and nothing else.
 
 ```
   Flow
@@ -554,41 +560,44 @@ place's flows and nothing else.
   Which flow the agents are driven through. The first thing you say once it is chosen is what
   it is to do. A flow anywhere else is a path you type.
 
-  Flow · Agents   tab/shift+tab to switch
   builtin · official · local   ←/→ to switch
 
 ❯ 1. chat                    Chat — one agent, one session, and every line typed between…
   2. ralph_loop              Ralph loop (flowbench: ralph_loop) — a fresh session every…
   3. stateful_ralph          Stateful ralph (flowbench: stateful_ralph) — one session, re-…
 
-  Enter to choose · f copies it here · Esc to close · s to search
+  Enter opens what drives it · f copies it here · v the flowverses · Esc to close · s to search
 ```
 
 | Key | |
 | --- | --- |
+| **enter** | Open that flow: what drives it, which is the next thing to answer. |
 | `←` `→` | Read the place before or after this one, wrapping round. |
 | `f` | Copy the flow under the cursor into `.humanize/flows/`, whole — what it imports and the skills it brings — to change. Your own are looked in first, so from then on that name means your copy. |
+| `v` | [Where flows come from](#where-flows-come-from): the places themselves, and what can happen to one. |
 
-The page opens on the place the flow in force came from. **A flowverse that has never been
+The list opens on the place the flow in force came from. **A flowverse that has never been
 fetched is fetched as the menu opens** — which in practice is `official`, the one every flow
 that is not in the package is in — in the background, once per opening however it goes, and
 without moving what you are reading: this is the place nobody fetched being fetched because
 its flows are wanted, not somebody asking to be taken to it. It runs off the interface's own
 loop — the menu keeps drawing while it clones — and what became of it is said under the list
 rather than thrown at you. A place with nothing in it says so where its flows would be, and
-one that has never been fetched says which menu fetches it: adding a place, fetching one again
-and taking one away are [`/flowverses`](#where-flows-come-from).
+one that has never been fetched says which key opens the menu that fetches it: adding a place,
+fetching one again and taking one away are [**v**](#where-flows-come-from).
 
-Choosing a flow reads back what that flow was last set up with here, asks
-[what the flow itself takes](#setting-a-flow-up) where it takes anything, and lands on the
-**Agents** page, which is the next thing to answer. Its last row, `save`, validates every
-agent and applies the flow and all its agents together.
+Enter on a flow opens it: what that flow was last set up with here is read back,
+[what the flow itself takes](#setting-a-flow-up) is asked where it takes anything, and what
+drives it is what you land in — which is the next thing to answer. **Esc comes back to the
+flows**, one step, and esc again leaves the menu. The last row inside a flow, `save`, validates
+every agent and applies the flow and all its agents together.
 
-**The Flow page is shut while a flow is running** — a flow is chosen in order to be started,
-and there is one going. The Agents page never is: an agent thinking too little, on the wrong
-account or allowed too much is something you find out halfway through a run. What you save then
-reaches the agents that are running, each of them from its next turn on. A CLI you changed is
-the one thing that cannot be swapped under a flow already holding that agent, and says so.
+**There are no flows to choose from while one is running** — a flow is chosen in order to be
+started, and there is one going. So `/flow` opens inside the agents of the flow that is going,
+and esc there leaves: an agent thinking too little, on the wrong account or allowed too much is
+something you find out halfway through a run. What you save then reaches the agents that are
+running, each of them from its next turn on. A CLI you changed is the one thing that cannot be
+swapped under a flow already holding that agent, and says so.
 
 This menu is the only way in that is typed. A machine being set up or a script reaches the
 same places through [`Hmz().verses`](/reference/sdk) — `add`, `fetch`, `remove` and `holds`,
@@ -601,11 +610,11 @@ them, so what you type finds a flow without your having to remember which flowve
 
 ## Where flows come from
 
-`/flowverses` is the places themselves — a git repository with a `flows/` directory apiece,
-cloned under humanize's home, and the flows of your own read where they lie. Each is offered
-under the name it is listed under. A place that has never been fetched is listed all the same,
-with its URL and `not fetched yet` beside it: what there is to run is not the same question as
-what has been downloaded.
+**v** in `/flow`, and `/flowverses`, open the places themselves — a git repository with a
+`flows/` directory apiece, cloned under humanize's home, and the flows of your own read where
+they lie. Each is offered under the name it is listed under. A place that has never been
+fetched is listed all the same, with its URL and `not fetched yet` beside it: what there is to
+run is not the same question as what has been downloaded.
 
 ![The /flowverses list: builtin, which holds the flows humanize ships, and official, a GitHub
 URL marked as not fetched yet](/demo/flowverses.png)
@@ -617,10 +626,19 @@ URL marked as not fetched yet](/demo/flowverses.png)
 | **r** | Fetch the one under the cursor again, or for the first time. `builtin` came with humanize, and `local` and `user` are directories of your own: all three say there is nothing to fetch. |
 | **d** **d** | Take an added one away, flows and all. `builtin`, `official`, `local` and `user` are always here, and say so. |
 
-Its own menu rather than three more keys on `/flow`, because they are about something else:
+Its own menu rather than three more keys on the flows, because they are about something else:
 adding a repository, fetching one again and taking one away are done to the list of places,
-while the page they were on is asking which flow to run — and a sheet that asks one question
-with three keys about another is a sheet asking two.
+while the list they would be keys of is asking which flow to run — and a sheet that asks one
+question with three keys about another is a sheet asking two. Its own menu rather than a deeper
+view of `/flow` for a second reason: that menu holds everything until you save it, and each of
+these runs git as you ask for it.
+
+`/flowverses` stays a command as well as a key, because the key belongs to the flows and there
+are none to choose from while a flow is running. Either way in is the same sheet.
+
+**v** is refused while `/flow` is still fetching the place it opened on, and says so under the
+list: two clones of one place land in one directory, and the one that loses takes the other's
+work with it.
 
 **What happens here happens as it is asked for** rather than when the menu is saved: each of
 these runs git, and something that has already been cloned is not a draft. A clone runs off
@@ -629,7 +647,7 @@ said under the list and again in the transcript on the way out. Nothing here is 
 a flow is running: a place fetched now is one the next run may reach for, and none of it
 touches the flow that is going.
 
-`/flow` kept the two keys that are about flows rather than about places: `←` and `→`, which
+The flows kept the two keys that are about flows rather than about places: `←` and `→`, which
 step between these same places because that is which list of flows is being read, and `f`,
 which copies the flow under the cursor into this project.
 
@@ -639,8 +657,8 @@ the cursor with enter meaning it.
 
 ## What each agent is
 
-The **Agents** page of `/flow` lists what the flow drives, by the name the flow calls each, and
-enter opens one. Everything that agent is is a row of one sheet:
+Opening a flow in `/flow` lists what it drives, by the name the flow calls each, and enter
+opens one. Everything that agent is is a row of one sheet:
 
 ```
   Set up builder
@@ -677,8 +695,8 @@ for an agent [the flow says may be pointed at a machine](#where-each-agent-works
 flow put in a container it is read rather than opened, and for one that works here it is not
 there at all.
 
-`save` accepts this agent and returns straight to the flow's Agents page. It changes only the
-flow draft; the complete setup is written down when `save` is chosen on that outer page. Esc
+`save` accepts this agent and returns straight to the flow's agents. It changes only the flow
+draft; the complete setup is written down when `save` is chosen there. Esc
 off the agent sheet remains a fallback: it asks whether to accept or discard changes.
 
 ## Which CLI, and which account
@@ -1032,7 +1050,7 @@ over the headings.
 | **esc** | Back to the menu, changing nothing |
 
 It opens as the flow is chosen — enter on a flow that takes settings puts it up, and answering
-it lands on the Agents page — and what it answers is held with the rest of that menu until the
+it lands inside that flow's agents — and what it answers is held with the rest of that menu until the
 menu is saved: setting a flow up is a thing about the flow rather than about what runs it. A
 flow that takes no settings is not asked, so the walk is the same either way. There is no
 command for it, here or on a line: choosing the flow again is how you answer it again, and
@@ -1076,9 +1094,9 @@ the terminal's colours; a name no theme answers to is ignored rather than refuse
 
 - **Open twice.** `hmz` with no command is the only way in — with or without `-f`, `-c` and
   `-a`, which say how it opens rather than opening a second one.
-- **Run two flows at once.** The Flow page of `/flow` is shut while one is running, and
-  what the flow itself takes is not asked. What each agent is stays open: that is the half
-  worth changing mid-run.
+- **Run two flows at once.** There are no flows to choose from in `/flow` while one is
+  running, and what the flow itself takes is not asked. What each agent is stays open: that is
+  the half worth changing mid-run.
 - **Guess at a bad line.** A line it cannot carry out is shown and the interface stays up. Only
   `/exit` closes it — and `/detach`, which closes this terminal and not the run.
 - **Ask the flow anything.** What is drawn beside and under the transcript is kept from the

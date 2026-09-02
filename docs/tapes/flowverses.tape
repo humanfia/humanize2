@@ -1,5 +1,8 @@
 # `/flowverses`: the places flows come from, and what one of them holds.
 #
+# The same menu `v` opens from `/flow`. Recorded from the command because opening the flows
+# fetches whatever has never been fetched, and nothing here reaches the network.
+#
 # Nothing is fetched here. The two that are always listed are the package's own flows and
 # humanize's repository of the rest; asking what one holds reads the flows already on this
 # container's disk, and no turn is taken.

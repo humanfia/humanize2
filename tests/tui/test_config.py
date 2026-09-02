@@ -22,7 +22,7 @@ from hmz.tui.pick import Agent, Configures, Flows, setting
 from hmz.tui.selecting import Transcript
 from tests.stubs import written
 
-from .test_app import into_agent, keeps, onto
+from .test_app import into_agent, keeps, onto, rows
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -190,7 +190,7 @@ async def test_setting_up_comes_between_the_flow_and_its_agents(flows: Path) -> 
             await until(lambda: isinstance(app.screen, Flows), driver)
             sheet = app.screen
             assert isinstance(sheet, Flows)
-            await until(lambda: sheet._tab == 1, driver)
+            await until(lambda: sheet._inside, driver)
             await into_agent(app, driver)
             assert isinstance(app.screen, Agent)
 
@@ -207,7 +207,7 @@ async def test_a_flow_that_takes_no_setting_up_is_not_asked_about(flows: Path) -
             await _set_up(app, driver, "plain")
             sheet = app.screen
             assert isinstance(sheet, Flows)
-            await until(lambda: sheet._tab == 1, driver)
+            await until(lambda: sheet._inside, driver)
 
             assert isinstance(
                 app.screen, Flows
@@ -451,8 +451,13 @@ async def test_a_flow_that_groups_nothing_is_one_list(flows: Path) -> None:
 
 
 @pytest.mark.timeout(60)
-async def test_agents_does_not_ask_how_the_flow_is_set_up(flows: Path) -> None:
-    """The two are split: the flow's own settings are a key, its agents are a page."""
+async def test_the_agents_are_not_where_the_flow_itself_is_set_up(flows: Path) -> None:
+    """The two are split: what the flow takes is asked as it is opened, and only there.
+
+    Opening a flow is choosing it, so its own settings are what comes up on the way in -- and
+    what drives it, which is what is under them, says nothing about them. Two answers to one
+    question is one of them being wrong.
+    """
     app = Humanize()
     with unittest.mock.patch(
         "hmz.tui.app.installed",
@@ -470,13 +475,15 @@ async def test_agents_does_not_ask_how_the_flow_is_set_up(flows: Path) -> None:
             await driver.press("enter")
             await into_agent(app, driver)
 
-            # Straight to what the agent is, with nothing about the flow itself on the way.
+            # What the agent is, and not one row of what the flow itself takes.
             assert isinstance(app.screen, Agent)
+            assert "loud" not in rows(app)
+            assert "rounds" not in rows(app)
 
 
 @pytest.mark.timeout(60)
-async def test_agents_leaves_how_the_flow_is_set_up_alone(flows: Path) -> None:
-    """A question it did not ask is one it must not answer, either -- even by keeping it."""
+async def test_walking_past_how_the_flow_is_set_up_leaves_it_alone(flows: Path) -> None:
+    """Esc off the settings changes nothing: a walk to the agents is not an answer to them."""
     app = Humanize()
     with unittest.mock.patch(
         "hmz.tui.app.installed",

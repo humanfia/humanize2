@@ -60,8 +60,9 @@ The flows appear one place at a time, one list each. **←** and **→** step be
 /flow ralph_loop
 ```
 
-`/flow` is **refused while a flow is running**. You get `no choosing a flow while a flow is
-running: ctrl+c twice stops it first`. Looking and leaving without choosing changes nothing.
+There are **no flows to choose from while a flow is running**: `/flow` opens inside the agents
+of the one that is going, and `/flow ralph_loop` is refused outright with `hmz: a flow is
+running; no choosing a flow`. Looking and leaving without choosing changes nothing.
 
 ::: details What the three built-in flows are
 | Flow | Agents | |
@@ -142,7 +143,7 @@ sessions and its own record. `/epics` is where both of them are.
 **Hold the conversation instead of dropping it.** `/flow stateful_ralph`, same task. Compare
 how often it re-reads files it has already read.
 
-**Move the effort.** Open the Agents page of `/flow`, choose the agent, find the `effort` row,
+**Move the effort.** Open the flow in `/flow`, choose the agent, find the `effort` row,
 and press **←/→**. A Ralph loop of `low` turns is a different animal from one of `max` turns.
 See [Efforts](/user/efforts).
 

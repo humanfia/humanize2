@@ -198,7 +198,7 @@ $ hmz exec -f gated -a kimi/kimi-code/k3:high -a kimi/kimi-code/k3:high "fix the
 hmz exec: error: gated: builder has to run PermissionRequest, which kimi does not
 ```
 
-The agents page of `/flow` then offers only the CLIs that would work for that place.
+Opening that flow in `/flow` then offers only the CLIs that would work for that place.
 
 ## Two rules
 

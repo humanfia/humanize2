@@ -281,9 +281,9 @@ async def test_the_flow_that_is_picked_is_the_one_that_was_chosen(theirs: Path) 
         await until(lambda: _rows(sheet) == ["theirs/loop"], driver)
 
         await driver.press("enter")
-        await until(lambda: sheet._tab == 1, driver)
+        await until(lambda: sheet._inside, driver)
 
-        # On to what it runs, which is the page beside it, holding that flow's own agents.
+        # And into what it runs, which is that flow's own agents.
         assert sheet._flow == "theirs/loop"
 
 
@@ -356,7 +356,7 @@ async def test_one_of_the_flows_a_file_holds_is_chosen_like_any_other(
         await driver.press("enter")
 
         # On to what that flow drives, rather than a refusal that the file has no `run`.
-        await until(lambda: sheet._tab == 1, driver)
+        await until(lambda: sheet._inside, driver)
         await into_agent(app, driver)
         assert isinstance(app.screen, Agent)
         assert "builder" in str(app.screen.query_one("#asked", Label).content)
@@ -390,12 +390,12 @@ async def test_each_of_them_is_set_up_with_its_own_settings(
 
         # And the one beside it takes nothing, so choosing it asks nothing.
         await driver.press("escape")
-        await until(lambda: sheet._tab == 1, driver)
-        await driver.press("shift+tab")
-        await until(lambda: sheet._tab == 0, driver)
+        await until(lambda: sheet._inside, driver)
+        await driver.press("escape")
+        await until(lambda: not sheet._inside, driver)
         await onto(app, driver, "local\x1flocal/three:rlcr")
         await driver.press("enter")
-        await until(lambda: sheet._tab == 1, driver)
+        await until(lambda: sheet._inside, driver)
 
         assert isinstance(app.screen, Flows)
 
