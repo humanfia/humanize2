@@ -18,14 +18,6 @@ hmz
 
 Check the [documentation](https://docs.humanfia.ai/humanize2/) for more usage guides.
 
-## Maintainers
-
-[@futrime](https://github.com/futrime), [@SihaoLiu](https://github.com/SihaoLiu), [@lyken17](https://github.com/lyken17).
-
-## Thanks
-
-This project was initiated by Sihao Liu at UCLA in the [PolyArch/humanize](https://github.com/PolyArch/humanize) repository. It has since received contributions from NVIDIA Research, MIT HAN Lab, NUNCHAKU, and the broader community.
-
 ## Contributing
 
 Feel free to request features in the [wishlist](https://github.com/humanfia/humanize2/issues/26), report bugs in the [issues](https://github.com/humanfia/humanize2/issues), or submit PRs.
