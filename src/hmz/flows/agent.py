@@ -67,6 +67,12 @@ class Session(Protocol):
     #: to catch the refusal.
     takes_tools: ClassVar[bool]
 
+    #: Whether this backend has a native history operation that branches a conversation in
+    #: place, which is what :meth:`fork` reaches for. Only Claude and Codex do; a flow that
+    #: forks declares the place with `Annotated[Agent, Forks]`, and the run is refused a
+    #: backend without it before the first turn.
+    forks: ClassVar[bool]
+
     @property
     def id(self) -> str:
         """What the backend calls this conversation, once a turn has landed in it.
@@ -79,6 +85,35 @@ class Session(Protocol):
     @property
     def named(self) -> str | None:
         """The same name, or None while the backend has not said one."""
+        ...
+
+    @property
+    def last_turn_id(self) -> str | None:
+        """The backend's id for the latest completed turn, where it exposes one.
+
+        What a fork names its boundary by; None for a backend with no intermediate boundary
+        and before any turn has completed. A forked child starts empty here.
+        """
+        ...
+
+    def fork(
+        self, *, last_turn_id: str | None = None, permission: str | None = None
+    ) -> Session:
+        """Branches this conversation into an independent one, preserving its prefix.
+
+        Eager and prompt-free: the returned child already has its backend id, and the parent
+        is left open, idle and unchanged, so it may be driven on at once while the child runs
+        on its own. Only an open, idle, unmoved session may be forked.
+
+        Args:
+          last_turn_id: The completed turn to fork through, inclusive. None forks through the
+            latest completed turn; Codex also accepts an earlier one, and Claude raises
+            NotImplementedError for a non-None boundary.
+          permission: The rung the child runs at, or None to inherit the parent's.
+
+        Returns:
+          The child session, already named by the backend.
+        """
         ...
 
     @property

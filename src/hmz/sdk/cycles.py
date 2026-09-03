@@ -106,7 +106,7 @@ class Cycles:
         """
         import datetime
 
-        from hmz.cycle import TRACES
+        from hmz.cycle import TRACES, forks
         from hmz.tracing.profile import PROFILE
 
         agents = self.opened(cycle)
@@ -123,6 +123,7 @@ class Cycles:
             start=start,
             end=end,
             profile=cycle / PROFILE,
+            parents=forks(cycle),
         )
         return where, document
 
@@ -135,6 +136,7 @@ class Cycles:
         start: str | None = None,
         end: str | None = None,
         profile: str | os.PathLike[str] | None = None,
+        parents: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         """Gathers what a run left behind into one Chrome trace.
 
@@ -148,6 +150,8 @@ class Cycles:
           start: The earliest session time to include, in any wording dateparser understands.
           end: The latest.
           profile: Where the run's own profile was written, for a run that was profiled.
+          parents: What each session branched from, child id to parent id, for the forked
+            children a trace draws under their parent.
 
         Returns:
           The trace, as the object that was written.
@@ -162,4 +166,5 @@ class Cycles:
             start=start,
             end=end,
             profile=profile,
+            parents=parents,
         )

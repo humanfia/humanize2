@@ -30,6 +30,38 @@ if TYPE_CHECKING:
 __all__ = ["Runner", "flow_and_agents", "read_agent", "set_up_from"]
 
 
+def _forkable(agent: AgentBase) -> bool:
+    """Whether this agent's backend has a native fork, read off the session it opens.
+
+    `forks` is a fact of the session rather than of the agent, the way `shapes` and
+    `takes_tools` are -- the class `new` answers with is what carries it. Resolved by name
+    rather than through `get_type_hints`, which would ask every annotation to resolve.
+
+    Args:
+      agent: The agent whose backend is being asked.
+
+    Returns:
+      True for a backend whose session declares `forks`, False otherwise.
+    """
+    import contextlib
+    import inspect
+    import sys as running
+
+    told: object = None
+    with contextlib.suppress(Exception):
+        told = inspect.signature(type(agent).new).return_annotation
+        if isinstance(told, str):
+            told = vars(running.modules[type(agent).__module__]).get(told)
+    if not isinstance(told, type) or not getattr(told, "forks", False):
+        return False
+    ready = getattr(told, "native_ready", None)
+    if not callable(ready):
+        return True
+    with contextlib.suppress(Exception):
+        return bool(ready())
+    return False
+
+
 def _finished(running: Awaitable[None]) -> None:
     """Runs a flow that is a coroutine, until it returns.
 
@@ -145,6 +177,11 @@ class Runner:
                 raise NotAFlow(
                     f"{flow}: {place.name or 'the agent'} is run under a goal, but goals "
                     "were switched off for it"
+                )
+            if place.forks and not _forkable(agent):
+                raise NotAFlow(
+                    f"{flow}: {place.name or 'the agent'} branches a conversation, which "
+                    f"{agent.backend} has no native fork for"
                 )
             lands(flow, agent, place)
         # The person at the prompt is made here rather than given: nobody chooses what they

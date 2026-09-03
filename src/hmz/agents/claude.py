@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import functools
 import json
+import shutil
+import subprocess
 import uuid
 from collections import Counter
 from dataclasses import dataclass
@@ -10,7 +13,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, StreamSessionBase
 from .config import AgentConfig
-from .event import Event, Question, Usage
+from .event import Event, Failed, Question, Usage
 from .hooks import EVERYWHERE, SUBAGENTS, Moment
 
 if TYPE_CHECKING:
@@ -46,6 +49,7 @@ _FLEET = ("Task", "Agent")
 _ALLOWED_TOOLS_MAX = 32
 
 _ALLOWED_TOOL_RULE_MAX_CHARS = 4096
+_FORK_SECONDS = 30.0
 
 #: Reasons that leave an answer unfinished even when a broken intermediary labels the result
 #: `success`. Claude normally keeps its own agent loop going for these rather than returning
@@ -97,6 +101,34 @@ _AS_IT_GOES = {
     "cache_read": "cache_read_input_tokens",
     "cache_write": "cache_creation_input_tokens",
 }
+
+
+@functools.lru_cache(maxsize=8)
+def _native_fork_ready(binary: str | None = None) -> bool:
+    """Whether the installed Claude CLI advertises prompt-free session forking."""
+    binary = binary or shutil.which("claude")
+    if binary is None:
+        return False
+    try:
+        result = subprocess.run(
+            [binary, "--help"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    text = f"{result.stdout}\n{result.stderr}"
+    if "--fork-session" in text and "--session-id" in text:
+        return True
+    # Test doubles and third-party wrappers may not implement --help. Their native operation
+    # remains the source of truth, while a real Claude help page has a recognizable usage.
+    return result.returncode == 0 and not any(
+        marker in text for marker in ("Usage:", "Options:")
+    )
 
 
 def _about(called: dict[str, Any]) -> str:
@@ -185,6 +217,16 @@ class ClaudeCodeSession(StreamSessionBase):
     #: this turn without anything of the person at this machine's being written.
     takes_tools: ClassVar[bool] = True
 
+    #: `--resume <parent> --fork-session --session-id <child>` is Claude's native fork: it
+    #: branches a conversation in place without a prompt, so the child keeps the parent's
+    #: prefix for the provider's cache. A fork is eager and prompt-free here.
+    forks: ClassVar[bool] = True
+
+    @classmethod
+    def native_ready(cls) -> bool:
+        """Whether this installation exposes Claude's native fork flags."""
+        return _native_fork_ready(shutil.which("claude"))
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:
@@ -241,7 +283,7 @@ class ClaudeCodeSession(StreamSessionBase):
         # A fresh id per attempt: an opening turn that failed may still have left Claude holding
         # the id it was given, and retrying under that one would collide forever.
         pinned = self._id or str(uuid.uuid4())
-        argv = [
+        return [
             "claude",
             "--print",
             "--input-format",
@@ -251,20 +293,44 @@ class ClaudeCodeSession(StreamSessionBase):
             "--verbose",
             "--resume" if self._id else "--session-id",
             pinned,
+            *self._session_args(),
+        ]
+
+    def _session_args(self) -> list[str]:
+        """The settings a process is started with, off the config in force for this session.
+
+        A forked child reads them off its frozen fork context rather than off the agent, so
+        that reconfiguring the parent afterwards does not change the child -- and the fork
+        command itself is built from the same frozen values, so the branch carries them.
+
+        Returns:
+          The permission, tier, model, effort, tool rules and MCP config, as argv.
+        """
+        context = self._fork_context
+        if context is None:
+            config = self._agent.config
+            model, effort = self._agent.config.model, self.effort
+            permission = self._agent.config.permission
+            service_tier = self._agent.config.service_tier
+            goals = self._agent.goals_enabled
+            web_search = self._agent.config.web_search
+        else:
+            config = self._frozen_config
+            model, effort = context.model, context.effort
+            permission, service_tier = context.permission, context.service_tier
+            goals, web_search = context.goals, context.web_search
+        argv = [
             *(
                 ["--permission-mode", mode]
-                if (mode := _PERMITTED.get(self._agent.config.permission))
+                if (mode := _PERMITTED.get(permission))
                 else ["--dangerously-skip-permissions"]
             ),
             "--settings",
-            json.dumps(
-                {"fastMode": self._agent.config.service_tier == "fast"},
-                separators=(",", ":"),
-            ),
+            json.dumps({"fastMode": service_tier == "fast"}, separators=(",", ":")),
             "--model",
-            self._agent.config.model,
+            model,
             "--effort",
-            self.effort,
+            effort,
         ]
         if self._shaping is not None:
             # Claude validates the answer against this itself, so a turn that lands has
@@ -277,13 +343,13 @@ class ClaudeCodeSession(StreamSessionBase):
         # scheduler -- and one told not to search the web is refused the two that reach it.
         # Everything else it may reach for is what its permission rung says it may.
         denied: list[str] = []
-        if not self._agent.goals_enabled:
+        if not goals:
             denied += _CONTINUATION_TOOLS
-        if not self._agent.config.web_search:
+        if not web_search:
             denied += _WEB_TOOLS
         if denied:
             argv += ["--disallowedTools", ",".join(denied)]
-        allowed_tools = getattr(self._agent.config, "allowed_tools", ())
+        allowed_tools = getattr(config, "allowed_tools", ())
         if allowed_tools:
             argv += ["--allowedTools", ",".join(allowed_tools)]
         # Read once and kept, so that what the process is recorded as having been told is
@@ -297,9 +363,116 @@ class ClaudeCodeSession(StreamSessionBase):
             # own servers away for the length of this flow, which is not this flow's to do.
             argv += [
                 "--mcp-config",
-                json.dumps(self._agent.toolbox.config(), separators=(",", ":")),
+                json.dumps(self._toolbox().config(), separators=(",", ":")),
             ]
         return argv
+
+    def _permission(self) -> str:
+        """The permission rung frozen for this child, or the live agent rung otherwise."""
+        if self._fork_context is not None:
+            return self._fork_context.permission
+        return self._agent.config.permission
+
+    def _fork_command(self, parent_id: str, child_id: str) -> list[str]:
+        """The one-time native fork: resume the parent and branch it into a named child.
+
+        Args:
+          parent_id: The parent conversation, as Claude logged it.
+          child_id: The child the branch is to become, chosen up front.
+
+        Returns:
+          The command, which must not be sent a user prompt: the fork is done by the flags.
+        """
+        return [
+            "claude",
+            "--print",
+            "--input-format",
+            "stream-json",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--resume",
+            parent_id,
+            "--fork-session",
+            "--session-id",
+            child_id,
+            *self._session_args(),
+        ]
+
+    def _fork(self, *, parent_id: str, last_turn_id: str | None) -> str:
+        """Performs Claude's native fork eagerly, without sending a prompt.
+
+        The branch is made by the flags alone; the child id is adopted before any turn, and
+        later child turns resume it with an ordinary ``--resume <child-id>``.
+
+        Args:
+          parent_id: The parent conversation to branch.
+          last_turn_id: Refused: Claude forks the whole conversation, with no boundary.
+
+        Returns:
+          The child's id, which the child adopts.
+
+        Raises:
+          NotImplementedError: For a non-None boundary, which Claude cannot express.
+          subprocess.CalledProcessError: If the fork could not be made.
+        """
+        if last_turn_id is not None:
+            raise NotImplementedError(
+                "Claude forks the whole conversation; it has no intermediate boundary"
+            )
+        child_id = str(uuid.uuid4())
+        argv = self._spawned(self._fork_command(parent_id, child_id))
+        with subprocess.Popen(
+            argv,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+            env=self._environ(),
+            cwd=(
+                None
+                if (
+                    self._fork_context.anchor
+                    if self._fork_context is not None
+                    else self._agent.anchor
+                )
+                is not None
+                else self._workspace()
+            ),
+        ) as proc:
+            assert proc.stdout is not None  # noqa: S101
+            assert proc.stderr is not None  # noqa: S101
+            assert proc.stdin is not None  # noqa: S101
+            try:
+                # An empty input closes stdin without a prompt. Calling communicate after a
+                # manual close would make Python flush the already-closed pipe a second time.
+                stdout, stderr = proc.communicate(input="", timeout=_FORK_SECONDS)
+            except subprocess.TimeoutExpired as timed:
+                proc.kill()
+                stdout, stderr = proc.communicate()
+                raise Failed(
+                    124,
+                    argv,
+                    stdout or "",
+                    f"Claude native fork timed out after {_FORK_SECONDS:g}s: {stderr or ''}",
+                ) from timed
+            status = proc.returncode
+        if status != 0:
+            if self._agent.cycle is not None:
+                self._agent.cycle.fork_lost(
+                    self._agent,
+                    parent_id,
+                    last_turn_id,
+                    provider=(
+                        self._fork_context.provider
+                        if self._fork_context is not None
+                        else None
+                    ),
+                )
+            raise Failed(status or 1, argv, stdout or "", stderr or "")
+        return child_id
 
     def _write(self, text: str, ticket: str = "") -> str:
         """Renders one thing to say as the user message Claude reads it as.
@@ -350,7 +523,14 @@ class ClaudeCodeSession(StreamSessionBase):
           argument schema again before every turn to catch a reworded sentence would cost
           each turn more than the sentence is worth.
         """
-        return tuple(sorted(one.name for one in self._agent.toolbox.offered()))
+        return tuple(sorted(one.name for one in self._toolbox().offered()))
+
+    def _validate_fork_boundary(self, last_turn_id: str | None) -> None:
+        """Claude's native fork has no intermediate turn boundary."""
+        if last_turn_id is not None:
+            raise NotImplementedError(
+                "Claude forks the whole conversation; it has no intermediate boundary"
+            )
 
     def _stale(self) -> bool:
         """Whether the process up was started for something this turn is no longer.
@@ -608,7 +788,7 @@ class ClaudeCodeSession(StreamSessionBase):
                 about=_about(called),
                 called=called,
             )
-            if self._agent.config.permission == "read-only":
+            if self._permission() == "read-only":
                 self._reply(
                     said,
                     {"behavior": "deny", "message": f"{tool} would change something"},

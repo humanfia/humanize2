@@ -57,6 +57,7 @@ def run(*argv: str) -> int:
                 "start": None,
                 "end": None,
                 "profile": None,  # and nothing was profiled, there being no run
+                "parents": None,  # nor forked, there being no run
             },
         ),
         (
@@ -81,6 +82,7 @@ def run(*argv: str) -> int:
                 "start": "1am",
                 "end": "2am",
                 "profile": None,
+                "parents": None,
             },
         ),
     ],

@@ -768,6 +768,25 @@ def test_what_a_codex_turn_spent_is_charged_to_the_turn_that_spent_it(
     assert second[-1].tokens == {"gpt-5-codex": 500}  # 1500 all told, 1000 of it before
 
 
+def test_a_codex_turn_counts_cached_input_once_as_cache_read(
+    working: _FakeServer,
+) -> None:
+    """The server states the input with the cached part inside it, so it is split once."""
+    session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
+
+    (result,) = [
+        event for event in session.stream("do the task") if event.kind == "result"
+    ]
+
+    # Net-new input, cached input and output: the three together are the whole of what
+    # crossed the wire, and the cached part is not counted twice.
+    assert result.spent["cache_read"] == 800
+    assert result.spent["input"] == 100  # net-new, not the whole 900
+    assert result.spent["output"] == 100
+    assert result.spent.total == 1000
+    assert result.tokens == {"gpt-5-codex": 1000}
+
+
 def test_a_codex_session_with_no_turn_running_cannot_be_talked_to() -> None:
     session = CodexAgent(CodexAgentConfig(model="gpt-5-codex", effort="high")).new()
 

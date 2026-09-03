@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from .agents import AgentBase
+    from .agents.event import Usage
     from .tracing.profile import Profiler
 
 __all__ = [
@@ -73,6 +74,7 @@ __all__ = [
     "Sub",
     "called",
     "cycles",
+    "forks",
     "linked",
     "opened",
     "read",
@@ -828,6 +830,108 @@ class Cycle:
         )
         self.links(name)
 
+    def forked(
+        self,
+        agent: AgentBase,
+        parent: str,
+        child: str,
+        last_turn_id: str | None = None,
+        *,
+        provider: str | None = None,
+        permission: str | None = None,
+        cache_equivalent: bool = True,
+    ) -> None:
+        """Writes down that one session branched into another, at a completed boundary.
+
+        A fork is not an open: the child did not start from nothing, so the run records the
+        parent it came from and the boundary it came off. Both ids are written for
+        diagnostics, and both relation keys -- the cycle's own names for the two sessions --
+        for whoever links the trace afterwards.
+
+        Args:
+          agent: Whose conversation it is, which is the same agent for both.
+          parent: The parent's backend id.
+          child: The child's backend id, just given by the native fork.
+          last_turn_id: The completed turn the child branched from, or None for a backend
+            whose fork takes no intermediate boundary.
+          provider: The effective provider snapshot at the fork boundary, if already known.
+          permission: The child's effective permission.
+          cache_equivalent: Whether the child retains the parent's cache-equivalent settings.
+        """
+        account = _provider(agent) if provider is None else provider
+        parent_name = called(agent.id, agent.backend, account, parent)
+        child_name = called(agent.id, agent.backend, account, child)
+        with self._writing:
+            self._sessions[child_name] = (agent.backend, child)
+        self.write(
+            "forked",
+            agent=agent.id,
+            backend=agent.backend,
+            provider=account or LOCAL,
+            parent_session_id=parent,
+            session_id=child,
+            parent_key=parent_name,
+            session_key=child_name,
+            permission=permission,
+            cache_equivalent=cache_equivalent,
+            **({"last_turn_id": last_turn_id} if last_turn_id else {}),
+        )
+        self.links(child_name)
+
+    def fork_usage(self, agent: AgentBase, session: str, usage: Usage) -> None:
+        """Writes numeric usage for one completed fork child turn."""
+        if not usage.total:
+            return
+        self.write(
+            "fork-usage",
+            agent=agent.id,
+            backend=agent.backend,
+            session_id=session,
+            **dict(usage),
+            total=usage.total,
+        )
+
+    def fork_failed(self, agent: AgentBase, session: str, error: str) -> None:
+        """Writes a bounded diagnostic for a fork child turn that failed."""
+        self.write(
+            "fork-failed",
+            agent=agent.id,
+            backend=agent.backend,
+            session_id=session,
+            error=" ".join(error.split())[:400],
+        )
+
+    def fork_lost(
+        self,
+        agent: AgentBase,
+        parent: str,
+        last_turn_id: str | None = None,
+        *,
+        provider: str | None = None,
+    ) -> None:
+        """Writes down a fork whose child id was lost with the response that made it.
+
+        A native fork that fails after the backend may already have created the child is not
+        retried -- a retry would create another branch -- so the orphan is written down for a
+        person to reconcile rather than left to multiply in silence.
+
+        Args:
+          agent: Whose conversation it is.
+          parent: The parent's backend id, which the branch was made from.
+          last_turn_id: The boundary the branch was made at, or None where the backend takes
+            none.
+          provider: The effective provider snapshot, or None to resolve it from the agent.
+        """
+        provider = _provider(agent) if provider is None else provider
+        self.write(
+            "fork-lost",
+            agent=agent.id,
+            backend=agent.backend,
+            provider=provider or LOCAL,
+            parent_session_id=parent,
+            **({"last_turn_id": last_turn_id} if last_turn_id else {}),
+        )
+
     def links(self, only: str = "") -> None:
         """Points this cycle's `sessions/` at the logs its sessions are being written to.
 
@@ -996,6 +1100,31 @@ def records(cycle: Path) -> list[Path]:
     return held
 
 
+def forks(cycle: Path) -> dict[str, str]:
+    """What each session one cycle branched from, child id to parent id.
+
+    A forked child did not start from nothing, so a trace of the run draws it as the child of
+    the conversation it branched from. Read across every record of the cycle, as
+    :func:`opened` is, and keyed by the backend ids -- which is what a trace is gathered by.
+
+    Args:
+      cycle: The cycle to read.
+
+    Returns:
+      One entry per fork, the child's id to the parent's id. Empty for a run that forked
+      nothing.
+    """
+    held: dict[str, str] = {}
+    for at in records(cycle):
+        for said in _events(at):
+            if said.get("event") != "forked" or not said.get("session_id"):
+                continue
+            parent = said.get("parent_session_id")
+            if isinstance(parent, str):
+                held[str(said["session_id"])] = parent
+    return held
+
+
 def opened(cycle: Path) -> dict[str, list[str]]:
     """What each agent of one cycle opened, as the ids the backends gave those sessions.
 
@@ -1042,13 +1171,18 @@ def sessions(cycle: Path) -> list[Session]:
             "",
         )
         for said in events:
-            if said.get("event") != "opened" or not said.get("session"):
+            if said.get("event") == "opened" and said.get("session"):
+                ident = str(said["session"])
+            elif said.get("event") == "forked" and said.get("session_id"):
+                # A forked child is a session the run opened, even though it did not start
+                # from nothing: it is read back the same way, keyed by the id the fork gave.
+                ident = str(said["session_id"])
+            else:
                 continue
             agent, backend = (
                 str(said.get("agent") or ""),
                 str(said.get("backend") or ""),
             )
-            ident = str(said["session"])
             provider = str(said.get("provider") or LOCAL)
             held.append(
                 Session(
@@ -1058,9 +1192,11 @@ def sessions(cycle: Path) -> list[Session]:
                     ident=ident,
                     # Worked out where an older cycle did not write one down: a name is what
                     # this session is called, and a cycle written before it had one still
-                    # has sessions.
+                    # has sessions. A fork writes its own name, as `session_key`.
                     name=str(
-                        said.get("name") or called(agent, backend, provider, ident)
+                        said.get("name")
+                        or said.get("session_key")
+                        or called(agent, backend, provider, ident)
                     ),
                     at=str(said.get("at") or ""),
                     flow=flow,

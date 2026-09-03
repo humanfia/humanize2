@@ -14,23 +14,28 @@ features of the thread rather than flags of a command line, and neither is a wor
 from __future__ import annotations
 
 import contextlib
+import functools
 import itertools
 import json
 import os
 import queue
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import weakref
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from .base import AgentBase, SessionBase
 from .config import PERMISSIONS, AgentConfig
 from .event import Event, Failed, Question, Usage, say
 from .hooks import EVERYWHERE, SUBAGENTS, Moment, Occasion
+from .tools import Toolbox
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -41,6 +46,38 @@ if TYPE_CHECKING:
 #: none of them is already a field of AgentConfig -- model, effort and permission are asked
 #: elsewhere, and a second place for them would be two answers.
 _OVERRIDE_KEYS = frozenset({"model_context_window", "model_auto_compact_token_limit"})
+_LIVE = object()
+
+
+@functools.lru_cache(maxsize=8)
+def _native_fork_ready(binary: str | None = None) -> bool:
+    """Whether the installed Codex app-server schema exposes ``thread/fork``."""
+    binary = binary or shutil.which("codex")
+    if binary is None:
+        return False
+    try:
+        with tempfile.TemporaryDirectory(prefix="hmz-codex-probe-") as output:
+            result = subprocess.run(
+                [binary, "app-server", "generate-json-schema", "--out", output],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=8,
+                check=False,
+            )
+            files = tuple(path for path in Path(output).rglob("*") if path.is_file())
+            schema = "\n".join(
+                path.read_text(encoding="utf-8", errors="replace") for path in files
+            )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if "thread/fork" in schema:
+        return True
+    # Test doubles and wrappers often accept app-server but do not implement schema generation;
+    # let their native request decide while rejecting a real successful schema without the method.
+    return result.returncode == 0 and not schema and not result.stdout.strip()
+
 
 #: What the server calls a turn stopping to ask its user something. Every other request it
 #: makes of a client is an approval, which an unattended flow does not stop for.
@@ -58,6 +95,8 @@ class _Running:
 
     thread: str | None = None
     turn: str | None = None
+    #: The id of the latest completed turn, which is what a fork names its boundary by.
+    last: str | None = None
     #: The server this turn is being taken on, bound where the turn starts rather than asked
     #: for again when there is a word to put in. The agent's server is let go of and started
     #: again whenever what it was started knowing has moved -- another account, another list
@@ -95,10 +134,53 @@ _PERMITTED = {
     "bypass": {"approvalPolicy": "never", "sandbox": "danger-full-access"},
 }
 
-#: What each kind of token is called in the totals the server states. Cached input is counted
-#: inside the input rather than beside it, so it is not a kind of its own here: adding it would
-#: be counting the same tokens twice.
-_KINDS = {"input": "inputTokens", "output": "outputTokens"}
+
+def _usage(usage: Mapping[str, Any]) -> Counter[str]:
+    """Codex's token totals, as the common kinds, cached input counted once as `cache_read`.
+
+    The server states the input with the cached part already inside it, so the two must not
+    both become kinds of their own -- that would count the cached tokens twice. `input` here
+    is the net-new input, `cache_read` the cached part, and `output` what came out: the three
+    together are the whole of what crossed the wire, so ``Usage.total`` still says that.
+
+    Args:
+      usage: The ``tokenUsage.total`` the server stated.
+
+    Returns:
+      The kinds, empty where the server said nothing.
+    """
+    input_tokens = int(usage.get("inputTokens") or 0)
+    cached = int(usage.get("cachedInputTokens") or 0)
+    held = Counter(
+        {
+            "input": max(input_tokens - cached, 0),
+            "cache_read": cached,
+            "output": int(usage.get("outputTokens") or 0),
+        }
+    )
+    return Counter({kind: tokens for kind, tokens in held.items() if tokens})
+
+
+def _permission_from_fork(result: Mapping[str, Any], default: str) -> str:
+    """Maps Codex's effective fork sandbox back into the common permission ladder."""
+    sandbox: object = cast("object", result.get("sandbox"))
+    raw_type = cast(
+        "object",
+        cast("dict[str, object]", sandbox).get("type")
+        if isinstance(sandbox, dict)
+        else sandbox,
+    )
+    sandbox_type = raw_type if isinstance(raw_type, str) else ""
+    if sandbox_type == "dangerFullAccess":
+        return "bypass"
+    if sandbox_type == "readOnly":
+        return "read-only"
+    if sandbox_type == "workspaceWrite":
+        policy = result.get("approvalPolicy")
+        if policy == "on-request":
+            return "auto"
+        return "workspace-write"
+    return default
 
 
 def unattended(permission: str, service_tier: str = "default") -> dict[str, Any]:
@@ -258,6 +340,9 @@ class _AppServer:
         #: total, so what one turn cost is the rise across it.
         self._counted: dict[str, Counter[str]] = {}
         self._messages: queue.Queue[dict[str, Any] | None] = queue.Queue()
+        #: Messages that arrived while another operation was waiting for its own response.
+        #: They are replayed to the next matching consumer instead of being silently discarded.
+        self._deferred: list[dict[str, Any]] = []
         # Read from a thread of its own, so that a turn can wait on the server for a while
         # rather than only for as long as it takes.
         threading.Thread(target=self._pump, daemon=True).start()
@@ -293,7 +378,9 @@ class _AppServer:
         """
         return unattended(self._instead.get(permission, permission), service_tier)
 
-    def call(self, method: str, params: dict[str, Any]) -> Any:
+    def call(
+        self, method: str, params: dict[str, Any], *, fallback: bool = True
+    ) -> Any:
         """Makes one call and reads until it is answered.
 
         A call naming a rung this machine's Codex will not take is made again a rung down: an
@@ -304,6 +391,8 @@ class _AppServer:
         Args:
           method: The method to call.
           params: What to call it with.
+          fallback: Whether permission refusals may step down the normal agent ladder. Fork
+            creation passes False because a child may not change its effective sandbox.
 
         Returns:
           What the server answered with.
@@ -312,6 +401,8 @@ class _AppServer:
           subprocess.CalledProcessError: If it refused the call for anything but the rung it
             named, or stopped before answering.
         """
+        if not fallback:
+            return self._called(method, params)
         while True:
             try:
                 return self._called(method, params)
@@ -372,12 +463,11 @@ class _AppServer:
             self._write(
                 {"jsonrpc": "2.0", "id": ident, "method": method, "params": params}
             )
-            # An answer is a message with no method of its own: the server asks things of us
-            # over the same stream, numbering its own calls, and one of those is not this one.
-            while (message := self._read()) is None or not (
-                message.get("id") == ident and "method" not in message
-            ):
-                pass
+            # An answer is a message with no method of its own: notifications and replies for
+            # other operations share this stream, so the router keeps them for their consumer.
+            message = self._matching(
+                lambda one: one.get("id") == ident and "method" not in one
+            )
             return self._answer(message, "")
 
     def pursue(self, params: dict[str, Any]) -> str:
@@ -419,7 +509,13 @@ class _AppServer:
             )
             idle = False
             said = ""
-            while (message := self._read(_QUIET_SECONDS if idle else None)) is not None:
+            while (
+                message := self._read_relevant(
+                    thread=str(params["threadId"]),
+                    ident=ident,
+                    timeout=_QUIET_SECONDS if idle else None,
+                )
+            ) is not None:
                 if message.get("id") == ident and "method" not in message:
                     self._answer(message, said)
                 match message.get("method"):
@@ -475,14 +571,19 @@ class _AppServer:
             costing = Usage()
             started: set[Any] = set()  # the items this turn has already shown
             try:
-                while (message := self._read()) is not None:
+                while (
+                    message := self._read_relevant(thread=thread, ident=ident)
+                ) is not None:
                     if message.get("id") == ident and "method" not in message:
                         self._answer(message, said)
+                    elif "id" in message and "method" not in message:
+                        self._deferred.append(message)
                     told: dict[str, Any] = message.get("params") or {}
                     # One server holds every session of the agent, and a turn one of them
                     # abandoned still says so on this stream. What is not this thread's is
                     # not this turn's.
                     if told.get("threadId") not in (None, thread):
+                        self._deferred.append(message)
                         continue
                     named_turn: dict[str, Any] = told.get("turn") or {}
                     if turn := told.get("turnId") or named_turn.get("id"):
@@ -572,17 +673,10 @@ class _AppServer:
                             # Sent as the turn spends it. `total` is the thread, every turn of
                             # it; `last` is the one request that just came back. Cached input
                             # is counted inside the input rather than beside it, so the input
-                            # the server states is the whole of what went in -- and the two
-                            # kinds together are the whole of what crossed the wire.
+                            # the server states is the whole of what went in -- and `_usage`
+                            # splits it once, so the cached part is not counted twice.
                             counted: dict[str, Any] = told.get("tokenUsage") or {}
-                            usage: dict[str, Any] = counted.get("total") or {}
-                            held = Counter(
-                                {
-                                    kind: int(usage.get(named) or 0)
-                                    for kind, named in _KINDS.items()
-                                    if usage.get(named)
-                                }
-                            )
+                            held = _usage(counted.get("total") or {})
                             if sum(held.values()):
                                 risen = Usage(
                                     {
@@ -618,6 +712,9 @@ class _AppServer:
                             # Codex reports a reconnect attempt as an error notification even
                             # when a later sampling request completes this same turn.
                             failed = None
+                            running.last = str(
+                                turn_said.get("id") or running.turn or ""
+                            )
                         case "thread/status/changed" if (
                             begun and told["status"]["type"] == "idle"
                         ):
@@ -861,6 +958,38 @@ class _AppServer:
         Raises:
           subprocess.CalledProcessError: If the server stopped mid-turn.
         """
+        if self._deferred:
+            return self._deferred.pop(0)
+        return self._read_raw(timeout)
+
+    def _read_relevant(
+        self,
+        *,
+        thread: str,
+        ident: int,
+        timeout: float | None = None,
+    ) -> dict[str, Any] | None:
+        """Reads the next message for a thread/request, retaining all other messages."""
+
+        def relevant(message: dict[str, Any]) -> bool:
+            if "id" in message and "method" not in message:
+                return message.get("id") == ident
+            params = cast("dict[str, Any]", message.get("params") or {})
+            item = cast("dict[str, Any]", params.get("item") or {})
+            event_thread = params.get("threadId") or item.get("threadId")
+            return event_thread in (None, thread)
+
+        for index, message in enumerate(self._deferred):
+            if relevant(message):
+                return self._deferred.pop(index)
+        message = self._read_raw(timeout)
+        while message is not None and not relevant(message):
+            self._deferred.append(message)
+            message = self._read_raw(timeout)
+        return message
+
+    def _read_raw(self, timeout: float | None = None) -> dict[str, Any] | None:
+        """Reads only from the pump queue, bypassing deferred messages during routing."""
         try:
             message = self._messages.get(timeout=timeout)
         except queue.Empty:
@@ -871,6 +1000,19 @@ class _AppServer:
                 self._proc.wait(), self._argv, "", "app server stopped mid-turn"
             )
         return message
+
+    def _matching(self, predicate: Callable[[dict[str, Any]], bool]) -> dict[str, Any]:
+        """Waits for one message and preserves every message meant for another consumer."""
+        for index, message in enumerate(self._deferred):
+            if predicate(message):
+                return self._deferred.pop(index)
+        while True:
+            message = self._read_raw()
+            if message is None:
+                raise Failed(self._proc.wait(), self._argv, "", "app server stopped")
+            if predicate(message):
+                return message
+            self._deferred.append(message)
 
     def _answer(self, message: dict[str, Any], said: str) -> Any:
         """Unwraps one answer.
@@ -966,6 +1108,16 @@ class CodexSession(SessionBase):
     #: reach this turn without a line being written into anybody's `config.toml`.
     takes_tools: ClassVar[bool] = True
 
+    #: `thread/fork` is Codex's native fork: it branches a thread in place, so the child
+    #: keeps the parent's prefix for the provider's cache. A fork is eager and prompt-free
+    #: here, and the child runs on a dedicated app server so parent and child may overlap.
+    forks: ClassVar[bool] = True
+
+    @classmethod
+    def native_ready(cls) -> bool:
+        """Whether this installation's app-server schema exposes ``thread/fork``."""
+        return _native_fork_ready(shutil.which("codex"))
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:
@@ -978,11 +1130,159 @@ class CodexSession(SessionBase):
         super().__init__(agent, cwd)
         #: The turn under way, which is what a word put in has to name.
         self._running = _Running()
+        #: The dedicated app server a forked child runs its turns on, or None for a session
+        #: nobody forked -- which runs on the agent's own, shared, server.
+        self._own: _AppServer | None = None
 
     @property
     def named(self) -> str | None:
         """The thread this session is, which the server names before the turn starts."""
         return self._id or self._running.thread
+
+    def _server(self) -> _AppServer:
+        """The server this session's turns run on: its own for a forked child, else the agent's."""
+        if self._fork_context is None:
+            return self._agent.server
+        if self._own is None:
+            context = self._fork_context
+            config = self._frozen_config
+            offering = tuple(sorted(one.name for one in self._toolbox().offered()))
+            own = _AppServer(
+                self._spawned(
+                    self._agent._server_argv(
+                        offering,
+                        goals=context.goals,
+                        web_search=context.web_search,
+                        overrides=getattr(config, "overrides", ()),
+                        toolbox=self._toolbox(),
+                    )
+                ),
+                self._environ(),
+            )
+            own._held.append(weakref.ref(self._agent))
+            self._own = own
+            weakref.finalize(self, _AppServer.stop, own)
+        return self._own
+
+    def _model(self) -> str:
+        """The model this session runs at, off its fork context where it has one."""
+        if self._fork_context is not None:
+            return self._fork_context.model
+        return self._agent.config.model
+
+    def _effort_at(self) -> str:
+        """How hard this session's next turn thinks, off its fork context where it has one."""
+        if self._fork_context is not None:
+            return self._fork_context.effort
+        return self.effort
+
+    def _permission(self) -> str:
+        """The rung this session runs at, off its fork context where it has one."""
+        if self._fork_context is not None:
+            return self._fork_context.permission
+        return self._agent.config.permission
+
+    def _tier(self) -> str:
+        """The common provider tier this session runs at, off its fork context where it has one."""
+        if self._fork_context is not None:
+            return self._fork_context.service_tier
+        return self._agent.config.service_tier
+
+    def _fork(self, *, parent_id: str, last_turn_id: str | None) -> str:
+        """Performs Codex's native fork on a dedicated server, eagerly and prompt-free.
+
+        The branch is made by ``thread/fork`` alone; the child's first turn goes through the
+        ordinary ``turn/start`` on this child server, using the effective values the fork
+        context froze. A non-None boundary names an earlier completed turn, inclusive.
+
+        Args:
+          parent_id: The parent thread to branch.
+          last_turn_id: The completed turn to fork through, or None for the latest.
+
+        Returns:
+          The child thread's id, which the child adopts.
+        """
+        server = self._server()
+        params: dict[str, Any] = {"threadId": parent_id}
+        if last_turn_id is not None:
+            params["lastTurnId"] = last_turn_id
+        context = self._fork_context
+        if context is not None and context.permission_override:
+            params.update(server.permitted(context.permission, context.service_tier))
+        try:
+            result = server.call("thread/fork", params, fallback=False)
+            result_map = cast(
+                "dict[str, Any]", result if isinstance(result, dict) else {}
+            )
+            thread = result_map.get("thread")
+            thread_map = cast(
+                "dict[str, Any]", thread if isinstance(thread, dict) else {}
+            )
+            child = thread_map.get("id")
+            if not isinstance(child, str) or not child:
+                raise Failed(
+                    1, server._argv, "", "thread/fork returned no child thread id"
+                )
+            if self._fork_context is not None:
+                tier = result_map.get("serviceTier")
+                self._fork_context = replace(
+                    self._fork_context,
+                    model=str(result_map.get("model") or self._fork_context.model),
+                    effort=str(
+                        result_map.get("reasoningEffort") or self._fork_context.effort
+                    ),
+                    service_tier=(
+                        "fast"
+                        if tier == "priority"
+                        else "default"
+                        if tier == "default"
+                        else self._fork_context.service_tier
+                    ),
+                    permission=_permission_from_fork(
+                        result_map, self._fork_context.permission
+                    ),
+                )
+            return child  # noqa: TRY300 -- malformed responses are handled below
+        except subprocess.CalledProcessError:
+            # The thread may have been created even though the response was lost. The fork is
+            # never retried -- that would create another branch -- so the orphan is written
+            # down for a person to reconcile, and the failure surfaces as it was.
+            if self._agent.cycle is not None:
+                self._agent.cycle.fork_lost(
+                    self._agent,
+                    parent_id,
+                    last_turn_id,
+                    provider=(
+                        self._fork_context.provider
+                        if self._fork_context is not None
+                        else None
+                    ),
+                )
+            raise
+        except (TypeError, ValueError, AttributeError) as malformed:
+            if self._agent.cycle is not None:
+                self._agent.cycle.fork_lost(
+                    self._agent,
+                    parent_id,
+                    last_turn_id,
+                    provider=(
+                        self._fork_context.provider
+                        if self._fork_context is not None
+                        else None
+                    ),
+                )
+            raise Failed(1, server._argv, "", str(malformed)) from malformed
+
+    def _shut(self) -> None:
+        """Takes down only this child's dedicated server, never the parent agent's."""
+        own, self._own = self._own, None
+        if own is not None:
+            own.stop()
+
+    def _tools_changed(self) -> None:
+        """Restarts a fork server when its private tool list changes."""
+        if self._fork_context is not None and self._own is not None:
+            self._shut()
 
     def _stream(
         self, prompt: str, *, schema: type[BaseModel] | None = None
@@ -1003,7 +1303,7 @@ class CodexSession(SessionBase):
         with self._lock:  # a conversation is a sequence: one turn at a time
             # Read once and held for the whole turn: asking the agent for its server again
             # may be starting another one, and the thread this turn is on is the first one's.
-            server = self._agent.server
+            server = self._server()
             thread = self._thread(server)
             # Known before the turn starts, so a word put in has a thread to name even though
             # the session is only opened once the turn has landed. The book goes with it: the
@@ -1021,17 +1321,14 @@ class CodexSession(SessionBase):
                 {
                     "threadId": thread,
                     "input": [{"type": "text", "text": prompt}],
-                    "model": self._agent.config.model,
-                    "effort": self.effort,
+                    "model": self._model(),
+                    "effort": self._effort_at(),
                     **(
                         {"outputSchema": schema.model_json_schema()}
                         if schema is not None
                         else {}
                     ),
-                    **server.permitted(
-                        self._agent.config.permission,
-                        self._agent.config.service_tier,
-                    ),
+                    **server.permitted(self._permission(), self._tier()),
                 },
                 self._running,
             ):
@@ -1050,6 +1347,9 @@ class CodexSession(SessionBase):
                 # has had it already, as the turn said it.
                 say(said, sys.stdout)
             self._adopt(thread)  # a turn has landed, so the session is open
+            self._last_turn = self._running.last
+            if self._last_turn and self._last_turn not in self._completed_turns:
+                self._completed_turns = (*self._completed_turns, self._last_turn)
             yield Event(kind="result", text=said, tokens=spent, spent=costing)
 
     def interject(self, text: str) -> None:
@@ -1087,16 +1387,14 @@ class CodexSession(SessionBase):
         Returns:
           The thread's id, which is also the session's.
         """
-        rung = server.permitted(
-            self._agent.config.permission, self._agent.config.service_tier
-        )
+        rung = server.permitted(self._permission(), self._tier())
         if (thread := self._id) is None:
             return str(
                 server.call(
                     "thread/start",
                     {
                         "cwd": self._workspace(),
-                        "model": self._agent.config.model,
+                        "model": self._model(),
                         **rung,
                     },
                 )["thread"]["id"]
@@ -1120,17 +1418,16 @@ class CodexSession(SessionBase):
             leaving the session unopened so that the next call retries it.
         """
         with self._lock:  # a conversation is a sequence: one turn at a time
-            server = self._agent.server
-            config = self._agent.config
+            server = self._server()
             thread = self._thread(server)
             server.call("thread/goal/set", {"threadId": thread, "objective": objective})
             answer = server.pursue(
                 {
                     "threadId": thread,
                     "input": [{"type": "text", "text": objective}],
-                    "model": config.model,
-                    "effort": self.effort,
-                    **server.permitted(config.permission, config.service_tier),
+                    "model": self._model(),
+                    "effort": self._effort_at(),
+                    **server.permitted(self._permission(), self._tier()),
                 }
             )
             self._adopt(thread)
@@ -1215,48 +1512,100 @@ class CodexAgent(AgentBase):
                 # is stopped by its own finalizer when the agent is collected either way.
                 self._server, self._server_as = None, ""
             if self._server is None:
-                argv = ["codex", "app-server"]
-                if not self.goals_enabled:
-                    # Per server rather than in config, so this flow changes no other Codex
-                    # session belonging to the user.
-                    argv += ["--disable", "goals"]
-                # Said in both directions rather than only when it is off: Codex searches
-                # nothing until it is asked to, so an agent that may search the web has to
-                # say so here for `web_search` to mean on every backend what it says.
-                argv += [
-                    "-c",
-                    f"tools.web_search={'true' if self.config.web_search else 'false'}",
-                ]
-                argv += ["--stdio"]
-                for key, value in getattr(self.config, "overrides", ()):
-                    # The same `-c` Codex's own client takes, scoped to this server: a
-                    # window asked for here is this agent's, and the user's config.toml is
-                    # left exactly as it was.
-                    argv += ["-c", f"{key}={value}"]
-                if offering:
-                    # The flow's own callbacks, as the one thing Codex takes a tool it was
-                    # not shipped with on. Scoped to this server for the reason the overrides
-                    # are: nothing of the user's `config.toml` is written, and no other Codex
-                    # they are running is told about a tool that belongs to this flow.
-                    held = self.toolbox.command()
-                    argv += [
-                        "-c",
-                        f"mcp_servers.humanize.command={json.dumps(held[0])}",
-                        "-c",
-                        f"mcp_servers.humanize.args={json.dumps(held[1:])}",
-                    ]
                 # Read before the environment is built out of it: a fallback landing
                 # between the two reads would name the account this server is *not* signed
                 # into, and a server that believes it is already elsewhere is one nothing ever
                 # starts again.
                 account = self.node().name
-                self._server = _AppServer(self.spawned(argv), self._environ())
+                self._server = _AppServer(
+                    self.spawned(self._server_argv(offering)), self._environ()
+                )
                 self._server_as, self._server_tools = account, offering
                 self._server._held.append(weakref.ref(self))
                 # Held by the finalizer alone, which is what takes the server down: when the
                 # agent is collected, and at exit for one held to the end.
                 weakref.finalize(self, self._server.stop)
             return self._server
+
+    def _server_argv(
+        self,
+        offering: tuple[str, ...],
+        *,
+        goals: bool | object = _LIVE,
+        web_search: bool | object = _LIVE,
+        overrides: Sequence[tuple[str, str]] | object = _LIVE,
+        toolbox: Toolbox | object = _LIVE,
+    ) -> list[str]:
+        """The command that starts an app server for this agent, given what it offers.
+
+        Args:
+          offering: The flow's callbacks this server is to be told about, by name.
+          goals: Whether backend goals are enabled, or the live agent setting when omitted.
+          web_search: Whether web search is enabled, or the live agent setting when omitted.
+          overrides: Codex process overrides, or the live config when omitted.
+          toolbox: The callback bridge to expose, or the live agent toolbox when omitted.
+
+        Returns:
+          The argv, over the same home and MCP bridge the agent's own server uses.
+        """
+        selected_goals = self.goals_enabled if goals is _LIVE else bool(goals)
+        selected_search = (
+            self.config.web_search if web_search is _LIVE else bool(web_search)
+        )
+        selected_overrides: tuple[tuple[str, str], ...] = (
+            tuple(getattr(self.config, "overrides", ()))
+            if overrides is _LIVE
+            else tuple(cast("Sequence[tuple[str, str]]", overrides))
+        )
+        selected_toolbox = self.toolbox if toolbox is _LIVE else toolbox
+        argv = ["codex", "app-server"]
+        if not selected_goals:
+            # Per server rather than in config, so this flow changes no other Codex
+            # session belonging to the user.
+            argv += ["--disable", "goals"]
+        # Said in both directions rather than only when it is off: Codex searches
+        # nothing until it is asked to, so an agent that may search the web has to
+        # say so here for `web_search` to mean on every backend what it says.
+        argv += [
+            "-c",
+            f"tools.web_search={'true' if selected_search else 'false'}",
+        ]
+        argv += ["--stdio"]
+        for key, value in selected_overrides:
+            # The same `-c` Codex's own client takes, scoped to this server: a
+            # window asked for here is this agent's, and the user's config.toml is
+            # left exactly as it was.
+            argv += ["-c", f"{key}={value}"]
+        if offering:
+            # The flow's own callbacks, as the one thing Codex takes a tool it was
+            # not shipped with on. Scoped to this server for the reason the overrides
+            # are: nothing of the user's `config.toml` is written, and no other Codex
+            # they are running is told about a tool that belongs to this flow.
+            assert isinstance(selected_toolbox, Toolbox)  # noqa: S101
+            held = selected_toolbox.command()
+            argv += [
+                "-c",
+                f"mcp_servers.humanize.command={json.dumps(held[0])}",
+                "-c",
+                f"mcp_servers.humanize.args={json.dumps(held[1:])}",
+            ]
+        return argv
+
+    def spawn_server(self) -> _AppServer:
+        """A fresh app server for a forked child, over the same home, machine and bridge.
+
+        The child runs its turns here rather than on the agent's server, so that a child turn
+        may overlap a parent turn: the agent's own server stays serialized over its sessions,
+        and the fork runtime owns this separate one. Held by the child, which stops it alone --
+        never the parent agent's server.
+
+        Returns:
+          The server, already introduced to.
+        """
+        offering = tuple(sorted(one.name for one in self.toolbox.offered()))
+        server = _AppServer(self.spawned(self._server_argv(offering)), self._environ())
+        server._held.append(weakref.ref(self))
+        return server
 
     def stop(self) -> None:
         """Takes no further turn, and takes down the server the turn under way is waiting on."""

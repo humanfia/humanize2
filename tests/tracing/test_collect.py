@@ -351,3 +351,15 @@ def test_keeps_unicode_readable(
     tracing.collect(workspace, output=tmp_path / "trace.json")
 
     assert "接上循环" in (tmp_path / "trace.json").read_text(encoding="utf-8")
+
+
+def test_a_forked_child_is_drawn_under_its_parent(
+    claude_home: pathlib.Path, workspace: pathlib.Path
+) -> None:
+    """A fork is a native branch, not a sub-agent, so the cycle's relation supplies the link."""
+    document = collector.collect(workspace, parents={CLAUDE_SESSION: "parent-xyz"})
+
+    assert any(
+        event["args"].get("parent") == "claude:parent-xyz"
+        for event in banners(document)
+    )

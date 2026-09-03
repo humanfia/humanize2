@@ -331,6 +331,9 @@ class Place(NamedTuple):
       goal: Whether the flow runs this one under the backend's own goal feature, which it
         said by writing `Annotated[Agent, Goal]` where it declared the place. Only four
         backends have one, so a flow built on it is not a flow any agent can drive.
+      forks: Whether the flow branches a conversation of this one, which it said by writing
+        `Annotated[Agent, Forks]` where it declared the place. Only Claude and Codex have a
+        native fork, so a flow built on it is not a flow any agent can drive.
       goals_default: Whether the agent picker initially offers backend goals on or off for
         this place, which a flow may suggest with `AgentDefaults(goals=False)`. Once selected,
         the effective value belongs to the agent's config. A required `Goal` always starts on.
@@ -348,6 +351,7 @@ class Place(NamedTuple):
     where: type[Remote] | Remote | Isolated | None = None
     goal: bool = False
     goals_default: bool = True
+    forks: bool = False
 
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
@@ -1317,6 +1321,7 @@ def _place(name: str, kind: object) -> Place:
     where = _where(kind)
     goal = _goal(kind)
     goals_default = _goals_default(kind)
+    forks = _forks(kind)
     if get_origin(kind) is Annotated:
         kind = get_args(kind)[0]
     return Place(
@@ -1326,6 +1331,7 @@ def _place(name: str, kind: object) -> Place:
         where=where,
         goal=goal,
         goals_default=True if goal else goals_default,
+        forks=forks,
     )
 
 
@@ -1364,6 +1370,23 @@ def _goal(kind: object) -> bool:
     if get_origin(kind) is not Annotated:
         return False
     return any(said is Goal for said in get_args(kind)[1:])
+
+
+def _forks(kind: object) -> bool:
+    """Whether a flow said it branches a conversation of the agent filling a place.
+
+    Args:
+      kind: What the flow annotated the place with.
+
+    Returns:
+      True if it wrote `Forks` beside the type, and False for a place annotated with the type
+      alone -- which is one driven by turns like every other.
+    """
+    from hmz.agents import Forks
+
+    if get_origin(kind) is not Annotated:
+        return False
+    return any(said is Forks for said in get_args(kind)[1:])
 
 
 def _goals_default(kind: object) -> bool:

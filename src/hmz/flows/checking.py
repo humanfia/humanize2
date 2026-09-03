@@ -1429,10 +1429,10 @@ def _valued(value: ast.expr, scope: _Scope) -> frozenset[str] | _Crew | _Answer 
 def _called(value: ast.Call, scope: _Scope) -> frozenset[str] | _Crew | _Answer | None:
     """What calling one thing answers with, where what is called is tracked."""
     func = value.func
-    opened = isinstance(func, ast.Attribute) and func.attr in {"new", "clone"}
+    opened = isinstance(func, ast.Attribute) and func.attr in {"new", "clone", "fork"}
     target = func.value if isinstance(func, ast.Attribute) and opened else func
     held = _valued(target, scope) if opened else None
-    if isinstance(func, ast.Attribute) and func.attr == "new":
+    if isinstance(func, ast.Attribute) and func.attr in {"new", "fork"}:
         if isinstance(held, frozenset) and held:
             return frozenset({"session"})
         return None
@@ -2175,6 +2175,19 @@ def catalogue() -> tuple[Capability, ...]:
             pursuing,
             "a place run under that feature declares it -- Annotated[Agent, Goal] -- "
             "and is refused an agent whose backend has none before the first turn",
+        )
+    )
+    forking = frozenset(
+        name for name, one in sessions.items() if getattr(one, "forks", False)
+    )
+    held.append(
+        Capability(
+            "forks",
+            forking,
+            "branch a conversation in place, preserving its prefix -- "
+            "child = session.fork() answers a session already named by the backend, and "
+            "the parent is left open and unchanged -- which a backend not among these "
+            "refuses; a flow that forks declares the place, Annotated[Agent, Forks]",
         )
     )
     return tuple(held)

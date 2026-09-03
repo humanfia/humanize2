@@ -66,6 +66,7 @@ def collect(
     start: str | None = None,
     end: str | None = None,
     profile: str | os.PathLike[str] | Iterable[Process] | None = None,
+    parents: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Aggregates agent trajectories into a Chrome trace.
 
@@ -103,6 +104,11 @@ def collect(
             the trace with a track per thread, beside the agents' own: a turn
             is mostly other programs, and one timeline is what makes that
             visible.
+        parents: What each session branched from, child id to parent id, which
+            is what a run's `forked` events record. A forked child is drawn as
+            the child of the conversation it came from, where nothing in its
+            own log says it did -- a fork is a native history operation, not a
+            sub-agent.
 
     Returns:
         The Chrome trace document, also written to output when one is given.
@@ -154,6 +160,12 @@ def collect(
         if reader is not None and home.is_dir():
             collected += reader(home, root, names, window)
 
+    if parents:
+        for item in collected:
+            parent = parents.get(item.ident)
+            if parent is not None:
+                # A fork stays on one backend, so the parent's key carries the child's.
+                item.parent = f"{item.backend}:{parent}"
     named = {ident: name for name, opened in (agents or {}).items() for ident in opened}
     known = {item.key: item for item in collected}
     for item in collected:

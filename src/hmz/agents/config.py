@@ -16,6 +16,7 @@ __all__ = [
     "SERVICE_TIERS",
     "AgentConfig",
     "AgentDefaults",
+    "Forks",
     "Goal",
     "Isolated",
     "Remote",
@@ -60,6 +61,22 @@ class Goal:
 
     and an agent whose backend has no goal feature is refused before the first turn rather
     than raising in the middle of one, which is where a loop would otherwise find out.
+    """
+
+
+class Forks:
+    """What a flow writes beside an agent it will branch a conversation of.
+
+    `Session.fork` branches an already-open conversation into an independent one, preserving
+    the parent's prefix for the backend's own cache. Only Claude and Codex have a native
+    history operation for it, so a flow built on it is not a flow any agent can drive. It says
+    which of its agents has to have one, by writing this where it declares them::
+
+        class Agents(NamedTuple):
+            worker: Annotated[AgentBase, Forks]
+
+    and an agent whose backend has no native fork is refused before the first turn rather than
+    raising in the middle of one, which is where a loop would otherwise find out.
     """
 
 

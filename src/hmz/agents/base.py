@@ -21,7 +21,18 @@ import weakref
 from abc import ABC, abstractmethod
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
-from typing import IO, TYPE_CHECKING, Any, ClassVar, Literal, Protocol, Self, overload
+from dataclasses import dataclass
+from typing import (
+    IO,
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+    Protocol,
+    Self,
+    cast,
+    overload,
+)
 
 from .codenames import codename
 from .event import Event, Failed, Question, Stopped, Unrecoverable, Usage, say
@@ -43,6 +54,9 @@ if TYPE_CHECKING:
     from .config import AgentConfig
 
 
+_LIVE = object()
+
+
 class Journal(Protocol):
     """Where an agent writes down a session it opened, which is the run it is part of.
 
@@ -54,6 +68,83 @@ class Journal(Protocol):
     def opened(self, agent: AgentBase, session: str) -> None:
         """Writes down a session one of the agents has just opened."""
         ...
+
+    def forked(
+        self,
+        agent: AgentBase,
+        parent: str,
+        child: str,
+        last_turn_id: str | None = None,
+        *,
+        provider: str | None = None,
+        permission: str | None = None,
+        cache_equivalent: bool = True,
+    ) -> None:
+        """Writes down that one session branched into another, at a completed boundary."""
+        ...
+
+    def fork_lost(
+        self,
+        agent: AgentBase,
+        parent: str,
+        last_turn_id: str | None = None,
+        *,
+        provider: str | None = None,
+    ) -> None:
+        """Writes down a fork whose child id was lost with the response that made it.
+
+        A native fork that fails after the backend may already have created the child is not
+        retried -- a retry would create another branch -- so the orphan is written down for a
+        person to reconcile rather than left to multiply in silence.
+        """
+        ...
+
+    def fork_usage(self, agent: AgentBase, session: str, usage: Usage) -> None:
+        """Writes numeric usage for one completed fork child turn."""
+        ...
+
+    def fork_failed(self, agent: AgentBase, session: str, error: str) -> None:
+        """Writes a bounded diagnostic for a fork child turn that failed."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ForkContext:
+    """The effective configuration a forked child was branched under, frozen at the boundary.
+
+    A fork preserves the provider-visible prefix of the parent conversation, so the child's
+    first turn must run under the same backend, model, account, permission, service tier,
+    effort, skills and tools the parent had when it was forked -- not whatever the parent has
+    since been reconfigured to. These are that, snapshotted where the fork was made. A later
+    `permission` override is the one field a flow may move; it is recorded separately, on the
+    child, and marks the fork as not cache-equivalent.
+
+    Attributes:
+      model: The model the parent's turns ran at.
+      effort: How hard those turns thought, in the backend's own wording.
+      permission: The rung the parent ran at, one of :data:`PERMISSIONS`.
+      service_tier: The common provider tier the parent asked for.
+      provider: The account those turns ran as, or "" for this machine's own.
+      provider_ref: The immutable provider snapshot used to start child processes.
+      goals: Whether the parent's backend goal feature was switched on.
+      web_search: Whether the parent was allowed to search the web.
+      skills: The flow's skills the parent carried, by name.
+      tools: The flow's callbacks the parent offered, by name.
+    """
+
+    model: str
+    effort: str
+    permission: str
+    service_tier: str
+    provider: str
+    provider_ref: Provider
+    anchor: AnchorConfig | None
+    goals: bool
+    web_search: bool
+    skills: tuple[str, ...]
+    tools: tuple[str, ...]
+    cache_equivalent: bool = True
+    permission_override: bool = False
 
 
 def _tee(
@@ -379,6 +470,13 @@ class SessionBase(ABC):
     #: offering it -- a tool the model never sees is a flow that does not do what it says.
     takes_tools: ClassVar[bool] = False
 
+    #: Whether this backend has a native history operation that branches a conversation in
+    #: place, which is what :meth:`fork` reaches for. Only Claude and Codex do; every other
+    #: backend keeps its current session behaviour and refuses a fork before a child is made.
+    #: A fact of the backend, said the same way `shapes` and `takes_tools` are -- a stand-in
+    #: written for a test says it too, `forks: ClassVar[bool] = True`.
+    forks: ClassVar[bool] = False
+
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
     ) -> None:
@@ -401,6 +499,10 @@ class SessionBase(ABC):
         #: far as writing the tests wants the skill about writing them and no longer wants
         #: the eight about reading the codebase, and it is the same conversation either way.
         self._skills: tuple[str, ...] | None = None
+        #: A forked child's loaded skill objects, frozen at the branch boundary. The agent's
+        #: flow may load a different set later, but this conversation must keep the exact
+        #: objects it branched with so that a changed skill file cannot alter its prefix.
+        self._fork_loaded: tuple[Loaded, ...] | None = None
         #: The flow's own callbacks this conversation is putting in front of the agent, which
         #: it may say again between any two turns. Held here as well as in the agent's
         #: toolbox so that a session can say what it is offering without asking the agent
@@ -421,6 +523,27 @@ class SessionBase(ABC):
         #: What this conversation is to think at from its next turn on, where it has been
         #: told something other than what its agent runs at, and None where it has not.
         self._effort: str | None = None
+        #: The frozen configuration a forked child was branched under, or None for a session
+        #: nobody forked. A forked child reads its model, effort, permission and the rest off
+        #: this rather than off its agent, so that reconfiguring or moving the parent later
+        #: does not change the child.
+        self._fork_context: ForkContext | None = None
+        #: A forked child gets its own callback bridge. The agent toolbox is intentionally shared
+        #: by ordinary sessions, but using it here would expose a parent's later tools to the
+        #: child (including the research callback that is waiting on it).
+        self._fork_toolbox: Toolbox | None = None
+        #: The parent's full agent config at the boundary, frozen by the config dataclass's own
+        #: immutability: `reconfigure` replaces rather than mutates it, so holding this is a
+        #: snapshot. Backend-specific fields a forked child's command builder reads -- Claude's
+        #: `allowed_tools`, Codex's `overrides` -- come off this, not the agent's live config.
+        self._frozen_config: AgentConfig | None = None
+        #: The backend's id for the last completed turn of this conversation, or None before
+        #: one has finished and for a backend whose native fork has no intermediate boundary.
+        self._last_turn: str | None = None
+        #: Every completed backend turn in order. Codex can fork through an earlier boundary;
+        #: keeping the ids here lets the public method reject an in-flight or unknown id before
+        #: it reaches the native driver.
+        self._completed_turns: tuple[str, ...] = ()
         #: What this conversation has cost and how fast, written as the backend says what
         #: each request came to rather than once the turn is over: a turn is minutes long,
         #: and a rate that stood still for all of them would be a rate of nothing.
@@ -481,7 +604,9 @@ class SessionBase(ABC):
         flow's to say, and a name nothing answers to is a name to correct rather than a skill
         to invent.
         """
-        brought = self._agent.loaded
+        brought = (
+            self._fork_loaded if self._fork_loaded is not None else self._agent.loaded
+        )
         if self._skills is None:
             return tuple(one.name for one in brought)
         wanted = set(self._skills)
@@ -541,7 +666,7 @@ class SessionBase(ABC):
                 f"{self._agent.backend} has no way of being given a tool of a flow's own"
             )
         self._tools = () if tools is None else tuple(tools)
-        box = self._agent.toolbox
+        box = self._fork_toolbox or self._agent.toolbox
         if self._tools and self._unoffering is None:
             # Registered the first time anything is said and not before: the toolbox is keyed
             # by a number this session answers to for as long as it is alive, so what takes
@@ -552,6 +677,24 @@ class SessionBase(ABC):
             # its number can be handed to another one.
             self._unoffering = weakref.finalize(self, box.offers, id(self), ())
         box.offers(id(self), self._tools)
+        self._tools_changed()
+        if not self._tools and self._fork_toolbox is not None:
+            # A native fork may have started its private bridge while inheriting the parent's
+            # tools. Close that socket as soon as a helper narrows the child to no callbacks;
+            # Toolbox can lazily reopen it if the child is explicitly offered tools later.
+            box.close()
+
+    def _toolbox(self) -> Toolbox:
+        """The callback bridge this session's backend must be given.
+
+        Ordinary sessions share their agent's bridge because some backends run one server for
+        every conversation. A forked session owns a private bridge, which is what keeps the
+        parent's later tools (especially a callback waiting on the child) out of its context.
+        """
+        return self._fork_toolbox or self._agent.toolbox
+
+    def _tools_changed(self) -> None:  # noqa: B027 -- empty hook for backend runtimes
+        """Lets a backend restart a child runtime whose tool configuration is immutable."""
 
     @property
     def id(self) -> str:
@@ -576,6 +719,18 @@ class SessionBase(ABC):
           The backend's id, or None before the backend has said one.
         """
         return self._id
+
+    @property
+    def last_turn_id(self) -> str | None:
+        """The backend's id for the latest completed turn, where it exposes one.
+
+        What a fork names its boundary by: forking through the latest completed turn means
+        naming this, and a backend that also takes an earlier one lets a flow name that
+        instead. None for a backend whose native fork has no intermediate boundary -- Claude
+        forks the whole conversation -- and before any turn has completed. A forked child
+        starts empty here, so that a child forked again names the child's own turns.
+        """
+        return self._last_turn
 
     def spent(self) -> Usage:
         """What this conversation has cost so far, by the kind of token it went on.
@@ -645,6 +800,8 @@ class SessionBase(ABC):
         through an answer, and a flow that changed it mid-turn would be describing a turn that
         never happened.
         """
+        if self._fork_context is not None:
+            return self._fork_context.effort
         return self._effort or self._agent.effort
 
     @effort.setter
@@ -709,7 +866,7 @@ class SessionBase(ABC):
             # takes is that long on the next round too.
             raise
         except subprocess.CalledProcessError:
-            if not suppress:
+            if self._fork_context is not None or not suppress:
                 raise
             return None if schema is not None else ""
         if schema is None:
@@ -717,7 +874,7 @@ class SessionBase(ABC):
         try:
             return _shaped(said, schema)
         except ValueError:
-            if not suppress:
+            if self._fork_context is not None or not suppress:
                 raise
             return None
 
@@ -835,7 +992,11 @@ class SessionBase(ABC):
         # Anything said while nobody was working goes into this turn. A flow's own prompt is
         # the only way into a turn that has not started, so it is asked for here rather than
         # written to the session: a session between turns would answer it on its own.
-        held = self._agent.waiting() if self._agent.waiting is not None else []
+        held = (
+            self._agent.waiting()
+            if self._fork_context is None and self._agent.waiting is not None
+            else []
+        )
         if held:
             prompt = "\n\n".join([prompt, *held])
         # Before the moments rather than only on the first turn: a session closed and then
@@ -867,33 +1028,46 @@ class SessionBase(ABC):
                 # for. On the prompt as it is sent rather than on the one the hooks and the
                 # transcript see, which is the flow's own words: a schema in the transcript
                 # is the plumbing showing through.
-                for event in self._falling_back(prompt, schema=schema):
-                    if event.kind == "result":
-                        # Held back: a hook may yet send the agent on, and a turn that was
-                        # sent on has not answered.
-                        answered = event
-                        continue
-                    self._heard(event)
-                    if event.kind == "tool":
-                        named, _, about = event.text.partition(" ")
-                        self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
-                    elif event.kind in ("subagent", "subagent-ends"):
-                        # An agent this one started of its own, bracketed the way a turn is:
-                        # a fleet under a turn is something a flow may want a word about, and
-                        # the id is what makes the one that started and the one that ended
-                        # one agent rather than two lines.
-                        named, _, about = event.text.partition(" ")
-                        self._fire(
-                            Moment.SUBAGENT_START
-                            if event.kind == "subagent"
-                            else Moment.SUBAGENT_STOP,
-                            tool=named,
-                            about=about,
-                            under=event.whose,
-                        )
-                    yield event
+                try:
+                    for event in self._falling_back(prompt, schema=schema):
+                        if event.kind == "result":
+                            # Held back: a hook may yet send the agent on, and a turn that was
+                            # sent on has not answered.
+                            answered = event
+                            continue
+                        self._heard(event)
+                        if event.kind == "tool":
+                            named, _, about = event.text.partition(" ")
+                            self._fire(Moment.PRE_TOOL_USE, tool=named, about=about)
+                        elif event.kind in ("subagent", "subagent-ends"):
+                            # An agent this one started of its own, bracketed the way a turn is:
+                            # a fleet under a turn is something a flow may want a word about,
+                            # and the id is what makes the one that started and the one that
+                            # ended one agent rather than two lines.
+                            named, _, about = event.text.partition(" ")
+                            self._fire(
+                                Moment.SUBAGENT_START
+                                if event.kind == "subagent"
+                                else Moment.SUBAGENT_STOP,
+                                tool=named,
+                                about=about,
+                                under=event.whose,
+                            )
+                        yield event
+                except BaseException as failed:
+                    if self._fork_context is not None and self._agent.cycle is not None:
+                        with contextlib.suppress(Exception):
+                            self._agent.cycle.fork_failed(
+                                self._agent, self._id or "", type(failed).__name__
+                            )
+                    raise
                 # Heard whether or not it is passed on, because what a turn cost is on it.
                 self._heard(answered)
+                if self._fork_context is not None and self._agent.cycle is not None:
+                    with contextlib.suppress(Exception):
+                        self._agent.cycle.fork_usage(
+                            self._agent, self._id or "", answered.spent
+                        )
                 stopping = self._fire(
                     Moment.STOP, said=answered.text, prompt=prompt, again=again
                 )
@@ -942,6 +1116,13 @@ class SessionBase(ABC):
               that failed for a reason no other try could come out differently on is a turn
               that has failed, and trying it again is a loop rather than a recovery.
         """
+        if self._fork_context is not None:
+            # A native fork is a single backend/account lineage. Moving it through the normal
+            # fallback chain would destroy the provider-visible prefix and make its child id
+            # meaningless, so failures are surfaced directly from the fork runtime.
+            yield from self._stream(self._shaped_ask(prompt, schema), schema=schema)
+            return
+
         from hmz import fallbacks, providers
 
         # How this place is tried again, read once for the whole walk: it is a file, and a
@@ -1282,6 +1463,214 @@ class SessionBase(ABC):
                     del self._steered[ticket]
                     return
 
+    def fork(
+        self, *, last_turn_id: str | None = None, permission: str | None = None
+    ) -> SessionBase:
+        """Branches this conversation into an independent one, preserving its prefix.
+
+        The fork is eager and prompt-free: the native operation runs before this returns, the
+        returned child already has its backend id, and the parent is left exactly as it was --
+        open, idle, its transcript and pending turn and future prompts untouched -- so it may
+        be driven on at once while the child runs on its own. Only an open, idle, unmoved
+        session may be forked, and only Claude and Codex have a native operation for it.
+
+        Args:
+          last_turn_id: The completed turn to fork through, inclusive. None forks through the
+            latest completed turn; Codex also accepts an earlier completed turn, and Claude
+            raises NotImplementedError for a non-None boundary.
+          permission: The rung the child runs at, or None to inherit the parent's. The one v1
+            override; an explicit value is passed through the native operation and marks the
+            fork as not cache-equivalent where it differs from the parent.
+
+        Returns:
+          The child session, already named by the backend.
+
+        Raises:
+          NotImplementedError: If this backend has no native fork.
+          RuntimeError: If the parent is unopened, running a turn, closed, or moved to
+            another backend.
+          ValueError: If `permission` is not one of the common rungs.
+        """
+        from .config import PERMISSIONS
+
+        if not type(self).forks:
+            raise NotImplementedError(f"{type(self).__name__} has no native fork")
+        if self._working:
+            raise RuntimeError("cannot fork while a turn is running")
+        # Do not wait behind a turn: a callback running inside that turn could otherwise block
+        # here while the backend waits for the callback to return. A second check under the
+        # session lock closes the race with a turn starting immediately after the first check.
+        if not self._lock.acquire(blocking=False):
+            raise RuntimeError("cannot fork while a turn is running")
+        try:
+            if self._working:
+                raise RuntimeError("cannot fork while a turn is running")
+            if self._id is None:
+                raise RuntimeError("session has not run a turn yet")
+            if self._ended:
+                raise RuntimeError("cannot fork a closed session")
+            if self._moved_to is not None:
+                raise RuntimeError(
+                    "cannot fork a session that moved to another backend"
+                )
+            if permission is not None and permission not in PERMISSIONS:
+                raise ValueError(
+                    f"permission must be one of {', '.join(PERMISSIONS)}, "
+                    f"not {permission!r}"
+                )
+            self._validate_fork_boundary(last_turn_id)
+            ready = getattr(type(self), "native_ready", None)
+            if callable(ready) and not ready():
+                raise NotImplementedError(
+                    f"{type(self).__name__} native fork is unavailable in this CLI"
+                )
+            child = type(self)(self._agent, self._cwd)
+            child._fork_from(self, last_turn_id=last_turn_id, permission=permission)
+            return child
+        finally:
+            self._lock.release()
+
+    def _validate_fork_boundary(self, last_turn_id: str | None) -> None:
+        """Rejects a boundary that is not one of this session's completed turns."""
+        if last_turn_id is not None and last_turn_id not in self._completed_turns:
+            raise RuntimeError(
+                f"last_turn_id {last_turn_id!r} is not a completed turn of this session"
+            )
+
+    def _fork_from(
+        self, parent: SessionBase, *, last_turn_id: str | None, permission: str | None
+    ) -> None:
+        """Snapshots the parent, performs the native fork, and names this child.
+
+        Args:
+          parent: The conversation being branched, which this child is made from.
+          last_turn_id: The boundary, as for :meth:`fork`.
+          permission: The override, as for :meth:`fork`.
+        """
+        source = parent._fork_context
+        source_config = parent._frozen_config or parent._agent.config
+        effective = (
+            permission
+            if permission is not None
+            else (source.permission if source is not None else source_config.permission)
+        )
+        # `fork` refuses an unopened parent before this is reached, so the parent has an id.
+        assert parent._id is not None  # noqa: S101
+        from dataclasses import replace
+
+        provider = source.provider_ref if source is not None else parent._agent.node()
+        provider = replace(
+            provider,
+            env=dict(provider.env),
+            args=tuple(provider.args),
+        )
+        self._fork_toolbox = Toolbox()
+        weakref.finalize(self, self._fork_toolbox.close)
+        self._fork_loaded = tuple(parent._carrying())
+        offered = tuple(parent._toolbox().offered())
+        self._frozen_config = source_config
+        self._fork_context = ForkContext(
+            model=source.model if source is not None else source_config.model,
+            effort=source.effort if source is not None else parent.effort,
+            permission=effective,
+            service_tier=(
+                source.service_tier
+                if source is not None
+                else source_config.service_tier
+            ),
+            provider=provider.name,
+            provider_ref=provider,
+            anchor=source.anchor if source is not None else parent._agent.anchor,
+            goals=(source.goals if source is not None else parent._agent.goals_enabled),
+            web_search=(
+                source.web_search if source is not None else source_config.web_search
+            ),
+            skills=parent.skills,
+            tools=tuple(one.name for one in offered),
+            cache_equivalent=(source.cache_equivalent if source is not None else True)
+            and (
+                permission is None
+                or effective
+                == (
+                    source.permission
+                    if source is not None
+                    else source_config.permission
+                )
+            ),
+            permission_override=permission is not None,
+        )
+        # The child carries the parent's skills and callbacks, frozen: its own answer, so that
+        # a later `loads` or `offers` on the parent does not move it.
+        self._skills = tuple(self._fork_context.skills)
+        self._tools = offered
+        if self._tools:
+            self.offers(self._tools)
+        try:
+            child_id = self._fork(parent_id=parent._id, last_turn_id=last_turn_id)
+        except BaseException:
+            # The child has not been exposed, so release its private bridge if native fork
+            # creation failed. A backend that already created an orphan records that separately.
+            self._shut()
+            self._fork_toolbox.close()
+            self._fork_toolbox = None
+            raise
+        self._adopt_fork(child_id, parent._id, last_turn_id)
+
+    def _fork(self, *, parent_id: str, last_turn_id: str | None) -> str:
+        """The backend's native fork, already bound to a snapshot, returning the child id.
+
+        The effective rung is already on :attr:`_fork_context`, so the backend reads it there
+        rather than being handed it again.
+
+        Args:
+          parent_id: The parent's backend id, which the native operation branches from.
+          last_turn_id: The boundary, or None for the latest completed turn.
+
+        Returns:
+          The child's backend id.
+
+        Raises:
+          NotImplementedError: For a boundary this backend cannot express -- Claude has no
+            intermediate boundary -- and for a backend with no native fork.
+          subprocess.CalledProcessError: If the native operation fails.
+        """
+        raise NotImplementedError(f"{type(self).__name__} has no native fork")
+
+    def _adopt_fork(
+        self, child_id: str, parent_id: str, last_turn_id: str | None
+    ) -> None:
+        """Takes the child's backend id, and writes the fork down as a fork rather than an open.
+
+        A forked child is a session the agent has opened, so it is in the agent's list; but the
+        run writes it as a branch of the parent rather than as a session that started from
+        nothing, so that a trace can draw the two as one lineage.
+
+        Args:
+          child_id: The id the native fork gave this child.
+          parent_id: The parent's id, which the run links this child back to.
+          last_turn_id: The boundary, for the record.
+        """
+        self._id = child_id
+        self._agent._opens(child_id)
+        if self._agent.cycle is not None:
+            self._agent.cycle.forked(
+                self._agent,
+                parent_id,
+                child_id,
+                last_turn_id,
+                provider=(
+                    self._fork_context.provider
+                    if self._fork_context is not None
+                    else None
+                ),
+                permission=(
+                    self._fork_context.permission if self._fork_context else None
+                ),
+                cache_equivalent=(
+                    self._fork_context.cache_equivalent if self._fork_context else True
+                ),
+            )
+
     def close(self) -> None:
         """Ends the conversation, so that a turn under way stops waiting.
 
@@ -1307,7 +1696,7 @@ class SessionBase(ABC):
             # another thread while this one may be offering: a list landing between the two
             # lines above would otherwise be an entry with nothing left to take it back.
             # Offering after this has returned is offering afresh, which registers its own.
-            self._agent.toolbox.offers(id(self), ())
+            (self._fork_toolbox or self._agent.toolbox).offers(id(self), ())
         if self._moved_to is not None:
             # And the conversation this one moved to, which is this conversation carried on
             # somewhere else: it ends when this one does.
@@ -1319,6 +1708,9 @@ class SessionBase(ABC):
             # files would have them taken away underneath it. The turn itself lets go of them
             # as it ends, which is the first moment nothing is using them.
             self._unmounted()
+        if self._fork_toolbox is not None:
+            self._fork_toolbox.close()
+            self._fork_toolbox = None
 
     def _unmounted(self) -> None:
         """Takes away what this session mounted, once and whenever the last holder is done.
@@ -1351,7 +1743,12 @@ class SessionBase(ABC):
           Whether to let go of it before this turn. False for a session holding nothing yet,
           and for one whose agent has not moved.
         """
-        return self._as is not None and self._as != self._agent.node().name
+        account = (
+            self._fork_context.provider_ref.name
+            if self._fork_context is not None
+            else self._agent.node().name
+        )
+        return self._as is not None and self._as != account
 
     @property
     def cwd(self) -> str:
@@ -1360,7 +1757,11 @@ class SessionBase(ABC):
         Which is the path on the machine the work lands on: the one the session was opened
         with, or the workspace the flow is running in where it was opened with none.
         """
-        anchor = self._agent.anchor
+        anchor = (
+            self._fork_context.anchor
+            if self._fork_context is not None
+            else self._agent.anchor
+        )
         if self._cwd is not None:
             return os.path.abspath(self._cwd)  # noqa: PTH100
         if anchor is not None:
@@ -1383,7 +1784,11 @@ class SessionBase(ABC):
             agent whose turns land elsewhere -- at one outside the workspace the anchor names.
             Said before the first turn rather than as a backend failing to start in it.
         """
-        anchor = self._agent.anchor
+        anchor = (
+            self._fork_context.anchor
+            if self._fork_context is not None
+            else self._agent.anchor
+        )
         if anchor is None:
             where = self.cwd
             if not os.path.isdir(where):  # noqa: PTH112
@@ -1456,7 +1861,9 @@ class SessionBase(ABC):
         Returns:
           The flow's own, in the flow's order, less any this session was told not to carry.
         """
-        brought = self._agent.loaded
+        brought = (
+            self._fork_loaded if self._fork_loaded is not None else self._agent.loaded
+        )
         if self._skills is None:
             return tuple(brought)
         wanted = set(self._skills)
@@ -1474,7 +1881,21 @@ class SessionBase(ABC):
         Returns:
           The variables to add, which are set for the turn and for nothing else.
         """
+        if self._fork_context is not None:
+            return self._fork_context.provider_ref.env
         return self._agent.environment()
+
+    def _hushed(self) -> frozenset[str]:
+        """The credential variables to remove for this session's provider snapshot."""
+        if self._fork_context is None:
+            return self._agent.hushed()
+        from hmz.backends import named
+
+        profile = named(self._agent.backend)
+        if profile is None:
+            return frozenset()
+        provider = self._fork_context.provider_ref
+        return profile.accounts() - set(provider.env)
 
     def _environ(self) -> dict[str, str] | None:
         """The whole environment this session's processes are started with.
@@ -1483,12 +1904,24 @@ class SessionBase(ABC):
           This process's own, less what a provider hushes and plus what this session and that
           provider set, or None where there is nothing to change.
         """
-        added, hushed = self._environment(), self._agent.hushed()
+        added, hushed = self._environment(), self._hushed()
         if not added and not hushed:
             return None
         return {
             name: value for name, value in os.environ.items() if name not in hushed
         } | dict(added)
+
+    def _spawned(self, argv: list[str]) -> list[str]:
+        """Spawns a command using this session's frozen backend context when forked."""
+        if self._fork_context is None:
+            return self._agent.spawned(argv, self.cwd)
+        return self._agent.spawned(
+            argv,
+            self.cwd,
+            provider=self._fork_context.provider_ref,
+            anchor=self._fork_context.anchor,
+            toolbox=self._toolbox(),
+        )
 
     def _adopt(self, session_id: str) -> None:
         """Takes the name the backend gave this session, the first time a turn lands in it.
@@ -1532,14 +1965,19 @@ class SessionBase(ABC):
             set: a flow that disabled them retains control of every continuation.
           subprocess.CalledProcessError: If the turn fails and `suppress` is not set.
         """
-        if not self._agent.goals_enabled:
+        goals = (
+            self._fork_context.goals
+            if self._fork_context is not None
+            else self._agent.goals_enabled
+        )
+        if not goals:
             raise RuntimeError(f"{self._agent.id}: goals are disabled")
         try:
             return self._pursue(objective)
         except Unrecoverable:
             raise  # not covered by `suppress`, for the reason it is not in a turn
         except subprocess.CalledProcessError:
-            if not suppress:
+            if self._fork_context is not None or not suppress:
                 raise
             return ""
 
@@ -1632,7 +2070,7 @@ class CommandSessionBase(SessionBase):
             # signal handling with it, which a flow pumping turns from threads of its own has
             # no way to lend it. Whether there is one to spawn -- an anchor, a provider's own
             # paths, both -- is the agent's to say.
-            argv = self._agent.spawned(argv, self.cwd)
+            argv = self._spawned(argv)
             out: list[str] = []
             err: list[str] = []
             said: queue.Queue[Event | None] = queue.Queue()
@@ -1653,7 +2091,16 @@ class CommandSessionBase(SessionBase):
                 env=self._environ(),
                 # The directory the session was opened at, which is this one unless it was
                 # opened at another; an anchored turn is put there by the anchor instead.
-                cwd=None if self._agent.anchor is not None else where,
+                cwd=(
+                    None
+                    if (
+                        self._fork_context.anchor
+                        if self._fork_context is not None
+                        else self._agent.anchor
+                    )
+                    is not None
+                    else where
+                ),
             ) as proc:
                 assert proc.stdout is not None  # noqa: S101
                 assert proc.stderr is not None  # noqa: S101
@@ -1871,7 +2318,11 @@ class StreamSessionBase(SessionBase):
                 complained = "".join(self._complaints)
                 self._shut()
                 raise Failed(status or 1, argv, said, complained)
-            if self._agent.anchor is not None:
+            if (
+                self._fork_context.anchor
+                if self._fork_context is not None
+                else self._agent.anchor
+            ) is not None:
                 # An anchored turn has to be over when it says it is: coganchor pushes what the
                 # agent wrote when the session ends, so a process held open past the turn would
                 # leave that turn's work still on this machine. The cost is that an anchored
@@ -1997,8 +2448,12 @@ class StreamSessionBase(SessionBase):
         # somewhere else is one that never starts again -- the wrong credentials for good.
         # Read early, the same fallback makes it start again once for nothing, which is a
         # turn's cost rather than a run's.
-        account = self._agent.node().name
-        argv = self._agent.spawned(argv, self.cwd)
+        account = (
+            self._fork_context.provider_ref.name
+            if self._fork_context is not None
+            else self._agent.node().name
+        )
+        argv = self._spawned(argv)
         started = subprocess.Popen(
             argv,
             stdin=subprocess.PIPE,
@@ -2012,7 +2467,16 @@ class StreamSessionBase(SessionBase):
             env=self._environ(),
             # And in the directory the session was opened at, as for one of those: a backend
             # held open across its turns is held open where its conversation is rooted.
-            cwd=None if self._agent.anchor is not None else where,
+            cwd=(
+                None
+                if (
+                    self._fork_context.anchor
+                    if self._fork_context is not None
+                    else self._agent.anchor
+                )
+                is not None
+                else where
+            ),
         )
         assert started.stderr is not None  # noqa: S101
         # Which account it was started as, so that an agent that falls back is an agent whose
@@ -2858,7 +3322,15 @@ class AgentBase(ABC):
             name: value for name, value in os.environ.items() if name not in hushed
         } | dict(added)
 
-    def spawned(self, argv: list[str], cwd: str = "") -> list[str]:
+    def spawned(
+        self,
+        argv: list[str],
+        cwd: str = "",
+        *,
+        provider: Provider | object | None = _LIVE,
+        anchor: AnchorConfig | object | None = _LIVE,
+        toolbox: Toolbox | object | None = _LIVE,
+    ) -> list[str]:
         """One turn of this agent, as the command to actually spawn.
 
         Every backend renders its own call and then comes here, so that what a turn is wrapped
@@ -2875,6 +3347,9 @@ class AgentBase(ABC):
             or "" for the workspace itself. An anchored turn is told there rather than put
             there: the agent is started in this machine's mirror of that directory, which is
             the anchor's to work out.
+          provider: The provider snapshot to use, or the live agent provider when omitted.
+          anchor: The machine snapshot to use, or the live agent anchor when omitted.
+          toolbox: The callback bridge to expose, or the live agent toolbox when omitted.
 
         Returns:
           The command to spawn, which is `argv` itself for an agent that is neither anchored
@@ -2890,22 +3365,33 @@ class AgentBase(ABC):
         # still fails saying what could not be found.
         if (found := elsewhere(argv[0])) is not None:
             argv = [found, *argv[1:]]
-        provider = self.provider
-        if provider is not None and provider.args:
-            argv = [*argv, *provider.args]
-        swaps = provider.swaps() if provider is not None else ()
+        selected_provider = (
+            self.provider if provider is _LIVE else cast("Provider | None", provider)
+        )
+        if selected_provider is not None and selected_provider.args:
+            argv = [*argv, *selected_provider.args]
+        swaps = selected_provider.swaps() if selected_provider is not None else ()
         # What the provider hands the agent as variables is the agent's own, and the target
         # is not to be given it: everything the agent exports is inherited by every command
         # it runs there, and a key crossing to another machine is a key on that machine.
-        private = tuple(provider.env) if provider is not None else ()
-        anchor = self.anchor
-        if anchor is not None:
-            return self._reaching(anchor).command(
+        private = tuple(selected_provider.env) if selected_provider is not None else ()
+        selected_anchor = (
+            self.anchor if anchor is _LIVE else cast("AnchorConfig | None", anchor)
+        )
+        selected_toolbox = (
+            self._toolbox if toolbox is _LIVE else cast("Toolbox | None", toolbox)
+        )
+        if selected_anchor is not None:
+            return self._reaching(selected_anchor, toolbox=selected_toolbox).command(
                 argv, swaps=swaps, private=private, chdir=cwd
             )
-        return provider.command(argv) if provider is not None else argv
+        return (
+            selected_provider.command(argv) if selected_provider is not None else argv
+        )
 
-    def _reaching(self, anchor: AnchorConfig) -> AnchorConfig:
+    def _reaching(
+        self, anchor: AnchorConfig, *, toolbox: Toolbox | object | None = _LIVE
+    ) -> AnchorConfig:
         """The anchor, plus whatever a turn under it has to be able to reach on this machine.
 
         Which is the bridge to the flow's own callbacks, for an agent that is offering any:
@@ -2915,6 +3401,8 @@ class AgentBase(ABC):
 
         Args:
           anchor: Where this agent's turns land.
+          toolbox: The callback bridge whose command must run on this machine, or None when no
+            callbacks are offered.
 
         Returns:
           It, or a copy naming the bridge as a program that runs here. The socket itself needs
@@ -2923,9 +3411,12 @@ class AgentBase(ABC):
         """
         from dataclasses import replace
 
-        if self._toolbox.empty():
+        selected_toolbox = (
+            self._toolbox if toolbox is _LIVE else cast("Toolbox | None", toolbox)
+        )
+        if selected_toolbox is None or selected_toolbox.empty():
             return anchor
-        held = self._toolbox.command()[0]
+        held = selected_toolbox.command()[0]
         if held in anchor.local_execs:
             return anchor
         return replace(anchor, local_execs=(*anchor.local_execs, held))
