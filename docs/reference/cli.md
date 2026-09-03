@@ -75,6 +75,16 @@ hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] [--containe
 | `-a`, `--agent <spec>` | **Repeated once for each agent the flow drives**, in the order it takes them — so none at all for a flow whose only side is you, since nobody chooses what the person runs. |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
 
+The task is on this process's command line, and once it has been read the process is renamed:
+`ps` shows `hmz exec`, not the task. `pkill -f` matches a pattern against the command line of
+every process you own, and a task that names a test file is a process whose command line names
+that test file — so an agent tidying up with `pkill -f "pytest tests/x.py"` used to reach the
+process holding its own run. The rename covers `hmz` started as itself: an installed `hmz`, or
+`.venv/bin/hmz`. Started through a wrapper that stays as the parent — `uv run hmz`, `uvx hmz` —
+the wrapper's own command line still carries the task and passes a signal on, so keep the task
+short there and point it at a file. The kill reaches the agent's own processes still; a run whose
+agents are in a [container](/guide/containers) is out of their reach altogether.
+
 ### Writing an agent
 
 ```

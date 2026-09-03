@@ -145,6 +145,10 @@ ALLOWED: dict[str, set[str]] = {
     # the half of humanize which is a process and a socket can be read without any of the
     # half that drives coding agents.
     "hmz.daemon": set(),
+    # What this process is called to every other process. A leaf: it names nothing, and
+    # only `hmz exec` names it -- the one line that carries a task, which is what the
+    # rename keeps off the command line.
+    "hmz.proctitle": set(),
     "hmz.tui": {
         "hmz.agents",
         "hmz.backends",

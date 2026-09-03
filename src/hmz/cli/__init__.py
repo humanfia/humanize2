@@ -89,6 +89,7 @@ def _exec(argv: list[str]) -> int:
     """
     from hmz import telemetry
     from hmz.flows import NotAFlow
+    from hmz.proctitle import named
     from hmz.sdk import Hmz
 
     hmz = Hmz()
@@ -96,6 +97,10 @@ def _exec(argv: list[str]) -> int:
     # run with nobody to ask, and silence is not an answer.
     hmz.reports()
     path, agents, task, config, container = hmz.read(argv)
+    # The task is on this process's command line, and this is the one line that carries one:
+    # renamed before an agent starts, so its ``pkill -f`` on a path the task names cannot
+    # reach the run -- see ``hmz.proctitle``.
+    named("exec")
     try:
         running = hmz.run(path, agents, task, config, container=container)
     except NotAFlow as error:

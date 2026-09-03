@@ -53,6 +53,7 @@ a target and could be lifted out whole, so it has a name of its own.
 | `sdk/` | humanize as one object. A workspace, what is remembered about it, the flows there are, the agents and accounts they run as, the runs already made and the run being made now. It composes the layers and restates none of them, and it reaches each of them from inside the call that needs it — which is what lets `hmz exec` name it without paying for the tracer. | `Hmz`, `Run`, `Session` |
 | `tui/` | The terminal interface. | `Humanize` |
 | `daemon/` | A run held where a terminal closing cannot end it, and the terminals that come and go from it. A leaf: what it holds is a callable that opens a run and returns when it is over, so it knows nothing of what a run is. | `Daemon`, `Held`, `running`, `daemons`, `start` |
+| `proctitle.py` | What this process is called to every other process. `hmz exec` renames itself to just that once it has read its line — the command, and nothing typed after it — so an agent's `pkill -f` on a path the task names cannot reach the run. A leaf. | `named` |
 | `cli/` | The one command line, over layers that have none of their own. | `main`, `COMMANDS` |
 
 ### Inside the bigger ones
@@ -109,7 +110,9 @@ machines            │
        │
       tui        daemon   ← a leaf: it holds a callable, not a run
        │
-      cli   ← may name anything; it is what joins them
+      cli ── proctitle   ← a leaf: what `hmz exec` is called
+       ↑
+       may name anything; it is what joins them
 ```
 
 <HmzStack />

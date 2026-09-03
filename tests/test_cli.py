@@ -27,9 +27,20 @@ COMMANDS = [
     # is written down elsewhere is fetched when a flow names it, not when the line is read.
     # And the SDK, which is the one object every way in holds: it reaches a layer only from
     # inside the call that needs it, so naming it costs nothing but itself.
+    # And the process's name: the one line that carries a task renames itself once it has
+    # read it, so an agent's `pkill -f` on a path the task names cannot reach the run.
     (
         "exec",
-        {"sdk", "runner", "flows", "backends", "telemetry", "settings", "kept"},
+        {
+            "sdk",
+            "runner",
+            "flows",
+            "backends",
+            "telemetry",
+            "settings",
+            "kept",
+            "proctitle",
+        },
     ),
     ("trace", set[str]()),
     ("anchor", {"coganchor"}),
