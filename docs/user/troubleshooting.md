@@ -262,6 +262,20 @@ Nothing matched. In order of likelihood:
    `hmz trace collect --all` or `--session <id>`.
 5. **The time window excludes it.** Drop `--start`/`--end`.
 
+### One of my agents is not in the trace at all
+
+A trace is gathered by session id, and a session is opened by a turn that **landed**. An agent
+whose every turn failed — a CLI that was never signed in, an account whose quota went overnight
+— opened nothing, so the run's record names no session for it and a trace of that run has
+nothing of it to collect. Two agents declared and one of them in the trace is that, rather than
+a trace that lost one.
+
+Where it is said is the run as it happened: a failed turn closes on a
+[`failed`](/reference/agents#watching-a-turn-as-it-happens) carrying what the CLI said about it,
+shown in the interface and put on stderr for a run nothing is watching. The flow cannot tell you
+— a turn taken under `suppress=True`, which is every loop, is handed the same nothing whether it
+failed or answered with nothing — so that event is the place to read it.
+
 ### Two agents show up as one
 
 They ran at the same configuration, and nothing said they were two. `hmz trace collect` reads

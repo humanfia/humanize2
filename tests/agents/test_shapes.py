@@ -112,6 +112,23 @@ def test_a_turn_that_failed_answers_with_nothing_rather_than_an_empty_model() ->
     assert agent.new()("how did it go?", schema=Verdict, suppress=True) is None
 
 
+def test_a_reviewer_that_never_ran_is_not_a_reviewer_that_agreed() -> None:
+    """The rlar shape, where None is the answer to two questions at once.
+
+    A flow reads `done` off a shape and goes round again on anything else, so a reviewer whose
+    CLI is not signed in and a reviewer that had nothing to add are the same None -- and the
+    loop that is held to the reviewer's judgement rather than to a budget runs on. Which of
+    the two it was is the turn's to say, and it says it here.
+    """
+    agent = _SaysAgent(None)
+    heard: list[tuple[str, str]] = []
+    agent.watch(lambda _agent, _session, event: heard.append((event.kind, event.text)))
+
+    assert agent.new()("how did it go?", schema=Verdict, suppress=True) is None
+
+    assert [kind for kind, _text in heard].count("failed") == 1
+
+
 def test_a_turn_asked_for_nothing_in_particular_is_asked_for_nothing() -> None:
     agent = _SaysAgent("looks fine")
     assert agent.new()("how did it go?") == "looks fine"

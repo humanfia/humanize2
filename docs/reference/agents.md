@@ -379,6 +379,15 @@ rather than a turn to retry, and not an `Unrecoverable`. That last one for the r
 not caught: a `while True` that swallowed a failure no other try could come out differently on
 would go round on the same failure until somebody stopped it.
 
+What it covers is the **raising** rather than the failing. The turn still closes on a
+[`failed`](#watching-a-turn-as-it-happens) carrying what went wrong, and a run nothing is
+watching is told the same sentence on stderr — so a loop that went round on a turn it was
+handed nothing for is still a loop somebody can see went round. That matters most for the agent
+that never once worked: a turn that failed opens no session, so the
+[epic](/user/tracing#what-a-run-writes-down) does not name it either, and a reviewer whose CLI
+was never signed in would otherwise read afterwards exactly like a reviewer that had nothing to
+say.
+
 ## Sessions
 
 ```python

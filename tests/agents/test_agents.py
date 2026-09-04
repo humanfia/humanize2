@@ -27,14 +27,19 @@ from hmz.agents import (
     ClaudeCodeAgent,
     ClaudeCodeAgentConfig,
     CommandSessionBase,
+    Event,
+    Failed,
     Question,
     Stopped,
 )
 from hmz.machines import AnchoredConfig
-from tests.stubs import HereAnchor, ShellAgent
+from tests.stubs import HereAnchor, ShellAgent, ShellSession
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
+
+    from pydantic import BaseModel
 
 CODEX_ID = "019fa62b-d9e1-7b73-be84-bd70260e1cf6"
 
@@ -749,6 +754,80 @@ def test_a_suppressed_failure_is_quiet_on_the_answer_but_not_on_the_reason(
     # sentence and the non-zero exit, neither of which the raw stderr tee puts out.
     assert "issue with the selected model" in said.err
     assert "returned non-zero exit status" in said.err
+
+
+def test_a_turn_that_failed_closes_on_a_failed_rather_than_on_nothing() -> None:
+    """A turn ends on one event whichever way it went, so that a watcher can see it end.
+
+    `begins` and then `ends` with nothing between them was a turn that failed and a turn that
+    answered with nothing alike, and `suppress` -- which every loop is written with -- hands a
+    flow the same nothing for both. So an agent that never once worked read afterwards as an
+    agent that had nothing to say, and nothing anywhere said otherwise.
+    """
+    agent = ShellAgent(CONFIG)
+    heard: list[tuple[str, str]] = []
+    agent.watch(lambda _agent, _session, event: heard.append((event.kind, event.text)))
+
+    with pytest.raises(subprocess.CalledProcessError):
+        agent.new()("echo boom >&2; exit 3")
+
+    # In place of the `result` a turn that landed ends on, and inside the same bracket.
+    kinds = [kind for kind, _text in heard]
+    assert kinds[0] == "begins"
+    assert kinds[-2:] == ["failed", "ends"]
+    assert "result" not in kinds
+    failed = [text for kind, text in heard if kind == "failed"]
+    assert (
+        "boom" in failed[0]
+    )  # carrying what the CLI said about it, not only that it did
+
+
+def test_a_suppressed_failure_is_still_said_to_whoever_is_watching() -> None:
+    """`suppress` covers the raising rather than the failing.
+
+    The reason reaches stderr on a run nothing is watching, which is the other test above.
+    This is the same reason for a run something *is* watching: the interface, the status
+    column, and anything else hung on the agent read the turns rather than stderr, and a
+    round that failed has to be one of the things they are shown.
+    """
+    agent = ShellAgent(CONFIG, name="reviewer")
+    heard: list[tuple[str, str]] = []
+    agent.watch(lambda _agent, _session, event: heard.append((event.kind, event.text)))
+
+    assert agent.new()("echo boom >&2; exit 3", suppress=True) == ""
+
+    assert [kind for kind, _text in heard].count("failed") == 1
+
+
+def test_a_turn_that_said_it_failed_is_not_made_to_say_it_twice() -> None:
+    """A backend reading a protocol is told which request failed, and says so itself.
+
+    It raises after saying it, the way every other failed turn does -- so the two would be one
+    failure written down as two, which is a run that reads as twice as broken as it was.
+    """
+
+    class _SaysItFailed(ShellSession):
+        def _stream(
+            self, prompt: str, *, schema: type[BaseModel] | None = None
+        ) -> Iterator[Event]:
+            yield Event(kind="failed", text="the account is not signed in")
+            raise Failed(1, ["stand-in"], "", "the account is not signed in")
+
+    class _SaysItFailedAgent(ShellAgent):
+        def new(self, cwd: str | os.PathLike[str] | None = None) -> _SaysItFailed:
+            return _SaysItFailed(self, cwd)
+
+    agent = _SaysItFailedAgent(CONFIG)
+    heard: list[tuple[str, str]] = []
+    agent.watch(lambda _agent, _session, event: heard.append((event.kind, event.text)))
+
+    assert agent.new()("whatever", suppress=True) == ""
+
+    assert [kind for kind, _text in heard].count("failed") == 1
+    assert heard[1] == (
+        "failed",
+        "the account is not signed in",
+    )  # the backend's own words
 
 
 def test_calling_the_agent_is_a_session_it_keeps_nothing_of(clis: _FakeCLIs) -> None:

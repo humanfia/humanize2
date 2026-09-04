@@ -64,6 +64,10 @@ wrote](/weaver/writing-a-flow#make-the-loop-survive-a-bad-turn), which has to le
 agent(task, suppress=True)   # a turn that failed answers ""; the loop goes round again
 ```
 
+The turn still says it failed — a [`failed`](/reference/agents#watching-a-turn-as-it-happens)
+event, and the same sentence on stderr where nothing is watching the run. Suppressing a turn
+keeps the loop going; it does not make the failure quiet.
+
 It deliberately does not catch `Stopped`. A loop that carried on past a stop would never end:
 
 ```python

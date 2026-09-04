@@ -673,7 +673,10 @@ class SessionBase(ABC):
           prompt: The input prompt for this turn.
           suppress: Whether a turn that fails answers with nothing instead of raising. A flow
             is a loop, and a loop that catches its own turns is `try` around every line of
-            it; this is the `|| true` that flowbench writes beside each one.
+            it; this is the `|| true` that flowbench writes beside each one. What it covers
+            is the raising rather than the failing: the turn still closes on a `failed`, so
+            a loop that carried on is a loop whoever is watching it can see carrying on --
+            an agent that failed every round of a week is not one that read quietly.
           schema: The shape to answer in, as the pydantic model a flow reads the answer as, or
             None to take what the agent says as it says it. A turn asked for one answers with
             that model rather than with text, so a flow that needs a decision reads a field
@@ -840,6 +843,12 @@ class SessionBase(ABC):
 
         Yields:
           What the agent said, in the order it said it.
+
+        Raises:
+          subprocess.CalledProcessError: If the turn failed, which is said as a `failed`
+            before it is raised: a turn closes on one or the other whichever way it went,
+            so that a turn that failed is one thing a watcher can see rather than the
+            absence of a thing.
         """
         if self._agent._stopped:
             raise Stopped(f"{self._agent.id} was stopped")
@@ -862,6 +871,12 @@ class SessionBase(ABC):
         if submitted.adds:
             prompt = f"{prompt}\n\n{submitted.adds}"
         self._heard(Event(kind="begins", text=prompt))
+        # Whether the turn has already closed on a `failed` of the backend's own. One reading
+        # a protocol is told which request failed and in what words, and says so as the event;
+        # one run as a command line has its exit status and whatever it wrote on the way out,
+        # which arrives here as the exception instead. The turn closes the same way on either,
+        # and not twice on the one that came both ways.
+        closed = False
         try:
             if submitted.refused:
                 # The turn does not run, and what the hook said instead is what it answers
@@ -884,6 +899,7 @@ class SessionBase(ABC):
                         # sent on has not answered.
                         answered = event
                         continue
+                    closed = closed or event.kind == "failed"
                     self._heard(event)
                     if event.kind == "tool":
                         named, _, about = event.text.partition(" ")
@@ -912,6 +928,22 @@ class SessionBase(ABC):
                     yield answered
                     return
                 prompt, again = stopping.because, again + 1
+        except subprocess.CalledProcessError as failed:
+            # A turn that failed closes on `failed`, the way one that landed closes on
+            # `result`. Between `begins` and `ends` there was otherwise nothing at all, which
+            # is what a turn that answered with nothing looks like too -- so whatever is
+            # watching the agent was shown a round that failed and a round with nothing to
+            # say as the same thing, and `suppress` hands the flow the same nothing for both.
+            # Which is how a whole agent goes unnoticed: a turn that failed is never asked
+            # for a session id, so the run's own record names no session for it either, and a
+            # reviewer whose CLI was never signed in reads afterwards exactly like a reviewer
+            # that agreed. A run nothing is watching has the reason on stderr already; this
+            # is the same reason for the interface, the status column and anything else hung
+            # on the agent. Said once: a backend that closed the turn on a `failed` of its
+            # own is not made to say it twice.
+            if not closed:
+                self._heard(Event(kind="failed", text=str(failed)))
+            raise
         finally:
             self._heard(Event(kind="ends", text=""))
 
