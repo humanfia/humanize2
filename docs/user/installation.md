@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **Python 3.12 or newer** | 3.12, 3.13 and 3.14 are the ones CI runs the tests on. |
-| **At least one supported backend** | `agy`, `claude`, `codex`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen` or `zcode` on your `PATH` — or nothing at all, since DeepSeek Harness arrives with humanize and needs only a DeepSeek API key. |
+| **At least one supported backend** | `agy`, `claude`, `codex`, `cursor-agent`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen` or `zcode` on your `PATH` — or nothing at all, since DeepSeek Harness arrives with humanize and needs only a DeepSeek API key. |
 | **A project you are willing to have rewritten** | Read [Security](/user/security) first. |
 
 Nothing else, and no tutorial needs more. Two features do: [a container of the agent's
@@ -67,8 +67,8 @@ installer would have put one — `~/.local/bin`, `/usr/local/bin`, `/opt/homebre
 started `hmz` handed it a `PATH` of its own, as a notebook kernel, a service or a runtime
 platform's launcher does.
 
-`dsh` stays in the list of CLIs an agent may be set to when its SDK is missing, so that it can
-show the installation command. It becomes selectable when this import succeeds:
+DeepSeek Harness stays in the list of CLIs an agent may be set to when its SDK is missing, so
+that it can show the installation command. It becomes selectable when this import succeeds:
 
 ```sh
 python -c 'import deepseek_harness; print("dsh installed")'
@@ -136,8 +136,8 @@ DEEPSEEK_API_KEY=sk-… hmz exec -f ralph_loop \
 ```
 
 The other official model is `deepseek-v4-pro`. The efforts are `max`, `high` and `off`. The
-current SDK exposes no per-session permission or skill controls, so dsh agents must use the
-default `permission="bypass"`.
+current SDK exposes no per-session permission or skill controls, so DeepSeek Harness agents
+must use the default `permission="bypass"`.
 
 To run one CLI as **more than one** account at a time, use [providers](/user/providers). It is
 a separate store, made with `hmz providers add` rather than by signing the CLI in twice.

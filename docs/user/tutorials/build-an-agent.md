@@ -9,7 +9,8 @@ own, stops on its own, and hands the next one a file rather than a conversation.
 
 ::: tip Before you start
 Finish the [quickstart on the home page](/#run-a-flow). The third phase needs a builder that
-can run permission hooks, which today means `claude` or `codex`; the first two run on anything,
+can run permission hooks, which today means Claude Code or Codex; the first two run on
+anything,
 including DeepSeek Harness.
 :::
 
@@ -172,7 +173,7 @@ answer with nothing and the run carries on.
 The task string is not put to any agent. `docs/plan.md` is what the loop runs on; `"build it"`
 is only what the run is called wherever you watch it.
 
-The builder must be `claude` or `codex` because this phase hangs a hook on the
+The builder must be Claude Code or Codex because this phase hangs a hook on the
 `PERMISSION_REQUEST` moment, and those are the two backends that run it. The hook is what keeps
 the plan fixed and the loop's own state out of the builder's hands. Any backend can review.
 

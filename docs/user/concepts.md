@@ -13,9 +13,10 @@ run as a **provider**; and what the whole thing did is read back as a **trace**.
 ## Backend
 
 **A coding agent CLI installed on this machine that humanize knows how to drive.** There are
-twelve: `agy` (Antigravity CLI), `claude` (Claude Code), `codex`, `cursor` (Cursor Agent),
-`dsh` (DeepSeek Harness), `grok` (Grok Build), `kimi` (Kimi Code), `mimo` (mimocode),
-`opencode`, `pi`, `qwen` (Qwen Code) and `zcode` (ZCode). Any CLI of your own that speaks the
+twelve: Antigravity CLI (`agy`), Claude Code (`claude`), Codex (`codex`), Cursor Agent
+(`cursor`), DeepSeek Harness (`dsh`), Grok Build (`grok`), Kimi Code (`kimi`), mimocode
+(`mimo`), opencode (`opencode`), pi (`pi`), Qwen Code (`qwen`) and ZCode (`zcode`) — the short
+name in brackets is what you write in an agent. Any CLI of your own that speaks the
 [Agent Client Protocol](/reference/agents#a-cli-of-your-own) can be added at `/providers`.
 
 humanize never talks to a model provider. It drives the CLI you already have, logged in the way
@@ -244,7 +245,8 @@ that opened it, using the epic. It writes a Chrome JSON trace into the epic of t
 trace of; load it in [ui.perfetto.dev](https://ui.perfetto.dev). Each agent is a process, each
 row of that agent's sessions is a track, and each slice is one thing the agent did.
 
-It works on sessions no flow ever drove, too: a trace of yesterday's `claude` session is `hmz
+It works on sessions no flow ever drove, too: a trace of yesterday's Claude Code session is
+`hmz
 trace collect` away. See [Tracing](/reference/tracing).
 
 ## How they fit

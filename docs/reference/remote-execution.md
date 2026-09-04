@@ -92,7 +92,8 @@ the agent once it exits, and when the session ends nothing it started is left ru
 - The agent's own runtime executables and re-execs. For any CLI installed by npm that includes
   the interpreter its `#!/usr/bin/env` line names, at every path on `PATH` the search for it may
   reach; for Codex, the native CLI and its code-mode host besides.
-- Its state directory, and anything the agent runs from inside it — grok keeps its native binary
+- Its state directory, and anything the agent runs from inside it — Grok Build keeps its native
+  binary
   under `~/.grok/bin` and re-execs it. All twelve known CLIs are known by name — `agy`, `claude`,
   `codex`, `cursor`, `dsh`, `grok`, `kimi`, `mimo`, `opencode`, `pi`, `qwen`, `zcode` — as is
   humanize's own `~/.humanize`; any other agent keeping state inside the workspace has to be

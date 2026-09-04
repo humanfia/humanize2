@@ -89,7 +89,7 @@ An answer in parentheses is what a question takes when you say nothing. A way wi
 its own runs it on this terminal, under the provider's paths, and what it writes is the provider;
 a way that is only answers keeps them as the variables the backend reads them under.
 
-**claude**
+**Claude Code** (`claude`)
 
 | Way | | Asks for |
 | --- | --- | --- |
@@ -100,7 +100,7 @@ a way that is only answers keeps them as the variables the backend reads them un
 | `bedrock` | Anthropic's models on an AWS account of yours. Also sets `CLAUDE_CODE_USE_BEDROCK=1`. | `AWS_PROFILE`, `AWS_REGION` (`us-east-1`) |
 | `vertex` | Anthropic's models on a Google Cloud project of yours. Also sets `CLAUDE_CODE_USE_VERTEX=1`. | `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION` (`us-east5`) |
 
-**codex**
+**Codex** (`codex`)
 
 | Way | | Asks for |
 | --- | --- | --- |
@@ -115,7 +115,7 @@ Codex takes a provider as settings rather than as variables, so a turn under `ga
 `config.toml` is written. The key of the `key` way is read by `codex login` off its standard
 input and kept in codex's own store, so it is not kept a second time as a variable.
 
-**kimi**
+**Kimi Code** (`kimi`)
 
 | Way | | Asks for |
 | --- | --- | --- |
@@ -136,14 +136,14 @@ input and kept in codex's own store, so it is not kept a second time as a variab
 | `wellknown` | A provider that hands out its own credential, by URL. Runs `opencode auth login <url>`. | `OPENCODE_WELLKNOWN`, the URL answering at `/.well-known/opencode` |
 | `zen` | An OpenCode Zen key, which its own models run on. | `OPENCODE_API_KEY` |
 
-**mimo**
+**mimocode** (`mimo`)
 
 | Way | | Asks for |
 | --- | --- | --- |
 | `login` | mimocode's own provider list, and whichever way that one takes. Runs `mimo auth login`. | — |
 | `key` | A MiMo key, which its own models run on. | `XIAOMI_API_KEY` |
 
-**`agy`**
+**Antigravity CLI** (`agy`)
 
 | Way | | Asks for |
 | --- | --- | --- |
@@ -151,13 +151,13 @@ input and kept in codex's own store, so it is not kept a second time as a variab
 | `key` | A Gemini API key, from AI Studio. | `GEMINI_API_KEY` |
 | `adc` | Google Application Default Credentials, for a service account. Also sets `AGY_ADC_AUTH=1`. | `GOOGLE_APPLICATION_CREDENTIALS` |
 
-**`dsh`**
+**DeepSeek Harness** (`dsh`)
 
 | Way | | Asks for |
 | --- | --- | --- |
 | `key` | A DeepSeek API key, from the platform. | `DEEPSEEK_API_KEY` |
 
-**`grok`**
+**Grok Build** (`grok`)
 
 | Way | | Asks for |
 | --- | --- | --- |
@@ -167,14 +167,14 @@ input and kept in codex's own store, so it is not kept a second time as a variab
 | `gateway` | An endpoint speaking Grok Build's own protocol; its models are listed at `/models`. | `GROK_MODELS_BASE_URL`, `XAI_API_KEY` |
 | `oidc` | Your own identity provider, for an organisation that signs in through one. | `GROK_OIDC_ISSUER`, `GROK_OIDC_CLIENT_ID` |
 
-**`qwen`**
+**Qwen Code** (`qwen`)
 
 | Way | | Asks for |
 | --- | --- | --- |
 | `login` | Sign in to a Qwen account, in a session opened for it. Runs `qwen` and hands you the terminal: `/auth`, then `/quit`. | — |
 | `key` | A key for the OpenAI-compatible endpoint it runs against. | `OPENAI_API_KEY`, `OPENAI_BASE_URL` (`https://dashscope.aliyuncs.com/compatible-mode/v1`) |
 
-**`zcode`**
+**ZCode** (`zcode`)
 
 | Way | | Asks for |
 | --- | --- | --- |
@@ -183,7 +183,7 @@ input and kept in codex's own store, so it is not kept a second time as a variab
 | `key` | A Z.AI or BigModel coding plan key, which its own models run on. | `ZCODE_API_KEY` |
 | `gateway` | An endpoint speaking ZCode's own protocol — a proxy, a router, another vendor. | `ZCODE_BASE_URL`, `ZCODE_API_KEY` |
 
-**Every backend but `dsh`, as well as its own:**
+**Every backend but DeepSeek Harness, as well as its own:**
 
 | Way | | Asks for |
 | --- | --- | --- |

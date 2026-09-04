@@ -5,8 +5,9 @@ from the CLI's own. Reach for one when two agents need to run the same CLI as tw
 accounts at once. An agent with no provider runs its CLI exactly as you run it yourself.
 
 A coding agent CLI signs in once. Claude Code keeps its account under `~/.claude`, so every
-`claude` on this machine runs as whoever is signed in there, and a flow that wants two of them
-on two accounts has two accounts wanting one directory. A provider is the second directory.
+Claude Code on this machine runs as whoever is signed in there, and a flow that wants two of
+them on two accounts has two accounts wanting one directory. A provider is the second
+directory.
 
 ## Try it
 
@@ -54,7 +55,7 @@ hmz exec -f official/flame_chase \
     "fix the build"
 ```
 
-`flame_chase` hands the same task to two agents in turn, and both run the same `claude`. The
+`flame_chase` hands the same task to two agents in turn, and both run the same Claude Code. The
 first reads the subscription's tokens and refreshes them; the second dials the endpoint with
 the token you typed. Neither can read the other's credential file, and neither can read yours.
 

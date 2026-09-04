@@ -7,7 +7,7 @@ past 1,790.
 
 ::: tip Before you start
 Finish the [quickstart on the home page](/#run-a-flow). You need two backends logged in — this
-tutorial uses `claude` and `codex`, and any two will do, including the same one twice.
+tutorial uses Claude Code and Codex, and any two will do, including the same one twice.
 :::
 
 ## The shape of work this is for
@@ -121,7 +121,7 @@ hmz exec -f official/flame_chase \
 ```
 
 Two `-a` flags because `flame_chase` drives two agents, taken in the order you write them: the
-first turn goes to `claude`, the second to `codex`, and round it goes.
+first turn goes to Claude Code, the second to Codex, and round it goes.
 
 The first time you name `official/…`, humanize fetches the [official
 flowverse](/weaver/flowverses) — a git repository of flows — into `~/.humanize/flowverses/`.
