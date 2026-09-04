@@ -123,11 +123,6 @@ ignore = [
 # recorded in. It is copied into a container and run by path rather than imported, so it
 # is a file rather than a package, and there is nothing for an `__init__.py` to do.
 "docs/tapes/stage.py" = ["INP001"]
-# The concurrency rig, for the same reason: each script is run by path inside the cgroup
-# being measured rather than imported, so there is nothing for an `__init__.py` to do. And
-# what a measurement writes, it prints -- the ladder reads one JSON object per run off
-# their stdout, and the summary is a table.
-"bench/**" = ["INP001", "T201"]
 # The syscall layer's domain type is the string path: it reads them out of ptrace
 # registers and puts them on a wire, so `pathlib` would only convert them twice.
 "src/hmz/coganchor/**" = ["PTH"]
