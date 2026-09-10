@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 __all__ = [
     "ALIKE",
     "PROFILES",
+    "UNKNOWN",
     "Asked",
     "Model",
     "Profile",
@@ -128,6 +129,14 @@ class Model:
     swarms: bool = False
 
 
+#: How long a turn may say nothing before it is worth looking at, for a backend that has not
+#: said otherwise. A quarter of an hour: every CLI here reports its tool calls as it makes
+#: them, so a turn silent this long is either a model on one very long thought or a CLI that
+#: has stopped -- and the first of those is rare enough to be worth interrupting once in order
+#: to catch the second at all.
+_SILENCE = 900.0
+
+
 @dataclass(frozen=True, slots=True)
 class Profile:
     """One coding agent CLI, as everything outside its driver needs to know it.
@@ -186,6 +195,25 @@ class Profile:
         with no way of being told, whose agents go on reaching the web exactly as that CLI
         lets them -- an agent configured not to search on a backend that cannot be told would
         be a setting that lies, so it is refused where it is written instead.
+      silence: How long a turn of this backend may say nothing before it is worth looking at,
+        in seconds. A fact about the CLI because it differs by CLI: one that streams its
+        reasoning is never quiet while it thinks, and one that says nothing between tool calls
+        is quiet for the whole of a long one. Generous everywhere -- a turn thinks for minutes
+        and says nothing for most of them, so a window short enough to catch a wedge quickly
+        is a window that kills healthy turns.
+      restarts: Whether what holds a turn of this backend open may be put down and started
+        again while the run continues. True for every CLI here: the transport is a process
+        humanize spawned or a runtime it opened, and either can be replaced. This is where a
+        backend whose transport is somebody else's to end would say so, and a watchdog that
+        found one leaves its turn alone rather than reaching into it.
+      resumes: Whether a conversation of this backend survives that, being picked back up by
+        the id it was opened under. True for every CLI here, each of which takes a session id
+        on the way back in; false for one that can only ever open a new session, whose turn
+        taken again is a turn taken from nothing.
+      shares: Whether one transport serves every conversation with an agent rather than one
+        apiece -- an app server, a daemon. It changes what putting that transport down costs:
+        one wedged turn freed, and every other turn on that agent ended with it, which is
+        something whoever is watching has to be told rather than left to discover.
       creds: What a login to this backend leaves behind: the paths it reads its credentials
         back out of and writes its refreshed ones to. One under this backend's home per entry,
         one under the user's own home where the entry starts with `~/` -- which is where some
@@ -221,6 +249,10 @@ class Profile:
     beyond: tuple[str, ...] = ()
     swarms: bool = False
     searches: bool = False
+    silence: float = _SILENCE
+    restarts: bool = True
+    resumes: bool = True
+    shares: bool = False
     creds: tuple[str, ...] = ()
     ways: tuple[Way, ...] = ()
     ambient: tuple[str, ...] = ()
@@ -568,6 +600,9 @@ PROFILES = (
         # `tools.web_search` is a setting of the app server, and is sent in both
         # directions: Codex searches nothing until it is asked to.
         searches=True,
+        # And that app server is one per agent, not one per conversation: every thread of it
+        # goes down together, which is what a watchdog has to say before it puts one down.
+        shares=True,
         aliases=("codex",),
         home_var="CODEX_HOME",
         home_dir=".codex",
@@ -662,6 +697,11 @@ PROFILES = (
     ),
     Profile(
         name="dsh",
+        # Shorter than the rest, and for a reason of its own: this is the one backend driven
+        # through an SDK rather than a command line, and that SDK already gives every request
+        # of its own three minutes. A turn quiet for twice that is the runtime having stopped
+        # answering rather than the model still thinking, so there is nothing to wait for.
+        silence=360.0,
         aliases=("dsh", "deepseek-harness"),
         home_var="DSH_HOME",
         home_dir=".dsh",
@@ -774,6 +814,8 @@ PROFILES = (
     ),
     Profile(
         name="kimi",
+        # One daemon per agent serves every conversation with it, as Codex's app server does.
+        shares=True,
         aliases=("kimi", "kimi-code"),
         home_var="KIMI_CODE_HOME",
         home_dir=".kimi-code",
@@ -1066,6 +1108,8 @@ PROFILES = (
         # `WebFetch` and `WebSearch` are the two tools it reaches outside the workspace with,
         # and a session may be opened with a denylist naming them.
         searches=True,
+        # One app server per agent holds every session of it, as Codex's and Kimi's do.
+        shares=True,
         aliases=("zcode", "zcode-cli"),
         # None: its configuration, its sessions and its skills are all under `~/.zcode`, and
         # the one variable it does read moves the part the desktop app shares rather than the
@@ -1288,6 +1332,23 @@ def forget(name: str) -> bool:
     return True
 
 
+#: What is assumed about a backend nobody has written a profile for: a CLI added through the
+#: agent client protocol, which is a command, a name and a promise to speak the protocol. It
+#: runs somewhere -- so it is a process that can be put down and started again -- and its
+#: conversations do not survive that: the protocol's only way to open a session opens a new
+#: one, so a turn taken again after the transport went is a turn taken from nothing. Nothing
+#: else here is true of it, which is why every other field is left at what it says by default.
+UNKNOWN = Profile(
+    name="",
+    aliases=(),
+    home_var="",
+    home_dir="",
+    logs=(),
+    efforts=(),
+    resumes=False,
+)
+
+
 def profiles() -> tuple[Profile, ...]:
     """Every backend there is: the ones humanize drives, and the ones somebody added.
 
@@ -1310,7 +1371,8 @@ def _speaks(name: str) -> Profile:
     Returns:
       A profile saying the little there is to say: it has no home humanize can find, no logs
       it can read, and one rung of an effort ladder, because the protocol describes none of
-      those. What it does have is a name to be chosen by.
+      those. What it does have is a name to be chosen by, and one thing that follows from the
+      protocol itself -- a conversation of its does not survive its process.
     """
     return Profile(
         name=name,
@@ -1319,6 +1381,10 @@ def _speaks(name: str) -> Profile:
         home_dir="",
         logs=(),
         efforts=(_UNSAID,),
+        # The protocol's only way to open a session opens a new one. There is a `session/load`
+        # in it, but an agent need not implement it and nothing here can find out whether this
+        # one did -- so a turn taken again after the agent went is a turn taken from nothing.
+        resumes=False,
     )
 
 

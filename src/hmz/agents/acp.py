@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
 from .event import Event, Failed
+from .watchdog import Watchdog
 
 if TYPE_CHECKING:
     import os
@@ -433,40 +434,53 @@ class AcpSession(SessionBase):
         del schema
         link = self._connection()
         said: list[str] = []
-        try:
-            at = link.send(
-                "session/prompt",
-                {
-                    "sessionId": self.id,
-                    "prompt": [{"type": "text", "text": prompt}],
-                },
-            )
-            for event in self._serving(link, at):
-                if event.kind == "text":
-                    said.append(event.text)
-                yield event
-            answered = link.answers.pop(at)
-        except _Stopped as gone:
-            link.stop()
-            self._link = None
-            raise Failed(
-                1, list(cast("AcpAgent", self._agent).command), "".join(said), str(gone)
-            ) from gone
-        if isinstance(answered, Exception):
-            raise Failed(
-                1,
-                list(cast("AcpAgent", self._agent).command),
-                "".join(said),
-                str(answered),
-            )
-        why = str(cast("dict[str, Any]", answered).get("stopReason") or "")
-        if why not in _ANSWERED:
-            raise Failed(
-                1,
-                list(cast("AcpAgent", self._agent).command),
-                "".join(said),
-                f"the turn ended on {why}",
-            )
+        # Under a clock: reading the agent is reading its stdout, and an agent still
+        # holding that pipe open and never writing to it again is neither an answer nor
+        # an exit. The process is this session's own, so the watchdog signals it; the
+        # conversation does not survive -- the protocol's only way to open a session
+        # opens a new one -- which is what it says before it does it.
+        with Watchdog(self, riding=lambda: link.proc) as watch:
+            try:
+                at = link.send(
+                    "session/prompt",
+                    {
+                        "sessionId": self.id,
+                        "prompt": [{"type": "text", "text": prompt}],
+                    },
+                )
+                for event in self._serving(link, at):
+                    watch.saw()
+                    if event.kind == "text":
+                        said.append(event.text)
+                    with (
+                        watch.held()
+                    ):  # a reader that pauses is not the agent's silence
+                        yield event
+                answered = link.answers.pop(at)
+            except _Stopped as gone:
+                link.stop()
+                self._link = None
+                raise Failed(
+                    1,
+                    list(cast("AcpAgent", self._agent).command),
+                    "".join(said),
+                    str(gone),
+                ) from gone
+            if isinstance(answered, Exception):
+                raise Failed(
+                    1,
+                    list(cast("AcpAgent", self._agent).command),
+                    "".join(said),
+                    str(answered),
+                )
+            why = str(cast("dict[str, Any]", answered).get("stopReason") or "")
+            if why not in _ANSWERED:
+                raise Failed(
+                    1,
+                    list(cast("AcpAgent", self._agent).command),
+                    "".join(said),
+                    f"the turn ended on {why}",
+                )
         yield Event(kind="result", text="".join(said).strip())
 
     def interject(self, text: str) -> None:
