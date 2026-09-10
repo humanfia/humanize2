@@ -189,7 +189,7 @@ however many of that level are running at once.
 
 Asked from outside every flow — the interface drawing its status line, a crash report being
 written — it is every flow of the run, oldest first, each saying how `deep` it is and what it is
-`under`. That is what the interface reads: it names them on its status line and on `/status` as
+`under`. That is what the interface reads: it names them on its status line and on `/monitor` as
 `chat ▸ official/rlar`. The [epic](/user/tracing#what-a-run-writes-down) records each call and
 each return.
 

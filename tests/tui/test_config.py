@@ -379,7 +379,7 @@ async def test_there_is_no_command_that_sets_a_flow_up(flows: Path) -> None:
         assert "no such command" in app.query_one("#transcript", Transcript).text
 
 
-def test_status_says_only_what_was_changed() -> None:
+def test_the_monitor_says_only_what_was_changed() -> None:
     """A flow of forty settings says nothing by listing the thirty-nine nobody touched."""
     from pydantic import BaseModel, Field
 

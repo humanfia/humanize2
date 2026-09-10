@@ -27,7 +27,7 @@ run.
 
 **esc does not stop anything.** It is pressed to dismiss whatever is on the screen everywhere
 else in the interface, so it is not the key that ends a day's work: it opens
-[`/status`](/reference/tui#how-the-run-is-going) instead. With nothing running at all, two
+[`/monitor`](/reference/tui#watching-the-run) instead. With nothing running at all, two
 presses of **ctrl+c** leave the interface.
 
 ## What a stop does to the turn under way

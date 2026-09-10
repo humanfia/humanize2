@@ -27,6 +27,6 @@ found in the flow's output.
 
 ## See also
 
-- [The shape of a run](/user/status)
+- [Watching a run](/user/monitor)
 - [Talking to a running turn](/user/steering)
 - [Permissions](/user/permissions)

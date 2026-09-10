@@ -326,7 +326,7 @@ reports both as usage errors.
 
 ## Watching a run instead
 
-A trace is for after. While a run is going, the interface's `/status` shows the same shape
+A trace is for after. While a run is going, the interface's `/monitor` shows the same shape
 live: who is working, every handover between agents with how often it happened, and what each
 model has cost with the rate it is costing it at.
 

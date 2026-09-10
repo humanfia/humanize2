@@ -22,7 +22,7 @@ the flows humanize knows.
 | --- | --- |
 | **↑ ↓** | Move within the list. |
 | **tab** or **enter** | Take the highlighted offer. |
-| **esc** | Dismiss the list. Press it again with no list up and it opens [`/status`](/reference/tui#how-the-run-is-going). |
+| **esc** | Dismiss the list. Press it again with no list up and it opens [`/monitor`](/reference/tui#watching-the-run). |
 
 A command name that is already whole shows a **hint** rather than offers. Type `/afk` and it
 shows what the command takes after its name. There is nothing to take, because taking an offer

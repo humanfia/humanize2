@@ -65,7 +65,7 @@ mean the same thing whenever they are pressed.
 | **enter** | Sends what is typed. Over an open [offers list](#completion), takes what is highlighted instead. |
 | **shift+enter** | Breaks the line, which is what enter would do anywhere else. |
 | **ctrl+j** | The same, for a terminal that cannot tell shift+enter from enter. |
-| **esc** | Opens [`/status`](#how-the-run-is-going), which is where the run is read and the flow is drawn. Dismisses the offers list first, if one is open. |
+| **esc** | Opens [`/monitor`](#watching-the-run), which is where the run is watched and the flow is drawn. Dismisses the offers list first, if one is open. |
 | **ctrl+c** | Takes back the nearest thing there is to take back: what is half-typed if anything is, the run if not. Twice stops the flow, a third press does not wait for it to unwind, and with nothing running twice leaves. |
 | **↑ / ↓** | Walks what was typed here before — but only off the first and last line, so a prompt of several lines is still moved around in. Over an open offers list, moves within the list. |
 | **tab** | [Steps to the next agent that is working](#reading-one-agent), and round to the one they all appear on. Over an open offers list, takes the highlighted offer instead. |
@@ -92,7 +92,7 @@ two presses leave; `/exit` is the other way out.
 
 **esc does not stop anything.** It is pressed to dismiss whatever is on the screen everywhere
 else in this interface, so it is not the key that ends a day's work: it opens
-[`/status`](#how-the-run-is-going) instead, which is where the run is read and where the
+[`/monitor`](#watching-the-run) instead, which is where the run is watched and where the
 flow is drawn.
 
 Focus cannot leave the editor. There is nowhere else for it to go — which is why tab and
@@ -147,7 +147,7 @@ list appears under the editor with a line about each.
 | `/epics` | | The runs of this directory, newest first: what each was, how it went, and what there is to do with one — gather its [trace](/user/tracing), say where it is written, and carry it on where its flow says it can be picked up. |
 | `/providers` | | [The accounts](#the-accounts-themselves) an agent may be run as: what there is, and what can happen to one — made, taken away, and, on enter, corrected, signed in again, pointed at what it falls back to or told how it is tried again. |
 | `/settings` | | [What humanize remembers](#what-humanize-remembers): two pages, one for what is true of this machine and one for what is remembered about this directory. |
-| `/status` | | [How the run is going](#how-the-run-is-going), and the shape of it: a box per agent that has worked, marked as it works, with the handovers between them drawn as the arrows joining them, whatever each started of its own hanging under it, and [the board](/user/board) below. Enter reads an agent or changes a line. **esc** opens it. |
+| `/monitor` | | [The run, drawn](#watching-the-run): a box per agent that has worked, marked as it works and saying how long it has been at it, with the handovers between them as the arrows joining them, whatever each started of its own hanging under it, and [the board](/user/board) below. Enter reads an agent or changes a line. **esc** opens it. |
 | `/btw` | `<question>` | Asks a side question about the running flow from a read-only snapshot of its progress. It runs in a separate session and never steers the flow. |
 | `/details` | `[on\|off]` | Shows or hides everything a turn did on the way to its answer: tool calls, thinking, and whatever a backend printed on its way past. One question — how much of the working to show — so one switch. **Off** to begin with. |
 | `/afk` | `[on\|off]` | Whether an agent may stop and ask you something. See [below](#questions-and-being-away). |
@@ -202,7 +202,7 @@ are watching is the flow.
 end. With ten agents going, what you are stepping between is the ones thinking right now, not
 the ones that have stopped. An agent between its turns is still read once you are on it — what
 you are reading is left where it is until you press one of these — but it is not stepped onto.
-Every agent that has worked can still be read from [`/status`](#how-the-run-is-going), which draws the
+Every agent that has worked can still be read from [`/monitor`](#watching-the-run), which draws the
 whole flow: that is where the one that has stopped, or has not started, is picked out by name.
 
 **Every conversation of one agent is that agent's one transcript**, running on down it. A
@@ -257,51 +257,62 @@ What is kept is bounded, a flow being a thing that runs for days: the last eight
 and the last two thousand lines of each. Older lines and older conversations are gone from the
 screen, not from the [trace](/reference/tracing) — that is what a trace is for.
 
-## How the run is going
+## Watching the run
 
-`/status` says how the run is going and draws the shape of it, and **esc** is what opens it. It
-is read rather than answered, so it is not refused while a flow runs, and it is redrawn while
-it is open — what it is about moves without anybody touching it.
+`/monitor` draws the run, and **esc** is what opens it. It is read rather than answered, so it
+is not refused while a flow runs, and it is redrawn while it is open — what it is about moves
+without anybody touching it.
 
-The shape of a flow is not written down anywhere. A flow is a Python file that may branch any
-way it likes, so what it did is read off the turns going past — and drawn as a box per agent,
-in the order the flow takes them, with the handovers between neighbours as the arrows joining
-them:
+The diagram *is* the sheet. It takes the height the terminal has, and what is written under it
+is only what a picture cannot say. The shape of a flow is not written down anywhere: a flow is
+a Python file that may branch any way it likes, so what it did is read off the turns going past
+— and drawn as a box per agent, in the order the flow takes them, with the handovers between
+neighbours as the arrows joining them:
 
 ```
-  ▣ every agent · 1 of 2 working · reading
+   ▣ every agent · 1 of 2 working · 17 turns · 7m11s
 
-  ┌──────────────────────────────────────────────┐
-  │ ● builder · claude#a1b2                      │
-  │ claude/claude-opus-5:high · 12 turns         │
-  └──────────────────────────────────────────────┘
-    ├╴◆ Task read the tests
-    └╴◇ Task find the flaky one
-      ↓ 6   ↑ 5
-  ┌──────────────────────────────────────────────┐
-  │ ○ reviewer · codex#c3d4                      │
-  │ codex/gpt-5.6-sol:high · 5 turns             │
-  └──────────────────────────────────────────────┘
+   ┌────────────────────────────────────────────────────────┐
+   │ ● builder · claude#a1b2                            43s │
+   │ claude/claude-opus-5:high · 12 turns                   │
+   └────────────────────────────────────────────────────────┘
+     ├╴◆ Task read the tests
+     └╴◇ Task find the flaky one
+   │   ↓ 6 · ↑ 5
+   ┌────────────────────────────────────────────────────────┐
+ ❯ │ ○ reviewer · codex#c3d4                     idle 1m04s │
+   │ codex/gpt-5.6-sol:high · 5 turns                unread │
+   └────────────────────────────────────────────────────────┘
 
-  Board · what you and the flow both write on
-    ◈ todo          write the parser
-    ◈ doing         write the parser · flow's
+   Board · what you and the flow both write on
+   ◈ todo                      write the parser
+   ◈ doing                     two of five · flow's
 
-   Working:  builder
-   Running:  431s
-   Also:     builder → reporter · ×2
-   Tokens:   claude-opus-5                48.2k    91/s
+   Flow:             chat
+   Also:             builder → reporter · ×2
+   Tokens:           claude-opus-5                48.2k    91/s
 ```
 
-`●` is an agent with a turn open and `○` one that has stopped, and they move as the run does.
-A handover between two agents the boxes did not put next to each other is said under the
-diagram as `Also` rather than drawn: a line crossing the page from the first box to the fourth
-is a line nothing in a terminal draws readably.
+**Each box says what its agent is on the left and what it is doing on the right.** What it runs
+and how many turns it has taken stand still; the right-hand column moves. `●` is an agent with a
+turn open and `○` one that has stopped, and beside them is how long the open turn has been open
+— or, for one that has stopped, how long it has been since its last turn ended, so the agent
+that has been quiet four minutes is the one that stands out. `reading` marks the transcript on
+the screen behind the sheet and `unread` one that has said something since you last looked at
+it.
+
+**The arrows carry the handovers**, with how often each way went, and the one the flow took most
+recently is drawn lit: with six boxes on the page, where the run just went is the first thing
+you look for. A handover between two agents the boxes did not put next to each other is said
+under the diagram as `Also` rather than drawn — a line crossing the page from the first box to
+the fourth is a line nothing in a terminal draws readably.
 
 **A box appears as its agent takes its first turn**, and not before. A flow may declare ten
 agents and reach three of them, and seven boxes that have never done anything are seven rows
 saying nothing: the diagram is what the run *is doing* rather than a list of what was set up.
-Each stays for the rest of the run once it is there.
+Each stays for the rest of the run once it is there. Before any of them has worked, the sheet
+says so, and lists the agents that are set up — which is the one thing it says about them that
+the boxes are not there yet to carry.
 
 **An agent one of them started of its own hangs off its box**, without a box of its own: `◆`
 for one still going, `◇` for one that has come back. It is a thing the agent above it is doing
@@ -316,13 +327,15 @@ changes the one under the cursor, and `d` twice takes it off. A line the flow ke
 says so instead of opening an editor. See [The mission board](/user/board).
 
 **Enter or a click on a box reads that agent** — whether or not it is working. tab is held to
-the ones thinking, so this is the one place an agent that has stopped is reached. The first row
-is the transcript every agent's work appears on, which is the way back to watching the flow
+the ones thinking, so this is the one place an agent that has stopped is reached. The box under
+the cursor is drawn in the marker colour rather than highlighted, `❯` beside its name; the first
+row is the transcript every agent's work appears on, which is the way back to watching the flow
 rather than one agent of it.
 
-The agents of the last run are still drawn once it is over. Their transcripts are still on the
-screen and still worth reading back, and a run that has just ended is usually the one you want
-to look at.
+The agents of the last run are still drawn once it is over, and every clock on the sheet stops
+where the run stopped. Their transcripts are still on the screen and still worth reading back,
+a run that has just ended is usually the one you want to look at, and a diagram still counting
+would say the flow was still doing something.
 
 ## Talking to a running flow
 

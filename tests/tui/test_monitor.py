@@ -6,7 +6,7 @@ way it likes -- so the order it ran its agents in is only ever recoverable from 
 
 from __future__ import annotations
 
-from hmz.tui.monitor import Monitor
+from hmz.tui.monitor import Monitor, lasting
 
 
 def test_who_is_working_is_whoever_has_a_turn_open() -> None:
@@ -189,3 +189,55 @@ def test_nothing_spent_is_nothing_shown() -> None:
     monitor.spend("actor", 0)
 
     assert monitor.spending() == []
+
+
+def test_a_box_says_how_long_its_agent_has_been_at_what_it_is_doing() -> None:
+    """Which is two different lengths of time: a turn open, and a wait since the last one."""
+    monitor = Monitor()
+    monitor.begins("actor", "opus", now=1000.0)
+    monitor.begins("reviewer", "opus", now=1010.0)
+    monitor.ends("reviewer", now=1020.0)
+    monitor.until = 1030.0  # a run that is over is read at its own end
+
+    shape = monitor.shape()
+
+    assert shape.since["actor"] == 30.0  # working, so since its turn began
+    assert shape.since["reviewer"] == 10.0  # stopped, so since its last turn ended
+
+
+def test_an_agent_holding_two_turns_has_been_working_since_the_first_of_them() -> None:
+    """The second turn is not the agent starting: it never stopped between the two."""
+    monitor = Monitor()
+    monitor.begins("actor", "opus", now=1000.0)
+    monitor.begins("actor", "opus", now=1015.0)
+    monitor.until = 1020.0
+
+    assert monitor.shape().since["actor"] == 20.0
+
+
+def test_the_handover_taken_last_is_the_one_the_diagram_lights() -> None:
+    """Where the run just went is the first thing a reader looks for, and only this says it."""
+    monitor = Monitor()
+    assert monitor.shape().latest is None  # nothing has been handed anywhere yet
+
+    for agent in ("actor", "reviewer"):
+        monitor.begins(agent, "opus")
+        monitor.ends(agent)
+
+    assert monitor.shape().latest == ("actor", "reviewer")
+
+    monitor.begins("actor", "opus")
+    assert monitor.shape().latest == ("reviewer", "actor")
+
+    monitor.ends("actor")
+    monitor.begins("actor", "opus")  # a second turn running hands to nobody
+    assert monitor.shape().latest == ("reviewer", "actor")
+
+
+def test_a_clock_is_read_in_whatever_units_it_is_worth_reading_in() -> None:
+    """Seconds while a turn is young, minutes once it is not, and never a wider box."""
+    assert lasting(0.4) == "0s"
+    assert lasting(43.0) == "43s"
+    assert lasting(75.0) == "1m15s"
+    assert lasting(605.0) == "10m05s"
+    assert lasting(3661.0) == "1h01m"
