@@ -1,0 +1,512 @@
+{
+ "backend": "zcode",
+ "candidate": {
+  "driver_zcode_py_sha256": [
+   "228257199152f7d59140c152584ac84c950585760125f6edb54bcf49da23225c"
+  ],
+  "label": "per-session demultiplexed app-server stream",
+  "results_jsonl_sha256": "43af427f5cc6a4e4bdf5c96b66efec2d68d47ccaf9ef3aa7396f9e25a6bf2898",
+  "rungs": [
+   {
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 5.305129888001829,
+     "p50": 5.215852321940474,
+     "p95": 5.305129888001829
+    },
+    "concurrency": 1,
+    "failed": 0,
+    "meets_half_speed_floor": true,
+    "ok": 5,
+    "ratios": {
+     "cold.first_event_seconds.p50": 1.0,
+     "cold.first_event_seconds.p95": 1.0,
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "cold.work_seconds.p50": 1.0,
+     "cold.work_seconds.p95": 1.0,
+     "warm.first_event_seconds.p50": 1.0,
+     "warm.first_event_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0,
+     "warm.work_seconds.p50": 1.0,
+     "warm.work_seconds.p95": 1.0
+    },
+    "repeats": 5,
+    "wall_seconds": 31.072065348969772,
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 0.8417518649948761,
+     "p50": 0.6684437580406666,
+     "p95": 0.8417518649948761
+    },
+    "worst_complete_task_ratio": 1.0
+   },
+   {
+    "cold_result_seconds": {
+     "count": 25,
+     "max": 9.082219704985619,
+     "p50": 8.571610028971918,
+     "p95": 9.036764239077456
+    },
+    "concurrency": 5,
+    "failed": 0,
+    "meets_half_speed_floor": true,
+    "ok": 25,
+    "ratios": {
+     "cold.first_event_seconds.p50": 1.6451519972221265,
+     "cold.first_event_seconds.p95": 1.7307519916427458,
+     "cold.result_seconds.p50": 1.6433766717120142,
+     "cold.result_seconds.p95": 1.7034011286915243,
+     "cold.work_seconds.p50": 1.6756927335865084,
+     "cold.work_seconds.p95": 2.1980615178442915,
+     "warm.first_event_seconds.p50": 0.8255564097310648,
+     "warm.first_event_seconds.p95": 0.6966012688525565,
+     "warm.result_seconds.p50": 0.9689627007642726,
+     "warm.result_seconds.p95": 0.8735454955836175,
+     "warm.work_seconds.p50": 1.1560059666087588,
+     "warm.work_seconds.p95": 1.0936297759794915
+    },
+    "repeats": 5,
+    "wall_seconds": 49.096748085925356,
+    "warm_result_seconds": {
+     "count": 25,
+     "max": 0.787583322962746,
+     "p50": 0.6476970691001043,
+     "p95": 0.7353085500653833
+    },
+    "worst_complete_task_ratio": 1.7034011286915243
+   },
+   {
+    "cold_result_seconds": {
+     "count": 30,
+     "max": 10.678716292022727,
+     "p50": 10.071592004969716,
+     "p95": 10.571598966955207
+    },
+    "concurrency": 6,
+    "failed": 0,
+    "meets_half_speed_floor": true,
+    "ok": 30,
+    "ratios": {
+     "cold.first_event_seconds.p50": 1.894379647144971,
+     "cold.first_event_seconds.p95": 2.00038952133112,
+     "cold.result_seconds.p50": 1.9309580454576103,
+     "cold.result_seconds.p95": 1.9927125612634127,
+     "cold.work_seconds.p50": 2.10297036731337,
+     "cold.work_seconds.p95": 2.7751636417236,
+     "warm.first_event_seconds.p50": 0.9443949836754929,
+     "warm.first_event_seconds.p95": 0.8134285235143712,
+     "warm.result_seconds.p50": 1.1052596716721839,
+     "warm.result_seconds.p95": 1.058702845924336,
+     "warm.work_seconds.p50": 1.274469815292379,
+     "warm.work_seconds.p95": 1.3083394866633098
+    },
+    "repeats": 5,
+    "wall_seconds": 57.6872591067804,
+    "warm_result_seconds": {
+     "count": 30,
+     "max": 0.964574723970145,
+     "p50": 0.7388039285433479,
+     "p95": 0.8911650950321928
+    },
+    "worst_complete_task_ratio": 1.9927125612634127
+   },
+   {
+    "cold_result_seconds": {
+     "count": 35,
+     "max": 11.951896563987248,
+     "p50": 11.06234351103194,
+     "p95": 11.80361518706195
+    },
+    "concurrency": 7,
+    "failed": 0,
+    "meets_half_speed_floor": false,
+    "ok": 35,
+    "ratios": {
+     "cold.first_event_seconds.p50": 2.1218387339654856,
+     "cold.first_event_seconds.p95": 2.2567091271057396,
+     "cold.result_seconds.p50": 2.1209081140005077,
+     "cold.result_seconds.p95": 2.2249436745662354,
+     "cold.work_seconds.p50": 2.058458807191436,
+     "cold.work_seconds.p95": 2.7726879355630127,
+     "warm.first_event_seconds.p50": 1.0668851481922694,
+     "warm.first_event_seconds.p95": 1.1256343471531236,
+     "warm.result_seconds.p50": 1.123300352474995,
+     "warm.result_seconds.p95": 1.4571289497762212,
+     "warm.work_seconds.p50": 1.3459114042730496,
+     "warm.work_seconds.p95": 1.5955500854683031
+    },
+    "repeats": 5,
+    "wall_seconds": 62.9283305099234,
+    "warm_result_seconds": {
+     "count": 35,
+     "max": 1.5664518640842289,
+     "p50": 0.750863109016791,
+     "p95": 1.2265410110121593
+    },
+    "worst_complete_task_ratio": 2.2249436745662354
+   }
+  ]
+ },
+ "fixture": {
+  "directory": "/tmp/zcode-fixture-a49",
+  "endpoint": "http://127.0.0.1:18936",
+  "installed_plugins": [
+   "android-emulator",
+   "browser-use",
+   "computer-use",
+   "document-skills",
+   "ios-simulator",
+   "restore-legacy-sessions",
+   "skill-creator",
+   "zcode-guide"
+  ],
+  "launcher_sha256": "f57ed196d51ff99be297e297ed61df0237532bb2a2481bb6a4956f86c4766cb6",
+  "native_config_mapping": "/home/nvidia/.zcode/cli/config.json",
+  "not_isolated": [
+   "~/.zcode/cli/plugins",
+   "~/.zcode/cli/db",
+   "~/.zcode/cli/log",
+   "~/.zcode/cli/exec",
+   "~/.zcode/cli/rollout"
+  ],
+  "setup": "bench/cli-concurrency/setup_zcode_fixture.py"
+ },
+ "gate": {
+  "bound": 2.0,
+  "metric": "result_seconds (complete task)",
+  "note": "The 0.5x speed floor: a rung passes when every complete-task quantile is within twice its own run's fresh serial control. The earlier startup and fixed-work gates are not applied.",
+  "phases": [
+   "cold",
+   "warm"
+  ],
+  "quantiles": [
+   "p50",
+   "p95"
+  ]
+ },
+ "instances": "separate",
+ "isolation": {
+  "foreign_executables_in_rungs": [],
+  "groups_verified_free_before_each_run": true,
+  "guard": "hmzbench-run after the cgroup.procs occupancy fix"
+ },
+ "official_distribution": {
+  "bundle": "/tmp/hmz-zcode-official/app/resources/glm/zcode.cjs",
+  "bundle_sha256": "e9f1868c0fdb863537ed910ee3828b9be96b8c2fd805473f63b439e1113266b8",
+  "cli_version": "0.16.5",
+  "product": "ZCode 3.11.2 linux-x64 AppImage, extracted",
+  "unmodified": true
+ },
+ "original": {
+  "driver_zcode_py_sha256": [
+   "9cf90ffb0f029121f6a401742bd1a0cef53102c452b39b1b835cc3c48fe59299"
+  ],
+  "label": "origin/main 48d1559",
+  "results_jsonl_sha256": "116ca11e0f34fc6503c300c6d52327d2fe1818082bec51efabe2daf39c99cb98",
+  "rungs": [
+   {
+    "cold_result_seconds": {
+     "count": 5,
+     "max": 4.970092992996797,
+     "p50": 4.714778761961497,
+     "p95": 4.970092992996797
+    },
+    "concurrency": 1,
+    "failed": 0,
+    "meets_half_speed_floor": true,
+    "ok": 5,
+    "ratios": {
+     "cold.first_event_seconds.p50": 1.0,
+     "cold.first_event_seconds.p95": 1.0,
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "cold.work_seconds.p50": 1.0,
+     "cold.work_seconds.p95": 1.0,
+     "warm.first_event_seconds.p50": 1.0,
+     "warm.first_event_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0,
+     "warm.work_seconds.p50": 1.0,
+     "warm.work_seconds.p95": 1.0
+    },
+    "repeats": 5,
+    "wall_seconds": 28.874272402958013,
+    "warm_result_seconds": {
+     "count": 5,
+     "max": 0.7912594239460304,
+     "p50": 0.6224471320165321,
+     "p95": 0.7912594239460304
+    },
+    "worst_complete_task_ratio": 1.0
+   },
+   {
+    "cold_result_seconds": {
+     "count": 25,
+     "max": 9.388316201977432,
+     "p50": 8.225370545056649,
+     "p95": 9.15650647005532
+    },
+    "concurrency": 5,
+    "failed": 0,
+    "meets_half_speed_floor": true,
+    "ok": 25,
+    "ratios": {
+     "cold.first_event_seconds.p50": 1.7710789030480127,
+     "cold.first_event_seconds.p95": 1.8725724057064408,
+     "cold.result_seconds.p50": 1.7445931103742043,
+     "cold.result_seconds.p95": 1.8423209551526434,
+     "cold.work_seconds.p50": 1.5249053198425508,
+     "cold.work_seconds.p95": 1.9687266222771582,
+     "warm.first_event_seconds.p50": 0.829269381515071,
+     "warm.first_event_seconds.p95": 0.9620490064235078,
+     "warm.result_seconds.p50": 0.9599272070388143,
+     "warm.result_seconds.p95": 0.9918117765904451,
+     "warm.work_seconds.p50": 1.0747088022137656,
+     "warm.work_seconds.p95": 1.125007933025311
+    },
+    "repeats": 5,
+    "wall_seconds": 48.24009305704385,
+    "warm_result_seconds": {
+     "count": 25,
+     "max": 0.8788586379960179,
+     "p50": 0.5975039369659498,
+     "p95": 0.7847804150078446
+    },
+    "worst_complete_task_ratio": 1.8423209551526434
+   },
+   {
+    "cold_result_seconds": {
+     "count": 30,
+     "max": 10.192109644995071,
+     "p50": 9.556215477001388,
+     "p95": 10.06008865404874
+    },
+    "concurrency": 6,
+    "failed": 0,
+    "meets_half_speed_floor": false,
+    "ok": 30,
+    "ratios": {
+     "cold.first_event_seconds.p50": 2.0401399994746963,
+     "cold.first_event_seconds.p95": 2.038277006752396,
+     "cold.result_seconds.p50": 2.0268640289339257,
+     "cold.result_seconds.p95": 2.0241248339264675,
+     "cold.work_seconds.p50": 2.011490893589246,
+     "cold.work_seconds.p95": 2.474032587061308,
+     "warm.first_event_seconds.p50": 0.9667956573016696,
+     "warm.first_event_seconds.p95": 0.9567611130043976,
+     "warm.result_seconds.p50": 1.1190604249701457,
+     "warm.result_seconds.p95": 1.0850722467832445,
+     "warm.work_seconds.p50": 1.1583877152066568,
+     "warm.work_seconds.p95": 1.3028715010233116
+    },
+    "repeats": 5,
+    "wall_seconds": 54.84337351890281,
+    "warm_result_seconds": {
+     "count": 30,
+     "max": 0.9189761659363285,
+     "p50": 0.6965559520758688,
+     "p95": 0.858573640929535
+    },
+    "worst_complete_task_ratio": 2.0268640289339257
+   },
+   {
+    "cold_result_seconds": {
+     "count": 35,
+     "max": 12.42911209911108,
+     "p50": 11.331342476070859,
+     "p95": 12.104422542033717
+    },
+    "concurrency": 7,
+    "failed": 0,
+    "meets_half_speed_floor": false,
+    "ok": 35,
+    "ratios": {
+     "cold.first_event_seconds.p50": 2.425663933530399,
+     "cold.first_event_seconds.p95": 2.446542532471129,
+     "cold.result_seconds.p50": 2.403366742781513,
+     "cold.result_seconds.p95": 2.435451923955886,
+     "cold.work_seconds.p50": 2.244046119127894,
+     "cold.work_seconds.p95": 2.9089587039785805,
+     "warm.first_event_seconds.p50": 1.1326823290542714,
+     "warm.first_event_seconds.p95": 1.1724687401712466,
+     "warm.result_seconds.p50": 1.3513965552985385,
+     "warm.result_seconds.p95": 1.4238925766002852,
+     "warm.work_seconds.p50": 1.4655582216107106,
+     "warm.work_seconds.p95": 1.72077613177268
+    },
+    "repeats": 5,
+    "wall_seconds": 64.5183425899595,
+    "warm_result_seconds": {
+     "count": 35,
+     "max": 1.2325272359885275,
+     "p50": 0.8411729100625962,
+     "p95": 1.1266684199217707
+    },
+    "worst_complete_task_ratio": 2.435451923955886
+   }
+  ]
+ },
+ "real_model_performance_verified": false,
+ "rejected_shared_server": {
+  "adopted": false,
+  "driver_zcode_py_sha256": [
+   "228257199152f7d59140c152584ac84c950585760125f6edb54bcf49da23225c"
+  ],
+  "instances": "shared",
+  "label": "same revision as candidate, one agent for every session",
+  "results_jsonl_sha256": "2416ca259aaa0c759ec2dc42a6bb437d6e2c2d69a05793c8a621a551d4da99c5",
+  "rungs": [
+   {
+    "cold_result_seconds": {
+     "count": 3,
+     "max": 5.001570663996972,
+     "p50": 4.953603373956867,
+     "p95": 5.001570663996972
+    },
+    "concurrency": 1,
+    "failed": 0,
+    "meets_half_speed_floor": true,
+    "ok": 3,
+    "ratios": {
+     "cold.first_event_seconds.p50": 1.0,
+     "cold.first_event_seconds.p95": 1.0,
+     "cold.result_seconds.p50": 1.0,
+     "cold.result_seconds.p95": 1.0,
+     "cold.work_seconds.p50": 1.0,
+     "cold.work_seconds.p95": 1.0,
+     "warm.first_event_seconds.p50": 1.0,
+     "warm.first_event_seconds.p95": 1.0,
+     "warm.result_seconds.p50": 1.0,
+     "warm.result_seconds.p95": 1.0,
+     "warm.work_seconds.p50": 1.0,
+     "warm.work_seconds.p95": 1.0
+    },
+    "repeats": 3,
+    "wall_seconds": 17.79749549506232,
+    "warm_result_seconds": {
+     "count": 3,
+     "max": 0.6993688349612057,
+     "p50": 0.6350260359467939,
+     "p95": 0.6993688349612057
+    },
+    "worst_complete_task_ratio": 1.0
+   },
+   {
+    "cold_result_seconds": {
+     "count": 12,
+     "max": 8.45328164997045,
+     "p50": 7.88602193450788,
+     "p95": 8.45328164997045
+    },
+    "concurrency": 4,
+    "failed": 0,
+    "meets_half_speed_floor": false,
+    "ok": 12,
+    "ratios": {
+     "cold.first_event_seconds.p50": 1.538661795362711,
+     "cold.first_event_seconds.p95": 1.5957508923296775,
+     "cold.result_seconds.p50": 1.5919768578905502,
+     "cold.result_seconds.p95": 1.6901254061689224,
+     "cold.work_seconds.p50": 2.0265851859839437,
+     "cold.work_seconds.p95": 3.464328253392349,
+     "warm.first_event_seconds.p50": 1.0783290604086206,
+     "warm.first_event_seconds.p95": 2.0541610346122745,
+     "warm.result_seconds.p50": 1.6602364237603071,
+     "warm.result_seconds.p95": 2.3450779188354387,
+     "warm.work_seconds.p50": 1.8983428152649058,
+     "warm.work_seconds.p95": 4.169435599203735
+    },
+    "repeats": 3,
+    "wall_seconds": 28.91968310298398,
+    "warm_result_seconds": {
+     "count": 12,
+     "max": 1.6400744119891897,
+     "p50": 1.0542933549149893,
+     "p95": 1.6400744119891897
+    },
+    "worst_complete_task_ratio": 2.3450779188354387
+   },
+   {
+    "cold_result_seconds": {
+     "count": 18,
+     "max": 12.184377475990914,
+     "p50": 10.175229069485795,
+     "p95": 12.184377475990914
+    },
+    "concurrency": 6,
+    "failed": 0,
+    "meets_half_speed_floor": false,
+    "ok": 18,
+    "ratios": {
+     "cold.first_event_seconds.p50": 1.8809088980293636,
+     "cold.first_event_seconds.p95": 2.267453139444271,
+     "cold.result_seconds.p50": 2.054106536462157,
+     "cold.result_seconds.p95": 2.4361102330710347,
+     "cold.work_seconds.p50": 4.437643567480306,
+     "cold.work_seconds.p95": 5.952226119406206,
+     "warm.first_event_seconds.p50": 1.3380387581076678,
+     "warm.first_event_seconds.p95": 2.3382319429768157,
+     "warm.result_seconds.p50": 2.6226252566794623,
+     "warm.result_seconds.p95": 3.349917634104177,
+     "warm.work_seconds.p50": 3.3634090670941985,
+     "warm.work_seconds.p95": 6.765191171125271
+    },
+    "repeats": 3,
+    "wall_seconds": 40.33874675410334,
+    "warm_result_seconds": {
+     "count": 18,
+     "max": 2.342827992979437,
+     "p50": 1.6654353205231018,
+     "p95": 2.342827992979437
+    },
+    "worst_complete_task_ratio": 3.349917634104177
+   },
+   {
+    "cold_result_seconds": {
+     "count": 24,
+     "max": 16.144125559949316,
+     "p50": 14.080937529506627,
+     "p95": 15.975585832959041
+    },
+    "concurrency": 8,
+    "failed": 0,
+    "meets_half_speed_floor": false,
+    "ok": 24,
+    "ratios": {
+     "cold.first_event_seconds.p50": 2.496634975425271,
+     "cold.first_event_seconds.p95": 2.8907905041436694,
+     "cold.result_seconds.p50": 2.8425645871318475,
+     "cold.result_seconds.p95": 3.1941137906851558,
+     "cold.work_seconds.p50": 6.901060721575449,
+     "cold.work_seconds.p95": 7.883374494336565,
+     "warm.first_event_seconds.p50": 2.2653479444620355,
+     "warm.first_event_seconds.p95": 3.12079541006824,
+     "warm.result_seconds.p50": 4.227569045991645,
+     "warm.result_seconds.p95": 5.1565281390465465,
+     "warm.work_seconds.p50": 5.592138673783917,
+     "warm.work_seconds.p95": 9.1942671754334
+    },
+    "repeats": 3,
+    "wall_seconds": 52.141215360024944,
+    "warm_result_seconds": {
+     "count": 24,
+     "max": 3.9014298600377515,
+     "p50": 2.6846164129674435,
+     "p95": 3.6063150770496577
+    },
+    "worst_complete_task_ratio": 5.1565281390465465
+   }
+  ],
+  "why": "One server is one Node event loop and this CLI's turns are CPU rather than waiting, so carrying every session on one server misses the floor at four sessions where four separate agents pass. Retained in REJECTED.md. It does work: one app server serves the whole rung and peak RSS grows about 0.63 GiB a session rather than 1.0."
+ },
+ "revision": "zcode-speed-floor-confirmation-v1",
+ "synthetic_model": true,
+ "verdict": {
+  "confirmed_sessions": 5,
+  "driver_change_effect": "None that these measurements can resolve. Every published zcode rung uses one agent per session, where a server holds a single session and the serialization the candidate removes never had two turns to serialize.",
+  "limit": "CPU inside the official CLI. One task pair costs about 8.1 CPU-seconds and peaks near 2.7 busy cores; the four-core quota is saturated from four sessions upward, and at eight sessions a rung's wall time is within about 11% of the floor that total CPU implies.",
+  "why_not_six": "Six is on the bound and its verdict is not stable. The candidate's five-repeat confirmation gives 1.993 and the original's gives 2.027, but the candidate is not faster in absolute terms at six sessions (10.07s cold p50 against the original's 9.56s); the ratios differ because the two runs' own fresh serial controls differ by 11% (5.22s against 4.71s), which is larger than the gap between the verdicts. An exploratory three-repeat trial put six at 2.080. Five clears with margin in both variants and is what is published."
+ }
+}

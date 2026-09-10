@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -500,4 +501,167 @@ def test_two_sessions_of_one_agent_share_the_server_it_started(
 
     assert agent.server is agent.server
     assert len(server.named("session/create")) == 2
+    agent.stop()
+
+
+#: A stand-in that will not finish a turn until another is running beside it. Each
+#: `session/create` is a session of its own, and a `session/send` is written down rather than
+#: answered until two of them are outstanding -- at which point both turns are said at once,
+#: interleaved, each on its own session. A client that reads the one stream in turn never gets
+#: its first turn back, so this hangs rather than passing where turns are serialized.
+_TOGETHER = """
+import json, sys, threading
+
+HELD = []
+LOCK = threading.Lock()
+
+
+def send(message):
+    with LOCK:
+        sys.stdout.write(json.dumps(message) + "\\n")
+        sys.stdout.flush()
+
+
+def event(session, kind, payload):
+    send({"method": "session/event", "params": {
+        "sessionId": session, "type": kind, "payload": payload}})
+
+
+def both():
+    # Interleaved deliberately: each turn must take its own out of the shared stream.
+    for session, _ in HELD:
+        event(session, "model.streaming", {"assistantMessageId": "msg_" + session,
+                                           "kind": "text_delta", "delta": session})
+    for session, prompt in HELD:
+        event(session, "session.updated", {"assistantMessageId": "msg_" + session,
+                                           "content": prompt, "stopReason": "stop",
+                                           "usage": {"inputTokens": 1, "outputTokens": 1,
+                                                     "totalTokens": 2}})
+    for session, prompt in HELD:
+        event(session, "turn.completed", {"response": prompt, "toolCallCount": 0,
+                                          "usage": {"inputTokens": 1, "outputTokens": 1,
+                                                    "totalTokens": 2}})
+
+
+for line in sys.stdin:
+    call = json.loads(line)
+    if "method" not in call or "id" not in call:
+        continue
+    if call["method"] == "session/create":
+        named = "sess_%d" % (len(HELD) + call["id"])
+        send({"id": call["id"], "result": {
+            "session": {"sessionId": named, "mode": "build",
+                        "model": {"providerId": "zai", "modelId": "glm"}},
+            "projection": {"turnCount": 0}, "messages": [],
+            "protocol": {"name": "ZCode Protocol", "version": 1}}})
+        continue
+    if call["method"] == "session/send":
+        HELD.append((call["params"]["sessionId"], call["params"]["content"]))
+        send({"id": call["id"], "result": {"accepted": True}})
+        if len(HELD) == 2:
+            both()
+        continue
+    send({"id": call["id"], "result": {}})
+"""
+
+
+def test_two_turns_of_one_agent_run_at_once_rather_than_one_behind_the_other(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The one stream is sorted per session, so a turn waits only on its own session."""
+    binaries = tmp_path / "bin"
+    binaries.mkdir(exist_ok=True)
+    fake = binaries / "zcode"
+    fake.write_text(f"#!{sys.executable}\n{_TOGETHER}")
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
+
+    agent = _agent()
+    said: dict[str, str] = {}
+
+    def turn(name: str) -> None:
+        said[name] = agent.new(tmp_path)(name)
+
+    # Neither finishes until both are running, so a driver that ran them one at a time would
+    # leave the second unsent and the first waiting forever.
+    # Daemons so that a driver which serializes them fails this in thirty seconds rather
+    # than leaving the suite waiting on a turn that is never coming back.
+    threads = [
+        threading.Thread(target=turn, args=(name,), daemon=True)
+        for name in ("one", "two")
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+
+    assert not [thread for thread in threads if thread.is_alive()]
+    assert said == {"one": "one", "two": "two"}
+    agent.stop()
+
+
+#: A stand-in that says a whole stale turn -- one that ended before this one was asked for --
+#: in the moment between reading `session/send` and answering it. The real one has its own
+#: reasons to talk about a session outside a turn: a subscription catching a client up, a goal
+#: it is still working. None of it is the turn now being sent, and a turn that read it would
+#: end on somebody else's answer without ever having run.
+_STALE = """
+import json, sys
+
+SESSION = "sess_stale"
+
+
+def send(message):
+    sys.stdout.write(json.dumps(message) + "\\n")
+    sys.stdout.flush()
+
+
+def event(kind, payload):
+    send({"method": "session/event", "params": {
+        "sessionId": SESSION, "type": kind, "payload": payload}})
+
+
+def turn(response):
+    event("session.updated", {"assistantMessageId": "msg_" + response,
+                              "content": response, "stopReason": "stop",
+                              "usage": {"inputTokens": 1, "outputTokens": 1,
+                                        "totalTokens": 2}})
+    event("turn.completed", {"response": response, "toolCallCount": 0,
+                             "usage": {"inputTokens": 1, "outputTokens": 1,
+                                       "totalTokens": 2}})
+
+
+for line in sys.stdin:
+    call = json.loads(line)
+    if "method" not in call or "id" not in call:
+        continue
+    if call["method"] == "session/create":
+        send({"id": call["id"], "result": {
+            "session": {"sessionId": SESSION, "mode": "build",
+                        "model": {"providerId": "zai", "modelId": "glm"}},
+            "projection": {"turnCount": 0}, "messages": [],
+            "protocol": {"name": "ZCode Protocol", "version": 1}}})
+        continue
+    if call["method"] == "session/send":
+        turn("a turn that ended before this one was asked for")
+        send({"id": call["id"], "result": {"accepted": True}})
+        turn(call["params"]["content"])
+        continue
+    send({"id": call["id"], "result": {}})
+"""
+
+
+def test_what_a_session_said_before_the_turn_started_is_not_the_turns_own_answer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The answer to the call that starts a turn is the line before it and after it."""
+    binaries = tmp_path / "bin"
+    binaries.mkdir(exist_ok=True)
+    fake = binaries / "zcode"
+    fake.write_text(f"#!{sys.executable}\n{_STALE}")
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{binaries}{os.pathsep}{os.environ['PATH']}")
+
+    agent = _agent()
+    assert agent.new(tmp_path)("what this turn asked") == "what this turn asked"
     agent.stop()
