@@ -6,10 +6,20 @@ somebody's gateway are three catalogues under one command. So there is no list h
 backend is asked, in whatever way that backend offers being asked -- a control request, a debug
 command, a provider dump, a table -- and what it says is kept per account.
 
-Asking means starting a coding agent, which costs seconds a prompt has not got. So nothing is
-asked at a prompt: an account is asked the moment it is made, `ask` is what asks again, and
-everything else reads what was kept. A catalogue that has never been asked for is empty rather
-than guessed at -- a model nobody can run is worse than a list somebody has to fill.
+Except that a CLI pointed at somebody's endpoint answers with the models *it* ships. It has no
+way not to: nothing it enumerates ever went and looked at the other end of the base URL it was
+handed. That answer is wrong the moment it is given, however recently it was taken, and the
+account it is wrong for is exactly the one whose models nobody could have written down. So
+where an account names an endpoint, the endpoint is what is asked -- `GET {base}/v1/models`,
+under that account's own credentials -- and the CLI is asked only where there is no endpoint,
+where it will not answer, or where what came back is not a list of models.
+
+Asking means starting a coding agent, or reaching somebody's endpoint, and both cost seconds a
+prompt has not got. So nothing is asked at a prompt: an account is asked the moment it is made,
+`ask` is what asks again -- the `r` key and `hmz providers`, where somebody pressed something
+and is waiting on the answer -- and everything else reads what was kept. A catalogue that has
+never been asked for is empty rather than guessed at: a model nobody can run is worse than a
+list somebody has to fill.
 
 What is kept for an account lives with that account, so that taking the account away takes its
 catalogue with it: they are the same fact. The account nobody chose -- the CLI as whoever is at
@@ -19,19 +29,24 @@ this machine already runs it -- keeps its own under humanize's home.
 from __future__ import annotations
 
 import datetime
+import http.client
 import json
 import os
 import pathlib
 import re
 import subprocess
+import urllib.error
+import urllib.parse
+import urllib.request
 from typing import TYPE_CHECKING, Any, cast
 
 from hmz import home, providers
 from hmz.backends import Model, elsewhere, named, speaking
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
     from pathlib import Path
+    from typing import IO
 
     from hmz.backends import Profile
 
@@ -69,18 +84,44 @@ _LISTED = "list"
 _ABOUT = " — "
 
 #: The advisory catalogue shipped by the official DeepSeek adapter. Its preview SDK has no
-#: model-list request, so this is both what asking it answers and what a first prompt offers
-#: before there is a cache to read.
+#: model-list request, so where the account names no endpoint this is both what asking it
+#: answers and what a first prompt offers before there is a cache to read.
 _DSH_MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
 
 #: The same for Qwen Code, which has no command that lists what it runs: it is a client of an
 #: OpenAI-compatible endpoint, so the catalogue belongs to the account rather than to the CLI.
-#: These are what it ships pointed at; any other id that endpoint serves may be named instead.
+#: These are what it ships pointed at, for an account that names no endpoint of its own; one
+#: that does is answered by that endpoint, which is where its catalogue was all along.
 _QWEN_MODELS = ("qwen3-coder-plus", "qwen3-coder-flash")
 
 #: The backends whose catalogue is written down here rather than asked for, which is what a
 #: prompt offers before either has been asked.
 _ADVISORY = {"dsh": _DSH_MODELS, "qwen": _QWEN_MODELS}
+
+#: How long an endpoint is given to say what it serves. Short beside `WAITING`, which is a
+#: coding agent starting up: this is one request, and one that does not answer promptly is
+#: one to fall back from rather than one to wait out.
+_REACHING = 20.0
+
+#: The most that will be read from it. A catalogue is kilobytes; this is the cap that says a
+#: redirect onto something else is not a list to parse.
+_MOST = 8 * 1024 * 1024
+
+#: Where a model list is served under a base URL that already names its version -- an account
+#: is written down either way, `https://host` and `https://host/v1` both being how a person
+#: was told to spell the same gateway, and `/v1/v1/models` is nowhere.
+_VERSIONED = re.compile(r"/v\d+[a-z0-9]*$")
+
+#: What a key is sent as. Both, because a gateway fronting several vendors is asked what it
+#: serves without knowing which protocol it prefers to be asked in: `Authorization` is what an
+#: OpenAI-shaped catalogue reads and `x-api-key` is what an Anthropic-shaped one does, and
+#: each ignores the other. The value never leaves this request -- not to the file, not to a
+#: log, and not into the message raised when the endpoint refuses.
+_BEARER = "Authorization"
+_KEYED = "x-api-key"
+
+#: The version an Anthropic-shaped endpoint refuses to answer without.
+_DATED = "2023-06-01"
 
 
 def where(cli: str, provider: str = "") -> Path:
@@ -155,19 +196,22 @@ def asked(cli: str, provider: str = "") -> str:
 
 
 def ask(cli: str, provider: str = "", seconds: float = WAITING) -> tuple[Model, ...]:
-    """Asks the backend itself what it runs as this account, writes it down, and answers.
+    """Asks what this account runs, writes it down, and answers.
 
-    Started the way a turn of that account would be started: under the provider's own paths
-    and with the variables that account sets, and without the ones its backend would take
-    another account from. What comes back is what a turn could actually name.
+    Asked of the endpoint the account points its backend at, where it names one, and of the
+    backend itself where it does not. Either way as a turn of that account is taken: under the
+    provider's own paths, with the variables that account sets and without the ones its
+    backend would take another account from. What comes back is what a turn could actually
+    name -- which is why the endpoint goes first where there is one, a CLI having no way of
+    answering with anything but the models it shipped with.
 
     Args:
       cli: The backend, by any name it answers to.
       provider: The account, or "" for the CLI as whoever is at this machine already runs it.
-      seconds: How long it is given to answer.
+      seconds: How long the backend is given to answer, for the times it is the one asked.
 
     Returns:
-      What it said, in its own order and with each model named once.
+      What was said, in its own order and with each model named once.
 
     Raises:
       ValueError: If the backend is not one there is, has no way of being asked, is not that
@@ -181,9 +225,11 @@ def ask(cli: str, provider: str = "", seconds: float = WAITING) -> tuple[Model, 
     reading = _READING.get(profile.name)
     if reading is None:
         raise ValueError(f"{profile.name} has no way of being asked what it runs")
+    environ, run = _asking(profile, provider, seconds)
+    served = _served(profile, environ)
     found: list[Model] = []
     seen: set[str] = set()
-    for model in reading(profile, _asking(profile, provider, seconds)):
+    for model in served if served is not None else reading(profile, run):
         # A backend may name one model twice -- Claude Code offers the default under its own
         # name as well as under `default` -- and a list with a model in it twice is a list
         # somebody reads as two models.
@@ -194,7 +240,9 @@ def ask(cli: str, provider: str = "", seconds: float = WAITING) -> tuple[Model, 
     return tuple(found)
 
 
-def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., str]:
+def _asking(
+    profile: Profile, provider: str, seconds: float
+) -> tuple[dict[str, str], Callable[..., str]]:
     """How to put a question to one backend as one account.
 
     Args:
@@ -203,8 +251,11 @@ def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., st
       seconds: How long it is given to answer.
 
     Returns:
-      What runs the backend's own command and answers with what it printed, taking the
-      arguments after the command's own name and what to say to it on the way in.
+      The environment a turn of that account runs under, and what runs the backend's own
+      command and answers with what it printed -- taking the arguments after the command's
+      own name and what to say to it on the way in. The environment comes back beside it so
+      that whatever asks the endpoint instead reads the same resolution rather than a second
+      one of its own: an account is where its variables say it is, once.
 
     Raises:
       ValueError: If that backend has no account of that name.
@@ -246,7 +297,143 @@ def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., st
             )
         return done.stdout
 
-    return run
+    return environ, run
+
+
+def _served(profile: Profile, environ: Mapping[str, str]) -> list[Model] | None:
+    """What the endpoint this account points its backend at says it serves.
+
+    The whole of the fix for a catalogue that is fresh and wrong: a CLI handed a base URL
+    answers with the models it ships, having nothing that goes and looks, so an account on
+    somebody's gateway is offered three names the gateway will refuse and a refresh changes
+    nothing. What that account may name is what is at the other end of its own base URL.
+
+    Args:
+      profile: The backend, which says which variable carries that URL.
+      environ: The environment a turn of this account runs under, as `_asking` resolved it.
+
+    Returns:
+      One per id it serves, each at the backend's whole ladder -- a catalogue says nothing
+      about how hard a model may be asked to think, and a model nothing narrows is one its
+      backend will take any rung for. None where there is no endpoint to ask, where it would
+      not answer, and where what it answered is not a list of models: an endpoint that will
+      not say is a reason to ask the CLI, never a reason to have no catalogue at all.
+    """
+    base = environ.get(profile.endpoint, "").strip() if profile.endpoint else ""
+    if not base:
+        return None
+    try:
+        ids = _listing(base, _secret(profile, environ))
+    except (OSError, http.client.HTTPException, urllib.error.URLError, ValueError):
+        # It is down, it refused, it is not HTTP, it answered something else, or the answer
+        # stopped half way through. Every one of them is the CLI's turn to be asked.
+        return None
+    return [Model(one, profile.efforts, profile.swarms) for one in ids] if ids else None
+
+
+class _Nearby(urllib.request.HTTPRedirectHandler):
+    """A redirect that would carry the account's credential anywhere new, refused.
+
+    urllib sends the headers it was given again wherever it is sent, and these carry the key
+    the account was made with: an endpoint answering `302 https://somewhere-else` would be
+    handed it, by a machine that was only asking what models there are. The same host is the
+    whole of what is followed -- a path corrected, or `http` upgraded to `https` -- and going
+    anywhere else, or back down to plain HTTP with the key still on the request, stops here.
+    Which reads to the caller as an endpoint that would not say, and asks the CLI instead.
+    """
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: http.client.HTTPMessage,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        moved = urllib.parse.urlsplit(newurl)
+        plainer = req.type == "https" and moved.scheme != "https"
+        if moved.netloc != req.host or plainer:
+            return None  # not a place this account's credential may go
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+#: What asks, with that in place of urllib's own -- which follows anywhere and takes the
+#: headers with it. Built once: it holds nothing between requests.
+_OPENING = urllib.request.build_opener(_Nearby)
+
+
+def _listing(base: str, secret: str) -> list[str]:
+    """The ids one endpoint serves.
+
+    Args:
+      base: Where it is, as the account spells it -- with or without the version on the end.
+      secret: The account's own credential, which is sent and nowhere else put.
+
+    Returns:
+      The ids, in the endpoint's own order and none of them empty. Nothing at all for a body
+      this cannot read as a catalogue, which is how an endpoint that answers something other
+      than a list of models ends up being fallen back from.
+
+    Raises:
+      ValueError: If the account points at something that is not HTTP.
+      OSError: If it cannot be reached, or refused.
+    """
+    said = base.rstrip("/")
+    at = f"{said}/models" if _VERSIONED.search(said) else f"{said}/v1/models"
+    headers = {"Accept": "application/json", "User-Agent": "humanize"}
+    if secret:
+        headers |= {
+            _BEARER: f"Bearer {secret}",
+            _KEYED: secret,
+            "anthropic-version": _DATED,
+        }
+    asked = urllib.request.Request(at, headers=headers)  # noqa: S310 -- checked below
+    if asked.type not in {"http", "https"}:
+        msg = f"a catalogue comes over http, not {asked.type}"
+        raise ValueError(msg)
+    with _OPENING.open(asked, timeout=_REACHING) as answer:
+        body: object = json.loads(answer.read(_MOST))
+    if not isinstance(body, dict):
+        return []
+    listed: object = cast("dict[str, Any]", body).get("data")
+    if not isinstance(listed, list):
+        return []
+    return [
+        str(cast("dict[str, Any]", one).get("id") or "")
+        for one in cast("list[Any]", listed)
+        if isinstance(one, dict) and cast("dict[str, Any]", one).get("id")
+    ]
+
+
+def _secret(profile: Profile, environ: Mapping[str, str]) -> str:
+    """The credential this account would send, out of its own resolved environment.
+
+    Read rather than written down: every way in already says which of the things it asks for
+    is a secret, and a turn under a provider runs with that provider's own and without any
+    other account's -- so the first of them that is set is this account's and no one else's.
+
+    Args:
+      profile: The backend, whose ways say which variables carry a secret.
+      environ: The environment a turn of this account runs under.
+
+    Returns:
+      The credential, or "" for an account that keeps it somewhere an environment cannot
+      reach -- a login's own store, a key a CLI read off stdin. Never printed, never written
+      down, and never put in a message: it lives as long as one request.
+    """
+    # The way that names the endpoint first, since a way asking for both asks for a pair: the
+    # key that goes with a gateway is the one that way named, and not a subscription's token
+    # somebody also has exported. Stable, so the rest keep the order they are declared in.
+    for way in sorted(
+        profile.ways,
+        key=lambda way: profile.endpoint not in {one.env for one in way.asks},
+    ):
+        for one in way.asks:
+            said = environ.get(one.env, "").strip()
+            if one.secret and said:
+                return said
+    return ""
 
 
 def _rungs(profile: Profile, said: object) -> tuple[str, ...]:
@@ -438,7 +625,8 @@ def _dsh(profile: Profile, _run: Callable[..., str]) -> list[Model]:
 
     The rc6 Python SDK has no model-list request. These are the two defaults its bundled
     `@deepseek-ai/dsh-llm-deepseek` composition publishes; that adapter also accepts an
-    uncatalogued DeepSeek model id when one is named explicitly.
+    uncatalogued DeepSeek model id when one is named explicitly. An account that sets
+    `DEEPSEEK_BASE_URL` is answered by that endpoint instead and never reaches this.
 
     Args:
       profile: DeepSeek Harness's own.
@@ -593,11 +781,12 @@ def _plain(said: str) -> str:
 
 
 def _qwen(profile: Profile, _run: Callable[..., str]) -> list[Model]:
-    """What Qwen Code runs, which is whatever the endpoint behind it serves.
+    """What Qwen Code runs where its account names no endpoint to ask instead.
 
     It has no command that lists them: it is an OpenAI-compatible client, so its catalogue is
-    the account's rather than the CLI's, and there is nothing to ask. These are the ids Qwen
-    Code itself ships pointed at, and any other id that endpoint serves may be named instead.
+    the account's rather than the CLI's, and there is nothing here to ask. An account that
+    sets `OPENAI_BASE_URL` never reaches this -- the endpoint is asked and answers -- so these
+    are the ids Qwen Code ships pointed at, for the account that named nowhere else.
 
     Args:
       profile: Qwen Code's own.
