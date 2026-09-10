@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import IO, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Sequence
 
 __all__ = ["Event", "Failed", "Question", "Stopped", "Unrecoverable", "Usage", "say"]
 
@@ -108,20 +108,81 @@ class Failed(subprocess.CalledProcessError):
     account needs attention rather than that humanize is broken -- and until this they were
     a field on an exception whose message said nothing.
 
+    It also says which *kind* of failure it was, where somebody has worked that out. A kind
+    rather than a sentence, because the answer to each kind is a different answer: a rate
+    limit is waited out and then taken to another account, a refused credential is not waited
+    out at all, a retired model is answered by another place and by nothing else. Before that
+    there were two kinds -- a turn that failed and a turn no other try could change -- so a
+    401 was retried five times on a schedule and a `database is locked` waited a minute.
+
+    Which kind it was is worked out where the backend, the exit status and the CLI's own log
+    are all to hand, which is `hmz.backends.trouble` reached from the session -- not here: a
+    value carries what it was told, and reading a message to guess at one is somebody else's
+    job. What is written down here is what was decided.
+
     A `CalledProcessError` still, so that a flow catches turns rather than transports and
     every loop written against one goes on working.
+
+    Attributes:
+      fault: Which kind of failure this was, as `hmz.backends.FAULTS` names them, or "" for
+        one nobody has classified -- which is a turn tried again exactly as it always was.
+      fix: What a person does about it, in a few words, or "" where there is nothing to say
+        beyond what the CLI already said.
     """
 
+    def __init__(
+        self,
+        returncode: int,
+        cmd: Sequence[str],
+        output: str | bytes | None = None,
+        stderr: str | bytes | None = None,
+        *,
+        fault: str = "",
+        fix: str = "",
+    ) -> None:
+        """Initializes a failed turn.
+
+        Args:
+          returncode: How the process exited.
+          cmd: What was run.
+          output: What it wrote on stdout.
+          stderr: What it wrote on stderr.
+          fault: Which kind of failure it was, where the backend already knows.
+          fix: What a person does about it, where the backend already knows that too.
+        """
+        super().__init__(returncode, cmd, output, stderr)
+        self.fault = fault
+        self.fix = fix
+
     def __str__(self) -> str:
-        """What the process was, and then what it said about why it stopped.
+        """What the process was, then what it said about why it stopped, then which kind.
 
         Both of what it said, where the two are different things: a CLI that warns on one
         stream and fails on the other -- pi says `no project session found` on stderr and
         `the requested model is not available for your geography` on stdout -- would
         otherwise be reported by the half that does not matter.
+
+        And the kind last, because it is the reading rather than the evidence: whoever is
+        looking at this wants what the CLI actually said first, and what to do about it after.
         """
-        said = [super().__str__(), _words(self.stderr), _plainly(self.output)]
+        said = [
+            super().__str__(),
+            _words(self.stderr),
+            _plainly(self.output),
+            self.reads(),
+        ]
         return " ".join(one for one in said if one)
+
+    def reads(self) -> str:
+        """Which kind of failure this was and what to do about it, as one clause.
+
+        Returns:
+          It in parentheses, and "" for a failure nobody has classified -- which reads exactly
+          as a failed turn has always read.
+        """
+        if not self.fault:
+            return ""
+        return f"({self.fault}: {self.fix})" if self.fix else f"({self.fault})"
 
 
 class Unrecoverable(Failed):
@@ -130,9 +191,11 @@ class Unrecoverable(Failed):
     Most of what goes wrong in a turn is worth another go: a gateway that answered 503, a
     subscription that said `too many requests`, a socket that closed mid-stream are each the
     same call away from working, which is what an account's retries and the chain behind it
-    are for. Some of it is not. A prompt the model refused for being longer than its context
-    window is that long again on the next try; a conversation whose backend can no longer be
-    reached under the id it was opened with is not reachable under it a second later either.
+    are for -- and `fault` says which of those it was, so that each gets the go that suits it
+    rather than all of them getting the same one. Some of it is not. A prompt the model
+    refused for being longer than its context window is that long again on the next try; a
+    conversation whose backend can no longer be reached under the id it was opened with is
+    not reachable under it a second later either.
 
     Tried again, those become a loop: the same failure, at whatever interval the account was
     given, for as long as anybody leaves it running. So they are said once, as this, and

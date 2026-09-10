@@ -238,6 +238,61 @@ def test_the_waits_are_the_ones_everybody_uses() -> None:
     assert 0.0 <= waits("nonesuch", 3) <= 2.0
 
 
+def test_every_kind_of_failure_has_an_answer_and_nothing_else_does() -> None:
+    """One row per kind, and the kind nobody recognised is not among them: it is the default."""
+    assert {one.fault for one in fallbacks.ANSWERS} == set(backends.FAULTS)
+
+    owed = fallbacks.answers("nothing-is-called-this")
+    assert owed.about == "failed"  # which is how a failed turn has always been narrated
+    assert (owed.tries, owed.held, owed.policy, owed.least) == (0, False, "", 0.0)
+    assert owed.accounts
+
+
+def test_a_kind_may_floor_the_goes_a_place_asked_for_and_may_take_them_away() -> None:
+    """A floor is what a failure worth another go needs; a ceiling would overrule a person."""
+    # Three goes at a store another turn had open, whether or not anybody asked for any.
+    assert fallbacks.answers("contended").tries == fallbacks._BUSY
+    assert not fallbacks.answers("contended").held
+    # And none at all for a credential that was refused, however many the place asked for.
+    assert fallbacks.answers("refused").held
+
+
+def test_the_least_a_rate_limit_waits_is_longer_than_a_backoff_starts_at() -> None:
+    """The first second of an exponential backoff is a second the service already refused."""
+    assert fallbacks.answers("throttled").least == fallbacks.THROTTLED
+    assert fallbacks.waits("exponential", 2) < fallbacks.THROTTLED
+    # And never longer than a wait may be, however the shape of it is arrived at.
+    assert fallbacks.THROTTLED <= fallbacks.CEILING
+
+
+def test_which_kinds_another_account_answers_is_written_down_here() -> None:
+    """A model that is gone is gone under every account of that CLI, and so is a missing CLI."""
+    assert not fallbacks.answers("retired").accounts
+    assert not fallbacks.answers("missing").accounts
+    # And the two an account is exactly the answer to.
+    assert fallbacks.answers("throttled").accounts
+    assert fallbacks.answers("refused").accounts
+
+
+def test_a_chain_is_not_walked_for_a_failure_no_account_of_it_answers(
+    accounts: None, tmp_path: Path
+) -> None:
+    """Walking four accounts to be told the same thing four times is four turns for nothing."""
+    providers.points("shell", "main", "second")
+    providers.points("shell", "second", "spare")
+    tally = tmp_path / "tries.txt"
+
+    with pytest.raises(subprocess.CalledProcessError):
+        _agent("main").new()(
+            f'echo "${{WHOSE:-nobody}}" >> {tally}; '
+            'echo "404 model not found: m" >&2; exit 1'
+        )
+
+    # One go, under the account it started on, and no walk at all: `spare` would have
+    # answered any other failure, and is offered the same catalogue as `main`.
+    assert tally.read_text().split() == ["main"]
+
+
 def test_a_policy_that_is_not_one_is_refused_where_it_is_written(
     accounts: None,
 ) -> None:

@@ -59,6 +59,15 @@ other way. The waits are the ones everybody uses: `none`, `constant`, `linear`, 
 `exponential-jitter` (full jitter, which is what keeps a flow's agents from all coming back on
 the same second) and `fibonacci`.
 
+**Each kind of failure gets the answer that kind takes.** What stopped the turn is worked out
+first — from what the CLI said, how it exited, and, for the one backend that keeps it there,
+its own log — and the kind decides how many goes it is worth, how long the shortest wait is and
+whether another account answers it at all. A 429 waits half a minute and then moves account; a
+401 moves account at once and says the one it left needs signing in; a retired model skips the
+accounts entirely, they are all offered the same catalogue. The whole table is in
+[falling back](/user/fallback#what-went-wrong). A failure nothing recognises is tried again
+exactly as a failed turn always was.
+
 **Some failures are taken once whatever the step says.** A backend that knows its own
 failure cannot come out differently says so by raising `hmz.agents.Unrecoverable`, and that
 one is neither retried nor carried to the next account in the chain. A conversation longer
@@ -369,6 +378,14 @@ It says **why**, which a bare `CalledProcessError` does not:
 ```console
 Command '['mimo']' returned non-zero exit status 1. MiMo free API service has ended.
     Sign in or configure a third-party API.
+```
+
+And it says **which kind** of failure it was and what to do about it, in brackets at the end,
+where anything recognised it:
+
+```console
+Command '['claude', …]' returned non-zero exit status 1. 429 rate limit exceeded
+(throttled: this account has spent its quota; another one, or a wait, is what answers it)
 ```
 
 Most of what stops a turn is about the account rather than about humanize — a model this

@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hmz import backends, fallbacks
+from hmz import backends, fallbacks, providers
 from hmz.agents import AgentConfig, ClaudeCodeAgent, ClaudeCodeAgentConfig, Tool
 from hmz.agents.skills import Loaded
 from tests.stubs import ShellAgent
@@ -268,6 +268,60 @@ def test_a_turn_with_nowhere_left_to_run_is_taken_at_the_place_it_falls_back_to(
 
     # `exit 3` is a turn that failed, and this agent has no account to fall back to.
     assert agent.new()("exit 3") == "claude took it: exit 3"
+
+
+@pytest.mark.timeout(60)
+def test_a_model_that_is_gone_walks_no_account_before_it_takes_the_step(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every account of a CLI is offered the same catalogue, so the step is the whole answer."""
+    _claude(tmp_path, monkeypatch)
+    providers.add("shell", "main", env={"WHOSE": "main"})
+    providers.add("shell", "spare", env={"WHOSE": "spare"})
+    providers.points("shell", "main", "spare")
+    fallbacks.points("shell@main/m", "claude/claude-opus-5")
+    agent = ShellAgent(AgentConfig(model="m", effort="high", provider="main"))
+    tally = tmp_path / "took.txt"
+    said: list[str] = []
+    agent.watch(
+        lambda _agent, _session, event: (
+            said.append(event.text) if event.kind == "tool" else None
+        )
+    )
+
+    script = f'echo "$WHOSE" >> {tally}; echo "404 model not found: m" >&2; exit 1'
+    assert agent.new()(script) == f"claude took it: {script}"
+
+    # One go, under the account it started on. `spare` would have answered any other failure.
+    assert tally.read_text().split() == ["main"]
+    # And the step says what sent the turn there rather than only that it went.
+    assert any(
+        "shell has no such model" in one
+        and "carrying on as claude/claude-opus-5" in one
+        for one in said
+    )
+
+
+@pytest.mark.timeout(60)
+def test_a_turn_that_failed_for_nothing_anybody_named_steps_as_it_always_did(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failure nothing recognises is narrated the way one has always been narrated."""
+    _claude(tmp_path, monkeypatch)
+    fallbacks.points("shell/m", "claude/claude-opus-5")
+    agent = ShellAgent(CONFIG)
+    said: list[str] = []
+    agent.watch(
+        lambda _agent, _session, event: (
+            said.append(event.text) if event.kind == "tool" else None
+        )
+    )
+
+    agent.new()("exit 3")
+
+    assert said == [
+        "shell has nowhere left to run; carrying on as claude/claude-opus-5"
+    ]
 
 
 @pytest.mark.timeout(60)
