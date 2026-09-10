@@ -851,7 +851,11 @@ PROFILES = (
         shared=(".agents/skills/*/SKILL.md",),
         #
         # One file holding every provider it has been signed into, and the lock its own
-        # processes serialize a refresh under.
+        # processes serialize a refresh under. Worth knowing what these cost: pi checks
+        # whether `auth.json` has changed before nearly every credential it resolves --
+        # measured at 614 to 823 `statx` of that one path per process, better than half of
+        # every path syscall a pi start makes -- so a turn run under a provider takes the
+        # supervisor's most expensive path, a rewritten one, some eight hundred times.
         # Every provider pi knows reads its own key out of the environment, and an agent under
         # a provider must not be handed one of somebody else's. The vendors' own names, which
         # is what pi looks for; a provider that wants one sets it itself.

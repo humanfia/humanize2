@@ -1,0 +1,2440 @@
+{
+ "backend": "pi",
+ "candidate_source_manifest_sha256": "d132d2a0239ec6980530959108edc5cfa7fb079b5681bd690deabb83e5249a63",
+ "confirmed_note": "Nine sessions passed four of five sole-occupant five-repeat pairings; the fifth missed at 2.038 and is retained. Eight passed four of four. Ten missed both of its pairings. Unchanged origin/main passed both of its eight-session pairings and missed all three of its nine-session ones, so nine is the rung the adapter change adds.",
+ "confirmed_sessions": 9,
+ "date": "2026-09-10",
+ "gate": {
+  "deleted_gates_not_measured": [
+   "startup <= 2x",
+   "fixed work <= 1.10x"
+  ],
+  "name": "0.5x-speed floor",
+  "rule": "complete-task result_seconds p50 and p95 <= 2.0x, cold and warm",
+  "serial_control": "origin/main at one session, five fresh repetitions, run adjacently in the same exclusive four-core measurement group"
+ },
+ "installed": {
+  "node_version": "v22.23.2",
+  "pi_executable": "/usr/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js",
+  "pi_version": "0.85.1"
+ },
+ "isolation": {
+  "enforced_by": "cgroup v2 cpuset, 4 exclusive physical cores, 16 GiB, no swap",
+  "note": "Every trial here ran after the measurement groups' occupancy guard was corrected. Readings taken before that fix shared CPUs with other work and are discarded, not published. Pairings that shared the host with a second pairing are retained but excluded from the pooled estimate and from the confirmation counts."
+ },
+ "original_commit": "48d1559805cbdb083958bf381a2ff57c183f96ab",
+ "pooled": {
+  "method": "Every sole-occupant pairing's correct turns pooled, so one control draw does not decide a rung. The per-pairing verdicts remain the protocol; this is how they are read together.",
+  "serial_control": {
+   "cold": {
+    "count": 78,
+    "p50": 0.7667950260220096,
+    "p95": 0.9685376110719517
+   },
+   "warm": {
+    "count": 78,
+    "p50": 0.27202431455953047,
+    "p95": 0.3261508910218254
+   }
+  },
+  "trials": [
+   {
+    "complete_task_ratios": {
+     "cold.result_seconds.p50": 1.6131157688735809,
+     "cold.result_seconds.p95": 1.444702055971448,
+     "warm.result_seconds.p50": 0.9105363554465833,
+     "warm.result_seconds.p95": 1.0873588475351659
+    },
+    "pairings_missed": 0,
+    "pairings_passed": 4,
+    "pairings_pooled": 4,
+    "sessions": 8,
+    "speed_floor_pass": true,
+    "turns_pooled": 320,
+    "under_test": "candidate",
+    "worst_complete_task_ratio": 1.6131157688735809
+   },
+   {
+    "complete_task_ratios": {
+     "cold.result_seconds.p50": 1.813488134106664,
+     "cold.result_seconds.p95": 1.655368783588895,
+     "warm.result_seconds.p50": 1.0720691070720683,
+     "warm.result_seconds.p95": 1.2546317679549426
+    },
+    "pairings_missed": 1,
+    "pairings_passed": 4,
+    "pairings_pooled": 5,
+    "sessions": 9,
+    "speed_floor_pass": true,
+    "turns_pooled": 450,
+    "under_test": "candidate",
+    "worst_complete_task_ratio": 1.813488134106664
+   },
+   {
+    "complete_task_ratios": {
+     "cold.result_seconds.p50": 2.0631948751692324,
+     "cold.result_seconds.p95": 1.841482813456276,
+     "warm.result_seconds.p50": 1.159957031769978,
+     "warm.result_seconds.p95": 1.335055258118939
+    },
+    "pairings_missed": 2,
+    "pairings_passed": 0,
+    "pairings_pooled": 2,
+    "sessions": 10,
+    "speed_floor_pass": false,
+    "turns_pooled": 200,
+    "under_test": "candidate",
+    "worst_complete_task_ratio": 2.0631948751692324
+   },
+   {
+    "complete_task_ratios": {
+     "cold.result_seconds.p50": 1.8279111814969744,
+     "cold.result_seconds.p95": 1.558445297122625,
+     "warm.result_seconds.p50": 0.8916527072190038,
+     "warm.result_seconds.p95": 1.1664938882760143
+    },
+    "pairings_missed": 0,
+    "pairings_passed": 2,
+    "pairings_pooled": 2,
+    "sessions": 8,
+    "speed_floor_pass": true,
+    "turns_pooled": 128,
+    "under_test": "original",
+    "worst_complete_task_ratio": 1.8279111814969744
+   },
+   {
+    "complete_task_ratios": {
+     "cold.result_seconds.p50": 2.08581269396619,
+     "cold.result_seconds.p95": 1.9852728411877796,
+     "warm.result_seconds.p50": 1.1031001122257016,
+     "warm.result_seconds.p95": 1.4629546539652605
+    },
+    "pairings_missed": 3,
+    "pairings_passed": 0,
+    "pairings_pooled": 3,
+    "sessions": 9,
+    "speed_floor_pass": false,
+    "turns_pooled": 270,
+    "under_test": "original",
+    "worst_complete_task_ratio": 2.08581269396619
+   }
+  ]
+ },
+ "real_model_performance_verified": false,
+ "revision": "pi-speed-floor-v1",
+ "synthetic_model": true,
+ "trials": [
+  {
+   "candidate_snapshot": "a",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.7950648001945133,
+    "cold.result_seconds.p95": 1.8810818189126226,
+    "warm.result_seconds.p50": 0.9807996373269533,
+    "warm.result_seconds.p95": 1.1663065479974097
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.7560868680011481,
+     "p50": 0.7002835590392351,
+     "p95": 0.7560868680011481
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.30388578004203737,
+     "p50": 0.25971142295747995,
+     "p95": 0.30388578004203737
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g3",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.4602,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 763965440,
+    "peak_cpu_busy_cores": 2.0163850541398096,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.434050087002106,
+     "p50": 1.2570543669862673,
+     "p95": 1.4222612609155476
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.40919826994650066,
+     "p50": 0.2547248694463633,
+     "p95": 0.3544239751063287
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.8031,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1380319232,
+    "peak_cpu_busy_cores": 4.003572685483477,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.8810818189126226
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.6538674107433953,
+    "cold.result_seconds.p95": 1.7431047251889247,
+    "warm.result_seconds.p50": 0.9802633011691049,
+    "warm.result_seconds.p95": 1.2829781420719752
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.7790431150933728,
+     "p50": 0.7525172389578074,
+     "p95": 0.7790431150933728
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.2789111250312999,
+     "p50": 0.2478122350294143,
+     "p95": 0.2789111250312999
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.5016,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1954422784,
+    "peak_cpu_busy_cores": 1.982848337722902,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.3645599510055035,
+     "p50": 1.244563737534918,
+     "p95": 1.3579537350451574
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.3821161469677463,
+     "p50": 0.24292123958002776,
+     "p95": 0.35783687699586153
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.7916,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2582151168,
+    "peak_cpu_busy_cores": 4.0093879326980755,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.7431047251889247
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.5758846997372913,
+    "cold.result_seconds.p95": 1.6104251634302502,
+    "warm.result_seconds.p50": 0.7733109667812758,
+    "warm.result_seconds.p95": 1.0501387802524573
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.8704970859689638,
+     "p50": 0.7873892869101837,
+     "p95": 0.8704970859689638
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3303153340239078,
+     "p50": 0.30146122397854924,
+     "p95": 0.3303153340239078
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g3",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.7266,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2173210624,
+    "peak_cpu_busy_cores": 1.9731818241855719,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.4556073959684,
+     "p50": 1.2408347299788147,
+     "p95": 1.401870411937125
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.3609046390047297,
+     "p50": 0.23312327056191862,
+     "p95": 0.3468769419705495
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.7988,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2790080512,
+    "peak_cpu_busy_cores": 4.003015725479309,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.6104251634302502
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.4901594343279585,
+    "cold.result_seconds.p95": 1.4091063480085244,
+    "warm.result_seconds.p50": 0.9500214330586045,
+    "warm.result_seconds.p95": 1.173662655592532
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.9685376110719517,
+     "p50": 0.8252241130685434,
+     "p95": 0.9685376110719517
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.28623126191087067,
+     "p50": 0.2705392779316753,
+     "p95": 0.28623126191087067
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.7222,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2048114688,
+    "peak_cpu_busy_cores": 1.9752767608342419,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.380080510978587,
+     "p50": 1.2297154975240119,
+     "p95": 1.3647724960464984
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.3552435969468206,
+     "p50": 0.2570181125192903,
+     "p95": 0.33593894296791404
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.7924,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2667810816,
+    "peak_cpu_busy_cores": 4.004324910251189,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.4901594343279585
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.6460335233066348,
+    "cold.result_seconds.p95": 1.5898570453121506,
+    "warm.result_seconds.p50": 0.9839495135569244,
+    "warm.result_seconds.p95": 1.342840606807975
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.9989105949643999,
+     "p50": 0.8573759070131928,
+     "p95": 0.9989105949643999
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.2947377120144665,
+     "p50": 0.28037686203606427,
+     "p95": 0.2947377120144665
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6985,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1958006784,
+    "peak_cpu_busy_cores": 1.979613208913109,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 1.6146429700311273,
+     "p50": 1.4112694850191474,
+     "p95": 1.5881250470411032
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.41930485994089395,
+     "p50": 0.27587667701300234,
+     "p95": 0.3957857680507004
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.7992,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2660999168,
+    "peak_cpu_busy_cores": 4.007889137460006,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.6460335233066348
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.8998839448927383,
+    "cold.result_seconds.p95": 2.0381181589601187,
+    "warm.result_seconds.p50": 0.9520235619264291,
+    "warm.result_seconds.p95": 1.454414816013928
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.7926502199843526,
+     "p50": 0.7406364919152111,
+     "p95": 0.7926502199843526
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.2975258909864351,
+     "p50": 0.2909659310244024,
+     "p95": 0.2975258909864351
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6645,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2040741888,
+    "peak_cpu_busy_cores": 1.951322024736133,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": false,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 1.6519832729827613,
+     "p50": 1.4071233799913898,
+     "p95": 1.6155148070538417
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.46589725697413087,
+     "p50": 0.27700642205309123,
+     "p95": 0.43272606399841607
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.8036,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2734510080,
+    "peak_cpu_busy_cores": 4.003611915683984,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.0381181589601187
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.6689166733862033,
+    "cold.result_seconds.p95": 1.5631392702032312,
+    "warm.result_seconds.p50": 1.0253070479025919,
+    "warm.result_seconds.p95": 1.324759984214543
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 1.0156559919705614,
+     "p50": 0.8415066410088912,
+     "p95": 1.0156559919705614
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.303166072932072,
+     "p50": 0.28727348905522376,
+     "p95": 0.303166072932072
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.7384,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2059587584,
+    "peak_cpu_busy_cores": 1.9894668663987143,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 1.607889472041279,
+     "p50": 1.4044044639449567,
+     "p95": 1.5876117660664022
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.460207722033374,
+     "p50": 0.294543533003889,
+     "p95": 0.40162228199187666
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.8097,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2753900544,
+    "peak_cpu_busy_cores": 4.114786367244422,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.6689166733862033
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.7676756196022099,
+    "cold.result_seconds.p95": 1.8465152753262346,
+    "warm.result_seconds.p50": 1.0972716123039354,
+    "warm.result_seconds.p95": 1.3310442245034957
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.8653261499712244,
+     "p50": 0.7753388680284843,
+     "p95": 0.8653261499712244
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3019881440559402,
+     "p50": 0.275621677050367,
+     "p95": 0.3019881440559402
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g1",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6473,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 8404877312,
+    "peak_cpu_busy_cores": 1.9780204293375245,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 1.6497294959845021,
+     "p50": 1.370547613943927,
+     "p95": 1.5978379540611058
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.42162264604121447,
+     "p50": 0.3024318419629708,
+     "p95": 0.4019595750141889
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.8026,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 9108389888,
+    "peak_cpu_busy_cores": 4.164878585339306,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.8465152753262346
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.813940378683871,
+    "cold.result_seconds.p95": 1.5802544030886494,
+    "warm.result_seconds.p50": 1.0758130942617574,
+    "warm.result_seconds.p95": 1.237960594316211
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 1.0167749369284138,
+     "p50": 0.7633890199940652,
+     "p95": 1.0167749369284138
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3264618590474129,
+     "p50": 0.27607249398715794,
+     "p95": 0.3264618590474129
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g1",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.7343,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 8424751104,
+    "peak_cpu_busy_cores": 1.9747701531681412,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 1.6259153130231425,
+     "p50": 1.3847421680111438,
+     "p95": 1.6067630710313097
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.4181860239477828,
+     "p50": 0.2970024039968848,
+     "p95": 0.4041469170479104
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.7978,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 9121947648,
+    "peak_cpu_busy_cores": 4.112785382923754,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.813940378683871
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.125401226458437,
+    "cold.result_seconds.p95": 2.162008715885387,
+    "warm.result_seconds.p50": 1.1441926929123112,
+    "warm.result_seconds.p95": 1.3173851588794512
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.8249482769751921,
+     "p50": 0.7500259970547631,
+     "p95": 0.8249482769751921
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3356147790327668,
+     "p50": 0.26727424398995936,
+     "p95": 0.3356147790327668
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g1",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6692,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 8426983424,
+    "peak_cpu_busy_cores": 1.970028534607358,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 10,
+   "speed_floor_pass": false,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 50,
+     "max": 1.8221839549951255,
+     "p50": 1.5941061740159057,
+     "p95": 1.783545364974998
+    },
+    "warm": {
+     "count": 50,
+     "max": 0.4734255550429225,
+     "p50": 0.3058132369769737,
+     "p95": 0.44213392899837345
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 50,
+    "cpu_seconds_per_item": 0.8044,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 9223135232,
+    "peak_cpu_busy_cores": 4.177588073473902,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.162008715885387
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.044922603484129,
+    "cold.result_seconds.p95": 2.1643309087643283,
+    "warm.result_seconds.p50": 1.1900653760322886,
+    "warm.result_seconds.p95": 1.4982836482991861
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.8269335150253028,
+     "p50": 0.7728089289739728,
+     "p95": 0.8269335150253028
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.2906188440974802,
+     "p50": 0.27059365599416196,
+     "p95": 0.2906188440974802
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g1",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6515,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 8437350400,
+    "peak_cpu_busy_cores": 1.9841071628240368,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 10,
+   "speed_floor_pass": false,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 50,
+     "max": 1.7961394609883428,
+     "p50": 1.5803344470332377,
+     "p95": 1.7897577660623938
+    },
+    "warm": {
+     "count": 50,
+     "max": 0.4474393930286169,
+     "p50": 0.3220241409726441,
+     "p95": 0.435429461998865
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 50,
+    "cpu_seconds_per_item": 0.8013,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 9221783552,
+    "peak_cpu_busy_cores": 4.0074472747698,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.1643309087643283
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.9846148989819568,
+    "cold.result_seconds.p95": 1.9444712981944006,
+    "warm.result_seconds.p50": 0.920258081855875,
+    "warm.result_seconds.p95": 1.436192650260476
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 3,
+     "max": 0.7812349770683795,
+     "p50": 0.7078039370244369,
+     "p95": 0.7812349770683795
+    },
+    "warm": {
+     "count": 3,
+     "max": 0.28642622206825763,
+     "p50": 0.2630200970452279,
+     "p95": 0.28642622206825763
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g1",
+   "repeats": 3,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 3,
+    "cpu_seconds_per_item": 1.613,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 3850227712,
+    "peak_cpu_busy_cores": 1.971614151800571,
+    "repeats": 3,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 24,
+     "max": 1.5377339420374483,
+     "p50": 1.404718238976784,
+     "p95": 1.5190889900550246
+    },
+    "warm": {
+     "count": 24,
+     "max": 0.4128783140331507,
+     "p50": 0.2420463699963875,
+     "p95": 0.41136323497630656
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 24,
+    "cpu_seconds_per_item": 0.8629,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 4367536128,
+    "peak_cpu_busy_cores": 4.004671489532489,
+    "repeats": 3,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.9846148989819568
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.7878294954345522,
+    "cold.result_seconds.p95": 1.7803842401040593,
+    "warm.result_seconds.p50": 0.962257100170867,
+    "warm.result_seconds.p95": 1.2148325523439385
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.8380399839952588,
+     "p50": 0.7834437020355836,
+     "p95": 0.8380399839952588
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3000063829822466,
+     "p50": 0.25422660110052675,
+     "p95": 0.3000063829822466
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6512,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2034642944,
+    "peak_cpu_busy_cores": 1.9966559908952395,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.5109279559692368,
+     "p50": 1.400663758511655,
+     "p95": 1.4920331800822169
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.39944482792634517,
+     "p50": 0.2446313519612886,
+     "p95": 0.36445751995779574
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.8625,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2552680448,
+    "peak_cpu_busy_cores": 4.008155774285724,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.7878294954345522
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.072013820780411,
+    "cold.result_seconds.p95": 2.1344568966736803,
+    "warm.result_seconds.p50": 1.0633080176351535,
+    "warm.result_seconds.p95": 1.2514280638152007
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.8219466810114682,
+     "p50": 0.7458307490451261,
+     "p95": 0.8219466810114682
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3261508910218254,
+     "p50": 0.27176123403478414,
+     "p95": 0.3261508910218254
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6062,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2042368000,
+    "peak_cpu_busy_cores": 1.972164501326476,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": false,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 1.8041149720083922,
+     "p50": 1.5453716199845076,
+     "p95": 1.75440976198297
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.4248017390491441,
+     "p50": 0.2889658990316093,
+     "p95": 0.40815437806304544
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.8711,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2639478784,
+    "peak_cpu_busy_cores": 4.1420511271494975,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.1344568966736803
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.8786163306809913,
+    "cold.result_seconds.p95": 2.0235230014845897,
+    "warm.result_seconds.p50": 1.2151688057780659,
+    "warm.result_seconds.p95": 1.6036129690156027
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.945787595002912,
+     "p50": 0.8463284429162741,
+     "p95": 0.945787595002912
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.2680463249562308,
+     "p50": 0.24693692801520228,
+     "p95": 0.2680463249562308
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g1",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.7445,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 8409120768,
+    "peak_cpu_busy_cores": 1.9757063955703016,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": false,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 2.060973734012805,
+     "p50": 1.5899264339823276,
+     "p95": 1.913822953007184
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.5588548799278215,
+     "p50": 0.3000700519187376,
+     "p95": 0.42984256299678236
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.9033,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 9004032000,
+    "peak_cpu_busy_cores": 4.0090495848461565,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.0235230014845897
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.18031447160573,
+    "cold.result_seconds.p95": 2.4718244572560986,
+    "warm.result_seconds.p50": 1.3986191089304592,
+    "warm.result_seconds.p95": 1.8239067216306537
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.8019018078921363,
+     "p50": 0.7567288900027052,
+     "p95": 0.8019018078921363
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.2786046670516953,
+     "p50": 0.24880348390433937,
+     "p95": 0.2786046670516953
+    }
+   },
+   "host_condition": "sole pairing running on the host",
+   "measurement_group": "0::/hmzbench/g1",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6018,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 8413491200,
+    "peak_cpu_busy_cores": 2.0273763010091956,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": false,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 2.0854947780026123,
+     "p50": 1.6499069499550387,
+     "p95": 1.982160501065664
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.5371116650057957,
+     "p50": 0.34798130695708096,
+     "p95": 0.5081489249132574
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.9458,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 9031909376,
+    "peak_cpu_busy_cores": 4.008092524310769,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.4718244572560986
+  },
+  {
+   "candidate_snapshot": "a",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.19149598203911,
+    "cold.result_seconds.p95": 1.99863988190099,
+    "warm.result_seconds.p50": 1.22189917905884,
+    "warm.result_seconds.p95": 1.6683049173450804
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 3,
+     "max": 0.8733991869958118,
+     "p50": 0.6936011840589345,
+     "p95": 0.8733991869958118
+    },
+    "warm": {
+     "count": 3,
+     "max": 0.25822382199112326,
+     "p50": 0.24712127004750073,
+     "p95": 0.25822382199112326
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/u16",
+   "repeats": 3,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 3,
+    "cpu_seconds_per_item": 1.5504,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 3223093248,
+    "peak_cpu_busy_cores": 2.0025290723752285,
+    "repeats": 3,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": false,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 27,
+     "max": 1.7461647449526936,
+     "p50": 1.5200242080027238,
+     "p95": 1.7456104479497299
+    },
+    "warm": {
+     "count": 27,
+     "max": 0.4364838330075145,
+     "p50": 0.3019572769990191,
+     "p95": 0.4307960720034316
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 27,
+    "cpu_seconds_per_item": 0.8434,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 3916226560,
+    "peak_cpu_busy_cores": 4.05913700831927,
+    "repeats": 3,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.19149598203911
+  },
+  {
+   "candidate_snapshot": "a",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.391548737793056,
+    "cold.result_seconds.p95": 2.316074731204875,
+    "warm.result_seconds.p50": 1.4586299289037923,
+    "warm.result_seconds.p95": 2.0346789534511696
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 3,
+     "max": 0.842368167010136,
+     "p50": 0.7317428339738399,
+     "p95": 0.842368167010136
+    },
+    "warm": {
+     "count": 3,
+     "max": 0.25615986401680857,
+     "p50": 0.22958476608619094,
+     "p95": 0.25615986401680857
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/u17",
+   "repeats": 3,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 3,
+    "cpu_seconds_per_item": 1.5825,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 476426240,
+    "peak_cpu_busy_cores": 1.9493930865913798,
+    "repeats": 3,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 10,
+   "speed_floor_pass": false,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 30,
+     "max": 1.9762606400763616,
+     "p50": 1.7499986509792507,
+     "p95": 1.9509876259835437
+    },
+    "warm": {
+     "count": 30,
+     "max": 0.5512247299775481,
+     "p50": 0.33487921103369445,
+     "p95": 0.5212030840339139
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 30,
+    "cpu_seconds_per_item": 0.8835,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1276022784,
+    "peak_cpu_busy_cores": 4.007440538891417,
+    "repeats": 3,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.391548737793056
+  },
+  {
+   "candidate_snapshot": "a",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.7466638148552491,
+    "cold.result_seconds.p95": 1.6534501161200468,
+    "warm.result_seconds.p50": 0.9066169731198194,
+    "warm.result_seconds.p95": 1.1251194527264208
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.85917024302762,
+     "p50": 0.7298648389987648,
+     "p95": 0.85917024302762
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3545647629071027,
+     "p50": 0.28725677402690053,
+     "p95": 0.3545647629071027
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g5",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.5465,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1448488960,
+    "peak_cpu_busy_cores": 1.9658531982421998,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.461670521995984,
+     "p50": 1.2748285040142946,
+     "p95": 1.4205951381009072
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.43522289698012173,
+     "p50": 0.2604318669764325,
+     "p95": 0.3989277119981125
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.8156,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2073608192,
+    "peak_cpu_busy_cores": 4.122874152035318,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.7466638148552491
+  },
+  {
+   "candidate_snapshot": "a",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.3235553155763053,
+    "cold.result_seconds.p95": 2.28232659452935,
+    "warm.result_seconds.p50": 1.176430418502487,
+    "warm.result_seconds.p95": 1.5927953451299839
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.7629819830181077,
+     "p50": 0.6703601340996101,
+     "p95": 0.7629819830181077
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.2708003940060735,
+     "p50": 0.23975401395000517,
+     "p95": 0.2708003940060735
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g1",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.4809,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 4594208768,
+    "peak_cpu_busy_cores": 2.005605592746238,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": false,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 1.7962842569686472,
+     "p50": 1.557618852937594,
+     "p95": 1.741374070988968
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.5584989959606901,
+     "p50": 0.2820539149688557,
+     "p95": 0.43132960703223944
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.8655,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 5293436928,
+    "peak_cpu_busy_cores": 4.082813349379076,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.3235553155763053
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.8570233235799791,
+    "cold.result_seconds.p95": 1.7126538898261203,
+    "warm.result_seconds.p50": 1.0202618702634103,
+    "warm.result_seconds.p95": 1.371562764856969
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.9359572289977223,
+     "p50": 0.7739612150471658,
+     "p95": 0.9359572289977223
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.30895606300327927,
+     "p50": 0.29104771197307855,
+     "p95": 0.30895606300327927
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.7328,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1968717824,
+    "peak_cpu_busy_cores": 1.9922647423830107,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 1.6382061899639666,
+     "p50": 1.4372640278888866,
+     "p95": 1.6029707889538258
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.4707717599812895,
+     "p50": 0.2969448829535395,
+     "p95": 0.42375263199210167
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.8211,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2671849472,
+    "peak_cpu_busy_cores": 4.006401607274999,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.8570233235799791
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.7954029395691133,
+    "cold.result_seconds.p95": 1.9206040441682686,
+    "warm.result_seconds.p50": 1.086601722136036,
+    "warm.result_seconds.p95": 1.2164136096596827
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.9345747060142457,
+     "p50": 0.8915660430211574,
+     "p95": 0.9345747060142457
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3848675749031827,
+     "p50": 0.2972526280209422,
+     "p95": 0.3848675749031827
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g3",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.8499,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2148782080,
+    "peak_cpu_busy_cores": 1.9775442601917803,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 10,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 50,
+     "max": 1.8188042599940673,
+     "p50": 1.6007202944601886,
+     "p95": 1.7949479599483311
+    },
+    "warm": {
+     "count": 50,
+     "max": 0.514238953939639,
+     "p50": 0.3229952175170183,
+     "p95": 0.4681581560289487
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 50,
+    "cpu_seconds_per_item": 0.8126,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2946506752,
+    "peak_cpu_busy_cores": 4.00317527281071,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.9206040441682686
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.8920009466801122,
+    "cold.result_seconds.p95": 2.043472121905226,
+    "warm.result_seconds.p50": 1.6104862075870685,
+    "warm.result_seconds.p95": 1.5527803398163234
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.7073197170393541,
+     "p50": 0.6805782440351322,
+     "p95": 0.7073197170393541
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.23804146703332663,
+     "p50": 0.164273323956877,
+     "p95": 0.23804146703332663
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g3",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.4021,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2161283072,
+    "peak_cpu_busy_cores": 1.9878919156092647,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": false,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.534449346945621,
+     "p50": 1.2876546820043586,
+     "p95": 1.4453881230438128
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.42039999505504966,
+     "p50": 0.26455992250703275,
+     "p95": 0.36962611007038504
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.835,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2794303488,
+    "peak_cpu_busy_cores": 4.004873477642874,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.043472121905226
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.07517740576913,
+    "cold.result_seconds.p95": 2.1136329086086776,
+    "warm.result_seconds.p50": 1.7665977527480294,
+    "warm.result_seconds.p95": 2.3862530629603413
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.7677453139331192,
+     "p50": 0.6961463009938598,
+     "p95": 0.7677453139331192
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.1680584109853953,
+     "p50": 0.1649825460044667,
+     "p95": 0.1680584109853953
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g4",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.4137,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 949633024,
+    "peak_cpu_busy_cores": 1.9823217412946061,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": false,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.6444539950462058,
+     "p50": 1.4446270749322139,
+     "p95": 1.622731760959141
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.4269268630305305,
+     "p50": 0.29145779501413926,
+     "p95": 0.40102989797014743
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.9059,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1568534528,
+    "peak_cpu_busy_cores": 4.113682558881477,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.3862530629603413
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.1238582133203705,
+    "cold.result_seconds.p95": 1.7676369640924592,
+    "warm.result_seconds.p50": 1.0290476430341478,
+    "warm.result_seconds.p95": 1.2329587508043454
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.9562120109330863,
+     "p50": 0.6980962969828397,
+     "p95": 0.9562120109330863
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3862064710119739,
+     "p50": 0.2852020768914372,
+     "p95": 0.3862064710119739
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group, and this repository's full test suite ran on the host's other CPUs",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6099,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1976279040,
+    "peak_cpu_busy_cores": 1.9989963931553867,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": false,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.7277680059196427,
+     "p50": 1.4826575540355407,
+     "p95": 1.690235696034506
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.4988109839614481,
+     "p50": 0.2934865250135772,
+     "p95": 0.47617664805147797
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.9668,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2603413504,
+    "peak_cpu_busy_cores": 4.177820138389653,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.1238582133203705
+  },
+  {
+   "candidate_snapshot": "b",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.8004333019035674,
+    "cold.result_seconds.p95": 1.6639037995846098,
+    "warm.result_seconds.p50": 0.93286070103027,
+    "warm.result_seconds.p95": 1.1116804590052634
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 1.006163474987261,
+     "p50": 0.8601777229923755,
+     "p95": 1.006163474987261
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.40486591297667474,
+     "p50": 0.32972378795966506,
+     "p95": 0.40486591297667474
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group, and this repository's full test suite ran on the host's other CPUs",
+   "measurement_group": "0::/hmzbench/g3",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.7887,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2160611328,
+    "peak_cpu_busy_cores": 1.9876847953807664,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "candidate",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.683505802997388,
+     "p50": 1.5486926180310547,
+     "p95": 1.674159229034558
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.5071347190532833,
+     "p50": 0.30758636398240924,
+     "p95": 0.45008152397349477
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.9821,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2781396992,
+    "peak_cpu_busy_cores": 4.005667786432014,
+    "repeats": 5,
+    "source": "candidate",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.8004333019035674
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.2260444069865466,
+    "cold.result_seconds.p95": 1.9501070177697069,
+    "warm.result_seconds.p50": 0.8128418346327412,
+    "warm.result_seconds.p95": 1.1853874397501942
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 3,
+     "max": 0.9246341480175033,
+     "p50": 0.7139755869284272,
+     "p95": 0.9246341480175033
+    },
+    "warm": {
+     "count": 3,
+     "max": 0.36176153691485524,
+     "p50": 0.32568184204865247,
+     "p95": 0.36176153691485524
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/u16",
+   "repeats": 3,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 3,
+    "cpu_seconds_per_item": 1.7048,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 3230646272,
+    "peak_cpu_busy_cores": 1.986327914957413,
+    "repeats": 3,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": false,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 27,
+     "max": 1.8072342859813944,
+     "p50": 1.5893413620069623,
+     "p95": 1.803135540918447
+    },
+    "warm": {
+     "count": 27,
+     "max": 0.4574643010273576,
+     "p50": 0.2647278259973973,
+     "p95": 0.4288275820435956
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 27,
+    "cpu_seconds_per_item": 0.8958,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 3816599552,
+    "peak_cpu_busy_cores": 4.088449665031827,
+    "repeats": 3,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.2260444069865466
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.545411036300118,
+    "cold.result_seconds.p95": 2.4606031369322943,
+    "warm.result_seconds.p50": 1.0613743348994535,
+    "warm.result_seconds.p95": 1.538211656452026
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 3,
+     "max": 0.8032438609516248,
+     "p50": 0.6831500650150701,
+     "p95": 0.8032438609516248
+    },
+    "warm": {
+     "count": 3,
+     "max": 0.3172210300108418,
+     "p50": 0.28763198805972934,
+     "p95": 0.3172210300108418
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/u17",
+   "repeats": 3,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 3,
+    "cpu_seconds_per_item": 1.5816,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 472223744,
+    "peak_cpu_busy_cores": 2.0009578685788743,
+    "repeats": 3,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 10,
+   "speed_floor_pass": false,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 30,
+     "max": 1.9805674949893728,
+     "p50": 1.7388977149385028,
+     "p95": 1.9764643639791757
+    },
+    "warm": {
+     "count": 30,
+     "max": 0.530383582925424,
+     "p50": 0.3052852100227028,
+     "p95": 0.4879530860343948
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 30,
+    "cpu_seconds_per_item": 0.8754,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1118494720,
+    "peak_cpu_busy_cores": 4.005754210902566,
+    "repeats": 3,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.545411036300118
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.9425945688107777,
+    "cold.result_seconds.p95": 1.8694877981387474,
+    "warm.result_seconds.p50": 1.1761777370627806,
+    "warm.result_seconds.p95": 1.305502706387489
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.7694867120590061,
+     "p50": 0.6542488780105487,
+     "p95": 0.7694867120590061
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.2580646339338273,
+     "p50": 0.19326453807298094,
+     "p95": 0.2580646339338273
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.4421,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1430638592,
+    "peak_cpu_busy_cores": 1.94531202208558,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 7,
+   "speed_floor_pass": true,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 35,
+     "max": 1.4536740509793162,
+     "p50": 1.270940317073837,
+     "p95": 1.4385460190242156
+    },
+    "warm": {
+     "count": 35,
+     "max": 0.337112857028842,
+     "p50": 0.22731344704516232,
+     "p95": 0.3369040780235082
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 35,
+    "cpu_seconds_per_item": 0.9176,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1890344960,
+    "peak_cpu_busy_cores": 4.006589383697127,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.9425945688107777
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.2366759282966875,
+    "cold.result_seconds.p95": 2.35535845783465,
+    "warm.result_seconds.p50": 1.455158544003172,
+    "warm.result_seconds.p95": 1.6617338989596908
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.6877188360085711,
+     "p50": 0.6221430780133232,
+     "p95": 0.6877188360085711
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.23767445993144065,
+     "p50": 0.1969257090240717,
+     "p95": 0.23767445993144065
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g5",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.3452,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1466023936,
+    "peak_cpu_busy_cores": 1.9773908916563248,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": false,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.725070370011963,
+     "p50": 1.3915324465488084,
+     "p95": 1.6198243770049885
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.43209165800362825,
+     "p50": 0.2865581280202605,
+     "p95": 0.3949517069850117
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.8983,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1980284928,
+    "peak_cpu_busy_cores": 4.093554324241897,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.35535845783465
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.8777806450398433,
+    "cold.result_seconds.p95": 1.7201599921198303,
+    "warm.result_seconds.p50": 0.8646380221572098,
+    "warm.result_seconds.p95": 1.0524112104176708
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.9194744920823723,
+     "p50": 0.7536457640817389,
+     "p95": 0.9194744920823723
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.3494034140603617,
+     "p50": 0.3032893850468099,
+     "p95": 0.3494034140603617
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g2",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.7126,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1970401280,
+    "peak_cpu_busy_cores": 2.0081743608719416,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.623131938977167,
+     "p50": 1.4151814290089533,
+     "p95": 1.5816432350547984
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.38901462708599865,
+     "p50": 0.26223553402815014,
+     "p95": 0.3677160699153319
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.8869,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2527350784,
+    "peak_cpu_busy_cores": 4.175752196170789,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.8777806450398433
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.8207519337375995,
+    "cold.result_seconds.p95": 1.739891090185139,
+    "warm.result_seconds.p50": 0.9018337403245843,
+    "warm.result_seconds.p95": 1.2200552445438433
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.9302716400707141,
+     "p50": 0.7857115810038522,
+     "p95": 0.9302716400707141
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.31098250404465944,
+     "p50": 0.27117415505927056,
+     "p95": 0.31098250404465944
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g4",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6192,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 933826560,
+    "peak_cpu_busy_cores": 1.9899872933633078,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.6294290069490671,
+     "p50": 1.4305858804727904,
+     "p95": 1.6185713380109519
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.4393725770059973,
+     "p50": 0.24455400253646076,
+     "p95": 0.3794158350210637
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.896,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 1463558144,
+    "peak_cpu_busy_cores": 4.006040012046552,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.8207519337375995
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 1.9539760875274292,
+    "cold.result_seconds.p95": 1.894100365324416,
+    "warm.result_seconds.p50": 0.904220423584943,
+    "warm.result_seconds.p95": 1.1659052970455188
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.8122726399451494,
+     "p50": 0.7184152979170904,
+     "p95": 0.8122726399451494
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.29045647697057575,
+     "p50": 0.2760563630145043,
+     "p95": 0.29045647697057575
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g1",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.6072,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 7700570112,
+    "peak_cpu_busy_cores": 2.012889207332268,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 8,
+   "speed_floor_pass": true,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 40,
+     "max": 1.5413480449933559,
+     "p50": 1.4037663130438887,
+     "p95": 1.5385259040631354
+    },
+    "warm": {
+     "count": 40,
+     "max": 0.4243249330902472,
+     "p50": 0.24961580149829388,
+     "p95": 0.33864474506117404
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 40,
+    "cpu_seconds_per_item": 0.8761,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 8226164736,
+    "peak_cpu_busy_cores": 4.080766629446359,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 1.9539760875274292
+  },
+  {
+   "candidate_snapshot": "",
+   "complete_task_ratios": {
+    "cold.result_seconds.p50": 2.5244879017003945,
+    "cold.result_seconds.p95": 2.424106686379216,
+    "warm.result_seconds.p50": 1.438556754805594,
+    "warm.result_seconds.p95": 2.1234886852310533
+   },
+   "control_distribution": {
+    "cold": {
+     "count": 5,
+     "max": 0.7575786900706589,
+     "p50": 0.6461912310915068,
+     "p95": 0.7575786900706589
+    },
+    "warm": {
+     "count": 5,
+     "max": 0.2180753470165655,
+     "p50": 0.21207631402648985,
+     "p95": 0.2180753470165655
+    }
+   },
+   "host_condition": "another of this investigation's pairings ran in a second measurement group",
+   "measurement_group": "0::/hmzbench/g3",
+   "repeats": 5,
+   "serial_control": {
+    "cleanup_survivors": [],
+    "correct_item_records": 5,
+    "cpu_seconds_per_item": 1.4094,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2150764544,
+    "peak_cpu_busy_cores": 1.9583745940433543,
+    "repeats": 5,
+    "source": "origin/main via PYTHONPATH snapshot",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "sessions": 9,
+   "speed_floor_pass": false,
+   "under_test": "original",
+   "under_test_distribution": {
+    "cold": {
+     "count": 45,
+     "max": 1.8834617070388049,
+     "p50": 1.6313019450753927,
+     "p95": 1.836451568058692
+    },
+    "warm": {
+     "count": 45,
+     "max": 0.4813921869499609,
+     "p50": 0.3050838140770793,
+     "p95": 0.4630805319175124
+    }
+   },
+   "under_test_run": {
+    "cleanup_survivors": [],
+    "correct_item_records": 45,
+    "cpu_seconds_per_item": 0.9021,
+    "failed_item_records": 0,
+    "peak_cgroup_memory_bytes": 2758410240,
+    "peak_cpu_busy_cores": 4.00384426714449,
+    "repeats": 5,
+    "source": "original",
+    "watchdog_killed": false,
+    "worker_complete": true
+   },
+   "worst_complete_task_ratio": 2.5244879017003945
+  }
+ ]
+}
