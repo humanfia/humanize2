@@ -51,7 +51,7 @@ whole piece of work start to finish; everything under them is for looking up.
 | [Permissions](/user/permissions) | Four rungs, from `read-only` to `bypass` — declared by the flow |
 | [Skills](/user/skills) | What an agent carries: its CLI's own, and the ones the flow brings |
 | [Questions](/user/questions) | An agent stopping mid-turn to ask its user something |
-| [Cost and rate](/user/tally) | What has been spent, how fast, and how hard it is thinking |
+| [Cost and rate](/user/tally) | What has been spent in tokens and money, how fast, and how hard it is thinking |
 | [Reporting](/user/reporting) | What humanize sends its developers, and how to say no |
 
 ## Where the work lands

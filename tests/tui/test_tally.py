@@ -317,3 +317,133 @@ def test_a_session_with_no_log_to_read_is_left_to_its_backend(home: Path) -> Non
     monitor.spend(agent.id, 4000, model="opus")  # what the turn itself reported
 
     assert monitor.spent == {"opus": 4000}
+
+
+def test_what_was_read_is_reported_kind_by_kind(home: Path) -> None:
+    """The count is a lump; the bill is not. Only the kinds can be put a price against."""
+    log = home / "claude_config_dir" / "projects" / "-tmp-work" / "s1.jsonl"
+    _rows(log, _said("claude-opus-5", 300))
+    agent = ClaudeCodeAgent(ClaudeCodeAgentConfig(model="opus", effort="high"))
+    agent.new()._adopt("s1")
+    monitor = Monitor()
+
+    Tally([agent], monitor).read()
+
+    assert monitor.kinds[("read", "claude-opus-5")] == {
+        "input": 2,
+        "output": 300,
+        "cache_read": 1000,
+    }  # and no cache write, which this request did not make
+
+
+def test_a_log_that_says_only_a_total_is_counted_and_not_priced(home: Path) -> None:
+    """Codex's rollout may name a total and no kinds. That is tokens, and no bill."""
+    log = (
+        home
+        / "codex_home"
+        / "sessions"
+        / "2026"
+        / "08"
+        / "rollout-2026-08-06T07-14-14-t1.jsonl"
+    )
+    _rows(
+        log,
+        {
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {"last_token_usage": {"total_tokens": 1000}},
+            },
+        },
+    )
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low"))
+    agent.new()._adopt("t1")
+    monitor = Monitor()
+
+    Tally([agent], monitor).read()
+
+    assert monitor.spent == {"gpt-5.6-sol": 1000}
+    # Counted under no kind at all, which is what cannot be priced -- rather than guessed
+    # at as input, which would be a bill nobody can stand behind.
+    assert monitor.kinds[("read", "gpt-5.6-sol")] == {"": 1000}
+    assert monitor.spending()[0].dollars is None
+
+
+def test_a_cached_read_codex_counted_inside_the_input_is_not_billed_twice(
+    home: Path,
+) -> None:
+    """Codex's `input_tokens` has the cached reads inside it, at a tenth of the price."""
+    log = (
+        home
+        / "codex_home"
+        / "sessions"
+        / "2026"
+        / "08"
+        / "rollout-2026-08-06T07-14-14-t1.jsonl"
+    )
+    _rows(
+        log,
+        {
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {
+                    "last_token_usage": {
+                        "input_tokens": 900,
+                        "cached_input_tokens": 800,
+                        "output_tokens": 100,
+                        "total_tokens": 1000,
+                    }
+                },
+            },
+        },
+    )
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low"))
+    agent.new()._adopt("t1")
+    monitor = Monitor()
+
+    Tally([agent], monitor).read()
+
+    assert monitor.kinds[("read", "gpt-5.6-sol")] == {
+        "input": 100,
+        "cache_read": 800,
+        "output": 100,
+    }
+
+
+def test_a_prompt_that_was_wholly_cached_has_no_plain_input_rather_than_none_of_it(
+    home: Path,
+) -> None:
+    """Taking the cached reads back out can leave nothing, and nothing is not a kind."""
+    log = (
+        home
+        / "codex_home"
+        / "sessions"
+        / "2026"
+        / "08"
+        / "rollout-2026-08-06T07-14-14-t1.jsonl"
+    )
+    _rows(
+        log,
+        {
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {
+                    "last_token_usage": {
+                        "input_tokens": 800,
+                        "cached_input_tokens": 800,
+                        "output_tokens": 100,
+                        "total_tokens": 900,
+                    }
+                },
+            },
+        },
+    )
+    agent = CodexAgent(CodexAgentConfig(model="gpt-5.6-sol", effort="low"))
+    agent.new()._adopt("t1")
+    monitor = Monitor()
+
+    Tally([agent], monitor).read()
+
+    assert monitor.kinds[("read", "gpt-5.6-sol")] == {"cache_read": 800, "output": 100}

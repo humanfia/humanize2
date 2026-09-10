@@ -328,7 +328,7 @@ reports both as usage errors.
 
 A trace is for after. While a run is going, the interface's `/monitor` shows the same shape
 live: who is working, every handover between agents with how often it happened, and what each
-model has cost with the rate it is costing it at.
+model has cost — in tokens, in money, and the rate it is costing it at.
 
 That is read from the turns going past and from the logs the backends write as they go — never
 by asking the flow, which is a Python file that may branch any way it likes. See

@@ -52,6 +52,7 @@ from textual.widgets.option_list import Option
 from hmz import telemetry
 from hmz.agents import ANYONE, FLOW, SWARM, USER, anchored, driver
 from hmz.kept import Runs
+from hmz.prices import money
 from hmz.telemetry import KEPT, SAYS, SENT
 
 from .discover import installed, machines, ready_to_open
@@ -7082,6 +7083,10 @@ class Monitoring(Sheet[str]):
                     "Tokens",
                     [
                         f"{escape(spend.model):<26}{thousands(spend.tokens):>8}"
+                        # Blank rather than nought for a model nobody prices: a run whose
+                        # bill is not known has still cost something, and `$0.00` would say
+                        # it had not.
+                        f"{money(spend.dollars) if spend.dollars is not None else '':>10}"
                         f"   [$text-muted]{spend.rate:.0f}/s[/]"
                         for spend in spending
                     ]

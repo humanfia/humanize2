@@ -13,6 +13,8 @@ from collections import Counter, deque
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from hmz import prices
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -141,7 +143,7 @@ class Shape:
 
 @dataclass(frozen=True, slots=True)
 class Spend:
-    """What one model has cost so far, and how fast it is costing it.
+    """What one model has cost so far, in tokens and in money, and how fast.
 
     Attributes:
       model: The model the tokens were spent on.
@@ -150,11 +152,15 @@ class Spend:
         is younger than that. Seconds on the clock, not seconds an agent was talking: a flow
         sleeps between rounds, commits, reads what the last turn wrote, and that time is time
         the tokens were spent over.
+      dollars: What those tokens came to, or None where nobody prices this model or the
+        source that counted them did not say which kind each was. None is not nothing spent:
+        a reader MUST show the tokens alone rather than a bill of zero.
     """
 
     model: str
     tokens: int
     rate: float
+    dollars: float | None = None
 
 
 @dataclass
@@ -195,6 +201,12 @@ class Monitor:
     totals: dict[tuple[str, str], int] = field(
         default_factory=dict[tuple[str, str], int]
     )
+    #: And what each of those totals was made of, by kind of token, for the sources that say.
+    #: Money needs the kinds: an input token and an output token of one model differ in price
+    #: by five or ten times, so a lump of tokens is a lump nobody can put a figure on.
+    kinds: dict[tuple[str, str], dict[str, float]] = field(
+        default_factory=dict[tuple[str, str], dict[str, float]]
+    )
     #: Recent spending as (when, model, tokens), which is what the rate is measured over.
     #: Bounded by the window rather than by the length of the run: a flow going for days
     #: keeps five minutes of it.
@@ -204,6 +216,8 @@ class Monitor:
     #: The rate per model as it was last worked out, and what it was worked out from: the rate
     #: is worked out again when something it is made of moves, and not on any clock of its own.
     rates: dict[str, float] = field(default_factory=dict[str, float])
+    #: And the money, worked out at the same moment and from the same tokens.
+    money: dict[str, float | None] = field(default_factory=dict[str, float | None])
     figured: int | None = None
     #: How many times what has been spent has changed, which is what `figured` is against.
     changed: int = 0
@@ -296,6 +310,7 @@ class Monitor:
         tokens: int,
         model: str | None = None,
         now: float | None = None,
+        kinds: Mapping[str, float] | None = None,
     ) -> None:
         """Notes tokens an agent's backend has just reported spending.
 
@@ -305,18 +320,37 @@ class Monitor:
           model: What they were spent on, if the backend said. What it says beats what the
             agent was configured with: a turn that reached for a sub-agent spent it there.
           now: When, defaulting to this moment. Given only so a test can say.
+          kinds: What those same tokens were, kind by kind, where the backend said. Only the
+            kinds put a price on them, an input token and an output token of one model
+            differing in price several times over.
         """
         if tokens <= 0:
             return
         if model is not None:
             self.models[agent] = model
         model = self.models.get(agent, agent)
-        # Added up here rather than there, so that what a backend reports a turn at a time
-        # arrives as the same kind of thing a log read from the top does: a total.
-        self.counted("told", model, self.totals.get(("told", model), 0) + tokens, now)
+        # The whole read-modify-write under the lock: two turns of one model land on two
+        # threads, and a total each of them read before either wrote is a turn lost.
+        with self._lock:
+            # Added up here rather than there, so that what a backend reports a turn at a
+            # time arrives as the same kind of thing a log read from the top does: a total.
+            running = self.totals.get(("told", model), 0) + tokens
+            broken = dict(self.kinds.get(("told", model), {}))
+            for kind, spent in (kinds or {}).items():
+                broken[kind] = broken.get(kind, 0.0) + spent
+            # Whatever the kinds did not account for still cost something, and is put under
+            # no kind at all rather than guessed at as one: what is priced is then a floor.
+            if (rest := tokens - sum((kinds or {}).values())) > 0:
+                broken[""] = broken.get("", 0.0) + rest
+            self._counted("told", model, running, now, broken or None)
 
     def counted(
-        self, source: str, model: str, total: int, now: float | None = None
+        self,
+        source: str,
+        model: str,
+        total: int,
+        now: float | None = None,
+        kinds: Mapping[str, float] | None = None,
     ) -> None:
         """Notes what one source has now seen spent on one model, all told.
 
@@ -329,21 +363,51 @@ class Monitor:
           model: What the tokens were spent on.
           total: Every token that source has seen spent on it.
           now: When, defaulting to this moment. Given only so a test can say.
+          kinds: The same total broken into the kinds of token it went on, where this source
+            says which. A total rather than an addition, for the reason `total` is one.
         """
         with self._lock:
-            if total <= self.totals.get((source, model), 0):
-                return
-            self.totals[(source, model)] = total
-            # The most any source has seen, which is what has been spent: two sources counting
-            # the same tokens are not two lots of tokens.
-            seen = max(
-                held for (_, named), held in self.totals.items() if named == model
-            )
-            if (risen := seen - self.spent[model]) <= 0:
-                return
-            self.spent[model] = seen
-            self.recent.append((time.monotonic() if now is None else now, model, risen))
-            self.changed += 1
+            self._counted(source, model, total, now, kinds)
+
+    def _counted(
+        self,
+        source: str,
+        model: str,
+        total: int,
+        now: float | None,
+        kinds: Mapping[str, float] | None,
+    ) -> None:
+        """The whole of `counted`, with the lock already held by whoever called."""
+        was = self.totals.get((source, model), 0)
+        broken = dict(kinds) if kinds else None
+        # A breakdown that has changed is worth having even where the total has not moved:
+        # one source may say a lump where another says what the lump was made of, and the
+        # money is worked out from whichever of them said.
+        moved = broken != self.kinds.get((source, model))
+        if total <= was and not moved:
+            return
+        # Written even where it has not risen, and even where it is nought: what is spent is
+        # the most any source has seen, and a source with no entry at all is one there is no
+        # max to take. A log read again from the top says less than it did, and keeps what
+        # it said.
+        self.totals[(source, model)] = max(total, was)
+        if moved:
+            # Replaced rather than merged, and dropped where a source has stopped saying:
+            # a breakdown outliving the total it described would price a bigger total
+            # against a smaller reckoning of what went into it.
+            if broken is None:
+                self.kinds.pop((source, model), None)
+            else:
+                self.kinds[(source, model)] = broken
+            self.changed += 1  # so that what it is worth is worked out again
+        # The most any source has seen, which is what has been spent: two sources counting
+        # the same tokens are not two lots of tokens.
+        seen = max(held for (_, named), held in self.totals.items() if named == model)
+        if (risen := seen - self.spent[model]) <= 0:
+            return
+        self.spent[model] = seen
+        self.recent.append((time.monotonic() if now is None else now, model, risen))
+        self.changed += 1
 
     def spending(self, now: float | None = None) -> list[Spend]:
         """What each model has cost, and how fast, biggest spender first.
@@ -379,11 +443,52 @@ class Monitor:
                     model: lately[model] / over if over > 0 else 0.0
                     for model in self.spent
                 }
+                # Priced here rather than as it is drawn: the prices are read off the disk,
+                # and a screen redrawn twice a second must not pay for that twice a second.
+                self.money = {model: self._priced(model) for model in self.spent}
                 self.figured = self.changed
             return [
-                Spend(model=model, tokens=tokens, rate=self.rates.get(model, 0.0))
+                Spend(
+                    model=model,
+                    tokens=tokens,
+                    rate=self.rates.get(model, 0.0),
+                    dollars=self.money.get(model),
+                )
                 for model, tokens in self.spent.most_common()
             ]
+
+    def _priced(self, model: str) -> float | None:
+        """What has been spent on one model, in money. Held under the lock by its callers.
+
+        The kinds come from whichever source said the kind of the most tokens, and where two
+        said as much, from the one that has seen the most: two sources counting the same
+        tokens are one bill, so the fullest reckoning that can be priced is the one to price
+        -- and a total nobody broke down is no reckoning at all rather than the biggest one.
+
+        Args:
+          model: The model.
+
+        Returns:
+          Dollars, or None where nobody lists this model or no source said which kind each
+          token was -- which a reader shows as tokens alone rather than as nothing spent.
+          What comes back is a floor: tokens no source said the kind of are left out of it.
+        """
+        fullest: Mapping[str, float] | None = None
+        best = (-1.0, -1.0)
+        for (source, named), held in self.totals.items():
+            if named != model:
+                continue
+            broken = self.kinds.get((source, model))
+            if broken is None:
+                continue
+            # How much of its total that source actually said the kind of, which is what
+            # ranks a log against the backend that keeps it: the fullest *priceable*
+            # reckoning wins, since a source whose whole total is tokens of no named kind
+            # can be priced at nothing at all however many of them it has seen.
+            told = sum(count for kind, count in broken.items() if kind)
+            if (told, held) > best:
+                best, fullest = (told, held), broken
+        return prices.cost(fullest, model) if fullest else None
 
     def now_working(self) -> list[str]:
         """Who has a turn open, taken whole so that a reader never sees it mid-change.

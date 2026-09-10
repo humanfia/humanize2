@@ -6,6 +6,8 @@ way it likes -- so the order it ran its agents in is only ever recoverable from 
 
 from __future__ import annotations
 
+import pytest
+
 from hmz.tui.monitor import Monitor, lasting
 
 
@@ -241,3 +243,120 @@ def test_a_clock_is_read_in_whatever_units_it_is_worth_reading_in() -> None:
     assert lasting(75.0) == "1m15s"
     assert lasting(605.0) == "10m05s"
     assert lasting(3661.0) == "1h01m"
+
+
+def test_a_model_nobody_prices_is_tokens_and_no_bill_at_all() -> None:
+    """The whole honesty of the money: `$0.00` against an unlisted model is a lie."""
+    monitor = Monitor()
+    monitor.begins("actor", "a-model-nobody-lists")
+    monitor.spend("actor", 4000, kinds={"input": 3000, "output": 1000})
+
+    (spending,) = monitor.spending()
+
+    assert spending.tokens == 4000
+    assert spending.dollars is None
+
+
+def test_the_bill_is_the_kinds_at_their_own_rates(priced: str) -> None:
+    """Not the tokens at an average of them: an output token is five times an input one."""
+    monitor = Monitor()
+    monitor.begins("actor", priced)
+    monitor.spend("actor", 1040, kinds={"input": 1000, "output": 40})
+
+    (spending,) = monitor.spending()
+
+    assert spending.tokens == 1040
+    assert spending.dollars == pytest.approx(1000 / 1e6 * 1 + 40 / 1e6 * 5)
+
+
+def test_a_source_that_says_no_kinds_says_no_bill(priced: str) -> None:
+    """A lump of tokens is a lump nobody can put a figure on, listed model or not."""
+    monitor = Monitor()
+    monitor.begins("actor", priced)
+    monitor.spend("actor", 1040)
+
+    (spending,) = monitor.spending()
+
+    assert spending.tokens == 1040
+    assert spending.dollars is None
+
+
+def test_the_bill_is_read_off_whichever_source_has_seen_the_most(priced: str) -> None:
+    """The same rule the count follows: two sources counting one spend are one bill."""
+    monitor = Monitor()
+    monitor.counted("told", priced, 1040, kinds={"input": 1000, "output": 40})
+    monitor.counted("read", priced, 2080, kinds={"input": 2000, "output": 80})
+
+    (spending,) = monitor.spending()
+
+    assert spending.tokens == 2080
+    assert spending.dollars == pytest.approx(2 * (1000 / 1e6 * 1 + 40 / 1e6 * 5))
+
+
+def test_a_source_that_says_the_kinds_is_believed_over_one_that_says_a_lump(
+    priced: str,
+) -> None:
+    """A log catching up on a backend that said a total is a bill where there was none.
+
+    The two are counting the same tokens, so the total does not move -- and the money still
+    has to be worked out again, or the first `None` would stand for the rest of the run.
+    """
+    monitor = Monitor()
+    monitor.spend(
+        "actor", 1040, model=priced
+    )  # the backend, saying only what it came to
+
+    assert monitor.spending()[0].dollars is None
+
+    monitor.counted("read", priced, 1040, kinds={"input": 1000, "output": 40})
+
+    (spending,) = monitor.spending()
+
+    assert spending.tokens == 1040  # the same tokens, seen twice
+    assert spending.dollars == pytest.approx(1000 / 1e6 * 1 + 40 / 1e6 * 5)
+
+
+def test_a_source_saying_the_kinds_of_fewer_tokens_is_still_the_one_priced(
+    priced: str,
+) -> None:
+    """The log lags the backend by a second, and the backend may say only a total.
+
+    Ranked on the total alone, the bigger lump would win and the bill would stay blank for
+    the rest of the run with a full reckoning of most of it sitting right beside it.
+    """
+    monitor = Monitor()
+    monitor.spend(
+        "actor", 1050, model=priced
+    )  # the backend: a lump, and the larger one
+    monitor.counted("read", priced, 1000, kinds={"input": 900, "output": 100})
+
+    (spending,) = monitor.spending()
+
+    assert spending.tokens == 1050  # counted off whichever has seen the most
+    assert spending.dollars == pytest.approx(900 / 1e6 * 1 + 100 / 1e6 * 5)
+
+
+def test_a_source_reporting_nothing_at_all_does_not_stop_the_monitor(
+    priced: str,
+) -> None:
+    """A breakdown of a total of nought is still a source, and still must not raise."""
+    monitor = Monitor()
+
+    monitor.counted("read", priced, 0, kinds={"input": 5})
+
+    assert monitor.spending() == []  # nothing spent, so nothing to show
+
+
+def test_a_breakdown_does_not_outlive_the_total_it_was_of(priced: str) -> None:
+    """A source that stops saying which kinds is a source with no bill to give, again."""
+    monitor = Monitor()
+    monitor.counted("read", priced, 1040, kinds={"input": 1000, "output": 40})
+
+    assert monitor.spending()[0].dollars is not None
+
+    monitor.counted("read", priced, 9000)  # a bigger total, and nothing about its kinds
+
+    (spending,) = monitor.spending()
+
+    assert spending.tokens == 9000
+    assert spending.dollars is None  # rather than nine thousand priced as one thousand
