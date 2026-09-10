@@ -15,6 +15,23 @@ arguments.
 `python -m hmz` is the same command line, which is how a turn spawns itself under an
 [anchor](/reference/remote-execution).
 
+## Who is reading
+
+Every command is written twice over: for somebody at a terminal, and for a program.
+
+- **A terminal** gets colour and layout. `hmz exec` draws the run as it happens — which agent
+  is working and in which conversation, what it says, the tools it runs, the sub-agents it
+  starts, a clock at the foot while it thinks, and what the turn cost when it lands.
+- **A pipe or a file** gets exactly the same lines with no escape sequences in them. What each
+  turn answered still goes to stdout and the run itself to stderr, so `hmz exec … > answer.txt`
+  and `hmz exec … 2>/dev/null` mean what they always did.
+- **A program** gets `--json`: one JSON object per line, flushed as it is written, and nothing
+  else on stdout at all — anything the flow prints is put on stderr for the duration, so a
+  stray line cannot break the stream.
+
+`NO_COLOR`, `FORCE_COLOR` and `TERM=dumb` are honoured, in that order of authority. See
+[environment variables](#environment-variables).
+
 ## `hmz`
 
 ```
@@ -64,7 +81,7 @@ hmz -f official/humanize1:rlcr -c setup.yaml
 Runs a [flow](/reference/flows) in the current directory, on the agents it is given.
 
 ```
-hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] [--container <image>] <task>
+hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] [--container <image>] [--json] <task>
 ```
 
 | Argument | |
@@ -73,7 +90,59 @@ hmz exec -f|--flow <flow> -a|--agent <cli>/<model>:<effort> [-a ...] [--containe
 | `-c`, `--config <path>` | A YAML file of what to set the flow up with, one field per line, under the names the flow declared — only for a flow that says it [can be set up](/reference/flows#settings-of-the-flow-s-own). The flow's own model checks it before the first turn. |
 | `--container <image>` | Run the whole of it in one container of that image: every agent's turns land there, the project directory is mounted at the path it already has, and the flow reaches it through `hmz.flows.container()`. A place the flow itself declared `Isolated` keeps the container the flow named. See [Containers](/user/containers#the-whole-run-in-one-container). |
 | `-a`, `--agent <spec>` | **Repeated once for each agent the flow drives**, in the order it takes them — so none at all for a flow whose only side is you, since nobody chooses what the person runs. |
+| `--json` | Write the run for a program: one JSON object on stdout per thing an agent says, as it says it. See [Watching a run](#watching-a-run). |
 | `<task>` | **Required.** What the flow is to have the agents do, as the text itself. Put `--` before it if it starts with a dash. |
+
+### Watching a run
+
+At a terminal, the run is drawn as it happens:
+
+```console
+$ hmz exec -f official/rlar -a claude/claude-opus-5:high -a codex/gpt-5.6-sol:high "fix the build"
+● builder is working
+● Bash(pytest -q tests/)
+● I fixed add() and the tests pass.
+✻ input 40.0k · output 1.2k · claude-opus-5 · builder
+✻ Worked for 74s · builder
+```
+
+While a turn is thinking — which is most of a turn — a clock sits at the foot of the screen
+saying which agent is working and for how long, or how many turns are open where there are
+several. It is drawn only where a terminal is reading **and** escapes are wanted — a clock is
+written in them, cursor and all, so `NO_COLOR` and `TERM=dumb` mean no clock — and it is gone
+when the run is.
+
+Piped or redirected, the same lines are written with no escape sequences in them. The run goes
+to **stderr** and what each turn answered to **stdout**, which is where every script written
+against `hmz exec` reads it:
+
+```sh
+hmz exec -f chat -a claude/claude-opus-5:high "summarise CHANGELOG.md" > summary.txt
+```
+
+`--json` writes the run for a program instead — [NDJSON](https://github.com/ndjson/ndjson-spec),
+one object a line, flushed as each is written:
+
+```console
+$ hmz exec -f chat -a claude/claude-opus-5:high --json "say hello" | jq -c 'select(.kind == "result")'
+{"at":1789026740.6,"agent":"assistant","cli":"claude","model":"claude-opus-5","session":"1d1ff959","kind":"result","text":"Hello.","whose":"","tokens":{"claude-opus-5":2080},"spent":{"input":2000,"output":80}}
+```
+
+| Key | |
+| --- | --- |
+| `at` | When it was said, as a Unix timestamp. |
+| `agent` | Which agent said it, by the name the flow gave it. |
+| `cli`, `model` | Which backend and model it was said on. |
+| `session` | The backend's own id for the conversation, or `""` before the backend has named one. |
+| `kind` | `begins` and `ends` bracket a turn; `text` is the agent talking, `reasoning` it thinking aloud, `tool` it using one, `subagent`/`subagent-ends` an agent it started of its own, `asks` it stopping to ask, `failed` a turn that went wrong, `result` the answer it ends on. |
+| `text` | The words themselves. |
+| `whose` | Which of a turn's several things it is about — the backend's id for a sub-agent — and `""` for everything else. |
+| `tokens` | What the turn cost, per model. Only a `result` carries it, and only from a backend that says. |
+| `spent` | The same cost by the kind of token it went on. |
+
+Every object carries every key, whether or not it has anything to put in it. While `--json` is
+on, **nothing else reaches stdout**: whatever the flow prints goes to stderr instead, so one
+stray line cannot break the stream.
 
 ### Writing an agent
 
@@ -164,7 +233,7 @@ them. See [Tracing](/reference/tracing).
 
 ```
 hmz trace collect [<workspace>] [--epic <epic> | --session <session>[,<session>]... | --all]
-                  [--output <output>] [--start <start>] [--end <end>]
+                  [--output <output>] [--start <start>] [--end <end>] [--json]
 ```
 
 | Argument | |
@@ -176,6 +245,7 @@ hmz trace collect [<workspace>] [--epic <epic> | --session <session>[,<session>]
 | `--output <path>` | Where to write. Defaults to `traces/<datetime>.trace.json` inside the run it is a trace of, and beside that workspace's runs for a trace that is of none; the directory is created if it is not there. |
 | `--start <when>` | Earliest record to include, in any wording [dateparser](https://dateparser.readthedocs.io/) understands. |
 | `--end <when>` | Latest record to include, same wording. |
+| `--json` | Say where it went and what it holds as one JSON object, for a program to read. |
 
 A trace is of a run and holds the sessions that run opened and no others, asked for by the ids
 the run wrote down rather than by the directory it ran in -- so a run that worked in a
@@ -327,8 +397,8 @@ humanize's home, and the flows of your own read where they lie. Each is offered 
 it is listed here under. See [Flowverses](/weaver/flowverses).
 
 ```
-hmz flowverses list [-q|--quiet]
-hmz flowverses show <name>
+hmz flowverses list [-q|--quiet] [--json]
+hmz flowverses show <name> [--json]
 hmz flowverses add <url> [<name>]
 hmz flowverses fetch <name>
 hmz flowverses remove <name>
@@ -340,8 +410,8 @@ is not always a moment you are sitting in the interface. Naming no command at al
 
 | Command | |
 | --- | --- |
-| `list` | Every place flows come from, in the order they are offered: the name, whether it has been fetched, and where from. `-q` prints just the names, one a line, for a script to read. |
-| `show <name>` | What one is — where from, where kept, whether fetched — and the name each flow in it is offered under, which is what `-f` takes, with the line each says about itself. |
+| `list` | Every place flows come from, in the order they are offered: the name, whether it has been fetched, and where from. `-q` prints just the names, one a line, for a script to read, and `--json` one object a place. |
+| `show <name>` | What one is — where from, where kept, whether fetched — and the name each flow in it is offered under, which is what `-f` takes, with the line each says about itself. `--json` says the whole of it as one object, the flows in a `holds` list. |
 | `add <url> [<name>]` | Fetches one. `<url>` is a URL, a path, or `owner/repo` for one on GitHub; `<name>` is what to keep it under, defaulting to the repository's own name as `git clone` does. |
 | `fetch <name>` | Fetches it again, or for the first time — which is what `official` usually has done to it. What the repository says now, not a merge into what you have. |
 | `remove <name>` | Takes it away, flows and all. |
@@ -416,12 +486,12 @@ The accounts an agent may be run as: one named set of credentials per provider, 
 the CLI's own. See [Providers](/reference/providers).
 
 ```
-hmz providers list [<cli>]
-hmz providers ways <cli>
+hmz providers list [<cli>] [--json]
+hmz providers ways <cli> [--json]
 hmz providers add <cli>/<name> [-w|--way <way>] [-s|--set VAR=VALUE]... [--no-login]
                                [--also <cli>[,<cli>...]]
 hmz providers login <cli>/<name> [-s|--set VAR=VALUE]...
-hmz providers show <cli>/[<name>]
+hmz providers show <cli>/[<name>] [--json]
 hmz providers falls-back <cli>/[<name>] [<name>]
 hmz providers remove <cli>/<name>
 ```
@@ -465,8 +535,8 @@ hmz providers remove claude/deepseek
 ## `hmz fallback`
 
 ```sh
-hmz fallback list [-q|--quiet]
-hmz fallback show <cli>[@<account>]/<model>
+hmz fallback list [-q|--quiet] [--json]
+hmz fallback show <cli>[@<account>]/<model> [--json]
 hmz fallback add <cli>[@<account>]/<model> <cli>[@<account>]/<model>
 hmz fallback retry <cli>[@<account>]/<model> <tries> [-p|--policy <policy>] [-t|--timeout <seconds>]
 hmz fallback remove <cli>[@<account>]/<model>
@@ -484,8 +554,8 @@ is what a failed turn does.
 
 | Command | |
 | --- | --- |
-| `list` | Every step: the place, how often a failed turn there is taken again, and where it goes once those are spent. `-q` prints the place alone. |
-| `show <place>` | The whole walk from that place, in the order a turn tries them. |
+| `list` | Every step: the place, how often a failed turn there is taken again, and where it goes once those are spent. `-q` prints the place alone, `--json` one object a step. |
+| `show <place>` | The whole walk from that place, in the order a turn tries them. `--json` says one object a place of the walk. |
 | `add <place> <place>` | Says where the first one's turns go when it cannot run. |
 | `retry <place> <tries>` | Says how many goes beyond the first a failed turn there gets before the step is taken: `-p` how long to wait between them (`none`, `constant`, `linear`, `exponential`, `exponential-jitter`, `fibonacci`), `-t` the longest the whole of it may go on for. Nothing is retried by default. |
 | `remove <place>` | Takes the whole step away, tries and destination alike. |
@@ -510,13 +580,13 @@ is doing, and the two ways one ends. `hmz` on its own is how one is opened and r
 what is left to say about one from outside it.
 
 ```
-hmz daemon [list [-q] | status [<workspace>] | start [-f <flow>] [-a <agent>]... | attach [<workspace>] | stop [<workspace>] [--kill]]
+hmz daemon [list [-q] [--json] | status [<workspace>] [--json] | start [-f <flow>] [-a <agent>]... | attach [<workspace>] | stop [<workspace>] [--kill]]
 ```
 
 | | |
 | --- | --- |
-| `list` | Every run being held on this machine, oldest first: where, which process, since when, and how many terminals are reading. `-q` prints the directories alone, one a line. A line naming no command does this. |
-| `status [<workspace>]` | What one of them is doing, without attaching to it: how many are reading, and which flows are running under it. |
+| `list` | Every run being held on this machine, oldest first: where, which process, since when, and how many terminals are reading. `-q` prints the directories alone, one a line, and `--json` one object a run. A line naming no command does this. |
+| `status [<workspace>]` | What one of them is doing, without attaching to it: how many are reading, and which flows are running under it. `--json` says the whole of it as one object, which is what a monitor that cannot attach reads. |
 | `start [-f <flow>] [-a <agent>]...` | Holds a run here without reading it, for a machine being set up rather than sat at. Takes `-f` and `-a` exactly as `hmz` does. |
 | `attach [<workspace>]` | Reads one from this terminal, which is the long way round of what `hmz` already does. |
 | `stop [<workspace>]` | Stops the flow and closes the interface, which is what `/exit` means, and waits for it to go. `--kill` ends the process holding both instead, for one that will not. |
@@ -570,7 +640,9 @@ than as a turn that failed.
 | `PI_CODING_AGENT_DIR` | same | pi's home. Defaults to `~/.pi/agent`. |
 | `QWEN_HOME` | same | Qwen Code's home. Defaults to `~/.qwen`. |
 | `XDG_DATA_HOME` | the model list | Where opencode and mimocode keep their data. Defaults to `~/.local/share`. |
-| `NO_COLOR` | the TUI | Honoured. |
+| `NO_COLOR` | every command, the TUI | Honoured. Set to anything non-empty, nothing writes an escape sequence — and it wins over `FORCE_COLOR`. |
+| `FORCE_COLOR` | every command | Set to anything but `0`, a command writes colour into something that is not a terminal — which is what a CI log wants. It does not make a run believe somebody is watching it: a piped run is still written plainly in shape, just in colour. |
+| `TERM` | every command | `dumb` is a terminal saying it could not read escapes, and is honoured as `NO_COLOR` is. |
 | `TEXTUAL_THEME` | the TUI | Names a Textual theme to use instead of humanize's own, which is your terminal's sixteen colours. A name no theme answers to is ignored. |
 
 Antigravity CLI and ZCode are the two backends whose homes cannot be moved: neither reads a

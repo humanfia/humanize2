@@ -54,9 +54,21 @@ def fallback(argv: list[str]) -> int:
         action="store_true",
         help="one place a line, and nothing else",
     )
+    listing.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="one JSON object per step, one a line, for a program to read",
+    )
 
     showing = doing.add_parser("show", help="the places one turn would walk, in order")
     showing.add_argument("place", metavar=_PLACE, help="the place the turn starts at")
+    showing.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="one JSON object per place of the walk, one a line, for a program to read",
+    )
 
     adding = doing.add_parser(
         "add", help="say where one place's turns go when it cannot run"
@@ -95,10 +107,11 @@ def fallback(argv: list[str]) -> int:
     )
 
     args = parser.parse_args(argv)
+    machine = getattr(args, "as_json", False)
     if args.doing in (None, "list"):
-        return _list(steps, quiet=getattr(args, "quiet", False))
+        return _list(steps, quiet=getattr(args, "quiet", False), as_json=machine)
     if args.doing == "show":
-        return _show(steps, args.place)
+        return _show(steps, args.place, as_json=machine)
     if args.doing == "add":
         return _add(steps, args.place, args.at)
     if args.doing == "retry":
@@ -115,34 +128,53 @@ def _said(step: Falls) -> str:
     return f"{step.tries} more tries, {step.policy}{over}; {goes}"
 
 
-def _list(steps: Fallbacks, *, quiet: bool) -> int:
+def _list(steps: Fallbacks, *, quiet: bool, as_json: bool = False) -> int:
     """Prints every step, one a line, in the order they were written down."""
+    from .output import Out
+
     found = steps.all()
-    if not found:
-        if quiet:
+    with Out(as_json=as_json) as out:
+        if not found:
+            if not quiet:
+                out.note(
+                    "nothing written down yet; try "
+                    "`hmz fallback add claude/claude-opus-5 codex/gpt-5.6-sol`"
+                )
             return 0
-        print(
-            "nothing written down yet; try "
-            "`hmz fallback add claude/claude-opus-5 codex/gpt-5.6-sol`"
-        )
-        return 0
-    for one in found:
-        print(one.spec if quiet else f"{one.spec}  ->  {_said(one)}")
+        for one in found:
+            out.row(
+                one.spec if quiet else f"{one.spec}  ->  {_said(one)}",
+                place=one.spec,
+                to=one.to,
+                tries=one.tries,
+                policy=one.policy,
+                timeout=one.timeout,
+            )
     return 0
 
 
-def _show(steps: Fallbacks, place: str) -> int:
+def _show(steps: Fallbacks, place: str, *, as_json: bool = False) -> int:
     """Prints the places one turn walks, the one it starts at first."""
+    from .output import Out
+
     if not steps.reads(place):
         print(f"hmz: {place}: expected {_PLACE}", file=sys.stderr)
         return 1
     walked = steps.chain(place)
-    for at, one in enumerate(walked):
-        step = steps.tried(one)
-        tries = f"   [{step.tries} more tries, {step.policy}]" if step.tries else ""
-        print(f"{at + 1}. {one}{tries}")
-    if len(walked) == 1:
-        print("falls back nowhere: a failed turn is a failed turn")
+    with Out(as_json=as_json) as out:
+        for at, one in enumerate(walked):
+            step = steps.tried(one)
+            tries = f"   [{step.tries} more tries, {step.policy}]" if step.tries else ""
+            out.row(
+                f"{at + 1}. {one}{tries}",
+                at=at + 1,
+                place=one,
+                tries=step.tries,
+                policy=step.policy,
+                timeout=step.timeout,
+            )
+        if len(walked) == 1:
+            out.note("falls back nowhere: a failed turn is a failed turn")
     return 0
 
 

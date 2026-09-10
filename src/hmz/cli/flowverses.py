@@ -51,9 +51,21 @@ def flowverses(argv: list[str]) -> int:
         action="store_true",
         help="just the names, one a line, for a script to read",
     )
+    listing.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="one JSON object per place, one a line, for a program to read",
+    )
 
     showing = doing.add_parser("show", help="what one holds")
     showing.add_argument("name", metavar="NAME")
+    showing.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="the whole of it as one JSON object, for a program to read",
+    )
 
     making = doing.add_parser("add", help="fetch one, and offer its flows")
     making.add_argument(
@@ -74,10 +86,11 @@ def flowverses(argv: list[str]) -> int:
     dropping.add_argument("name", metavar="NAME")
 
     args = parser.parse_args(argv)
+    machine = getattr(args, "as_json", False)
     if args.doing in (None, "list"):
-        return _list(quiet=getattr(args, "quiet", False))
+        return _list(quiet=getattr(args, "quiet", False), as_json=machine)
     if args.doing == "show":
-        return _show(args.name)
+        return _show(args.name, as_json=machine)
     if args.doing == "add":
         return _add(args.url, args.name)
     if args.doing == "fetch":
@@ -85,7 +98,7 @@ def flowverses(argv: list[str]) -> int:
     return _remove(args.name)
 
 
-def _list(*, quiet: bool) -> int:
+def _list(*, quiet: bool, as_json: bool = False) -> int:
     """Prints every place flows come from, in the order they are offered.
 
     Says which places there are and not what any of them holds, and so reads none of them.
@@ -95,19 +108,32 @@ def _list(*, quiet: bool) -> int:
     """
     from hmz.sdk import Hmz
 
+    from .output import Out
+
     verses = Hmz().verses
-    for one in verses.all():
-        if quiet:
-            print(one.name)
-            continue
-        # What has been downloaded is not the same question as what there is to run, so one
-        # that has not been fetched says that rather than being left off the list.
-        state = "fetched" if one.fetched else "not fetched"
-        print(f"{one.name:14} {state:12} {verses.whence(one)}")
+    with Out(as_json=as_json) as out:
+        for one in verses.all():
+            if quiet and not as_json:
+                print(one.name)
+                continue
+            # What has been downloaded is not the same question as what there is to run, so
+            # one that has not been fetched says that rather than being left off the list.
+            state = "fetched" if one.fetched else "not fetched"
+            # `whence`, never the URL itself: a private one is added with a token signed into
+            # it, and this line is printed every time the places are listed.
+            whence = verses.whence(one)
+            out.row(
+                f"{one.name:14} {state:12} {whence}",
+                name=one.name,
+                fetched=one.fetched,
+                whence=whence,
+                at=str(one.at),
+                fixed=one.fixed,
+            )
     return 0
 
 
-def _show(name: str) -> int:
+def _show(name: str, *, as_json: bool = False) -> int:
     """Prints what one flowverse is, and the name each flow in it is offered under.
 
     This is the line that reads them. What a file holds is not a fact its name carries -- one
@@ -118,11 +144,28 @@ def _show(name: str) -> int:
     """
     from hmz.sdk import Hmz
 
+    from .output import Out
+
     verses = Hmz().verses
     one = verses.find(name)
     if one is None:
         print(f"hmz: no flowverse called {name!r}", file=sys.stderr)
         return 1
+    if as_json:
+        # One question, one object. Held open while the flows are read, since reading them
+        # imports somebody else's package and a package that prints on import would otherwise
+        # put a line that is not JSON into a stream that has to be all of it.
+        with Out(as_json=True) as out:
+            held = verses.holds(one) if one.fetched else ()
+            out.record(
+                name=one.name,
+                whence=verses.whence(one),
+                at=str(one.at),
+                fetched=one.fetched,
+                fixed=one.fixed,
+                holds=[{"name": flow.name, "about": flow.about} for flow in held],
+            )
+        return 0
     print(f"flowverse   {one.name}")
     print(f"from        {verses.whence(one)}")
     print(f"kept in     {one.at}")

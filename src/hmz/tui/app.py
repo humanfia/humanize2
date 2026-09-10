@@ -2868,7 +2868,9 @@ class Humanize(App[None]):
             self.show("hmz: a flow is already running", "red")
             return
         try:
-            path, chosen, task, _, container = self.hmz.read(argv)
+            # `--json` says how a run is written for whoever is at a command line, and there
+            # is nobody at one here: the interface draws the same events itself.
+            path, chosen, task, _, container, _ = self.hmz.read(argv)
         except SystemExit:
             return  # argparse has already said what was wrong, and it went to the transcript
         try:

@@ -71,6 +71,46 @@ Two things follow:
 - A flow that asks you for [an answer in a shape](/weaver/shapes) gets `None`, and the weaver
   who wrote it had better have handled that.
 
+## Watch it while it runs
+
+At a terminal, the run is drawn as it happens — which agent is working, what it says, the
+tools it runs, and what each turn cost when it lands. A turn thinks for minutes and says
+nothing for most of them, so a clock sits at the foot of the screen while it does:
+
+```console
+$ hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
+● builder is working
+● Bash(pytest -q tests/)
+● I fixed add() and the tests pass.
+✻ input 40.0k · output 1.2k · claude-opus-4-8 · builder
+✻ Worked for 74s · builder
+```
+
+Redirect it and the escape sequences go: the same lines, plain. What each turn **answered**
+goes to stdout and the run itself to stderr, so a script reads one without the other:
+
+```sh
+hmz exec -f chat -a claude/claude-opus-4-8:high "summarise CHANGELOG.md" > summary.txt
+hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)" 2> run.log
+```
+
+`NO_COLOR` turns colour off outright; `FORCE_COLOR` turns it on for a log that renders it.
+
+## Read it with a program
+
+`--json` writes the run as [NDJSON](https://github.com/ndjson/ndjson-spec) — one object per
+thing an agent says, on stdout, flushed as it is said:
+
+```sh
+hmz exec -f ralph_loop -a claude/claude-opus-4-8:high --json "$(cat TASK.md)" \
+    | jq -c 'select(.kind == "result")'
+```
+
+Every object carries the agent, the backend and model, the conversation, the kind of thing it
+was, the words, what the turn cost and when — the keys are in the
+[CLI reference](/reference/cli#watching-a-run). While `--json` is on, nothing else reaches
+stdout: whatever the flow prints goes to stderr, so one stray line cannot break the stream.
+
 ## See what is checked first
 
 Run these on purpose. Each is refused before a single turn:
