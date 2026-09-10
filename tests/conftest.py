@@ -106,6 +106,54 @@ def asking(_asks_nothing: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(hmz.models, "ask", _ASKS)
 
 
+@pytest.fixture
+def priced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """Puts one model's unit prices where the interface will read them.
+
+    Written and fetched from a file rather than from the network: what a token costs is
+    somebody else's list, and a suite must not go and ask them for it.
+
+    Returns:
+      The model that is now listed, at a dollar a million in and five a million out.
+    """
+    import json
+
+    from hmz import prices
+
+    source = tmp_path / "prices-source.json"
+    source.write_text(
+        json.dumps(
+            {
+                "currency": "USD",
+                "unit": "per 1M tokens",
+                "versions": [
+                    {
+                        "date": "2026-09-10",
+                        "models": [
+                            {
+                                "provider": "Anthropic",
+                                "id": "claude-haiku-4.5",
+                                "name": "Claude Haiku 4.5",
+                                "pricingItems": [
+                                    {"category": "input_tokens", "price": 1},
+                                    {"category": "output_tokens", "price": 5},
+                                    {"category": "cache_read_tokens", "price": 0.1},
+                                    {"category": "cache_write_tokens", "price": 1.25},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(prices.WHENCE, str(source))
+    prices._tried = 0.0
+    assert prices.refresh(wait=True)
+    return "claude-haiku-4.5"
+
+
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "agent: end-to-end test that drives a real coding agent binary"

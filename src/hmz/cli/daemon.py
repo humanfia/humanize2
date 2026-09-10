@@ -47,9 +47,21 @@ def daemon(argv: list[str]) -> int:
         action="store_true",
         help="just the directories, one a line, for a script to read",
     )
+    listing.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="one JSON object per run, one a line, for a program to read",
+    )
 
     showing = doing.add_parser("status", help="what one of them is doing")
     showing.add_argument("workspace", nargs="?", default=None, help="which directory")
+    showing.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="the whole of it as one JSON object, for a program to read",
+    )
 
     starting = doing.add_parser("start", help="hold a run here, without reading it")
     starting.add_argument(
@@ -78,60 +90,82 @@ def daemon(argv: list[str]) -> int:
     )
 
     args = parser.parse_args(argv)
+    machine = getattr(args, "as_json", False)
     if args.doing in (None, "list"):
-        return _list(quiet=getattr(args, "quiet", False))
+        return _list(quiet=getattr(args, "quiet", False), as_json=machine)
     if args.doing == "start":
         return _start(args.flow, args.agents, parser)
     if args.doing == "status":
-        return _status(args.workspace)
+        return _status(args.workspace, as_json=machine)
     if args.doing == "attach":
         return _attach(args.workspace)
     return _stop(args.workspace, kill=args.kill)
 
 
-def _list(*, quiet: bool) -> int:
+def _list(*, quiet: bool, as_json: bool = False) -> int:
     """Prints every run being held on this machine, oldest first."""
     from hmz.cli import many
     from hmz.daemon import daemons
 
+    from .output import Out
+
     found = daemons()
-    if not found:
-        if quiet:
+    with Out(as_json=as_json) as out:
+        if not found:
+            if not quiet:
+                out.note("no runs are being held; `hmz` in a directory starts one")
             return 0
-        print("no runs are being held; `hmz` in a directory starts one")
-        return 0
-    for one in found:
-        if quiet:
-            print(one.workspace)
-            continue
-        said = one.status()
-        reading = said.get("attached") or 0
-        print(
-            f"{one.workspace}  pid {one.pid}  since {one.started}  "
-            f"{many(reading, 'terminal')} reading"
-        )
+        for one in found:
+            if quiet and not as_json:
+                print(one.workspace)
+                continue
+            said = one.status()
+            reading = said.get("attached") or 0
+            out.row(
+                f"{one.workspace}  pid {one.pid}  since {one.started}  "
+                f"{many(reading, 'terminal')} reading",
+                workspace=one.workspace,
+                pid=one.pid,
+                started=one.started,
+                at=str(one.at),
+                reading=reading,
+            )
     return 0
 
 
-def _status(workspace: str | None) -> int:
+def _status(workspace: str | None, *, as_json: bool = False) -> int:
     """Prints what one held run is doing."""
     from hmz.cli import many
+
+    from .output import Out
 
     one = _found(workspace)
     if one is None:
         return 1
     said = one.status()
     flows = said.get("flows")
-    print(f"workspace   {one.workspace}")
-    print(f"pid         {one.pid}")
-    print(f"started     {one.started}")
-    print(f"socket      {one.at}")
-    # What the run is drawing for, which is the terminal it was started from: a run holds
-    # one pseudoterminal for its whole life, and a terminal of another kind that reads it
-    # later is read at that one's size and told in that one's language.
-    print(f"drawing for {said.get('term') or 'an unnamed terminal'}")
-    print(f"reading     {many(said.get('attached') or 0, 'terminal')}")
-    print(f"running     {', '.join(flows) if flows else 'nothing'}")
+    with Out(as_json=as_json) as out:
+        if as_json:
+            out.record(
+                workspace=one.workspace,
+                pid=one.pid,
+                started=one.started,
+                at=str(one.at),
+                term=said.get("term") or "",
+                reading=said.get("attached") or 0,
+                running=list(flows or ()),
+            )
+            return 0
+        print(f"workspace   {one.workspace}")
+        print(f"pid         {one.pid}")
+        print(f"started     {one.started}")
+        print(f"socket      {one.at}")
+        # What the run is drawing for, which is the terminal it was started from: a run holds
+        # one pseudoterminal for its whole life, and a terminal of another kind that reads it
+        # later is read at that one's size and told in that one's language.
+        print(f"drawing for {said.get('term') or 'an unnamed terminal'}")
+        print(f"reading     {many(said.get('attached') or 0, 'terminal')}")
+        print(f"running     {', '.join(flows) if flows else 'nothing'}")
     return 0
 
 

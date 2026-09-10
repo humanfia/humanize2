@@ -48,6 +48,10 @@ hmz exec -f ralph_loop -a claude/claude-opus-4-8:high "$(cat TASK.md)"
 This is the whole reason the setting exists. A nine-hour unattended loop that blocked forever
 on `Which approach would you prefer?` is a run that did nothing.
 
+The question is still shown, in yellow, so that a run read back afterwards says what the agent
+wanted to ask and what it did instead — and it is an `asks` object under
+[`--json`](/user/unattended#read-it-with-a-program), for a job that wants to count them.
+
 ## From Python
 
 `agent.ask` is the hook. Set it and questions reach you. Leave it unset and the backend is told

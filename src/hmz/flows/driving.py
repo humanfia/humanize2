@@ -428,15 +428,6 @@ class Place(NamedTuple):
     goals: bool = True
     web_search: bool = True
 
-    @property
-    def goals_default(self) -> bool:
-        """What the agent picker called `goals` while a picker still decided it.
-
-        Nothing decides it now but the flow, so this answers the declaration itself. Here
-        only for the sheet rows that still read it, and goes when they do.
-        """
-        return self.goals
-
 
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
     """What a flow calls each of the coding agents it drives, in the order it takes them.

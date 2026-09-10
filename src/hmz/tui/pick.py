@@ -984,7 +984,7 @@ def settled(
             # What the flow suggested for a place nothing was remembered for: a flow that
             # says its agent starts without goals is one whose fallback agent starts that
             # way too, rather than one whose suggestion only counts on a command line.
-            one = spare[0]._replace(goals=place.goals_default)
+            one = spare[0]._replace(goals=place.goals)
         else:
             # Nothing remembered and nothing to fall back on, which is a machine with no
             # coding agent installed on it: a place with no agent is a place with no agent,
