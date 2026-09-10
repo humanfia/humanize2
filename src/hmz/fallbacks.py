@@ -48,12 +48,16 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 __all__ = [
+    "ANSWERS",
     "BASE",
     "CEILING",
     "DEFAULT",
     "POLICIES",
+    "THROTTLED",
+    "Answer",
     "Falls",
     "Policy",
+    "answers",
     "chain",
     "clear",
     "falls",
@@ -119,6 +123,157 @@ POLICIES = (
 #: exponential backoff with full jitter is what every one of these services documents, and the
 #: jitter is what keeps a flow's agents from retrying in lockstep.
 DEFAULT = "exponential-jitter"
+
+#: The least a turn waits after being told there have been too many requests. Half the longest
+#: wait there is, which is long enough that a per-minute window has moved on and short enough
+#: that a flow does not read as hung -- and long whatever the place's policy says, since the
+#: first second of an exponential backoff is a second the service has already refused.
+THROTTLED = CEILING / 2
+
+#: How many goes a turn gets at a store another turn had open. Three, because the contention
+#: is one process holding a file lock for the length of one write: it is gone by the second
+#: try nearly always and by the third all but never not.
+_BUSY = 3
+
+
+@dataclass(frozen=True, slots=True)
+class Answer:
+    """What a turn does about one kind of failure, which is a different thing for each.
+
+    A place says how many times over a failed turn is taken again and how long to wait between
+    them, and that is the right thing for a place to say -- but it is one answer, and what
+    stopped the turn is not one question. A rate limit wants a long wait and then another
+    account; a credential that was refused wants no wait at all and the same account chain; a
+    model that has been retired wants neither, no account of that CLI having it either. Retried
+    the same way, three of those are a flow that makes no progress and one is a flow that
+    hammers a service which has just told it to stop.
+
+    So the place says the shape and this says what the failure does to it: how few goes it is
+    worth, how long the shortest of them waits, whether the account chain answers it at all,
+    and what to tell whoever is watching.
+
+    Attributes:
+      fault: The kind, as `hmz.backends.FAULTS` names them, and "" for the one nobody
+        classified -- whose answer is the one a turn has always had.
+      about: What happened, as the clause an event narrating the recovery is built round.
+      tries: The fewest goes here, whatever the place says. A place that asked for more gets
+        more: this is a floor under a failure that is worth another go and not a ceiling on
+        what somebody asked for.
+      held: Whether that is also the most, which is none: a failure the same call cannot come
+        out of differently is one to walk away from rather than to schedule.
+      policy: A wait of its own to put under the place's, or "" to wait only the way the
+        place says. Under rather than instead of: a place that asked for a longer backoff
+        asked for it, and a row that shortened one would be this file overruling somebody --
+        in the one direction that hammers whatever has just failed.
+      least: The shortest any of those waits may be, however short both policies made it.
+      accounts: Whether another account of this backend answers it. False for the failures no
+        account answers -- a model that is gone, a CLI that is not installed -- whose turn
+        goes straight to the chain of places rather than round every account first.
+      reopen: Whether whatever was holding the conversation open is let go of before the next
+        go. The conversation is the backend's own and is named by an id, so a new transport
+        resumes it: what was lost was the socket and not the session.
+      fix: What a person does about it, in a few words, for the failures where there is
+        something to do. It goes on the event that narrates the recovery and on the turn's own
+        failure, so that an account needing attention says so rather than reading as a bug.
+    """
+
+    fault: str
+    about: str
+    tries: int = 0
+    held: bool = False
+    policy: str = ""
+    least: float = 0.0
+    accounts: bool = True
+    reopen: bool = False
+    fix: str = ""
+
+
+#: What every kind of failure gets. One row per kind, and the kind nobody recognised is not
+#: among them: a failure this cannot name is a turn tried again exactly as it always was,
+#: which is the only answer that cannot be wrong about something it has not understood.
+ANSWERS: tuple[Answer, ...] = (
+    # Waited out first and then walked away from, in that order: the service has said the
+    # account is spending too fast, so the next call under the same account is the same
+    # answer -- and the account after it is not rate-limited at all.
+    Answer(
+        "throttled",
+        "is rate-limited",
+        tries=1,
+        least=THROTTLED,
+        fix="this account has spent its quota; another one, or a wait, is what answers it",
+    ),
+    # Not waited out at all. A key that was refused is refused a minute later, and five goes
+    # on a schedule is five minutes spent finding that out.
+    Answer(
+        "refused",
+        "was refused the credentials",
+        held=True,
+        fix="that account needs signing in again",
+    ),
+    # And neither waited out nor walked round: every account of this CLI is offered the same
+    # catalogue, so the model that is gone is gone under all of them.
+    Answer(
+        "retired",
+        "has no such model",
+        held=True,
+        accounts=False,
+        fix="the model is gone or was never this account's; another place is what answers it",
+    ),
+    # Two turns at one local store, which is nobody's account and nothing to walk to. It
+    # clears itself in the time it takes the other turn to finish writing.
+    Answer(
+        "contended",
+        "found its own store busy",
+        tries=_BUSY,
+        policy="constant",
+        fix="two turns of it are sharing one database",
+    ),
+    # The socket rather than the session. Reopened and resumed, and given whatever wait the
+    # place asks for and no more: there is nothing here to wait out, the thing that failed
+    # having already gone, and a place that asked for a backoff against a gateway that is
+    # down asked for it.
+    Answer(
+        "dropped",
+        "lost the connection",
+        tries=1,
+        reopen=True,
+        fix="",
+    ),
+    # The process rather than the socket. Reopened too, and given a moment first: a machine
+    # that has just killed something for memory has not got it back yet.
+    Answer(
+        "killed",
+        "was killed rather than answered",
+        tries=1,
+        policy="constant",
+        reopen=True,
+        fix="the machine it runs on may be out of memory",
+    ),
+    # Nothing to run, and no account of a CLI that is not here. What answers it is a line in
+    # a terminal, or a step to a CLI this machine actually has.
+    Answer(
+        "missing",
+        "is not installed here",
+        held=True,
+        accounts=False,
+        fix="",
+    ),
+)
+
+
+def answers(fault: str) -> Answer:
+    """What to do about one kind of failure.
+
+    Args:
+      fault: The kind, as `hmz.backends.FAULTS` names them.
+
+    Returns:
+      Its row, or the one a failure nobody classified gets: no goes beyond the ones the place
+      asked for, the place's own wait, and the account chain after them -- which is what every
+      failed turn got before there was a taxonomy to read one by. So whoever is recovering a
+      turn reads a row rather than a row and a special case.
+    """
+    return next((one for one in ANSWERS if one.fault == fault), Answer(fault, "failed"))
 
 
 @dataclass(frozen=True, slots=True)

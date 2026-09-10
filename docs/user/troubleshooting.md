@@ -124,6 +124,57 @@ claude --help
 codex --version
 ```
 
+### The turn failed and I want to know which of my problems it is
+
+Every failed turn now ends with the kind of failure it was and what to do about it, in
+brackets after whatever the CLI said:
+
+```
+Command '['claude', …]' returned non-zero exit status 1. 429 rate limit exceeded
+(throttled: this account has spent its quota; another one, or a wait, is what answers it)
+```
+
+The kinds are `throttled`, `refused`, `retired`, `contended`, `dropped`, `killed` and
+`missing`, and each of them gets [a different answer](/user/fallback#what-went-wrong) before
+the turn is given up on. A failure with no kind in brackets is one nothing recognised, which is
+tried again exactly as a failed turn always was.
+
+### `(refused: that account needs signing in again)`
+
+The credential, not the request: a 401, a 403, or a login that has expired. Nothing is tried
+again under it — it would be refused a minute later too — and the turn carries on under the
+next account of that backend. Sign the one it left back in:
+
+```sh
+claude auth login
+hmz providers
+```
+
+### `(retired: the model is gone or was never this account's; another place is what answers it)`
+
+The CLI or its service says there is no such model. No account of that backend answers it, they
+are all offered the same catalogue, so the turn goes straight to the next
+[place](/user/fallback). Ask the backend what it actually runs, and give the agent one of
+those:
+
+```sh
+hmz check
+```
+
+### `(missing: npm i -g @anthropic-ai/claude-code)`
+
+There was nothing to run. The CLI is not installed, or would not start. The line in brackets is
+the one that installs it; `curl https://cursor.com/install -fsS | bash` for Cursor, `pip
+install 'deepseek-harness-sdk'` for DeepSeek Harness. humanize looks on `PATH` first and then
+where an installer would have put one — see [what you have](/user/installation#check-what-you-have).
+
+### `(contended: two turns of it are sharing one database)`
+
+opencode keeps its sessions in one SQLite database shared across workspaces, so two turns of it
+at once can lose a race and be told `database is locked` before either has spoken to a
+provider. The turn is taken again three times, a second apart, which nearly always clears it.
+If it does not, run fewer opencode agents at once.
+
 ### `codex: this machine will not run an agent at bypass, so it runs at auto`
 
 Not a failure: a note, said once per agent. This Codex was given requirements by somebody
