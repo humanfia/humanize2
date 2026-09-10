@@ -1069,9 +1069,10 @@ class Humanize(App[None]):
         first filling of it -- the moment before that, there is nothing to offer at any of the
         sheets and nothing to open talking to.
 
-        In the background and one at a time, because asking means starting a coding agent:
-        a prompt cannot wait on one, and six at once is six of them. A backend that will not
-        answer is left alone rather than retried -- `r` on the models is what asks again.
+        In the background and one at a time, because asking means starting a coding agent,
+        or reaching the endpoint an account points one at: a prompt cannot wait on either, and
+        six at once is six of them. A backend that will not answer is left alone rather than
+        retried -- `r` on the models is what asks again.
         """
         import asyncio
 

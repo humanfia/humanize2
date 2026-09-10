@@ -374,6 +374,14 @@ class Profile:
         switch onto a cloud. Named so that a turn under a provider can be run without them --
         a key in a shell profile is a key this CLI would rather have than the one it was
         signed in with, and nothing about that reads as wrong until the bill arrives.
+      endpoint: Which one of those variables says where a turn of this backend actually goes.
+        Named on its own, out of the several base URLs a profile lists, because it is the one
+        whose value can be asked what it serves: a CLI pointed at somebody's gateway answers
+        with the models it ships rather than with the gateway's, so what a turn could name is
+        what is at the other end of this. Empty for a backend whose endpoint's ids are not
+        ids a turn of it could name -- one that spells a model `provider/id` out of several
+        endpoints at once, or one whose endpoint speaks a protocol of its own -- whose own
+        answer is already the account's. :mod:`hmz.models` is what reads it.
       signs: What this CLI says when a turn stops that no other one says, and which kind of
         failure each of those makes it. Read before :data:`SIGNS`, which is what every one of
         them says. Empty for a backend whose failures read like everybody else's.
@@ -412,6 +420,7 @@ class Profile:
     creds: tuple[str, ...] = ()
     ways: tuple[Way, ...] = ()
     ambient: tuple[str, ...] = ()
+    endpoint: str = ""
     signs: tuple[Sign, ...] = ()
     journal: tuple[str, ...] = ()
     installs: str = ""
@@ -649,6 +658,11 @@ PROFILES = (
             "CLAUDE_CODE_USE_VERTEX",
             "CLAUDE_CODE_USE_BEDROCK",
         ),
+        # Where a turn actually goes when it is not going to Anthropic: the gateway way sets
+        # it, and Claude Code sends every request of that turn there under the id it was
+        # given. Both protocols list what is behind it the same way, so what it serves is
+        # what a turn may name.
+        endpoint="ANTHROPIC_BASE_URL",
         ways=(
             Way(
                 name="login",
@@ -759,6 +773,10 @@ PROFILES = (
             # with its key -- and the answers come back looking exactly as they should.
             "GOOGLE_GEMINI_BASE_URL",
         ),
+        # The Gemini endpoint a turn's requests go to. Google's own lists its models
+        # somewhere else and in another shape, so this ordinarily falls back to asking agy;
+        # a gateway put behind it that answers `/v1/models` is answered from there.
+        endpoint="GOOGLE_GEMINI_BASE_URL",
         ways=(
             Way(
                 name="login",
@@ -819,6 +837,10 @@ PROFILES = (
         # provider with somebody's copy of it still exported would hand that provider's token
         # to somebody's endpoint.
         ambient=("CODEX_API_KEY", "CODEX_AUTHAPI_BASE_URL", "OPENAI_BASE_URL"),
+        # The gateway way's own, rather than either of the ambient two: codex takes a
+        # provider as settings, and `model_providers.humanize.base_url` -- which is where
+        # every request of such a turn goes -- is filled from this and from nothing else.
+        endpoint="CODEX_PROVIDER_URL",
         ways=(
             Way(
                 name="login",
@@ -916,6 +938,9 @@ PROFILES = (
         # the Python SDK, which carries no skills at all -- so a list here would be of skills
         # nothing in this session would ever load.
         ambient=("DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL"),
+        # Its SDK has no model-list request at all, so an endpoint that answers one is the
+        # only way this backend ever says something other than the two names it ships with.
+        endpoint="DEEPSEEK_BASE_URL",
         ways=(
             Way(
                 name="key",
@@ -979,6 +1004,10 @@ PROFILES = (
             "GROK_OIDC_CLIENT_ID",
             "GROK_OIDC_ISSUER",
         ),
+        # The one a turn's requests go to, rather than `GROK_MODELS_BASE_URL`, which moves
+        # only where the CLI looks up its own catalogue: a list from somewhere a turn does
+        # not go is the same fresh-and-wrong answer as the CLI's own.
+        endpoint="GROK_XAI_API_BASE_URL",
         ways=(
             Way(
                 name="login",
@@ -1056,6 +1085,10 @@ PROFILES = (
             "KIMI_OAUTH_HOST",
             "KIMI_REGISTRY_API_KEY",
         ),
+        # The `model` way's endpoint rather than either of the two that move Kimi's own
+        # service: that way builds a provider out of it in memory and makes it the default,
+        # so it is where the turns of such an account go.
+        endpoint="KIMI_MODEL_BASE_URL",
         ways=(
             Way(
                 name="login",
@@ -1177,6 +1210,10 @@ PROFILES = (
             "QWEN_MODEL",
             "QWEN_OAUTH_MODELS",
         ),
+        # Qwen Code has no command that lists what it runs, being an OpenAI-compatible
+        # client: its catalogue was never the CLI's to know, and this is the only place it
+        # is written -- which is why the two names it ships pointed at are advisory.
+        endpoint="OPENAI_BASE_URL",
         ways=(
             Way(
                 name="login",

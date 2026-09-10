@@ -177,11 +177,30 @@ they are. A secret typed at the prompt is drawn as bullets and never shown back.
 ![hmz providers ways, add, list and show — naming variables and never their
 values](/demo/providers.gif)
 
-The models an account can run belong to that account, so the CLI is asked as soon as one is
-made: which models a turn may name depends on which subscription, key or gateway it runs under.
-The answer is kept in `~/.humanize/providers/claude/deepseek/models.json`. A CLI that will not
-say does not fail the line; the account was made. **r** on the models sheet asks it again, and
-it is where you find out that the model you came for is not in the list.
+The models an account can run belong to that account, so it is asked as soon as one is made:
+which models a turn may name depends on which subscription, key or gateway it runs under.
+The answer is kept in `~/.humanize/providers/claude/deepseek/models.json`. Something that will
+not say does not fail the line; the account was made. **r** on the models sheet asks it again,
+and it is where you find out that the model you came for is not in the list.
+
+**A gateway account is asked the gateway.** A coding agent pointed at somebody's endpoint lists
+the models it ships with — it never goes and looks at the other end — so its answer is a list
+your key will refuse, however recently it was taken. Where an account sets the base URL its
+backend routes turns by, `GET {base}/v1/models` under that account's own credentials is what
+gets written down, so the list is the ids that endpoint actually serves:
+
+```
+   claude/nvidia
+     1. azure/anthropic/claude-haiku-4-5
+     2. azure/anthropic/claude-opus-5
+     3. azure/openai/gpt-5.6-sol
+```
+
+The credential goes into that one request and nowhere else — not into `models.json`, not into
+a log, not into the message you get when the endpoint refuses, and not to another host: a
+redirect off the address you gave is refused rather than followed, since the headers would go
+with it. An endpoint that is down, that refuses, or that answers something other than a model
+list leaves the CLI to answer as before.
 
 ## In the interface
 

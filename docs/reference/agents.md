@@ -261,6 +261,17 @@ provider that serves it, and the CLI is asked for the pair. `qwen` names whateve
 OpenAI-compatible endpoint behind it serves, and `grok` names one out of its own catalogue:
 `grok models` lists them.
 
+For an account that points its backend at an endpoint of somebody else's, the model list comes
+from that endpoint rather than from the CLI — see [what it runs is discovered for the
+account](/features/backends#what-it-runs-is-discovered-for-the-account). `claude`, `codex`,
+`agy`, `dsh`, `grok`, `kimi` and `qwen` each route their turns by one base-URL variable
+(`ANTHROPIC_BASE_URL`, `CODEX_PROVIDER_URL`, `GOOGLE_GEMINI_BASE_URL`, `DEEPSEEK_BASE_URL`,
+`GROK_XAI_API_BASE_URL`, `KIMI_MODEL_BASE_URL`, `OPENAI_BASE_URL`), and where an account sets
+one, `GET {base}/v1/models` is what says what a turn could name. The four that spell a model
+`provider/id` are not asked that way: one endpoint's ids carry no provider, so the list would
+be of models those CLIs cannot name. `cursor` is not either — its endpoint speaks its own
+protocol, and `cursor-agent --list-models` is already the account's answer.
+
 DeepSeek Harness is driven through its own Python SDK, which arrives with humanize rather
 than as an extra — there is nothing to install for it. It supports API-key login only:
 leave `provider` empty to use the credentials and base URL saved by dsh (or its environment),
