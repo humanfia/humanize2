@@ -29,7 +29,7 @@ _ABOUT = {
     "clear": "Clear the screen",
     "details": "Toggle tool calls and thinking",
     "afk": "Toggle whether an agent may ask you",
-    "export": "Write the transcript out",
+    "export": "Package this whole run up to send",
     "detach": "Let go of this terminal, leaving the flow running",
     "exit": "Exit humanize",
 }

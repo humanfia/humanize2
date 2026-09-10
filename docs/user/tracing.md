@@ -138,14 +138,18 @@ keeps it. They are made again when the run ends, because a sub-agent's transcrip
 whenever that sub-agent ran, and a filesystem that will not make one is a run without links
 rather than a run that stops.
 
+Being links, they are worth nothing on any machine but this one — so sending a run to somebody
+else means following them and carrying what is behind them, which is what
+[`/export`](/user/export) does.
+
 ![one run's sessions/ directory, its name saying agent, CLI and account, holding a symlink to
 Claude Code's own log](/demo/run-linked.png)
 
 `/epics` is the same list at the prompt: every run of this directory, newest first, with a mark
 on the ones whose flow says it can be picked up. Enter opens what there is to do with the run
-under the cursor — carry on from here, collect a trace, where it is. Collecting a trace is
-offered for every run, whatever its flow says; the rest is [picking a run
-up](/user/resuming#carrying-an-older-one-on).
+under the cursor — carry on from here, collect a trace, [export it](/user/export), where it is.
+Collecting a trace and exporting are offered for every run, whatever its flow says; the rest is
+[picking a run up](/user/resuming#carrying-an-older-one-on).
 
 **It is not a transcript.** The backend's own log is the turn-by-turn record. An epic is the
 *shape* of the run: enough to gather a trace afterwards out of the ids alone. It covers one run
@@ -327,6 +331,7 @@ live. It is read off the turns going past, never by asking the flow.
 ## See also
 
 - [Picking a run up](/user/resuming) — carrying one of these runs on where it stopped
+- [Exporting a run](/user/export) — the same run packaged up whole, to send to somebody else
 - [Tracing reference](/reference/tracing)
 - [CLI › `hmz trace`](/reference/cli#hmz-trace)
 - [Troubleshooting](/user/troubleshooting#_0-sessions-0-slices)

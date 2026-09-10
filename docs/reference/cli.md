@@ -212,6 +212,52 @@ hmz trace collect --session 0a1b2c3d,5f6e            # two sessions, wherever th
 hmz trace collect --end "yesterday 18:00" --output /tmp/before.json
 ```
 
+## `hmz export`
+
+One whole run, packaged up to send to somebody who was not there: what it did, what every
+session of every agent was logged as, and what this machine was running — with every credential
+taken out. See [Exporting a run](/user/export).
+
+```
+hmz export [<epic>] [-o|--output <output>]
+```
+
+| Argument | |
+| --- | --- |
+| `<epic>` | Which run, by the name of its directory, a leading part of that name, or the path to it. Defaults to the last run of this directory. |
+| `-o`, `--output <path>` | Where to write it: a file, or a directory to write it into under its own name. Defaults to `.humanize/<run>.epic.tar.gz` here; the directory is created if it is not there. |
+
+A run points at each backend's own session log by a symlink rather than copying it, which is
+right on the machine that ran it and worth nothing anywhere else. An export follows every one
+of those links and carries what is behind it, beside the run's own records, the state a
+resumable flow left, the profile of a profiled run, every trace gathered of it, and a
+`manifest.json` saying which run this was, which agents drove it — CLI, model, effort, and the
+account **by name** — the workspace and the commit it is on, and per backend the version it
+reports and the SHA-256 of the executable that took the turns.
+
+Every byte of every file is scrubbed on the way in: the values of every account's variables,
+keys in the shapes the vendors mint them, anything signed into a URL, and any value a log named
+as a token, a secret, a key or a password. What a turn cost is left alone.
+
+A session the archive holds no log for says why — opencode and mimocode keep their sessions in
+a database of their own and write nothing humanize can read.
+
+Prints where it landed, which run it is of, what is in it and how big it came out:
+
+```console
+$ hmz export
+/home/you/code/.humanize/20260809T014455.212Z-9f21ab.epic.tar.gz of 20260809T014455.212Z-9f21ab: 3 sessions, 4 logs, 812 kB
+```
+
+### Examples
+
+```sh
+hmz export                                   # the last run here
+hmz export 20260809T0144                     # a run of this directory, by name
+hmz export ~/.humanize/epics/-home-you-x/20260809T014455.212Z-9f21ab
+hmz export -o /tmp/for-the-issue.tar.gz      # somewhere to attach it from
+```
+
 ## `hmz anchor`
 
 Runs a coding agent on this machine whose work lands on another one. See
@@ -608,7 +654,7 @@ A backend home that does not exist is skipped rather than being an error.
 | `~/.humanize/daemons/<project>-<digest>/daemon.sock` | `hmz` with no command | The socket a terminal reaches a [held run](/reference/daemon) through. `0600`. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.json` | the same | Which process is holding it, which workspace, and since when. |
 | `~/.humanize/daemons/<project>-<digest>/daemon.log` | the same | Whatever could not be said through a terminal about that run — what the daemon itself could not say, and what went wrong in a process reaching for its socket. |
-| `.humanize/<datetime>.session.md` | `/export` | The transcript on screen. |
+| `.humanize/<run>.epic.tar.gz` | `/export`, `hmz export` | One whole run, packaged up to send: its records, its session logs in full, the transcript, and a manifest. `0600`. |
 | `~/.humanize/flowverses/<name>/` | `hmz flowverses add`, **a** in `/flowverses` | A [flowverse](/weaver/flowverses), cloned. Every flow in it is offered as `<name>/<flow>`. |
 | `~/.humanize/skills/<owner>-<repo>-<digest>/` | a flow that named one | A repository of [skills a flow brings](/reference/flows#the-skills-a-flow-brings), cloned. The digest is of the URL, so two repositories of one name on two hosts are two directories. Fetched again the next time a run asks for it. |
 | `.humanize/flows/*/` | you | This project's own flows, offered as `local/<flow>`. |
