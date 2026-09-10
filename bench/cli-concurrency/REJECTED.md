@@ -98,3 +98,44 @@ These routes do not provide a validated replacement for local print-and-resume w
 The benchmark therefore retains the official local print command per turn, including
 its measured startup overhead. Standard Cursor service authentication is evaluated
 separately from the local model fixture.
+
+### What else was tried against the speed floor
+
+The per-turn cost is the official CLI's, not the adapter's. Timing the driver's own work
+for one turn -- local-runtime detection, the environment a turn is run with, the command
+it builds and the supervisor wrapper -- totals 0.22 ms against the 5.46 s serial turn the
+confirmed rungs are measured against, so no adapter change can move the complete-turn
+ratio.
+
+The CLI's own `startup.metrics` sidecar says what does move. A serial turn spends 472 ms
+loading the 9.6 MB bundle and 3,569 ms inside `computeGlobalCache`'s `codebaseRef`, which
+is an idle wait rather than work. At sixteen sessions `codebaseRef` is unchanged at
+3,684 ms while bundle load reaches 2,227 ms, 4.7x its serial cost: sixteen Node processes
+compiling the same bundle on four cores is the whole of the degradation. The wait is in
+the serial control too, so it divides out of the ratio, and it is why this backend
+tolerates concurrency that others cannot. Removing it would make every turn faster and
+the measured ratio worse.
+
+Node's compile cache is therefore not an available win here: the official launcher already
+points `NODE_COMPILE_CACHE` at the user's cache directory whenever `HOME` is set, and the
+472 ms is the cached cost. What that cache is worth was measured rather than assumed, by
+pointing the variable at a path Node cannot use as a cache directory for both the serial
+controls and the candidate. Bundle load at one session rose from 472 ms to 654 ms, and the
+worst complete-turn ratio at twelve sessions -- the rung that decides this ceiling -- rose
+from 2.014 to 2.234, with the serial control itself 6% slower. So a warm compile cache is
+worth roughly a tenth of the ratio where it matters most, which is more than a low-
+concurrency probe would suggest and still not a ceiling-mover. Any Node CLI whose launcher
+does not set it is leaving that much on the table.
+
+Reducing Node's pools -- `NODE_OPTIONS=--v8-pool-size=2` with `UV_THREADPOOL_SIZE=2`, for
+both fresh serial controls and the candidate -- cut peak threads at one session from 72 to
+55 and did not help: sixteen sessions measured a worst complete-turn ratio of 2.601 against
+2.389 for the default profile in the neighbouring trial. Not adopted, as a default or as a
+tuning suggestion.
+
+Pacing the driver's own process starts, so that a fan-out's bundle-load burst is spread
+rather than simultaneous, was not attempted. `_at_once` states this library's position on
+it: "a flow that asks for a thousand answers has asked for a thousand turns, and pacing
+them behind a number nobody chose would be this library deciding how wide a fan-out may
+be." A driver that throttled a caller's fan-out to flatter this benchmark would contradict
+that, and the throttled turns would pay the wait anyway.
