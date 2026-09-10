@@ -73,10 +73,16 @@ model for it in the prompt is not the same feature. A turn that has to stay open
 to](/features/steering) is such a case: a command line run per turn has ended by the time
 there is anything to say to it.
 
-Where a server is needed it is started at most once per agent, only when a turn first needs
-one, so a flow that needs none starts none. One server serves every session of its agent, so
-calls on it are serialized: two turns interleaved on one stream would each take the other's
-answers.
+Where a server is needed it is started only when a turn first needs one, so a flow that needs
+none starts none, and one server serves more than one session of its agent. Where the backend
+takes one turn at a time, that is one server per agent and calls on it are serialized: two
+turns interleaved on one stream would each take the other's answers. Codex runs the turns of
+separate conversations at the same time, so its driver hands each message read back to whoever
+it belongs to instead — the call that asked for it, or the turn of the thread it names. A
+conversation there belongs to the server that opened it, and a session is opened on a server no
+turn is running on: an agent runs one server for a flow that takes its turns in sequence,
+however many sessions it opens and drops, and one apiece for a fleet that works its sessions at
+once.
 
 ## Skills are read where that CLI reads them
 

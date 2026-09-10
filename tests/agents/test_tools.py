@@ -475,6 +475,16 @@ def test_swapping_one_callback_for_another_starts_a_codex_server_told_about_it(
             started.append(argv)
             self._held: list[Any] = []
 
+        def take(self) -> bool:
+            """Nothing runs on it, so it is always free for the turn that asked."""
+            return True
+
+        def share(self) -> None:
+            """Nothing runs on it, so there is nothing to run beside."""
+
+        def give(self) -> None:
+            """Nothing took it, so there is nothing to hand back."""
+
         def stop(self) -> None:
             """Nothing was started, so there is nothing to take down."""
 

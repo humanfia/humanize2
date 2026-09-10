@@ -1141,11 +1141,30 @@ class DummySession(CommandSessionBase): ...
   there, and asking the model for it in the prompt is not the same feature. A turn that must
   stay open to be talked to is such a case: a command line run per turn has ended by the time
   there is anything to say to it.
-- Such a server MUST be started at most once per agent, only when a turn first needs one, so
-  that a flow which needs none starts none; it MUST be started under the agent's anchor, and
-  stopped when the agent is collected or the process exits.
-- One server is shared by every session of its agent, so a call on it MUST be serialized: two
-  turns interleaved on one stream would each take the other's answers.
+- Such a server MUST be started only when a turn first needs one, so that a flow which needs
+  none starts none; a driver that takes one turn at a time on one MUST start at most one per
+  agent. It MUST be started under the agent's anchor, and stopped when the agent is collected
+  or the process exits.
+- One server is shared by more than one session of its agent, and what is written to it MUST be
+  written whole. A driver whose backend takes one turn at a time MUST serialize its calls: two
+  turns interleaved on one stream would each take the other's answers. A driver whose backend
+  runs the turns of separate conversations at the same time MUST instead hand each message read
+  back to whoever it belongs to -- the call that asked for it, or the turn of the thread it
+  names -- and MUST NOT let a turn hold the stream for its duration, which would make sharing a
+  server cost the whole of the turn ahead of it. What names no thread MUST reach the one turn
+  reading where there is one, which is what a stream held alone would have handed it, and MUST
+  reach none where more than one is: a message that does not say whose it is MUST NOT be what
+  ends or fails somebody else's turn.
+- Where such a backend will not hand a conversation it holds open to a second server, a session
+  MUST take every turn of its life on the server it was opened on, and MUST be opened on one no
+  turn is running on -- one more started only when every server the agent has is busy. So an
+  agent runs one server for a flow that takes its turns in sequence, however many sessions it
+  opens and drops, and one apiece for a fleet that works its sessions at once. A server per
+  session starts one a turn for a loop that opens a session a turn; one per agent makes every
+  session of a fleet wait out every turn ahead of it.
+- A thread the server already holds, at the settings the turn asks for, MUST NOT be picked up
+  again: picking one up reads the whole conversation back off the disk to tell that server what
+  it has already been told.
 - A backend told where to work MUST be told the directory the anchor puts it in, which is the
   workspace itself unless the mirror was put somewhere else, and this one when it is not
   anchored at all.
