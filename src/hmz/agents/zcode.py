@@ -38,6 +38,7 @@ from .base import AgentBase, SessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Question, Saying, Usage, say
 from .hooks import EVERYWHERE, Moment, Occasion
+from .watchdog import Watchdog
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
@@ -889,15 +890,24 @@ class ZcodeSession(SessionBase):
             said = ""
             spent: Mapping[str, int] = {}
             costing = Usage()
-            for event in server.turn(session, prompt, self._held):
-                if event.kind == "result":
-                    said, spent, costing = event.text, event.tokens, event.spent
-                    continue
-                if not self._agent._watchers:
-                    # On stderr, where every other backend puts its progress: a turn nobody can
-                    # watch is a flow that reads as hung for as long as the turn takes.
-                    say(event.text, sys.stderr)
-                yield event
+            # Under a clock: this waits on a queue the server's reader fills, and a server
+            # that stops filling it without stopping fills it never. The server's own process
+            # is what the clock looks at; putting it down goes through `_lets_go`, since
+            # `hmz.backends` says every session of the agent is on this one.
+            with Watchdog(self, riding=lambda: server._proc) as watch:
+                for event in server.turn(session, prompt, self._held):
+                    watch.saw()
+                    if event.kind == "result":
+                        said, spent, costing = event.text, event.tokens, event.spent
+                        continue
+                    if not self._agent._watchers:
+                        # On stderr, where every other backend puts its progress: a turn
+                        # nobody can watch reads as hung for as long as the turn takes.
+                        say(event.text, sys.stderr)
+                    with (
+                        watch.held()
+                    ):  # a reader that pauses is not the server's silence
+                        yield event
             if not self._agent._watchers:
                 say(said, sys.stdout)
             self._adopt(session)  # a turn has landed, so the session is open
@@ -950,6 +960,16 @@ class ZcodeSession(SessionBase):
             return session
         server.settle(session, self._held)
         return session
+
+    def _lets_go(self) -> None:
+        """Takes down the app server, which is what a wedged turn here is waiting on.
+
+        The agent's rather than this session's: one server holds every session of it, so
+        there is nothing of this conversation's own to put down, and every other turn on this
+        agent goes with it. The sessions survive: the next turn starts another server and
+        resumes this one by the id it already has.
+        """
+        self._agent._down()
 
 
 class ZcodeAgent(AgentBase):
@@ -1016,10 +1036,17 @@ class ZcodeAgent(AgentBase):
         self._down()
 
     def _down(self) -> None:
-        """Takes down the server this agent holds, if it is holding one."""
-        if self._server is not None:
-            self._server.stop()
-            self._server = None
+        """Takes down the server this agent holds, if it is holding one.
+
+        Captured under the lock the server is started under, and stopped outside it: a
+        watchdog reaches this from a thread of its own while a session on another may be
+        starting a replacement, and reading the field twice would either stop the new one or
+        find nothing between the two reads.
+        """
+        with self._serving:
+            server, self._server = self._server, None
+        if server is not None:
+            server.stop()
 
     def new(self, cwd: str | os.PathLike[str] | None = None) -> ZcodeSession:
         """Opens a new ZCode session, in the directory it is given or in this one."""

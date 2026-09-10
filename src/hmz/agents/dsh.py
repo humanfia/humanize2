@@ -26,6 +26,7 @@ import yaml
 from .base import AgentBase, SessionBase
 from .config import AgentConfig
 from .event import Event, Failed, Saying, Unrecoverable, Usage, say
+from .watchdog import Watchdog
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping
@@ -174,66 +175,81 @@ class DshSession(SessionBase):
                     notification_subscription=subscribed,
                 )
                 received = False
-                while True:
-                    method, payload = _notification(subscribed.next())
-                    if not received:
-                        if not _receipt(method, payload, session_id, message_id):
-                            continue
-                        received = True
-                    if (
-                        method == "session.event"
-                        and payload.get("sessionId") == session_id
-                    ):
-                        event = _mapping(payload.get("event"))
-                        data = _mapping(event.get("data"))
-                        kind = event.get("type")
-                        if kind == "assistant/chunk":
-                            chunk = _mapping(data.get("chunk"))
-                            block = str(chunk.get("type") or "")
-                            event_kind = _CHUNKS.get(block)
-                            text = chunk.get("text")
-                            if (
-                                event_kind is not None
-                                and isinstance(text, str)
-                                and text
-                            ):
-                                saying.delta(event_kind, text, _answer(data))
-                        elif kind == "assistant/message":
-                            message = _mapping(data.get("message"))
-                            content = message.get("content", data.get("content"))
-                            whole = _whole(content)
-                            for block_kind, said in whole.items():
-                                # The chunks put back together, plus whatever arrived in no
-                                # chunk at all -- the runtime hands both over the same way.
-                                saying.whole(block_kind, said, _answer(data))
-                            answer = whole.get("text", "")
-                            for said_event in saying.ended(_answer(data)):
-                                yield self._shows(said_event)
-                            usage = _usage(data.get("usage"))
-                            if usage.total:
-                                self._spends(usage)
-                                costing = costing + usage
-                        elif kind == "tool/call":
-                            # What it said before reaching for something is what says why it
-                            # reached, so the answer so far goes out ahead of the call. The
-                            # one being streamed, rather than whichever step this call names:
-                            # a call that named none would otherwise flush an answer nobody
-                            # is writing, and the words would come out after the call.
-                            for said_event in saying.upto():
-                                yield self._shows(said_event)
-                            name = str(data.get("name") or "tool")
-                            about = str(data.get("arguments") or "")
-                            yield self._shows(
-                                Event(kind="tool", text=f"{name} {about}".rstrip())
-                            )
-                        elif kind == "turn/end":
-                            reason = _mapping(data.get("reason"))
-                    elif (
-                        method == "session.status"
-                        and payload.get("sessionId") == session_id
-                        and payload.get("status") == "idle"
-                    ):
-                        break
+                # Under a clock: `next` blocks on the SDK's own subscription, and a
+                # runtime that has stopped publishing without stopping never wakes it.
+                # No process is named -- what holds this turn is a runtime inside this
+                # interpreter -- so the watchdog closes it through `_lets_go`, which is
+                # what makes the subscription give up.
+                with Watchdog(self) as watch:
+                    while True:
+                        method, payload = _notification(subscribed.next())
+                        watch.saw()  # anything at all: the runtime is answering
+                        if not received:
+                            if not _receipt(method, payload, session_id, message_id):
+                                continue
+                            received = True
+                        if (
+                            method == "session.event"
+                            and payload.get("sessionId") == session_id
+                        ):
+                            event = _mapping(payload.get("event"))
+                            data = _mapping(event.get("data"))
+                            kind = event.get("type")
+                            if kind == "assistant/chunk":
+                                chunk = _mapping(data.get("chunk"))
+                                block = str(chunk.get("type") or "")
+                                event_kind = _CHUNKS.get(block)
+                                text = chunk.get("text")
+                                if (
+                                    event_kind is not None
+                                    and isinstance(text, str)
+                                    and text
+                                ):
+                                    saying.delta(event_kind, text, _answer(data))
+                            elif kind == "assistant/message":
+                                message = _mapping(data.get("message"))
+                                content = message.get("content", data.get("content"))
+                                whole = _whole(content)
+                                for block_kind, said in whole.items():
+                                    # The chunks put back together, plus whatever arrived in
+                                    # no chunk at all -- the runtime hands both over the same
+                                    # way.
+                                    saying.whole(block_kind, said, _answer(data))
+                                answer = whole.get("text", "")
+                                for said_event in saying.ended(_answer(data)):
+                                    with watch.held():
+                                        yield self._shows(said_event)
+                                usage = _usage(data.get("usage"))
+                                if usage.total:
+                                    self._spends(usage)
+                                    costing = costing + usage
+                            elif kind == "tool/call":
+                                # What it said before reaching for something is what says why
+                                # it reached, so the answer so far goes out ahead of the call.
+                                # The one being streamed, rather than whichever step this call
+                                # names: a call that named none would otherwise flush an
+                                # answer nobody is writing, and the words would come out after
+                                # the call.
+                                for said_event in saying.upto():
+                                    with watch.held():
+                                        yield self._shows(said_event)
+                                name = str(data.get("name") or "tool")
+                                about = str(data.get("arguments") or "")
+                                with watch.held():
+                                    yield self._shows(
+                                        Event(
+                                            kind="tool",
+                                            text=f"{name} {about}".rstrip(),
+                                        )
+                                    )
+                            elif kind == "turn/end":
+                                reason = _mapping(data.get("reason"))
+                        elif (
+                            method == "session.status"
+                            and payload.get("sessionId") == session_id
+                            and payload.get("status") == "idle"
+                        ):
+                            break
 
             # A runtime that fell idle without closing its last message still said what it
             # said, and words held back for a boundary that never came would be swallowed.

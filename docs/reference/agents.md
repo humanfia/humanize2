@@ -143,6 +143,66 @@ process, a Codex server, a DeepSeek Harness runtime — was started as the accou
 so it is let
 go of as the agent moves and the next turn opens one as whoever the agent now is.
 
+## When a CLI stops answering
+
+The two sections above are about turns that **fail**. A third thing can happen, and until
+there was a watchdog it was the worst of them: the CLI is still running, still holding its
+stream open, and never going to say another word. Nothing fails, so nothing is retried. The
+turn waits — for as long as anybody leaves the flow running.
+
+Every read a turn blocks on now runs under a clock. It restarts whenever the backend says
+anything at all — a token of reasoning, a tool call, a line of protocol nobody shows — so what
+keeps a turn alive is that it is talking, not that it is finishing quickly.
+
+When the clock runs out, a ladder is climbed, gentlest first:
+
+1. **Look.** A model thinking and a process spinning both say nothing. What tells them apart
+   is the machine: a process burning CPU, itself or under something it started, is given more
+   time — a turn that has been running `pytest` for twenty minutes is working. A process that
+   is suspended, defunct or gone is not, and gets none.
+2. **Ask it to stop.** Where the backend has somewhere to be told, the turn is interrupted,
+   saying why, and the conversation is untouched. A backend that takes its whole prompt up
+   front has nothing listening, and the ladder goes straight on rather than waiting on a
+   message it never sent.
+3. **Put the transport down.** The process is signalled, everything it started with it. For a
+   backend whose turns run on an app server shared by every conversation with that agent —
+   codex, kimi, zcode — the server goes instead, which ends its other turns too. That is said
+   before it happens.
+4. **Kill what is left**, and wait on it, so nothing is left running and nothing is left in
+   the process table.
+
+Every rung says so on the stream the turn is read from, the way a retry and a fallback do, so
+a flow watching its agent sees the intervention rather than a silent stall:
+
+```
+claude is idle and has said nothing for 903s
+claude cannot be interrupted, so its transport goes instead
+claude is not answering; ending it; 4e0d…c1 is picked back up on the next try
+```
+
+The clock stops while the turn is waiting on **you** rather than on its backend. A permission
+prompt somebody takes twenty minutes to answer is not silence a CLI is responsible for, and
+neither is a watcher or a hook that pauses over an event.
+
+The turn then fails, with what actually happened rather than with `exit status -9`. It is an
+ordinary failed turn — a `subprocess.CalledProcessError`, not a stop and not an
+`Unrecoverable` — so [the retries](#when-an-account-goes-down) take it, against the same
+conversation: the id is the backend's own, and the next try resumes it.
+
+How long the clock runs is a fact about the CLI, and it is **generous**: a quarter of an hour
+of complete silence by default, less only for the DeepSeek Harness, whose SDK already bounds
+every request it makes. A window short enough to catch a wedge quickly is a window that kills
+healthy turns, and a wedge noticed late costs the time it was wedged where a healthy turn shot
+costs the work.
+
+Override it for a machine where the default is wrong — a container that suspends, a gateway
+that queues for an hour:
+
+```sh
+HUMANIZE_WATCHDOG=3600 hmz exec -f rlar -a claude/claude-opus-5:high "…"
+HUMANIZE_WATCHDOG=0    hmz exec -f rlar -a claude/claude-opus-5:high "…"   # no watchdog
+```
+
 ## A CLI of your own
 
 Any coding agent that speaks the [Agent Client Protocol](https://agentclientprotocol.com) can

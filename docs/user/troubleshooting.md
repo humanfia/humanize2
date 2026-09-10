@@ -217,6 +217,37 @@ See [what each backend can do](/reference/agents#what-each-backend-can-do).
 You called `interject` on a backend that *can* be talked to, but no process is up to hear it.
 Open the session with a turn first.
 
+### `the watchdog stopped this turn: … has said nothing for …`
+
+The CLI was still running and had stopped saying anything, so the turn was ended rather than
+waited on. It is a failed turn like any other: the conversation is untouched, and the retries
+and fallbacks written down for that place take it against the same session. Nothing has to be
+done unless it keeps happening.
+
+If it keeps happening, the run says which rung it got to and what it saw — `is idle`, `is
+stopped`, `is gone`, `is still working` — on the stream you are watching the agent on. `is
+gone` means the CLI exited without ending the turn, which is a crash to look for in that CLI's
+own log; `is stopped` means something suspended it; `is idle` means it was waiting on
+something that never came back.
+
+### A healthy turn was killed for thinking too long
+
+The default window is a quarter of an hour of **complete** silence — no reasoning, no tool
+call, no line of protocol — which no ordinary turn reaches. If yours does, say so:
+
+```sh
+HUMANIZE_WATCHDOG=3600 hmz exec -f rlar -a claude/claude-opus-5:high "…"
+```
+
+`HUMANIZE_WATCHDOG=0` turns the watchdog off entirely. See
+[when a CLI stops answering](/reference/agents#when-a-cli-stops-answering).
+
+### `NotImplementedError: … cannot be interrupted: …`
+
+That backend takes a turn's whole prompt up front and runs it as one command, so there is
+nothing listening to be told to stop. Nothing is wrong: whatever asked goes on to what it does
+about a turn that cannot be asked — the watchdog puts the process down instead.
+
 ### `NotImplementedError: … has no goal feature`
 
 `pursue` is the backend's own goal feature, not a prompt asking for one. `suppress=True` does
